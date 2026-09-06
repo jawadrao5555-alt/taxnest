@@ -185,6 +185,12 @@ class PosAddonService
             if (in_array($code, $taken, true)) {
                 continue;
             }
+            // Not for this kind of business (Task 1582)? Then it is hidden,
+            // not for sale — the billing page must never upsell a consultant
+            // delivery riders.
+            if (!PosFeatureService::moduleRelevant($company, $addon['gate'])) {
+                continue;
+            }
             // Already included in the package? Then there is nothing to sell.
             if (PosFeatureService::planAllows($company, $addon['gate'])) {
                 continue;

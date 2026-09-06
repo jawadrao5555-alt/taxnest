@@ -25,6 +25,9 @@ class TutorialVideo extends Model
         'slug', 'product', 'title', 'description', 'video_url', 'category',
         'required_feature', 'min_role', 'sort', 'is_published', 'show_public',
         'duration_seconds', 'controls_applied',
+        // Task 1582: category family this video is for (all / food_service /
+        // goods_retail / pharmacy / services). Legacy rows read as 'all'.
+        'audience_family',
     ];
 
     protected $casts = [
@@ -137,6 +140,22 @@ class TutorialVideo extends Model
         return $query->where('is_published', true);
     }
 
+    /** Category-family audience (Task 1582). Blank / missing column = 'all'. */
+    public function getAudienceFamilyAttribute($value): string
+    {
+        $v = is_string($value) ? trim($value) : '';
+        return in_array($v, \App\Services\PosCategoryProfiles::AUDIENCE_FAMILIES, true) ? $v : 'all';
+    }
+
+    public function reachesFamily(?Company $company): bool
+    {
+        try {
+            return PosFeatureService::audienceMatches($company, $this->audience_family);
+        } catch (\Throwable $e) {
+            return true;
+        }
+    }
+
     /** Landing-page set: published AND super-admin allowed. */
     public function scopePublicVisible($query)
     {
@@ -151,6 +170,11 @@ class TutorialVideo extends Model
      */
     public function visibleToCompany(?Company $company): bool
     {
+        // Category family first (Task 1582): a food-service tutorial never
+        // reaches a pharmacy, whatever its plan says. Blank/unknown = 'all'.
+        if ($company && !$this->reachesFamily($company)) {
+            return false;
+        }
         $gate = trim((string) $this->required_feature);
         if ($gate === '') {
             return true;
@@ -161,6 +185,11 @@ class TutorialVideo extends Model
         try {
             if ($gate === 'restaurant' || $gate === 'restaurant_enabled') {
                 return PosFeatureService::restaurantAllowed($company);
+            }
+            // Task 1582: a module FLAG key (barcode, inventory, recipes …) is
+            // answered by the relevance-aware availability predicate.
+            if (in_array($gate, PosFeatureService::ALL_FLAGS, true)) {
+                return PosFeatureService::moduleAvailable($company, $gate);
             }
 
             return PosFeatureService::planAllows($company, $gate);

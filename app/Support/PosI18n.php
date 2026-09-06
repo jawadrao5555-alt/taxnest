@@ -105,7 +105,7 @@ final class PosI18n
      *
      * @return array<string, string>
      */
-    public static function baked(string $view): array
+    public static function baked(string $view, array $replace = []): array
     {
         $bladePath = resource_path('views/' . $view . '.blade.php');
         $all = __('pos');
@@ -124,7 +124,34 @@ final class PosI18n
                 }
             }
         }
+        // Category vocabulary (Task 1582): fill ":item / :example ..." style
+        // placeholders with the shop's own words so window.TXT never says
+        // "burger" to a pharmacy. Same :key / :Key / :KEY semantics as __().
+        // Only strings are touched; nested arrays are baked verbatim.
+        if ($replace) {
+            foreach ($out as $k => $v) {
+                if (is_string($v) && str_contains($v, ':')) {
+                    $out[$k] = self::fill($v, $replace);
+                }
+            }
+        }
         return $out;
+    }
+
+    /** Laravel-style placeholder fill (":key", ":Key", ":KEY"), dependency-free. */
+    public static function fill(string $line, array $replace): string
+    {
+        // Longer keys first so ":items" is never eaten by ":item".
+        uksort($replace, fn ($a, $b) => strlen((string) $b) <=> strlen((string) $a));
+        foreach ($replace as $key => $value) {
+            $value = (string) $value;
+            $line = str_replace(
+                [':' . $key, ':' . ucfirst($key), ':' . strtoupper($key)],
+                [$value, ucfirst($value), strtoupper($value)],
+                $line
+            );
+        }
+        return $line;
     }
 
     /**

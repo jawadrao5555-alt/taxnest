@@ -29,6 +29,15 @@ trait FbrPlanGate
             return null;
         }
         $company = Company::find((int) $user->company_id);
+        // Category profile (Task 1582): not-for-this-business = hidden, so the
+        // URL fails like a hidden module (dashboard + friendly note), never as
+        // a billing upsell.
+        if ($company && !PosFeatureService::moduleRelevant($company, $planColumn)) {
+            if (request()->expectsJson()) {
+                abort(403, __('pos.feature_not_for_business'));
+            }
+            return redirect('/fbr-pos/dashboard')->with('error', __('pos.feature_not_for_business'));
+        }
         if (!PosFeatureService::planAllows($company, $planColumn)) {
             if (request()->expectsJson()) {
                 abort(403, __('pos.plan_locked_feature'));

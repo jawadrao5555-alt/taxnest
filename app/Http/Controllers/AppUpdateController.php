@@ -59,6 +59,7 @@ class AppUpdateController extends Controller
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             // Audience (Aug 2026): 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
             'audience' => 'nullable|in:pos,fbr_pos,all',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
             // Type (Task 1286): 'feature' = Naya Feature, 'improvement' = Behtari / Masla Hal.
             'type' => 'nullable|in:feature,improvement',
         ]);
@@ -80,7 +81,9 @@ class AppUpdateController extends Controller
         ] + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')
             ? ['is_featured' => $request->boolean('is_featured')] : [])
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')
-            ? ['type' => $request->input('type') ?: 'improvement'] : []));
+            ? ['type' => $request->input('type') ?: 'improvement'] : [])
+          + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')
+            ? ['audience_family' => $request->input('audience_family', 'all')] : []));
 
         return redirect('/admin/app-updates')->with('success', 'Update published. POS users will see it on their next page load.');
     }
@@ -94,6 +97,7 @@ class AppUpdateController extends Controller
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'audience' => 'nullable|in:pos,fbr_pos,all',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
             'type' => 'nullable|in:feature,improvement',
         ]);
 
@@ -108,6 +112,9 @@ class AppUpdateController extends Controller
         ];
         if ($request->filled('audience')) {
             $data['audience'] = $request->input('audience');
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')) {
+            $data['audience_family'] = $request->input('audience_family', 'all');
         }
         // Unchecked checkbox = false (edit form always sends the field's state).
         if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')) {

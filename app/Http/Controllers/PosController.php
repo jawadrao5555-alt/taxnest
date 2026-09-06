@@ -2899,7 +2899,16 @@ class PosController extends Controller
         // this view. The business category decides which regulator the shop
         // files under, so it is a SaaS-admin-only decision — the page shows the
         // shop its own type and nothing else about any other type.
-        $allFlags = PosFeatureService::ALL_FLAGS;
+        $panelFlags = PosFeatureService::flagsForPanel('pos');
+        $categoryFlags = array_values(array_intersect(
+            PosFeatureService::categoryModules($company),
+            $panelFlags
+        ));
+        $addedFlags = array_values(array_intersect(
+            array_keys(PosFeatureService::extraModules($company)),
+            $panelFlags
+        ));
+        $allFlags = array_values(array_unique(array_merge($categoryFlags, $addedFlags)));
         // First-time setup → wizard shows welcome banner + opens on Step 1.
         $isFirstTime = $request->boolean('welcome') || !($company->pos_setup_completed ?? false);
         // Global defaults shown as placeholders in the Sales Tax Rates card.
@@ -2913,7 +2922,7 @@ class PosController extends Controller
         // (will lapse); trial-ended = flags were on but the trial expired.
         $restaurantAccessSource = PosFeatureService::restaurantAccessSource($company);
         $restaurantTrialEnded = PosFeatureService::restaurantLostToTrialExpiry($company);
-        return view('pos.feature-settings', compact('company', 'features', 'allFlags', 'isFirstTime', 'globalTaxRates', 'restaurantAllowed', 'restaurantAccessSource', 'restaurantTrialEnded'));
+        return view('pos.feature-settings', compact('company', 'features', 'allFlags', 'categoryFlags', 'addedFlags', 'isFirstTime', 'globalTaxRates', 'restaurantAllowed', 'restaurantAccessSource', 'restaurantTrialEnded'));
     }
 
     public function updateFeatureSettings(Request $request)
@@ -7704,6 +7713,15 @@ class PosController extends Controller
     private function planGate(string $planColumn)
     {
         $company = Company::find(app('currentCompanyId'));
+        // Category profile (Task 1582): a module that does not belong to this
+        // kind of shop is hidden, so it must fail like a hidden module — back
+        // to the dashboard with a friendly note, never to the billing upsell.
+        if ($company && !PosFeatureService::moduleRelevant($company, $planColumn)) {
+            if (request()->expectsJson()) {
+                abort(403, __('pos.feature_not_for_business'));
+            }
+            return redirect('/pos/dashboard')->with('error', __('pos.feature_not_for_business'));
+        }
         if (!PosFeatureService::planAllows($company, $planColumn)) {
             if (request()->expectsJson()) {
                 abort(403, __('pos.plan_locked_feature'));
@@ -10287,11 +10305,14 @@ class PosController extends Controller
     // Sample rows shown in the blank template. importProducts() silently skips a row
     // that still matches one of these EXACTLY (name+price+sku) so an untouched sample
     // never becomes a real product in the shop's list.
-    private const IMPORT_SAMPLE_ROWS = [
-        ['Chicken Biryani', 450.0, 'CB-001'],
-        ['Pepsi 500ml', 120.0, 'PEP-500'],
-        ['Naan', 30.0, 'NAN-001'],
-    ];
+    private function importSampleRows(?Company $company): array
+    {
+        return array_map(
+            fn (array $row, int $i) => [$row[0], (float) $row[2], 'SAMPLE-' . str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT)],
+            \App\Support\PosVocabulary::for($company)['import_rows'],
+            array_keys(\App\Support\PosVocabulary::for($company)['import_rows'])
+        );
+    }
 
     public function downloadProductTemplate()
     {
@@ -10301,6 +10322,7 @@ class PosController extends Controller
             return $r;
         }
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
         $existingProducts = PosProduct::where('company_id', $companyId)->orderBy('name')->get();
 
         // Real .xlsx (not CSV) — shopkeepers edit in Excel and upload the SAME file
@@ -10326,12 +10348,9 @@ class PosController extends Controller
 
         $rowNum = 2;
         if ($existingProducts->isEmpty()) {
-            $samples = [
-                ['Chicken Biryani', 450, 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', 16, 'NOS', 'No'],
-                ['Pepsi 500ml', 120, 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', 5, 'NOS', 'No'],
-                ['Naan', 30, 'Tandoori naan', 'Food', 'NAN-001', '', 0, 'NOS', 'Yes'],
-            ];
-            foreach ($samples as $s) {
+            foreach ($this->importSampleRows($company) as $i => $sample) {
+                $vocabRow = \App\Support\PosVocabulary::for($company)['import_rows'][$i];
+                $s = [$sample[0], $sample[1], '', $vocabRow[1], $sample[2], '', 0, $vocabRow[3], 'No'];
                 // Pad to 10 elements (9=exempt, 10=third_schedule)
                 if (count($s) < 10) { $s[] = 'No'; }
                 $this->writeProductRow($sheet, $rowNum++, $s);
@@ -10389,6 +10408,7 @@ class PosController extends Controller
             return $r;
         }
         $companyId = app('currentCompanyId');
+        $importCompany = Company::find($companyId);
 
         // Subscription access gate (Task 361 review): this route deliberately has
         // no plan.limit middleware (an at-cap shop must still be able to run an
@@ -10554,7 +10574,7 @@ class PosController extends Controller
             }
 
             // Untouched template sample rows never become real products.
-            foreach (self::IMPORT_SAMPLE_ROWS as $s) {
+            foreach ($this->importSampleRows($importCompany) as $s) {
                 if (strcasecmp($name, $s[0]) === 0 && abs($price - $s[1]) < 0.001 && strcasecmp((string) $sku, $s[2]) === 0) {
                     $samplesSkipped++;
                     continue 2;
@@ -12573,12 +12593,17 @@ class PosController extends Controller
                 );
             }
         }
+        $addonCatalog = array_filter(
+            \App\Services\PosAddonPricingService::catalog(),
+            fn (array $addon) => PosFeatureService::moduleRelevant($company, (string) ($addon['gate'] ?? ''))
+        );
+        $relevantAddonCodes = array_keys($addonCatalog);
         $addons = [
             'eligibility' => \App\Services\PosAddonService::purchaseEligibility($company),
-            'catalog' => \App\Services\PosAddonPricingService::catalog(),
+            'catalog' => $addonCatalog,
             'purchasable' => $addonPurchasable,
-            'active' => \App\Services\PosAddonService::activeCodes($company),
-            'pending' => \App\Services\PosAddonService::pendingCodes($company),
+            'active' => array_values(array_intersect(\App\Services\PosAddonService::activeCodes($company), $relevantAddonCodes)),
+            'pending' => array_values(array_intersect(\App\Services\PosAddonService::pendingCodes($company), $relevantAddonCodes)),
             'preselected' => array_values(array_intersect($rememberedAddonQuote['codes'], $addonPurchasable)),
             'preselected_cycle' => $rememberedAddonQuote['cycle'],
             'quotes' => $addonQuotes,

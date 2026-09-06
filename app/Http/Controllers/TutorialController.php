@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\TutorialVideo;
+use App\Services\PosFeatureService;
 use Illuminate\Support\Facades\App;
 
 /**
@@ -72,7 +73,7 @@ class TutorialController extends Controller
             ->values();
 
         return view('pos.tutorials', [
-            'groups' => TutorialVideo::groupedFrom($videos),
+            'groups' => $this->relevantGroups(TutorialVideo::groupedFrom($videos), $company),
         ]);
     }
 
@@ -97,7 +98,24 @@ class TutorialController extends Controller
             ->values();
 
         return view('fbr-pos.tutorials', [
-            'groups' => TutorialVideo::groupedFrom($videos),
+            'groups' => $this->relevantGroups(TutorialVideo::groupedFrom($videos), $company),
         ]);
+    }
+
+    private function relevantGroups(array $groups, ?Company $company): array
+    {
+        $moduleByCategory = [
+            'restaurant' => 'kitchen',
+            'riders' => 'riders_enabled',
+            'deals' => 'deals_enabled',
+        ];
+
+        return array_filter(
+            $groups,
+            fn (array $group, string $key) => !empty($group['videos'])
+                && (!isset($moduleByCategory[$key])
+                    || PosFeatureService::moduleRelevant($company, $moduleByCategory[$key])),
+            ARRAY_FILTER_USE_BOTH
+        );
     }
 }

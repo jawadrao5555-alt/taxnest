@@ -509,12 +509,23 @@ class MedicineCatalogueSyncService
         });
     }
 
+    /**
+     * Dismiss one notice. The transition is a single conditional UPDATE
+     * (status must still be pending) so a dismiss racing an apply from
+     * another tab can never overwrite an applied notice — the product was
+     * repriced, and the notice must keep saying so. Audit only on success.
+     */
     public function dismissNotice(MedicinePriceNotice $notice, int $userId): bool
     {
-        if ($notice->status !== MedicinePriceNotice::STATUS_PENDING) {
+        $moved = MedicinePriceNotice::whereKey($notice->id)
+            ->where('company_id', $notice->company_id)
+            ->where('status', MedicinePriceNotice::STATUS_PENDING)
+            ->update(['status' => MedicinePriceNotice::STATUS_DISMISSED, 'acted_by' => $userId, 'acted_at' => now(), 'updated_at' => now()]);
+        // pending → dismissed always changes the row, so MySQL's "changed rows"
+        // and SQLite's "matched rows" agree here (see db-affected-rows-lease).
+        if ($moved !== 1) {
             return false;
         }
-        $notice->forceFill(['status' => MedicinePriceNotice::STATUS_DISMISSED, 'acted_by' => $userId, 'acted_at' => now()])->save();
         try {
             AuditLogService::log('medicine_mrp_notice_dismissed', 'product', $notice->product_id, null,
                 ['notice_id' => $notice->id, 'old_mrp' => $notice->old_mrp, 'new_mrp' => $notice->new_mrp],

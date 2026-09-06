@@ -584,4 +584,54 @@ class MedicineCatalogueTest extends TestCase
         $this->assertSame(0, $res->getData(true)['remaining']);
         $this->assertSame(1, Product::where('company_id', self::COMPANY)->count(), 'cap never overspent');
     }
+
+    /**
+     * Interleaving: tab A opens the notice (still pending), tab B applies it
+     * (product repriced), then tab A's dismiss arrives. The stale dismiss
+     * must lose — the notice stays "applied", no dismissal audit row, and
+     * the controller answers 409 because the DB transition was conditional.
+     */
+    public function test_stale_dismiss_cannot_overwrite_an_applied_notice(): void
+    {
+        $svc = app(MedicineCatalogueSyncService::class);
+        $rows = $this->fixtureRows();
+        $svc->ingestPage($rows);
+        $owner = $this->owner();
+        $e1 = MedicineCatalogueEntry::whereNotNull('mrp')->orderBy('id')->first();
+        $this->controller()->add($this->jsonPost('/fbr-pos/pharmacy/catalogue/add', ['ids' => [$e1->id]]));
+        $p1 = Product::where('medicine_catalogue_id', $e1->id)->firstOrFail();
+        $svc->ingestPage(collect($rows)->map(function ($r) use ($e1) {
+            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) $r['mrp'] = (float) $r['mrp'] + 20;
+            return $r;
+        })->all());
+        $notice = MedicinePriceNotice::where('product_id', $p1->id)->where('status', 'pending')->firstOrFail();
+
+        // Tab A has the notice in hand (pending). Tab B applies meanwhile.
+        $staleCopy = MedicinePriceNotice::find($notice->id);
+        $this->assertTrue($svc->applyNotice(MedicinePriceNotice::find($notice->id), $owner->id));
+        $this->assertEquals((float) $e1->mrp + 20, (float) $p1->fresh()->mrp);
+
+        // Tab A's dismiss with its stale (pending) copy.
+        $this->assertFalse($svc->dismissNotice($staleCopy, $owner->id));
+        $this->assertSame('applied', $notice->fresh()->status, 'a stale dismiss must never hide an applied reprice');
+        $this->assertSame(0, DB::table('audit_logs')->where('action', 'medicine_mrp_notice_dismissed')->count());
+        $this->assertSame(1, DB::table('audit_logs')->where('action', 'medicine_mrp_notice_applied')->count());
+
+        // Through the HTTP path the same race answers 409, not a fake "dismissed".
+        $res = $this->controller()->dismiss($this->jsonPost("/fbr-pos/pharmacy/price-updates/{$notice->id}/dismiss", []), $notice->id);
+        $this->assertSame(409, $res->getStatusCode());
+        $this->assertSame('applied', $notice->fresh()->status);
+
+        // Mirror image: a dismiss that wins first makes a later apply a no-op on the product.
+        $svc->ingestPage(collect($rows)->map(function ($r) use ($e1) {
+            if ($r['drap_reg_no'] === $e1->drap_reg_no && $r['pack_size'] === $e1->pack_size) $r['mrp'] = (float) $r['mrp'] + 25;
+            return $r;
+        })->all());
+        $n2 = MedicinePriceNotice::where('product_id', $p1->id)->where('status', 'pending')->firstOrFail();
+        $staleApply = MedicinePriceNotice::find($n2->id);
+        $this->assertTrue($svc->dismissNotice(MedicinePriceNotice::find($n2->id), $owner->id));
+        $this->assertFalse($svc->applyNotice($staleApply, $owner->id));
+        $this->assertSame('dismissed', $n2->fresh()->status);
+        $this->assertEquals((float) $e1->mrp + 20, (float) $p1->fresh()->mrp, 'product untouched after a dismissed notice');
+    }
 }

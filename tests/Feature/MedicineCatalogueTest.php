@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Pharmacy\DrapPriceIndexClient;
 use App\Services\Pharmacy\MedicineCatalogueSyncService;
 use App\Services\Pharmacy\MedicineCompositionParser;
+use App\Services\PlanLimitService;
 use App\Services\PosFeatureService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -105,6 +106,7 @@ class MedicineCatalogueTest extends TestCase
         });
 
         (require base_path('database/migrations/2026_11_20_100000_medicine_catalogue.php'))->up();
+        (require base_path('database/migrations/2026_11_21_100000_products_medicine_catalogue_unique.php'))->up();
 
         foreach ([self::COMPANY => 'Pharmacy Co', self::OTHER_COMPANY => 'Other Co'] as $id => $name) {
             DB::table('companies')->insert([
@@ -507,5 +509,79 @@ class MedicineCatalogueTest extends TestCase
         $this->assertSame('Mep-Med infusion 40 mg', FbrPosCatalogueController::productNameFor($e));
         $e = new MedicineCatalogueEntry(['brand_name' => 'Ceftro 1g', 'pack_size' => "1's"]);
         $this->assertSame('Ceftro 1g', FbrPosCatalogueController::productNameFor($e));
+    }
+
+    /**
+     * Concurrency contract of the picker's add endpoint: the duplicate check
+     * and the plan-cap check both run AFTER the company row is locked, so a
+     * rival writer that lands between "request arrives" and "lock acquired"
+     * is seen — no second linked copy, no overspent product cap — and the
+     * (company_id, medicine_catalogue_id) unique index stands behind it.
+     */
+    public function test_concurrent_adds_cannot_duplicate_a_link_or_overspend_the_product_cap(): void
+    {
+        app(MedicineCatalogueSyncService::class)->ingestPage($this->fixtureRows());
+        $this->owner();
+        $e1 = MedicineCatalogueEntry::whereNotNull('mrp')->orderBy('id')->first();
+        $e2 = MedicineCatalogueEntry::whereNotNull('mrp')->orderBy('id')->skip(1)->first();
+
+        // 1) The DB fence: a second linked copy is impossible even for a
+        //    writer that never takes the lock.
+        DB::table('products')->insert(['company_id' => self::COMPANY, 'name' => 'first', 'medicine_catalogue_id' => $e2->id, 'created_at' => now(), 'updated_at' => now()]);
+        try {
+            DB::table('products')->insert(['company_id' => self::COMPANY, 'name' => 'second', 'medicine_catalogue_id' => $e2->id, 'created_at' => now(), 'updated_at' => now()]);
+            $this->fail('unique (company_id, medicine_catalogue_id) must reject a second link');
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            // expected
+        }
+        // Another company may link the same catalogue row; NULL links repeat freely.
+        DB::table('products')->insert(['company_id' => self::OTHER_COMPANY, 'name' => 'theirs', 'medicine_catalogue_id' => $e2->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('products')->insert(['company_id' => self::COMPANY, 'name' => 'plain a', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('products')->insert(['company_id' => self::COMPANY, 'name' => 'plain b', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('products')->where('company_id', self::COMPANY)->delete();
+        DB::table('products')->where('company_id', self::OTHER_COMPANY)->delete();
+
+        // 2) A plan with room for exactly ONE more product.
+        Schema::create('pricing_plans', function (Blueprint $t) {
+            $t->id(); $t->string('name'); $t->string('product_type')->default('fbrpos');
+            $t->boolean('is_trial')->default(false); $t->integer('max_products')->nullable(); $t->timestamps();
+        });
+        Schema::create('subscriptions', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->unsignedBigInteger('pricing_plan_id')->nullable();
+            $t->boolean('active')->default(true); $t->string('override_type')->default('none');
+            $t->timestamp('override_until')->nullable(); $t->timestamps();
+        });
+        DB::table('pricing_plans')->insert(['id' => 1, 'name' => 'Tiny', 'product_type' => 'fbrpos', 'max_products' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('subscriptions')->insert(['company_id' => self::COMPANY, 'pricing_plan_id' => 1, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('companies')->where('id', self::COMPANY)->update(['is_internal_account' => false]);
+        $this->assertSame(1, PlanLimitService::remainingProductAllowance(self::COMPANY, 'fbr'));
+
+        // 3) The rival: the moment our request takes the company-row lock, a
+        //    second tab's add for the SAME row has just committed and used the
+        //    last slot. (SQLite has no FOR UPDATE, so the lock statement is the
+        //    plain single-row company SELECT inside the transaction.)
+        $fired = false;
+        DB::listen(function ($q) use (&$fired, $e1) {
+            if ($fired || !str_contains($q->sql, 'from "companies"') || !DB::transactionLevel()) {
+                return;
+            }
+            $fired = true;
+            DB::table('products')->insert(['company_id' => self::COMPANY, 'name' => 'rival tab', 'medicine_catalogue_id' => $e1->id, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        });
+
+        $res = $this->controller()->add($this->jsonPost('/fbr-pos/pharmacy/catalogue/add', ['ids' => [$e1->id]]));
+        $this->assertTrue($fired, 'the rival must have written while we held the lock');
+        $j = $res->getData(true);
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertCount(0, $j['created'], 'the rival copy is seen as "already", never re-created');
+        $this->assertSame('already', $j['skipped'][0]['reason']);
+        $this->assertSame(1, Product::where('company_id', self::COMPANY)->where('medicine_catalogue_id', $e1->id)->count());
+
+        // 4) Cap: the plan has no room left, so a DIFFERENT row is refused
+        //    with the quota answer — the pre-lock world never gets to decide.
+        $res = $this->controller()->add($this->jsonPost('/fbr-pos/pharmacy/catalogue/add', ['ids' => [$e2->id]]));
+        $this->assertSame(422, $res->getStatusCode());
+        $this->assertSame(0, $res->getData(true)['remaining']);
+        $this->assertSame(1, Product::where('company_id', self::COMPANY)->count(), 'cap never overspent');
     }
 }

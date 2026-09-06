@@ -358,10 +358,14 @@
                         <div>
                             <div class="flex items-center gap-2 mb-1.5">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/20 backdrop-blur text-[10px] font-bold uppercase tracking-wider">🚀 PRA POS Universal v2</span>
-                                @if($company->business_category || $company->pos_type)
-                                    {{-- Resolved, not raw: a pre-split shop has only a pos_type and would otherwise show no business at all. --}}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-400/30 backdrop-blur text-[10px] font-bold uppercase tracking-wider">{{ \App\Services\PosFeatureService::presetMeta(\App\Services\PosFeatureService::resolveCategory($company))['label'] }}</span>
-                                @endif
+                                @php
+                                    $profileCategory = \App\Services\PosFeatureService::profileCategory($company);
+                                    $profileFamily = \App\Services\PosFeatureService::familyFor($company);
+                                    $profileExtraCount = count(\App\Services\PosFeatureService::extraModules($company));
+                                @endphp
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-400/30 backdrop-blur text-[10px] font-bold uppercase tracking-wider">{{ \App\Support\PosVocabulary::categoryLabel($profileCategory) }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-white/20 backdrop-blur text-[10px] font-bold uppercase tracking-wider">{{ \App\Support\PosVocabulary::audienceOptions()[$profileFamily] ?? ucfirst(str_replace('_', ' ', $profileFamily)) }}</span>
+                                <a href="/admin/company/{{ $company->id }}/pos-features" class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-400/30 hover:bg-amber-400/40 backdrop-blur text-[10px] font-bold uppercase tracking-wider">{{ $profileExtraCount }} {{ \Illuminate\Support\Str::plural('extra', $profileExtraCount) }}</a>
                             </div>
                             <h4 class="text-lg font-extrabold mb-1">Manage POS Features for this Company</h4>
                             <p class="text-xs text-white/85 max-w-xl">Override the company's POS configuration — switch industry preset, toggle modules (KOT, KDS, recipes, inventory, etc.), set UI density. All changes are audit-logged.</p>

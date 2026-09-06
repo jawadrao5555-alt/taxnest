@@ -667,13 +667,18 @@
         $pd = $pendingDeliveries ?? (object) ['active' => false, 'count' => 0, 'amount' => 0, 'assigned' => 0, 'unassigned' => 0, 'khata_count' => 0, 'khata_amount' => 0];
         $clProv = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry','finalize'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
         $clPendingLocal = ($localWash->prov_count ?? 0) + ($localWash->final_count ?? 0);
+        $dcRestaurantRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'tables')
+            || \App\Services\PosFeatureService::moduleRelevant($company, 'kitchen');
+        $dcRidersRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'riders_enabled');
+        $dcKhataRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'khata_enabled');
         $clRows = [
-            ['count' => $openOrders ?? 0, 'block' => true],
-            ['count' => $pd->count, 'block' => true],
+            ['count' => $dcRestaurantRelevant ? ($openOrders ?? 0) : 0, 'block' => true],
+            ['count' => $dcRidersRelevant ? $pd->count : 0, 'block' => true],
             ['count' => $clPendingLocal, 'block' => false],
-            ['count' => $pd->khata_count, 'block' => false],
+            ['count' => ($dcRidersRelevant && $dcKhataRelevant) ? $pd->khata_count : 0, 'block' => false],
         ];
-        $clBlocked = ($openOrders ?? 0) > 0 || $pd->count > 0;
+        $clBlocked = ($dcRestaurantRelevant && ($openOrders ?? 0) > 0)
+            || ($dcRidersRelevant && $pd->count > 0);
         // Cancel button = the SAME verdict the sale-screen board uses, so the
         // checklist never shows a button the endpoint would 403.
         $dcCanCancelOrder = auth('pos')->user() && \App\Services\PosAccessService::orderCancelAllowed(auth('pos')->user());
@@ -683,7 +688,7 @@
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.dc_checklist_hint') }}</p>
         <ul class="space-y-2">
             {{-- 1. Open restaurant orders — BLOCKER (restaurant-mode shops only) --}}
-            @if(($company->restaurant_mode ?? false) || ($openOrders ?? 0) > 0)
+            @if($dcRestaurantRelevant)
             <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ ($openOrders ?? 0) > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
                 <span class="font-bold {{ ($openOrders ?? 0) > 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ ($openOrders ?? 0) > 0 ? '✗' : '✓' }}</span>
                 <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_open_orders') }}</span>
@@ -726,7 +731,7 @@
             </li>
             @endif
             {{-- 2. Undispatched delivery bills — BLOCKER (ZFC waqia; delivery-feature shops only) --}}
-            @if($pd->active)
+            @if($dcRidersRelevant && $pd->active)
             <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ $pd->count > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
                 <span class="font-bold {{ $pd->count > 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ $pd->count > 0 ? '✗' : '✓' }}</span>
                 <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_undispatched') }}</span>
@@ -791,7 +796,7 @@
                 @endif
             </li>
             {{-- 4. Rider unsettled cash khata — WARNING ONLY, never blocks --}}
-            @if($pd->active)
+            @if($dcRidersRelevant && $dcKhataRelevant && $pd->active)
             <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ $pd->khata_count > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
                 <span class="font-bold {{ $pd->khata_count > 0 ? 'text-amber-600' : 'text-emerald-600' }}">{{ $pd->khata_count > 0 ? '!' : '✓' }}</span>
                 <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_rider_khata') }}</span>
@@ -1445,7 +1450,7 @@
     {{-- Delivery Riders (Jul 2026): rider day detail stored on the closed report.
          Same placement logic as the wash summary — shows even when PRA sales are zero. --}}
     {{-- Task 1197: frozen rider recon is company-wide — hidden from isolated cashiers. --}}
-    @if($existingReport && !($dcIso ?? false) && is_array($existingReport->rider_summary) && !empty($existingReport->rider_summary['riders']))
+    @if($existingReport && \App\Services\PosFeatureService::moduleRelevant($company, 'riders_enabled') && !($dcIso ?? false) && is_array($existingReport->rider_summary) && !empty($existingReport->rider_summary['riders']))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.delivery_riders_day_summary') }}</h3>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">

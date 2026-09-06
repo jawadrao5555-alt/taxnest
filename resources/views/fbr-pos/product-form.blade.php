@@ -7,6 +7,9 @@
     $sticky = ($sticky ?? []) ?: [];
     $suppliers = $suppliers ?? collect();
     $inventoryAllowed = (bool) ($inventoryAllowed ?? false);
+    $inventoryRelevant = \App\Services\PosFeatureService::moduleRelevant($company ?? null, 'inventory');
+    $barcodeRelevant = \App\Services\PosFeatureService::moduleRelevant($company ?? null, 'barcode');
+    $inventoryAllowed = $inventoryAllowed && $inventoryRelevant;
 
     $initMode = $isEdit ? 'single' : (string) old('entry_mode', $sticky['entry_mode'] ?? 'single');
     if (!in_array($initMode, ['single', 'multi'], true)) { $initMode = 'single'; }
@@ -18,7 +21,8 @@
     $initTaxRate = $initTaxRate === null || $initTaxRate === '' ? 18 : $initTaxRate;
     $initThird = old('is_third_schedule', $isEdit ? ($product->is_third_schedule ?? false) : ($sticky['is_third_schedule'] ?? false));
     $initPriceEditable = old('is_price_editable', $isEdit ? $product->is_price_editable : ($sticky['is_price_editable'] ?? true));
-    $currentUom = old('uom', $product->uom ?? ($sticky['uom'] ?? 'U'));
+    $vocab = \App\Support\PosVocabulary::for($company ?? null);
+    $currentUom = old('uom', $product->uom ?? ($sticky['uom'] ?? $vocab['unit']));
     $stickySupplierId = (string) old('supplier_id', $sticky['supplier_id'] ?? '');
 
     // Multi-mode rows: re-fill every row from old input after a validation
@@ -103,8 +107,12 @@
                     <div class="col-span-4">{{ __('pos.product_name_label') }} *</div>
                     <div class="col-span-2">{{ __('pos.price_pkr') }} *</div>
                     <div class="col-span-2" x-show="thirdSchedule" x-cloak>{{ __('pos.mrp_label') }} *</div>
+                    @if($barcodeRelevant)
                     <div class="col-span-{{ $inventoryAllowed ? 2 : 4 }}">{{ __('pos.barcode_label') }}</div>
+                    @endif
+                    @if($inventoryRelevant)
                     <div class="col-span-2">{{ __('pos.fbr_pf_opening_stock') }}</div>
+                    @endif
                     @if($inventoryAllowed)
                     <div class="col-span-2">{{ __('pos.stock_kharid_rate_ph') }}</div>
                     @endif
@@ -131,16 +139,20 @@
                                    placeholder="{{ __('pos.mrp_label') }} *"
                                    class="w-full rounded-lg border-blue-300 dark:border-blue-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
+                        @if($barcodeRelevant)
                         <div class="md:col-span-{{ $inventoryAllowed ? 2 : 4 }}">
                             <input type="text" :name="`rows[${i}][barcode]`" x-model="row.barcode" maxlength="64" :disabled="mode !== 'multi'"
                                    placeholder="{{ __('pos.barcode_label') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm font-mono focus:ring-blue-500 focus:border-blue-500">
                         </div>
+                        @endif
+                        @if($inventoryRelevant)
                         <div class="md:col-span-2">
                             <input type="number" :name="`rows[${i}][opening_stock]`" x-model="row.opening_stock" step="0.001" min="0" :disabled="mode !== 'multi'"
                                    placeholder="{{ __('pos.fbr_pf_opening_stock') }}"
                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
+                        @endif
                         @if($inventoryAllowed)
                         <div class="md:col-span-2">
                             <input type="number" :name="`rows[${i}][unit_cost]`" x-model="row.unit_cost" step="0.01" min="0" :disabled="mode !== 'multi'"
@@ -172,7 +184,7 @@
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.product_name_label') }} <span class="text-red-500">*</span></label>
                     <input type="text" name="name" value="{{ old('name', $product->name ?? request('name', '')) }}" required :disabled="mode === 'multi'"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="{{ ($pharmacyMode ?? false) ? __('pos.ph_medicine_name_ph') : __('pos.ph_chicken_burger') }}">
+                        placeholder="{{ ($pharmacyMode ?? false) ? __('pos.ph_medicine_name_ph') : \App\Support\PosVocabulary::t('ph_chicken_burger') }}">
                 </div>
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.price_pkr') }} <span class="text-red-500">*</span></label>
@@ -224,6 +236,8 @@
                                 'ROL' => 'Roll',
                                 'SET' => 'Set',
                             ];
+                            $preferredUoms = array_flip($vocab['units']);
+                            uksort($uomList, fn ($a, $b) => ($preferredUoms[$a] ?? PHP_INT_MAX) <=> ($preferredUoms[$b] ?? PHP_INT_MAX));
                         @endphp
                         @foreach($uomList as $code => $label)
                             <option value="{{ $code }}" {{ $currentUom == $code ? 'selected' : '' }}>{{ $code }} — {{ $label }}</option>
@@ -319,10 +333,10 @@
                         </div>
                     </div>
                 </div>
-                @endif
                 {{-- Peti (Wholesale) Rate (Task 1414): pieces-per-peti. Single mode
                      only (multi-entry rows share defaults; peti is per-product).
                      Blank ⇒ this product stays out of the peti feature. --}}
+                @if(\App\Services\PosFeatureService::moduleRelevant($company ?? null, 'bulk_pricing'))
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_peti_pack_size_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
                     <input type="number" name="pack_size" min="1" step="1" x-model="packSize" :disabled="mode === 'multi'"
@@ -330,12 +344,16 @@
                         placeholder="24">
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.fbr_peti_pack_size_hint') }}</p>
                 </div>
+                @endif
+                @endif
+                @if($barcodeRelevant)
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.barcode_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_ean_upc_optional') }}</span></label>
                     <input type="text" name="barcode" value="{{ old('barcode', $product->barcode ?? '') }}" :disabled="mode === 'multi'"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
                         placeholder="{{ __('pos.ph_scan_barcode') }}">
                 </div>
+                @endif
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.sku_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_internal_optional') }}</span></label>
                     <input type="text" name="sku" value="{{ old('sku', $product->sku ?? '') }}" :disabled="mode === 'multi'"
@@ -403,7 +421,7 @@
                     <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">{{ __('pos.stock_edit_pick_branch') }}</p>
                 </div>
                 @endif
-                @unless($isEdit)
+                @if(!$isEdit && $inventoryRelevant)
                 {{-- Edit mode handles stock in its own adjustment card (Task 1276) --}}
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_pf_opening_stock') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
@@ -411,7 +429,7 @@
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         placeholder="0">
                 </div>
-                @endunless
+                @endif
                 @if(!$isEdit && $inventoryAllowed)
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.stock_kharid_rate_ph') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
@@ -625,7 +643,7 @@
         </div>
         @endif
 
-        @if($isEdit)
+        @if($isEdit && $inventoryRelevant)
         {{-- ═══ STOCK ADJUSTMENT (Task 1276) — add stock as a purchase or correct
              the quantity via an adjustment movement; never a raw overwrite. ═══ --}}
         <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">

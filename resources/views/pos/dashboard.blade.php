@@ -1,4 +1,8 @@
 <x-pos-layout>
+@php
+    $dashboardRidersRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'riders_enabled');
+    $dashboardKhataRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'khata_enabled');
+@endphp
 
 <div class="w-full overflow-x-hidden">
     <div class="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
@@ -360,9 +364,9 @@
 
         @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')
-        @include('pos.partials.rider-settlement-pending')
+        @if($dashboardRidersRelevant) @include('pos.partials.rider-settlement-pending') @endif
         @include('pos.partials.inactive-customers')
-        @include('pos.partials.today-khata')
+        @if($dashboardKhataRelevant) @include('pos.partials.today-khata') @endif
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
         @include('pos.dashboard-styles._drafts-section')
     </div>

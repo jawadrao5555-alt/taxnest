@@ -12,6 +12,7 @@
     // (pos_held_sales) instead of the restaurant held-order flow, which such a
     // shop can never display again. Same predicate as typeFlowGate, inverted.
     $retailHold = !\App\Services\PosParkedBills::restaurantShaped($features);
+    $barcodeRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'barcode');
 @endphp
 @if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=5">@endif
 {{-- Boot splash (customer report, 25 Jul 2026): on slow shop connections this large
@@ -40,7 +41,7 @@
      was ~245KB / ~4,400 keys; the used subset is a few hundred. QA: deploy
      preflight runs scripts/pos-i18n-check.php (missing keys in en/rur/ur or
      dynamic non-literal TXT subscript access fail the deploy). --}}
-<script type="application/json" id="tn-pos-i18n">{!! json_encode(\App\Support\PosI18n::baked('pos/universal'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
+<script type="application/json" id="tn-pos-i18n">{!! json_encode(\App\Support\PosI18n::baked('pos/universal', \App\Support\PosVocabulary::replacements()), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
 <script>window.TXT = (function () { try { return JSON.parse(document.getElementById('tn-pos-i18n').textContent) || {}; } catch (e) { return {}; } })();</script>
 <script>
 // SALE_CACHE idempotent re-prime. Originally this ran only on the first
@@ -1042,7 +1043,7 @@ window.addEventListener('popstate', function() {
 
         {{-- Quick Type — OPT-IN (Customize POS toggle); hidden server-side when OFF. --}}
         @if($company->pos_quick_type_enabled ?? false)
-        <button @if($isSaaf) data-saaf-secondary="1" @endif @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="{{ __('pos.ti_quick_type_f7') }}">
+        <button @if($isSaaf) data-saaf-secondary="1" @endif @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="{{ \App\Support\PosVocabulary::t('ti_quick_type_f7') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span class="hidden lg:inline">Quick</span>
             <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F7</span>
@@ -1585,7 +1586,7 @@ window.addEventListener('popstate', function() {
                             <svg class="w-12 h-12 text-purple-400 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                         </div>
                         <p class="text-base font-bold text-gray-700 dark:text-gray-200">{{ __('pos.your_cart_is_empty') }}</p>
-                        <p class="text-xs mt-1.5 text-gray-400 dark:text-gray-500 max-w-[220px]">{{ __('pos.tap_product_hint') }}</p>
+                        <p class="text-xs mt-1.5 text-gray-400 dark:text-gray-500 max-w-[220px]">{{ __($barcodeRelevant ? 'pos.tap_product_hint' : 'pos.pra_tap_product_hint_no_barcode') }}</p>
                     </div>
                 </template>
                 <template x-if="cartMode && cart.length > 0">
@@ -3837,7 +3838,7 @@ window.addEventListener('popstate', function() {
                         <span class="text-[10px] text-gray-400 dark:text-gray-500 font-mono" x-show="quickTypeText.length > 0" x-text="(quickTypeText.split(/[,;\n]+/).filter(s=>s.trim()).length) + window.TXT.sfx_lines"></span>
                     </div>
                     <div class="relative">
-                        <textarea x-model="quickTypeText" autocomplete="off" name="pos_quicktype_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;(or comma-separated: chai 2, samosa 1)" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
+                        <textarea x-model="quickTypeText" autocomplete="off" name="pos_quicktype_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="{{ \App\Support\PosVocabulary::for($company)['quick_type'] }}" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
                     </div>
                     <div class="flex items-center justify-between mt-2 px-1">
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">

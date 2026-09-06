@@ -60,8 +60,8 @@ Yeh Nest FBR POS (FBR-integrated Point of Sale) ka guide hai. Sirf is guide ki m
 - Auto Day-Close (24h) ka option bhi hai — ON ho to din khud band ho jata hai; warna roz khud close karna parta hai.
 - Din close karne se pehle fail queue check kar lein — behtar hai ke sab bills FBR ko report ho chuke hon.
 
-## Products, Stock aur Customers
-- Products: /fbr-pos/products — naya product, price, barcode/SKU, tax settings. Excel import/template bhi hai (/fbr-pos/products/import).
+## {items}, Stock aur Customers
+- {items}: /fbr-pos/products — naya {item}, price, barcode/SKU, tax settings. Excel import/template bhi hai (/fbr-pos/products/import).
 - Stock/Inventory: /fbr-pos/stock — purchase entry, suppliers, corrections, movements, minimum level alerts. Inventory tracking ON ho to bill banate waqt stock khud katta hai.
 - Customers: /fbr-pos/customers — customer list, history, export.
 - Khata (udhaar): /fbr-pos/khata — customer ka udhaar ledger aur wasooli. Khata sirf admin/manager dekh sakta hai.

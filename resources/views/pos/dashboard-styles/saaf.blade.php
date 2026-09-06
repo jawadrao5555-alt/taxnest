@@ -11,6 +11,8 @@
     // Cashiers see these links only when the company switch (Customize) or a
     // Custom Access tick re-opens it — same verdict as nav + route guards.
     $saafCanDayClose = \App\Services\PosAccessService::dayCloseAllowed(auth('pos')->user());
+    $saafVocab = \App\Support\PosVocabulary::for($company);
+    $saafTablesRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'tables');
     if (!empty($isRestaurant)) {
         // Task 988: combined PRA+Local (+exempt) figures — match the Aaj ka
         // Khaata sum this user sees (fallback = old single-stream sums).
@@ -125,7 +127,7 @@
         </div>
         @endif
 
-        @if(!empty($isRestaurant))
+        @if(!empty($isRestaurant) && $saafTablesRelevant)
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
@@ -203,7 +205,7 @@
                     <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">
                         <svg class="w-5 h-5" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     </span>
-                    <div class="text-[12px] font-bold text-gray-700 dark:text-gray-300">{{ __("pos.products_word") }}</div>
+                    <div class="text-[12px] font-bold text-gray-700 dark:text-gray-300">{{ $saafVocab['items'] }}</div>
                 </a>
                 <a href="{{ route('pos.customers') }}" class="group rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
                     <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">

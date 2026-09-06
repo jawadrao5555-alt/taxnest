@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260906-090748-f398fc6c'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260906-092249-2429ba97'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -147,7 +147,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const req = e.request;
-                const url = '/pos/restaurant/tables';
+    const url = new URL(req.url);
     if (url.origin !== location.origin) return;
 
     // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —
@@ -179,9 +179,9 @@ self.addEventListener('fetch', e => {
     // become the active offline copy. Offline with no valid copy → recovery page.
     if (req.mode === 'navigate' && SALE_DOCUMENT_MARKERS[url.pathname] && url.search === '') {
         e.respondWith((async () => {
-                const c = await caches.open(WAITER_CACHE);
+            const c = await caches.open(SALE_CACHE);
             const variant = SALE_DOCUMENT_MARKERS[url.pathname];
-                const cached = await c.match(WAITER_PAGE);
+            let cached = await c.match(req);
             if (cached && !(await isValidCachedSaleDocument(cached, variant))) {
                 await c.delete(req);
                 cached = undefined;
@@ -195,7 +195,7 @@ self.addEventListener('fetch', e => {
                 || /(?:^|,)\s*no-cache\s*(?:,|$)/i.test(req.headers.get('cache-control') || '');
             if (forceFresh) {
                 try {
-                const fresh = await network();
+                    const fresh = await network();
                     if (saleDocumentLooksLikeLogin(fresh.response)) await c.delete(req);
                     if (fresh.valid || !cached || saleDocumentLooksLikeLogin(fresh.response)) {
                         return fresh.valid || saleDocumentLooksLikeLogin(fresh.response)
@@ -242,9 +242,9 @@ self.addEventListener('fetch', e => {
     if (req.mode === 'navigate' && url.pathname === '/pos/restaurant/tables' && url.search === '') {
         const resultingClientId = e.resultingClientId;
         e.respondWith((async () => {
-                const c = await caches.open(WAITER_CACHE);
-                if (await c.match(url)) return; // already primed
-                const res = await fetch(WAITER_PAGE, { credentials: 'same-origin' });
+            const c = await caches.open(TABLES_CACHE);
+            try {
+                const res = await fetch(req);
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) {
                     c.put(req, res.clone());
@@ -259,7 +259,7 @@ self.addEventListener('fetch', e => {
             } catch (err) {
                 // Offline / server unreachable: serve last-known snapshot.
                 // tables.blade auto-reloads on 'online' event.
-                const cached = await c.match(WAITER_PAGE);
+                const cached = await c.match(req);
                 if (cached) {
                     // AWAITED before `return cached` — flag is durably stored before
                     // the browser parses the cached HTML and scripts execute.
@@ -289,14 +289,14 @@ self.addEventListener('fetch', e => {
     // valid copy the recovery page appears — the same honest state as before.
     if (req.mode === 'navigate' && url.pathname === WAITER_PAGE && url.search === '') {
         e.respondWith((async () => {
-                const c = await caches.open(WAITER_CACHE);
-                if (await c.match(url)) return; // already primed
-                const res = await fetch(WAITER_PAGE, { credentials: 'same-origin' });
+            const c = await caches.open(WAITER_CACHE);
+            try {
+                const res = await fetch(req);
                 if (await isValidWaiterDocument(res)) c.put(req, res.clone());
                 else if (saleDocumentLooksLikeLogin(res)) await c.delete(req);
                 return res;
             } catch (err) {
-                const cached = await c.match(WAITER_PAGE);
+                const cached = await c.match(req);
                 if (cached && await isValidWaiterDocument(cached)) return cached;
                 if (cached) await c.delete(req);
                 return (await caches.match(OFFLINE_PAGE)) || saleRecoveryResponse();
@@ -443,12 +443,12 @@ self.addEventListener('message', e => {
         e.waitUntil((async () => {
             try {
                 const saleUrls = ['/pos/invoice/create', '/fbr-pos/create'];
-                const c = await caches.open(WAITER_CACHE);
+                const c = await caches.open(SALE_CACHE);
                 await Promise.all(saleUrls.map(async (u) => {
-                const cached = await c.match(WAITER_PAGE);
-                if (cached && await isValidWaiterDocument(cached)) return;
-                if (cached) await c.delete(WAITER_PAGE);
-                const res = await fetch(WAITER_PAGE, { credentials: 'same-origin' });
+                    const cached = await c.match(u);
+                    if (cached && await isValidCachedSaleDocument(cached, SALE_DOCUMENT_MARKERS[u])) return;
+                    if (cached) await c.delete(u);
+                    const res = await fetch(u, { credentials: 'same-origin' });
                     if (await isValidSaleDocument(res, SALE_DOCUMENT_MARKERS[u])) await c.put(u, res.clone());
                 }));
             } catch (err) { /* best-effort — normal second-load prime still applies */ }
@@ -466,9 +466,9 @@ self.addEventListener('message', e => {
         e.waitUntil((async () => {
             try {
                 const url = '/pos/restaurant/tables';
-                const c = await caches.open(WAITER_CACHE);
+                const c = await caches.open(TABLES_CACHE);
                 if (await c.match(url)) return; // already primed
-                const res = await fetch(WAITER_PAGE, { credentials: 'same-origin' });
+                const res = await fetch(url, { credentials: 'same-origin' });
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(url, res.clone());
             } catch (err) { /* best-effort — next online visit still primes via navigate path */ }

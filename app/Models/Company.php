@@ -145,6 +145,9 @@ class Company extends Model
         'pos_type',
         'business_category',
         'feature_flags',
+        // Task 1582: modules carried OUTSIDE the business category (admin
+        // grants + grandfathered) — written only via PosFeatureService::grantExtra().
+        'pos_module_extras',
         'use_universal_pos',
         'pos_ui_density',
         'pos_theme',
@@ -305,6 +308,7 @@ class Company extends Model
         'offline_queue_reported_at' => 'datetime',
         'pos_printer_settings' => 'array',
         'feature_flags' => 'array',
+        'pos_module_extras' => 'array',
         'invoice_display_prefs' => 'array',
         'di_branding' => 'array',
         'public_profile_settings' => 'array',
@@ -574,6 +578,11 @@ class Company extends Model
             'pos_theme', 'pos_dashboard_style', 'pos_ui_density', 'use_universal_pos',
             'pos_guided_flow_enabled', 'pos_quick_type_enabled', 'default_language',
             'pos_receipt_autoclose_seconds', 'invoice_display_prefs', 'feature_flags',
+            // Task 1582: the category profile decides which modules and which
+            // vocabulary (item noun, examples, units) are BAKED into the sale
+            // screen — a category change or an admin extra grant must refresh
+            // cached/offline sale screens.
+            'business_category', 'pos_module_extras',
             'pos_cash_received_enabled',
             'pos_whatsapp_bill_enabled', 'pos_whatsapp_bill_auto_open',
             // Tax / pricing

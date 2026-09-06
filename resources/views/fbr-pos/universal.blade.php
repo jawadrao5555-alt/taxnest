@@ -28,8 +28,8 @@
         // D1 decision: reuse kitchen_printer_enabled (already loaded, no new column).
         // Strict plan binding (Aug 2026): AND with the plan's kot_enabled gate —
         // server-side fbrPlanGate('kot_enabled') blocks the ticket routes too.
-        'kot' => (bool)($company->kitchen_printer_enabled ?? false)
-                 && \App\Services\PosFeatureService::planAllows($company, 'kot_enabled'),
+        'kot' => \App\Services\PosFeatureService::moduleRelevant($company, 'kot_enabled')
+                 && \App\Services\PosFeatureService::fbrStoreSlipOn($company),
         'kitchen' => false, 'recipes' => false, 'inventory' => false,
         // Task 1403: per-item Store note is now a real FBR switch (Customize →
         // Features). It only makes sense when the Store slip itself exists, so
@@ -37,9 +37,8 @@
         // rawFlag (not forCompany) because kitchen_notes is a RESTAURANT_FLAG and
         // every fbrpos plan has restaurant_enabled = 0 — forCompany() would mask
         // it to false forever. Shim pin stays: never delete the key.
-        'kitchen_notes' => \App\Services\PosFeatureService::rawFlag($company, 'kitchen_notes')
-            && (bool) ($company->kitchen_printer_enabled ?? false)
-            && \App\Services\PosFeatureService::planAllows($company, 'kot_enabled'),
+        'kitchen_notes' => \App\Services\PosFeatureService::moduleRelevant($company, 'kitchen_notes')
+            && \App\Services\PosFeatureService::fbrStoreNotesOn($company),
     ];
     // Services (Task 1272): UNPINNED — create() bakes active PosService rows so
     // service items (repairs etc.) sell here as product_id-NULL lines carrying
@@ -74,6 +73,30 @@
     $_fbrAllFeatures = \App\Services\PosFeatureService::forCompany($company);
     $showDeliveriesBoardBtn = !empty($_fbrAllFeatures->delivery)
         && \App\Services\PosFeatureService::planAllows($company, 'riders_enabled');
+    $pharmacyMode = (bool) ($pharmacyMode ?? false)
+        && \App\Services\PosFeatureService::moduleAvailable($company, 'pharmacy');
+    $fbrVocab = \App\Support\PosVocabulary::for($company);
+    $fbrQuickTypeLines = str_replace(', ', "\n", $fbrVocab['quick_type']);
+    $fbrBarcodeRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'barcode');
+    $fbrFoodUpsellRules = [
+        'burger' => ['fries', 'cola', 'drink', 'pepsi', 'coke'],
+        'pizza' => ['garlic', 'cola', 'drink', 'pepsi'],
+        'biryani' => ['raita', 'salad', 'drink', 'cola'],
+        'karahi' => ['naan', 'roti', 'salad', 'drink'],
+        'shawarma' => ['fries', 'drink', 'cola'],
+        'sandwich' => ['fries', 'drink', 'chips'],
+        'roll' => ['fries', 'drink', 'chips'],
+        'broast' => ['fries', 'drink', 'cola'],
+        'chicken' => ['fries', 'drink', 'roti', 'naan'],
+        'steak' => ['fries', 'drink', 'sauce'],
+        'pasta' => ['drink', 'garlic', 'salad'],
+        'coffee' => ['cookie', 'cake', 'muffin'],
+        'tea' => ['biscuit', 'cookie', 'cake'],
+        'fries' => ['cola', 'drink', 'pepsi', 'coke'],
+        'cake' => ['coffee', 'tea', 'drink'],
+    ];
+    // Food keyword map ships only to food shops; Blade's @json splits on commas, so resolve it here.
+    $fbrUpsellRules = in_array($fbrVocab['family'], ['food_service', 'general'], true) ? $fbrFoodUpsellRules : [];
 @endphp
 {{-- Same bounded sale-screen boot guard as PRA. FBR previously had no full-screen
      recovery at all, so an Alpine startup failure left only the grid spinner. --}}
@@ -378,7 +401,7 @@ input:focus:not(:focus-visible) { outline: none; }
 {{-- Task 658 (Aug 2026): bake only the TXT.* keys this screen actually uses —
      see pos/universal.blade.php twin note. QA: scripts/pos-i18n-check.php in
      the deploy preflight. --}}
-<script type="application/json" id="tn-pos-i18n">{!! json_encode(\App\Support\PosI18n::baked('fbr-pos/universal'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
+<script type="application/json" id="tn-pos-i18n">{!! json_encode(\App\Support\PosI18n::baked('fbr-pos/universal', \App\Support\PosVocabulary::replacements()), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
 <script>window.TXT = (function () { try { return JSON.parse(document.getElementById('tn-pos-i18n').textContent) || {}; } catch (e) { return {}; } })();</script>
 <script>
 // SALE_CACHE idempotent re-prime. Run after every successful document load:
@@ -515,7 +538,7 @@ window.addEventListener('popstate', function() {
             </button>
 
             {{-- Quick F7 (moved from toolbar Row 2, owner 6 Aug 2026) --}}
-            <button @click="openQuickType()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-500/70 hover:bg-sky-500/90 ring-1 ring-sky-300/40 transition flex-shrink-0" title="{{ __('pos.ti_quick_type_f7') }}">
+            <button @click="openQuickType()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-500/70 hover:bg-sky-500/90 ring-1 ring-sky-300/40 transition flex-shrink-0" title="{{ \App\Support\PosVocabulary::t('ti_quick_type_f7') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 <span class="hidden lg:inline">Quick</span>
                 <span class="text-[9px] font-mono bg-white/20 px-1 rounded">F7</span>
@@ -859,7 +882,7 @@ window.addEventListener('popstate', function() {
         <div class="flex-1 relative" style="min-width:170px;">
             {{-- Barcode/scan icon (retail fast-billing Aug 2026) --}}
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h1v12H4zm3 0h1v12H7zm3 0h2v12h-2zm4 0h1v12h-1zm3 0h1v12h-1zM2 4h20v2H2zm0 14h20v2H2z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.escape="if (phAltOpen) { $event.preventDefault(); phAltClose(); }" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ __('pos.ph_scan_or_first_letter') }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm font-medium border-2 border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.escape="if (phAltOpen) { $event.preventDefault(); phAltClose(); }" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ __(\App\Services\PosFeatureService::moduleRelevant($company, 'barcode') ? 'pos.ph_scan_or_first_letter' : 'pos.ph_first_letter_no_barcode') }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm font-medium border-2 border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1420,7 +1443,7 @@ window.addEventListener('popstate', function() {
                             <svg class="w-12 h-12 text-purple-400 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                         </div>
                         <p class="text-base font-bold text-gray-700 dark:text-gray-200">{{ __('pos.your_cart_is_empty') }}</p>
-                        <p class="text-xs mt-1.5 text-gray-400 dark:text-gray-500 max-w-[220px]">{{ __('pos.tap_product_hint') }}</p>
+                        <p class="text-xs mt-1.5 text-gray-400 dark:text-gray-500 max-w-[220px]">{{ __(\App\Services\PosFeatureService::moduleRelevant($company, 'barcode') ? 'pos.tap_product_hint' : 'pos.pra_tap_product_hint_no_barcode') }}</p>
                     </div>
                 </template>
                 <template x-if="cartMode && cart.length > 0">
@@ -1879,7 +1902,9 @@ window.addEventListener('popstate', function() {
                 </button>
             </div>
             <div class="p-4 space-y-3" style="max-height:70vh; overflow-y:auto;">
+                @if(\App\Services\PosFeatureService::moduleRelevant($company, 'barcode'))
                 <p x-show="qcFromScan" class="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 rounded-lg px-3 py-2 font-medium">{{ __('pos.qc_scanned_hint') }}</p>
+                @endif
                 <p x-show="!qcFromScan && !qcExistingId" class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.qc_typed_hint') }}</p>
                 <p x-show="qcExistingId" x-cloak class="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 rounded-lg px-3 py-2 font-medium">{{ __('pos.qc_existing_hint') }}</p>
                 <div>
@@ -1929,13 +1954,15 @@ window.addEventListener('popstate', function() {
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
+                    @if($fbrBarcodeRelevant)
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.barcode_label') }} <span class="text-gray-400 font-normal">({{ __('pos.optional_lc') }})</span></label>
                         <input type="text" x-model="qcBarcode" @keydown.enter.prevent.stop="qcSave()"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
                             autocomplete="one-time-code" name="qc_barcode_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore>
                     </div>
-                    <div>
+                    @endif
+                    <div class="{{ $fbrBarcodeRelevant ? '' : 'col-span-2' }}">
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.hs_code_col') }} <span class="text-gray-400 font-normal">({{ __('pos.optional_lc') }})</span></label>
                         <input type="text" x-model="qcHsCode" @keydown.enter.prevent.stop="qcSave()" placeholder="{{ __('pos.ph_hs_code') }}"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -2889,7 +2916,7 @@ window.addEventListener('popstate', function() {
                         <span class="text-[10px] text-gray-400 dark:text-gray-500 font-mono" x-show="quickTypeText.length > 0" x-text="(quickTypeText.split(/[,;\n]+/).filter(s=>s.trim()).length) + window.TXT.sfx_lines"></span>
                     </div>
                     <div class="relative">
-                        <textarea x-model="quickTypeText" autocomplete="off" name="pos_quicktype_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="chai 2&#10;samosa 1&#10;paratha 3&#10;&#10;(or comma-separated: chai 2, samosa 1)" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
+                        <textarea x-model="quickTypeText" autocomplete="off" name="pos_quicktype_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore @input="parseQuickTypeText()" @keydown.ctrl.enter.prevent="applyQuickType()" @keydown.meta.enter.prevent="applyQuickType()" x-init="$nextTick(() => $el.focus())" rows="5" placeholder="{{ __('pos.fbr_quick_type_placeholder', ['lines' => $fbrQuickTypeLines, 'quick_type' => $fbrVocab['quick_type']]) }}" class="w-full text-sm rounded-2xl border-2 border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-3 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 font-mono leading-relaxed transition-all shadow-sm hover:shadow-md"></textarea>
                     </div>
                     <div class="flex items-center justify-between mt-2 px-1">
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">
@@ -6403,24 +6430,7 @@ function restaurantPos() {
         // - Session memory: dismissed pairs don't re-show until page reload
         // - Enter = accept, Esc = dismiss (handled in keyboard router)
         // ──────────────────────────────────────────────────────────────
-        upsellRules: {
-            // keyword in product name → candidate keywords to suggest
-            'burger':   ['fries', 'cola', 'drink', 'pepsi', 'coke'],
-            'pizza':    ['garlic', 'cola', 'drink', 'pepsi'],
-            'biryani':  ['raita', 'salad', 'drink', 'cola'],
-            'karahi':   ['naan', 'roti', 'salad', 'drink'],
-            'shawarma': ['fries', 'drink', 'cola'],
-            'sandwich': ['fries', 'drink', 'chips'],
-            'roll':     ['fries', 'drink', 'chips'],
-            'broast':   ['fries', 'drink', 'cola'],
-            'chicken':  ['fries', 'drink', 'roti', 'naan'],
-            'steak':    ['fries', 'drink', 'sauce'],
-            'pasta':    ['drink', 'garlic', 'salad'],
-            'coffee':   ['cookie', 'cake', 'muffin'],
-            'tea':      ['biscuit', 'cookie', 'cake'],
-            'fries':    ['cola', 'drink', 'pepsi', 'coke'],
-            'cake':     ['coffee', 'tea', 'drink'],
-        },
+        upsellRules: @json($fbrUpsellRules),
         currentUpsell: null,           // { trigger:{id,name}, suggest:{id,name,price,...} }
         dismissedUpsells: [],          // ['triggerId:suggestId', ...] — session-only
         triggerUpsell(triggerItem) {

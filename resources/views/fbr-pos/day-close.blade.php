@@ -1,4 +1,8 @@
 <x-fbr-pos-layout>
+@php
+    $fbrRidersRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'riders_enabled');
+    $fbrVocab = \App\Support\PosVocabulary::for($company);
+@endphp
 <div class="max-w-7xl mx-auto">
     @include('fbr-pos.partials.back-link')
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
@@ -296,7 +300,7 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                {{ __('pos.top_products_of_day') }}
+                {{ __('pos.fbr_vocab_top_items', ['items' => $fbrVocab['items']]) }}
             </h3>
             @if($analytics->top_products->isEmpty())
             <p class="text-sm text-gray-500">{{ __('pos.no_item_data_day') }}</p>
@@ -306,7 +310,7 @@
                     <thead>
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.product_col') }}</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ $fbrVocab['item'] }}</th>
                             <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{{ __('pos.qty_word') }}</th>
                             <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.revenue_word') }}</th>
                         </tr>
@@ -420,7 +424,7 @@
     {{-- Shown whenever the stored summary carries rider rows OR a nonzero
          cash figure — a cash-in-only day (old bills settled today, no new
          rider bills) must still surface the money movement. --}}
-    @if($existingReport && is_array($existingReport->rider_summary) && (!empty($existingReport->rider_summary['riders']) || ($existingReport->rider_summary['cash_out'] ?? 0) > 0 || ($existingReport->rider_summary['cash_in'] ?? 0) > 0))
+    @if($fbrRidersRelevant && $existingReport && is_array($existingReport->rider_summary) && (!empty($existingReport->rider_summary['riders']) || ($existingReport->rider_summary['cash_out'] ?? 0) > 0 || ($existingReport->rider_summary['cash_in'] ?? 0) > 0))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.delivery_riders_day_summary') }}</h3>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
@@ -530,7 +534,7 @@
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.dc_checklist_hint') }}</p>
         <ul class="space-y-2">
             {{-- 1. Undispatched delivery bills — BLOCKER (ZFC waqia; delivery-feature shops only) --}}
-            @if($pd->active)
+            @if($fbrRidersRelevant && $pd->active)
             <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ $pd->count > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
                 <span class="font-bold {{ $pd->count > 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ $pd->count > 0 ? '✗' : '✓' }}</span>
                 <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_undispatched') }}</span>
@@ -563,7 +567,7 @@
                 @endif
             </li>
             {{-- 3. Rider unsettled cash khata — WARNING ONLY, never blocks --}}
-            @if($pd->active)
+            @if($fbrRidersRelevant && $pd->active)
             <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ $pd->khata_count > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
                 <span class="font-bold {{ $pd->khata_count > 0 ? 'text-amber-600' : 'text-emerald-600' }}">{{ $pd->khata_count > 0 ? '!' : '✓' }}</span>
                 <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_rider_khata') }}</span>

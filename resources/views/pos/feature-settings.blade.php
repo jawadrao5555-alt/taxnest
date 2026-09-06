@@ -3,8 +3,9 @@
         // The business type is chosen at REGISTRATION and is read-only here: it
         // decides which regulator the shop files under, so only a SaaS admin may
         // change it. This step shows what the shop is, not a picker.
-        $currentCategory = \App\Services\PosFeatureService::resolveCategory($company);
+        $currentCategory = \App\Services\PosFeatureService::profileCategory($company);
         $currentMeta = \App\Services\PosFeatureService::presetMeta($currentCategory);
+        $currentCategoryLabel = \App\Support\PosVocabulary::categoryLabel($currentCategory);
         // ONLY this shop's own preset is shipped into the page (Task 1559). The
         // whole catalogue used to ride along in the wizard's x-data, so every
         // other business type — its name, icon, description and default module
@@ -12,7 +13,7 @@
         // A shop sitting on a retired/unknown category still gets a working
         // page: presetMeta() falls back to a real card and the flag map falls
         // back to empty (everything simply lands under "Extra").
-        $currentDefaults = \App\Services\PosFeatureService::categoryFlagMap($currentCategory);
+        $currentDefaults = array_fill_keys($categoryFlags, true);
         $currentMetaLite = [
             'label' => $currentMeta['label'],
             'description' => $currentMeta['description'],
@@ -23,7 +24,7 @@
         // business type, and the wizard never reads it.
         // Panel-scoped: another panel's business mode (Pharmacy) is not part of
         // this shop's catalogue, so its key/label/description never ship here.
-        $panelFlags = \App\Services\PosFeatureService::flagsForPanel('pos');
+        $panelFlags = $allFlags;
         $flagMetaLite = [];
         foreach ($panelFlags as $f) {
             $m = \App\Services\PosFeatureService::flagMeta($f);
@@ -109,7 +110,7 @@
             {{-- ════════════════════ STEP 1 — BUSINESS TYPE (read-only) ════════════════════ --}}
             <div x-show="step === 1" x-transition.opacity>
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 sm:p-6 shadow-sm">
-                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white">{{ __('pos.business_type') }}</h2>
+                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white">{{ __('pos.vocab_for_your_business', ['category' => $currentCategoryLabel]) }}</h2>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.business_type_locked_note') }}</p>
 
                     <div class="rounded-xl border-2 border-purple-200 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-900/10 p-4 flex items-start gap-3">
@@ -147,13 +148,13 @@
                 <div class="mb-3 flex items-center gap-2 text-sm">
                     <span class="text-2xl" x-text="selectedPresetMeta.icon"></span>
                     <div>
-                        <p class="font-extrabold text-gray-900 dark:text-white">{{ __('pos.features_for') }} <span class="text-purple-700 dark:text-purple-300" x-text="selectedPresetMeta.label"></span></p>
+                        <p class="font-extrabold text-gray-900 dark:text-white">{{ __('pos.vocab_for_your_business', ['category' => $currentCategoryLabel]) }}</p>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.recommended_already_on') }}</p>
                     </div>
                 </div>
 
                 {{-- Restaurant module plan-lock notice (Business+ since Aug 2026) --}}
-                <div x-show="restaurantLocked" x-cloak class="mb-4 p-3.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 flex items-start gap-2.5">
+                <div x-show="restaurantLocked && restaurantFlags.some(f => allFlags.includes(f))" x-cloak class="mb-4 p-3.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 flex items-start gap-2.5">
                     <span class="text-lg leading-none">🔒</span>
                     <div>
                         @if(!empty($restaurantTrialEnded))
@@ -206,11 +207,12 @@
                     </div>
                 </div>
 
-                {{-- EXTRA --}}
+                {{-- Admin-granted / grandfathered additions only. Unrelated modules
+                     are not shipped to the browser and cannot appear as upsells. --}}
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm mb-4" x-show="extraFlags.length">
                     <div class="flex items-center gap-2 mb-3">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-[10px] font-extrabold uppercase tracking-wider">+ {{ __('pos.extra_word') }}</span>
-                        <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.optional_switch_on') }}</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-[10px] font-extrabold uppercase tracking-wider">+ {{ __('pos.vocab_added_for_you') }}</span>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.vocab_added_for_you_hint') }}</span>
                     </div>
                     <div class="grid sm:grid-cols-2 gap-2.5">
                         <template x-for="f in extraFlags" :key="'extra-'+f">
@@ -412,6 +414,7 @@
                 selectedPresetMeta: @json($currentMetaLite),
                 {{-- The shop's own preset flag map (recommended vs extra split). --}}
                 categoryDefaults: @json($currentDefaults),
+                addedFlags: @json($addedFlags),
                 flagMeta: @json($flagMetaLite),
                 dependencies: @json($panelDeps),
                 allFlags: @json($panelFlags),
@@ -423,8 +426,7 @@
                     return this.allFlags.filter(f => d[f]);
                 },
                 get extraFlags() {
-                    const d = this.categoryDefaults || {};
-                    return this.allFlags.filter(f => !d[f]);
+                    return this.allFlags.filter(f => this.addedFlags.includes(f));
                 },
                 get enabledFlags() {
                     return this.allFlags.filter(f => this.flags[f]);

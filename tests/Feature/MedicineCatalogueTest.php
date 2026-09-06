@@ -458,6 +458,41 @@ class MedicineCatalogueTest extends TestCase
         $this->assertSame('running', $run->state);
         $this->assertSame(412, (int) $run->next_page, 'resume keeps the cursor, never page 1');
         $this->assertSame(1, \App\Models\MedicineCatalogueSync::count(), 'no second run row');
+
+        // A run the worker FAILED (job timeout) is continued from its cursor as a
+        // new 'resume' run — bounded per day so a DRAP outage cannot loop all week.
+        $run->forceFill(['state' => 'failed', 'completed_at' => now(), 'last_error' => 'job failed: timed out', 'next_page' => 618, 'pages_done' => 617])->save();
+        $this->artisan('catalogue:sync-drap --resume')->assertSuccessful();
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SyncMedicineCatalogueJob::class, 2);
+        $cont = \App\Models\MedicineCatalogueSync::latest('id')->first();
+        $this->assertNotSame($run->id, $cont->id);
+        $this->assertSame('resume', $cont->trigger);
+        $this->assertSame(618, (int) $cont->next_page, 'continuation starts where the failed run stopped');
+        $this->assertSame(617, (int) $cont->pages_done);
+
+        for ($i = 0; $i < \App\Console\Commands\SyncMedicineCatalogue::MAX_AUTO_RESUMES_PER_DAY; $i++) {
+            \App\Models\MedicineCatalogueSync::latest('id')->first()->forceFill(['state' => 'failed', 'completed_at' => now()])->save();
+            $this->artisan('catalogue:sync-drap --resume')->assertSuccessful();
+        }
+        $this->assertSame(1 + \App\Console\Commands\SyncMedicineCatalogue::MAX_AUTO_RESUMES_PER_DAY,
+            \App\Models\MedicineCatalogueSync::count(), 'auto-resume stops at the daily cap');
+        $this->assertSame('failed', \App\Models\MedicineCatalogueSync::latest('id')->first()->state);
+    }
+
+    public function test_slice_never_starts_a_page_it_cannot_finish(): void
+    {
+        // A slow DRAP must not push a slice past the job timeout: with almost no
+        // budget left the slice returns "more to do" WITHOUT touching the network.
+        \Illuminate\Support\Facades\Http::fake(fn () => throw new \LogicException('network must not be hit'));
+        $run = \App\Models\MedicineCatalogueSync::create([
+            'state' => 'running', 'trigger' => 'schedule', 'phase_index' => 0, 'next_page' => 5,
+            'total_pages' => 1069, 'pages_done' => 4, 'started_at' => now(), 'last_progress_at' => now(),
+        ]);
+        $done = app(\App\Services\Pharmacy\MedicineCatalogueSyncService::class)->runSlice($run, 3);
+        $this->assertFalse($done);
+        $this->assertSame(5, (int) $run->fresh()->next_page);
+        $this->assertSame('running', $run->fresh()->state);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
     }
 
     public function test_product_name_carries_the_pack_once(): void

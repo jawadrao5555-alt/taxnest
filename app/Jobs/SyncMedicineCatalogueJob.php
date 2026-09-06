@@ -25,7 +25,9 @@ class SyncMedicineCatalogueJob implements ShouldQueue
 
     public const QUEUE = 'bulk';
 
-    public int $timeout = 80;
+    // retry_after on the database queue is 90s: the slice budget (55s) plus one
+    // deadline-bounded DRAP attempt must always end before this fires.
+    public int $timeout = 85;
 
     public int $tries = 1;
 

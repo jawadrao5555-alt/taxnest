@@ -88,11 +88,11 @@
                  one does NOT touch them, but the admin must see they exist. --}}
             <template x-if="deleteSiblings.length">
                 <div class="mb-4 p-3 rounded-lg bg-amber-900/20 border border-amber-800">
-                    <p class="text-xs text-amber-300 font-semibold mb-1">Is customer ke doosre accounts bhi hain:</p>
+                    <p class="text-xs text-amber-300 font-semibold mb-1">This customer also has other accounts:</p>
                     <ul class="text-xs text-amber-200/80 list-disc list-inside space-y-0.5">
                         <template x-for="s in deleteSiblings" :key="s"><li x-text="s"></li></template>
                     </ul>
-                    <p class="text-[11px] text-amber-200/60 mt-1">Yeh delete sirf isi account ka hai — baqi accounts par asar nahi hoga.</p>
+                    <p class="text-[11px] text-amber-200/60 mt-1">This delete affects only this account — the others are untouched.</p>
                 </div>
             </template>
 
@@ -100,14 +100,14 @@
                  only the honest UI in front of that gate. --}}
             <template x-if="deleteHold">
                 <div class="mb-4 p-3 rounded-lg bg-red-900/20 border border-red-800">
-                    <p class="text-xs text-red-300">Yeh company abhi <span class="font-semibold">bin hold</span> mein hai. Permanent delete <span class="font-semibold" x-text="deleteEligible"></span> se possible hai.</p>
+                    <p class="text-xs text-red-300">This company is still in its <span class="font-semibold">bin hold</span>. Permanent delete is possible from <span class="font-semibold" x-text="deleteEligible"></span>.</p>
                     @if($isSuperAdmin)
-                        <label class="block text-[11px] text-red-200/80 mt-2 mb-1">Override karne ke liye company ka poora naam type karein:</label>
+                        <label class="block text-[11px] text-red-200/80 mt-2 mb-1">To override, type the company's full name:</label>
                         <input type="text" x-model="typedName" name="confirm_name" form="binDeleteForm" autocomplete="off"
                                class="w-full px-3 py-2 bg-gray-950 border border-red-800 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-red-600"
                                :placeholder="deleteName">
                     @else
-                        <p class="text-[11px] text-red-200/70 mt-1">Sirf ek super-admin hold override kar sakta hai.</p>
+                        <p class="text-[11px] text-red-200/70 mt-1">Only a super-admin can override the hold.</p>
                     @endif
                 </div>
             </template>

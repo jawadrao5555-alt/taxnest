@@ -2058,6 +2058,11 @@ return [
     'pra_counterpart_none' => 'کوئی پی آر اے ہم منصب نہیں',
     'billing_scope_badge_local' => 'صرف مقامی',
     'billing_scope_badge_pra' => 'صرف پی آر اے',
+    // 06 Sep 2026: khufia station key (Ctrl+Alt+Shift+L) link status + single-save counterpart
+    'station_key_linked_to' => 'خفیہ کلید ⇄ :name',
+    'station_key_not_linked' => 'خفیہ کلید: پی آر اے ہم منصب منسلک نہیں — اس آئی ڈی پر کلید کچھ نہیں کرتی',
+    'pra_counterpart_hint' => 'وہ پی آر اے کیشیئر آئی ڈی جس پر یہ اسٹیشن خفیہ کلید سے منتقل ہوتا ہے (اور واپس)۔',
+    'pra_counterpart_none_available' => 'ابھی کوئی پی آر اے والی کیشیئر آئی ڈی نہیں — پہلے کسی دوسری کیشیئر آئی ڈی کا دائرہ پی آر اے رکھیں۔',
     'billing_scope_pra_only' => 'یہ اکاؤنٹ صرف پی آر اے بلنگ کے لیے مقرر ہے — مقامی/عبوری بل کی اجازت نہیں۔',
     'billing_scope_local_only' => 'یہ اکاؤنٹ صرف مقامی بلنگ کے لیے مقرر ہے — پی آر اے بل کی اجازت نہیں۔',
     'billing_scope_no_toggle' => 'آپ کا بلنگ دائرہ ایڈمن نے مقرر کیا ہے — پی آر اے سوئچ بند ہے۔',

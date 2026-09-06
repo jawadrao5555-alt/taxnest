@@ -178,7 +178,30 @@
                 </thead>
                 <tbody>
                     @forelse($team as $member)
-                    <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50" x-data="{ editing: false, showPw: false, accessOpen: false }">
+                    @php
+                        // Task 1186: dropdown selection = RAW column state, not the
+                        // effective scope. Cashier gets the extra "Auto" option
+                        // (derived default — label shows the current effective
+                        // stream); "Dono (Both)" is the owner's OFF switch.
+                        $mScopeIsCashier = $member->pos_role === 'pos_cashier';
+                        $mScopeRaw = in_array($member->pos_billing_scope, ['both', 'local', 'pra'], true)
+                            ? $member->pos_billing_scope
+                            : ($mScopeIsCashier ? 'auto' : 'both');
+                        // Khufia station key (Task 705) — owner-only link status. A LOCAL
+                        // cashier with no PRA counterpart makes the key a silent no-op by
+                        // design (staff never see a message), so the OWNER must be able to
+                        // see at a glance whether the pair is set (Pizza Master, 06 Sep 2026).
+                        $mKhufiaShow = $counterpartColReady && $scopeManageAllowed && $mScopeIsCashier;
+                        $mKhufiaTarget = null;
+                        $mKhufiaSources = collect();
+                        if ($mKhufiaShow) {
+                            $mKhufiaTarget = $team->first(fn ($t) => $t->id === (int) ($member->pos_counterpart_user_id ?? 0)
+                                && $t->pos_role === 'pos_cashier' && $t->is_active && $t->posBillingScopeExplicit() !== 'local');
+                            $mKhufiaSources = $team->filter(fn ($t) => (int) ($t->pos_counterpart_user_id ?? 0) === $member->id
+                                && $t->pos_role === 'pos_cashier' && $t->is_active && $t->posBillingScopeExplicit() === 'local');
+                        }
+                    @endphp
+                    <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50" x-data="{ editing: false, showPw: false, accessOpen: false, scopeSel: @js($mScopeRaw) }">
                         <td class="px-4 py-3" data-label="{{ __('pos.name_label') }}">
                             <span x-show="!editing" class="font-medium text-gray-900 dark:text-white">{{ $member->name }}</span>
                             <template x-if="editing">
@@ -250,6 +273,18 @@
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide mt-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" title="{{ __('pos.billing_scope_auto_hint') }}">
                                     {{ $member->posBillingScope($company) === 'local' ? __('pos.billing_scope_badge_auto_local') : __('pos.billing_scope_badge_auto_pra') }}
                                 </span>
+                                @endif
+                                {{-- Khufia station key link status (owner-only, Task 705): a LOCAL
+                                     cashier shows its PRA counterpart (or the missing link); the PRA
+                                     side shows which local ID(s) switch onto it. Staff rows stay silent. --}}
+                                @if($mKhufiaShow && $mExplicitScope === 'local')
+                                    @if($mKhufiaTarget)
+                                    <span x-show="!editing" class="block text-[10px] text-teal-700 dark:text-teal-300 mt-1" data-khufia-link="linked">{{ __('pos.station_key_linked_to', ['name' => $mKhufiaTarget->name]) }}</span>
+                                    @else
+                                    <span x-show="!editing" class="block text-[10px] font-semibold text-amber-700 dark:text-amber-300 mt-1" data-khufia-link="missing">{{ __('pos.station_key_not_linked') }}</span>
+                                    @endif
+                                @elseif($mKhufiaShow && $mKhufiaSources->isNotEmpty())
+                                <span x-show="!editing" class="block text-[10px] text-teal-700 dark:text-teal-300 mt-1" data-khufia-link="target">{{ __('pos.station_key_linked_to', ['name' => $mKhufiaSources->pluck('name')->implode(', ')]) }}</span>
                                 @endif
                             @endif
                         </td>
@@ -323,17 +358,10 @@
                                         <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="{{ __('pos.ph_new_password_optional') }}" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                         {{-- Billing Scope (07 Aug 2026): cashier + manager only; owner (ya allowed admin) hi dekh sakta hai --}}
                                         @if($scopeManageAllowed && in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true))
-                                        @php
-                                            // Task 1186: dropdown selection = RAW column state, not the
-                                            // effective scope. Cashier gets the extra "Auto" option
-                                            // (derived default — label shows the current effective
-                                            // stream); "Dono (Both)" is the owner's OFF switch.
-                                            $mScopeIsCashier = $member->pos_role === 'pos_cashier';
-                                            $mScopeRaw = in_array($member->pos_billing_scope, ['both', 'local', 'pra'], true)
-                                                ? $member->pos_billing_scope
-                                                : ($mScopeIsCashier ? 'auto' : 'both');
-                                        @endphp
-                                        <select form="edit-{{ $member->id }}" name="pos_billing_scope" title="{{ __('pos.billing_scope_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                                        {{-- $mScopeRaw / $mScopeIsCashier computed once per row (top of the @forelse).
+                                             x-model keeps the row's scopeSel in step so the counterpart select
+                                             below can appear the moment "Local" is chosen — one Save, not two. --}}
+                                        <select form="edit-{{ $member->id }}" name="pos_billing_scope" x-model="scopeSel" title="{{ __('pos.billing_scope_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                             @if($mScopeIsCashier)
                                             <option value="auto" {{ $mScopeRaw === 'auto' ? 'selected' : '' }}>{{ $member->praReportingEnabled($company) ? __('pos.billing_scope_auto_pra') : __('pos.billing_scope_auto_local') }}</option>
                                             @endif
@@ -344,17 +372,37 @@
                                         @endif
                                         {{-- Task 705: PRA counterpart (khufia identity switch target) —
                                              LOCAL-scoped cashier only; owner-only visibility (scope rule).
-                                             Options = same-company ACTIVE cashiers that can bill PRA. --}}
-                                        {{-- Task 1186: counterpart link = EXPLICIT-lock feature (Task 705) — derived default par nahi khulta. --}}
-                                        @if($counterpartColReady && $scopeManageAllowed && $member->pos_role === 'pos_cashier' && $member->posBillingScopeExplicit() === 'local')
-                                        <select form="edit-{{ $member->id }}" name="pos_counterpart_user_id" title="{{ __('pos.pra_counterpart_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
-                                            <option value="">{{ __('pos.pra_counterpart_none') }}</option>
-                                            @foreach($team as $cpOption)
-                                                @if($cpOption->pos_role === 'pos_cashier' && $cpOption->id !== $member->id && $cpOption->is_active && $cpOption->posBillingScopeExplicit() !== 'local')
+                                             Options = same-company ACTIVE cashiers that can bill PRA
+                                             (effective stream, so a reporting-OFF "Auto" cashier is not
+                                             offered — switching onto an offline ID would be a no-op). --}}
+                                        {{-- Task 1186: counterpart link = EXPLICIT-lock feature (Task 705) — derived
+                                             default par nahi khulta. 06 Sep 2026: the select is rendered for every
+                                             cashier but only shown/submitted while the scope dropdown says "Local",
+                                             so scope + counterpart save together (the old two-save dance left
+                                             shops with an unlinked local cashier and a "dead" key). --}}
+                                        @if($counterpartColReady && $scopeManageAllowed && $mScopeIsCashier)
+                                        @php
+                                            // The CURRENT link is always kept in the list (even if that ID is
+                                            // derived-local today) so an unrelated save (name/password) never
+                                            // clears it silently — the server's own rule is explicit≠local.
+                                            $mCpCurrentId = (int) ($member->pos_counterpart_user_id ?? 0);
+                                            $mCpOptions = $team->filter(fn ($t) => $t->pos_role === 'pos_cashier' && $t->id !== $member->id
+                                                && $t->is_active && $t->posBillingScopeExplicit() !== 'local'
+                                                && ($t->id === $mCpCurrentId || $t->posBillingScope($company) !== 'local'));
+                                        @endphp
+                                        <span x-show="scopeSel === 'local'" class="inline-flex flex-col gap-0.5">
+                                            @if($mCpOptions->isNotEmpty())
+                                            <select form="edit-{{ $member->id }}" name="pos_counterpart_user_id" :disabled="scopeSel !== 'local'" title="{{ __('pos.pra_counterpart_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                                                <option value="">{{ __('pos.pra_counterpart_none') }}</option>
+                                                @foreach($mCpOptions as $cpOption)
                                                 <option value="{{ $cpOption->id }}" {{ (int) ($member->pos_counterpart_user_id ?? 0) === $cpOption->id ? 'selected' : '' }}>{{ __('pos.pra_counterpart_label') }}: {{ $cpOption->name }}</option>
-                                                @endif
-                                            @endforeach
-                                        </select>
+                                                @endforeach
+                                            </select>
+                                            <span class="text-[10px] text-gray-400 dark:text-gray-500">{{ __('pos.pra_counterpart_hint') }}</span>
+                                            @else
+                                            <span class="text-[10px] font-semibold text-amber-700 dark:text-amber-300" data-khufia-link="no-target">{{ __('pos.pra_counterpart_none_available') }}</span>
+                                            @endif
+                                        </span>
                                         @endif
                                         <button form="edit-{{ $member->id }}" type="submit" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">{{ __('pos.save_btn') }}</button>
                                         <button @click="editing = false" class="text-gray-400 hover:text-gray-600 text-xs font-medium">{{ __('pos.cancel') }}</button>

@@ -5,18 +5,22 @@
 #   - Does NOT use Environment "production" or PRODUCTION_SSH_PRIVATE_KEY
 #   - Does NOT checkout untrusted PR code (workflow_run on the default branch)
 #   - Fork PRs are ignored
-#   - Auto-merge is requested only after "PR checks" succeeds, then GitHub
-#     still honors any additional required checks / conversation rules.
-#     This workflow cannot bypass required checks and does not merge itself.
+#   - Runs only after the "PR checks" workflow succeeds
+#   - GitHub still enforces any additional required checks / reviews;
+#     this job cannot skip them
+#
+# GitHub GraphQL enablePullRequestAutoMerge fails with
+# "Pull request is in clean status" when mergeable_state is CLEAN
+# (nothing left to wait for). In that case squash-merge the same SHA
+# that PR checks already validated.
 #
 # After this file is on main, future PRs whose head branch starts with
-# "cursor/" targeting main get squash auto-merge requested once PR checks pass.
+# "cursor/" targeting main get squash auto-merge, or an immediate squash
+# if GitHub reports CLEAN.
 #
-# Repo settings the owner must keep enabled (Settings → General):
-#   - Allow auto-merge
-#   - Allow squash merging
-# Mark workflow job "PR checks / validate" as a required status check on main
-# so GitHub waits for the latest commit's checks (not only the first enable).
+# Repo settings: Allow squash merging. Allow auto-merge is still useful
+# when required checks are pending. Mark "PR checks / validate" required
+# on main so later commits cannot land without a green check.
 
 name: Enable PR auto-merge
 
@@ -56,6 +60,26 @@ jobs:
               core.info('No open PR found for this PR-checks run; nothing to enable.');
               return;
             }
+
+            async function squashMerge(pr) {
+              if (pr.head.sha !== run.head_sha) {
+                throw new Error(
+                  `head SHA ${pr.head.sha} does not match PR-checks SHA ${run.head_sha}`
+                );
+              }
+              if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
+                throw new Error(`not mergeable (state=${pr.mergeable_state})`);
+              }
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: pr.number,
+                merge_method: 'squash',
+                sha: run.head_sha,
+              });
+              core.info(`PR #${pr.number}: squash-merged (GitHub CLEAN / already mergeable).`);
+            }
+
             let enabled = 0;
             for (const brief of candidates) {
               const { data: pr } = await github.rest.pulls.get({
@@ -71,7 +95,21 @@ jobs:
                 core.info(`PR #${pr.number}: skip non-cursor/ branch ${pr.head.ref}`);
                 continue;
               }
+              if (pr.merged) {
+                core.info(`PR #${pr.number}: already merged.`);
+                enabled += 1;
+                continue;
+              }
+              if (pr.head.sha !== run.head_sha) {
+                core.info(`PR #${pr.number}: skip stale head (PR ${pr.head.sha} vs checks ${run.head_sha})`);
+                continue;
+              }
               try {
+                if (pr.mergeable_state === 'clean') {
+                  await squashMerge(pr);
+                  enabled += 1;
+                  continue;
+                }
                 await github.graphql(
                   `mutation($id: ID!) {
                     enablePullRequestAutoMerge(input: {
@@ -91,6 +129,26 @@ jobs:
                   core.info(`PR #${pr.number}: auto-merge already enabled.`);
                   enabled += 1;
                   continue;
+                }
+                if (/clean status/i.test(msg) || /already merged/i.test(msg)) {
+                  try {
+                    const { data: latest } = await github.rest.pulls.get({
+                      owner, repo, pull_number: pr.number,
+                    });
+                    if (latest.merged) {
+                      core.info(`PR #${pr.number}: already merged.`);
+                      enabled += 1;
+                      continue;
+                    }
+                    await squashMerge(latest);
+                    enabled += 1;
+                    continue;
+                  } catch (mergeErr) {
+                    core.setFailed(
+                      `PR #${pr.number}: CLEAN auto-merge fallback squash failed: ${mergeErr.message || mergeErr}`
+                    );
+                    return;
+                  }
                 }
                 core.setFailed(
                   `PR #${pr.number}: could not enable auto-merge: ${msg}. ` +

@@ -81,14 +81,21 @@ import json, subprocess, sys
 parse, path = sys.argv[1], sys.argv[2]
 raw = subprocess.check_output([sys.executable, parse, path], text=True)
 d = json.loads(raw)
-assert d["title"] != "Daily L001 ke liye roz Reset dabana zaroori nahi"
-# Title already on live from the first CI Elaan insert — reuse is a no-op and
-# will not satisfy the freshness gate.
-assert d["title"] != "What's New ab approved production deploy ke saath aata hai"
+title = d["title"]
+# Titles already known to exist (or have existed) on live from prior CI inserts.
+# Reusing any of these is a successful insert no-op and will NOT pass the
+# NEW-SHA time-based freshness gate. Keep this list in sync when a new
+# production Elaan ships so the next PR cannot accidentally reuse it.
+KNOWN_LIVE_OR_RETIRED_TITLES = {
+    "Daily L001 ke liye roz Reset dabana zaroori nahi",
+    "What's New ab approved production deploy ke saath aata hai",
+    "Production update — exact approved commit ab live par aata hai",
+}
+assert title not in KNOWN_LIVE_OR_RETIRED_TITLES, title
 assert d["audience"] in ("pos", "all")
 PY
   then
-    ok "committed spec is a new unique pos/all title (not L001, not the live existing title)"
+    ok "committed spec is a new unique pos/all title (not L001, not a known live title)"
   else
     bad "committed spec must use a new unique title that can pass the freshness gate"
   fi

@@ -3,10 +3,10 @@
 # Do not reuse Daily L001, and do not reuse a title that already exists on live
 # (that is a successful insert no-op and will not pass the freshness gate).
 
-title: "Production update — exact approved commit ab live par aata hai"
+title: "Production update — same-SHA Elaan rerun ab fresh gate ke saath safe hai"
 audience: pos
 type: improvement
 points:
   - "POS aur FBR POS ka What's New popup aur bell pehle jaisa hai — 7 din live, seen tracking, aur admin master switch."
-  - "Yeh announcement is production update ke liye naya hai; pehle wala title dubara nahi bheja jata aur existing What's New re-date nahi hota."
-  - "Code GitHub production Environment approval ke baad exact commit par lagta hai — shops ke saved settings is se nahi badalte."
+  - "Naya production SHA ke liye naya unique title zaroori hai; pehle wala title dubara nahi bheja jata aur existing What's New re-date nahi hota."
+  - "Same exact SHA ka Actions rerun ab original approved announcement se pass ho sakta hai — naya SHA ab bhi fresh announcement maangta hai, shops ke saved settings is se nahi badalte."

@@ -29,6 +29,23 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 - When feasible, run the full suite with `php artisan test` before declaring a task complete.
 - Documentation-only or purely procedural tasks may skip the full suite when application tests are clearly unnecessary.
 
+## Cloud development environment
+
+Local/Cloud bootstrap (MariaDB `taxnest_dev`, Vite, PHPUnit sqlite):
+
+- How-to: `docs/ops/cloud-agent-development.md`
+- Non-secret architecture/invariants: `docs/ops/cloud-agent-architecture.md`
+- Cursor config: `.cursor/environment.json` → `scripts/cloud-dev-install.sh` / `scripts/cloud-dev-start.sh`
+
+```bash
+bash scripts/cloud-dev-install.sh
+bash scripts/cloud-dev-start.sh
+bash scripts/cloud-dev-bootstrap.sh
+php artisan test
+```
+
+Do not commit `.env`. Do not use production credentials in Cloud Agent VMs.
+
 ## Safety / never without explicit owner instruction
 
 - **Never deploy production** unless the owner explicitly instructs you to deploy.

@@ -25,7 +25,10 @@ return new class extends Migration
 
         if (!Schema::hasColumn('invoices', 'import_batch_id')) {
             Schema::table('invoices', function (Blueprint $table) {
-                $table->unsignedBigInteger('import_batch_id')->nullable()->after('source')
+                // Do not use ->after('source'): on a fresh MySQL migrate the
+                // `source` column is added later (2026_09_02_…). Positioning
+                // is cosmetic; missing `after` target aborts Cloud/local bootstrap.
+                $table->unsignedBigInteger('import_batch_id')->nullable()
                     ->comment('invoice_import_batches.id when this draft came from an Excel/CSV bulk import');
                 $table->index(['company_id', 'import_batch_id'], 'invoices_company_import_batch_idx');
             });

@@ -1,0 +1,12 @@
+{
+  "name": "TaxNest Cloud Development",
+  "install": "bash scripts/cloud-dev-install.sh",
+  "start": "bash scripts/cloud-dev-start.sh",
+  "chromeExecutablePath": "/usr/bin/google-chrome",
+  "terminals": [
+    {
+      "name": "Laravel",
+      "command": "test -f .env || bash scripts/cloud-dev-bootstrap.sh; php artisan serve --host=127.0.0.1 --port=8000"
+    }
+  ]
+}

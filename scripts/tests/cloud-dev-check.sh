@@ -113,6 +113,23 @@ else
   bad "missing docs/ops/cloud-agent-local-browser-qa.md"
 fi
 
+ISSUE_DOC="$ROOT/docs/ops/cloud-agent-issue-resolution.md"
+if [ -f "$ISSUE_DOC" ]; then
+  ok "present cloud-agent-issue-resolution.md"
+else
+  bad "missing docs/ops/cloud-agent-issue-resolution.md"
+fi
+if [ -f "$HAND" ]; then
+  grep -q 'cloud-agent-issue-resolution.md' "$HAND" \
+    && ok "handoff links issue-resolution policy" \
+    || bad "CLOUD_AGENT_HANDOFF.md should link issue-resolution policy"
+fi
+if [ -f "$ROOT/AGENTS.md" ]; then
+  ok "present AGENTS.md"
+else
+  bad "missing AGENTS.md"
+fi
+
 echo ""
 if [ "$FAILS" -eq 0 ]; then
   echo "ALL CHECKS PASSED"

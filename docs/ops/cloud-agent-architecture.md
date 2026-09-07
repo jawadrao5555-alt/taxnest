@@ -53,11 +53,12 @@ Guards are isolated — no cross-login except admin auto-detect rules documented
 
 ## Testing expectations
 
+- **DEFAULT issue workflow:** `docs/ops/cloud-agent-issue-resolution.md` (reproduce → root-cause fix → re-test original failure → evidence → PR).
 - Primary gate: `php artisan test` (sqlite `:memory:` via `phpunit.xml`).
 - After NestPOS changes: targeted Feature tests under `tests/Feature/Pos*`.
 - Local Chrome UI smoke (Cloud Agent): `docs/ops/cloud-agent-local-browser-qa.md` — loopback only; fictional `videodemo@nestpos.pk` shop; `DevStagingGuard` allows `taxnest_dev` \| `taxnest_staging`.
 - Frontend: `npm ci` && `npm run build` when assets/Vite inputs change.
-- Do not weaken tests to hide environment gaps.
+- Do not weaken tests to hide environment gaps. Do not claim FIXED without re-testing the reported issue.
 
 ## Deploy / Git (summary)
 
@@ -70,4 +71,7 @@ Guards are isolated — no cross-login except admin auto-detect rules documented
 
 - `replit.md` — product map & owner rules
 - `CLOUD_AGENT_HANDOFF.md` — agent workflow & safety
+- `AGENTS.md` — short agent entrypoint
+- `docs/ops/cloud-agent-issue-resolution.md` — **DEFAULT** issue-resolution policy
 - `docs/ops/cloud-agent-development.md` — how to bootstrap this environment
+- `docs/ops/cloud-agent-local-browser-qa.md` — fail-closed Chrome UI smoke

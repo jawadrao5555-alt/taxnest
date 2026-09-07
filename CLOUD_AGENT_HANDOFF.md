@@ -2,9 +2,37 @@
 
 Permanent development handoff for Cursor Cloud Agents working on **jawadrao5555-alt/taxnest**.
 
+## Default for reported issues (REQUIRED)
+
+When the owner reports a **real TaxNest issue**, do **not** jump straight to a
+patch + PHPUnit + PR. Operate as the end-to-end issue-resolution owner using the
+local-only environment:
+
+→ **[`docs/ops/cloud-agent-issue-resolution.md`](docs/ops/cloud-agent-issue-resolution.md)** (DEFAULT policy)
+
+Minimum bar before a `cursor/*` PR on an issue:
+
+1. Understand the affected user/business flow
+2. Inspect relevant code / models / routes / UI / tests
+3. **Reproduce locally** (MariaDB + real app flow) whenever practical
+4. Use **local Chrome** for UI flows; capture evidence under `.local/browser-evidence/`
+5. Fix the **root cause** (smallest correct change; keep fiscal/tenancy/tax invariants)
+6. Targeted tests + post-fix **re-test of the original failure**
+7. Iterate if anything fails — do not stop or claim success on a red check
+8. Full `php artisan test` when feasible; `npm run build` when assets change
+9. One focused PR with reproduction, root cause, commands, browser evidence, limitations
+
+Never say **DONE**, **FIXED**, or **VERIFIED** merely because code changed or
+PHPUnit passed. The original reported issue must have been re-tested successfully.
+
+**Production is out of bounds:** never access/modify/deploy production; never use
+production credentials, live customer data, production DB, FBR/PRA production
+tokens, or production SSH keys. Deploy remains Desktop / GitHub Actions + manual
+Environment approval.
+
 ## Product map
 
-`replit.md` is the authoritative product and operations map (modules, invariants, owner preferences, NestPOS PRA focus). Read the matching `.agents/memory/` topic before editing a subsystem. Do not copy or restate that map here.
+`replit.md` is the authoritative product and operations map (modules, invariants, owner preferences, NestPOS PRA focus). Read the matching `.agents/memory/` topic before editing a subsystem. Do not copy or restate that map here. Also see `AGENTS.md`.
 
 ## Current focus
 
@@ -25,10 +53,11 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 
 ## Testing
 
+- Follow **`docs/ops/cloud-agent-issue-resolution.md`** for reported bugs/features that need verification.
 - Run appropriate **targeted tests** after changes.
 - When feasible, run the full suite with `php artisan test` before declaring a task complete.
-- Documentation-only or purely procedural tasks may skip the full suite when application tests are clearly unnecessary.
-- For NestPOS UI/regression work, prefer the **local browser QA** loop (MariaDB `taxnest_dev` + `php artisan serve` + Chrome smoke) documented in `docs/ops/cloud-agent-local-browser-qa.md`:
+- Documentation-only or purely procedural tasks may skip the full suite when application tests are clearly unnecessary — still run `bash scripts/tests/cloud-agent-issue-resolution-check.sh` when editing that policy.
+- For NestPOS UI/regression work, use the **local browser QA** loop (MariaDB `taxnest_dev` + `php artisan serve` + Chrome smoke) documented in `docs/ops/cloud-agent-local-browser-qa.md`:
   - `bash scripts/cloud-local-qa-seed.sh`
   - `BASE_URL=http://127.0.0.1:8000 node scripts/cloud-local-ui-smoke.mjs`
   - Evidence under `.local/browser-evidence/` (gitignored). Fail-closed: loopback only; never live QA / `taxnest.pk`.
@@ -39,6 +68,7 @@ Local/Cloud bootstrap (MariaDB `taxnest_dev`, Vite, PHPUnit sqlite):
 
 - How-to: `docs/ops/cloud-agent-development.md`
 - Non-secret architecture/invariants: `docs/ops/cloud-agent-architecture.md`
+- Issue-resolution policy (DEFAULT): `docs/ops/cloud-agent-issue-resolution.md`
 - Cursor config: `.cursor/environment.json` → `scripts/cloud-dev-install.sh` / `scripts/cloud-dev-start.sh`
 
 ```bash
@@ -83,4 +113,4 @@ Owner GitHub settings (one-time): **Allow auto-merge**, **Allow squash merging**
 
 ## This file’s purpose
 
-Keep Cloud Agents on a safe, reusable branch → test → PR path against `main`, with NestPOS PRA as default scope and `replit.md` as the product source of truth.
+Keep Cloud Agents on a safe, reusable **reproduce → fix → evidence → PR** path against `main`, with NestPOS PRA as default scope and `replit.md` as the product source of truth. Issue work defaults to `docs/ops/cloud-agent-issue-resolution.md`.

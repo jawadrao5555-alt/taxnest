@@ -29,6 +29,9 @@ bash scripts/cloud-dev-bootstrap.sh --seed-local-qa
 
 Browser / UI self-testing (fail-closed, loopback only): `docs/ops/cloud-agent-local-browser-qa.md`
 
+**DEFAULT for reported issues** (reproduce → fix → re-test → evidence → PR):
+`docs/ops/cloud-agent-issue-resolution.md`
+
 Generate / refresh key manually if needed:
 
 ```bash
@@ -52,6 +55,7 @@ Do **not** commit `.env`.
 | Local QA seed (fictional shop) | `bash scripts/cloud-local-qa-seed.sh` |
 | NestPOS Chrome UI smoke | `BASE_URL=http://127.0.0.1:8000 node scripts/cloud-local-ui-smoke.mjs` |
 | Browser QA static check | `bash scripts/tests/cloud-local-browser-qa-check.sh` |
+| Issue-resolution policy check | `bash scripts/tests/cloud-agent-issue-resolution-check.sh` |
 
 ## Local database
 
@@ -70,6 +74,7 @@ Replit’s older MySQL Staging path (`.local/mysql_run`, port `9000`, `scripts/d
 
 - Default product focus: **NestPOS PRA** (`replit.md`, `CLOUD_AGENT_HANDOFF.md`).
 - Architecture / invariants (non-secret): `docs/ops/cloud-agent-architecture.md`.
+- **Issue-resolution (DEFAULT):** `docs/ops/cloud-agent-issue-resolution.md` — reproduce locally, Chrome when UI, re-test original failure, evidence before PR.
 - Cloud Agents may use local DB, local `.env`, PHPUnit, Vite, and browser smoke against `127.0.0.1` only (`docs/ops/cloud-agent-local-browser-qa.md`).
 - Prefer `scripts/cloud-local-ui-smoke.mjs` for NestPOS UI evidence. Do **not** use `scripts/live-screen-smoke.sh` from Cloud Agents (it targets live `taxnest.pk`).
 - Cloud Agents must **never**:
@@ -84,8 +89,7 @@ Replit’s older MySQL Staging path (`.local/mysql_run`, port `9000`, `scripts/d
 ```
 latest origin/main
   → cursor/* branch
-  → implement
-  → tests
+  → reproduce (local) → fix → re-test + evidence
   → PR to main
   → PR checks
   → automatic squash merge (cursor/*)

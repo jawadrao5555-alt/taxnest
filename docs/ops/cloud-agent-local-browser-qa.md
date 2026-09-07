@@ -1,6 +1,9 @@
 # Cloud Agent — local browser / UI QA (fail-closed)
 
 Reusable NestPOS Chrome smoke for **local disposable environments only**.
+Used as the UI verification step inside the **DEFAULT** issue-resolution
+policy: `docs/ops/cloud-agent-issue-resolution.md`.
+
 This is the Cloud Agent analogue of Replit-Agent self-testing: reproduce a UI
 issue locally, exercise the real flow in Chrome, inspect console/page errors,
 fix, and re-test — without production credentials or hosts.
@@ -92,3 +95,9 @@ bash scripts/tests/cloud-local-browser-qa-check.sh
 - Production deploy / SSH / live DB  
 - Replacing PHPUnit  
 - Calling `scripts/live-screen-smoke.sh` from Cloud Agents (uses live QA on `taxnest.pk`)  
+
+## Related
+
+- Default issue workflow: `docs/ops/cloud-agent-issue-resolution.md`
+- Bootstrap: `docs/ops/cloud-agent-development.md`
+- Handoff: `CLOUD_AGENT_HANDOFF.md`

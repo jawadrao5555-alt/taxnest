@@ -16,6 +16,14 @@
 #     --title "Test elaan" \
 #     --point "Test point 1"
 #
+# Usage (committed spec — GitHub Actions after Environment approval + SSH):
+#   bash scripts/elaan-insert.sh --from-file deploy/elaan.yml
+#
+# Idempotency: if a published row with the SAME title already exists:
+#   - created after the last live deploy marker → ELAAN_EXISTS (retry-safe)
+#   - created before that marker (or no retry window) → FAIL (will not
+#     duplicate or re-date, including the reserved Daily L001 title)
+#
 # Rules (from .agents/memory/pos-whats-new-updates.md):
 #   - points MUST be a PHP array on the way in (never a pre-encoded JSON string).
 #   - AppUpdate model's setPointsAttribute handles encoding — just pass the array.
@@ -43,25 +51,46 @@ fail() { echo ""; echo "ELAAN INSERT FAILED: $*" >&2; exit 1; }
 # ---------------------------------------------------------- Parse args
 TITLE=""
 AUDIENCE="pos"
+ELAAN_TYPE="improvement"
 DEV=0
+DRY_RUN=0
+FROM_FILE=""
 declare -a POINTS=()
 declare -a CATEGORIES=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --title)    shift; TITLE="$1" ;;
-    --point)    shift; POINTS+=("$1") ;;
-    --audience) shift; AUDIENCE="$1" ;;
-    --category) shift; CATEGORIES+=("$1") ;;
-    --dev)      DEV=1 ;;
+    --title)     shift; TITLE="$1" ;;
+    --point)     shift; POINTS+=("$1") ;;
+    --audience)  shift; AUDIENCE="$1" ;;
+    --category)  shift; CATEGORIES+=("$1") ;;
+    --from-file) shift; FROM_FILE="$1" ;;
+    --dev)       DEV=1 ;;
+    --dry-run)   DRY_RUN=1 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
   shift
 done
 
+if [ -n "$FROM_FILE" ]; then
+  [ -f "$FROM_FILE" ] || fail "--from-file not found: $FROM_FILE"
+  command -v python3 >/dev/null 2>&1 || fail "python3 is required to parse $FROM_FILE"
+  SPEC_BASH=$(python3 "$(dirname "$0")/lib/elaan-spec-parse.py" --bash "$FROM_FILE") \
+    || fail "could not parse Elaan spec $FROM_FILE"
+  eval "$SPEC_BASH"
+fi
+
 [ -n "$TITLE" ] || fail "--title is required"
 [ ${#POINTS[@]} -gt 0 ] || fail "at least one --point is required"
 case "$AUDIENCE" in pos|fbr_pos|all) ;; *) fail "--audience must be pos, fbr_pos, or all" ;; esac
+case "$ELAAN_TYPE" in feature|improvement|"") ;; *) fail "type must be feature or improvement" ;; esac
+[ -n "$ELAAN_TYPE" ] || ELAAN_TYPE="improvement"
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo "ELAAN_DRY_RUN title=$TITLE"
+  echo "ELAAN_DRY_RUN audience=$AUDIENCE type=$ELAAN_TYPE points=${#POINTS[@]} categories=${#CATEGORIES[@]}"
+  exit 0
+fi
 
 echo ""
 echo "==> Elaan insert: \"$TITLE\" (audience=$AUDIENCE, ${#POINTS[@]} point(s))"
@@ -95,6 +124,8 @@ PHP_CATS_ARRAY="${PHP_CATS_ARRAY})"
 
 TITLE_ESCAPED=$(printf '%s' "$TITLE" | sed "s/'/\\\\'/g")
 AUDIENCE_ESCAPED=$(printf '%s' "$AUDIENCE" | sed "s/'/\\\\'/g")
+TYPE_ESCAPED=$(printf '%s' "$ELAAN_TYPE" | sed "s/'/\\\\'/g")
+MARKER_FILE_ESCAPED=$(printf '%s' "$LIVE_DEPLOY_MARKER" | sed "s/'/\\\\'/g")
 
 # ---------------------------------------------------------- PHP bootstrap script
 # Runs identically on live (hardcoded LIVE_DIR paths) or dev (relative paths from CWD).
@@ -144,6 +175,40 @@ if (\$cats && ! Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'tar
     exit(1);
 }
 \$extra = \$cats ? ['target_categories' => \$cats] : [];
+if (Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')) {
+    \$extra['type'] = '$TYPE_ESCAPED';
+}
+
+\$reserved = 'Daily L001 ke liye roz Reset dabana zaroori nahi';
+if ('$TITLE_ESCAPED' === \$reserved) {
+    fwrite(STDERR, "ERROR: reserved Daily L001 title — will not re-create or re-date that announcement.\\n");
+    exit(1);
+}
+
+\$existing = App\Models\AppUpdate::where('title', '$TITLE_ESCAPED')->orderByDesc('id')->get();
+\$sinceTs = null;
+\$markerFile = '$MARKER_FILE_ESCAPED';
+if (is_string(\$markerFile) && \$markerFile !== '' && is_file(\$markerFile)) {
+    \$raw = trim((string) file_get_contents(\$markerFile));
+    \$epoch = explode('|', \$raw, 2)[0];
+    if (preg_match('/^[0-9]+$/', \$epoch)) {
+        \$sinceTs = (int) \$epoch;
+    }
+}
+foreach (\$existing as \$row) {
+    \$createdTs = \$row->created_at ? \$row->created_at->getTimestamp() : 0;
+    if (\$sinceTs !== null && \$createdTs > \$sinceTs) {
+        echo "ELAAN_EXISTS id=" . \$row->id . " title=" . json_encode(\$row->title) . "\\n";
+        exit(0);
+    }
+}
+if (\$existing->isNotEmpty()) {
+    \$old = \$existing->first();
+    fwrite(STDERR, "ERROR: title already exists as app_updates id=" . \$old->id
+        . " created_at=" . (\$old->created_at ? \$old->created_at->toDateTimeString() : 'unknown')
+        . " — will not duplicate or re-date. Use a new unique title in deploy/elaan.yml.\\n");
+    exit(1);
+}
 
 \$row = App\Models\AppUpdate::create([
     'title'        => '$TITLE_ESCAPED',
@@ -172,12 +237,16 @@ if [ "$DEV" = "1" ]; then
   rm -f "$TMP_SCRIPT"
   echo "$DEV_OUT"
   [ $DEV_RC -eq 0 ] || fail "PHP bootstrap failed on dev (exit $DEV_RC)"
-  echo "$DEV_OUT" | grep -q "ELAAN_INSERTED" \
-    || fail "PHP ran but ELAAN_INSERTED marker missing — row was NOT created; check output above"
+  echo "$DEV_OUT" | grep -qE "ELAAN_INSERTED|ELAAN_EXISTS" \
+    || fail "PHP ran but ELAAN_INSERTED/ELAAN_EXISTS marker missing — row was NOT created; check output above"
   CREATED_ID=$(echo "$DEV_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
   echo ""
   echo "---------------------------------------------------------------"
-  echo "ELAAN OK (dev): AppUpdate row #${CREATED_ID} created in dev DB."
+  if echo "$DEV_OUT" | grep -q "ELAAN_EXISTS"; then
+    echo "ELAAN OK (dev, idempotent): AppUpdate row #${CREATED_ID} already present."
+  else
+    echo "ELAAN OK (dev): AppUpdate row #${CREATED_ID} created in dev DB."
+  fi
   echo "                Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
   echo "                Verify: /admin/app-updates on the dev server."
   echo "---------------------------------------------------------------"
@@ -190,12 +259,16 @@ else
         "cat > /tmp/elaan_insert_$$.php && $LIVE_PHP /tmp/elaan_insert_$$.php; RC=\$?; rm -f /tmp/elaan_insert_$$.php; exit \$RC" \
     2>&1) || { echo "$LIVE_OUT" >&2; fail "PHP bootstrap failed on live"; }
   echo "$LIVE_OUT"
-  echo "$LIVE_OUT" | grep -q "ELAAN_INSERTED" \
-    || fail "PHP ran but ELAAN_INSERTED marker missing — check output above"
+  echo "$LIVE_OUT" | grep -qE "ELAAN_INSERTED|ELAAN_EXISTS" \
+    || fail "PHP ran but ELAAN_INSERTED/ELAAN_EXISTS marker missing — check output above"
   CREATED_ID=$(echo "$LIVE_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
   echo ""
   echo "---------------------------------------------------------------"
-  echo "ELAAN OK: AppUpdate row #${CREATED_ID} created on live."
+  if echo "$LIVE_OUT" | grep -q "ELAAN_EXISTS"; then
+    echo "ELAAN OK (idempotent): AppUpdate row #${CREATED_ID} already present after last deploy marker."
+  else
+    echo "ELAAN OK: AppUpdate row #${CREATED_ID} created on live."
+  fi
   echo "          Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
   echo "          POS bell badge + popup will appear on next page load."
   echo "          Verify: https://taxnest.pk/admin/app-updates"

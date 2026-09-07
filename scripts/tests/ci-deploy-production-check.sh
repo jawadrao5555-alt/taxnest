@@ -134,6 +134,24 @@ if [ -f "$CI" ]; then
   done
   ok "ci script skips Replit-local browser/MySQL preflights"
 
+  grep -q 'insert_committed_elaan_spec' "$CI" \
+    && ok "ci script inserts committed Elaan spec after SSH" \
+    || bad "ci script must insert deploy/elaan.yml after SSH"
+
+  grep -q 'elaan-insert.sh' "$CI" \
+    && ok "ci script uses existing elaan-insert.sh" \
+    || bad "ci script must call scripts/elaan-insert.sh"
+
+  python3 - "$CI" <<'PY' && ok "ci script inserts spec before freshness check / remote_apply" || bad "ci elaan insert must run before check_elaan_freshness and remote_apply"
+import sys
+text = open(sys.argv[1], encoding="utf-8").read()
+if "\ninsert_committed_elaan_spec\ncheck_elaan_freshness" not in text:
+    sys.exit(1)
+if text.find("\ninsert_committed_elaan_spec\ncheck_elaan_freshness") > text.find("remote_apply"):
+    sys.exit(1)
+sys.exit(0)
+PY
+
   bash -n "$CI" && ok "ci script bash -n clean" || bad "ci script bash -n failed"
 fi
 
@@ -195,10 +213,10 @@ fi
 
 # --- docs
 if [ -f "$DOC" ]; then
-  for needle in 'environment' 'production' 'PRODUCTION_SSH_PRIVATE_KEY' 'taxnest-production-deploy' 'nayatel_vps_key' 'ROLLBACK.md' 'required reviewers'; do
+  for needle in 'environment' 'production' 'PRODUCTION_SSH_PRIVATE_KEY' 'taxnest-production-deploy' 'nayatel_vps_key' 'ROLLBACK.md' 'required reviewers' 'deploy/elaan.yml' 'elaan-insert'; do
     grep -qi "$needle" "$DOC" || bad "docs missing mention of: $needle"
   done
-  ok "docs cover Environment, secret, key, reviewers, rollback"
+  ok "docs cover Environment, secret, key, reviewers, rollback, Elaan spec"
 fi
 
 # --- handoff pointer
@@ -206,6 +224,16 @@ if [ -f "$ROOT/CLOUD_AGENT_HANDOFF.md" ]; then
   grep -q 'github-production-deploy.md' "$ROOT/CLOUD_AGENT_HANDOFF.md" \
     && ok "CLOUD_AGENT_HANDOFF.md links production deploy docs" \
     || bad "CLOUD_AGENT_HANDOFF.md should link docs/ops/github-production-deploy.md"
+  grep -q 'deploy/elaan.yml' "$ROOT/CLOUD_AGENT_HANDOFF.md" \
+    && ok "CLOUD_AGENT_HANDOFF.md mentions deploy/elaan.yml" \
+    || bad "CLOUD_AGENT_HANDOFF.md should mention deploy/elaan.yml"
+fi
+
+# --- committed spec parser
+if [ -f "$ROOT/scripts/tests/elaan-spec-parse-check.sh" ]; then
+  bash "$ROOT/scripts/tests/elaan-spec-parse-check.sh" \
+    && ok "elaan spec parser checks passed" \
+    || bad "elaan spec parser checks failed"
 fi
 
 echo ""

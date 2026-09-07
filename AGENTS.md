@@ -34,6 +34,7 @@ Actions live-verify → self-heal loops on failure (max 3). Cloud Agents stay
 | `docs/ops/cloud-agent-development.md` | Local/Cloud bootstrap (MariaDB) |
 | `docs/ops/cloud-agent-local-browser-qa.md` | Fail-closed Chrome UI smoke |
 | `docs/ops/cloud-agent-architecture.md` | Non-secret invariants |
+| `docs/architecture/README.md` | **Permanent SaaS reverse-engineering knowledge base** (read before large changes) |
 | `replit.md` | Authoritative product map |
 
 ## Hard safety boundary

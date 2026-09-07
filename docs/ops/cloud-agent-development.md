@@ -20,6 +20,15 @@ Optional catalog seed only (no customer/demo credential seeders):
 bash scripts/cloud-dev-bootstrap.sh --seed-plans
 ```
 
+Optional fictional NestPOS local QA shop (for Chrome UI smoke — never production):
+
+```bash
+bash scripts/cloud-dev-bootstrap.sh --seed-local-qa
+# or: bash scripts/cloud-local-qa-seed.sh
+```
+
+Browser / UI self-testing (fail-closed, loopback only): `docs/ops/cloud-agent-local-browser-qa.md`
+
 Generate / refresh key manually if needed:
 
 ```bash
@@ -40,6 +49,9 @@ Do **not** commit `.env`.
 | Frontend build | `npm run build` |
 | Platform check | `composer check-platform-reqs` |
 | Setup static check | `bash scripts/tests/cloud-dev-check.sh` |
+| Local QA seed (fictional shop) | `bash scripts/cloud-local-qa-seed.sh` |
+| NestPOS Chrome UI smoke | `BASE_URL=http://127.0.0.1:8000 node scripts/cloud-local-ui-smoke.mjs` |
+| Browser QA static check | `bash scripts/tests/cloud-local-browser-qa-check.sh` |
 
 ## Local database
 
@@ -58,12 +70,14 @@ Replit’s older MySQL Staging path (`.local/mysql_run`, port `9000`, `scripts/d
 
 - Default product focus: **NestPOS PRA** (`replit.md`, `CLOUD_AGENT_HANDOFF.md`).
 - Architecture / invariants (non-secret): `docs/ops/cloud-agent-architecture.md`.
-- Cloud Agents may use local DB, local `.env`, PHPUnit, Vite, and browser smoke against `127.0.0.1`.
+- Cloud Agents may use local DB, local `.env`, PHPUnit, Vite, and browser smoke against `127.0.0.1` only (`docs/ops/cloud-agent-local-browser-qa.md`).
+- Prefer `scripts/cloud-local-ui-smoke.mjs` for NestPOS UI evidence. Do **not** use `scripts/live-screen-smoke.sh` from Cloud Agents (it targets live `taxnest.pk`).
 - Cloud Agents must **never**:
   - deploy production or SSH to the VPS without explicit owner instruction
   - request/commit production secrets, FBR/PRA tokens, SSH keys, mail passwords, customer credentials
   - connect to production databases
   - commit `.env` or `.local/` secrets
+  - point browser QA at non-loopback hosts
 
 ## Normal Git workflow
 

@@ -14,6 +14,7 @@
 # Usage:
 #   bash scripts/cloud-dev-bootstrap.sh
 #   bash scripts/cloud-dev-bootstrap.sh --seed-plans
+#   bash scripts/cloud-dev-bootstrap.sh --seed-local-qa
 #   bash scripts/cloud-dev-bootstrap.sh --skip-migrate
 
 set -euo pipefail
@@ -22,13 +23,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 SEED_PLANS=0
+SEED_LOCAL_QA=0
 SKIP_MIGRATE=0
 for arg in "$@"; do
   case "$arg" in
     --seed-plans) SEED_PLANS=1 ;;
+    --seed-local-qa) SEED_LOCAL_QA=1 ;;
     --skip-migrate) SKIP_MIGRATE=1 ;;
     -h|--help)
-      sed -n '2,20p' "$0"
+      sed -n '2,22p' "$0"
       exit 0
       ;;
   esac
@@ -88,11 +91,14 @@ else
   echo "Skipping migrations (--skip-migrate)"
 fi
 
-if [ "$SEED_PLANS" = "1" ]; then
+if [ "$SEED_PLANS" = "1" ] && [ "$SEED_LOCAL_QA" = "0" ]; then
   step "Seeding PricingPlanSeeder only (no customer/demo credential seeders)"
   php artisan db:seed --class=PricingPlanSeeder --force --no-interaction
+elif [ "$SEED_LOCAL_QA" = "1" ]; then
+  step "Seeding local NestPOS QA demo shop (fail-closed; see docs/ops/cloud-agent-local-browser-qa.md)"
+  bash "$ROOT/scripts/cloud-local-qa-seed.sh" --with-plans
 else
-  echo "Skipping seeders (pass --seed-plans for PricingPlanSeeder only)."
+  echo "Skipping seeders (pass --seed-plans and/or --seed-local-qa)."
   echo "NOTE: DatabaseSeeder and video/demo seeders are NOT run automatically."
 fi
 
@@ -118,5 +124,6 @@ echo "CLOUD DEV BOOTSTRAP OK"
 echo "  Local DB: taxnest_dev @ 127.0.0.1:3306"
 echo "  Serve:    php artisan serve --host=127.0.0.1 --port=8000"
 echo "  Tests:    php artisan test"
+echo "  UI smoke: bash scripts/cloud-local-qa-seed.sh && node scripts/cloud-local-ui-smoke.mjs"
 echo "  Frontend: npm ci && npm run build"
 echo "---------------------------------------------------------------"

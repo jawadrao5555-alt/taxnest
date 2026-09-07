@@ -28,6 +28,10 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 - Run appropriate **targeted tests** after changes.
 - When feasible, run the full suite with `php artisan test` before declaring a task complete.
 - Documentation-only or purely procedural tasks may skip the full suite when application tests are clearly unnecessary.
+- For NestPOS UI/regression work, prefer the **local browser QA** loop (MariaDB `taxnest_dev` + `php artisan serve` + Chrome smoke) documented in `docs/ops/cloud-agent-local-browser-qa.md`:
+  - `bash scripts/cloud-local-qa-seed.sh`
+  - `BASE_URL=http://127.0.0.1:8000 node scripts/cloud-local-ui-smoke.mjs`
+  - Evidence under `.local/browser-evidence/` (gitignored). Fail-closed: loopback only; never live QA / `taxnest.pk`.
 
 ## Cloud development environment
 

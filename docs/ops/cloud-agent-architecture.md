@@ -55,6 +55,7 @@ Guards are isolated — no cross-login except admin auto-detect rules documented
 
 - Primary gate: `php artisan test` (sqlite `:memory:` via `phpunit.xml`).
 - After NestPOS changes: targeted Feature tests under `tests/Feature/Pos*`.
+- Local Chrome UI smoke (Cloud Agent): `docs/ops/cloud-agent-local-browser-qa.md` — loopback only; fictional `videodemo@nestpos.pk` shop; `DevStagingGuard` allows `taxnest_dev` \| `taxnest_staging`.
 - Frontend: `npm ci` && `npm run build` when assets/Vite inputs change.
 - Do not weaken tests to hide environment gaps.
 

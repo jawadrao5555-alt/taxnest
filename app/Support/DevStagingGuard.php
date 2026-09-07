@@ -5,19 +5,29 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Single truth for "this process is talking to the LOCAL dev staging DB and
- * nothing else". Destructive dev-only tooling (video demo seeders, the fake
- * Desktop Agent loop) must call assertLocalStaging() before writing anything.
+ * Single truth for "this process is talking to a LOCAL disposable MariaDB
+ * database and nothing else". Destructive dev-only tooling (video demo
+ * seeders, the fake Desktop Agent loop, Cloud Agent local QA seed) must call
+ * assertLocalStaging() before writing anything.
+ *
+ * Allowed DB names:
+ *   - taxnest_staging — Replit / older local MySQL Staging (port 9000)
+ *   - taxnest_dev     — Cloud Agent / docs MariaDB path (port 3306)
  *
  * Deliberately exact: a production schema whose name merely *contains*
- * "staging" must not pass, and neither must a remote host.
+ * "staging" or "dev" must not pass, and neither must a remote host.
  */
 final class DevStagingGuard
 {
+    /** @deprecated Prefer DB_NAMES — kept for callers that expect a single legacy name */
     public const DB_NAME = 'taxnest_staging';
+
+    /** Local disposable database names only (exact match). */
+    public const DB_NAMES = ['taxnest_staging', 'taxnest_dev'];
+
     public const HOSTS = ['127.0.0.1', 'localhost'];
 
-    /** @return string[] reasons the current connection is NOT the local staging DB (empty = OK) */
+    /** @return string[] reasons the current connection is NOT a local disposable DB (empty = OK) */
     public static function problems(): array
     {
         $conn = DB::connection();
@@ -26,8 +36,9 @@ final class DevStagingGuard
         if (($cfg['driver'] ?? '') !== 'mysql') {
             $problems[] = "driver '" . ($cfg['driver'] ?? '?') . "' is not mysql";
         }
-        if ($conn->getDatabaseName() !== self::DB_NAME) {
-            $problems[] = "database '" . $conn->getDatabaseName() . "' is not " . self::DB_NAME;
+        $dbName = (string) $conn->getDatabaseName();
+        if (!in_array($dbName, self::DB_NAMES, true)) {
+            $problems[] = "database '{$dbName}' is not one of " . implode('|', self::DB_NAMES);
         }
         $host = (string) ($cfg['host'] ?? '');
         if (!in_array($host, self::HOSTS, true)) {
@@ -50,7 +61,7 @@ final class DevStagingGuard
         }
         $problems = self::problems();
         if ($problems) {
-            throw new \RuntimeException("{$tool} refused: not the local staging DB (" . implode('; ', $problems) . ').');
+            throw new \RuntimeException("{$tool} refused: not a local disposable DB (" . implode('; ', $problems) . ').');
         }
     }
 }

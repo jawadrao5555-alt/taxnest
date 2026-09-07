@@ -1,0 +1,15 @@
+# Optional commit-specific live verify markers (NestPOS).
+#
+# Used by scripts/ci-live-verify.sh AFTER deploy on GitHub Actions.
+# Format (one per line):
+#   /pos/path|Human feature name|regex
+#
+# Rules:
+#   - Non-secret markers only (no credentials)
+#   - Prefer language-independent DOM ids / data-* attributes
+#   - Do not add customer-specific assertions
+#   - Leave empty / omit file when the default NestPOS profile is enough
+#
+# Example (commented):
+# /pos/dashboard|Aaj ka Khaata|id="today-khata"
+# /pos/invoice/create|sale root|data-tn-sale-root

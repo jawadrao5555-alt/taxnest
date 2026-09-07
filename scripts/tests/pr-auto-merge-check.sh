@@ -80,6 +80,10 @@ if [ -f "$PC" ]; then
     && ok "PR checks runs pr-auto-merge-check.sh" \
     || bad "PR checks must run the static validator"
 
+  grep -q 'issue-to-live-check.sh' "$PC" \
+    && ok "PR checks runs issue-to-live-check.sh" \
+    || bad "PR checks must run issue-to-live-check.sh"
+
   if grep -vE '^\s*#' "$PC" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY'; then
     bad "PR checks must not use the production Environment or SSH secret"
   else
@@ -87,7 +91,7 @@ if [ -f "$PC" ]; then
   fi
 fi
 
-if [ -f "$DP" ]; then
+  if [ -f "$DP" ]; then
   grep -q 'environment: production' "$DP" \
     && ok "Deploy Production still uses environment: production" \
     || bad "must not remove production Environment from deploy workflow"
@@ -95,6 +99,14 @@ if [ -f "$DP" ]; then
   grep -q 'PRODUCTION_SSH_PRIVATE_KEY' "$DP" \
     && ok "Deploy Production still uses PRODUCTION_SSH_PRIVATE_KEY" \
     || bad "must not remove production SSH secret from deploy workflow"
+
+  grep -q 'ci-live-verify.sh' "$DP" \
+    && ok "Deploy Production runs post-deploy ci-live-verify.sh" \
+    || bad "Deploy Production must run scripts/ci-live-verify.sh after apply"
+
+  grep -q 'LIVE_QA_PASS' "$DP" \
+    && ok "Deploy Production wires LIVE_QA_PASS for live verify" \
+    || bad "Deploy Production must pass LIVE_QA_PASS into live verify"
 
   if grep -q 'pull_request' "$DP"; then
     bad "Deploy Production must not run on pull_request"

@@ -207,6 +207,21 @@ Those words are allowed only after the **original reported issue** was
 re-tested successfully (or after an explicit, evidence-backed statement that
 reproduction was impossible and why).
 
+For **LIVE VERIFIED**, also require Actions `ci-live-verify.sh` success for the
+fixing SHA — see `docs/ops/cloud-agent-issue-to-live.md`.
+
+---
+
+## After the PR (issue → live)
+
+Local PR evidence is not the end of ownership. Continue with:
+
+→ **`docs/ops/cloud-agent-issue-to-live.md`**
+
+Merge → Deploy Production (manual Environment approval) → live SHA + NestPOS
+marker verify → self-heal on failure (max 3 iterations). Cloud Agents remain
+production-secret-free.
+
 ---
 
 ## Quick command map
@@ -222,6 +237,8 @@ reproduction was impossible and why).
 | NestPOS Chrome smoke | `BASE_URL=http://127.0.0.1:8000 node scripts/cloud-local-ui-smoke.mjs` |
 | Browser QA static check | `bash scripts/tests/cloud-local-browser-qa-check.sh` |
 | This policy static check | `bash scripts/tests/cloud-agent-issue-resolution-check.sh` |
+| Issue→live static check | `bash scripts/tests/issue-to-live-check.sh` |
+| Observe deploy/verify (secret-free) | `bash scripts/cloud-issue-to-live-observe.sh` |
 | Frontend build | `npm ci && npm run build` |
 
 ---
@@ -239,7 +256,8 @@ reproduction was impossible and why).
 ## Related
 
 - `CLOUD_AGENT_HANDOFF.md` — entrypoint; points here for issue work  
+- `docs/ops/cloud-agent-issue-to-live.md` — merge → deploy → live-verify → self-heal  
 - `docs/ops/cloud-agent-local-browser-qa.md` — fail-closed Chrome tooling  
 - `docs/ops/cloud-agent-development.md` — bootstrap  
 - `docs/ops/cloud-agent-architecture.md` — invariants  
-- `docs/ops/github-production-deploy.md` — production path (not Cloud Agent)  
+- `docs/ops/github-production-deploy.md` — production Actions path  

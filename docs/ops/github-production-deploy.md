@@ -33,10 +33,13 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 
 2. **Required reviewers:** add yourself (and any other owners) so every production deploy waits for explicit approval. This is the production gate.
 
-3. **Environment secret:**
+3. **Environment secrets:**
    - Name (exact): `PRODUCTION_SSH_PRIVATE_KEY`
    - Value: the **private** half of the dedicated VPS deploy key whose public key comment is `taxnest-production-deploy`
    - Scope: Environment `production` only (not a repository-wide secret unless you intentionally want that — prefer Environment)
+   - Name (exact): `LIVE_QA_PASS`
+   - Value: password for the standing live NestPOS QA login (`qa.fullaudit@taxnest.com.pk`) used **only** by `scripts/ci-live-verify.sh` after deploy
+   - Scope: Environment `production` only — **never** give this to Cloud Agents
 
 4. **Do not** store or use the old Replit key (`.local/ssh/nayatel_vps_key`) in Actions.
 
@@ -54,9 +57,9 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 | Elaan spec | If `deploy/elaan.yml` is in the commit, `scripts/elaan-insert.sh --from-file` creates a published `AppUpdate` on live (same popup/bell/7-day/seen/master-switch as before). Idempotent on **title**: an existing exact title is a successful no-op (not duplicated or re-dated). The reserved Daily L001 title is rejected and never inserted. `skip_elaan` skips this insert. |
 | Elaan gate | Unchanged freshness check: a published `pos`/`all` row must have `created_at` after the last deploy marker. Infra-only deploys omit `deploy/elaan.yml` and use `skip_elaan`, or insert on live after the last marker. |
 | Apply | `scripts/ci-deploy-production.sh` → shared `scripts/lib/live-remote-apply.sh` |
+| Live verify | Same job runs `scripts/ci-live-verify.sh`: live HEAD == `github.sha`, `/up` 200, NestPOS QA login + feature markers (not merely HTTP 200). Uses Environment secrets `PRODUCTION_SSH_PRIVATE_KEY` + `LIVE_QA_PASS`. Failure fails the workflow — Cloud Agents must start a new diagnosis cycle (`docs/ops/cloud-agent-issue-to-live.md`). |
 | Semantics | Same remote core as `deploy-live.sh`: flock lock, maintenance `artisan down` (200), exact-SHA checkout, composer if needed, migrate only when the gap includes migrations, config/route/view cache rebuild, ownership + SELinux repair, PHP-FPM reload with OPcache proof, `taxnest-queue` restart, `artisan up`, homepage 200, cache-fresh probe, deploy marker. Fail closed (site stays in maintenance on apply failure). |
-| Not run | Replit-local preflights (MySQL staging, Chromium, `.local` QA), SW `CACHE_VERSION` auto-bump commits, any `git push` |
-
+| Not run | Replit-local preflights (MySQL staging, Chromium, `.local` QA), SW `CACHE_VERSION` auto-bump commits, any `git push`, Cloud Agent processes
 Manual `workflow_dispatch` inputs:
 
 - `skip_elaan` — emergency only; skips **both** committed-spec insert and the What's New freshness gate
@@ -88,6 +91,15 @@ Host identity is pinned in `scripts/lib/live-known-hosts`. Host metadata (IP, pa
 ## Relationship to `scripts/deploy-live.sh`
 
 `deploy-live.sh` remains the manual/Replit one-command deploy (local preflights, optional SW bump, push workspace HEAD to `main`, then remote apply). Both paths call `scripts/lib/live-remote-apply.sh` for the remote mutation core. Prefer the GitHub Actions path once the Environment secret and reviewers are configured.
+
+## Issue → live (Cloud Agent)
+
+After a `cursor/*` PR merges, follow **`docs/ops/cloud-agent-issue-to-live.md`**:
+
+- Push to `main` hands the commit to Deploy Production (Environment approval stays **manual**)
+- Actions runs post-deploy `ci-live-verify.sh` (SHA + NestPOS markers)
+- Cloud Agents observe with `bash scripts/cloud-issue-to-live-observe.sh` (secret-free)
+- On live-verify failure: autonomous fix→PR→redeploy cycle (max 3); never claim LIVE VERIFIED early
 
 ## Rollback
 

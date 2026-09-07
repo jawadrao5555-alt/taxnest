@@ -1,0 +1,96 @@
+#!/bin/bash
+# Static validation for Cloud Agent PR auto-merge + PR checks workflows.
+# Does NOT SSH, deploy, or require secrets.
+# Usage: bash scripts/tests/pr-auto-merge-check.sh
+set -uo pipefail
+
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+FAILS=0
+ok()  { echo "PASS: $*"; }
+bad() { echo "FAIL: $*" >&2; FAILS=$((FAILS+1)); }
+
+AM="$ROOT/.github/workflows/enable-pr-auto-merge.yml"
+PC="$ROOT/.github/workflows/pr-checks.yml"
+DP="$ROOT/.github/workflows/deploy-production.yml"
+
+[ -f "$AM" ] || bad "missing $AM"
+[ -f "$PC" ] || bad "missing $PC"
+[ -f "$DP" ] || bad "missing $DP"
+
+if [ -f "$AM" ]; then
+  grep -q 'enablePullRequestAutoMerge' "$AM" \
+    && ok "auto-merge workflow uses GitHub native enablePullRequestAutoMerge" \
+    || bad "auto-merge workflow must call enablePullRequestAutoMerge"
+
+  grep -q 'mergeMethod: SQUASH' "$AM" \
+    && ok "auto-merge method is SQUASH" \
+    || bad "auto-merge must use SQUASH"
+
+  grep -q 'workflow_run' "$AM" \
+    && ok "auto-merge listens on workflow_run of PR checks (default-branch, after checks pass)" \
+    || bad "auto-merge should use workflow_run so it runs from main after PR checks"
+
+  grep -q "startsWith('cursor/')" "$AM" || grep -q "startsWith(\"cursor/\")" "$AM" \
+    && ok "auto-merge is limited to cursor/ Cloud Agent branches" \
+    || bad "auto-merge must filter cursor/ branches"
+
+  grep -q 'head.repo.full_name' "$AM" \
+    && ok "auto-merge ignores forks" \
+    || bad "auto-merge must refuse fork PRs"
+
+  grep -q 'workflows: \["PR checks"\]' "$AM" \
+    && ok "auto-merge is gated on the PR checks workflow succeeding" \
+    || bad "auto-merge must run only after workflow PR checks"
+
+  if grep -vE '^\s*#' "$AM" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY|deploy-live|ci-deploy-production'; then
+    bad "auto-merge workflow must not reference production deploy secrets or jobs"
+  else
+    ok "auto-merge workflow has no production deploy wiring"
+  fi
+
+  if grep -vE '^\s*#' "$AM" | grep -qiE 'actions/checkout'; then
+    bad "auto-merge workflow must not checkout PR code"
+  else
+    ok "auto-merge workflow does not checkout untrusted code"
+  fi
+fi
+
+if [ -f "$PC" ]; then
+  grep -q 'name: PR checks' "$PC" \
+    && ok "PR checks workflow is named PR checks" \
+    || bad "PR checks workflow name should be 'PR checks' (required-check target)"
+
+  grep -q 'pr-auto-merge-check.sh' "$PC" \
+    && ok "PR checks runs pr-auto-merge-check.sh" \
+    || bad "PR checks must run the static validator"
+
+  if grep -vE '^\s*#' "$PC" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY'; then
+    bad "PR checks must not use the production Environment or SSH secret"
+  else
+    ok "PR checks has no production Environment/secret"
+  fi
+fi
+
+if [ -f "$DP" ]; then
+  grep -q 'environment: production' "$DP" \
+    && ok "Deploy Production still uses environment: production" \
+    || bad "must not remove production Environment from deploy workflow"
+
+  grep -q 'PRODUCTION_SSH_PRIVATE_KEY' "$DP" \
+    && ok "Deploy Production still uses PRODUCTION_SSH_PRIVATE_KEY" \
+    || bad "must not remove production SSH secret from deploy workflow"
+
+  if grep -q 'pull_request' "$DP"; then
+    bad "Deploy Production must not run on pull_request"
+  else
+    ok "Deploy Production does not run on pull_request"
+  fi
+fi
+
+echo ""
+if [ "$FAILS" -eq 0 ]; then
+  echo "ALL CHECKS PASSED"
+  exit 0
+fi
+echo "$FAILS CHECK(S) FAILED" >&2
+exit 1

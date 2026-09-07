@@ -15,12 +15,12 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 1. **`main` is protected / read-only** for Cloud Agent work. Never commit application changes on `main`.
 2. Before every task: fetch `origin/main` and confirm a clean working tree.
 3. Start from the latest `origin/main`.
-4. Create **one feature branch per task** from that baseline.
+4. Create **one feature branch per task** from that baseline. The branch name **must** start with `cursor/` (example: `cursor/short-task-slug`) so GitHub can enable squash auto-merge after required PR checks pass.
 5. Make all edits, commits, and pushes **only** on that feature branch.
 6. Commit only the task’s intentional changes.
 7. Push the feature branch to GitHub.
 8. Open a PR targeting **`main`**.
-9. **Do not merge** the PR unless the owner explicitly instructs you to merge.
+9. **Do not click Merge** and do not approve the production Environment. After **PR checks** succeed, Actions requests GitHub **native squash auto-merge**. GitHub still waits for any required status checks and does not bypass them. Landing on `main` then starts **Deploy Production**, which still waits for **manual** Environment approval.
 10. If a change is wrong, **preserve branch/PR history** so the change can be safely reverted. Do not force-rewrite shared history to hide mistakes.
 
 ## Testing
@@ -38,7 +38,7 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 
 ## Production deploy (GitHub Actions)
 
-After the owner merges a PR to `main`, production is intended to deploy via GitHub Actions + Environment approval — **not** by the Cloud Agent SSHing to the VPS.
+After a `cursor/` PR is squash-merged to `main` (GitHub auto-merge after checks, or a manual merge), production is intended to deploy via GitHub Actions + **manual** Environment approval — **not** by the Cloud Agent SSHing to the VPS. Auto-merge of the PR is not production approval.
 
 - Workflow: `.github/workflows/deploy-production.yml`
 - Environment: `production` (required reviewers approve)
@@ -47,7 +47,19 @@ After the owner merges a PR to `main`, production is intended to deploy via GitH
 - Rollback: `deployment/ROLLBACK.md`
 - **What's New / Elaan:** for a POS-visible production change, put a unique spec in `deploy/elaan.yml` (see `deploy/elaan.example.yml`). After the owner approves the GitHub Environment, Actions inserts that `AppUpdate` on live via `scripts/elaan-insert.sh`. Agents must **not** write production `app_updates` or SSH to the VPS. Never reuse the Daily L001 title. Infra-only deploys may omit the spec; the freshness gate still applies unless the owner uses emergency `skip_elaan`.
 
-Agents must **not** merge to `main`, approve the Environment, or run a real production deploy unless the owner explicitly instructs them to.
+Agents must **not** click Merge, approve the Environment, or run a real production deploy unless the owner explicitly instructs them to. They also must **not** receive production SSH keys, production secrets, live database access, or customer credentials.
+
+## PR auto-merge (GitHub native, squash)
+
+Permanent workflow (applies to **future** Cloud Agent PRs once these files are on `main`):
+
+1. Agent opens a non-draft, same-repo PR to `main` from a `cursor/*` branch.
+2. `.github/workflows/pr-checks.yml` runs (no production secrets, no deploy).
+3. On success, `.github/workflows/enable-pr-auto-merge.yml` (`workflow_run` on the default branch) calls `enablePullRequestAutoMerge` with `mergeMethod: SQUASH`.
+4. GitHub merges only after required checks still pass; this workflow cannot skip those checks.
+5. Push to `main` may start **Deploy Production**, which still uses Environment `production` and waits for the owner’s **manual** approval before any SSH.
+
+Owner GitHub settings (one-time): **Allow auto-merge**, **Allow squash merging**, and a ruleset/branch protection that requires the **PR checks / validate** job on `main`. Without that required check, GitHub may squash as soon as auto-merge is enabled (which is only after PR checks already succeeded).
 
 ## This file’s purpose
 

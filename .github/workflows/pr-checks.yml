@@ -1,0 +1,21 @@
+# Lightweight PR checks. Does not deploy, SSH, or read production secrets.
+# Mark this workflow as a required status check on main so GitHub auto-merge
+# waits for it (auto-merge must not run against an empty check gate).
+
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Workflow and auto-merge safety checks
+        run: bash scripts/tests/pr-auto-merge-check.sh

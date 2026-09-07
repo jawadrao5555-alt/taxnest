@@ -1,7 +1,8 @@
 # Deploy production (Nayatel VPS) via GitHub Actions
 #
 # Flow (permanent):
-#   Cloud Agent → feature branch → PR → owner merges to main
+#   Cloud Agent → cursor/* branch → PR → squash onto main (auto-merge after checks)
+#   Production Environment approval stays MANUAL and is not this workflow's PR path.
 #   → this workflow (push to main and/or workflow_dispatch)
 #   → GitHub Environment "production" required reviewers approve
 #   → SSH as taxnest-production-deploy → insert deploy/elaan.yml (if present)

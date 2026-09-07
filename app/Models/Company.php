@@ -216,6 +216,7 @@ class Company extends Model
         'agent_update_stage',
         'agent_update_error',
         'agent_update_at',
+        'agent_force_update_at',
         'agent_offline_notified_at',
         // Offline queue telemetry — reported by the sale screen, not the agent.
         'offline_queue_depth',
@@ -307,6 +308,7 @@ class Company extends Model
         'agent_offline_mode' => 'boolean',
         'agent_snapshot_at' => 'datetime',
         'agent_update_at' => 'datetime',
+        'agent_force_update_at' => 'datetime',
         'agent_offline_notified_at' => 'datetime',
         'offline_queue_depth' => 'integer',
         'offline_queue_oldest_at' => 'datetime',

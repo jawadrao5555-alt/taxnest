@@ -34,6 +34,11 @@ On failure, run the self-heal cycle (max **3** iterations). Say **LIVE VERIFIED*
 only after that Actions step passes. Observe with
 `bash scripts/cloud-issue-to-live-observe.sh` (secret-free).
 
+**Live Ops (NestPOS PRA investigate → explain → owner-approved fix):**
+[`docs/ops/live-ops.md`](docs/ops/live-ops.md). Cloud Agents use
+`scripts/cloud-live-ops-request.sh` / `scripts/cloud-live-ops-remediate-request.sh`
+only. Secrets stay in Environment `production`. Diagnosis ≠ approval.
+
 **Production is out of bounds for the agent process:** never access/modify/deploy
 production directly; never use production credentials, live customer data,
 production DB, FBR/PRA production tokens, or production SSH keys. Deploy remains

@@ -163,7 +163,7 @@ insert_committed_elaan_spec() {
     echo "Freshness check still requires a published pos/all AppUpdate after the last deploy marker."
     return 0
   fi
-  echo "Inserting $SPEC via scripts/elaan-insert.sh (idempotent; will not re-date Daily L001)."
+  echo "Inserting $SPEC via scripts/elaan-insert.sh (idempotent; existing exact title is a successful no-op, will not re-date Daily L001)."
   bash "$ROOT/scripts/elaan-insert.sh" --from-file "$SPEC" \
     || fail "committed Elaan spec insert failed — fix deploy/elaan.yml or use skip_elaan for emergencies"
 }

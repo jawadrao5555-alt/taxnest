@@ -17,6 +17,14 @@ bad() { echo "FAIL: $*" >&2; FAILS=$((FAILS+1)); }
 php "$PHP_MODEL" && ok "PHP store model: first insert, no-op, no duplicate, no re-date, L001 reserved" \
   || bad "PHP store model failed"
 
+if [ -f "$ROOT/scripts/tests/elaan-insert-outcome-check.sh" ]; then
+  bash "$ROOT/scripts/tests/elaan-insert-outcome-check.sh" \
+    && ok "outcome classifier: existing no-op, new insert, genuine fail" \
+    || bad "outcome classifier checks failed"
+else
+  bad "missing scripts/tests/elaan-insert-outcome-check.sh"
+fi
+
 if [ -f "$INSERT" ]; then
   grep -q "Daily L001 ke liye roz Reset dabana zaroori nahi" "$INSERT" \
     && grep -q 'will not re-create or re-date that announcement' "$INSERT" \

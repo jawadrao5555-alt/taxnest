@@ -19,10 +19,9 @@
 # Usage (committed spec — GitHub Actions after Environment approval + SSH):
 #   bash scripts/elaan-insert.sh --from-file deploy/elaan.yml
 #
-# Idempotency: if a published row with the SAME title already exists:
-#   - created after the last live deploy marker → ELAAN_EXISTS (retry-safe)
-#   - created before that marker (or no retry window) → FAIL (will not
-#     duplicate or re-date, including the reserved Daily L001 title)
+# Idempotency: if a row with the SAME title already exists, ELAAN_EXISTS
+# (exit 0). Do not insert a duplicate and do not re-date the existing row.
+# The reserved Daily L001 title is always rejected (never inserted/updated).
 #
 # Rules (from .agents/memory/pos-whats-new-updates.md):
 #   - points MUST be a PHP array on the way in (never a pre-encoded JSON string).
@@ -125,7 +124,6 @@ PHP_CATS_ARRAY="${PHP_CATS_ARRAY})"
 TITLE_ESCAPED=$(printf '%s' "$TITLE" | sed "s/'/\\\\'/g")
 AUDIENCE_ESCAPED=$(printf '%s' "$AUDIENCE" | sed "s/'/\\\\'/g")
 TYPE_ESCAPED=$(printf '%s' "$ELAAN_TYPE" | sed "s/'/\\\\'/g")
-MARKER_FILE_ESCAPED=$(printf '%s' "$LIVE_DEPLOY_MARKER" | sed "s/'/\\\\'/g")
 
 # ---------------------------------------------------------- PHP bootstrap script
 # Runs identically on live (hardcoded LIVE_DIR paths) or dev (relative paths from CWD).
@@ -186,28 +184,13 @@ if ('$TITLE_ESCAPED' === \$reserved) {
 }
 
 \$existing = App\Models\AppUpdate::where('title', '$TITLE_ESCAPED')->orderByDesc('id')->get();
-\$sinceTs = null;
-\$markerFile = '$MARKER_FILE_ESCAPED';
-if (is_string(\$markerFile) && \$markerFile !== '' && is_file(\$markerFile)) {
-    \$raw = trim((string) file_get_contents(\$markerFile));
-    \$epoch = explode('|', \$raw, 2)[0];
-    if (preg_match('/^[0-9]+$/', \$epoch)) {
-        \$sinceTs = (int) \$epoch;
-    }
-}
-foreach (\$existing as \$row) {
-    \$createdTs = \$row->created_at ? \$row->created_at->getTimestamp() : 0;
-    if (\$sinceTs !== null && \$createdTs > \$sinceTs) {
-        echo "ELAAN_EXISTS id=" . \$row->id . " title=" . json_encode(\$row->title) . "\\n";
-        exit(0);
-    }
-}
 if (\$existing->isNotEmpty()) {
     \$old = \$existing->first();
-    fwrite(STDERR, "ERROR: title already exists as app_updates id=" . \$old->id
+    echo "ELAAN_EXISTS id=" . \$old->id
+        . " title=" . json_encode(\$old->title)
         . " created_at=" . (\$old->created_at ? \$old->created_at->toDateTimeString() : 'unknown')
-        . " — will not duplicate or re-date. Use a new unique title in deploy/elaan.yml.\\n");
-    exit(1);
+        . "\\n";
+    exit(0);
 }
 
 \$row = App\Models\AppUpdate::create([
@@ -265,7 +248,7 @@ else
   echo ""
   echo "---------------------------------------------------------------"
   if echo "$LIVE_OUT" | grep -q "ELAAN_EXISTS"; then
-    echo "ELAAN OK (idempotent): AppUpdate row #${CREATED_ID} already present after last deploy marker."
+    echo "ELAAN OK (idempotent): AppUpdate row #${CREATED_ID} already present (no duplicate, not re-dated)."
   else
     echo "ELAAN OK: AppUpdate row #${CREATED_ID} created on live."
   fi

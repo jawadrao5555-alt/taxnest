@@ -236,6 +236,12 @@ if [ -f "$ROOT/scripts/tests/elaan-spec-parse-check.sh" ]; then
     || bad "elaan spec parser checks failed"
 fi
 
+if [ -f "$ROOT/scripts/tests/elaan-insert-idempotency-check.sh" ]; then
+  bash "$ROOT/scripts/tests/elaan-insert-idempotency-check.sh" \
+    && ok "elaan insert idempotency checks passed" \
+    || bad "elaan insert idempotency checks failed"
+fi
+
 echo ""
 if [ "$FAILS" -eq 0 ]; then
   echo "ALL CHECKS PASSED"

@@ -86,12 +86,15 @@ async function processPendingCommands(opts) {
           }
           break;
         case 'SAFE_AGENT_RESTART':
+          if (typeof opts.requestRestart !== 'function') {
+            ok = false;
+            result.error = 'safe_restart_handler_unavailable';
+            break;
+          }
           result.restart_scheduled = true;
-          // Defer restart so result can be posted first.
+          // Defer restart so the command-result POST below can complete first.
           setTimeout(() => {
-            try {
-              if (typeof opts.requestRestart === 'function') opts.requestRestart('live_ops_safe_restart');
-            } catch (e) {}
+            try { opts.requestRestart('live_ops_safe_restart'); } catch (e) {}
           }, 1500);
           break;
         default:

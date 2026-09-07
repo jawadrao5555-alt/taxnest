@@ -395,4 +395,16 @@ async function getLocalPrinters() {
   }
 }
 
-module.exports = { startPrinting, stopPrinting, getPrintStatus, printHtml, getLocalPrinters };
+/**
+ * Force an immediate print-job poll (controlled pipeline claim path).
+ * Used by Live Ops TEST_PRINT — does not invent local print jobs.
+ */
+function nudgePrintPoll() {
+  if (typeof pollLoopNudge === 'function') {
+    pollLoopNudge();
+    return true;
+  }
+  return false;
+}
+
+module.exports = { startPrinting, stopPrinting, getPrintStatus, printHtml, getLocalPrinters, reportPrinters, nudgePrintPoll };

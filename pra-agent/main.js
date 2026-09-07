@@ -13,7 +13,7 @@ const os = require('os');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
-const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent } = require('./src/agent');
+const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent, setSafeRestartHandler } = require('./src/agent');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { createLanServer } = require('./src/lan-server');
 const { createLocalCoreLanTls } = require('./src/local-core/lan-tls');
@@ -311,6 +311,24 @@ const store = new Store();
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+
+// Live Ops SAFE_AGENT_RESTART — Electron's documented self-relaunch only.
+// No shell commands. Result POST is deferred by the command handler before this runs.
+setSafeRestartHandler((reason) => {
+  console.log('[live-ops] safe agent restart requested:', reason || 'live_ops_safe_restart');
+  try {
+    app.relaunch();
+  } catch (e) {
+    console.log('[live-ops] app.relaunch failed:', e && e.message);
+    return false;
+  }
+  isQuitting = true;
+  try { stopAgent(); } catch (e) {}
+  setTimeout(() => {
+    try { app.quit(); } catch (e) {}
+  }, 400);
+  return true;
+});
 
 function getMigratedAgentConfig() {
   const migrated = migrateAgentConfig(store.get('config'));

@@ -38,6 +38,7 @@ abstract class LiveOpsTestCase extends TestCase
             $table->string('name');
             $table->string('owner_name')->nullable();
             $table->string('email')->nullable();
+            $table->string('ntn')->nullable();
             $table->string('account_code')->nullable();
             $table->string('product_type')->nullable();
             $table->string('status')->default('approved');

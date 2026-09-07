@@ -14,14 +14,23 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Super-admin Live Ops console — diagnostics, proposals, approvals, history.
+ * Super-admin Live Ops console — NestPOS PRA diagnostics + owner-approved remediation.
+ *
+ * Authorization mirrors AdminLiveActivityController / Support Inbox:
+ * SaaS AdminUser with isSuperAdmin() only. This is NOT the POS panel.
+ *
+ * POS company_admin / pos_manager / cashier / viewer / archive_viewer / local_viewer
+ * authenticate on the users table (pos/web guards) and cannot reach /admin/* Live Ops.
+ * There is no users↔companies multi-company staff pivot; one user → one company_id.
+ * Cross-company SaaS visibility is super_admin-only (same as Live Activity).
  */
 class AdminLiveOpsController extends Controller
 {
     private function gate(): void
     {
-        if ((auth('admin')->user()->role ?? null) !== 'super_admin') {
-            abort(403);
+        $admin = auth('admin')->user();
+        if (!$admin || !$admin->isSuperAdmin()) {
+            abort(403, 'Super admin only.');
         }
     }
 
@@ -42,27 +51,40 @@ class AdminLiveOpsController extends Controller
             ? LiveOpsAuditEvent::orderByDesc('id')->limit(30)->get()
             : collect();
 
-        $q = trim((string) $request->query('q', ''));
+        // Same filter shape as /admin/companies (search + status), scoped to NestPOS PRA.
+        $search = trim((string) $request->query('search', $request->query('q', '')));
+        $status = trim((string) $request->query('status', ''));
         $companies = collect();
-        if ($q !== '') {
+        if ($search !== '' || $status !== '') {
             $companies = Company::query()
                 ->whereIn('product_type', config('live_ops.product_types', ['pos']))
-                ->where(function ($w) use ($q) {
-                    $w->where('name', 'like', '%'.$q.'%');
-                    if (ctype_digit($q)) {
-                        $w->orWhere('id', (int) $q);
-                    }
-                    if (Schema::hasColumn('companies', 'account_code')) {
-                        $w->orWhere('account_code', 'like', '%'.$q.'%');
-                    }
+                ->when($status !== '', fn ($q) => $q->where('status', $status))
+                ->when($search !== '', function ($q) use ($search) {
+                    $q->where(function ($w) use ($search) {
+                        $w->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('owner_name', 'like', '%'.$search.'%')
+                            ->orWhere('ntn', 'like', '%'.$search.'%');
+                        if (ctype_digit($search)) {
+                            $w->orWhere('id', (int) $search);
+                        }
+                        if (Schema::hasColumn('companies', 'account_code')) {
+                            $w->orWhere('account_code', 'like', '%'.$search.'%');
+                        }
+                    });
                 })
                 ->orderBy('name')
                 ->limit(25)
-                ->get(['id', 'name', 'account_code', 'agent_last_seen', 'agent_enabled', 'agent_version']);
+                ->get(array_values(array_filter([
+                    'id', 'name', 'status', 'agent_last_seen', 'agent_enabled', 'agent_version', 'owner_name',
+                    Schema::hasColumn('companies', 'account_code') ? 'account_code' : null,
+                    Schema::hasColumn('companies', 'ntn') ? 'ntn' : null,
+                ])));
         }
 
         return view('saas-admin.live-ops.index', [
-            'q' => $q,
+            'search' => $search,
+            'status' => $status,
+            'q' => $search, // backward-compatible alias for older links
             'companies' => $companies,
             'recentReports' => $recentReports,
             'recentRemediations' => $recentRemediations,

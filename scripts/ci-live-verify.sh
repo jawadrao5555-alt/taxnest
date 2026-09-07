@@ -129,14 +129,49 @@ say "NestPOS login as live QA identity (non-customer standing QA company)"
 PAGE=$("${CURL[@]}" "${LIVE_URL}/pos/login") || cannot "cannot reach ${LIVE_URL}/pos/login"
 TOKEN=$(echo "$PAGE" | grep -oE 'name="_token" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"$//')
 [ -n "$TOKEN" ] || cannot "CSRF token missing on /pos/login"
-CODE=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
+# Capture status + Location only. Never print Set-Cookie / body / password.
+LOGIN_HDR="$TMPD/login.hdr"
+CODE=$("${CURL[@]}" -D "$LOGIN_HDR" -o /dev/null -w '%{http_code}' -X POST \
   --data-urlencode "_token=$TOKEN" \
   --data-urlencode "login=$LOGIN" \
   --data-urlencode "password=$PASS" \
   "${LIVE_URL}/pos/login")
 [ "$CODE" = "302" ] || cannot "login POST returned $CODE (expected 302) — check LIVE_QA_PASS"
+# Location header only (case-insensitive); strip CR. Do not dump the header file
+# (it may contain Set-Cookie).
+LOGIN_LOC=$(awk 'BEGIN{IGNORECASE=1} /^Location:/ {
+  sub(/\r$/, "")
+  sub(/^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]:[[:space:]]*/, "")
+  print
+  exit
+}' "$LOGIN_HDR" 2>/dev/null || true)
+LOGIN_CLASS=$(python3 "$ROOT/scripts/lib/ci-live-verify-login-redirect.py" "${LOGIN_LOC:-}" "$LIVE_URL" 2>/dev/null || true)
+LOGIN_PATH=$(printf '%s' "$LOGIN_CLASS" | python3 -c 'import json,sys
+try:
+  print(json.load(sys.stdin).get("path",""))
+except Exception:
+  print("")' 2>/dev/null || true)
+LOGIN_MSG=$(printf '%s' "$LOGIN_CLASS" | python3 -c 'import json,sys
+try:
+  print(json.load(sys.stdin).get("message",""))
+except Exception:
+  print("")' 2>/dev/null || true)
+LOGIN_DECISION=$(printf '%s' "$LOGIN_CLASS" | python3 -c 'import json,sys
+try:
+  print(json.load(sys.stdin).get("decision",""))
+except Exception:
+  print("")' 2>/dev/null || true)
+if [ "$LOGIN_DECISION" != "OK" ]; then
+  if [ -n "$LOGIN_MSG" ]; then
+    cannot "$LOGIN_MSG"
+  fi
+  cannot "NestPOS login failed: login POST redirect Location could not be classified (path='${LOGIN_PATH:-}')."
+fi
+echo "    OK: login POST redirected to NestPOS route ${LOGIN_PATH}"
 CODE=$("${CURL[@]}" -o /dev/null -w '%{http_code}' "${LIVE_URL}/pos/dashboard")
-[ "$CODE" = "200" ] || cannot "post-login /pos/dashboard returned $CODE"
+if [ "$CODE" != "200" ]; then
+  cannot "post-login /pos/dashboard returned $CODE (login Location was ${LOGIN_PATH:-unknown}) — authentication/session failure, not a NestPOS marker miss"
+fi
 ok "authenticated NestPOS session"
 
 fetch() {

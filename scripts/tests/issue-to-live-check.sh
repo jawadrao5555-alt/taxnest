@@ -119,6 +119,12 @@ if [ -f "$LIB" ]; then
   grep -q 'assertLocalOnlyBaseUrl' "$LIB" && ok "local browser fail-closed helper still present" || bad "local-browser guard missing"
 fi
 
+if [ -f "$ROOT/scripts/tests/ci-live-verify-login-redirect-check.sh" ]; then
+  bash "$ROOT/scripts/tests/ci-live-verify-login-redirect-check.sh" \
+    && ok "ci-live-verify login redirect diagnostics checks passed" \
+    || bad "ci-live-verify login redirect diagnostics checks failed"
+fi
+
 echo ""
 if [ "$FAILS" -eq 0 ]; then
   echo "issue-to-live-check: ALL PASS"

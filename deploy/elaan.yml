@@ -1,10 +1,12 @@
 # Elaan for THIS production deploy only. Next PR must use a new unique title
 # (or omit this file and skip_elaan / a live insert after the last marker).
-# Do not reuse the Daily L001 title.
+# Do not reuse Daily L001, and do not reuse a title that already exists on live
+# (that is a successful insert no-op and will not pass the freshness gate).
 
-title: "What's New ab approved production deploy ke saath aata hai"
+title: "Production update — exact approved commit ab live par aata hai"
 audience: pos
 type: improvement
 points:
   - "POS aur FBR POS ka What's New popup aur bell pehle jaisa hai — 7 din live, seen tracking, aur admin master switch."
-  - "Naya announcement production Environment approval ke baad live par create hota hai; pehle wala Daily L001 elaan dubara nahi bheja jata."
+  - "Yeh announcement is production update ke liye naya hai; pehle wala title dubara nahi bheja jata aur existing What's New re-date nahi hota."
+  - "Code GitHub production Environment approval ke baad exact commit par lagta hai — shops ke saved settings is se nahi badalte."

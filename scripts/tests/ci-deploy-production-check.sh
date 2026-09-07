@@ -49,9 +49,9 @@ if [ -f "$WF" ]; then
     && ok "workflow supports workflow_dispatch" \
     || bad "workflow missing workflow_dispatch"
 
-  grep -q 'ref: \${{ github.sha }}' "$WF" \
-    && ok "checkout uses github.sha" \
-    || bad "checkout must pin ref to github.sha"
+  grep -q 'ref: \${{ steps.resolve.outputs.sha }}' "$WF" \
+    && ok "checkout pins exact resolved deploy SHA" \
+    || bad "checkout must pin ref to steps.resolve.outputs.sha"
 
   # Must never disable host key checks in the workflow itself (ignore comments)
   if grep -vE '^\s*#' "$WF" | grep -qiE 'StrictHostKeyChecking\s*=\s*no|UserKnownHostsFile\s*=\s*/dev/null'; then
@@ -240,6 +240,12 @@ if [ -f "$ROOT/scripts/tests/elaan-insert-idempotency-check.sh" ]; then
   bash "$ROOT/scripts/tests/elaan-insert-idempotency-check.sh" \
     && ok "elaan insert idempotency checks passed" \
     || bad "elaan insert idempotency checks failed"
+fi
+
+if [ -f "$ROOT/scripts/tests/elaan-same-sha-freshness-check.sh" ]; then
+  bash "$ROOT/scripts/tests/elaan-same-sha-freshness-check.sh" \
+    && ok "elaan same-SHA freshness checks passed" \
+    || bad "elaan same-SHA freshness checks failed"
 fi
 
 echo ""

@@ -76,7 +76,7 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 | Checkout | Exact deploy SHA (resolved), full history |
 | SSH | Writes `PRODUCTION_SSH_PRIVATE_KEY` to a temp file (mode 600), uses `scripts/lib/live-known-hosts` + `StrictHostKeyChecking=yes` |
 | Elaan spec | If `deploy/elaan.yml` is in the commit, `scripts/elaan-insert.sh --from-file` creates a published `AppUpdate` on live (same popup/bell/7-day/seen/master-switch as before). Idempotent on **title**: an existing exact title is a successful no-op (not duplicated or re-dated). The reserved Daily L001 title is rejected and never inserted. `skip_elaan` skips this insert. |
-| Elaan gate | Unchanged freshness check: a published `pos`/`all` row must have `created_at` after the last deploy marker. Infra-only deploys omit `deploy/elaan.yml` and use `skip_elaan`, or insert on live after the last marker. |
+| Elaan gate | Freshness check: a published `pos`/`all` row must have `created_at` after the last deploy marker for a **new** SHA. A **same-SHA** rerun/refresh (live HEAD and marker commit both equal the TARGET_SHA) may pass only when the committed `deploy/elaan.yml` exact title still exists as a published `pos`/`all` AppUpdate — unrelated old announcements do not count, and existing titles are never re-dated or duplicated. Infra-only deploys omit `deploy/elaan.yml` and use `skip_elaan`, or insert on live after the last marker. |
 | Apply | `scripts/ci-deploy-production.sh` → shared `scripts/lib/live-remote-apply.sh` |
 | Live verify | Same job runs `scripts/ci-live-verify.sh`: live HEAD == deploy SHA, `/up` 200, NestPOS QA login + feature markers (not merely HTTP 200). Uses Environment secrets `PRODUCTION_SSH_PRIVATE_KEY` + `LIVE_QA_PASS`. Failure fails the workflow — Cloud Agents must start a new diagnosis cycle (`docs/ops/cloud-agent-issue-to-live.md`). |
 | Semantics | Same remote core as `deploy-live.sh`: flock lock, maintenance `artisan down` (200), exact-SHA checkout, composer if needed, migrate only when the gap includes migrations, config/route/view cache rebuild, ownership + SELinux repair, PHP-FPM reload with OPcache proof, `taxnest-queue` restart, `artisan up`, homepage 200, cache-fresh probe, deploy marker. Fail closed (site stays in maintenance on apply failure). |
@@ -95,7 +95,7 @@ POS/FBR What's New still lives in `app_updates` (admin `/admin/app-updates`, pop
 For a production-bound PR that should announce a change:
 
 1. Copy `deploy/elaan.example.yml` → `deploy/elaan.yml` (or edit the existing file).
-2. Use a **new unique title**. Never reuse `Daily L001 ke liye roz Reset dabana zaroori nahi`. Never reuse a title that already exists in live `app_updates` — that insert is a successful no-op and will **not** pass the freshness gate.
+2. Use a **new unique title**. Never reuse `Daily L001 ke liye roz Reset dabana zaroori nahi`. Never reuse a title that already exists in live `app_updates` for a **new** SHA — that insert is a successful no-op and will **not** pass the time-based freshness gate. (A same-SHA Actions rerun of an already-deployed commit may reuse the original title as evidence that the announcement for that SHA still exists; it will not re-date or duplicate the row.)
 3. After Environment approval, Actions inserts the row on live, then the freshness gate must still pass.
 
 The freshness gate counts `audience IN ('pos','all')` only. An `fbr_pos`-only spec will insert but will **not** satisfy the gate.

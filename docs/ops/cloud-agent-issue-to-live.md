@@ -27,17 +27,22 @@ Issue (owner)
   → full php artisan test (+ npm build if assets)
   → one focused cursor/* PR with evidence
   → PR checks → automatic squash-merge (cursor/*)
-  → main push starts ".github/workflows/deploy-production.yml"
+  → Enable PR auto-merge dispatches Deploy Production with exact squash SHA
+    (workflow_dispatch; required because GITHUB_TOKEN merges suppress push workflows)
   → GitHub Environment "production" MANUAL approval (owner — not the agent)
-  → Actions SSH (PRODUCTION_SSH_PRIVATE_KEY) applies exact github.sha
+  → Actions SSH (PRODUCTION_SSH_PRIVATE_KEY) applies exact target_sha
   → Actions runs scripts/ci-live-verify.sh (SHA + NestPOS markers; LIVE_QA_PASS)
   → PASS ⇒ may say LIVE VERIFIED (cite SHA + Actions URL)
   → FAIL ⇒ autonomous diagnosis/fix/test/PR/merge/redeploy cycle (below)
 ```
 
-Cloud Agent **hands** the main commit to the protected deploy workflow by
-landing on `main` via auto-merge. The agent does **not** approve the
-Environment, hold SSH keys, or run authenticated live smoke itself.
+Cloud Agent **hands** the main commit to the protected deploy workflow via
+auto-merge plus an explicit `workflow_dispatch` of Deploy Production with
+`inputs.target_sha` set to the squash commit. The agent does **not** approve
+the Environment, hold SSH keys, or run authenticated live smoke itself.
+
+Human merges / non-token pushes to `main` still start Deploy Production via
+the normal `push` trigger (same Environment + exact SHA + live-verify).
 
 ---
 

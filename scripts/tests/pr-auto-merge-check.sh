@@ -58,11 +58,19 @@ if [ -f "$AM" ]; then
     && ok "already-clean mergeable PRs squash without waiting on auto-merge" \
     || bad "workflow must treat mergeable_state clean as squash-now"
 
-  if grep -vE '^\s*#' "$AM" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY|deploy-live|ci-deploy-production'; then
-    bad "auto-merge workflow must not reference production deploy secrets or jobs"
+  if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS|environment:\s*production|deploy-live\.sh|ci-deploy-production\.sh'; then
+    bad "auto-merge workflow must not reference production deploy secrets or apply scripts"
   else
-    ok "auto-merge workflow has no production deploy wiring"
+    ok "auto-merge workflow has no production secrets/apply scripts"
   fi
+
+  grep -q 'createWorkflowDispatch' "$AM" \
+    && ok "auto-merge hands off via createWorkflowDispatch" \
+    || bad "auto-merge must workflow_dispatch Deploy Production after GITHUB_TOKEN squash"
+
+  grep -q 'target_sha' "$AM" \
+    && ok "auto-merge passes target_sha for exact-SHA deploy" \
+    || bad "auto-merge must pass target_sha"
 
   if grep -vE '^\s*#' "$AM" | grep -qiE 'actions/checkout'; then
     bad "auto-merge workflow must not checkout PR code"
@@ -108,11 +116,25 @@ fi
     && ok "Deploy Production wires LIVE_QA_PASS for live verify" \
     || bad "Deploy Production must pass LIVE_QA_PASS into live verify"
 
+  grep -q 'target_sha' "$DP" \
+    && ok "Deploy Production accepts target_sha for auto-merge handoff" \
+    || bad "Deploy Production must accept workflow_dispatch target_sha"
+
+  grep -q 'steps.resolve.outputs.sha' "$DP" \
+    && ok "Deploy Production pins apply/verify to resolved SHA" \
+    || bad "Deploy Production must resolve and pin deploy SHA"
+
   if grep -q 'pull_request' "$DP"; then
     bad "Deploy Production must not run on pull_request"
   else
     ok "Deploy Production does not run on pull_request"
   fi
+fi
+
+if [ -f "$ROOT/scripts/tests/automerge-deploy-handoff-check.sh" ]; then
+  bash "$ROOT/scripts/tests/automerge-deploy-handoff-check.sh" \
+    && ok "automerge-deploy-handoff-check nested run" \
+    || bad "automerge-deploy-handoff-check nested run failed"
 fi
 
 echo ""

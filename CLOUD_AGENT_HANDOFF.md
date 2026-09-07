@@ -27,8 +27,9 @@ PHPUnit passed. The original reported issue must have been re-tested successfull
 
 **Issue → live (after the PR):** follow
 **[`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md)**.
-Auto-merge hands the commit to Deploy Production; Environment approval stays
-**manual**. Actions runs `scripts/ci-live-verify.sh` (SHA + NestPOS markers).
+Auto-merge squash-merges, then **workflow_dispatch** hands the exact squash SHA
+to Deploy Production (GITHUB_TOKEN merges do not start push workflows).
+Environment approval stays **manual**. Actions runs `scripts/ci-live-verify.sh`.
 On failure, run the self-heal cycle (max **3** iterations). Say **LIVE VERIFIED**
 only after that Actions step passes. Observe with
 `bash scripts/cloud-issue-to-live-observe.sh` (secret-free).

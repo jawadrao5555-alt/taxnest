@@ -69,7 +69,7 @@ POS/FBR What's New still lives in `app_updates` (admin `/admin/app-updates`, pop
 For a production-bound PR that should announce a change:
 
 1. Copy `deploy/elaan.example.yml` → `deploy/elaan.yml` (or edit the existing file).
-2. Use a **new unique title**. Never reuse `Daily L001 ke liye roz Reset dabana zaroori nahi`.
+2. Use a **new unique title**. Never reuse `Daily L001 ke liye roz Reset dabana zaroori nahi`. Never reuse a title that already exists in live `app_updates` — that insert is a successful no-op and will **not** pass the freshness gate.
 3. After Environment approval, Actions inserts the row on live, then the freshness gate must still pass.
 
 The freshness gate counts `audience IN ('pos','all')` only. An `fbr_pos`-only spec will insert but will **not** satisfy the gate.

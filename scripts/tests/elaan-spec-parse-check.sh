@@ -76,9 +76,22 @@ if [ -f "$ROOT/deploy/elaan.yml" ]; then
   python3 "$PARSE" "$ROOT/deploy/elaan.yml" >/dev/null \
     && ok "deploy/elaan.yml parses" \
     || bad "deploy/elaan.yml does not parse"
-  python3 "$PARSE" "$ROOT/deploy/elaan.yml" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["title"]!="Daily L001 ke liye roz Reset dabana zaroori nahi"' \
-    && ok "committed spec is not the Daily L001 title" \
-    || bad "committed spec must not reuse Daily L001 title"
+  if python3 - "$PARSE" "$ROOT/deploy/elaan.yml" <<'PY'
+import json, subprocess, sys
+parse, path = sys.argv[1], sys.argv[2]
+raw = subprocess.check_output([sys.executable, parse, path], text=True)
+d = json.loads(raw)
+assert d["title"] != "Daily L001 ke liye roz Reset dabana zaroori nahi"
+# Title already on live from the first CI Elaan insert — reuse is a no-op and
+# will not satisfy the freshness gate.
+assert d["title"] != "What's New ab approved production deploy ke saath aata hai"
+assert d["audience"] in ("pos", "all")
+PY
+  then
+    ok "committed spec is a new unique pos/all title (not L001, not the live existing title)"
+  else
+    bad "committed spec must use a new unique title that can pass the freshness gate"
+  fi
 fi
 
 DRY=$(bash "$INSERT" --from-file "$TMP/ok.yml" --dry-run) || bad "elaan-insert --from-file --dry-run failed"

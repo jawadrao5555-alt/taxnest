@@ -1,6 +1,6 @@
 # TaxNest Cloud Agent — architecture & invariants (non-secret)
 
-Safe, tracked reference for Cloud Agents. Authoritative short map remains `replit.md`.  
+Safe, tracked reference for Cloud Agents. Authoritative short map remains `replit.md`.
 Deep Replit `.agents/memory/` topics are **not** in GitHub (gitignored). Use this file + `replit.md` + code.
 
 **Do not** put secrets, tokens, SSH keys, customer credentials, or live data here.

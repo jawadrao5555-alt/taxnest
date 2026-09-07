@@ -1,6 +1,6 @@
 # TaxNest Cloud Agent development
 
-Repeatable local/Cloud development setup for **jawadrao5555-alt/taxnest**.  
+Repeatable local/Cloud development setup for **jawadrao5555-alt/taxnest**.
 This is **not** production. Production deploy remains Environment-gated — see `docs/ops/github-production-deploy.md`.
 
 ## Bootstrap (fresh Cloud Agent or local VM)

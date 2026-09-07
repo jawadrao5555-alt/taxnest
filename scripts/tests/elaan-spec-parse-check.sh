@@ -90,6 +90,7 @@ KNOWN_LIVE_OR_RETIRED_TITLES = {
     "Daily L001 ke liye roz Reset dabana zaroori nahi",
     "What's New ab approved production deploy ke saath aata hai",
     "Production update — exact approved commit ab live par aata hai",
+    "Production update — same-SHA Elaan rerun ab fresh gate ke saath safe hai",
 }
 assert title not in KNOWN_LIVE_OR_RETIRED_TITLES, title
 assert d["audience"] in ("pos", "all")

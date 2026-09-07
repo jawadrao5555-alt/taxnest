@@ -19,8 +19,12 @@
 # Usage (committed spec — GitHub Actions after Environment approval + SSH):
 #   bash scripts/elaan-insert.sh --from-file deploy/elaan.yml
 #
-# Idempotency: if a row with the SAME title already exists, ELAAN_EXISTS
-# (exit 0). Do not insert a duplicate and do not re-date the existing row.
+# Idempotency: if a row with the SAME title already exists, treat that as a
+# successful no-op (ELAAN_EXISTS, or the legacy "title already exists ... will
+# not duplicate or re-date" message even when PHP exited 1). Do not insert a
+# duplicate and do not re-date the existing row. The CI runner classifies
+# ssh/php output via scripts/lib/elaan-insert-outcome.py so a non-zero remote
+# status cannot mask that no-op as "PHP bootstrap failed on live".
 # The reserved Daily L001 title is always rejected (never inserted/updated).
 #
 # Rules (from .agents/memory/pos-whats-new-updates.md):
@@ -46,6 +50,11 @@ HOST="$LIVE_SSH_HOST"
 SSH_OPTS=("${LIVE_SSH_OPTS[@]}")
 
 fail() { echo ""; echo "ELAAN INSERT FAILED: $*" >&2; exit 1; }
+
+# Classify PHP/SSH output on this machine (CI or operator laptop). Never SSH.
+classify_elaan_outcome() {
+  printf '%s' "$2" | python3 "$(dirname "$0")/lib/elaan-insert-outcome.py" --rc "$1" --text-from-stdin
+}
 
 # ---------------------------------------------------------- Parse args
 TITLE=""
@@ -214,46 +223,72 @@ if [ "$DEV" = "1" ]; then
   TMP_SCRIPT=$(mktemp /tmp/elaan_insert_XXXXXX.php)
   printf '%s' "$PHP_SCRIPT" > "$TMP_SCRIPT"
   WORKSPACE_ROOT=$(pwd)
+  DEV_RC=0
   DEV_OUT=$(env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE \
-    php "$TMP_SCRIPT" "$WORKSPACE_ROOT" 2>&1)
-  DEV_RC=$?
+    php "$TMP_SCRIPT" "$WORKSPACE_ROOT" 2>&1) || DEV_RC=$?
   rm -f "$TMP_SCRIPT"
   echo "$DEV_OUT"
-  [ $DEV_RC -eq 0 ] || fail "PHP bootstrap failed on dev (exit $DEV_RC)"
-  echo "$DEV_OUT" | grep -qE "ELAAN_INSERTED|ELAAN_EXISTS" \
-    || fail "PHP ran but ELAAN_INSERTED/ELAAN_EXISTS marker missing — row was NOT created; check output above"
-  CREATED_ID=$(echo "$DEV_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
-  echo ""
-  echo "---------------------------------------------------------------"
-  if echo "$DEV_OUT" | grep -q "ELAAN_EXISTS"; then
-    echo "ELAAN OK (dev, idempotent): AppUpdate row #${CREATED_ID} already present."
-  else
-    echo "ELAAN OK (dev): AppUpdate row #${CREATED_ID} created in dev DB."
-  fi
-  echo "                Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
-  echo "                Verify: /admin/app-updates on the dev server."
-  echo "---------------------------------------------------------------"
+  DEV_OUTCOME=$(classify_elaan_outcome "$DEV_RC" "$DEV_OUT") \
+    || fail "could not classify Elaan insert outcome"
+  case "$DEV_OUTCOME" in
+    exists)
+      CREATED_ID=$(echo "$DEV_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
+      echo ""
+      echo "---------------------------------------------------------------"
+      echo "ELAAN OK (dev, idempotent): AppUpdate row #${CREATED_ID:-?} already present."
+      echo "                Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
+      echo "                Verify: /admin/app-updates on the dev server."
+      echo "---------------------------------------------------------------"
+      ;;
+    inserted)
+      CREATED_ID=$(echo "$DEV_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
+      echo ""
+      echo "---------------------------------------------------------------"
+      echo "ELAAN OK (dev): AppUpdate row #${CREATED_ID} created in dev DB."
+      echo "                Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
+      echo "                Verify: /admin/app-updates on the dev server."
+      echo "---------------------------------------------------------------"
+      ;;
+    *)
+      fail "PHP bootstrap failed on dev (exit $DEV_RC)"
+      ;;
+  esac
 else
   # Live: stream the PHP script to live via SSH and run it there.
   [ -f "$KEY" ] || fail "SSH key not found at $KEY — can only run on live from the workspace"
   echo "Streaming bootstrap script to live server..."
+  LIVE_RC=0
   LIVE_OUT=$(printf '%s' "$PHP_SCRIPT" \
     | timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" \
         "cat > /tmp/elaan_insert_$$.php && $LIVE_PHP /tmp/elaan_insert_$$.php; RC=\$?; rm -f /tmp/elaan_insert_$$.php; exit \$RC" \
-    2>&1) || { echo "$LIVE_OUT" >&2; fail "PHP bootstrap failed on live"; }
+    2>&1) || LIVE_RC=$?
   echo "$LIVE_OUT"
-  echo "$LIVE_OUT" | grep -qE "ELAAN_INSERTED|ELAAN_EXISTS" \
-    || fail "PHP ran but ELAAN_INSERTED/ELAAN_EXISTS marker missing — check output above"
-  CREATED_ID=$(echo "$LIVE_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
-  echo ""
-  echo "---------------------------------------------------------------"
-  if echo "$LIVE_OUT" | grep -q "ELAAN_EXISTS"; then
-    echo "ELAAN OK (idempotent): AppUpdate row #${CREATED_ID} already present (no duplicate, not re-dated)."
-  else
-    echo "ELAAN OK: AppUpdate row #${CREATED_ID} created on live."
-  fi
-  echo "          Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
-  echo "          POS bell badge + popup will appear on next page load."
-  echo "          Verify: https://taxnest.pk/admin/app-updates"
-  echo "---------------------------------------------------------------"
+  LIVE_OUTCOME=$(classify_elaan_outcome "$LIVE_RC" "$LIVE_OUT") \
+    || fail "could not classify Elaan insert outcome"
+  case "$LIVE_OUTCOME" in
+    exists)
+      CREATED_ID=$(echo "$LIVE_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
+      echo ""
+      echo "---------------------------------------------------------------"
+      echo "ELAAN OK (idempotent): AppUpdate row #${CREATED_ID:-?} already present (no duplicate, not re-dated)."
+      echo "          Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
+      echo "          POS bell badge + popup will appear on next page load."
+      echo "          Verify: https://taxnest.pk/admin/app-updates"
+      echo "---------------------------------------------------------------"
+      ;;
+    inserted)
+      CREATED_ID=$(echo "$LIVE_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
+      echo ""
+      echo "---------------------------------------------------------------"
+      echo "ELAAN OK: AppUpdate row #${CREATED_ID} created on live."
+      echo "          Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
+      echo "          POS bell badge + popup will appear on next page load."
+      echo "          Verify: https://taxnest.pk/admin/app-updates"
+      echo "---------------------------------------------------------------"
+      ;;
+    *)
+      echo "$LIVE_OUT" >&2
+      fail "PHP bootstrap failed on live"
+      ;;
+  esac
 fi

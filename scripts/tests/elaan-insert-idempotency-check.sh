@@ -74,9 +74,12 @@ if [ -f "$CI" ]; then
     && ok "skip_elaan still skips committed insert" \
     || bad "skip_elaan insert skip missing"
 
-  grep -q 'SKIP_ELAAN' "$CI" && grep -q 'ELAAN SKIPPED' "$CI" \
-    && ok "skip_elaan still skips freshness gate" \
-    || bad "skip_elaan freshness skip missing"
+  GATE="$ROOT/scripts/lib/elaan-freshness-check.sh"
+  if grep -q 'SKIP_ELAAN' "$CI" && [ -f "$GATE" ] && grep -q 'ELAAN SKIPPED' "$GATE"; then
+    ok "skip_elaan still skips freshness gate (shared elaan-freshness-check.sh)"
+  else
+    bad "skip_elaan freshness skip missing"
+  fi
 
   python3 - "$CI" <<'PY' && ok "CI continues to freshness gate then remote_apply after insert exit 0" || bad "CI does not proceed after successful insert/no-op"
 import sys

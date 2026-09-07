@@ -17,8 +17,10 @@
 #   NO_ELAAN=1 / --no-elaan
 #   ALLOW_SETTINGS / --allow-settings=a,b
 #   deploy/elaan.yml — committed What's New spec; inserted on live after SSH
-#                      (idempotent by title + last deploy marker) then the
-#                      existing freshness gate still runs.
+#                      (idempotent by title; never re-dates) then the freshness
+#                      gate runs. NEW SHA needs a time-fresh row; SAME-SHA
+#                      rerun may pass when marker commit == TARGET_SHA and the
+#                      committed title still exists as published pos/all.
 #
 # Usage (Actions):
 #   TARGET_SHA="$GITHUB_SHA" bash scripts/ci-deploy-production.sh
@@ -107,6 +109,8 @@ run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 
 # shellcheck source=scripts/lib/live-remote-apply.sh
 source "$ROOT/scripts/lib/live-remote-apply.sh"
+# shellcheck source=scripts/lib/elaan-freshness-check.sh
+source "$ROOT/scripts/lib/elaan-freshness-check.sh"
 
 # --------------------------------------------------------------------------- target SHA
 step "Resolve target commit"
@@ -168,75 +172,11 @@ insert_committed_elaan_spec() {
     || fail "committed Elaan spec insert failed — fix deploy/elaan.yml or use skip_elaan for emergencies"
 }
 
-# Elaan gate (same semantics as deploy-live.sh; emergency bypass via --no-elaan).
+# Elaan gate: NEW SHA keeps time-fresh requirement; SAME-SHA rerun may pass
+# only when marker commit == TARGET_SHA and the committed deploy/elaan.yml
+# title still exists as published pos/all (see scripts/lib/elaan-freshness-*).
 check_elaan_freshness() {
-  step "Preflight: Elaan freshness check"
-  if [ "$NO_ELAAN" = "1" ] || [ "${SKIP_ELAAN:-}" = "1" ] || [ "${SKIP_ELAAN:-}" = "true" ]; then
-    echo "!!! ELAAN SKIPPED (CI emergency / workflow input) !!!" >&2
-    return 0
-  fi
-  local ELAAN_OUT ELAAN_RC
-  ELAAN_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "LIVE_DIR='$LIVE_DIR' MARKER_FILE='$LIVE_DEPLOY_MARKER' bash -s" 2>&1 <<'EOFELAAN'
-if [ ! -f "$MARKER_FILE" ]; then
-  echo "ELAAN_NO_MARKER"
-  exit 0
-fi
-MARKER=$(head -1 "$MARKER_FILE" 2>/dev/null || echo "")
-MARKER_TS=$(echo "$MARKER" | cut -d'|' -f1)
-MARKER_COMMIT=$(echo "$MARKER" | cut -d'|' -f2)
-if ! echo "$MARKER_TS" | grep -qE '^[0-9]+$'; then
-  echo "ELAAN_MARKER_PARSE_ERROR"
-  exit 0
-fi
-SINCE=$(date -d "@$MARKER_TS" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
-  || date -r "$MARKER_TS" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
-  || echo "")
-if [ -z "$SINCE" ]; then
-  echo "ELAAN_MARKER_PARSE_ERROR"
-  exit 0
-fi
-cd "$LIVE_DIR"
-DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
-[ -z "$DB_HOST" ] && DB_HOST=127.0.0.1
-DB_USER=$(grep '^DB_USERNAME=' .env | head -1 | sed 's/^DB_USERNAME=//' | tr -d "\"'")
-DB_PASS=$(grep '^DB_PASSWORD=' .env | head -1 | sed 's/^DB_PASSWORD=//' | tr -d "\"'")
-DB_NAME=$(grep '^DB_DATABASE=' .env | head -1 | sed 's/^DB_DATABASE=//' | tr -d "\"'")
-if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
-  echo "ELAAN_DB_CREDS_MISSING"
-  exit 0
-fi
-COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND created_at > '$SINCE'" 2>&1)
-MYSQL_RC=$?
-if [ $MYSQL_RC -ne 0 ] || ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
-  echo "ELAAN_DB_ERROR"
-  exit 0
-fi
-echo "ELAAN_COUNT=$COUNT MARKER_COMMIT=$MARKER_COMMIT SINCE=$SINCE"
-EOFELAAN
-  )
-  ELAAN_RC=$?
-  if [ $ELAAN_RC -ne 0 ] || [ -z "$ELAAN_OUT" ]; then
-    fail "elaan check: SSH failed (rc=$ELAAN_RC) — use workflow_dispatch skip_elaan for emergencies only"
-  fi
-  case "$ELAAN_OUT" in
-    ELAAN_NO_MARKER*|ELAAN_MARKER_PARSE_ERROR*|ELAAN_DB_CREDS_MISSING*|ELAAN_DB_ERROR*)
-      fail "elaan check blocked deploy ($ELAAN_OUT) — create elaan or use skip_elaan for emergencies"
-      ;;
-    *ELAAN_COUNT=*)
-      local COUNT
-      COUNT=$(echo "$ELAAN_OUT" | grep -oE 'ELAAN_COUNT=[0-9]+' | cut -d= -f2)
-      if [ "${COUNT:-0}" -ge 1 ] 2>/dev/null; then
-        echo "Elaan check: PASSED ($COUNT published update(s) since last deploy)."
-        return 0
-      fi
-      fail "elaan missing — create announcement then re-run, or skip_elaan for emergencies"
-      ;;
-    *)
-      fail "elaan check: unexpected remote output: $ELAAN_OUT"
-      ;;
-  esac
+  elaan_freshness_check "$LIVE_HEAD_BEFORE" "$TARGET_SHA"
 }
 insert_committed_elaan_spec
 check_elaan_freshness

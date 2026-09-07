@@ -1,13 +1,16 @@
 # Deploy production (Nayatel VPS) via GitHub Actions
 #
-# Flow (permanent):
-#   Cloud Agent → cursor/* branch → PR → squash onto main (auto-merge after checks)
-#   Production Environment approval stays MANUAL and is not this workflow's PR path.
-#   → this workflow (push to main and/or workflow_dispatch)
-#   → GitHub Environment "production" required reviewers approve
+# Triggers:
+#   1) push to main — human merges / non-GITHUB_TOKEN pushes
+#   2) workflow_dispatch with inputs.target_sha — required handoff after
+#      Enable PR auto-merge squash (GITHUB_TOKEN merges suppress push workflows;
+#      workflow_dispatch is exempt). target_sha MUST be the exact squash commit.
+#
+# Flow:
+#   → GitHub Environment "production" required reviewers approve (MANUAL)
 #   → SSH as taxnest-production-deploy → insert deploy/elaan.yml (if present)
-#   → Elaan freshness gate → apply exact github.sha on the VPS
-#   → post-deploy live verification (scripts/ci-live-verify.sh: SHA + NestPOS markers)
+#   → Elaan freshness gate → apply exact TARGET_SHA on the VPS
+#   → post-deploy live verification (scripts/ci-live-verify.sh)
 #
 # Safety:
 #   - Never pushes to main (or any branch)
@@ -15,11 +18,12 @@
 #   - Uses scripts/lib/live-known-hosts with StrictHostKeyChecking=yes
 #   - Does not use the Replit key (.local/ssh/nayatel_vps_key)
 #   - Concurrency group blocks overlapping production deploys
-#   - Live QA password stays in Environment secret LIVE_QA_PASS (Cloud Agent never sees it)
+#   - Live QA password stays in Environment secret LIVE_QA_PASS
+#   - Deploy SHA is pinned (push: github.sha / dispatch: inputs.target_sha)
 #
-# Required Environment secrets (Settings → Environments → production):
-#   PRODUCTION_SSH_PRIVATE_KEY  — private half of taxnest-production-deploy
-#   LIVE_QA_PASS                — standing live NestPOS QA password (post-deploy verify)
+# Required Environment secrets:
+#   PRODUCTION_SSH_PRIVATE_KEY
+#   LIVE_QA_PASS
 #
 # Docs: docs/ops/github-production-deploy.md
 # Issue→live: docs/ops/cloud-agent-issue-to-live.md
@@ -33,6 +37,11 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      target_sha:
+        description: "Exact main commit SHA to deploy (auto-merge handoff). Leave empty only for emergency tip-of-main dispatch."
+        type: string
+        required: false
+        default: ""
       skip_elaan:
         description: "Emergency only — skip Elaan (What's New) freshness gate"
         type: boolean
@@ -55,26 +64,77 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Checkout triggering main commit
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-
-      - name: Guard — refuse non-main refs
+      - name: Resolve exact deploy SHA
+        id: resolve
         run: |
           set -euo pipefail
-          echo "github.ref=${GITHUB_REF}"
-          echo "github.sha=${GITHUB_SHA}"
-          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
-            echo "Refusing deploy: GITHUB_REF must be refs/heads/main (got ${GITHUB_REF})" >&2
+          EVENT="${GITHUB_EVENT_NAME}"
+          INPUT_SHA="${{ github.event.inputs.target_sha || '' }}"
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$INPUT_SHA" ]; then
+            case "$INPUT_SHA" in
+              *[!0-9a-fA-F]*|"")
+                echo "Invalid target_sha input: ${INPUT_SHA}" >&2
+                exit 1
+                ;;
+            esac
+            if [ "${#INPUT_SHA}" -ne 40 ]; then
+              echo "target_sha must be a full 40-char commit SHA (got ${#INPUT_SHA} chars)" >&2
+              exit 1
+            fi
+            echo "Deploy SHA source=workflow_dispatch inputs.target_sha"
+            echo "sha=${INPUT_SHA}" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "push" ]; then
+            echo "Deploy SHA source=push github.sha"
+            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "Deploy SHA source=workflow_dispatch empty target_sha → tip github.sha (emergency)"
+            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported event ${EVENT}" >&2
             exit 1
           fi
-          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Checkout exact deploy commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Guard — refuse wrong SHA / non-main history
+        run: |
+          set -euo pipefail
+          DEPLOY_SHA="${{ steps.resolve.outputs.sha }}"
+          echo "github.event_name=${GITHUB_EVENT_NAME}"
+          echo "github.ref=${GITHUB_REF}"
+          echo "DEPLOY_SHA=${DEPLOY_SHA}"
+          echo "checkout HEAD=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "${DEPLOY_SHA}"
+
+          # workflow_dispatch is always started with ref=main (YAML + permission boundary).
+          # push must be refs/heads/main.
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+              echo "Refusing deploy: push GITHUB_REF must be refs/heads/main (got ${GITHUB_REF})" >&2
+              exit 1
+            fi
+          else
+            if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+              echo "Refusing deploy: workflow_dispatch must be invoked on main (got ${GITHUB_REF})" >&2
+              exit 1
+            fi
+          fi
+
+          git fetch origin main --prune
+          ORIGIN_MAIN=$(git rev-parse refs/remotes/origin/main)
+          if ! git merge-base --is-ancestor "${DEPLOY_SHA}" "${ORIGIN_MAIN}"; then
+            echo "Refusing deploy: ${DEPLOY_SHA} is not in origin/main history" >&2
+            exit 1
+          fi
+          echo "Guard OK — ${DEPLOY_SHA} is on origin/main"
 
       - name: Deploy exact commit over SSH
         env:
-          TARGET_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ steps.resolve.outputs.sha }}
           PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
           SKIP_ELAAN: ${{ github.event.inputs.skip_elaan || 'false' }}
           ALLOW_SETTINGS: ${{ github.event.inputs.allow_settings || '' }}
@@ -93,12 +153,9 @@ jobs:
           fi
           bash scripts/ci-deploy-production.sh --target-sha="${TARGET_SHA}" "${EXTRA_ARGS[@]}"
 
-      # Post-deploy live verification (same Environment — secrets never leave Actions).
-      # Cloud Agents observe the conclusion only; they must not hold LIVE_QA_PASS.
-      # Failure ⇒ treat as a new diagnosis cycle (docs/ops/cloud-agent-issue-to-live.md).
       - name: Post-deploy live verification (SHA + NestPOS markers)
         env:
-          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_SHA: ${{ steps.resolve.outputs.sha }}
           PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
           LIVE_QA_PASS: ${{ secrets.LIVE_QA_PASS }}
           LIVE_URL: https://taxnest.pk

@@ -5,15 +5,35 @@ Permanent production deploy path after code is already on `main`:
 ```
 Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS-visible changes)
   → PR checks (no deploy) → GitHub squash auto-merge after required checks
-  → GitHub Actions workflow ".github/workflows/deploy-production.yml" on push to main
+  → Enable PR auto-merge dispatches Deploy Production with inputs.target_sha=<squash SHA>
+    (GITHUB_TOKEN merges do not start push workflows; workflow_dispatch does)
+  → OR a human push to main starts Deploy Production with github.sha
+  → GitHub Actions workflow ".github/workflows/deploy-production.yml"
   → GitHub Environment "production" (required reviewers approve — MANUAL)
   → SSH with dedicated deploy key "taxnest-production-deploy"
   → insert committed Elaan spec on live (scripts/elaan-insert.sh, idempotent)
   → existing Elaan freshness gate
-  → scripts/ci-deploy-production.sh applies the exact github.sha on the VPS
+  → scripts/ci-deploy-production.sh applies the exact TARGET_SHA on the VPS
+  → scripts/ci-live-verify.sh (live HEAD == TARGET_SHA + NestPOS markers)
 ```
 
 Deploy Production **never** pushes to `main` and **never** runs on `pull_request`. Auto-merge of a PR is not production approval. Agents and CI must not treat a green PR-checks run as permission to SSH or skip Environment reviewers.
+
+## Auto-merge → Deploy Production handoff
+
+GitHub suppresses new workflow runs for most events caused by `GITHUB_TOKEN`
+(including the `push` that follows an Actions `pulls.merge` squash). That is why
+cursor/* auto-merges after PR #14/#15 did not start Deploy Production.
+
+Supported handoff (no Cloud Agent secrets):
+
+1. `.github/workflows/enable-pr-auto-merge.yml` squash-merges (or waits for native auto-merge).
+2. It reads the **exact squash/merge commit SHA** on `main`.
+3. It calls `actions.createWorkflowDispatch` on `deploy-production.yml` with `inputs.target_sha=<that SHA>`.
+4. `workflow_dispatch` is exempt from GITHUB_TOKEN event suppression, so Deploy Production starts.
+5. Deploy Production checks out that SHA, refuses SHAs not on `origin/main`, keeps Environment approval + concurrency group `production-deploy`, applies that SHA, then runs `ci-live-verify.sh` with the same SHA.
+
+Static proof: `bash scripts/tests/automerge-deploy-handoff-check.sh`.
 
 ## Cloud Agent PR auto-merge vs production approval
 
@@ -49,19 +69,22 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 
 | Step | Behavior |
 |---|---|
-| Trigger | `push` to `main`, or manual `workflow_dispatch` on `main` |
+| Trigger | `push` to `main`, or `workflow_dispatch` on `main` (auto-merge handoff passes `target_sha`) |
+| Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA (must be on `origin/main`) |
 | Concurrency | `production-deploy` with `cancel-in-progress: false` — at most one production deploy runs; others queue |
 | Gate | Job uses `environment: production` → GitHub waits for required reviewers |
-| Checkout | Exact `github.sha` (the merged main commit), full history |
+| Checkout | Exact deploy SHA (resolved), full history |
 | SSH | Writes `PRODUCTION_SSH_PRIVATE_KEY` to a temp file (mode 600), uses `scripts/lib/live-known-hosts` + `StrictHostKeyChecking=yes` |
 | Elaan spec | If `deploy/elaan.yml` is in the commit, `scripts/elaan-insert.sh --from-file` creates a published `AppUpdate` on live (same popup/bell/7-day/seen/master-switch as before). Idempotent on **title**: an existing exact title is a successful no-op (not duplicated or re-dated). The reserved Daily L001 title is rejected and never inserted. `skip_elaan` skips this insert. |
 | Elaan gate | Unchanged freshness check: a published `pos`/`all` row must have `created_at` after the last deploy marker. Infra-only deploys omit `deploy/elaan.yml` and use `skip_elaan`, or insert on live after the last marker. |
 | Apply | `scripts/ci-deploy-production.sh` → shared `scripts/lib/live-remote-apply.sh` |
-| Live verify | Same job runs `scripts/ci-live-verify.sh`: live HEAD == `github.sha`, `/up` 200, NestPOS QA login + feature markers (not merely HTTP 200). Uses Environment secrets `PRODUCTION_SSH_PRIVATE_KEY` + `LIVE_QA_PASS`. Failure fails the workflow — Cloud Agents must start a new diagnosis cycle (`docs/ops/cloud-agent-issue-to-live.md`). |
+| Live verify | Same job runs `scripts/ci-live-verify.sh`: live HEAD == deploy SHA, `/up` 200, NestPOS QA login + feature markers (not merely HTTP 200). Uses Environment secrets `PRODUCTION_SSH_PRIVATE_KEY` + `LIVE_QA_PASS`. Failure fails the workflow — Cloud Agents must start a new diagnosis cycle (`docs/ops/cloud-agent-issue-to-live.md`). |
 | Semantics | Same remote core as `deploy-live.sh`: flock lock, maintenance `artisan down` (200), exact-SHA checkout, composer if needed, migrate only when the gap includes migrations, config/route/view cache rebuild, ownership + SELinux repair, PHP-FPM reload with OPcache proof, `taxnest-queue` restart, `artisan up`, homepage 200, cache-fresh probe, deploy marker. Fail closed (site stays in maintenance on apply failure). |
-| Not run | Replit-local preflights (MySQL staging, Chromium, `.local` QA), SW `CACHE_VERSION` auto-bump commits, any `git push`, Cloud Agent processes
+| Not run | Replit-local preflights (MySQL staging, Chromium, `.local` QA), SW `CACHE_VERSION` auto-bump commits, any `git push`, Cloud Agent processes |
+
 Manual `workflow_dispatch` inputs:
 
+- `target_sha` — exact 40-char main commit to deploy (used by auto-merge handoff; leave empty only for emergency tip-of-main)
 - `skip_elaan` — emergency only; skips **both** committed-spec insert and the What's New freshness gate
 - `allow_settings` — same meaning as `deploy-live.sh --allow-settings=...`
 
@@ -96,10 +119,12 @@ Host identity is pinned in `scripts/lib/live-known-hosts`. Host metadata (IP, pa
 
 After a `cursor/*` PR merges, follow **`docs/ops/cloud-agent-issue-to-live.md`**:
 
-- Push to `main` hands the commit to Deploy Production (Environment approval stays **manual**)
+- Auto-merge squash + `workflow_dispatch` handoff starts Deploy Production with the exact squash SHA (GITHUB_TOKEN merges do not fire `push` workflows)
+- Environment approval stays **manual**
 - Actions runs post-deploy `ci-live-verify.sh` (SHA + NestPOS markers)
 - Cloud Agents observe with `bash scripts/cloud-issue-to-live-observe.sh` (secret-free)
 - On live-verify failure: autonomous fix→PR→redeploy cycle (max 3); never claim LIVE VERIFIED early
+- Handoff static proof: `bash scripts/tests/automerge-deploy-handoff-check.sh`
 
 ## Rollback
 

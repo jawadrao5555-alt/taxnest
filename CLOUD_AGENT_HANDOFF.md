@@ -55,9 +55,8 @@ Permanent workflow (applies to **future** Cloud Agent PRs once these files are o
 
 1. Agent opens a non-draft, same-repo PR to `main` from a `cursor/*` branch.
 2. `.github/workflows/pr-checks.yml` runs (no production secrets, no deploy).
-3. On success, `.github/workflows/enable-pr-auto-merge.yml` (`workflow_run` on the default branch) calls `enablePullRequestAutoMerge` with `mergeMethod: SQUASH`.
-4. GitHub merges only after required checks still pass; this workflow cannot skip those checks.
-5. Push to `main` may start **Deploy Production**, which still uses Environment `production` and waits for the owner’s **manual** approval before any SSH.
+3. On success, `.github/workflows/enable-pr-auto-merge.yml` (`workflow_run` on the default branch) requests GitHub **native squash auto-merge**. If GitHub reports the PR is already **CLEAN** (mergeable, nothing left to wait for), `enablePullRequestAutoMerge` is rejected with "Pull request is in clean status"; the workflow then squash-merges that same PR-checks SHA. It still cannot skip required checks: GitHub’s merge API refuses a blocked PR, and the job only runs after **PR checks** succeeded.
+4. Push to `main` may start **Deploy Production**, which still uses Environment `production` and waits for the owner’s **manual** approval before any SSH.
 
 Owner GitHub settings (one-time): **Allow auto-merge**, **Allow squash merging**, and a ruleset/branch protection that requires the **PR checks / validate** job on `main`. Without that required check, GitHub may squash as soon as auto-merge is enabled (which is only after PR checks already succeeded).
 

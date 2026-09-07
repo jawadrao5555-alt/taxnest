@@ -42,6 +42,22 @@ if [ -f "$AM" ]; then
     && ok "auto-merge is gated on the PR checks workflow succeeding" \
     || bad "auto-merge must run only after workflow PR checks"
 
+  grep -q "pulls.merge" "$AM" && grep -q "merge_method: 'squash'" "$AM" \
+    && ok "CLEAN PRs fall back to REST squash merge" \
+    || bad "workflow must squash-merge when GitHub rejects auto-merge for CLEAN status"
+
+  grep -q 'clean status' "$AM" \
+    && ok "workflow handles GraphQL 'Pull request is in clean status'" \
+    || bad "workflow must catch GitHub CLEAN auto-merge rejection"
+
+  grep -q 'run.head_sha' "$AM" \
+    && ok "squash merge is pinned to the PR-checks head SHA" \
+    || bad "workflow must pin merge sha to workflow_run.head_sha"
+
+  grep -q "mergeable_state === 'clean'" "$AM" \
+    && ok "already-clean mergeable PRs squash without waiting on auto-merge" \
+    || bad "workflow must treat mergeable_state clean as squash-now"
+
   if grep -vE '^\s*#' "$AM" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY|deploy-live|ci-deploy-production'; then
     bad "auto-merge workflow must not reference production deploy secrets or jobs"
   else

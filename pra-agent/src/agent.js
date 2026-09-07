@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { startPrinting, stopPrinting, getPrintStatus } = require('./printer');
+const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 
 let pollInterval = null;
@@ -10,6 +10,26 @@ let heartbeatInterval = null;
 let currentConfig = null;
 let statusCallback = null;
 let updateCallback = null;
+let safeRestartHandler = null;
+
+// Bounded in-memory log ring for Live Ops UPLOAD_REDACTED_LOGS (never ships secrets raw).
+const LOG_RING_MAX = 80;
+const logRing = [];
+
+function pushLogLine(line) {
+  const text = String(line == null ? '' : line).slice(0, 500);
+  logRing.push(`${new Date().toISOString()} ${text}`);
+  while (logRing.length > LOG_RING_MAX) logRing.shift();
+}
+
+function getRecentLogs(limit = 40) {
+  const n = Math.max(1, Math.min(40, Number(limit) || 40));
+  return logRing.slice(-n);
+}
+
+function setSafeRestartHandler(fn) {
+  safeRestartHandler = typeof fn === 'function' ? fn : null;
+}
 
 // ─── Resilience state (Task 1062, Aug 2026) ─────────────────────────────────
 // Offline "flapping" root cause: a single failed heartbeat/sync just waited
@@ -212,6 +232,11 @@ function notify() {
 
 function log(...args) {
   console.log('[Agent]', new Date().toISOString(), ...args);
+  try {
+    pushLogLine(args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+  } catch (e) {
+    pushLogLine(String(args[0] || ''));
+  }
 }
 
 function clearHeartbeatRetry() {
@@ -312,10 +337,35 @@ async function heartbeat() {
           axios,
           log,
           syncOnce: () => syncOnce(),
-          getStatus: () => ({ ...status }),
-          requestRestart: typeof global.__taxnestRequestRestart === 'function'
-            ? global.__taxnestRequestRestart
-            : null,
+          getStatus: () => getStatus(),
+          getRecentLogs: (n) => getRecentLogs(n),
+          refreshPrinters: async () => {
+            await reportPrinters();
+            return { reported: true, printers: getPrintStatus().printersReported };
+          },
+          enqueueTestPrint: async (payload) => {
+            // Controlled pipeline only: never invent a local Windows print.
+            // Server ENQUEUE_TEST_PRINT (or shop UI) creates pos_print_jobs;
+            // this command refreshes printers and nudges the existing claim loop.
+            await reportPrinters();
+            const nudged = nudgePrintPoll();
+            return {
+              pipeline: 'pos_print_jobs',
+              printers_refreshed: true,
+              poll_nudged: !!nudged,
+              note: nudged
+                ? 'Print poll nudged — pending server test jobs will claim via silent print pipeline'
+                : 'Printing loop not active; start agent printing first, or use server ENQUEUE_TEST_PRINT then RESYNC',
+              payload_echo: payload && typeof payload === 'object' ? { has_printer: !!payload.printer } : {},
+            };
+          },
+          requestRestart: (reason) => {
+            if (typeof safeRestartHandler === 'function') {
+              safeRestartHandler(reason || 'live_ops_safe_restart');
+              return true;
+            }
+            return false;
+          },
         }).catch(() => {});
       } catch (e) {}
     }
@@ -560,4 +610,14 @@ function stopAgent() {
   log('Agent stopped');
 }
 
-module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent };
+module.exports = {
+  startAgent,
+  stopAgent,
+  getStatus,
+  setHeartbeatExtraProvider,
+  setLanBridge,
+  setCoreBridge,
+  wakeAgent,
+  getRecentLogs,
+  setSafeRestartHandler,
+};

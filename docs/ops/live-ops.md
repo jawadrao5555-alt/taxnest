@@ -51,6 +51,22 @@ Owner approval phrase: `OWNER_APPROVES_LIVE_OPS_FIX`
 
 Set `LIVE_OPS_RUNNER_TOKEN` in production `.env` to match the Environment secret.
 
-## Security
+## Authorization (existing TaxNest model — do not invent a parallel one)
 
-See `docs/ops/live-ops-security.md`.
+Live Ops lives in the **SaaS Admin** panel (`admin_users` + `admin.auth`), same gate as Live Activity / Support Inbox:
+
+| Actor | Table / guard | Live Ops access |
+|-------|---------------|-----------------|
+| Super Admin | `admin_users.role=super_admin` | Full NestPOS PRA Live Ops for any company |
+| SaaS support/viewer admin | `admin_users` non-super | **403** |
+| POS company_admin / pos_manager | `users` + pos/web | **No** `/admin/live-ops` (redirect login) — manage shop via `/pos/*` |
+| Viewer / cashier / archive_viewer / local_viewer | `users` | **No** Live Ops privileges |
+
+There is **no** `company_user` multi-company staff pivot. One `users.company_id` only.
+
+Related multi-entity tables that are **not** Live Ops auth:
+- `company_groups` / `company_group_members` — sibling product identity insight for SaaS admins
+- `franchises` + franchise portal — franchisees see their linked companies on a separate guard
+- `branch_user` — Health branch scoping inside one company
+
+Company search on Live Ops reuses the `/admin/companies` filter shape (`search` + `status` + name/ntn/owner), scoped to NestPOS PRA product types. Super Admin cross-company operation matches Live Activity / Agents / Support Inbox (`AdminUser::isSuperAdmin()`).

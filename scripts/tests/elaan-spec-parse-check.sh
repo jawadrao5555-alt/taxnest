@@ -91,6 +91,7 @@ KNOWN_LIVE_OR_RETIRED_TITLES = {
     "What's New ab approved production deploy ke saath aata hai",
     "Production update — exact approved commit ab live par aata hai",
     "Production update — same-SHA Elaan rerun ab fresh gate ke saath safe hai",
+    "Production update — NestPOS live-verify login redirect ab clear fail deta hai",
 }
 assert title not in KNOWN_LIVE_OR_RETIRED_TITLES, title
 assert d["audience"] in ("pos", "all")

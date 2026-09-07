@@ -1,12 +1,13 @@
 # Elaan for THIS production deploy only. Next PR must use a new unique title
 # (or omit this file and skip_elaan / a live insert after the last marker).
-# Do not reuse Daily L001, and do not reuse a title that already exists on live
+# Do not reuse a title that already exists on live
 # (that is a successful insert no-op and will not pass the freshness gate).
 
-title: "Production update — NestPOS live-verify login redirect ab clear fail deta hai"
+title: "Production update — NestPOS Live Ops diagnose aur owner-approved fix ab ready hai"
 audience: pos
-type: improvement
+type: feature
 points:
   - "POS aur FBR POS ka What's New popup aur bell pehle jaisa hai — 7 din live, seen tracking, aur admin master switch."
   - "Naya production SHA ke liye naya unique title zaroori hai; pehle wala title dubara nahi bheja jata aur existing What's New re-date nahi hota."
-  - "Live verify ab login POST Location check karta hai — /pos/login par wapas bounce clear auth failure hai, /pos/dashboard ab bhi HTTP 200 maangta hai; shops ke saved settings is se nahi badalte."
+  - "Cloud/Admin Live Ops se company diagnose (agent, printer, PRA, billing) allow-listed read-only reports se hota hai; Fix sirf OWNER_APPROVES_LIVE_OPS_FIX ke baad controlled low/medium actions par."
+  - "Desktop Agent pending commands (resync, printer refresh, redacted logs, safe restart, test-print poll nudge) heartbeat se aate hain — arbitrary shell/SQL nahi."

@@ -15,9 +15,16 @@
     <div class="grid lg:grid-cols-2 gap-6 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <h2 class="text-sm font-semibold text-white mb-3">Company search</h2>
-            <form method="get" action="{{ route('saas.admin.live-ops') }}" class="flex gap-2 mb-3">
-                <input type="text" name="q" value="{{ $q }}" placeholder="Name, id, or account code" class="flex-1 rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
-                <button class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm">Search</button>
+            <p class="text-[11px] text-gray-500 mb-3">Same filter pattern as Companies (search + status). NestPOS PRA scope only. Super admin can open any matching shop — POS managers/viewers cannot use this panel.</p>
+            <form method="get" action="{{ route('saas.admin.live-ops') }}" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                <input type="text" name="search" value="{{ $search ?? $q }}" placeholder="Search name, NTN, owner, id, account code…" class="sm:col-span-2 w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
+                <select name="status" class="rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
+                    <option value="">All statuses</option>
+                    <option value="approved" @selected(($status ?? '') === 'approved')>Approved</option>
+                    <option value="pending" @selected(($status ?? '') === 'pending')>Pending</option>
+                    <option value="suspended" @selected(($status ?? '') === 'suspended')>Suspended</option>
+                </select>
+                <button class="sm:col-span-3 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm">Search</button>
             </form>
             <ul class="space-y-2 text-sm">
                 @forelse($companies as $c)
@@ -26,11 +33,12 @@
                             <span class="text-white">{{ $c->name }}</span>
                             <span class="text-gray-500">#{{ $c->id }}</span>
                             @if($c->account_code)<span class="text-gray-600">{{ $c->account_code }}</span>@endif
+                            @if($c->status)<span class="text-[10px] uppercase text-gray-500">{{ $c->status }}</span>@endif
                         </div>
                         <a href="{{ route('saas.admin.live-ops.company', $c->id) }}" class="text-indigo-400 hover:underline">Diagnostic</a>
                     </li>
                 @empty
-                    <li class="text-gray-500">{{ $q === '' ? 'Enter a search term.' : 'No matches.' }}</li>
+                    <li class="text-gray-500">{{ ($search ?? $q ?? '') === '' && ($status ?? '') === '' ? 'Enter a search term (same idea as /admin/companies).' : 'No NestPOS PRA matches.' }}</li>
                 @endforelse
             </ul>
         </div>

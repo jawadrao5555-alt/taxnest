@@ -3,17 +3,28 @@
 Permanent production deploy path after code is already on `main`:
 
 ```
-Cloud Agent → feature branch → PR (include deploy/elaan.yml for POS-visible changes)
-  → owner merges to main
-  → GitHub Actions workflow ".github/workflows/deploy-production.yml"
-  → GitHub Environment "production" (required reviewers approve)
+Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS-visible changes)
+  → PR checks (no deploy) → GitHub squash auto-merge after required checks
+  → GitHub Actions workflow ".github/workflows/deploy-production.yml" on push to main
+  → GitHub Environment "production" (required reviewers approve — MANUAL)
   → SSH with dedicated deploy key "taxnest-production-deploy"
   → insert committed Elaan spec on live (scripts/elaan-insert.sh, idempotent)
   → existing Elaan freshness gate
   → scripts/ci-deploy-production.sh applies the exact github.sha on the VPS
 ```
 
-This workflow **never** pushes to `main`. Agents and CI must not treat a green Actions run as permission to merge.
+Deploy Production **never** pushes to `main` and **never** runs on `pull_request`. Auto-merge of a PR is not production approval. Agents and CI must not treat a green PR-checks run as permission to SSH or skip Environment reviewers.
+
+## Cloud Agent PR auto-merge vs production approval
+
+These are separate gates:
+
+| Gate | What happens | Who/what waits |
+|---|---|---|
+| PR checks + GitHub auto-merge | Enables **squash** auto-merge on same-repo `cursor/*` PRs to `main` after `.github/workflows/pr-checks.yml` succeeds (`enablePullRequestAutoMerge`). Does not use `PRODUCTION_SSH_PRIVATE_KEY` or Environment `production`. | GitHub required status checks (configure **PR checks / validate** as required on `main`). |
+| Production Environment | `.github/workflows/deploy-production.yml` on **push to `main`** (or `workflow_dispatch`) | Required reviewers on Environment `production` — **keep MANUAL**. |
+
+One-time repo settings: Settings → General → **Allow auto-merge** and **Allow squash merging**. Do not give Cloud Agent production SSH keys or Environment secrets.
 
 ## What you must configure in GitHub (manual)
 
@@ -29,7 +40,7 @@ This workflow **never** pushes to `main`. Agents and CI must not treat a green A
 
 4. **Do not** store or use the old Replit key (`.local/ssh/nayatel_vps_key`) in Actions.
 
-5. Optional but recommended: protect `main` with required PR reviews so only merged code can trigger the push-to-main deploy path.
+5. Protect `main` with a ruleset that **requires** the status check **PR checks / validate** so squash auto-merge cannot land a commit whose latest checks failed. Optional: also require PR reviews. Production Environment approval stays independent and **manual**.
 
 ## What the workflow does
 

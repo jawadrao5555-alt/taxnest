@@ -1,0 +1,104 @@
+# Enable GitHub native auto-merge (squash) on Cursor Cloud Agent PRs.
+#
+# Safety:
+#   - Does NOT deploy production
+#   - Does NOT use Environment "production" or PRODUCTION_SSH_PRIVATE_KEY
+#   - Does NOT checkout untrusted PR code (workflow_run on the default branch)
+#   - Fork PRs are ignored
+#   - Auto-merge is requested only after "PR checks" succeeds, then GitHub
+#     still honors any additional required checks / conversation rules.
+#     This workflow cannot bypass required checks and does not merge itself.
+#
+# After this file is on main, future PRs whose head branch starts with
+# "cursor/" targeting main get squash auto-merge requested once PR checks pass.
+#
+# Repo settings the owner must keep enabled (Settings → General):
+#   - Allow auto-merge
+#   - Allow squash merging
+# Mark workflow job "PR checks / validate" as a required status check on main
+# so GitHub waits for the latest commit's checks (not only the first enable).
+
+name: Enable PR auto-merge
+
+on:
+  workflow_run:
+    workflows: ["PR checks"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  enable-auto-merge:
+    name: Enable squash auto-merge
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request squash auto-merge
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const run = context.payload.workflow_run;
+            let candidates = run.pull_requests || [];
+            if (candidates.length === 0) {
+              const listed = await github.rest.pulls.list({
+                owner, repo, state: 'open', base: 'main', per_page: 50,
+              });
+              candidates = listed.data.filter((p) => p.head.sha === run.head_sha);
+            }
+            if (candidates.length === 0) {
+              core.info('No open PR found for this PR-checks run; nothing to enable.');
+              return;
+            }
+            let enabled = 0;
+            for (const brief of candidates) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner, repo, pull_number: brief.number,
+              });
+              if (pr.base.ref !== 'main') continue;
+              if (pr.draft) continue;
+              if (!pr.head.repo || pr.head.repo.full_name !== `${owner}/${repo}`) {
+                core.info(`PR #${pr.number}: skip fork`);
+                continue;
+              }
+              if (!pr.head.ref.startsWith('cursor/')) {
+                core.info(`PR #${pr.number}: skip non-cursor/ branch ${pr.head.ref}`);
+                continue;
+              }
+              try {
+                await github.graphql(
+                  `mutation($id: ID!) {
+                    enablePullRequestAutoMerge(input: {
+                      pullRequestId: $id,
+                      mergeMethod: SQUASH
+                    }) {
+                      pullRequest { number }
+                    }
+                  }`,
+                  { id: pr.node_id }
+                );
+                core.info(`PR #${pr.number}: squash auto-merge enabled.`);
+                enabled += 1;
+              } catch (err) {
+                const msg = String(err.message || err);
+                if (/already enabled/i.test(msg)) {
+                  core.info(`PR #${pr.number}: auto-merge already enabled.`);
+                  enabled += 1;
+                  continue;
+                }
+                core.setFailed(
+                  `PR #${pr.number}: could not enable auto-merge: ${msg}. ` +
+                  'Confirm Settings → General → Allow auto-merge and Allow squash merging.'
+                );
+                return;
+              }
+            }
+            if (enabled === 0) {
+              core.info('No matching cursor/ same-repo PRs to auto-merge.');
+            }

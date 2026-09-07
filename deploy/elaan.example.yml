@@ -1,0 +1,24 @@
+# Copy to deploy/elaan.yml in a production-bound PR, then CHANGE the title
+# for every new deploy. The same title will not be re-created or re-dated.
+#
+# GitHub Actions (after Environment approval + SSH) inserts this as a
+# published AppUpdate via scripts/elaan-insert.sh, then runs the existing
+# Elaan freshness gate. Cursor Cloud Agents must never write this to live
+# themselves.
+#
+# Omit deploy/elaan.yml for emergency/infra deploys that use skip_elaan,
+# or when an announcement was already inserted on live after the last marker.
+
+title: "Naya update — YYYY-MM-DD unique title"
+audience: pos
+# audience: pos | fbr_pos | all
+# Freshness gate counts pos and all only. fbr_pos-only will not pass the gate.
+type: improvement
+# type: feature | improvement
+points:
+  - "Pehla change POS user ko Roman Urdu / English mein."
+  - "Doosra point."
+# category: restaurant
+# categories:
+#   - restaurant
+#   - pharmacy

@@ -45,6 +45,7 @@ After the owner merges a PR to `main`, production is intended to deploy via GitH
 - Secret: `PRODUCTION_SSH_PRIVATE_KEY` (dedicated `taxnest-production-deploy` key only)
 - Docs: `docs/ops/github-production-deploy.md`
 - Rollback: `deployment/ROLLBACK.md`
+- **What's New / Elaan:** for a POS-visible production change, put a unique spec in `deploy/elaan.yml` (see `deploy/elaan.example.yml`). After the owner approves the GitHub Environment, Actions inserts that `AppUpdate` on live via `scripts/elaan-insert.sh`. Agents must **not** write production `app_updates` or SSH to the VPS. Never reuse the Daily L001 title. Infra-only deploys may omit the spec; the freshness gate still applies unless the owner uses emergency `skip_elaan`.
 
 Agents must **not** merge to `main`, approve the Environment, or run a real production deploy unless the owner explicitly instructs them to.
 

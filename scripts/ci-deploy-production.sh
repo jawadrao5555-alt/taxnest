@@ -16,6 +16,9 @@
 # Optional:
 #   NO_ELAAN=1 / --no-elaan
 #   ALLOW_SETTINGS / --allow-settings=a,b
+#   deploy/elaan.yml — committed What's New spec; inserted on live after SSH
+#                      (idempotent by title + last deploy marker) then the
+#                      existing freshness gate still runs.
 #
 # Usage (Actions):
 #   TARGET_SHA="$GITHUB_SHA" bash scripts/ci-deploy-production.sh
@@ -140,6 +143,31 @@ LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
   || fail "cannot reach live server over SSH (or live git repo broken)"
 echo "live HEAD (before): $LIVE_HEAD_BEFORE"
 
+# After Environment approval + proven SSH, insert the committed spec (if any)
+# using the existing elaan-insert.sh path. Then the unchanged freshness gate
+# still has to pass. skip_elaan skips BOTH insert and the gate (emergency).
+insert_committed_elaan_spec() {
+  step "Committed Elaan spec (deploy/elaan.yml) — insert on live if present"
+  if [ "$NO_ELAAN" = "1" ] || [ "${SKIP_ELAAN:-}" = "1" ] || [ "${SKIP_ELAAN:-}" = "true" ]; then
+    echo "skip_elaan set — not inserting a committed spec (emergency path)."
+    return 0
+  fi
+  local SPEC=""
+  if [ -f "$ROOT/deploy/elaan.yml" ]; then
+    SPEC="$ROOT/deploy/elaan.yml"
+  elif [ -f "$ROOT/deploy/elaan.yaml" ]; then
+    SPEC="$ROOT/deploy/elaan.yaml"
+  fi
+  if [ -z "$SPEC" ]; then
+    echo "No deploy/elaan.yml in this commit — skipping CI insert."
+    echo "Freshness check still requires a published pos/all AppUpdate after the last deploy marker."
+    return 0
+  fi
+  echo "Inserting $SPEC via scripts/elaan-insert.sh (idempotent; will not re-date Daily L001)."
+  bash "$ROOT/scripts/elaan-insert.sh" --from-file "$SPEC" \
+    || fail "committed Elaan spec insert failed — fix deploy/elaan.yml or use skip_elaan for emergencies"
+}
+
 # Elaan gate (same semantics as deploy-live.sh; emergency bypass via --no-elaan).
 check_elaan_freshness() {
   step "Preflight: Elaan freshness check"
@@ -210,6 +238,7 @@ EOFELAAN
       ;;
   esac
 }
+insert_committed_elaan_spec
 check_elaan_freshness
 
 if [ "$LIVE_HEAD_BEFORE" = "$TARGET_SHA" ]; then

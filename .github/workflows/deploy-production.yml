@@ -4,7 +4,8 @@
 #   Cloud Agent → feature branch → PR → owner merges to main
 #   → this workflow (push to main and/or workflow_dispatch)
 #   → GitHub Environment "production" required reviewers approve
-#   → SSH as taxnest-production-deploy → apply exact github.sha on the VPS
+#   → SSH as taxnest-production-deploy → insert deploy/elaan.yml (if present)
+#   → Elaan freshness gate → apply exact github.sha on the VPS
 #
 # Safety:
 #   - Never pushes to main (or any branch)

@@ -16,6 +16,7 @@ BOOT="$ROOT/scripts/cloud-dev-bootstrap.sh"
 EJ="$ROOT/.cursor/environment.json"
 DOC="$ROOT/docs/ops/cloud-agent-development.md"
 ARCH="$ROOT/docs/ops/cloud-agent-architecture.md"
+BROWSER_DOC="$ROOT/docs/ops/cloud-agent-local-browser-qa.md"
 LOCK="$ROOT/package-lock.json"
 HAND="$ROOT/CLOUD_AGENT_HANDOFF.md"
 
@@ -104,6 +105,12 @@ if [ -f "$HAND" ]; then
   grep -q 'cloud-agent-development.md' "$HAND" \
     && ok "handoff links cloud-agent-development.md" \
     || bad "CLOUD_AGENT_HANDOFF.md should link cloud-agent-development.md"
+fi
+
+if [ -f "$BROWSER_DOC" ]; then
+  ok "present cloud-agent-local-browser-qa.md"
+else
+  bad "missing docs/ops/cloud-agent-local-browser-qa.md"
 fi
 
 echo ""

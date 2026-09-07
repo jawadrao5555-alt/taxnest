@@ -35,10 +35,16 @@ class VideoDemoShopSeeder extends Seeder
         // Fail closed. This seeder rewrites a company, its login and its whole
         // catalogue — a stray `db:seed --class=VideoDemoShopSeeder` anywhere
         // near a real database must do nothing. APP_ENV is 'production' even in
-        // the dev workspace, so it proves nothing; the recording pipeline opts
-        // in explicitly instead (same guard as VideoStockCheckSeeder).
+        // the dev workspace, so it proves nothing; the recording / Cloud local
+        // QA pipeline opts in explicitly and must be on taxnest_staging or
+        // taxnest_dev at 127.0.0.1/localhost only.
         if (!filter_var(env('VIDEO_PIPELINE_ALLOW', false), FILTER_VALIDATE_BOOLEAN)) {
-            $this->command?->error('Refusing to run: set VIDEO_PIPELINE_ALLOW=1 (recording pipeline only).');
+            $this->command?->error('Refusing to run: set VIDEO_PIPELINE_ALLOW=1 (recording/local QA pipeline only).');
+            return;
+        }
+        if ($problems = \App\Support\DevStagingGuard::problems()) {
+            $this->command?->error('Refusing to run: not a local disposable DB (' . implode('; ', $problems) . ').');
+
             return;
         }
 

@@ -25,10 +25,19 @@ Minimum bar before a `cursor/*` PR on an issue:
 Never say **DONE**, **FIXED**, or **VERIFIED** merely because code changed or
 PHPUnit passed. The original reported issue must have been re-tested successfully.
 
-**Production is out of bounds:** never access/modify/deploy production; never use
-production credentials, live customer data, production DB, FBR/PRA production
-tokens, or production SSH keys. Deploy remains Desktop / GitHub Actions + manual
-Environment approval.
+**Issue → live (after the PR):** follow
+**[`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md)**.
+Auto-merge hands the commit to Deploy Production; Environment approval stays
+**manual**. Actions runs `scripts/ci-live-verify.sh` (SHA + NestPOS markers).
+On failure, run the self-heal cycle (max **3** iterations). Say **LIVE VERIFIED**
+only after that Actions step passes. Observe with
+`bash scripts/cloud-issue-to-live-observe.sh` (secret-free).
+
+**Production is out of bounds for the agent process:** never access/modify/deploy
+production directly; never use production credentials, live customer data,
+production DB, FBR/PRA production tokens, or production SSH keys. Deploy remains
+GitHub Actions + manual Environment approval. Cloud Agents never receive
+`PRODUCTION_SSH_PRIVATE_KEY` or `LIVE_QA_PASS`.
 
 ## Product map
 
@@ -68,7 +77,8 @@ Local/Cloud bootstrap (MariaDB `taxnest_dev`, Vite, PHPUnit sqlite):
 
 - How-to: `docs/ops/cloud-agent-development.md`
 - Non-secret architecture/invariants: `docs/ops/cloud-agent-architecture.md`
-- Issue-resolution policy (DEFAULT): `docs/ops/cloud-agent-issue-resolution.md`
+- Issue-resolution policy (DEFAULT local): `docs/ops/cloud-agent-issue-resolution.md`
+- Issue → live (merge/deploy/verify/self-heal): `docs/ops/cloud-agent-issue-to-live.md`
 - Cursor config: `.cursor/environment.json` → `scripts/cloud-dev-install.sh` / `scripts/cloud-dev-start.sh`
 
 ```bash

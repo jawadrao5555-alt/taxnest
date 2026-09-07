@@ -7,6 +7,7 @@
 #   → GitHub Environment "production" required reviewers approve
 #   → SSH as taxnest-production-deploy → insert deploy/elaan.yml (if present)
 #   → Elaan freshness gate → apply exact github.sha on the VPS
+#   → post-deploy live verification (scripts/ci-live-verify.sh: SHA + NestPOS markers)
 #
 # Safety:
 #   - Never pushes to main (or any branch)
@@ -14,11 +15,14 @@
 #   - Uses scripts/lib/live-known-hosts with StrictHostKeyChecking=yes
 #   - Does not use the Replit key (.local/ssh/nayatel_vps_key)
 #   - Concurrency group blocks overlapping production deploys
+#   - Live QA password stays in Environment secret LIVE_QA_PASS (Cloud Agent never sees it)
 #
-# Required Environment secret (Settings → Environments → production):
+# Required Environment secrets (Settings → Environments → production):
 #   PRODUCTION_SSH_PRIVATE_KEY  — private half of taxnest-production-deploy
+#   LIVE_QA_PASS                — standing live NestPOS QA password (post-deploy verify)
 #
 # Docs: docs/ops/github-production-deploy.md
+# Issue→live: docs/ops/cloud-agent-issue-to-live.md
 # Rollback: deployment/ROLLBACK.md
 
 name: Deploy Production
@@ -88,3 +92,15 @@ jobs:
             EXTRA_ARGS+=(--allow-settings="${ALLOW_SETTINGS}")
           fi
           bash scripts/ci-deploy-production.sh --target-sha="${TARGET_SHA}" "${EXTRA_ARGS[@]}"
+
+      # Post-deploy live verification (same Environment — secrets never leave Actions).
+      # Cloud Agents observe the conclusion only; they must not hold LIVE_QA_PASS.
+      # Failure ⇒ treat as a new diagnosis cycle (docs/ops/cloud-agent-issue-to-live.md).
+      - name: Post-deploy live verification (SHA + NestPOS markers)
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          LIVE_QA_PASS: ${{ secrets.LIVE_QA_PASS }}
+          LIVE_URL: https://taxnest.pk
+          LIVE_VERIFY_PROFILE: extended
+        run: bash scripts/ci-live-verify.sh

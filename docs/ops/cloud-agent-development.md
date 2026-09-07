@@ -32,6 +32,9 @@ Browser / UI self-testing (fail-closed, loopback only): `docs/ops/cloud-agent-lo
 **DEFAULT for reported issues** (reproduce → fix → re-test → evidence → PR):
 `docs/ops/cloud-agent-issue-resolution.md`
 
+**Issue → live** (merge → deploy → live-verify → self-heal):
+`docs/ops/cloud-agent-issue-to-live.md`
+
 Generate / refresh key manually if needed:
 
 ```bash
@@ -56,6 +59,8 @@ Do **not** commit `.env`.
 | NestPOS Chrome UI smoke | `BASE_URL=http://127.0.0.1:8000 node scripts/cloud-local-ui-smoke.mjs` |
 | Browser QA static check | `bash scripts/tests/cloud-local-browser-qa-check.sh` |
 | Issue-resolution policy check | `bash scripts/tests/cloud-agent-issue-resolution-check.sh` |
+| Issue→live policy check | `bash scripts/tests/issue-to-live-check.sh` |
+| Observe deploy/verify (secret-free) | `bash scripts/cloud-issue-to-live-observe.sh` |
 
 ## Local database
 

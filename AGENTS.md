@@ -17,12 +17,20 @@ one focused `cursor/*` PR with evidence.
 Do **not** claim DONE / FIXED / VERIFIED merely because code changed or
 PHPUnit passed.
 
+After the PR merges, continue with the **issue → live** chain
+([`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md)):
+PR auto-merge → protected Deploy Production (owner Environment approval) →
+Actions live-verify → self-heal loops on failure (max 3). Cloud Agents stay
+**production-secret-free**; say **LIVE VERIFIED** only after Actions
+`ci-live-verify.sh` passes.
+
 ## Entrypoints
 
 | Doc | Role |
 |---|---|
 | `CLOUD_AGENT_HANDOFF.md` | Git/PR/deploy boundary + links |
-| `docs/ops/cloud-agent-issue-resolution.md` | **DEFAULT** issue-resolution workflow |
+| `docs/ops/cloud-agent-issue-resolution.md` | **DEFAULT** local issue-resolution workflow |
+| `docs/ops/cloud-agent-issue-to-live.md` | **Issue → live** merge/deploy/verify/self-heal |
 | `docs/ops/cloud-agent-development.md` | Local/Cloud bootstrap (MariaDB) |
 | `docs/ops/cloud-agent-local-browser-qa.md` | Fail-closed Chrome UI smoke |
 | `docs/ops/cloud-agent-architecture.md` | Non-secret invariants |
@@ -34,4 +42,5 @@ Cloud Agents **MUST NEVER** access, modify, or deploy production; must never
 use production credentials, live customer data, production DB, FBR/PRA
 production tokens, or production SSH keys. Browser/DB testing is
 **loopback / local disposable DB only**. Production deploy is GitHub Actions +
-manual Environment approval — not the Cloud Agent.
+manual Environment approval — not the Cloud Agent. Authenticated live smoke
+runs only in Actions (`LIVE_QA_PASS` Environment secret).

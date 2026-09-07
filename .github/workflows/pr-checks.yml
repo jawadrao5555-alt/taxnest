@@ -19,3 +19,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Workflow and auto-merge safety checks
         run: bash scripts/tests/pr-auto-merge-check.sh
+      - name: Issue-to-live workflow safety checks
+        run: bash scripts/tests/issue-to-live-check.sh

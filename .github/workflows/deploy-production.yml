@@ -1,0 +1,88 @@
+# Deploy production (Nayatel VPS) via GitHub Actions
+#
+# Flow (permanent):
+#   Cloud Agent → feature branch → PR → owner merges to main
+#   → this workflow (push to main and/or workflow_dispatch)
+#   → GitHub Environment "production" required reviewers approve
+#   → SSH as taxnest-production-deploy → apply exact github.sha on the VPS
+#
+# Safety:
+#   - Never pushes to main (or any branch)
+#   - Never embeds private keys, passwords, tokens, or .env values
+#   - Uses scripts/lib/live-known-hosts with StrictHostKeyChecking=yes
+#   - Does not use the Replit key (.local/ssh/nayatel_vps_key)
+#   - Concurrency group blocks overlapping production deploys
+#
+# Required Environment secret (Settings → Environments → production):
+#   PRODUCTION_SSH_PRIVATE_KEY  — private half of taxnest-production-deploy
+#
+# Docs: docs/ops/github-production-deploy.md
+# Rollback: deployment/ROLLBACK.md
+
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      skip_elaan:
+        description: "Emergency only — skip Elaan (What's New) freshness gate"
+        type: boolean
+        default: false
+      allow_settings:
+        description: "Comma-separated settings columns this deploy may intentionally change"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy main commit to production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout triggering main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Guard — refuse non-main refs
+        run: |
+          set -euo pipefail
+          echo "github.ref=${GITHUB_REF}"
+          echo "github.sha=${GITHUB_SHA}"
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Refusing deploy: GITHUB_REF must be refs/heads/main (got ${GITHUB_REF})" >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Deploy exact commit over SSH
+        env:
+          TARGET_SHA: ${{ github.sha }}
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          SKIP_ELAAN: ${{ github.event.inputs.skip_elaan || 'false' }}
+          ALLOW_SETTINGS: ${{ github.event.inputs.allow_settings || '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PRODUCTION_SSH_PRIVATE_KEY}" ]; then
+            echo "PRODUCTION_SSH_PRIVATE_KEY is empty — configure it on the GitHub Environment 'production'." >&2
+            exit 1
+          fi
+          EXTRA_ARGS=()
+          if [ "${SKIP_ELAAN}" = "true" ] || [ "${SKIP_ELAAN}" = "1" ]; then
+            EXTRA_ARGS+=(--no-elaan)
+          fi
+          if [ -n "${ALLOW_SETTINGS}" ]; then
+            EXTRA_ARGS+=(--allow-settings="${ALLOW_SETTINGS}")
+          fi
+          bash scripts/ci-deploy-production.sh --target-sha="${TARGET_SHA}" "${EXTRA_ARGS[@]}"

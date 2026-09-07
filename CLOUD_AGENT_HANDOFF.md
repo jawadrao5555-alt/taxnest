@@ -36,6 +36,18 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 - Never commit secrets, credentials, passwords, tokens, `.env` contents, or `.local` contents.
 - Do not change company settings, permissions, feature toggles, or legacy chosen values unless the task explicitly requires it (see `replit.md`).
 
+## Production deploy (GitHub Actions)
+
+After the owner merges a PR to `main`, production is intended to deploy via GitHub Actions + Environment approval — **not** by the Cloud Agent SSHing to the VPS.
+
+- Workflow: `.github/workflows/deploy-production.yml`
+- Environment: `production` (required reviewers approve)
+- Secret: `PRODUCTION_SSH_PRIVATE_KEY` (dedicated `taxnest-production-deploy` key only)
+- Docs: `docs/ops/github-production-deploy.md`
+- Rollback: `deployment/ROLLBACK.md`
+
+Agents must **not** merge to `main`, approve the Environment, or run a real production deploy unless the owner explicitly instructs them to.
+
 ## This file’s purpose
 
 Keep Cloud Agents on a safe, reusable branch → test → PR path against `main`, with NestPOS PRA as default scope and `replit.md` as the product source of truth.

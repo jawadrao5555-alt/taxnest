@@ -4,16 +4,17 @@
 #
 # Does the FULL runbook from .agents/memory/islamabad-vps-stack.md:
 #   1. Push workspace HEAD to GitHub main (git push origin HEAD:main)
-#   2. Over SSH on the live server ($LIVE_DIR):
-#        git pull origin main
+#   2. Over SSH on the live server ($LIVE_DIR), via scripts/lib/live-remote-apply.sh:
+#        checkout the exact pushed commit on main
 #        php artisan migrate --force        (only when the gap includes migrations)
 #        config/route/view cache rebuild
 #        WEB OPcache reset by reloading PHP-FPM (proved by fresh worker PIDs)
 #        queue worker restarted so it stops running the OLD code
 #   3. Verify: live HEAD == workspace HEAD, and homepage curls 200.
 #
-# The host, key, paths and PHP binary all come from scripts/lib/live-host.sh —
-# never hardcode them here again.
+# Prefer the permanent post-merge path when configured:
+#   docs/ops/github-production-deploy.md  (.github/workflows/deploy-production.yml)
+# This script remains the manual / Replit deploy entrypoint.
 #
 # Fails LOUDLY on any step — no silent half-deploys. Safe to re-run.
 #
@@ -118,197 +119,13 @@ post_deploy_screen_smoke() {
   return 0
 }
 
-# ALL live-mutating work (pull/composer/migrate/caches/OPcache/queue) runs as
-# ONE remote payload under a single exclusive flock, so two people deploying
-# at once cannot interleave their stages.
+# ALL live-mutating work (checkout/composer/migrate/caches/OPcache/queue) runs
+# as ONE remote payload under a single exclusive flock, so two people deploying
+# at once cannot interleave their stages. Implementation lives in
+# scripts/lib/live-remote-apply.sh (shared with GitHub Actions CI deploy).
 DEPLOY_LOCK="$LIVE_DEPLOY_LOCK"
-
-# remote_apply DO_PULL DO_COMPOSER DO_MIGRATE
-# Executes the full mutation sequence on live inside one held lock AND inside
-# a pre-rendered HTTP-200 maintenance window: down(200) BEFORE any mutation,
-# up ONLY after caches + a CONFIRMED OPcache reset. On any failure the site
-# STAYS on the 200 maintenance page (fail closed).
-# Exit codes: 90 cd, 91 pull, 92 composer, 93 migrate, 94 caches,
-# 96 down failed (live untouched), 97 up failed, 98 opcache reset unconfirmed,
-# 99 queue worker did not come back. Prints REMOTE_* markers.
-remote_apply() {
-  local DO_PULL=$1 DO_COMPOSER=$2 DO_MIGRATE=$3
-  timeout 900 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "LIVE_DIR='$LIVE_DIR' LIVE_PHP='$LIVE_PHP' LIVE_WEB_GROUP='$LIVE_WEB_GROUP' \
-     LIVE_FPM_SERVICE='$LIVE_FPM_SERVICE' LIVE_QUEUE_SERVICE='$LIVE_QUEUE_SERVICE' \
-     LIVE_SETTINGS_BASE='$LIVE_SETTINGS_BASE' LIVE_SSH_USER='$LIVE_SSH_USER' \
-     flock -w 300 $DEPLOY_LOCK bash -s -- $DO_PULL $DO_COMPOSER $DO_MIGRATE '${ALLOW_SETTINGS:-}'" <<'REMOTE'
-set -u
-DO_PULL=$1; DO_COMPOSER=$2; DO_MIGRATE=$3; ALLOW_SETTINGS=${4:-}
-PHP="$LIVE_PHP"
-cd "$LIVE_DIR" || exit 90
-echo "REMOTE_LOCK_HELD"
-
-# Maintenance window FIRST — live must never serve mid-mutation state.
-# Bootstrap a minimal 200 page if the committed one isn't on live yet.
-if [ ! -f resources/views/errors/deploying.blade.php ]; then
-  mkdir -p resources/views/errors || exit 96
-  printf '%s' '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="4"><title>Updating</title></head><body style="font-family:sans-serif;text-align:center;padding-top:20vh;background:#0A4D5C;color:#fff"><h1>System update in progress&hellip;</h1><p>This page refreshes automatically.</p></body></html>' \
-    > resources/views/errors/deploying.blade.php || exit 96
-fi
-echo "REMOTE_STEP: artisan down (200 maintenance window)"
-$PHP artisan down --render=errors::deploying --status=200 --refresh=4 2>&1 || exit 96
-# From here on, any failure exits WITHOUT artisan up — site stays on the
-# friendly 200 page; recover manually ('php artisan up' after fixing).
-
-if [ "$DO_PULL" = 1 ]; then
-  echo "REMOTE_STEP: git pull origin main"
-  git pull origin main 2>&1 || exit 91
-fi
-if [ "$DO_COMPOSER" = 1 ]; then
-  echo "REMOTE_STEP: composer install"
-  composer install --no-interaction --prefer-dist --no-dev 2>&1 || exit 92
-fi
-# Settings baseline BEFORE any migration touches a column. Taken on the code
-# that is already live, so it reflects what the shops actually had. Never fatal:
-# a host that cannot snapshot must still be able to deploy a hotfix.
-SETTINGS_BASE="$LIVE_SETTINGS_BASE"
-SETTINGS_BASE_OK=0
-if $PHP artisan pos:settings-snapshot --out="$SETTINGS_BASE" >/dev/null 2>&1; then
-  SETTINGS_BASE_OK=1
-  echo "REMOTE_STEP: settings baseline captured"
-else
-  # Not a remote exit code (the site is mid-maintenance and the release itself
-  # is fine), but the deploy is NOT clean: nothing is watching the settings this
-  # time. The local script turns this marker into a loud failure.
-  echo "REMOTE_SETTINGS_BASELINE_FAILED"
-  echo "REMOTE_STEP: WARNING could not capture the settings baseline — regression guard is DISARMED for this deploy"
-fi
-
-if [ "$DO_MIGRATE" = 1 ]; then
-  echo "REMOTE_STEP: migrate --force"
-  $PHP artisan migrate --force 2>&1 || exit 93
-fi
-echo "REMOTE_STEP: cache rebuild"
-{ $PHP artisan config:clear && $PHP artisan cache:clear && $PHP artisan route:clear \
-  && $PHP artisan view:clear && $PHP artisan config:cache && $PHP artisan route:cache \
-  && $PHP artisan view:cache; } 2>&1 || exit 94
-
-# The web server writes into these as apache; artisan just rewrote them as us.
-# Left unfixed, the next request that needs to write a cache or a log hits a
-# permission error, and SELinux refuses the read outright. These MUST NOT be
-# best-effort: a silent failure here brings the site back UP with logging and
-# cache writes broken, which is worse than staying in maintenance.
-echo "REMOTE_STEP: repair ownership + SELinux contexts"
-sudo -n chown -R "$LIVE_SSH_USER:$LIVE_WEB_GROUP" storage bootstrap/cache 2>&1 || exit 95
-sudo -n restorecon -R storage bootstrap/cache public 2>&1 || exit 95
-
-# --- web OPcache reset -------------------------------------------------------
-# The old host had no privileged access, so it dropped a one-time PHP file into
-# public/ and curled it. That put an executable script in the web root, which is
-# exactly how a throwaway debug endpoint outlives its incident. Here we have
-# sudo, so we reload PHP-FPM instead: the master gracefully respawns every
-# worker, and a fresh worker cannot be holding old opcode.
-#
-# Reloading is not proof, so we PROVE it: the worker PIDs must all be new. An
-# unproven OPcache reset is how live silently serves last week's code.
-echo "REMOTE_STEP: web OPcache reset (PHP-FPM graceful reload)"
-fpm_worker_pids() { pgrep -f 'php-fpm: pool' 2>/dev/null | sort | tr '\n' ' '; }
-PIDS_BEFORE=$(fpm_worker_pids)
-RELOAD_TS=$(date '+%Y-%m-%d %H:%M:%S')
-sleep 1
-sudo -n systemctl reload "$LIVE_FPM_SERVICE" 2>&1 || exit 98
-
-# What must be true is that the MASTER re-executed: that is what rebuilds the
-# shared opcode memory. Do NOT demand that every old worker is gone — a
-# graceful reload lets a worker finish its current request first, and our own
-# long-polling endpoints can hold one for a while. Demanding zero survivors
-# would fail a perfectly good deploy and strand the shops in maintenance.
-OP_OK=0
-for TRY in 1 2 3 4 5; do
-  sleep 2
-  PIDS_AFTER=$(fpm_worker_pids)
-  # Evidence A: fresh workers exist that did not exist before the reload.
-  FRESH=0
-  for p in $PIDS_AFTER; do
-    case " $PIDS_BEFORE " in *" $p "*) ;; *) FRESH=1 ;; esac
-  done
-  # Evidence B: php-fpm's OWN log says the master came back up. Deliberately
-  # NOT systemd's "Reloaded ..." line — systemd prints that whenever it
-  # delivered the signal, whether or not php-fpm did anything with it. These
-  # two phrases are emitted by the re-executed master itself.
-  JOURNAL=$(sudo -n journalctl -u "$LIVE_FPM_SERVICE" --since "$RELOAD_TS" --no-pager 2>/dev/null \
-            | grep -ciE 'inherited socket|ready to handle connections' || true)
-  if [ "$FRESH" = 1 ] && [ "${JOURNAL:-0}" -gt 0 ]; then OP_OK=1; break; fi
-done
-[ "$OP_OK" = 1 ] || exit 98
-echo "OPCACHE_RESET_OK php-fpm master reloaded (before:[$PIDS_BEFORE] after:[$PIDS_AFTER])"
-
-# --- queue worker ------------------------------------------------------------
-# On the old host the queue ran from a cron line, so every minute spawned a
-# fresh process that picked up new code by itself. Here it is a long-lived
-# systemd unit: skip this and the worker keeps executing the code it booted
-# with, forever. Bills, ZIP exports and regulator filings would silently run
-# last release while the website runs this one.
-#
-# Deliberately BEFORE 'artisan up'. If the worker cannot come back we want the
-# shops on the maintenance page, not on a site that takes bills whose
-# background half is dead.
-echo "REMOTE_STEP: restart queue worker ($LIVE_QUEUE_SERVICE)"
-sudo -n systemctl restart "$LIVE_QUEUE_SERVICE" 2>&1 || exit 99
-sleep 3
-systemctl is-active --quiet "$LIVE_QUEUE_SERVICE" || exit 99
-echo "REMOTE_STEP: queue worker active on the new code"
-
-# Realtime Agent wake gateway is optional on older releases/hosts. Once
-# installed, every deploy must restart it so it cannot keep serving the
-# previous checkout's JavaScript while Laravel has moved forward.
-if sudo -n systemctl cat taxnest-agent-realtime.service >/dev/null 2>&1; then
-  echo "REMOTE_STEP: restart Agent realtime gateway"
-  sudo -n systemctl restart taxnest-agent-realtime.service 2>&1 || exit 93
-  sleep 2
-  systemctl is-active --quiet taxnest-agent-realtime.service || exit 93
-  curl --fail --silent http://127.0.0.1:6101/health >/dev/null || exit 93
-  echo "REMOTE_STEP: Agent realtime gateway active on the new code"
-fi
-
-echo "REMOTE_STEP: artisan up"
-$PHP artisan up 2>&1 || exit 97
-
-# Settings-regression check, AFTER the site is back up. Deliberately not a
-# remote exit code: the release already shipped, and dropping the shops back
-# into maintenance would punish them for our bug. Instead it prints a marker
-# the local script turns into a loud DEPLOY FAILED, so a human must look.
-if [ "$SETTINGS_BASE_OK" = 1 ]; then
-  echo "REMOTE_STEP: settings regression check"
-  if [ -n "$ALLOW_SETTINGS" ]; then
-    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" --allow="$ALLOW_SETTINGS" 2>&1)
-  else
-    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" 2>&1)
-  fi
-  SET_RC=$?
-  echo "$SET_OUT"
-  [ "$SET_RC" = 0 ] || echo "REMOTE_SETTINGS_REGRESSION"
-  rm -f "$SETTINGS_BASE"
-fi
-
-echo "REMOTE_DONE"
-exit 0
-REMOTE
-}
-
-apply_fail_reason() {
-  case "$1" in
-    90) echo "cd to live dir failed" ;;
-    91) echo "git pull failed on live — SITE LEFT IN MAINTENANCE (fix, then 'php artisan up' on live)" ;;
-    92) echo "composer install failed on live — SITE LEFT IN MAINTENANCE" ;;
-    93) echo "migrate --force failed on live — SITE LEFT IN MAINTENANCE" ;;
-    94) echo "cache rebuild failed on live — SITE LEFT IN MAINTENANCE" ;;
-    93) echo "Agent realtime gateway did not restart or pass health — SITE LEFT IN MAINTENANCE (old/new wake path mismatch risk)" ;;
-    95) echo "could not repair storage ownership / SELinux contexts — SITE LEFT IN MAINTENANCE (bringing it up would break logging and cache writes)" ;;
-    96) echo "could not open 200 maintenance window — ABORTED, live untouched" ;;
-    97) echo "artisan up failed after successful release — run 'php artisan up' on live" ;;
-    98) echo "web OPcache reset NOT confirmed (php-fpm reload) — SITE LEFT IN MAINTENANCE (old opcode risk)" ;;
-    99) echo "the site is live on the new code but the QUEUE WORKER did not come back — background jobs (bills, ZIPs, FBR filings) are NOT running. Fix now: sudo systemctl restart $LIVE_QUEUE_SERVICE" ;;
-    124) echo "remote apply timed out (or lock held >300s by another deploy) — check live maintenance state" ;;
-    *)  echo "remote apply failed with exit $1" ;;
-  esac
-}
+# shellcheck source=scripts/lib/live-remote-apply.sh
+source "$(dirname "$0")/lib/live-remote-apply.sh"
 
 # Live logging health: LOG_LEVEL must be 'warning' or lower (debug/info) so
 # scheduler/guard Log::warning lines actually land in laravel.log
@@ -699,6 +516,7 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   echo "Refreshing migrate + caches + OPcache anyway — racing auto-deploys can leave stale/poisoned state."
 
   step "Live (refresh): migrate + caches + OPcache under ONE held deploy lock"
+  # DO_PULL=0 — no code checkout; LOCAL_HEAD already matches live.
   REFRESH_OUT=$(remote_apply 0 0 1); APPLY_RC=$?
   echo "$REFRESH_OUT"
   [ $APPLY_RC -eq 0 ] || fail "$(apply_fail_reason $APPLY_RC)"
@@ -846,8 +664,10 @@ fi
 # One PHP on this box (/usr/bin/php 8.4) serves both CLI and FPM, so the old
 # host's split — a separate CLI binary for composer because ea-php84 lacked
 # gd/iconv — no longer applies.
-step "Live: pull + composer($NEED_COMPOSER) + migrate($NEED_MIGRATE) + caches + OPcache + queue under ONE held deploy lock"
-APPLY_OUT=$(remote_apply 1 "$NEED_COMPOSER" "$NEED_MIGRATE"); APPLY_RC=$?
+step "Live: checkout $LOCAL_HEAD + composer($NEED_COMPOSER) + migrate($NEED_MIGRATE) + caches + OPcache + queue under ONE held deploy lock"
+# Pass exact workspace HEAD so live lands on the commit we just pushed — not a
+# racing tip if origin/main moves during the SSH window.
+APPLY_OUT=$(remote_apply 1 "$NEED_COMPOSER" "$NEED_MIGRATE" "$LOCAL_HEAD"); APPLY_RC=$?
 echo "$APPLY_OUT"
 [ $APPLY_RC -eq 0 ] || fail "$(apply_fail_reason $APPLY_RC)"
 echo "$APPLY_OUT" | grep -q "OPCACHE_RESET_OK" \

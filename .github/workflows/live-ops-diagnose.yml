@@ -1,0 +1,104 @@
+# Live Ops Diagnose — read-only NestPOS PRA diagnostics for Cloud Agents.
+#
+# Cloud Agents trigger this via workflow_dispatch (gh) and download the artifact.
+# They NEVER receive PRODUCTION_SSH_PRIVATE_KEY, DB credentials, or LIVE_OPS_RUNNER_TOKEN.
+#
+# Secrets stay in GitHub Environment "production".
+# Prefer HTTPS runner API when LIVE_OPS_RUNNER_TOKEN + LIVE_OPS_BASE_URL are set;
+# otherwise SSH + php artisan live-ops:diagnose (fixed allow-listed args only).
+
+name: Live Ops Diagnose
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Allow-listed diagnostic operation"
+        type: choice
+        required: true
+        default: COMPANY_DIAGNOSTIC
+        options:
+          - COMPANY_HEALTH
+          - BILLING_SUMMARY
+          - BILLING_BY_COMPANY
+          - PRA_HEALTH
+          - AGENT_HEALTH
+          - PRINTER_HEALTH
+          - ERROR_SUMMARY
+          - COMPANY_DIAGNOSTIC
+          - PROBLEMATIC_COMPANIES
+      company_id:
+        description: "Company ID (required for company-scoped ops)"
+        type: string
+        required: false
+        default: ""
+      company_name:
+        description: "Exact company name or account_code"
+        type: string
+        required: false
+        default: ""
+      date_from:
+        description: "YYYY-MM-DD"
+        type: string
+        required: false
+        default: ""
+      date_to:
+        description: "YYYY-MM-DD"
+        type: string
+        required: false
+        default: ""
+      requester:
+        description: "Audit requester label"
+        type: string
+        required: false
+        default: cloud-agent
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-ops-diagnose
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    name: Run allow-listed Live Ops diagnostic
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guard — refuse arbitrary inputs
+        run: |
+          set -euo pipefail
+          OP="${{ github.event.inputs.operation }}"
+          case "$OP" in
+            COMPANY_HEALTH|BILLING_SUMMARY|BILLING_BY_COMPANY|PRA_HEALTH|AGENT_HEALTH|PRINTER_HEALTH|ERROR_SUMMARY|COMPANY_DIAGNOSTIC|PROBLEMATIC_COMPANIES) ;;
+            *) echo "Disallowed operation: $OP" >&2; exit 1 ;;
+          esac
+          CID="${{ github.event.inputs.company_id }}"
+          if [ -n "$CID" ]; then
+            echo "$CID" | grep -Eq '^[0-9]+$' || { echo "company_id must be numeric" >&2; exit 1; }
+          fi
+
+      - name: Run diagnostic (HTTPS runner or SSH artisan)
+        env:
+          LIVE_OPS_RUNNER_TOKEN: ${{ secrets.LIVE_OPS_RUNNER_TOKEN }}
+          LIVE_OPS_BASE_URL: ${{ secrets.LIVE_OPS_BASE_URL }}
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          OPERATION: ${{ github.event.inputs.operation }}
+          COMPANY_ID: ${{ github.event.inputs.company_id }}
+          COMPANY_NAME: ${{ github.event.inputs.company_name }}
+          DATE_FROM: ${{ github.event.inputs.date_from }}
+          DATE_TO: ${{ github.event.inputs.date_to }}
+          REQUESTER: ${{ github.event.inputs.requester }}
+        run: bash scripts/ci-live-ops-diagnose.sh
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-ops-diagnostic
+          path: artifacts/live-ops-diagnostic.json
+          if-no-files-found: error
+          retention-days: 14

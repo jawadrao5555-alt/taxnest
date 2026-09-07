@@ -44,3 +44,16 @@ production tokens, or production SSH keys. Browser/DB testing is
 **loopback / local disposable DB only**. Production deploy is GitHub Actions +
 manual Environment approval — not the Cloud Agent. Authenticated live smoke
 runs only in Actions (`LIVE_QA_PASS` Environment secret).
+
+## Live Ops (NestPOS PRA)
+
+For LIVE company/agent/printer/PRA investigation without production secrets in
+the Cloud Agent environment, use:
+
+→ [`docs/ops/live-ops.md`](docs/ops/live-ops.md)  
+→ [`docs/ops/live-ops-security.md`](docs/ops/live-ops-security.md)
+
+Cloud Agents may run `scripts/cloud-live-ops-request.sh` (diagnose) and
+`scripts/cloud-live-ops-remediate-request.sh` (propose / request
+approve+execute). Trusted runners hold secrets. Diagnosis never equals approval.
+Owner phrase: `OWNER_APPROVES_LIVE_OPS_FIX`.

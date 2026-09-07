@@ -57,6 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/rider-app/*',
             'api/caller-app/*',
             'api/di/*',            // DI invoice push API (Task 1231) — stateless Bearer-key JSON
+            'api/live-ops/*',      // Live Ops runner API — X-Live-Ops-Token (Actions only)
 
             'webhooks/whatsapp/*', // Meta WA Cloud API status callbacks
             'bio-sync/*/iclock/*', // Biometric device ADMS push (no browser session)

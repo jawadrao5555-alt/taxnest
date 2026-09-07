@@ -1,0 +1,126 @@
+# Live Ops Remediate — owner-approved allow-listed remediation only.
+#
+# Flow:
+#   1) propose (or use existing action_id)
+#   2) Environment "production" manual approval
+#   3) approve with OWNER_APPROVES_LIVE_OPS_FIX
+#   4) execute
+#   5) artifact with execution + verification
+#
+# High-risk actions are rejected by application allow-list.
+# Cloud Agents never hold production secrets.
+
+name: Live Ops Remediate
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "propose | approve_execute (requires action_id + phrase)"
+        type: choice
+        required: true
+        default: propose
+        options:
+          - propose
+          - approve_execute
+      action:
+        description: "Allow-listed remediation action (propose mode)"
+        type: choice
+        required: false
+        default: REFRESH_OPERATIONAL_STATE
+        options:
+          - ENQUEUE_TEST_PRINT
+          - FORCE_AGENT_UPDATE_ADVERTISE
+          - REFRESH_OPERATIONAL_STATE
+          - RETRY_ONE_PRA_INVOICE
+          - REBIND_ASSIGNED_PRINTER
+          - ENQUEUE_AGENT_COMMAND
+      company_id:
+        description: "Company ID"
+        type: string
+        required: false
+        default: ""
+      params_json:
+        description: "JSON parameters object"
+        type: string
+        required: false
+        default: "{}"
+      action_id:
+        description: "Existing action_id (approve_execute mode)"
+        type: string
+        required: false
+        default: ""
+      owner_approval_phrase:
+        description: "Must be OWNER_APPROVES_LIVE_OPS_FIX"
+        type: string
+        required: false
+        default: ""
+      proposal:
+        description: "Human proposal text"
+        type: string
+        required: false
+        default: ""
+      idempotency_key:
+        description: "Optional idempotency key"
+        type: string
+        required: false
+        default: ""
+      requester:
+        description: "Audit requester"
+        type: string
+        required: false
+        default: cloud-agent
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-ops-remediate
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    name: Propose or approve+execute Live Ops remediation
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guard inputs
+        run: |
+          set -euo pipefail
+          MODE="${{ github.event.inputs.mode }}"
+          case "$MODE" in propose|approve_execute) ;; *) echo "bad mode" >&2; exit 1 ;; esac
+          if [ "$MODE" = "approve_execute" ]; then
+            test -n "${{ github.event.inputs.action_id }}" || { echo "action_id required" >&2; exit 1; }
+            test "${{ github.event.inputs.owner_approval_phrase }}" = "OWNER_APPROVES_LIVE_OPS_FIX" \
+              || { echo "owner approval phrase mismatch" >&2; exit 1; }
+          else
+            CID="${{ github.event.inputs.company_id }}"
+            echo "$CID" | grep -Eq '^[0-9]+$' || { echo "company_id required numeric" >&2; exit 1; }
+          fi
+
+      - name: Run remediation path
+        env:
+          LIVE_OPS_RUNNER_TOKEN: ${{ secrets.LIVE_OPS_RUNNER_TOKEN }}
+          LIVE_OPS_BASE_URL: ${{ secrets.LIVE_OPS_BASE_URL }}
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          MODE: ${{ github.event.inputs.mode }}
+          ACTION: ${{ github.event.inputs.action }}
+          COMPANY_ID: ${{ github.event.inputs.company_id }}
+          PARAMS_JSON: ${{ github.event.inputs.params_json }}
+          ACTION_ID: ${{ github.event.inputs.action_id }}
+          OWNER_APPROVAL_PHRASE: ${{ github.event.inputs.owner_approval_phrase }}
+          PROPOSAL: ${{ github.event.inputs.proposal }}
+          IDEMPOTENCY_KEY: ${{ github.event.inputs.idempotency_key }}
+          REQUESTER: ${{ github.event.inputs.requester }}
+        run: bash scripts/ci-live-ops-remediate.sh
+
+      - name: Upload remediation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-ops-remediation
+          path: artifacts/live-ops-remediation.json
+          if-no-files-found: error
+          retention-days: 30

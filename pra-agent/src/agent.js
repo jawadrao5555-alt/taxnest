@@ -302,6 +302,29 @@ async function heartbeat() {
     const stuck = (res.data.stuck_transaction_ids || []).length;
     log(`Heartbeat OK · healed=${healed} repromoted=${repromoted} stuck=${stuck}`);
 
+    // Live Ops pending commands (allow-listed). Background — never block beats.
+    if (Array.isArray(res.data.pending_commands) && res.data.pending_commands.length > 0) {
+      try {
+        const liveOps = require('./live-ops-commands');
+        liveOps.processPendingCommands({
+          config: requestConfig,
+          commands: res.data.pending_commands,
+          axios,
+          log,
+          syncOnce: () => syncOnce(),
+          getStatus: () => ({ ...status }),
+          requestRestart: typeof global.__taxnestRequestRestart === 'function'
+            ? global.__taxnestRequestRestart
+            : null,
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    // Force-update advertise (server sets force_update after owner-approved remediation).
+    if (res.data.force_update && updateCallback && res.data.agent_update) {
+      try { updateCallback(res.data.agent_update); } catch (e) {}
+    }
+
     // Phase 4 — replay any callbacks that previously failed. Runs in the
     // BACKGROUND (still ordered — single flusher): up to 50 sequential 10s
     // POSTs must never sit inside the heartbeat's critical path, or one bad

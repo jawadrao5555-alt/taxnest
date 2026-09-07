@@ -1424,6 +1424,16 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
     Route::get('/live-activity', [\App\Http\Controllers\SaasAdmin\AdminLiveActivityController::class, 'index'])->name('saas.admin.live-activity');
 
+    // Live Ops console (NestPOS PRA diagnostics + owner-approved remediation)
+    Route::get('/live-ops', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'index'])->name('saas.admin.live-ops');
+    Route::post('/live-ops/diagnose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'diagnose'])->name('saas.admin.live-ops.diagnose');
+    Route::get('/live-ops/company/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showCompany'])->name('saas.admin.live-ops.company');
+    Route::post('/live-ops/propose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'propose'])->name('saas.admin.live-ops.propose');
+    Route::get('/live-ops/remediation/{actionId}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showRemediation'])->name('saas.admin.live-ops.remediation');
+    Route::post('/live-ops/remediation/{actionId}/approve', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'approve'])->name('saas.admin.live-ops.approve');
+    Route::post('/live-ops/remediation/{actionId}/reject', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'reject'])->name('saas.admin.live-ops.reject');
+    Route::post('/live-ops/remediation/{actionId}/execute', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'execute'])->name('saas.admin.live-ops.execute');
+
     // 🎯 Analytics + Reporting + Smart Pricing (Phases 1-4)
     Route::get('/analytics/dashboard', [\App\Http\Controllers\Admin\AnalyticsController::class, 'dashboard'])->name('admin.analytics.dashboard');
     Route::get('/analytics/advanced', [\App\Http\Controllers\Admin\AnalyticsController::class, 'advanced'])->name('admin.analytics.advanced');
@@ -2807,6 +2817,15 @@ Route::prefix('api/di/v1')->middleware(['di.api', 'throttle:120,1'])->withoutMid
     Route::get('/invoices/status', [\App\Http\Controllers\Api\DiInvoiceApiController::class, 'status'])->name('diapi.invoices.status');
 });
 
+// Live Ops runner API — trusted GitHub Actions / server only (X-Live-Ops-Token).
+// Cloud Agents never hold LIVE_OPS_RUNNER_TOKEN.
+Route::prefix('api/live-ops/v1')->middleware(['throttle:30,1'])->withoutMiddleware($statelessMachine)->group(function () {
+    Route::post('/diagnose', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'diagnose']);
+    Route::post('/remediate/propose', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'propose']);
+    Route::post('/remediate/{actionId}/approve', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'approve']);
+    Route::post('/remediate/{actionId}/execute', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'execute']);
+});
+
 Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {
     // Local realtime gateway credential exchange; deliberately sessionless.
     Route::get('/realtime-auth', [\App\Http\Controllers\AgentController::class, 'realtimeAuth']);
@@ -2823,6 +2842,8 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($state
     // LAN Mode: rings the phone could only deliver to the shop's own PC while
     // the internet was down, forwarded once it is back (history only).
     Route::post('/caller-events', [\App\Http\Controllers\AgentController::class, 'callerEvents']);
+    // Live Ops pending-command ACK/result (allow-listed commands only).
+    Route::post('/command-result', [\App\Http\Controllers\AgentController::class, 'commandResult']);
 });
 
 // Additive Local TaxNest Core protocol. This intentionally does not alter the

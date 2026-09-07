@@ -402,6 +402,9 @@ class AgentController extends Controller
             ]);
         }
 
+        $deviceUid = $this->requestDeviceUid($request);
+        $liveOpsExtras = $this->liveOpsHeartbeatExtras($company, $deviceUid, $request->input('version'));
+
         return response()->json([
             'ok' => true,
             'company' => [
@@ -417,7 +420,75 @@ class AgentController extends Controller
             'agent_update' => $this->agentUpdateInfo($request->input('version')),
             // Additive discovery for Local TaxNest Core-aware agents. Legacy
             // agents ignore unknown response keys; the database flag defaults off.
-        ] + $this->localCoreHeartbeat($company, $request));
+        ] + $this->localCoreHeartbeat($company, $request) + $liveOpsExtras);
+    }
+
+    /**
+     * Live Ops pending-command channel + optional force_update advertise.
+     * Additive keys only — older agents ignore them safely.
+     */
+    private function liveOpsHeartbeatExtras(Company $company, ?string $deviceUid, $agentVersion = null): array
+    {
+        $extras = [
+            'pending_commands' => [],
+            'force_update' => false,
+        ];
+
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_force_update_at')
+                && $company->agent_force_update_at
+                && $company->agent_force_update_at->gt(now()->subDays(2))) {
+                $extras['force_update'] = true;
+            }
+        } catch (\Throwable $e) {
+            // never break heartbeat
+        }
+
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('live_ops_agent_commands')) {
+                $extras['pending_commands'] = app(\App\Services\LiveOps\LiveOpsAgentCommandService::class)
+                    ->pendingForAgent((int) $company->id, $deviceUid, 5);
+            }
+        } catch (\Throwable $e) {
+            $extras['pending_commands'] = [];
+        }
+
+        return $extras;
+    }
+
+    /**
+     * Desktop Agent ACK / result for a Live Ops pending command.
+     */
+    public function commandResult(Request $request)
+    {
+        $company = $request->attributes->get('agent_company');
+        $validated = $request->validate([
+            'command_id' => 'required|string|max:64',
+            'acked' => 'nullable|boolean',
+            'ok' => 'nullable|boolean',
+            'result' => 'nullable|array',
+        ]);
+
+        try {
+            $svc = app(\App\Services\LiveOps\LiveOpsAgentCommandService::class);
+            if (!empty($validated['acked']) && !array_key_exists('ok', $validated)) {
+                $cmd = $svc->ack((int) $company->id, $validated['command_id']);
+
+                return response()->json(['ok' => true, 'status' => $cmd->status]);
+            }
+            $cmd = $svc->complete(
+                (int) $company->id,
+                $validated['command_id'],
+                is_array($validated['result'] ?? null) ? $validated['result'] : [],
+                array_key_exists('ok', $validated) ? (bool) $validated['ok'] : true
+            );
+
+            return response()->json(['ok' => true, 'status' => $cmd->status]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'error' => 'command_result_failed'], 500);
+        }
     }
 
     /** FBR POS equivalent of the PRA self-heal sweep, operating on fbr_pos_transactions. */
@@ -477,7 +548,8 @@ class AgentController extends Controller
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
             'agent_update' => $this->agentUpdateInfo($request->input('version')),
-        ] + $this->localCoreHeartbeat($company, $request));
+        ] + $this->localCoreHeartbeat($company, $request)
+          + $this->liveOpsHeartbeatExtras($company, $this->requestDeviceUid($request), $request->input('version')));
     }
 
     public function pendingInvoices(Request $request)

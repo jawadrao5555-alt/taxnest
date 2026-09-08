@@ -5,7 +5,11 @@
 #   - Does NOT SSH or hold PRODUCTION_SSH_PRIVATE_KEY / LIVE_QA_PASS
 #   - Does NOT checkout untrusted PR code (workflow_run on the default branch)
 #   - Fork PRs are ignored
-#   - Runs only after the "PR checks" workflow succeeds
+#   - Runs only after the "PR checks" workflow succeeds (workflow_run on
+#     the default branch — never a pull_request trigger on this file)
+#   - Draft PRs are skipped. ready_for_review re-runs "PR checks", which
+#     then re-fires this workflow; do not add ready_for_review here
+#     (would duplicate and would run this write-token job from the PR branch)
 #   - GitHub still enforces any additional required checks / reviews
 #
 # HANDOFF (why workflow_dispatch):
@@ -156,7 +160,10 @@ jobs:
                 owner, repo, pull_number: brief.number,
               });
               if (pr.base.ref !== 'main') continue;
-              if (pr.draft) continue;
+              if (pr.draft) {
+                core.info(`PR #${pr.number}: skip draft (auto-merge runs again after ready_for_review re-runs PR checks)`);
+                continue;
+              }
               if (!pr.head.repo || pr.head.repo.full_name !== `${owner}/${repo}`) {
                 core.info(`PR #${pr.number}: skip fork`);
                 continue;

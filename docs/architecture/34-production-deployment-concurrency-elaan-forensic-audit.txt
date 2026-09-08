@@ -1,0 +1,751 @@
+TAXNEST — FORENSIC AUDIT OF PRODUCTION DEPLOYMENT PIPELINE
+Concurrency, Environment approval, Elaan gate, exact-SHA, auto-merge handoff
+
+Date: 2026-09-08
+Scope: READ-ONLY. No source changes, no PRs, no workflow runs triggered,
+       no production SSH, no Environment/settings mutations, no Elaan edits.
+Report file: this path. Originally written read-only and uncommitted.
+Follow-up implementation (2026-09-08): see section 14 below and
+docs/architecture/35-production-deployment-stale-sha-fix-report.txt.
+
+Verdict: SAFE WITH IMPROVEMENTS
+  (not SAFE AS-IS, not REQUIRES emergency pipeline fix before next deploy)
+
+The #10 → #13 → #14 sequence is GitHub Actions concurrency + Environment
+approval behaving as configured. It is mostly INTENTIONAL. One interaction
+is a real pipeline design gap: a run that is waiting for production approval
+occupies the concurrency group like an in-progress job, so it can delay the
+newest deploy for hours and, if later approved, can still attempt an older
+(non-tip) main SHA. Exact-SHA guards prevent rolling LIVE BACKWARDS. They
+do not prevent deploying an intermediate SHA that is still ahead of live
+HEAD. Elaan uniqueness accidentally blocked #10; that is not a substitute
+for concurrency design.
+
+============================================================
+1. EXECUTIVE SUMMARY
+============================================================
+
+Deploy Production uses:
+  concurrency.group = production-deploy
+  cancel-in-progress = false          # .github/workflows/deploy-production.yml:57-59
+  jobs.deploy.environment = production  # line 65 (manual required reviewers)
+  workflow_dispatch target_sha + push to main  # lines 34-52
+
+GitHub semantics (documented by GitHub, confirmed by this incident):
+  - At most ONE run in the group is "active" (running OR waiting for an
+    Environment protection rule).
+  - Newer runs that cannot start are PENDING.
+  - When another run is queued into the same group, GitHub CANCELS the
+    previously pending run with:
+      "Cancelling since a higher priority waiting request for
+       production-deploy exists"
+  - cancel-in-progress: false means the ACTIVE run is NOT cancelled —
+    including a run that is only waiting for Environment approval.
+
+That is exactly #10 → #13 → #14.
+
+#10 sat in Environment-approval wait for ~12h49m and held the slot.
+#11, #12, #13 were each the pending successor and were cancelled when a
+newer auto-dispatch arrived. #14 became the pending successor. After the
+owner approved #10, #10 RAN (old SHA d39c3122) and failed the Elaan gate
+before SSH mutation. #14 then got its own Environment approval and
+successfully deployed exact SHA aecc864d (PR #28) over SSH and passed
+ci-live-verify.
+
+This is EXPECTED given the YAML. It is not a GitHub outage.
+
+It is NOT "latest SHA always deploys first". The oldest still-active
+approval request wins the SSH slot when approved. The newest pending run
+wins among the queued (not yet active) runs.
+
+============================================================
+2. EXACT RECONSTRUCTION OF #10 → #13 → #14
+============================================================
+
+All five runs were workflow_dispatch by github-actions[bot]
+(Enable PR auto-merge handoff). None were manual UI dispatches.
+
+ID                 #   Created (UTC)         SHA        PR on main     Conclusion
+34150075396       10  2026-09-07 18:03:12   d39c3122   #22 Live Ops   failure (Elaan)
+34152056025       11  2026-09-07 18:32:42   178d9881   #23            cancelled 27m
+34153848603       12  2026-09-07 18:59:53   075a8b0c   #24            cancelled 8h17m
+34182972323       13  2026-09-08 03:17:01   e175e157   #25            cancelled 3h20m
+34195505645       14  2026-09-08 06:37:49   aecc864d   #28            SUCCESS 42m
+
+Live HEAD throughout this wait (SSH preflight on both #10 and #14):
+  6eb68c22  Merge pull request #21 (successful Deploy Production
+            run 34146574469 at 2026-09-07 17:11:46Z)
+
+Timeline:
+
+  Sep 7 17:11  Deploy of #21 succeeds. Live = 6eb68c22.
+  Sep 7 18:03  Auto-merge of PR #22 dispatches Deploy #10 (d39c3122).
+               Job uses environment: production → WAITING FOR APPROVAL.
+               This run is the concurrency occupant.
+  Sep 7 18:32  PR #23 dispatches #11. #11 PENDING behind #10.
+  Sep 7 18:59  PR #24 dispatches #12. GitHub cancels #11
+               ("higher priority waiting request"). #12 PENDING behind #10.
+  Sep 8 03:17  PR #25 dispatches #13. GitHub cancels #12. #13 PENDING.
+  Sep 8 06:37  PR #28 squash-merge (aecc864d). Auto-merge workflow dispatches
+               #14. GitHub cancels #13 at 06:37:52. #14 PENDING behind #10.
+  Sep 8 06:51  #10 Environment approval granted (or wait ended). Job starts.
+               TARGET_SHA=d39c3122 (NOT tip of main; tip is already aecc864d).
+               SSH preflight: live HEAD still 6eb68c22.
+               Inserts deploy/elaan.yml from the #22 commit. Title is the
+               SAME as #21 ("…live-verify login redirect…"). Idempotent
+               ELAAN_EXISTS id=264 created_at=2026-09-07 22:13:22 — no
+               re-date. Freshness COUNT since marker = 0. NEW-SHA path
+               (live != target) → FAIL:
+               "CI DEPLOY FAILED: elaan missing — create announcement then
+               re-run, or skip elaan/--no-elaan for emergencies"
+               SSH apply NEVER ran. Live HEAD unchanged.
+  Sep 8 06:52  #10 job failed. Concurrency slot free.
+  Sep 8 07:18  #14 Environment approval; job starts.
+               TARGET_SHA=aecc864d (workflow_dispatch inputs.target_sha).
+               Guard OK — SHA on origin/main.
+               live HEAD (before)=6eb68c22
+               Elaan insert of UNIQUE title
+               "…Live Ops diagnose aur owner-approved fix…"
+               Elaan check PASSED (1 published update since last deploy).
+               Apply exact aecc864d. live HEAD (after)=aecc864d.
+               ci-live-verify: live HEAD matches EXPECTED_SHA. SUCCESS.
+
+Why #14 waited for #10:
+  #10 was the concurrency occupant (Environment wait, then the failed job).
+  #14 was pending. cancel-in-progress: false forbids cancelling #10.
+
+Why #13 was cancelled:
+  #13 was pending, not occupant. #14 joining the group is a "higher priority
+  waiting request". GitHub cancelled #13. This is normal Actions semantics.
+
+Why #14 then waited ~26 minutes after #10 failed (06:52 → 07:18):
+  A pending run that becomes eligible still needs Environment approval for
+  ITS own job. That is a second manual gate, not another concurrency wait
+  behind a running apply. PRODUCTION-VERIFICATION-REQUIRED: GitHub does not
+  expose reviewer timestamps via the public run JSON used here; the 26 min
+  matches a second approval, not a 12-hour concurrency queue.
+
+============================================================
+3. CONCURRENCY MECHANICS
+============================================================
+
+File: .github/workflows/deploy-production.yml lines 57-59
+
+  concurrency:
+    group: production-deploy
+    cancel-in-progress: false
+
+Same group for:
+  - push to main (human / non-GITHUB_TOKEN merges)          lines 35-37
+  - workflow_dispatch (auto-merge handoff AND manual UI)    lines 38-52
+
+So auto-deploy and manual deploy COMPETE in one group. Intentional
+serialization (docs/ops/github-production-deploy.md lines 74, 20).
+
+cancel-in-progress: false is INTENTIONAL and must not be flipped to true
+without a different design: an in-flight live-remote-apply.sh holds
+`flock`, `artisan down`, checkout, migrate, FPM reload. Cancelling that
+mid-SSH is how you leave the site in maintenance (apply_fail_reason codes
+91-99 in scripts/lib/live-remote-apply.sh).
+
+GitHub pending-cancellation ("higher priority waiting request"):
+  EXPECTED. It is how GitHub implements "only one pending successor".
+  It already IS a limited latest-wins for the QUEUE, not for the occupant.
+
+Can an old blocked/manual-approval deployment delay a newer one indefinitely?
+  YES. Environment wait default timeout is long (GitHub default 30 days
+  unless the Environment is configured shorter — PRODUCTION-ONLY to read
+  the Environment timeout UI). Until the occupant is approved, rejected,
+  or times out, the newest run stays pending.
+
+Can a stale production deployment become a queue blocker?
+  YES. #10 was exactly that for ~12h49m.
+
+Do multiple manual dispatches safe or dangerous?
+  Safe against overlapping SSH (one occupant).
+  Dangerous as a UX: each new dispatch cancels the previous pending one,
+  and none of them can start until the occupant (possibly an old SHA
+  waiting for approval) finishes.
+  Empty target_sha emergency dispatch pins github.sha AT DISPATCH TIME,
+  not at approval time (deploy-production.yml lines 89-91). Approving it
+  hours later still deploys that frozen SHA.
+
+Does the system guarantee "latest intended main SHA eventually deploys"?
+  NO guarantee.
+  It guarantees: the newest PENDING run survives; the occupant runs to
+  completion even if stale; after the occupant ends, the newest pending
+  run may start (after its own Environment approval).
+  If the occupant is never approved, the newest run never starts.
+  If the occupant is approved and succeeds on an intermediate SHA, live
+  moves there; then the pending newest run can still upgrade live IF it
+  is allowed to run. If that newest run is then cancelled (another even
+  newer dispatch) after the occupant already applied an intermediate SHA,
+  live can sit on the intermediate SHA until a later successful deploy.
+
+============================================================
+4. ENVIRONMENT APPROVAL MECHANICS
+============================================================
+
+jobs.deploy.environment: production
+  .github/workflows/deploy-production.yml:65
+
+GitHub holds the job in status waiting until required reviewers approve.
+Secrets PRODUCTION_SSH_PRIVATE_KEY and LIVE_QA_PASS are not available
+until after approval (docs/ops/github-production-deploy.md:56-62).
+
+Interaction with concurrency (from this incident + GitHub's model):
+
+  Q: Does a run waiting for approval hold the concurrency slot?
+  A: YES. Evidence: #11/#12/#13 never started a job (jobs: [] in gh run view)
+     while #10 had no job steps until 06:51 — yet they were cancelled as
+     pending, not run in parallel. #10 was the occupant the whole time.
+
+  Q: Can another deployment overtake the approval-waiting run?
+  A: NOT while cancel-in-progress is false. The pending successor cannot
+     start. It CAN replace a previous pending successor (#13 cancelled by #14).
+
+  Q: Can a newer run cancel an older waiting (approval) run?
+  A: NOT with current YAML. It can cancel older PENDING runs only.
+
+  Q: Is that safe for production?
+  A: Safe against two SSH applies at once. Unsafe as an operator model:
+     approving the oldest waiting run after main has moved still starts
+     that oldest SHA. #10 did exactly that (d39c3122 while tip was aecc864d).
+
+============================================================
+5. ELAAN GATE MECHANICS
+============================================================
+
+Order in scripts/ci-deploy-production.sh (after SSH preflight, BEFORE apply):
+
+  insert_committed_elaan_spec()   lines 153-173, called 181
+  check_elaan_freshness()         lines 178-180, called 182
+  then ancestor/dirty/gap/apply   lines 184-234
+
+Insert: scripts/elaan-insert.sh --from-file deploy/elaan.yml
+  Idempotent on exact title. Existing title = successful no-op, NOT re-dated.
+  (docs/ops/github-production-deploy.md:78-79, 99)
+
+Gate: scripts/lib/elaan-freshness-check.sh + elaan-freshness-eval.py
+
+  NEW SHA (live HEAD != target, or marker commit != target):
+    PASS only if COUNT of published audience IN (pos,all) with
+    created_at > last deploy marker >= 1.
+    ELAAN_EXISTS / title match is NEVER enough (eval.py:15, 57-61).
+
+  SAME SHA (live HEAD == target == marker commit):
+    PASS if time-fresh OR committed title still published as pos/all.
+
+Why #10 failed (EXPECTED by this design):
+
+  TARGET_SHA = d39c3122  (PR #22)
+  live HEAD  = 6eb68c22  (PR #21)  → NEW SHA path
+  deploy/elaan.yml AT d39c3122 still had PR #21's title:
+    "Production update — NestPOS live-verify login redirect ab clear fail deta hai"
+    (git show d39c3122:deploy/elaan.yml — PR #22 did not change the title)
+  Insert: ELAAN_EXISTS id=264 created_at=2026-09-07 22:13:22 — no-op, not re-dated
+  Marker from the successful #21 deploy is at/after that insert
+  time_fresh_count = 0
+  eval.py → FAIL reason new_sha_missing_fresh
+  fail() message at elaan-freshness-check.sh:202
+    "elaan missing — create announcement then re-run, or skip_elaan/--no-elaan"
+
+  The gate ran BEFORE apply, so live was not mutated. Correct fail-closed.
+
+  Note: even if Elaan had passed, ci-deploy-production.sh:198-199 would have
+  ALLOWED the apply: 6eb68c22 IS an ancestor of d39c3122 (forward deploy of
+  an intermediate SHA). The ancestor check blocks rollback, not skip-ahead
+  of later main commits.
+
+Why #14 passed:
+
+  Unique title from PR #23 onward (still in aecc864d):
+    "Production update — NestPOS Live Ops diagnose aur owner-approved fix ab ready hai"
+  Insert created a NEW published row after the marker.
+  "Elaan check: PASSED (1 published update(s) since last deploy)."
+  Then apply 6eb68c22 → aecc864d (ancestor OK; gap includes #22-#28).
+
+Can a deploy get stuck behind an old run because Elaan is stale?
+  Indirectly: the OLD occupant (#10) failed Elaan quickly once approved, which
+  FREED the slot for #14. If #10 had used a unique title, it would have
+  deployed the intermediate SHA first; #14 would still have followed.
+  Elaan did not cause the 12-hour wait. Approval + concurrency did.
+  Elaan caused #10's post-approval failure.
+
+Same-SHA reruns vs new-SHA: handled correctly in eval.py (commit 5a4496fd,
+PR #18). #10 was new-SHA; title reuse is supposed to fail. #14 was new-SHA
+with a unique title; pass.
+
+Elaan vs concurrency: they coexist. Gate is inside the occupant after
+approval+SSH, so it cannot preempt the queue. Evaluating Elaan before
+concurrency wait is not possible today without a job that runs before
+`environment: production` (and that job would not have live DB access
+without SSH secrets, which are Environment-scoped).
+
+skip_elaan: exists (workflow input lines 45-48; script 43-45, 155-157).
+NOT used on #10 or #14 (SKIP_ELAAN: false in #10 log). Do not use it as
+the normal fix (docs and eval comments).
+
+============================================================
+6. EXACT-SHA SAFETY ANALYSIS
+============================================================
+
+Resolution: deploy-production.yml:67-95
+  workflow_dispatch + 40-char target_sha → that SHA
+  push → github.sha
+  workflow_dispatch empty target_sha → github.sha of the dispatch ref (main
+  tip AT DISPATCH, frozen)
+
+Checkout: actions/checkout@v4 ref: steps.resolve.outputs.sha, fetch-depth: 0
+  lines 97-101
+
+Guard: lines 103-133
+  HEAD must equal DEPLOY_SHA
+  GITHUB_REF must be refs/heads/main
+  DEPLOY_SHA must be ancestor of origin/main (on main history)
+  Does NOT require DEPLOY_SHA == origin/main TIP
+
+Apply: ci-deploy-production.sh:130-134 checkout HEAD == TARGET_SHA
+  136-142 TARGET_SHA on origin/main
+  198-199 live HEAD must be ancestor of TARGET_SHA (no divergent / rollback)
+  236-238 live HEAD after apply must equal TARGET_SHA
+
+Verify: ci-live-verify.sh:104-112 live HEAD == EXPECTED_SHA
+  #14 log: "OK: live HEAD matches EXPECTED_SHA" aecc864d
+
+Prevents accidental deploy of an older SHA AFTER live is already newer?
+  YES, via ancestor check (ci-deploy-production.sh:198-199).
+  Example: live=aecc864d, target=d39c3122 → refuse.
+
+Prevents deploy of an older-than-TIP SHA while live is still behind?
+  NO. #10 would have been a legal forward deploy (6eb68c22 → d39c3122)
+  while tip was already aecc864d. That is the remaining exact-SHA gap.
+
+#14 did deploy the intended exact squash SHA over SSH. Confirmed in logs.
+
+============================================================
+7. AUTO-MERGE → DEPLOY HANDOFF ANALYSIS
+============================================================
+
+File: .github/workflows/enable-pr-auto-merge.yml
+
+Why workflow_dispatch: GITHUB_TOKEN merges suppress push workflows
+  (header comments lines 11-17; docs/ops/github-production-deploy.md:24-34).
+
+Handoff: dispatchDeployProduction() lines 70-99
+  createWorkflowDispatch workflow_id deploy-production.yml
+  ref: main
+  inputs.target_sha = exact squash/merge SHA (40-char, asserted)
+
+Paths:
+  squashMerge() → result.sha → dispatch          lines 102-124
+  waitMergedThenDispatch() → merge_commit_sha    lines 128-150
+  already-merged reruns SKIP dispatch            lines 168-173
+
+#10-#14 actors were all github-actions[bot] — this handoff, not humans.
+
+Manual dispatch can interfere: SAME concurrency group. A manual run and
+an auto-dispatch queue/cancel each other as described in §3.
+
+Auto-dispatched deploy can be delayed/cancelled:
+  Delayed: yes, behind an approval-waiting occupant (#14 behind #10).
+  Cancelled: only if it is still PENDING and a newer dispatch arrives
+  (#13 cancelled by #14). Once it is the occupant (approval wait or
+  running), cancel-in-progress: false protects it.
+
+Can a newer successful deployment be followed by an older SHA deployment?
+  Only if a still-active occupant targeting an older-than-live SHA is
+  later approved AND live has not moved past that SHA.
+  After #14, live=aecc864d. A zombie occupant targeting d39c3122 would
+  fail the ancestor check. There is no remaining occupant from this
+  incident (#10 failed, #11-#13 cancelled).
+
+  Theoretical remaining hole: occupant targeting SHA B (ahead of live,
+  behind tip) approved after SHA C is already on main but C's run is
+  only pending — B applies, then C applies. Final state C if C succeeds.
+  If C then fails live-verify, live can remain on B while main is C.
+
+============================================================
+8. SCENARIO MATRIX
+============================================================
+
+Scenario 1 — SHA A auto-dispatch waits for approval; SHA B merges meanwhile
+
+  Today: A remains occupant. B's dispatch is pending (or cancels a previous
+  pending). A, if approved, may apply A (if live is still ancestor of A).
+  Then B may apply B.
+  Stale live: possible temporarily (A then B) or if B never runs.
+  Older after newer: A can apply after B was already the intended tip.
+  Operator: must approve/reject A; rejecting A unblocks B faster.
+  Data safety: one-at-a-time SSH; no rollback past live HEAD.
+
+Scenario 2 — A waits 12 hours; B dispatched  (#10/#14)
+
+  Today: what happened. B pending. A approved → A attempts apply.
+  Elaan may fail A (as here) or A may succeed on intermediate SHA.
+  Stale: live stayed on #21 until #14; would have gone to #22 if Elaan passed.
+  Operator: required (two approvals).
+  Safety: preserved; #10 did not mutate live.
+
+Scenario 3 — Manual deploy of old SHA while newer main exists
+
+  If old SHA is behind live HEAD: REFUSED (ancestor check).
+  If old SHA is on main, ahead of live, behind tip: ALLOWED by current
+  guards (this is #10's shape). Operator can deploy a non-tip SHA.
+  Classification: IMPROVEMENT RECOMMENDED (optional "must be origin/main tip"
+  unless an explicit rollback workflow).
+
+Scenario 4 — Two automatic deployments close together
+
+  First becomes occupant (approval wait). Second pending. A third cancels
+  the second. Only latest pending remains. Expected GitHub behavior.
+  Both still need Environment approval in series.
+
+Scenario 5 — Elaan missing for SHA A; SHA B is latest main
+
+  A occupant fails gate after approval (no live mutate). B then runs.
+  If A is pending not occupant, a B dispatch cancels A before it ever
+  hits Elaan. Stuck queue is the occupant, not Elaan.
+  Unnecessary manual work: owner had to approve #10 knowing main had moved,
+  then approve #14. Elaan unique-title rule is extra work on every NEW SHA
+  (intentional product rule, not a concurrency bug).
+
+Scenario 6 — Failure after SSH mutation
+
+  live-remote-apply.sh: artisan down first (line 58-59). On failure, site
+  stays in maintenance (comments lines 60-61; apply_fail_reason 91-99).
+  Fail closed. Operator must artisan up after fix. No automatic rollback
+  (docs/ops/github-production-deploy.md:132; deployment/ROLLBACK.md).
+  ci-deploy-production.sh treats non-zero apply as fail; live-verify skipped.
+
+Scenario 7 — Deploy succeeds, live verification fails
+
+  Workflow job fails at Post-deploy live verification
+  (deploy-production.yml:156-163). Live HEAD may already equal TARGET_SHA
+  (mutation done). Cloud Agents must start a new diagnosis cycle
+  (docs/ops/cloud-agent-issue-to-live.md). Production is on the new SHA
+  with a failed verify — not rolled back.
+
+============================================================
+9. FINDINGS CLASSIFIED BY SEVERITY
+============================================================
+
+F1  Concurrency group production-deploy + cancel-in-progress false
+    SAFE / EXPECTED for overlapping SSH protection.
+    Must NOT be weakened to cancel-in-progress: true on the apply job.
+
+F2  GitHub cancels previously pending runs ("higher priority waiting request")
+    SAFE / EXPECTED. This is how #13 died and why only #14 remained queued.
+
+F3  Environment-approval wait occupies the concurrency group
+    IMPROVEMENT RECOMMENDED / HIGH PRIORITY PIPELINE BUG (operator model).
+    Not a CRITICAL live-data bug: #10 did not mutate live; rollback past
+    live HEAD is refused. But an approved stale occupant can delay the
+    newest SHA for hours/days and can apply an intermediate SHA.
+
+F4  No "must be origin/main tip" check
+    IMPROVEMENT RECOMMENDED.
+    Guard only requires SHA ∈ origin/main history
+    (deploy-production.yml:127-132; ci-deploy-production.sh:141-142).
+
+F5  Elaan #10 failure due to reused title + no re-date + NEW-SHA time gate
+    SAFE / EXPECTED (elaan-freshness-eval.py; PR #11/#18 design).
+    PR #22 shipped the same title as #21 (git show d39c3122:deploy/elaan.yml).
+    That is a content mistake on that PR, caught by the gate.
+
+F6  Elaan gate runs after approval and after taking the concurrency slot
+    IMPROVEMENT RECOMMENDED (UX). A unique-title problem cannot dequeue
+    an occupant. Not a safety hole.
+
+F7  Exact SHA pin, main-history guard, live ancestor check, post-apply HEAD
+    match, ci-live-verify HEAD match
+    SAFE / EXPECTED. #14 proved the happy path. Must NOT be weakened.
+
+F8  Auto-merge workflow_dispatch target_sha handoff
+    SAFE / EXPECTED (enable-pr-auto-merge.yml; PR #16). All of #10-#14
+    used it. GITHUB_TOKEN push suppression is real; this is the correct
+    workaround.
+
+F9  Auto-dispatch and manual dispatch share production-deploy
+    SAFE / EXPECTED serialization. Combined with F3, manual and auto
+    can block each other.
+
+F10 Fail-closed apply (maintenance page, no auto-rollback)
+    SAFE / EXPECTED. Must NOT add automatic rollback in the same job
+    without a separate design.
+
+F11 Empty target_sha emergency path uses frozen github.sha
+    SAFE if documented; IMPROVEMENT if operators think it means "tip at
+    approval time". deploy-production.yml:89-91.
+
+F12 No CRITICAL PRODUCTION SAFETY ISSUE found in this incident.
+    Live was not rolled back. Two SSH applies did not overlap. #14 landed
+    the intended SHA and verified. Settings snapshot / allow_settings path
+    unchanged; owner did not modify company settings.
+
+============================================================
+10. RECOMMENDED FUTURE DESIGN (DO NOT IMPLEMENT HERE)
+============================================================
+
+Goal: keep one-at-a-time SSH, stop stale approval occupants from blocking
+or applying non-tip SHAs.
+
+Safest design sketch (evaluate, do not ship in this audit):
+
+  1. Keep cancel-in-progress: false on the SSH/apply job. Never cancel
+     an in-flight live-remote-apply.
+
+  2. Split the workflow into two jobs:
+       job "gate" — no environment secrets; concurrency group
+         production-deploy-latest with cancel-in-progress: TRUE
+         (or a dedicated "queue" group). This job only resolves SHA and
+         asserts it equals origin/main tip (unless an explicit
+         rollback input is set). Waiting for Environment should happen
+         HERE or in a third "approve" job that IS cancellable.
+       job "apply" — environment: production, needs: gate, concurrency
+         production-deploy-apply, cancel-in-progress: false.
+
+     Effect: a newer main SHA cancels the old approval-wait, not the
+     in-flight SSH. This is the usual answer to questions 1, 2, 4, 6, 8.
+
+  3. Add a tip check on non-rollback deploys:
+       test "$DEPLOY_SHA" = "$(git rev-parse origin/main)"
+     after fetching origin/main (question 3 and 7). Historical SHA
+     deploys belong in deployment/ROLLBACK.md, not this workflow.
+
+  4. Do not move Elaan before Environment approval unless a secret-free
+     check is enough (committed unique title vs previous commit's title).
+     Live COUNT still needs SSH. Evaluating committed-title-uniqueness
+     in the cancellable gate job would have failed #10 before occupying
+     apply (question 5, partial).
+
+  5. Document for reviewers: if main has moved, REJECT the old
+     Environment request instead of approving it.
+
+  6. Optionally set a short Environment wait timer (GitHub UI, owner)
+     so a forgotten approval cannot block for 12 hours. That is an
+     Environment setting, not a YAML change — owner-only.
+
+Questions from the prompt, answered without implementing:
+
+  1. Latest-wins: YES for approval-wait / pending; NO for in-flight apply.
+  2. Expire/cancel old approvals when main advances: YES, via cancellable
+     pre-apply job or Environment timeout.
+  3. Only latest main SHA deployable: YES for this workflow; rollback
+     remains a separate documented path.
+  4. Same concurrency group for auto+manual: YES for apply; a second
+     cancellable group for the wait is the improvement.
+  5. Elaan before concurrency wait: only a secret-free unique-title
+     lint; live freshness still after SSH.
+  6. Invalidate stale approval when main advances: YES (see 2).
+  7. Prohibit historical SHA: YES on this workflow; not on rollback.
+  8. One-at-a-time without stale blockers: YES, by splitting jobs as in (2).
+
+============================================================
+11. WHAT IS ALREADY SAFE AND MUST NOT BE WEAKENED
+============================================================
+
+- environment: production + required reviewers (manual production gate)
+- PRODUCTION_SSH_PRIVATE_KEY / LIVE_QA_PASS only on that Environment
+- StrictHostKeyChecking=yes + live-known-hosts
+- Never push from Deploy Production
+- 40-char target_sha + HEAD==SHA + SHA on origin/main
+- live HEAD ancestor of TARGET (no CI rollback / divergent deploy)
+- post-apply live HEAD == TARGET + homepage 200 + cache probe + marker
+- ci-live-verify live HEAD == EXPECTED_SHA + NestPOS markers
+- cancel-in-progress: false on the apply/SSH job
+- artisan down fail-closed; no automatic rollback
+- Elaan: no re-date, unique title for NEW SHA, same-SHA title evidence
+  only when live==target==marker (eval.py). Do not treat ELAAN_EXISTS
+  as fresh.
+- skip_elaan remains emergency-only
+- Auto-merge does not hold production secrets
+- Settings snapshot / allow_settings regression guard
+- flock on live deploy lock
+
+============================================================
+12. OPEN QUESTIONS REQUIRING PRODUCTION-ONLY VERIFICATION
+============================================================
+
+P1  GitHub Environment "production" wait timer and reviewers list
+    (Settings → Environments). Not readable from the repo.
+
+P2  Exact reviewer timestamps for #10 approval (~06:51) and #14
+    approval (~07:18). Inferred from job startedAt.
+
+P3  Live deploy marker file contents at #10 fail time (COUNT=0 cause:
+    marker timestamp vs app_updates.created_at for id=264). SSH not
+    used in this audit. The idempotent no-op + NEW-SHA rule is sufficient
+    to explain the fail without reading the marker.
+
+P4  Whether any human also clicked workflow_dispatch in this window
+    (API actor is github-actions[bot] for #10-#14).
+
+P5  Whether GitHub will change concurrency+environment semantics;
+    today's behavior matches current public docs and this incident.
+
+============================================================
+13. FINAL VERDICT
+============================================================
+
+SAFE WITH IMPROVEMENTS
+
+The pipeline did what the YAML asked. #14 deployed the intended exact
+main SHA (aecc864d) over SSH and passed live verification. Overlapping
+applies did not happen. Live was never rolled back.
+
+The operator-visible pain (#10 waiting hours, #13 cancelled, #14 queued,
+#10 then failing Elaan on a reused title) is:
+
+  70% GitHub concurrency + Environment occupancy (F3) — design gap
+  20% Elaan unique-title rule catching PR #22's reused announcement (F5)
+      — working as designed
+  10% two serial Environment approvals (#10 then #14)
+
+Not CRITICAL. Do not disable Environment approval. Do not set
+cancel-in-progress: true on the SSH job. Do not skip Elaan as policy.
+
+Recommended next engineering (separate mission): split cancellable
+pre-apply gate from fail-closed apply, and refuse non-tip SHAs on this
+workflow.
+
+============================================================
+APPENDIX — EVIDENCE INDEX
+============================================================
+
+A. Files inspected (material line numbers)
+
+  .github/workflows/deploy-production.yml
+    34-52 triggers/inputs; 54-55 permissions contents:read
+    57-59 concurrency; 65 environment; 67-95 SHA resolve
+    97-101 checkout; 103-133 guard; 135-154 SSH deploy
+    156-163 live verify
+  .github/workflows/enable-pr-auto-merge.yml
+    11-17, 69-99 handoff; 102-150 squash/poll; 168-173 skip rerun
+  scripts/ci-deploy-production.sh
+    115-142 SHA; 153-182 Elaan insert+gate; 184-238 apply; 270-274 marker
+  scripts/lib/live-remote-apply.sh
+    58-186 down, checkout, migrate, caches, FPM, queue, up
+  scripts/lib/elaan-freshness-check.sh  entire
+  scripts/lib/elaan-freshness-eval.py   entire
+  scripts/elaan-insert.sh               (idempotent title; referenced)
+  scripts/ci-live-verify.sh             104-112 HEAD match
+  deploy/elaan.yml                      current (aecc864d) Live Ops title
+  docs/ops/github-production-deploy.md  1-140
+  scripts/tests/ci-deploy-production-check.sh
+  scripts/tests/automerge-deploy-handoff-check.sh
+  scripts/tests/elaan-same-sha-freshness-check.sh
+
+B. Git commits inspected
+
+  22878f8d Add GitHub Actions production deploy via Environment approval
+  d51414a7 Insert committed Elaan specs on live after Environment approval
+  0c369f58 Treat existing Elaan titles as a successful insert no-op. (#11)
+  4edccd7b Enable squash auto-merge for cursor/ Cloud Agent PRs after checks
+  e9a5f8da Squash-merge CLEAN PRs when GitHub rejects auto-merge
+  9ef549bb Fix auto-merge to Deploy Production handoff via workflow_dispatch. (#16)
+  34f32579 Wire issue-to-live deploy verification and self-heal policy. (#15)
+  5a4496fd Make Elaan freshness same-SHA rerun safe without weakening new deploys. (#18)
+  6eb68c22 Merge pull request #21 (live HEAD during the wait)
+  d39c3122 PR #22 (#10 target; reused Elaan title)
+  178d9881 PR #23 (#11; new Live Ops Elaan title)
+  075a8b0c PR #24 (#12)
+  e175e157 PR #25 (#13)
+  aecc864d PR #28 (#14 success; live HEAD after)
+
+C. Safe commands / tests run (no mutations of git remotes, Actions, or live)
+
+  gh run list / gh run view / gh run view --log / --log-failed  (read)
+  gh api repos/.../actions/runs/{id}                            (read)
+  git show SHA:deploy/elaan.yml
+  git merge-base --is-ancestor
+  git log --oneline -- <workflow files>
+  bash scripts/tests/ci-deploy-production-check.sh     ALL CHECKS PASSED
+  bash scripts/tests/automerge-deploy-handoff-check.sh ALL PASS
+  bash scripts/tests/elaan-same-sha-freshness-check.sh ALL SAME-SHA ELAAN CHECKS PASSED
+
+D. Whether ANY file outside this audit report was modified
+
+  NO. This audit created only
+  docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt
+  It was NOT committed. No PR. No workflow YAML edit. No script edit.
+
+E. Whether ANY external system was changed
+
+  NO. gh was used read-only. No workflow_dispatch, rerun, cancel, merge,
+  Environment edit, SSH, Elaan insert, or skip_elaan.
+
+============================================================
+14. IMPLEMENTATION FOLLOW-UP (2026-09-08)
+============================================================
+
+This section is NOT part of the original read-only audit. It records the
+narrow pipeline fix shipped after the audit verdict SAFE WITH IMPROVEMENTS.
+
+Implemented changes:
+  - Split Deploy Production into job "gate" and job "deploy".
+  - Removed workflow-level concurrency (that was the approval-slot bug).
+  - gate: no environment: production, no SSH secrets, concurrency group
+    production-deploy-gate, cancel-in-progress: true.
+  - gate requires requested SHA == current origin/main TIP (plus the
+    existing ancestor/history guard).
+  - After the tip check passes, gate cancels other Deploy Production runs
+    whose GitHub status is exactly "waiting" (Environment approval). It
+    never selects in_progress / queued / pending.
+  - deploy: environment: production (approval + secrets UNCHANGED),
+    concurrency group production-deploy, cancel-in-progress: false,
+    needs: gate. Re-checks tip AFTER approval, BEFORE SSH.
+  - scripts/ci-deploy-production.sh also requires origin/main tip BEFORE
+    the SSH preflight / Elaan insert / remote_apply.
+  - Historical SHA on this workflow is fail-closed with a diagnostic.
+    Rollback remains deployment/ROLLBACK.md.
+
+Tests:
+  - scripts/tests/deploy-stale-sha-guard-check.sh (new)
+  - scripts/tests/ci-deploy-production-check.sh (extended; nested)
+  - scripts/tests/automerge-deploy-handoff-check.sh (extended)
+  - scripts/tests/issue-to-live-check.sh (extended)
+  - pr-checks.yml now runs ci-deploy-production-check.sh
+  - php artisan test (full suite, run in the fix PR)
+
+New deployment-state model:
+
+  dispatch / push
+       |
+       v
+  job gate (NO Environment, NO secrets)
+       |  concurrency: production-deploy-gate, cancel-in-progress: true
+       |  resolve SHA → checkout SHA → history guard → TIP guard
+       |  if SHA != origin/main tip: FAIL (no approval request, no SSH)
+       |  if SHA == tip: cancel other runs with status=waiting
+       v
+  job deploy (Environment production — MANUAL approval still required)
+       |  concurrency: production-deploy, cancel-in-progress: false
+       |  waiting for approval does NOT block a newer gate
+       |  after approval: TIP guard again → Elaan → SSH apply → live verify
+       v
+  live HEAD == TARGET_SHA (still the tip at apply start)
+
+Explicit statements:
+  - Environment approval REMAINS enabled. It is not bypassed. Secrets stay
+    on Environment production. The gate job cannot read them.
+  - SSH/apply REMAINS serialized. cancel-in-progress is false on job deploy.
+    In-flight live-remote-apply is never cancelled by this workflow.
+  - Stale / non-tip SHA is FAIL-CLOSED before any production mutation
+    (before Environment wait when detected at gate; again before SSH if
+    main moved during approval).
+
+Audit recommendations implemented vs deferred:
+  - Latest-wins for approval-wait / pending: YES (cancel waiting + gate).
+  - Never cancel in-flight apply: YES.
+  - Only latest main SHA deployable on this workflow: YES.
+  - Auto+manual still share apply group: YES.
+  - Elaan policy unchanged (still after SSH connectivity, still fail-closed).
+  - Environment wait timer (GitHub UI): still owner-only, not changed.
+
+See docs/architecture/35-production-deployment-stale-sha-fix-report.txt.
+
+============================================================
+END OF AUDIT
+============================================================
+

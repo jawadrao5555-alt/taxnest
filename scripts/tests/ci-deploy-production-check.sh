@@ -41,6 +41,20 @@ if [ -f "$WF" ]; then
     && ok "concurrency does not cancel in-progress deploys" \
     || bad "concurrency should set cancel-in-progress: false"
 
+  if grep -E '^concurrency:' "$WF" >/dev/null; then
+    bad "workflow-level concurrency would make Environment wait occupy the SSH slot"
+  else
+    ok "no workflow-level concurrency (job-level split)"
+  fi
+
+  grep -q 'deploy_guard_main_tip\|deploy_require_origin_main_tip' "$WF" \
+    && ok "workflow requires origin/main tip (not merely ancestor)" \
+    || bad "workflow must fail-closed when requested SHA is not origin/main tip"
+
+  grep -q 'cancel-stale-waiting-production-deploys.sh' "$WF" \
+    && ok "workflow cancels stale Environment-waiting runs" \
+    || bad "workflow must cancel status=waiting Deploy Production runs from the gate"
+
   grep -qE 'branches:[[:space:]]*$|[[:space:]]+- main' "$WF" \
     && ok "workflow triggers on main" \
     || bad "workflow should trigger on main"
@@ -133,6 +147,14 @@ if [ -f "$CI" ]; then
     fi
   done
   ok "ci script skips Replit-local browser/MySQL preflights"
+
+  grep -q 'deploy-main-tip-guard.sh' "$CI" \
+    && ok "ci script sources deploy-main-tip-guard.sh" \
+    || bad "ci script must source deploy-main-tip-guard.sh"
+
+  grep -q 'deploy_require_origin_main_tip' "$CI" \
+    && ok "ci script fail-closes when TARGET_SHA is not origin/main tip" \
+    || bad "ci script must call deploy_require_origin_main_tip before SSH"
 
   grep -q 'insert_committed_elaan_spec' "$CI" \
     && ok "ci script inserts committed Elaan spec after SSH" \
@@ -272,6 +294,12 @@ if [ -f "$ROOT/scripts/tests/elaan-same-sha-freshness-check.sh" ]; then
   bash "$ROOT/scripts/tests/elaan-same-sha-freshness-check.sh" \
     && ok "elaan same-SHA freshness checks passed" \
     || bad "elaan same-SHA freshness checks failed"
+fi
+
+if [ -f "$ROOT/scripts/tests/deploy-stale-sha-guard-check.sh" ]; then
+  bash "$ROOT/scripts/tests/deploy-stale-sha-guard-check.sh" \
+    && ok "stale-SHA / concurrency split checks passed" \
+    || bad "stale-SHA / concurrency split checks failed"
 fi
 
 echo ""

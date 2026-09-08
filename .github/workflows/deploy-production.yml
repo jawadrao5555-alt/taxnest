@@ -7,7 +7,9 @@
 #      workflow_dispatch is exempt). target_sha MUST be the exact squash commit.
 #
 # Flow:
-#   → GitHub Environment "production" required reviewers approve (MANUAL)
+#   → job "gate" (no Environment, no secrets): resolve SHA, require it equals
+#     current origin/main TIP, cancel other runs WAITING for production approval
+#   → job "deploy": GitHub Environment "production" required reviewers (MANUAL)
 #   → SSH as taxnest-production-deploy → insert deploy/elaan.yml (if present)
 #   → Elaan freshness gate → apply exact TARGET_SHA on the VPS
 #   → post-deploy live verification (scripts/ci-live-verify.sh)
@@ -17,7 +19,12 @@
 #   - Never embeds private keys, passwords, tokens, or .env values
 #   - Uses scripts/lib/live-known-hosts with StrictHostKeyChecking=yes
 #   - Does not use the Replit key (.local/ssh/nayatel_vps_key)
-#   - Concurrency group blocks overlapping production deploys
+#   - gate concurrency (production-deploy-gate, cancel-in-progress: true) lets a
+#     newer tip supersede an older pre-apply run; does NOT cancel in-flight SSH
+#   - deploy concurrency (production-deploy, cancel-in-progress: false) serializes
+#     Environment-approved SSH/apply. NEVER set cancel-in-progress: true here.
+#   - Non-tip SHA fails closed BEFORE Environment approval and BEFORE SSH
+#   - Stale approved SHA fails closed again immediately before SSH
 #   - Live QA password stays in Environment secret LIVE_QA_PASS
 #   - Deploy SHA is pinned (push: github.sha / dispatch: inputs.target_sha)
 #
@@ -38,7 +45,7 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: "Exact main commit SHA to deploy (auto-merge handoff). Leave empty only for emergency tip-of-main dispatch."
+        description: "Exact current origin/main commit SHA to deploy (auto-merge handoff). Non-tip SHAs fail closed. Leave empty only for emergency tip-of-main dispatch (still fail-closed if main moved)."
         type: string
         required: false
         default: ""
@@ -54,15 +61,18 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: production-deploy
-  cancel-in-progress: false
-
 jobs:
-  deploy:
-    name: Deploy main commit to production
+  gate:
+    name: Refuse stale / non-tip SHA
     runs-on: ubuntu-latest
-    environment: production
+    permissions:
+      contents: read
+      actions: write
+    concurrency:
+      group: production-deploy-gate
+      cancel-in-progress: true
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
     steps:
       - name: Resolve exact deploy SHA
         id: resolve
@@ -87,7 +97,7 @@ jobs:
             echo "Deploy SHA source=push github.sha"
             echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           elif [ "$EVENT" = "workflow_dispatch" ]; then
-            echo "Deploy SHA source=workflow_dispatch empty target_sha → tip github.sha (emergency)"
+            echo "Deploy SHA source=workflow_dispatch empty target_sha → github.sha (emergency; still must equal origin/main tip at run time)"
             echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           else
             echo "Unsupported event ${EVENT}" >&2
@@ -100,7 +110,7 @@ jobs:
           ref: ${{ steps.resolve.outputs.sha }}
           fetch-depth: 0
 
-      - name: Guard — refuse wrong SHA / non-main history
+      - name: Guard — refuse wrong SHA / non-main history / non-tip
         run: |
           set -euo pipefail
           DEPLOY_SHA="${{ steps.resolve.outputs.sha }}"
@@ -108,29 +118,69 @@ jobs:
           echo "github.ref=${GITHUB_REF}"
           echo "DEPLOY_SHA=${DEPLOY_SHA}"
           echo "checkout HEAD=$(git rev-parse HEAD)"
-          test "$(git rev-parse HEAD)" = "${DEPLOY_SHA}"
+          # shellcheck source=scripts/lib/deploy-main-tip-guard.sh
+          source scripts/lib/deploy-main-tip-guard.sh
+          deploy_guard_main_tip "$DEPLOY_SHA" "${GITHUB_EVENT_NAME}" "${GITHUB_REF}"
 
-          # workflow_dispatch is always started with ref=main (YAML + permission boundary).
-          # push must be refs/heads/main.
-          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
-              echo "Refusing deploy: push GITHUB_REF must be refs/heads/main (got ${GITHUB_REF})" >&2
-              exit 1
-            fi
-          else
-            if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
-              echo "Refusing deploy: workflow_dispatch must be invoked on main (got ${GITHUB_REF})" >&2
-              exit 1
-            fi
-          fi
+      - name: Cancel stale Environment-waiting Deploy Production runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/lib/cancel-stale-waiting-production-deploys.sh
 
-          git fetch origin main --prune
-          ORIGIN_MAIN=$(git rev-parse refs/remotes/origin/main)
-          if ! git merge-base --is-ancestor "${DEPLOY_SHA}" "${ORIGIN_MAIN}"; then
-            echo "Refusing deploy: ${DEPLOY_SHA} is not in origin/main history" >&2
+  deploy:
+    name: Deploy main commit to production
+    needs: gate
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Pin SHA from gate
+        id: resolve
+        run: |
+          set -euo pipefail
+          DEPLOY_SHA="${{ needs.gate.outputs.sha }}"
+          INPUT_SHA="${{ github.event.inputs.target_sha || '' }}"
+          case "$DEPLOY_SHA" in
+            *[!0-9a-fA-F]*|"")
+              echo "Gate did not output a valid SHA" >&2
+              exit 1
+              ;;
+          esac
+          if [ "${#DEPLOY_SHA}" -ne 40 ]; then
+            echo "Gate SHA must be 40 chars" >&2
             exit 1
           fi
-          echo "Guard OK — ${DEPLOY_SHA} is on origin/main"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "$INPUT_SHA" ]; then
+            if [ "$INPUT_SHA" != "$DEPLOY_SHA" ]; then
+              echo "Refusing deploy: gate SHA $DEPLOY_SHA != inputs.target_sha $INPUT_SHA" >&2
+              exit 1
+            fi
+          fi
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "$DEPLOY_SHA" != "$GITHUB_SHA" ]; then
+            echo "Refusing deploy: gate SHA $DEPLOY_SHA != github.sha $GITHUB_SHA" >&2
+            exit 1
+          fi
+          echo "sha=${DEPLOY_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact deploy commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Guard — refuse stale SHA after Environment approval (before SSH)
+        run: |
+          set -euo pipefail
+          DEPLOY_SHA="${{ steps.resolve.outputs.sha }}"
+          echo "github.event_name=${GITHUB_EVENT_NAME}"
+          echo "github.ref=${GITHUB_REF}"
+          echo "DEPLOY_SHA=${DEPLOY_SHA}"
+          echo "checkout HEAD=$(git rev-parse HEAD)"
+          # shellcheck source=scripts/lib/deploy-main-tip-guard.sh
+          source scripts/lib/deploy-main-tip-guard.sh
+          deploy_guard_main_tip "$DEPLOY_SHA" "${GITHUB_EVENT_NAME}" "${GITHUB_REF}"
 
       - name: Deploy exact commit over SSH
         env:

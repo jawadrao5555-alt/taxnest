@@ -92,6 +92,8 @@ if [ -f "$DP" ]; then
   grep -q 'environment: production' "$DP" && ok "Deploy Production keeps environment: production" || bad "lost environment: production"
   grep -q 'concurrency:' "$DP" && grep -q 'production-deploy' "$DP" \
     && ok "Deploy Production keeps concurrency protection" || bad "concurrency protection missing"
+  grep -q 'deploy_guard_main_tip\|deploy_require_origin_main_tip' "$DP" \
+    && ok "Deploy Production refuses non-tip SHA" || bad "Deploy Production missing origin/main tip guard"
   grep -q 'github.sha' "$DP" && ok "Deploy Production still uses github.sha" || bad "exact SHA wiring missing"
   if grep -q 'pull_request' "$DP"; then
     bad "Deploy Production must not run on pull_request"

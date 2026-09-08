@@ -23,3 +23,5 @@ jobs:
         run: bash scripts/tests/issue-to-live-check.sh
       - name: Auto-merge → Deploy Production handoff checks
         run: bash scripts/tests/automerge-deploy-handoff-check.sh
+      - name: Production deploy workflow safety checks
+        run: bash scripts/tests/ci-deploy-production-check.sh

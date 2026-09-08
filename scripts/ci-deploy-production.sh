@@ -6,6 +6,8 @@
 #   - NEVER uses the Replit key at .local/ssh/nayatel_vps_key
 #   - NEVER reads or prints production .env / DB / mail / FBR secrets
 #   - Skips Replit-local preflights (MySQL staging, Chromium, .local QA)
+#   - TARGET_SHA must be the current origin/main TIP (stale SHA fail-closed
+#     before any SSH). Ancestor-only is not enough. Rollback is ROLLBACK.md.
 #
 # Required:
 #   TARGET_SHA                 — exact commit to place on live (usually github.sha)
@@ -111,6 +113,8 @@ run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 source "$ROOT/scripts/lib/live-remote-apply.sh"
 # shellcheck source=scripts/lib/elaan-freshness-check.sh
 source "$ROOT/scripts/lib/elaan-freshness-check.sh"
+# shellcheck source=scripts/lib/deploy-main-tip-guard.sh
+source "$ROOT/scripts/lib/deploy-main-tip-guard.sh"
 
 # --------------------------------------------------------------------------- target SHA
 step "Resolve target commit"
@@ -133,13 +137,10 @@ if [ "$LOCAL_HEAD" != "$TARGET_SHA" ]; then
   fail "checkout HEAD ($LOCAL_HEAD) != TARGET_SHA ($TARGET_SHA) — refuse to deploy a different commit than the workflow trigger"
 fi
 
-step "Confirm TARGET_SHA is on origin/main history"
-git fetch origin main --prune \
-  || fail "git fetch origin main failed"
-ORIGIN_MAIN=$(git rev-parse refs/remotes/origin/main 2>/dev/null) \
-  || fail "cannot resolve origin/main"
-git merge-base --is-ancestor "$TARGET_SHA" "$ORIGIN_MAIN" 2>/dev/null \
-  || fail "TARGET_SHA is not in origin/main history — CI never deploys non-main commits"
+step "Confirm TARGET_SHA is on origin/main history AND is the current tip"
+deploy_fetch_origin_main || exit 1
+deploy_require_on_main_history "$TARGET_SHA" || exit 1
+deploy_require_origin_main_tip "$TARGET_SHA" || exit 1
 
 # --------------------------------------------------------------------------- live preflight (SSH only)
 step "Preflight: SSH connectivity + live HEAD"

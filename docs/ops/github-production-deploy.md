@@ -9,8 +9,10 @@ Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS
     (GITHUB_TOKEN merges do not start push workflows; workflow_dispatch does)
   → OR a human push to main starts Deploy Production with github.sha
   → GitHub Actions workflow ".github/workflows/deploy-production.yml"
+  → job "gate": requested SHA must equal current origin/main tip; stale waiting
+    Environment-approval runs are cancelled (in_progress SSH is never cancelled)
   → GitHub Environment "production" (required reviewers approve — MANUAL)
-  → SSH with dedicated deploy key "taxnest-production-deploy"
+  → job "deploy": re-check tip, then SSH with dedicated deploy key "taxnest-production-deploy"
   → insert committed Elaan spec on live (scripts/elaan-insert.sh, idempotent)
   → existing Elaan freshness gate
   → scripts/ci-deploy-production.sh applies the exact TARGET_SHA on the VPS
@@ -31,7 +33,12 @@ Supported handoff (no Cloud Agent secrets):
 2. It reads the **exact squash/merge commit SHA** on `main`.
 3. It calls `actions.createWorkflowDispatch` on `deploy-production.yml` with `inputs.target_sha=<that SHA>`.
 4. `workflow_dispatch` is exempt from GITHUB_TOKEN event suppression, so Deploy Production starts.
-5. Deploy Production checks out that SHA, refuses SHAs not on `origin/main`, keeps Environment approval + concurrency group `production-deploy`, applies that SHA, then runs `ci-live-verify.sh` with the same SHA.
+5. Deploy Production **gate** checks out that SHA and refuses it unless it is
+   **exactly** the current `origin/main` tip (ancestor-only is not enough).
+   It then cancels other Deploy Production runs that are still `waiting` for
+   Environment approval. Job `deploy` keeps Environment approval + concurrency
+   group `production-deploy` with `cancel-in-progress: false`, re-checks the
+   tip, applies that SHA, then runs `ci-live-verify.sh` with the same SHA.
 
 Static proof: `bash scripts/tests/automerge-deploy-handoff-check.sh`.
 
@@ -70,9 +77,9 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 | Step | Behavior |
 |---|---|
 | Trigger | `push` to `main`, or `workflow_dispatch` on `main` (auto-merge handoff passes `target_sha`) |
-| Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA (must be on `origin/main`) |
-| Concurrency | `production-deploy` with `cancel-in-progress: false` — at most one production deploy runs; others queue |
-| Gate | Job uses `environment: production` → GitHub waits for required reviewers |
+| Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA. **Must equal current `origin/main` tip** at gate time and again after Environment approval, immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. |
+| Concurrency | **No workflow-level group.** `gate` uses `production-deploy-gate` with `cancel-in-progress: true` (newer tip supersedes older pre-apply). `deploy` uses `production-deploy` with `cancel-in-progress: false` — at most one SSH/apply; in-flight apply is never cancelled. After a SHA proves it is the tip, `gate` cancels other runs whose status is `waiting` (Environment approval only — never `in_progress`). |
+| Gate | Job `deploy` uses `environment: production` → GitHub waits for required reviewers. Job `gate` does **not** use the Environment (no secrets, starts immediately, fail-closed on non-tip). |
 | Checkout | Exact deploy SHA (resolved), full history |
 | SSH | Writes `PRODUCTION_SSH_PRIVATE_KEY` to a temp file (mode 600), uses `scripts/lib/live-known-hosts` + `StrictHostKeyChecking=yes` |
 | Elaan spec | If `deploy/elaan.yml` is in the commit, `scripts/elaan-insert.sh --from-file` creates a published `AppUpdate` on live (same popup/bell/7-day/seen/master-switch as before). Idempotent on **title**: an existing exact title is a successful no-op (not duplicated or re-dated). The reserved Daily L001 title is rejected and never inserted. `skip_elaan` skips this insert. |
@@ -85,7 +92,7 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 
 Manual `workflow_dispatch` inputs:
 
-- `target_sha` — exact 40-char main commit to deploy (used by auto-merge handoff; leave empty only for emergency tip-of-main)
+- `target_sha` — exact 40-char **current origin/main tip** to deploy (used by auto-merge handoff). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not wait for approval or SSH. Leave empty only for emergency dispatch of `github.sha`, which still must equal the tip at run time.
 - `skip_elaan` — emergency only; skips **both** committed-spec insert and the What's New freshness gate
 - `allow_settings` — same meaning as `deploy-live.sh --allow-settings=...`
 
@@ -135,6 +142,6 @@ Rollback is unchanged and is **not** automated by this workflow. Follow `deploym
 
 Before approving a production Environment deployment:
 
-- Confirm the commit is the intended merge on `main`
+- Confirm the commit is the **current** `origin/main` tip (not an older merge). If main has moved, reject / ignore the request and approve the newest Deploy Production run instead.
 - Confirm migrations / settings impact are expected
 - Confirm an Elaan exists for this deploy (`deploy/elaan.yml` in the commit, or a live insert after the last marker) unless this is an explicit emergency with `skip_elaan`

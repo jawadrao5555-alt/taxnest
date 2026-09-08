@@ -1,0 +1,36 @@
+TaxNest / NestPOS — Inventory Master Excel (Phase 1)
+====================================================
+Date: 2026-09-08
+
+Implements document 38 §3 / Phase 1 only. No Stock-In, no ledger writes,
+no FBR Receive Stock, no multi-branch Stock-In.
+
+What shipped
+  File: nestpos_inventory_master.xlsx
+  Sheet: Master
+  Row Type: PRODUCT | INGREDIENT | RECIPE
+  Pass order: INGREDIENT → PRODUCT → RECIPE
+  Codes: Excel TEXT; importer also restores scientific notation
+  Template: frozen header, Row Type dropdown, header comments, Misal: samples
+            (Coke with no recipe, Basmati Rice, Chicken Biryani 0.25 kg rice,
+            plus the pizza/burger/wings set from §3.C)
+
+Never
+  adjustIngredientStock / addStock / consumeForInvoice
+  stock_quantity / current_stock changes on update
+  FBR/DI product catalog
+  a Recipe header table
+
+UI
+  GET/POST /pos/inventory-master (PosAdminOnly; not inventory-middleware so
+  PRODUCT-only shops still work). Old product and recipe Excel routes remain.
+  Inventory sidebar + tab bars: Ingredients, Recipes (existing restaurant
+  routes), Inventory Master.
+
+Gates
+  PRODUCT rows: excel_enabled
+  INGREDIENT / RECIPE rows: feature:recipes
+  Mixed file: skip ungated rows with a reason; do not refuse the whole file.
+
+Tests
+  tests/Feature/PosInventoryMasterExcelTest.php

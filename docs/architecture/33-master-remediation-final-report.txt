@@ -7,7 +7,7 @@ Branch: cursor/master-remediation-0f83
 PR: https://github.com/jawadrao5555-alt/taxnest/pull/28
 Base: origin/main @ e175e157 (Add final architecture mastery proof from code tracing. #25)
 Code commit: 0e84c34b Harden TaxNest security and architecture gaps from the master audits.
-This report commit: 2eaf04fe (file content pinned on this SHA; the pin-update commit that follows is metadata only).
+This report commit: 2eaf04fe (content). Pin: e90e0534. CI-evidence update: see git log after that.
 
 Evidence classes used throughout:
   CODE-FIXED                      — change is in this branch
@@ -603,6 +603,15 @@ E. Adversarial re-check of CRITICAL/HIGH after the fixes (code + tests)
   billing bypass         DI API + Health money pinned
   impersonation          SuperAdminDualPath + existing LiveOps tests
   franchise IDOR         no id routes; constrained queries pinned
+
+F. GitHub PR checks (after push; not production deploy)
+
+  PR #28  get_ci_status: SUCCESS
+  Checks: 1 total, 1 successful, 0 failed, 0 pending
+  Job: PR checks / validate
+  https://github.com/jawadrao5555-alt/taxnest/actions/runs/34193868318/job/101957291173
+  This is GitHub Actions on the PR branch. It is NOT a production deploy and
+  is NOT production-host verification.
 
 ============================================================
 18. REMAINING RISKS

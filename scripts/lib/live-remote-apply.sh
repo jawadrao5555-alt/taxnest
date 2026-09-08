@@ -67,6 +67,9 @@ if [ "$DO_PULL" = 1 ]; then
   esac
   # core.fileMode off: cutover left executable-bit noise on tracked scripts.
   git config core.fileMode false >/dev/null 2>&1 || true
+  # Drop the previous deploy's working-tree SW cache stamp (see below) so the
+  # exact-SHA checkout can never be refused because public/sw.js is dirty.
+  git checkout -- public/sw.js 2>/dev/null || true
   git fetch origin --prune 2>&1 || exit 91
   if ! git rev-parse --verify "${TARGET_SHA}^{commit}" >/dev/null 2>&1; then
     git fetch origin "$TARGET_SHA" 2>&1 || exit 91
@@ -78,6 +81,26 @@ if [ "$DO_PULL" = 1 ]; then
   EXPECTED=$(git rev-parse "${TARGET_SHA}^{commit}")
   [ "$CURRENT" = "$EXPECTED" ] || exit 91
   echo "REMOTE_HEAD=$CURRENT"
+
+  # PWA cache bust (Actions path). deploy-live.sh bumps public/sw.js
+  # CACHE_VERSION in a commit before pushing; the GitHub Actions path deploys an
+  # already-merged SHA and cannot commit, so stamp the served copy on live with
+  # a version derived from the deployed SHA. Deterministic: a same-SHA re-run
+  # yields the same version (no needless purge); a new SHA always changes it so
+  # devices drop old STATIC/RUNTIME caches and show the SW update badge.
+  SW_STAMP="taxnest-$(date -u +%Y%m%d)-$(printf '%s' "$CURRENT" | cut -c1-8)"
+  if [ -f public/sw.js ] && grep -q "^const CACHE_VERSION = '" public/sw.js; then
+    sed -i "s|^const CACHE_VERSION = '[^']*';.*$|const CACHE_VERSION = '$SW_STAMP'; // stamped on live by live-remote-apply.sh from the deployed SHA|" public/sw.js
+    if grep -q "^const CACHE_VERSION = '$SW_STAMP';" public/sw.js; then
+      echo "REMOTE_STEP: sw.js CACHE_VERSION stamped $SW_STAMP"
+    else
+      echo "REMOTE_SW_STAMP_FAILED"
+      echo "REMOTE_STEP: WARNING sw.js CACHE_VERSION stamp did not apply — clients may keep stale PWA caches"
+    fi
+  else
+    echo "REMOTE_SW_STAMP_SKIPPED"
+    echo "REMOTE_STEP: WARNING public/sw.js CACHE_VERSION line not found — PWA cache bust skipped"
+  fi
 fi
 if [ "$DO_COMPOSER" = 1 ]; then
   echo "REMOTE_STEP: composer install"

@@ -130,14 +130,21 @@ class FbrAgentController extends Controller
 
         // Race-safe: only the first writer lands, everyone reads that key back
         // (two admins hitting Generate must not each get a different key).
+        $newKey = 'tnk_' . Str::random(48);
+        $update = [
+            'agent_api_key' => $newKey,
+            'agent_enabled' => true,
+        ];
+        // Query-builder update bypasses the model's saving hook — mirror the
+        // sha256 hash explicitly so AgentAuth can find the key.
+        if (\App\Support\AgentApiKey::hashColumnAvailable()) {
+            $update['agent_api_key_hash'] = \App\Support\AgentApiKey::hash($newKey);
+        }
         Company::whereKey($company->id)
             ->where(function ($q) {
                 $q->whereNull('agent_api_key')->orWhere('agent_api_key', '');
             })
-            ->update([
-                'agent_api_key' => 'tnk_' . Str::random(48),
-                'agent_enabled' => true,
-            ]);
+            ->update($update);
 
         // Optional FBR integration (Sep 2026): pairing the agent can be the
         // last missing piece for a shop that chose "connect" — turn reporting

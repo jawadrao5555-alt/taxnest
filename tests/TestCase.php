@@ -32,6 +32,7 @@ abstract class TestCase extends BaseTestCase
         \App\Support\IdentityScope::flushSchemaCache();
         \App\Services\CompanyGroupService::flushSchemaCache();
         \App\Http\Controllers\Auth\PasswordResetLinkController::flushSchemaCache();
+        \App\Support\AgentApiKey::flushSchemaCache();
 
         $this->assertTestEnvironmentIsIsolated();
     }

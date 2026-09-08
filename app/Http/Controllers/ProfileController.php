@@ -70,19 +70,23 @@ class ProfileController extends Controller
 
             // Invoice display preferences (per-company, DI product scope)
             if ($request->has('invoice_prefs_submitted')) {
-                $prefs = $company->invoice_display_prefs ?? [];
-                $prefs['di'] = [
-                    'show_address' => $request->has('dp_show_address'),
-                    'show_ntn' => $request->has('dp_show_ntn'),
-                    'show_email' => $request->has('dp_show_email'),
-                    'show_mobile' => $request->has('dp_show_mobile'),
-                    'show_footer' => $request->has('dp_show_footer'),
-                    'footer_text' => trim((string) $request->input('dp_footer_text', '')) ?: null,
-                ];
-                $data['invoice_display_prefs'] = $prefs;
+                // Only the 'di' set is owned here; merged onto the FRESH row under a
+                // lock (Company::mergeJsonColumn) together with the profile columns,
+                // so POS receipt sets saved concurrently are never overwritten.
+                $company->mergeJsonColumn('invoice_display_prefs', function (array $prefs) use ($request): array {
+                    $prefs['di'] = [
+                        'show_address' => $request->has('dp_show_address'),
+                        'show_ntn' => $request->has('dp_show_ntn'),
+                        'show_email' => $request->has('dp_show_email'),
+                        'show_mobile' => $request->has('dp_show_mobile'),
+                        'show_footer' => $request->has('dp_show_footer'),
+                        'footer_text' => trim((string) $request->input('dp_footer_text', '')) ?: null,
+                    ];
+                    return $prefs;
+                }, $data);
+            } else {
+                $company->update($data);
             }
-
-            $company->update($data);
 
             SecurityLogService::log('company_profile_updated', auth()->id(), [
                 'company_id' => $company->id,

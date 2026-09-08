@@ -6,7 +6,6 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Subscription;
 use App\Models\ComplianceReport;
-use App\Jobs\SendInvoiceToFbrJob;
 use App\Jobs\ComplianceScoringJob;
 use App\Jobs\IntelligenceProcessingJob;
 use App\Services\InvoiceActivityService;

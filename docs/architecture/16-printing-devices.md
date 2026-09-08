@@ -37,6 +37,25 @@ JSON `companies.pos_printer_settings` via `Company::printerSettings()`:
 Agent with device_uid: own jobs + NULL legacy jobs.  
 Agent without device_uid: NULL-only (legacy).
 
+## Duplicate-print guard (Sep 2026)
+
+`pos_print_jobs.content_fetched_at` is stamped the first time GET
+`/api/agent/print-jobs/{id}/content` is served for a job in `printing`.
+
+Housekeeping (`AgentController::printJobsHousekeeping`):
+
+- stale `printing` AND content never fetched → requeue to `pending` (nothing
+  could have printed; attempts < 3).
+- stale `printing` AND content was fetched → `failed`
+  (`unconfirmed_after_print_content_fetched`). Paper may have printed; the
+  shop reprints deliberately. Automatic requeue here would duplicate paper.
+- unstamped `pending` older than `config('print.pending_expiry_hours')`
+  (default 24) → `failed` (`expired_unclaimed`). Rows are never deleted for
+  this reason; the 7-day purge still only touches `done`/`failed`.
+
+There is no `claimed_at` / `printed_at` column. Claim is the
+`pending → printing` update plus `claim_token`; confirmation is `status=done`.
+
 ## Test print
 
 Server remediation / UI can enqueue test print jobs; agent `TEST_PRINT` Live Ops command refreshes printers and nudges claim loop (does not invent local print outside queue).

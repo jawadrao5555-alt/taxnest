@@ -20,6 +20,9 @@ class PosPrintJob extends Model
         'status',
         'claim_token',
         'device_uid', // Task 1166: per-counter routing — NULL = company-wide job
+        // Set when the agent fetched the printable content of a claimed job:
+        // from here on the paper may exist, so a lost result must not requeue.
+        'content_fetched_at',
 
         'printed_item_ids',
         'error',
@@ -30,6 +33,7 @@ class PosPrintJob extends Model
     protected $casts = [
         'attempts' => 'integer',
         'printed_item_ids' => 'array',
+        'content_fetched_at' => 'datetime',
     ];
 
     /**

@@ -23,6 +23,19 @@ class Company extends Model
      */
     protected static function booted(): void
     {
+        // Agent key hardening: AgentAuth authenticates against the sha256
+        // mirror column, so it must never drift from the plaintext key
+        // (regenerate / mint / clear all go through Eloquent saves).
+        static::saving(function (self $company) {
+            if ($company->isDirty('agent_api_key') && \App\Support\AgentApiKey::hashColumnAvailable()) {
+                $key = $company->getAttribute('agent_api_key');
+                $company->setAttribute(
+                    'agent_api_key_hash',
+                    ($key === null || $key === '') ? null : \App\Support\AgentApiKey::hash((string) $key)
+                );
+            }
+        });
+
         static::created(function (self $company) {
             if (blank($company->getAttribute('account_code'))
                 && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'account_code')) {
@@ -270,9 +283,13 @@ class Company extends Model
         // Nest ERPS (Task 1568): which vertical of the umbrella product line
         // this company runs. Same fillable rule as above.
         'erps_vertical',
+        // Meta App Secret for X-Hub-Signature-256 webhook verification
+        // (encrypted cast — see WhatsAppWebhookController::receive).
+        'wa_app_secret',
     ];
 
     protected $casts = [
+        'wa_app_secret' => 'encrypted',
         'extra_branch_slots' => 'integer',
         'token_expires_at' => 'datetime',
         'suspended_at' => 'datetime',
@@ -359,7 +376,104 @@ class Company extends Model
         'fbr_production_token',
         'confidential_pin',
         'manager_override_pin',
+        // Desktop-agent credential: explicit $company->agent_api_key reads
+        // (panel blades, AgentManagementController::regenerateKey JSON) still
+        // work — only toArray()/JSON serialisation and log dumps drop it.
+        'agent_api_key',
+        'agent_api_key_hash',
+        'wa_app_secret',
     ];
+
+    /**
+     * Atomic read-modify-write of ONE JSON settings column (pos_printer_settings,
+     * invoice_display_prefs, feature_flags, public_profile_settings, …).
+     *
+     * Every writer of these columns used to load the company early in the
+     * request, mutate the decoded array in memory and write the WHOLE column
+     * back. Two requests touching different keys of the same column (PRA vs
+     * Local receipt prefs, panel printer picks vs agent telemetry, …) then
+     * raced: the later write carried a stale copy and silently erased the
+     * earlier one (see migration 2026_09_07_000000_repair_wiped_pos_local_
+     * receipt_prefs). This helper re-reads the row under a row lock inside a
+     * transaction, hands the CURRENT decoded value to $mutator, and writes
+     * only what the mutator returns — so each writer changes just the keys
+     * it owns, on top of whatever the other writers saved meanwhile.
+     *
+     * $mutator(array $current): ?array — return the full new array for this
+     *   column, or null to leave the column (and $also) untouched.
+     * $also — extra plain attributes saved in the SAME UPDATE (fillable-guarded
+     *   like update()); may be a callable receiving the new array, for columns
+     *   derived from it (feature_flags master switches).
+     *
+     * Honors $this->timestamps (telemetry writers keep updated_at frozen).
+     * Afterwards $this carries the freshly written value(s) so callers keep
+     * reading the latest state. Works on sqlite (tests) and MySQL; the array
+     * cast is respected, non-cast columns are json_encoded.
+     *
+     * @return array the value now stored in $column
+     */
+    public function mergeJsonColumn(string $column, callable $mutator, array|callable $also = []): array
+    {
+        $decode = static function ($raw): array {
+            if (is_array($raw)) {
+                return $raw;
+            }
+            if (is_string($raw) && $raw !== '') {
+                $d = json_decode($raw, true);
+                return is_array($d) ? $d : [];
+            }
+            return [];
+        };
+        $arrayCast = $this->hasCast($column, ['array', 'json', 'object', 'collection']);
+
+        return $this->getConnection()->transaction(function () use ($column, $mutator, $also, $decode, $arrayCast) {
+            $fresh = $this->newQueryWithoutScopes()
+                ->whereKey($this->getKey())
+                ->lockForUpdate()
+                ->first();
+            if (!$fresh) {
+                $fresh = $this; // row gone (purged mid-request) — fall back to in-memory state
+            }
+
+            $current = $decode($fresh->getAttribute($column));
+            $new = $mutator($current);
+            if ($new === null) {
+                return $current;
+            }
+            if (!is_array($new)) {
+                throw new \LogicException("mergeJsonColumn({$column}) mutator must return array|null");
+            }
+
+            $extra = is_callable($also) ? (array) $also($new) : $also;
+            unset($extra[$column]);
+
+            $fresh->timestamps = $this->timestamps;
+            $fresh->fill($extra);
+            $fresh->setAttribute($column, $arrayCast ? $new : json_encode($new));
+            $fresh->save();
+
+            if ($fresh !== $this) {
+                // Copy the raw (already-encoded) values so $this reads the row as
+                // written, without re-casting and without disturbing other dirty
+                // attributes the caller may still intend to save().
+                $keys = array_merge([$column], array_keys($extra));
+                if ($fresh->usesTimestamps()) {
+                    $keys[] = $fresh->getUpdatedAtColumn();
+                }
+                $rawFresh = $fresh->getAttributes();
+                $raw = $this->getAttributes();
+                foreach ($keys as $k) {
+                    if (array_key_exists($k, $rawFresh)) {
+                        $raw[$k] = $rawFresh[$k];
+                    }
+                }
+                $this->setRawAttributes($raw, false);
+                $this->syncOriginalAttributes(array_values(array_filter($keys, fn ($k) => array_key_exists($k, $raw))));
+            }
+
+            return $new;
+        });
+    }
 
     /**
      * Receipt / invoice display preferences for a product ('pos' or 'di').
@@ -478,7 +592,16 @@ class Company extends Model
      */
     public function posReceiptStyle(): array
     {
-        $all = $this->invoice_display_prefs;
+        return self::receiptStyleFrom($this->invoice_display_prefs);
+    }
+
+    /**
+     * Same normalization as posReceiptStyle(), but over an explicit prefs array.
+     * Writers inside mergeJsonColumn() use it so the bold/logo fallback is
+     * derived from the FRESH row, not from the copy loaded early in the request.
+     */
+    public static function receiptStyleFrom($all): array
+    {
         $style = is_array($all) ? ($all['pos_style'] ?? []) : [];
         if (!is_array($style)) { $style = []; }
 
@@ -838,7 +961,16 @@ class Company extends Model
      */
     public function printerSettings(): array
     {
-        $s = $this->pos_printer_settings ?? [];
+        return self::printerSettingsFrom($this->pos_printer_settings);
+    }
+
+    /**
+     * Same normalized shape as printerSettings(), over an explicit raw value.
+     * Writers inside mergeJsonColumn() rebuild from the FRESH row with this.
+     */
+    public static function printerSettingsFrom($raw): array
+    {
+        $s = is_array($raw) ? $raw : [];
         return [
             'silent_print_enabled' => (bool) ($s['silent_print_enabled'] ?? false),
             'receipt_printer' => $s['receipt_printer'] ?? null,

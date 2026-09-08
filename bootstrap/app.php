@@ -48,6 +48,9 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
         );
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        // Cookie-session POS panel is CSRF-exempt (WebView/Kotlin). This
+        // rejects browser-labelled cross-site writes; missing headers pass.
+        $middleware->append(\App\Http\Middleware\RejectCrossSitePosWrites::class);
         // Slow-request telemetry: near-zero overhead on fast requests; logs
         // >2s requests to storage/logs/slow-requests-*.log in terminate().
         $middleware->append(\App\Http\Middleware\SlowRequestLogger::class);

@@ -183,6 +183,32 @@ if [ -f "$LIB" ]; then
     && ok "remote apply restarts queue service" \
     || bad "remote apply missing queue restart"
 
+  # PWA cache bust: the Actions path cannot commit a CACHE_VERSION bump, so the
+  # remote apply must stamp public/sw.js from the deployed SHA after checkout,
+  # and must restore the file before the next exact-SHA checkout.
+  grep -q "sed -i \"s|^const CACHE_VERSION = '\[^'\]\*';" "$LIB" \
+    && ok "remote apply stamps public/sw.js CACHE_VERSION from the deployed SHA" \
+    || bad "remote apply must stamp public/sw.js CACHE_VERSION (PWA clients keep stale caches otherwise)"
+
+  grep -q 'git checkout -- public/sw.js' "$LIB" \
+    && ok "remote apply restores public/sw.js before exact-SHA checkout" \
+    || bad "remote apply must restore public/sw.js before checkout (dirty file would refuse checkout)"
+
+  # The stamp sed must match the committed sw.js header exactly as shipped.
+  SW="$ROOT/public/sw.js"
+  if [ -f "$SW" ]; then
+    grep -q "^const CACHE_VERSION = '" "$SW" \
+      && ok "public/sw.js CACHE_VERSION line matches the stamp pattern" \
+      || bad "public/sw.js CACHE_VERSION header changed — remote stamp sed would not match"
+    TMP_SW=$(mktemp)
+    cp "$SW" "$TMP_SW"
+    sed -i "s|^const CACHE_VERSION = '[^']*';.*$|const CACHE_VERSION = 'taxnest-19700101-deadbeef'; // test|" "$TMP_SW"
+    grep -q "^const CACHE_VERSION = 'taxnest-19700101-deadbeef';" "$TMP_SW" \
+      && ok "stamp sed rewrites CACHE_VERSION on a copy of public/sw.js" \
+      || bad "stamp sed failed to rewrite CACHE_VERSION on public/sw.js copy"
+    rm -f "$TMP_SW"
+  fi
+
   bash -n "$LIB" && ok "live-remote-apply.sh bash -n clean" || bad "live-remote-apply.sh bash -n failed"
 fi
 

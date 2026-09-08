@@ -31,7 +31,28 @@
 
 ## Desktop Agent authentication (distinct)
 
-**FACT:** Middleware `agent.auth` (`AgentAuth`) — Bearer / `X-Agent-Key` matches `companies.agent_api_key` where `agent_enabled`. Binds company context for `/api/agent/*`. Stateless; session middleware stripped on those routes.
+**FACT:** Middleware `agent.auth` (`AgentAuth`) — Bearer / `X-Agent-Key`. Lookup
+is by `companies.agent_api_key_hash` (sha256) then `hash_equals`; legacy
+plaintext `agent_api_key` still authenticates once and is healed. The plaintext
+column remains so in-field agents and the owner panel copy-key UI keep working.
+`/api/agent/*` is throttled (`throttle:agent-api`, 600/min per presented key)
+and failed auths are limited per IP. `agent_api_key` is `$hidden` on Company.
+
+## Demo login (local only)
+
+**FACT:** `GET /demo-login/{role}` is registered for `company_admin|demo` only.
+`AuthenticatedSessionController::demoLogin` returns 404 unless `APP_ENV=local`
+AND `config('app.demo_login_enabled')` (env `DEMO_LOGIN_ENABLED`). A seeded
+account whose `users.role` is `super_admin` (or that has no `company_id`) is
+refused even when the switch is on. Production HTTP cannot use this path.
+
+## Distributor portal
+
+**FACT:** `/agent/login` and `/agent/*` remain 404 by design
+(`AgentPortalAuthController`). Distributors are referral-only records.
+The `agent` guard exists for historical credentials and must not establish
+a session.
+
 
 ## Consultant authentication pattern
 

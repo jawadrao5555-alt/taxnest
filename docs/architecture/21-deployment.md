@@ -17,6 +17,15 @@ flowchart LR
 
 Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
 
+## PWA cache bust on the Actions path
+
+`scripts/lib/live-remote-apply.sh` stamps the **served** `public/sw.js`
+`CACHE_VERSION` on live as `taxnest-<UTC date>-<sha8>` after the exact-SHA
+checkout (working tree only, restored before the next checkout). A new SHA
+always changes the version so devices purge STATIC/RUNTIME caches. Same-SHA
+re-runs are deterministic. This replaces the `deploy-live.sh` CACHE_VERSION
+**commit**, which Actions cannot do.
+
 ## Manual path still exists
 
 `scripts/deploy-live.sh` + `deployment/*` — older/manual.

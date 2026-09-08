@@ -23,7 +23,7 @@ class AdminFranchiseController extends Controller
             'email' => 'required|email|unique:franchises,email',
             'phone' => 'nullable|string|max:30',
             'commission_rate' => 'required|numeric|min:0|max:100',
-            'password' => 'required|string|min:6',
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $franchise = Franchise::create([

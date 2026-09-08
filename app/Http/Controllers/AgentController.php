@@ -14,6 +14,15 @@ use App\Services\FbrService;
 class AgentController extends Controller
 {
     /**
+     * pos_print_jobs.error texts written by printJobsHousekeeping(). Each
+     * starts with a stable machine-readable code (UI/greps key on it) followed
+     * by the operator-facing explanation shown on the Printer Settings
+     * "recent failed prints" strip.
+     */
+    public const UNCONFIRMED_AFTER_FETCH_ERROR = 'unconfirmed_after_print_content_fetched: the counter fetched this job for printing but never confirmed the outcome. Check the printer tray — reprint from the bill/order screen only if nothing came out.';
+    public const EXPIRED_UNCLAIMED_ERROR = 'expired_unclaimed: no counter claimed this job within the expiry window, so it was not printed. Reprint from the bill/order screen if it is still needed.';
+
+    /**
      * Agent TELEMETRY writes (last-seen beats, printer inventory) must NEVER
      * bump companies.updated_at: the sale screen's boot fingerprint hashes
      * that timestamp, so a beating agent made every cached sale screen look
@@ -25,6 +34,23 @@ class AgentController extends Controller
         $company->timestamps = false;
         try {
             $company->update($attrs);
+        } finally {
+            $company->timestamps = true;
+        }
+    }
+
+    /**
+     * Telemetry variant of Company::mergeJsonColumn(): the agent only owns a
+     * few keys of pos_printer_settings (available_printers, printers_reported_at,
+     * setup-form activation) and must never overwrite the routing the admin
+     * saved on the panel between two reports. Same updated_at freeze as
+     * telemetryUpdate(); $also = extra telemetry columns for the same UPDATE.
+     */
+    private function telemetryMergeJson($company, string $column, callable $mutator, array $also = []): array
+    {
+        $company->timestamps = false;
+        try {
+            return $company->mergeJsonColumn($column, $mutator, $also);
         } finally {
             $company->timestamps = true;
         }
@@ -45,6 +71,24 @@ class AgentController extends Controller
             try {
                 $ready = \Illuminate\Support\Facades\Schema::hasTable('pos_agent_devices')
                     && \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'device_uid');
+            } catch (\Throwable $e) {
+                $ready = false;
+            }
+        }
+        return $ready;
+    }
+
+    /**
+     * Duplicate-print guard column guard: pos_print_jobs.content_fetched_at
+     * (migration 2026_11_25). Same deploy-window/test-process caveats as
+     * deviceRoutingReady(). Missing column → legacy stale-requeue behaviour.
+     */
+    public static function contentFetchTrackingReady(): bool
+    {
+        static $ready = null;
+        if ($ready === null || app()->runningUnitTests()) {
+            try {
+                $ready = \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'content_fetched_at');
             } catch (\Throwable $e) {
                 $ready = false;
             }
@@ -758,6 +802,32 @@ class AgentController extends Controller
         $praInvoiceNumber = trim((string) $request->input('pra_invoice_number', ''));
         $treatAsSuccess = $request->boolean('success') || ($praInvoiceNumber !== '' && preg_match('/^\d{6}[A-Z]{4,6}\d{4,}$/', $praInvoiceNumber));
 
+        // IDEMPOTENT RESULT WRITE. A bill that already carries a fiscal number is
+        // settled: PRA holds it under THAT number and the receipt/QR were built
+        // from it. A second result for the same row — the agent re-posting after
+        // a lost ack, a stale queue entry, or a parallel server-side sender that
+        // won the race — must never overwrite the stored number with a different
+        // one, nor demote the row to failed/offline. Acknowledge so the agent
+        // drops the item, and leave the row exactly as it is.
+        $storedNumber = trim((string) ($txn->pra_invoice_number ?? ''));
+        if ($storedNumber !== '') {
+            Log::info('Agent: result for an already-fiscalised bill ignored (idempotent ack)', [
+                'company_id' => $company->id,
+                'transaction_id' => $txnId,
+                'stored_pra_invoice' => $storedNumber,
+                'incoming_pra_invoice' => $praInvoiceNumber !== '' ? $praInvoiceNumber : null,
+                'incoming_success' => $request->boolean('success'),
+                'conflicting_number' => $praInvoiceNumber !== '' && $praInvoiceNumber !== $storedNumber,
+            ]);
+            $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+
+            return response()->json([
+                'ok' => true,
+                'already_submitted' => true,
+                'pra_invoice_number' => $storedNumber,
+            ]);
+        }
+
         if ($treatAsSuccess && $praInvoiceNumber !== '') {
             $response = $request->input('response');
             $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
@@ -1039,22 +1109,25 @@ class AgentController extends Controller
         }
 
         if ($explicit) {
-            $settings = $company->printerSettings();
-            $settings['silent_print_enabled'] = true;
-            // Stamp dismiss so the one-click banner never re-appears (deliberate
-            // human choice from the agent setup form = same semantic as the banner).
-            $settings['prompt_dismissed_at'] = now()->toIso8601String();
-            // Single-counter shops: set the company-level receipt_printer too so
-            // bills route correctly even before the admin visits Printer Settings.
-            // Multi-counter shops already have per-device routing; company-level
-            // stays as-is if already set by the admin (most-recent-deliberate-
-            // choice rule: the admin panel wins if they set it explicitly there).
-            if (empty($settings['receipt_printer'])) {
-                $settings['receipt_printer'] = $printer;
-            }
-            // telemetryUpdate: does NOT bump companies.updated_at (sale-screen boot
+            // Fresh-row merge — the admin's panel picks saved meanwhile survive.
+            // telemetryMergeJson: does NOT bump companies.updated_at (sale-screen boot
             // fingerprint must not flap on every agent save — same guard as heartbeat).
-            $this->telemetryUpdate($company, ['pos_printer_settings' => $settings]);
+            $this->telemetryMergeJson($company, 'pos_printer_settings', function (array $current) use ($printer): array {
+                $settings = \App\Models\Company::printerSettingsFrom($current);
+                $settings['silent_print_enabled'] = true;
+                // Stamp dismiss so the one-click banner never re-appears (deliberate
+                // human choice from the agent setup form = same semantic as the banner).
+                $settings['prompt_dismissed_at'] = now()->toIso8601String();
+                // Single-counter shops: set the company-level receipt_printer too so
+                // bills route correctly even before the admin visits Printer Settings.
+                // Multi-counter shops already have per-device routing; company-level
+                // stays as-is if already set by the admin (most-recent-deliberate-
+                // choice rule: the admin panel wins if they set it explicitly there).
+                if (empty($settings['receipt_printer'])) {
+                    $settings['receipt_printer'] = $printer;
+                }
+                return $settings;
+            });
             $silentNowEnabled = true;
 
             Log::info('Agent: silent print activated from setup form', [
@@ -1080,8 +1153,7 @@ class AgentController extends Controller
             'printers.*.isDefault' => 'nullable|boolean',
         ]);
 
-        $settings = $company->printerSettings();
-        $settings['available_printers'] = collect($validated['printers'])->map(fn ($p) => [
+        $printers = collect($validated['printers'])->map(fn ($p) => [
             'name' => $p['name'],
             'displayName' => $p['displayName'] ?? $p['name'],
             'isDefault' => (bool) ($p['isDefault'] ?? false),
@@ -1091,12 +1163,16 @@ class AgentController extends Controller
             // flagged even though they can look similar.
             'isTextOnly' => self::detectTextOnlyPrinter($p['name'], $p['displayName'] ?? $p['name']),
         ])->values()->all();
-        $settings['printers_reported_at'] = now()->toIso8601String();
 
-        $this->telemetryUpdate($company, [
-            'pos_printer_settings' => $settings,
-            'agent_last_seen' => now(),
-        ]);
+        // The agent owns ONLY available_printers + printers_reported_at. Merging
+        // onto the FRESH row (row lock) means a report that started before the
+        // admin saved receipt/KOT picks on the panel can no longer erase them.
+        $settings = $this->telemetryMergeJson($company, 'pos_printer_settings', function (array $current) use ($printers): array {
+            $settings = \App\Models\Company::printerSettingsFrom($current);
+            $settings['available_printers'] = $printers;
+            $settings['printers_reported_at'] = now()->toIso8601String();
+            return $settings;
+        }, ['agent_last_seen' => now()]);
 
         // Task 1166: also store THIS counter's own printer list on its device
         // row, so the Printer Settings page can offer a per-device dropdown.
@@ -1439,20 +1515,69 @@ class AgentController extends Controller
             }
         }
 
-        // Stale-claim requeue: a job stuck 'printing' >2 min means the agent
-        // died mid-print. Retry up to 3 attempts, then park as failed.
+        // Stale claims: a job stuck 'printing' >2 min means the agent never
+        // reported the outcome. Job states are: pending = not started,
+        // printing = claimed/outcome unknown, done = confirmed, failed.
+        //
+        // Duplicate-print guard (Sep 2026): whether paper came out cannot be
+        // known once the agent has FETCHED the job content — the print may
+        // have succeeded and only the result POST was lost (PC rebooted,
+        // network blip). Such a job must NEVER be requeued automatically: it
+        // is parked as failed with a distinct code so the shop checks the
+        // tray and reprints deliberately (the failed strip on Printer
+        // Settings shows it; a fresh press on the bill enqueues a new job).
+        // A claim whose content was never fetched cannot have printed, so
+        // the safe retry below still applies to it.
+        $staleBefore = now()->subMinutes(2);
+        $fetchTracked = self::contentFetchTrackingReady();
+        if ($fetchTracked) {
+            DB::table('pos_print_jobs')
+                ->where('company_id', $company->id)
+                ->where('status', 'printing')
+                ->where('updated_at', '<', $staleBefore)
+                ->whereNotNull('content_fetched_at')
+                ->update([
+                    'status' => 'failed',
+                    'claim_token' => null,
+                    'error' => self::UNCONFIRMED_AFTER_FETCH_ERROR,
+                    'updated_at' => now(),
+                ]);
+        }
+        // Retry up to 3 attempts (agent died BEFORE rendering), then park as failed.
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'printing')
-            ->where('updated_at', '<', now()->subMinutes(2))
+            ->where('updated_at', '<', $staleBefore)
             ->where('attempts', '<', 3)
+            ->when($fetchTracked, fn ($q) => $q->whereNull('content_fetched_at'))
             ->update(['status' => 'pending', 'claim_token' => null, 'updated_at' => now()]);
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'printing')
-            ->where('updated_at', '<', now()->subMinutes(2))
+            ->where('updated_at', '<', $staleBefore)
             ->where('attempts', '>=', 3)
-            ->update(['status' => 'failed', 'error' => 'Print attempt timed out repeatedly (agent lost the job mid-print).', 'updated_at' => now()]);
+            ->update(['status' => 'failed', 'claim_token' => null, 'error' => 'Print attempt timed out repeatedly (agent lost the job mid-print).', 'updated_at' => now()]);
+
+        // Expired unclaimed jobs: an unstamped pending job nobody claimed for
+        // `print.pending_expiry_hours` (default 24h — e.g. every agent was
+        // switched off) must not surprise-print a day-old bill when a counter
+        // comes back. Park as failed, never delete (evidence retained). Stamped
+        // jobs are handled by the stranded rescue above and only reach here
+        // once unstamped. 0/negative config disables the horizon.
+        $expiryHours = (int) config('print.pending_expiry_hours', 24);
+        if ($expiryHours > 0) {
+            DB::table('pos_print_jobs')
+                ->where('company_id', $company->id)
+                ->where('status', 'pending')
+                ->when(self::deviceRoutingReady(), fn ($q) => $q->whereNull('device_uid'))
+                ->where('created_at', '<', now()->subHours($expiryHours))
+                ->update([
+                    'status' => 'failed',
+                    'claim_token' => null,
+                    'error' => self::EXPIRED_UNCLAIMED_ERROR,
+                    'updated_at' => now(),
+                ]);
+        }
 
         // Housekeeping: finished jobs older than 7 days are useless — prune so
         // the table never grows unbounded (failed jobs stay visible on the
@@ -1493,6 +1618,21 @@ class AgentController extends Controller
         $job = \App\Models\PosPrintJob::where('company_id', $company->id)->find($id);
         if (!$job) {
             return response()->json(['error' => 'Job not found'], 404);
+        }
+
+        // Duplicate-print guard: from this point the agent may put paper out,
+        // so record the hand-off BEFORE rendering (a render that then 404s or
+        // 204s is still safer treated as "may have printed" than requeued).
+        // Stamped once, only for a live claim — housekeeping keys on it.
+        if ($job->status === 'printing' && self::contentFetchTrackingReady()) {
+            try {
+                DB::table('pos_print_jobs')
+                    ->where('id', $job->id)
+                    ->whereNull('content_fetched_at')
+                    ->update(['content_fetched_at' => now(), 'updated_at' => now()]);
+            } catch (\Throwable $e) {
+                // Marker is a safety net — never block the slip on it.
+            }
         }
 
         // Views + nested render logic may read the container binding.

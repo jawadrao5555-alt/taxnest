@@ -40,6 +40,13 @@ return [
     // and may be offered a held poll.
     'active_window_minutes' => (int) env('PRINT_ACTIVE_WINDOW_MINUTES', 20),
 
+    // Unclaimed (company-wide, unstamped) pending jobs older than this are
+    // parked as failed ('expired_unclaimed') by housekeeping instead of
+    // waiting forever for an agent that may never come back — a day-old bill
+    // suddenly printing when the counter is switched on is worse than a
+    // visible failed entry. Rows are never deleted here; evidence is kept.
+    'pending_expiry_hours' => (int) env('PRINT_PENDING_EXPIRY_HOURS', 24),
+
     /*
      * Optional local realtime wake relay. Leave either value blank to keep the
      * established polling-only behaviour. This is deliberately a loopback URL:

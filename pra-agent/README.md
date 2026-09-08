@@ -14,7 +14,7 @@ A standalone Windows desktop application that auto-syncs your NestPOS invoices t
 1. Agent polls TaxNest server every **30 seconds** for pending PRA invoices
 2. Submits them directly to PRA from your local Pakistani IP
 3. Reports success/fail back to TaxNest server
-4. Sends heartbeat every **60 seconds** so the panel shows ONLINE status
+4. Sends heartbeat every **30 seconds** (`setInterval(heartbeat, 30000)` in `src/agent.js`) so the panel shows ONLINE status
 
 ---
 
@@ -93,7 +93,7 @@ pra-agent/
 
 | Endpoint                          | Method | Description                          |
 |-----------------------------------|--------|--------------------------------------|
-| `/api/agent/heartbeat`            | POST   | Agent → server (every 60s)           |
+| `/api/agent/heartbeat`            | POST   | Agent → server (every 30s)           |
 | `/api/agent/pending-invoices`     | GET    | Server → agent (returns queue)       |
 | `/api/agent/submit-result`        | POST   | Agent → server (PRA result)          |
 

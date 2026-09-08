@@ -41,22 +41,41 @@ class AuthenticatedSessionController extends Controller
         return redirect()->intended(route('dashboard', absolute: false));
     }
 
+    /**
+     * Local-development shortcut into a seeded demo tenant.
+     *
+     * Fails closed: 404 unless the app runs in the `local` environment AND
+     * DEMO_LOGIN_ENABLED=true. Platform-level roles (users.role = super_admin)
+     * are never offered, and a seeded account that carries such a role is
+     * refused even when the switch is on, so this path can never grant a
+     * CompanyScope / RoleMiddleware bypass.
+     */
+    public const DEMO_ROLES = [
+        'company_admin' => 'company_admin@test.com',
+        'demo' => 'demo@taxnest.pk',
+    ];
+
+    public static function demoLoginEnabled(): bool
+    {
+        return app()->environment('local') && (bool) config('app.demo_login_enabled', false);
+    }
+
     public function demoLogin(Request $request, string $role): RedirectResponse
     {
-        $demoUsers = [
-            'super_admin' => 'admin@test.com',
-            'company_admin' => 'company_admin@test.com',
-            'demo' => 'demo@taxnest.pk',
-        ];
+        abort_unless(self::demoLoginEnabled(), 404);
 
-        $email = $demoUsers[$role] ?? null;
+        $email = self::DEMO_ROLES[$role] ?? null;
         if (!$email) {
-            return redirect('/login')->with('error', 'Invalid demo role.');
+            abort(404);
         }
 
         $user = \App\Models\User::where('email', $email)->first();
         if (!$user) {
             return redirect('/login')->with('error', 'Demo user not found. Please run database seeder.');
+        }
+
+        if ($user->role === 'super_admin' || !$user->company_id) {
+            abort(404);
         }
 
         Auth::login($user);

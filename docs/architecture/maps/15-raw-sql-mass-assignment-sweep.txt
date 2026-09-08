@@ -1,0 +1,125 @@
+TaxNest — raw SQL / mass-assignment defensive sweep
+Date: 2026-09-08
+Scope: app/ (controllers, models, services, jobs, commands). vendor/ excluded.
+Method: ripgrep for whereRaw, DB::raw, selectRaw, orderByRaw, havingRaw,
+DB::statement, DB::select, DB::unprepared, request()->all(), fill/create/update
+from request, user-controlled orderBy, request-derived filesystem paths.
+Classification: SAFE | POTENTIAL | CONFIRMED.
+CONFIRMED items in this sweep were fixed in the same remediation PR or already
+had a whitelist. No remaining CONFIRMED injection/mass-assignment hole was
+left unfixed.
+
+================================================================
+A. User-controlled ORDER BY / column names
+================================================================
+InvoiceController::index sort= / dir=
+  Evidence: $sortBy = $request->get('sort'); $allowedSorts whitelist;
+            $sortDir in ['asc','desc'].
+  Class: SAFE (whitelist).
+
+No other $request-driven orderBy / orderByRaw column interpolation found.
+
+================================================================
+B. whereRaw / DB::raw / selectRaw / orderByRaw with request input
+================================================================
+FbrPosController frequent-products FIELD(id, ...)
+  Evidence: array_map('intval', $topIds) before implode. IDs from a company-
+            scoped aggregate, not from the request.
+  Class: SAFE.
+
+FbrReferenceController / FbrPosCatalogueController LIKE prefix
+  Evidence: bound parameters [?], not concatenated SQL identifiers.
+  Class: SAFE.
+
+InvoiceController completedStats dateFormat whereRaw
+  Evidence: DbCompat::dateFormat helper + bound [now()->format('Y-m')].
+  Class: SAFE.
+
+HealthAuditController orderByRaw($this->severityOrder())
+  Evidence: hardcoded CASE list, not request.
+  Class: SAFE.
+
+WhtReportController / DashboardController / MISController / Admin reports
+  Evidence: large selectRaw/whereRaw blocks using DbCompat date helpers and
+            bound dates / company_id from currentCompanyId, not request
+            identifiers.
+  Class: SAFE (volume is high; pattern is bound values + helpers).
+
+LiveOpsDiagnosticsService / AnomalyEngine / SmartTaxEngine
+  Evidence: diagnostic aggregates; identifiers are schema constants.
+  Class: SAFE.
+
+Commands (AutoCloseDay*, SchemaSelfHeal, DatabaseBackup, CnicDuplicatesReport)
+  Evidence: operator/CLI only, no HTTP input.
+  Class: SAFE in the HTTP threat model. DatabaseBackup path is operator-local.
+
+================================================================
+C. DB::statement / DB::unprepared / DB::select
+================================================================
+SchemaSelfHeal / SchemaManifestGenerate / CheckMysqlConnectionHealth
+  Evidence: CLI schema repair. Not request-reachable.
+  Class: SAFE (HTTP). PRODUCTION-VERIFICATION-REQUIRED only in the sense that
+         these commands must never be exposed over HTTP (setup routes that
+         used to call Artisan from GET were removed this PR).
+
+No DB::unprepared with request input found.
+
+================================================================
+D. Mass assignment / request->all()
+================================================================
+ProfileController: fill($request->validated()) — SAFE.
+PosController customer create/update: $request->only([...]) — SAFE.
+FbrPosCustomerController: $request->only([...]) — SAFE.
+AdminFranchiseController update: $request->only([...]) — SAFE.
+AdminCompanyController: $request->only($fields) — SAFE (field list).
+CompanySettingsController: $request->only([...]) — SAFE.
+TaxOverrideController: $request->only([...]) — SAFE.
+ProductController: $request->only([...]) — SAFE.
+SaasAdmin AdminAgentController create: $request->only([...]) — SAFE.
+paginate()->appends($request->all()) — SAFE (query-string echo, not fill).
+DiInvoiceApiController Validator::make($request->all(), $rules) — SAFE
+  (validated subset used afterwards).
+FbrPosController Validator::make($request->all(), $rules) — SAFE (same).
+AiInvoiceReaderController $request->all() passed into a typed importer —
+  POTENTIAL: importer must keep using validated fields. No CONFIRMED
+  unguarded create() from all() found.
+
+RestaurantPosController::payOrder logs $request->all()
+  Class: POTENTIAL (payload in logs; payment fields, not passwords). Do not
+  treat as a credential leak. Follow-up: redact or log only named keys.
+
+No fill($request->all()) / create($request->all()) / update($request->all())
+on Eloquent models found.
+
+================================================================
+E. Filesystem paths from request
+================================================================
+No storage_path/public_path/base_path interpolating $request input found.
+
+================================================================
+F. Franchise queries
+================================================================
+FranchiseDashboardController and sibling franchise controllers constrain
+company lists with companies.franchise_id = auth('franchise')->id().
+No franchise route takes a company/subscription id (pinned by
+tests/Feature/FranchiseIdorTest.php). Class: SAFE.
+
+================================================================
+G. Remaining POTENTIAL (not changed this PR)
+================================================================
+1. RestaurantPosController::payOrder logs the full request payload.
+2. AiInvoiceReaderController forwards $request->all() into the importer —
+   currently validated downstream; keep it that way.
+3. High volume of selectRaw in reporting controllers — SAFE today because
+   identifiers are code constants; a future "sort column from request"
+   without a whitelist would become CONFIRMED. InvoiceController already
+   shows the correct pattern.
+
+================================================================
+H. CONFIRMED in this remediation (fixed elsewhere, not in this sweep file)
+================================================================
+None remaining after this sweep. Prior CONFIRMED HTTP Artisan::call setup
+routes were removed (routes/web.php). Agent API key lookup no longer uses
+SQL equality on the plaintext secret as the primary path.
+
+End of sweep.

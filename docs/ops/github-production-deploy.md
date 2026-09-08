@@ -80,7 +80,8 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 | Apply | `scripts/ci-deploy-production.sh` → shared `scripts/lib/live-remote-apply.sh` |
 | Live verify | Same job runs `scripts/ci-live-verify.sh`: live HEAD == deploy SHA, `/up` 200, NestPOS QA login + feature markers (not merely HTTP 200). Uses Environment secrets `PRODUCTION_SSH_PRIVATE_KEY` + `LIVE_QA_PASS`. Failure fails the workflow — Cloud Agents must start a new diagnosis cycle (`docs/ops/cloud-agent-issue-to-live.md`). |
 | Semantics | Same remote core as `deploy-live.sh`: flock lock, maintenance `artisan down` (200), exact-SHA checkout, composer if needed, migrate only when the gap includes migrations, config/route/view cache rebuild, ownership + SELinux repair, PHP-FPM reload with OPcache proof, `taxnest-queue` restart, `artisan up`, homepage 200, cache-fresh probe, deploy marker. Fail closed (site stays in maintenance on apply failure). |
-| Not run | Replit-local preflights (MySQL staging, Chromium, `.local` QA), SW `CACHE_VERSION` auto-bump commits, any `git push`, Cloud Agent processes |
+| PWA cache | The remote apply stamps the served `public/sw.js` `CACHE_VERSION` on live as `taxnest-<UTC date>-<sha8>` right after the exact-SHA checkout (working tree only, never committed; restored before the next checkout). New SHA ⇒ new version ⇒ devices purge old STATIC/RUNTIME caches and get the SW update badge. Log markers: `REMOTE_STEP: sw.js CACHE_VERSION stamped …`, or `REMOTE_SW_STAMP_FAILED` / `REMOTE_SW_STAMP_SKIPPED` warnings. |
+| Not run | Replit-local preflights (MySQL staging, Chromium, `.local` QA), SW `CACHE_VERSION` auto-bump **commits** (replaced by the live stamp above), any `git push`, Cloud Agent processes |
 
 Manual `workflow_dispatch` inputs:
 

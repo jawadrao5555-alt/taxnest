@@ -86,6 +86,27 @@
                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <p class="text-xs text-gray-400 mt-1">Yehi token Meta App ke webhook setup mein "Verify token" field mein likhein. Subscribe field: <code>messages</code>.</p>
                         </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Meta App Secret (webhook signature)
+                                @if(!empty($hasAppSecret))
+                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Configured — signatures enforced</span>
+                                @else
+                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Not set — webhook unsigned</span>
+                                @endif
+                            </label>
+                            <input type="password" name="wa_app_secret" value="" placeholder="{{ !empty($hasAppSecret) ? '••••••••  (blank = keep existing)' : 'Meta App Dashboard → App settings → Basic → App secret' }}"
+                                   autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                   class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <p class="text-xs text-gray-400 mt-1">Meta har status POST ko is secret se sign karta hai (<code>X-Hub-Signature-256</code>). Set hone par ghalat / bina signature wale POST reject honge. Secret save ke baad dobara display nahi hota.</p>
+                            @if(!empty($hasAppSecret))
+                                <label class="inline-flex items-center gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                                    <input type="hidden" name="wa_app_secret_clear" value="0">
+                                    <input type="checkbox" name="wa_app_secret_clear" value="1" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                                    App Secret hata dein (webhook phir unsigned accept karega)
+                                </label>
+                            @endif
+                        </div>
                     </div>
                 </div>
 

@@ -30,7 +30,8 @@ class CompanyUserController extends Controller
             'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail(\App\Support\IdentityScope::ofCompanyId($companyId))],
             'phone' => ['nullable', 'string', 'max:20', \App\Support\IdentityScope::uniquePhone(\App\Support\IdentityScope::ofCompanyId($companyId))],
             'username' => ['nullable', 'string', 'max:100', 'alpha_dash', \App\Support\IdentityScope::uniqueUsername(\App\Support\IdentityScope::ofCompanyId($companyId))],
-            'password' => 'required|string|min:6',
+            // Same policy as self-registration / password reset (min 8).
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::defaults()],
             'role' => 'required|in:company_admin,employee,viewer',
         ]);
 
@@ -93,7 +94,7 @@ class CompanyUserController extends Controller
         }
 
         $request->validate([
-            'password' => 'required|string|min:6',
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $user->update(['password' => Hash::make($request->password)]);

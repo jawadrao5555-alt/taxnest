@@ -244,21 +244,27 @@ class PublicProfileController extends Controller
             return back()->with('success', 'Public profile settings saved.');
         }
 
-        $settings = self::settingsFor($company);
-        $settings['enabled'] = $request->has('pp_enabled');
-        foreach ($showKeys as $key) {
-            $settings[$key] = $request->has('pp_' . $key);
-        }
-        $settings['hours_text'] = trim((string) $request->input('hours_text', ''));
-        $settings['about_text'] = trim((string) $request->input('about_text', ''));
+        $enabled = $request->has('pp_enabled');
 
-        // First enable ever → mint the permanent random slug.
-        if ($settings['enabled'] && !$company->public_profile_slug) {
-            $company->public_profile_slug = self::mintSlug();
+        // First enable ever → mint the permanent random slug (same UPDATE below).
+        $also = [];
+        if ($enabled && !$company->public_profile_slug) {
+            $also['public_profile_slug'] = self::mintSlug();
         }
 
-        $company->public_profile_settings = $settings;
-        $company->save();
+        // Merged onto the FRESH row under a lock (Company::mergeJsonColumn):
+        // defaults + whatever is stored now + this form's values, so keys a
+        // future writer adds to the column are never dropped by a stale copy.
+        $company->mergeJsonColumn('public_profile_settings', function (array $current) use ($request, $showKeys, $enabled): array {
+            $settings = array_merge(self::DEFAULT_SETTINGS, $current);
+            $settings['enabled'] = $enabled;
+            foreach ($showKeys as $key) {
+                $settings[$key] = $request->has('pp_' . $key);
+            }
+            $settings['hours_text'] = trim((string) $request->input('hours_text', ''));
+            $settings['about_text'] = trim((string) $request->input('about_text', ''));
+            return $settings;
+        }, $also);
 
         return back()->with('success', 'Public profile settings saved.');
     }

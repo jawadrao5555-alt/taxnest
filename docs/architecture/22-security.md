@@ -10,7 +10,7 @@
 
 ## Hardening observed (FACT)
 
-- `ForceHttps` / HTTPS assumptions in production
+- HTTPS is terminated at the web server / proxy layer in production. `app/Http/Middleware/ForceHttps.php` EXISTS but is **NOT wired** in `bootstrap/app.php` (verified) — it is dormant code, not a control. PRODUCTION-VERIFICATION-REQUIRED: confirm the Apache/Cloudflare redirect + HSTS, and `TrustProxies` configuration, on the live host before relying on it.
 - Rate limiting middleware on company panels
 - Impersonation orphan cleanup (login lockout fix)
 - Redaction in Live Ops diagnostics (`LiveOpsRedactor`)

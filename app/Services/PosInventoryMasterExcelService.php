@@ -619,13 +619,17 @@ class PosInventoryMasterExcelService
 
     private function applyIngredient(array $op, array &$catalog, array &$counts): void
     {
-        if ($op['action'] === 'create') {
-            $ing = Ingredient::create($op['attrs']);
-            $counts['ingredients_added']++;
-        } else {
-            $ing = $op['existing'];
-            $ing->update($op['attrs']);
+        $attrs = $op['attrs'];
+        $ing = $this->persistedIngredientForOp($op, $catalog);
+        if ($ing) {
+            // In-file duplicates prepare against an id=0 pending clone. Re-resolve
+            // the real row and never write stock/company on that update.
+            unset($attrs['current_stock'], $attrs['company_id']);
+            $ing->update($attrs);
             $counts['ingredients_updated']++;
+        } else {
+            $ing = Ingredient::create($attrs);
+            $counts['ingredients_added']++;
         }
         $this->indexIngredient($catalog, $ing);
     }
@@ -772,13 +776,17 @@ class PosInventoryMasterExcelService
 
     private function applyProduct(array $op, array &$catalog, array &$counts): void
     {
-        if ($op['action'] === 'create') {
-            $product = PosProduct::create($op['attrs']);
-            $counts['products_added']++;
-        } else {
-            $product = $op['existing'];
-            $product->update($op['attrs']);
+        $attrs = $op['attrs'];
+        $product = $this->persistedProductForOp($op, $catalog);
+        if ($product) {
+            // In-file duplicates prepare against an id=0 pending clone. Re-resolve
+            // the real row; Master Excel never writes stock_quantity.
+            unset($attrs['stock_quantity'], $attrs['company_id']);
+            $product->update($attrs);
             $counts['products_updated']++;
+        } else {
+            $product = PosProduct::create($attrs);
+            $counts['products_added']++;
         }
         $this->indexProduct($catalog, $product);
     }
@@ -796,6 +804,56 @@ class PosInventoryMasterExcelService
         }
         if ($name !== '' && isset($catalog['byName'][strtolower($name)])) {
             return $catalog['byName'][strtolower($name)];
+        }
+        return null;
+    }
+
+    /**
+     * Real catalog row for an apply op. Pending prepare clones use id=0 and must
+     * not be UPDATE'd; after the first create, later in-file duplicates resolve here.
+     */
+    private function persistedIngredientForOp(array $op, array $catalog): ?Ingredient
+    {
+        $existing = $op['existing'] ?? null;
+        if ($existing instanceof Ingredient && (int) $existing->id > 0) {
+            return $existing;
+        }
+        $attrs = $op['attrs'] ?? [];
+        $code = isset($attrs['code']) ? trim((string) $attrs['code']) : '';
+        $name = (string) ($attrs['name'] ?? '');
+        $unit = strtolower((string) ($attrs['unit'] ?? ''));
+        $errors = [];
+        $match = $this->matchIngredient(
+            $catalog,
+            $code !== '' ? $code : null,
+            $name,
+            $unit,
+            $errors,
+            0,
+            $name,
+            'INGREDIENT'
+        );
+        if ($match instanceof Ingredient && (int) $match->id > 0) {
+            return $match;
+        }
+        return null;
+    }
+
+    private function persistedProductForOp(array $op, array $catalog): ?PosProduct
+    {
+        $existing = $op['existing'] ?? null;
+        if ($existing instanceof PosProduct && (int) $existing->id > 0) {
+            return $existing;
+        }
+        $attrs = $op['attrs'] ?? [];
+        $code = isset($attrs['sku']) ? trim((string) $attrs['sku']) : '';
+        if ($code === '' && isset($attrs['barcode'])) {
+            $code = trim((string) $attrs['barcode']);
+        }
+        $name = (string) ($attrs['name'] ?? '');
+        $match = $this->matchProduct($catalog, $code !== '' ? $code : null, $name);
+        if ($match instanceof PosProduct && (int) $match->id > 0) {
+            return $match;
         }
         return null;
     }

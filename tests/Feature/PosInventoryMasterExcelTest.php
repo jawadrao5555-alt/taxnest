@@ -562,4 +562,88 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertEquals(300.0, (float) Ingredient::first()->cost_per_unit);
         $this->assertEquals(0.25, (float) ProductRecipe::first()->quantity_needed);
     }
+
+    public function test_in_file_duplicate_product_rows_last_write_wins(): void
+    {
+        $result = $this->importRows(self::HEADER, [
+            ['PRODUCT', 'Coke 500ml', 'DK-500', 80, 'Drinks', 'first', '', '', '', '', '', '', '', '', '', '', ''],
+            ['PRODUCT', 'Coke 500ml', 'DK-500', 95, 'Soda', 'second', '', '', '', '', '', '', '', '', '', '', ''],
+        ]);
+
+        $this->assertTrue($result['ok'], $result['message']);
+        $this->assertSame(1, PosProduct::where('company_id', $this->companyId)->count());
+        $p = PosProduct::first();
+        $this->assertEquals(95.0, (float) $p->price);
+        $this->assertSame('Soda', $p->category);
+        $this->assertSame('second', $p->description);
+        $this->assertNull($p->stock_quantity);
+        $this->assertSame(0, InventoryMovement::count());
+        $this->assertSame(0, IngredientMovement::count());
+    }
+
+    public function test_in_file_duplicate_ingredient_rows_last_write_wins(): void
+    {
+        $result = $this->importRows(self::HEADER, [
+            ['INGREDIENT', '', '', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', 300, 50, '', ''],
+            ['INGREDIENT', '', '', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', 310, 60, '', ''],
+        ]);
+
+        $this->assertTrue($result['ok'], $result['message']);
+        $this->assertSame(1, Ingredient::where('company_id', $this->companyId)->count());
+        $ing = Ingredient::first();
+        $this->assertEquals(310.0, (float) $ing->cost_per_unit);
+        $this->assertEquals(60.0, (float) $ing->min_stock_level);
+        $this->assertEquals(0.0, (float) $ing->current_stock);
+        $this->assertSame(0, InventoryMovement::count());
+        $this->assertSame(0, IngredientMovement::count());
+    }
+
+    public function test_in_file_duplicate_product_then_recipe_uses_real_product_id(): void
+    {
+        $result = $this->importRows(self::HEADER, [
+            ['PRODUCT', 'Chicken Biryani', 'BRY-001', 400, 'Rice', 'first', '', '', '', '', '', '', '', '', '', '', ''],
+            ['PRODUCT', 'Chicken Biryani', 'BRY-001', 450, 'Rice', 'second', '', '', '', '', '', '', '', '', '', '', ''],
+            ['INGREDIENT', '', '', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', 300, 50, '', ''],
+            ['RECIPE', 'Chicken Biryani', 'BRY-001', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', '', '', 0.25, ''],
+        ]);
+
+        $this->assertTrue($result['ok'], $result['message']);
+        $this->assertSame(1, PosProduct::where('company_id', $this->companyId)->count());
+        $p = PosProduct::first();
+        $this->assertEquals(450.0, (float) $p->price);
+        $this->assertSame('second', $p->description);
+        $this->assertGreaterThan(0, (int) $p->id);
+        $this->assertSame(1, ProductRecipe::where('company_id', $this->companyId)->count());
+        $recipe = ProductRecipe::first();
+        $this->assertSame((int) $p->id, (int) $recipe->product_id);
+        $this->assertEquals(0.25, (float) $recipe->quantity_needed);
+        $this->assertNull($p->stock_quantity);
+        $this->assertEquals(0.0, (float) Ingredient::first()->current_stock);
+        $this->assertSame(0, InventoryMovement::count());
+        $this->assertSame(0, IngredientMovement::count());
+    }
+
+    public function test_in_file_duplicate_ingredient_then_recipe_uses_real_ingredient_id(): void
+    {
+        $result = $this->importRows(self::HEADER, [
+            ['INGREDIENT', '', '', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', 300, 50, '', ''],
+            ['INGREDIENT', '', '', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', 310, 60, '', ''],
+            ['PRODUCT', 'Chicken Biryani', 'BRY-001', 450, 'Rice', '', '', '', '', '', '', '', '', '', '', '', ''],
+            ['RECIPE', 'Chicken Biryani', 'BRY-001', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', '', '', 0.25, ''],
+        ]);
+
+        $this->assertTrue($result['ok'], $result['message']);
+        $this->assertSame(1, Ingredient::where('company_id', $this->companyId)->count());
+        $ing = Ingredient::first();
+        $this->assertEquals(310.0, (float) $ing->cost_per_unit);
+        $this->assertGreaterThan(0, (int) $ing->id);
+        $this->assertSame(1, ProductRecipe::where('company_id', $this->companyId)->count());
+        $recipe = ProductRecipe::first();
+        $this->assertSame((int) $ing->id, (int) $recipe->ingredient_id);
+        $this->assertEquals(0.25, (float) $recipe->quantity_needed);
+        $this->assertEquals(0.0, (float) $ing->current_stock);
+        $this->assertNull(PosProduct::first()->stock_quantity);
+        $this->assertSame(0, InventoryMovement::count());
+        $this->assertSame(0, IngredientMovement::count());
+    }
 }

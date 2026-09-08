@@ -933,14 +933,19 @@ Priority follow-ups (investigation/fix missions, not this commit):
 TEST EVIDENCE (THIS MISSION)
 ----------------------------
 
-Command:
-php artisan test --filter='LiveOpsAuthorization|ImpersonationLoginLockout|PrintJobDevice|DiInvoiceApi|CompanyScope|BranchContext|agentHandlesPra|fiscal_device|SendInvoiceToFbr'
+Command (safe local PHPUnit only):
+php artisan test --filter='LiveOpsAuthorization|ImpersonationLoginLockout|PrintJobDevice|fiscal_device'
 
-Result: 43 passed (231 assertions)
+Result (final re-run before commit): 40 passed (207 assertions)
 Includes: LiveOpsAuthorizationTest A–F, ImpersonationLoginLockoutTest,
 PosPrintJobDeviceRoutingTest (incl. stranded rescue), FBR fiscal_device day-close tests
 
+Earlier broader filter in same mission (also green):
+…|DiInvoiceApi|CompanyScope|BranchContext|agentHandlesPra|SendInvoiceToFbr
+→ 43 passed (231 assertions)
+
 Not run: full suite; browser smoke; production verify
+No production credentials; no destructive DB ops; no deploy.
 
 
 FILES CREATED

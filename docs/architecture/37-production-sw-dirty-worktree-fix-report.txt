@@ -123,13 +123,15 @@ invariants intact).
 6. TESTS / EVIDENCE
 ============================================================
 
-  bash scripts/tests/live-dirty-worktree-classify-check.sh
-  bash scripts/tests/ci-deploy-production-check.sh
-  bash scripts/tests/deploy-stale-sha-guard-check.sh
-  bash scripts/tests/automerge-deploy-handoff-check.sh
-  bash scripts/tests/pr-auto-merge-check.sh
-  bash scripts/tests/issue-to-live-check.sh
-  php artisan test
+  bash scripts/tests/live-dirty-worktree-classify-check.sh     ALL CHECKS PASSED
+  bash scripts/tests/ci-deploy-production-check.sh             ALL CHECKS PASSED
+      (includes nested Elaan, stale-SHA, and this classifier)
+  bash scripts/tests/deploy-stale-sha-guard-check.sh           ALL PASS
+  bash scripts/tests/automerge-deploy-handoff-check.sh         ALL PASS
+  bash scripts/tests/pr-auto-merge-check.sh                    ALL CHECKS PASSED
+  bash scripts/tests/issue-to-live-check.sh                    ALL PASS
+  php artisan test                                             2 skipped, 4559 passed
+                                                               (35190 assertions), 0 failed
 
 Proven by live-dirty-worktree-classify-check.sh:
   - Deploy #16 reconstruction (M public/sw.js + stamp-only diff) allows
@@ -137,6 +139,9 @@ Proven by live-dirty-worktree-classify-check.sh:
   - stamp + extra sw.js hunk blocks
   - no git stash/reset/checkout/clean in the new files
   - Elaan + tip + exact-SHA + cancel-in-progress:false still present
+
+PR: https://github.com/jawadrao5555-alt/taxnest/pull/31 (draft; not merged)
+This agent did not trigger Deploy Production.
 
 ============================================================
 7. PRODUCTION RECONCILIATION (OWNER / OPS)

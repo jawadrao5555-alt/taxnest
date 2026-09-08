@@ -17,8 +17,8 @@ flowchart LR
 
 **FACT:** `gate` requires the requested SHA to equal the current `origin/main` **tip** (not merely an ancestor) before Environment approval. Stale Environment-waiting runs are cancelled; in-flight SSH is never cancelled (`deploy` concurrency `production-deploy` + `cancel-in-progress: false`). Environment approval remains mandatory. Elaan remains fail-closed. CI publishes `{deploy/elaan.yml title} [deploy {TARGET_SHA}]` so a new SHA cannot no-op against an older AppUpdate with the same human title.
 
-Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `scripts/lib/elaan-deploy-title.py`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
-Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`, `docs/architecture/36-elaan-freshness-idempotency-fix-report.txt`.
+Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `scripts/lib/elaan-deploy-title.py`, `scripts/lib/live-dirty-worktree.sh`, `scripts/lib/live-dirty-worktree-classify.py`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
+Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`, `docs/architecture/36-elaan-freshness-idempotency-fix-report.txt`, `docs/architecture/37-production-sw-dirty-worktree-fix-report.txt`.
 
 ## PWA cache bust on the Actions path
 
@@ -28,6 +28,15 @@ checkout (working tree only, restored before the next checkout). A new SHA
 always changes the version so devices purge STATIC/RUNTIME caches. Same-SHA
 re-runs are deterministic. This replaces the `deploy-live.sh` CACHE_VERSION
 **commit**, which Actions cannot do.
+
+**FACT (Deploy Production #16):** that leftover working-tree stamp is
+intentional and is **not** committed. The CI/manual dirty-tree preflight
+(`scripts/lib/live-dirty-worktree.sh`) runs **before** `remote_apply`. It
+allows `public/sw.js` only when `git diff HEAD -- public/sw.js` is solely
+that stamp line. Any other tracked dirty file, or any extra `sw.js` hunk,
+still fail-closes. The preflight does not stash, reset, checkout, or
+clean. `remote_apply` still restores the file immediately before the next
+exact-SHA checkout, then restamps.
 
 ## Manual path still exists
 

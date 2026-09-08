@@ -115,6 +115,8 @@ source "$ROOT/scripts/lib/live-remote-apply.sh"
 source "$ROOT/scripts/lib/elaan-freshness-check.sh"
 # shellcheck source=scripts/lib/deploy-main-tip-guard.sh
 source "$ROOT/scripts/lib/deploy-main-tip-guard.sh"
+# shellcheck source=scripts/lib/live-dirty-worktree.sh
+source "$ROOT/scripts/lib/live-dirty-worktree.sh"
 
 # --------------------------------------------------------------------------- target SHA
 step "Resolve target commit"
@@ -207,19 +209,12 @@ else
     fail "live HEAD ($LIVE_HEAD_BEFORE) is not an ancestor of TARGET_SHA ($TARGET_SHA) — refusing divergent CI deploy (reconcile manually)"
   fi
 
-  # Live worktree must be clean for a safe checkout.
-  timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "cd '$LIVE_DIR' && git config core.fileMode false" >/dev/null 2>&1 || true
-  DIRTY=$(timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" "LIVE_DIR='$LIVE_DIR' bash -s" <<'DIRTYCHECK' 2>/dev/null || true
-cd "$LIVE_DIR" || exit 0
-git status --porcelain | grep -v '^??' | head -20
-DIRTYCHECK
-)
-  if [ -n "$DIRTY" ]; then
-    echo "Live worktree has MODIFIED tracked files:" >&2
-    echo "$DIRTY" >&2
-    fail "live tree dirty — reconcile first. Not auto-stashing."
-  fi
+  # Live worktree: unexpected tracked dirt fail-closes. The working-tree-only
+  # public/sw.js CACHE_VERSION stamp left by live-remote-apply.sh is expected
+  # and is NOT discarded here (remote_apply restores it immediately before
+  # the next exact-SHA checkout). No stash/reset/checkout in this preflight.
+  live_dirty_worktree_preflight \
+    || fail "live tree dirty — reconcile first. Not auto-stashing."
 
   GAP_FILES=$(git diff --name-only "$LIVE_HEAD_BEFORE".."$TARGET_SHA" 2>/dev/null || true)
   NEED_MIGRATE=0; NEED_COMPOSER=0

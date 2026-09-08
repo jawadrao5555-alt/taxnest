@@ -130,6 +130,8 @@ DEPLOY_LOCK="$LIVE_DEPLOY_LOCK"
 source "$(dirname "$0")/lib/live-remote-apply.sh"
 # shellcheck source=scripts/lib/elaan-freshness-check.sh
 source "$(dirname "$0")/lib/elaan-freshness-check.sh"
+# shellcheck source=scripts/lib/live-dirty-worktree.sh
+source "$(dirname "$0")/lib/live-dirty-worktree.sh"
 
 # Live logging health: LOG_LEVEL must be 'warning' or lower (debug/info) so
 # scheduler/guard Log::warning lines actually land in laravel.log
@@ -474,27 +476,13 @@ else
   echo "CACHE_VERSION bumped to $NEW_SW_VERSION (workspace HEAD now $LOCAL_HEAD)"
 fi
 
-# Live worktree must be clean for a fast-forward pull (untracked junk is fine).
-#
-# core.fileMode is forced off first. The cutover rsynced the app from the old
-# host and flipped the executable bit on ~39 tracked scripts, so git reports
-# them as modified forever. They would abort a pull the day an incoming commit
-# happens to touch one of them — a deploy failing on a permission bit that
-# means nothing on this box. Setting it here (not once by hand) keeps a
-# rebuilt server from quietly reintroducing the trap.
-timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-  "cd '$LIVE_DIR' && git config core.fileMode false" >/dev/null 2>&1 || true
-
-DIRTY=$(timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" "LIVE_DIR='$LIVE_DIR' bash -s" <<'DIRTYCHECK' 2>/dev/null || true
-cd "$LIVE_DIR" || exit 0
-git status --porcelain | grep -v '^??' | head -20
-DIRTYCHECK
-)
-if [ -n "$DIRTY" ]; then
-  echo "Live worktree has MODIFIED tracked files:" >&2
-  echo "$DIRTY" >&2
-  fail "live tree dirty — reconcile first (runbook: verify content is upstream, then git stash && pull). Not auto-stashing."
-fi
+# Live worktree: unexpected tracked dirt fail-closes (untracked junk is fine).
+# core.fileMode is forced off inside the classifier preflight (cutover left
+# executable-bit noise on tracked scripts). The working-tree-only public/sw.js
+# CACHE_VERSION stamp left by live-remote-apply.sh is expected and is NOT
+# discarded here. No stash/reset/checkout in this preflight.
+live_dirty_worktree_preflight \
+  || fail "live tree dirty — reconcile first (runbook: verify content is upstream, then git stash && pull). Not auto-stashing."
 
 # Does the gap include migrations / routes / composer changes?
 GAP_FILES=$(git diff --name-only "$LIVE_HEAD_BEFORE".."$LOCAL_HEAD" 2>/dev/null || true)

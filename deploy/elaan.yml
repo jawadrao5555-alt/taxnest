@@ -4,11 +4,11 @@
 # title (Deploy Production #15). Same-SHA retries stay idempotent.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
-title: "Production update — har naya SHA apna What's New row banata hai"
+title: "Production update — PWA cache stamp agle deploy ko dirty-tree par nahi rokta"
 audience: pos
 type: feature
 points:
   - "POS aur FBR POS ka What's New popup aur bell pehle jaisa hai — 7 din live, seen tracking, aur admin master switch."
   - "Har naya production SHA live par ek naya published AppUpdate banata hai (title ke sath deploy SHA). Purana announcement re-date nahi hota aur duplicate nahi banta."
-  - "Same SHA dubara deploy par existing row rahegi — koi naya duplicate nahi, created_at nahi badlega."
+  - "Live PWA CACHE_VERSION stamp working-tree par rehta hai (commit nahi). Agle deploy us expected stamp ko allow karta hai; koi unexpected tracked file ab bhi fail-closed hai."
   - "Cloud/Admin Live Ops se company diagnose allow-listed read-only reports se hota hai; Fix sirf OWNER_APPROVES_LIVE_OPS_FIX ke baad."

@@ -156,6 +156,18 @@ if [ -f "$CI" ]; then
     && ok "ci script fail-closes when TARGET_SHA is not origin/main tip" \
     || bad "ci script must call deploy_require_origin_main_tip before SSH"
 
+  grep -q 'live-dirty-worktree.sh' "$CI" \
+    && ok "ci script sources live-dirty-worktree.sh" \
+    || bad "ci script must classify live dirtiness (expected sw.js stamp vs unexpected)"
+
+  grep -q 'live_dirty_worktree_preflight' "$CI" \
+    && ok "ci script runs live_dirty_worktree_preflight before remote_apply" \
+    || bad "ci script must call live_dirty_worktree_preflight"
+
+  grep -q 'Not auto-stashing' "$CI" \
+    && ok "ci script still refuses to auto-stash a dirty live tree" \
+    || bad "ci script must keep Not auto-stashing fail-closed behavior"
+
   grep -q 'insert_committed_elaan_spec' "$CI" \
     && ok "ci script inserts committed Elaan spec after SSH" \
     || bad "ci script must insert deploy/elaan.yml after SSH"
@@ -306,6 +318,12 @@ if [ -f "$ROOT/scripts/tests/deploy-stale-sha-guard-check.sh" ]; then
   bash "$ROOT/scripts/tests/deploy-stale-sha-guard-check.sh" \
     && ok "stale-SHA / concurrency split checks passed" \
     || bad "stale-SHA / concurrency split checks failed"
+fi
+
+if [ -f "$ROOT/scripts/tests/live-dirty-worktree-classify-check.sh" ]; then
+  bash "$ROOT/scripts/tests/live-dirty-worktree-classify-check.sh" \
+    && ok "live dirty-worktree / sw.js stamp classification checks passed" \
+    || bad "live dirty-worktree / sw.js stamp classification checks failed"
 fi
 
 echo ""

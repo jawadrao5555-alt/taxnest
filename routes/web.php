@@ -54,6 +54,7 @@ use App\Http\Controllers\RestaurantTableController;
 use App\Http\Controllers\RestaurantKdsController;
 use App\Http\Controllers\IngredientController;
 use App\Http\Controllers\PosInventoryController;
+use App\Http\Controllers\PosInventoryMasterController;
 use App\Http\Controllers\PosStockCheckController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
@@ -1157,6 +1158,13 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         // request at cap). Access + per-row plan cap are enforced inside
         // importProducts (SubscriptionAccessService gate + remaining allowance).
         Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
+        // Inventory Master Excel (Phase 1) — catalog + BOM only. Not behind
+        // feature:inventory so PRODUCT-only shops can still import. Row-level
+        // excel_enabled / recipes gates live in PosInventoryMasterExcelService.
+        // Never posts stock. Keep /products/template and /recipes/import.
+        Route::get('/inventory-master', [PosInventoryMasterController::class, 'index'])->name('pos.inventory-master');
+        Route::get('/inventory-master/template', [PosInventoryMasterController::class, 'downloadTemplate'])->name('pos.inventory-master.template');
+        Route::post('/inventory-master/import', [PosInventoryMasterController::class, 'import'])->name('pos.inventory-master.import');
         Route::post('/products/bulk', [PosController::class, 'bulkProductAction'])->name('pos.products.bulk');
         Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
         Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');

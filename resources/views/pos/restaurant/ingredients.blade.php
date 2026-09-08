@@ -6,10 +6,13 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.ingredients_subtitle') }}</p>
         </div>
         <div class="flex gap-2">
+            <a href="{{ route('pos.inventory-master') }}" class="px-4 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-sm font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20">{{ __('pos.inventory_master') }}</a>
             <a href="{{ route('pos.restaurant.kitchen-report') }}" class="px-4 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-sm font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20">Kitchen report</a>
             <button @click="showAddModal = true" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">{{ __('pos.add_ingredient_btn') }}</button>
         </div>
     </div>
+
+    @include('pos.inventory.partials.nav-tabs', ['active' => 'ingredients'])
 
     @if(session('success'))
     <div class="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-sm">{{ session('success') }}</div>

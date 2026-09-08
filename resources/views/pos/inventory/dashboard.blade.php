@@ -17,22 +17,7 @@
         </a>
     </div>
 
-    <div class="flex flex-wrap gap-2 mb-6">
-        <a href="{{ route('pos.inventory.dashboard') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm">{{ __('pos.dashboard') }}</a>
-        <a href="{{ route('pos.inventory.stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.stock_levels') }}</a>
-        <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.movements') }}</a>
-        <a href="{{ route('pos.inventory.low-stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700 {{ $lowStockItems->count() > 0 ? 'relative' : '' }}">
-            {{ __('pos.low_stock_alerts') }}
-            @if($lowStockItems->count() > 0)
-            <span class="ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-red-500 text-white rounded-full animate-pulse">{{ $lowStockItems->count() }}</span>
-            @endif
-        </a>
-        <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.adjust_stock') }}</a>
-        @if($canTransfer ?? false)
-        <a href="{{ route('pos.inventory.transfers') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.branch_transfer') }}</a>
-        @endif
-        <a href="{{ route('pos.inventory.stock-check.index') }}" class="px-4 py-2 text-xs font-bold rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/35 transition shadow-sm border border-purple-200 dark:border-purple-700">{{ __('pos.stock_check') }}<x-new-badge feature="stock_check" class="ml-1" /></a>
-    </div>
+        @include('pos.inventory.partials.nav-tabs', ['active' => 'dashboard'])
 
     @include('pos.inventory.partials.branch-bar')
 
@@ -64,6 +49,20 @@
             @endforeach
         </ol>
         <p class="mt-4 text-xs font-medium text-purple-800 dark:text-purple-200">{{ __('pos.stock_check_safety_note') }}</p>
+    </section>
+
+    <section class="mb-6 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-5 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">{{ __('pos.inventory_master') }}</p>
+                <h2 class="mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.inventory_master_dashboard_title') }}</h2>
+                <p class="mt-1 max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">{{ __('pos.inventory_master_sub') }}</p>
+            </div>
+            <a href="{{ route('pos.inventory-master') }}" class="shrink-0 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+                {{ __('pos.inventory_master') }}
+                <svg class="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </div>
     </section>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

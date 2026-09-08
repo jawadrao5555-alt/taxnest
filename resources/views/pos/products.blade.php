@@ -148,6 +148,10 @@
             </div>
         </div>
         @endif
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ __('pos.inventory_master_products_teaser') }}</p>
+            <a href="{{ route('pos.inventory-master') }}" class="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition no-underline">{{ __('pos.inventory_master') }}</a>
+        </div>
     </div>
 
     <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5"

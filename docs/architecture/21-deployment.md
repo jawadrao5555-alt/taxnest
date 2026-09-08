@@ -15,10 +15,10 @@ flowchart LR
   Script --> Verify[ci-live-verify.sh]
 ```
 
-**FACT:** `gate` requires the requested SHA to equal the current `origin/main` **tip** (not merely an ancestor) before Environment approval. Stale Environment-waiting runs are cancelled; in-flight SSH is never cancelled (`deploy` concurrency `production-deploy` + `cancel-in-progress: false`). Environment approval remains mandatory. Elaan remains fail-closed.
+**FACT:** `gate` requires the requested SHA to equal the current `origin/main` **tip** (not merely an ancestor) before Environment approval. Stale Environment-waiting runs are cancelled; in-flight SSH is never cancelled (`deploy` concurrency `production-deploy` + `cancel-in-progress: false`). Environment approval remains mandatory. Elaan remains fail-closed. CI publishes `{deploy/elaan.yml title} [deploy {TARGET_SHA}]` so a new SHA cannot no-op against an older AppUpdate with the same human title.
 
-Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
-Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`.
+Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `scripts/lib/elaan-deploy-title.py`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
+Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`, `docs/architecture/36-elaan-freshness-idempotency-fix-report.txt`.
 
 ## PWA cache bust on the Actions path
 

@@ -1,5 +1,7 @@
-# Copy to deploy/elaan.yml in a production-bound PR, then CHANGE the title
-# for every new deploy. The same title will not be re-created or re-dated.
+# Copy to deploy/elaan.yml in a production-bound PR. GitHub Actions publishes
+# this as "{title} [deploy {TARGET_SHA}]" so each new SHA gets its own
+# AppUpdate row. Same-SHA retries no-op that qualified title (no duplicate,
+# no re-date). Do not reuse Daily L001. skip_elaan is emergency-only.
 #
 # GitHub Actions (after Environment approval + SSH) inserts this as a
 # published AppUpdate via scripts/elaan-insert.sh, then runs the existing

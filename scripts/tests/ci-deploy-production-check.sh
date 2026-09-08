@@ -296,6 +296,12 @@ if [ -f "$ROOT/scripts/tests/elaan-same-sha-freshness-check.sh" ]; then
     || bad "elaan same-SHA freshness checks failed"
 fi
 
+if [ -f "$ROOT/scripts/tests/elaan-deploy-sha-title-check.sh" ]; then
+  bash "$ROOT/scripts/tests/elaan-deploy-sha-title-check.sh" \
+    && ok "elaan SHA-qualified title checks passed" \
+    || bad "elaan SHA-qualified title checks failed"
+fi
+
 if [ -f "$ROOT/scripts/tests/deploy-stale-sha-guard-check.sh" ]; then
   bash "$ROOT/scripts/tests/deploy-stale-sha-guard-check.sh" \
     && ok "stale-SHA / concurrency split checks passed" \

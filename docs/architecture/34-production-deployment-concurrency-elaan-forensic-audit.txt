@@ -746,6 +746,27 @@ Audit recommendations implemented vs deferred:
 See docs/architecture/35-production-deployment-stale-sha-fix-report.txt.
 
 ============================================================
+15. ELAAN FOLLOW-UP AFTER DEPLOY PRODUCTION #15 (2026-09-08)
+============================================================
+
+PR #29 stale-SHA/concurrency shipped as 0adfa7c1. Deploy Production #15
+(run 34201528444) then:
+
+  - gate PASSED (0adfa7c1 == origin/main tip)
+  - live HEAD before apply: aecc864d
+  - insert of deploy/elaan.yml human title was ELAAN_EXISTS id=265
+    created_at=2026-09-08 12:18:44 (from #14) — no duplicate, not re-dated
+  - freshness FAIL new_sha_missing_fresh (row 265 is not after #14 marker)
+  - remote_apply NEVER ran
+
+That was fail-closed correctness of the OLD uniqueness-on-human-title
+rule, but it blocked a legitimate new-SHA deploy. Fix: CI publishes
+"{title} [deploy {TARGET_SHA}]". See
+docs/architecture/36-elaan-freshness-idempotency-fix-report.txt.
+
+PR #29 tip/concurrency/Environment invariants were not changed.
+
+============================================================
 END OF AUDIT
 ============================================================
 

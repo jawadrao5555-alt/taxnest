@@ -1,0 +1,189 @@
+TAXNEST — ELAAN FRESHNESS / IDEMPOTENCY FIX
+docs/architecture/36-elaan-freshness-idempotency-fix-report.txt
+
+Date: 2026-09-08
+Trigger: Deploy Production #15 (Actions run 34201528444)
+Base: origin/main @ 0adfa7c1 (PR #29 stale-SHA/concurrency)
+Scope: Elaan insert + freshness only. No production SSH from this agent,
+       no skip_elaan, no Environment/secret changes, no apply-job
+       cancel-in-progress: true.
+
+============================================================
+1. ROOT CAUSE
+============================================================
+
+Deploy Production #15:
+
+  TARGET_SHA     0adfa7c1bf8183669d89fea7bd80cc70b0136bb2  (PR #29 merge)
+  origin/main    same (tip guard PASSED)
+  live HEAD      aecc864da32d357d34dc02bb473706a8a2c34070  (PR #28, #14)
+  skip_elaan     false
+
+ci-deploy-production.sh inserted deploy/elaan.yml by exact human title:
+
+  "Production update — NestPOS Live Ops diagnose aur owner-approved fix ab ready hai"
+
+That title already existed as AppUpdate #265
+  created_at=2026-09-08 12:18:44
+  (created during successful deploy #14 of aecc864d)
+
+Insert outcome: ELAAN_EXISTS — "Elaan OK (idempotent): AppUpdate row #265
+already present (no duplicate, not re-dated)."
+
+Freshness evaluator (NEW SHA: live != target, time_fresh_count=0):
+  reason=new_sha_missing_fresh
+  "CI DEPLOY FAILED: elaan missing — create announcement then re-run..."
+
+remote_apply / live-verify did not run.
+
+Why the two messages can both be true:
+  - Idempotency is keyed on exact title.
+  - NEW-SHA freshness is keyed on created_at > last deploy marker.
+  - ELAAN_EXISTS is intentionally NEVER treated as fresh
+    (scripts/lib/elaan-freshness-eval.py).
+  - Reusing a human title from an older SHA is a successful no-op that
+    cannot satisfy a new SHA.
+
+This is the same class of failure as Deploy Production #10 (reused
+PR #21 title). PR #29 did not change Elaan; it exposed the next merge
+(#15) still carrying the Live Ops yaml title.
+
+============================================================
+2. EXACT CODE CHANGES
+============================================================
+
+A. scripts/lib/elaan-deploy-title.py (new)
+   qualify_title(human, sha40) -> "{base} [deploy {sha}]"
+   - lowercase 40-char SHA required
+   - strips an existing [deploy sha] suffix then re-applies (idempotent)
+   - refuses Daily L001
+   - truncates base so published title fits VARCHAR(150)
+
+B. scripts/elaan-insert.sh
+   --deploy-sha / --deploy-sha=  qualifies TITLE after spec parse,
+   before PHP. Idempotency remains exact-title in PHP (now the
+   qualified title). No touch(), no created_at update.
+
+C. scripts/ci-deploy-production.sh
+   insert_committed_elaan_spec always passes --deploy-sha="$TARGET_SHA"
+   and refuses to insert without a 40-char SHA.
+
+D. scripts/lib/elaan-freshness-check.sh
+   same-SHA title lookup uses elaan_published_title(TARGET_SHA)
+   (qualified). Does not fall back to the unqualified human title.
+
+E. deploy/elaan.yml
+   new human title for this change (plus SHA suffix at publish time).
+
+F. Tests + docs listed below.
+
+.github/workflows/deploy-production.yml was NOT modified (PR #29 intact).
+
+============================================================
+3. TESTS / EVIDENCE
+============================================================
+
+  bash scripts/tests/elaan-deploy-sha-title-check.sh     ALL PASS
+  bash scripts/tests/elaan-spec-parse-check.sh           ALL PASS
+  bash scripts/tests/elaan-same-sha-freshness-check.sh   ALL PASS
+  bash scripts/tests/elaan-insert-idempotency-check.sh   ALL PASS
+  bash scripts/tests/ci-deploy-production-check.sh       ALL CHECKS PASSED
+  bash scripts/tests/automerge-deploy-handoff-check.sh   ALL PASS
+  bash scripts/tests/pr-auto-merge-check.sh              ALL CHECKS PASSED
+  bash scripts/tests/issue-to-live-check.sh              ALL PASS
+  php artisan test                                       2 skipped, 4559 passed (35190 assertions), 0 failed
+
+#15 reconstruction used gh run view 34201528444 (read-only).
+
+============================================================
+4. RETRY / IDEMPOTENCY BEHAVIOR
+============================================================
+
+NEW SHA (live HEAD != TARGET_SHA):
+  published title T' = human [deploy TARGET_SHA]
+  T' does not exist → ELAAN_INSERTED (new row, now())
+  time_fresh_count >= 1 → PASS
+  then remote_apply
+
+SAME SHA retry (insert already done, apply not yet, live still old):
+  T' exists → ELAAN_EXISTS, created_at unchanged
+  if T' was created after last marker → time_fresh PASS
+  apply still serialized / tip-checked
+
+SAME SHA refresh after successful deploy (live == target == marker):
+  T' exists, time_fresh usually 0 (row is before the new marker)
+  same-SHA path looks up T' exactly → PASS
+  no new row, no re-date
+
+OLD human title (row #265) vs new SHA:
+  published title is T' != #265.title
+  #265 is not time-fresh after #14 marker
+  cannot PASS
+
+============================================================
+5. ADVERSARIAL REVIEW
+============================================================
+
+Q: Can an old AppUpdate satisfy a new deployment SHA?
+A: No. NEW SHA requires time_fresh_count >= 1. Title-match is ignored
+   on the new-SHA path. The insert uses a SHA-qualified title, so it
+   cannot no-op against #265. Proven by elaan-deploy-sha-title-check.sh
+   and elaan-freshness-eval.py new_sha_missing_fresh.
+
+Q: Can the same SHA create duplicate announcements?
+A: No. Same qualified title → ELAAN_EXISTS before AppUpdate::create.
+   PHP model + helper static checks: no second row.
+
+Q: Can a retry re-date an old announcement?
+A: No. exists path does not update/touch/save. created_at stays.
+
+Q: Can Elaan failure be bypassed before SSH apply?
+A: No. Order remains insert_committed_elaan_spec → check_elaan_freshness
+   → remote_apply. Freshness fail exits 1. skip_elaan still default false.
+   (Insert itself uses SSH to run PHP; code apply does not run.)
+
+Q: Does PR #29 stale-SHA protection remain intact?
+A: Yes. deploy-production.yml unchanged: gate + tip equality,
+   production-deploy cancel-in-progress: false, environment: production,
+   no workflow-level concurrency. Static test asserts this.
+
+============================================================
+6. PRODUCTION VERIFICATION STILL REQUIRED
+============================================================
+
+This agent did not deploy. After merge, owner must approve Deploy
+Production for the new tip. Expect:
+
+  - tip guard PASS
+  - Elaan insert ELAAN_INSERTED (new id, qualified title containing
+    the new SHA) — not ELAAN_EXISTS on #265
+  - freshness PASS (time_fresh)
+  - live HEAD == TARGET_SHA + ci-live-verify
+
+Do not use skip_elaan. Do not re-date #265.
+
+============================================================
+7. FILES CHANGED
+============================================================
+
+  scripts/lib/elaan-deploy-title.py                         (new)
+  scripts/elaan-insert.sh
+  scripts/ci-deploy-production.sh
+  scripts/lib/elaan-freshness-check.sh
+  scripts/lib/elaan-freshness-eval.py
+  deploy/elaan.yml
+  deploy/elaan.example.yml
+  scripts/tests/elaan-deploy-sha-title-check.sh             (new)
+  scripts/tests/elaan-spec-parse-check.sh
+  scripts/tests/ci-deploy-production-check.sh
+  docs/ops/github-production-deploy.md
+  docs/architecture/21-deployment.md
+  docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt
+  docs/architecture/36-elaan-freshness-idempotency-fix-report.txt (this file)
+
+============================================================
+8. FINAL VERDICT
+============================================================
+
+READY FOR REVIEW — production untouched, secrets not accessed,
+no Deploy Production run triggered by this agent.

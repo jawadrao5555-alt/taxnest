@@ -17,12 +17,19 @@
 #     --point "Test point 1"
 #
 # Usage (committed spec — GitHub Actions after Environment approval + SSH):
-#   bash scripts/elaan-insert.sh --from-file deploy/elaan.yml
+#   bash scripts/elaan-insert.sh --from-file deploy/elaan.yml --deploy-sha="$TARGET_SHA"
 #
-# Idempotency: if a row with the SAME title already exists, treat that as a
-# successful no-op (ELAAN_EXISTS, or the legacy "title already exists ... will
-# not duplicate or re-date" message even when PHP exited 1). Do not insert a
-# duplicate and do not re-date the existing row. The CI runner classifies
+# --deploy-sha (required for CI): publish title becomes
+#   "{spec title} [deploy {40-char sha}]"
+# so a NEW SHA cannot no-op against an older AppUpdate with the same human
+# title (Deploy Production #15 / AppUpdate #265). Same-SHA retry uses the
+# same qualified title → ELAAN_EXISTS, no duplicate, not re-dated.
+#
+# Idempotency: if a row with the SAME (possibly SHA-qualified) title already
+# exists, treat that as a successful no-op (ELAAN_EXISTS, or the legacy
+# "title already exists ... will not duplicate or re-date" message even when
+# PHP exited 1). Do not insert a duplicate and do not re-date the existing
+# row. The CI runner classifies
 # ssh/php output via scripts/lib/elaan-insert-outcome.py so a non-zero remote
 # status cannot mask that no-op as "PHP bootstrap failed on live".
 # The reserved Daily L001 title is always rejected (never inserted/updated).
@@ -63,18 +70,21 @@ ELAAN_TYPE="improvement"
 DEV=0
 DRY_RUN=0
 FROM_FILE=""
+DEPLOY_SHA=""
 declare -a POINTS=()
 declare -a CATEGORIES=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --title)     shift; TITLE="$1" ;;
-    --point)     shift; POINTS+=("$1") ;;
-    --audience)  shift; AUDIENCE="$1" ;;
-    --category)  shift; CATEGORIES+=("$1") ;;
-    --from-file) shift; FROM_FILE="$1" ;;
-    --dev)       DEV=1 ;;
-    --dry-run)   DRY_RUN=1 ;;
+    --title)      shift; TITLE="$1" ;;
+    --point)      shift; POINTS+=("$1") ;;
+    --audience)   shift; AUDIENCE="$1" ;;
+    --category)   shift; CATEGORIES+=("$1") ;;
+    --from-file)  shift; FROM_FILE="$1" ;;
+    --deploy-sha) shift; DEPLOY_SHA="$1" ;;
+    --deploy-sha=*) DEPLOY_SHA="${1#--deploy-sha=}" ;;
+    --dev)        DEV=1 ;;
+    --dry-run)    DRY_RUN=1 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
   shift
@@ -89,6 +99,10 @@ if [ -n "$FROM_FILE" ]; then
 fi
 
 [ -n "$TITLE" ] || fail "--title is required"
+if [ -n "$DEPLOY_SHA" ]; then
+  TITLE=$(python3 "$(dirname "$0")/lib/elaan-deploy-title.py" qualify --title "$TITLE" --sha "$DEPLOY_SHA") \
+    || fail "could not qualify Elaan title with deploy SHA"
+fi
 [ ${#POINTS[@]} -gt 0 ] || fail "at least one --point is required"
 case "$AUDIENCE" in pos|fbr_pos|all) ;; *) fail "--audience must be pos, fbr_pos, or all" ;; esac
 case "$ELAAN_TYPE" in feature|improvement|"") ;; *) fail "type must be feature or improvement" ;; esac

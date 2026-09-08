@@ -1,0 +1,770 @@
+TAXNEST — MASTER SECURITY + ARCHITECTURE GAP REMEDIATION
+FINAL REPORT
+docs/architecture/33-master-remediation-final-report.txt
+
+Date: 2026-09-08
+Branch: cursor/master-remediation-0f83
+PR: https://github.com/jawadrao5555-alt/taxnest/pull/28
+Base: origin/main @ e175e157 (Add final architecture mastery proof from code tracing. #25)
+Code commit: 0e84c34b Harden TaxNest security and architecture gaps from the master audits.
+This report commit: (see git log on this branch after this file lands)
+
+Evidence classes used throughout:
+  CODE-FIXED                      — change is in this branch
+  LOCALLY-VERIFIED                — proven by local tests/commands on this VM
+  PRODUCTION-VERIFICATION-REQUIRED — live host / live DB / live secrets were NOT inspected
+  NOT FIXED / DEFERRED            — intentional, false positive, or follow-up
+
+NO production SSH, credentials, database, migrations, seed, or deploy were used.
+
+============================================================
+1. EXECUTIVE SUMMARY
+============================================================
+
+This is the consolidated engineering follow-up to PR #24 (knowledge base),
+PR #25 (mastery proof), PR #26 (forensic audit), and PR #27 (independent
+challenger audit). Every listed CRITICAL/HIGH/MEDIUM/LOW item was
+independently re-verified against current main, then either fixed, proven
+not applicable, or recorded as production-only.
+
+Confirmed CRITICAL HTTP holes are gone from application code:
+  - unauthenticated GET migrate/seed closures removed
+  - unauthenticated privileged demo-login fail-closed (local switch only)
+
+Confirmed HIGH integrity/security items that were code-fixable are fixed:
+  - PRA concurrent double-submit lock + agent fiscal-number idempotency
+  - agent API key hashed lookup + constant-time compare + throttle
+  - backup.sql removed from HEAD (history still contains it)
+
+The full local PHPUnit suite is green:
+  php artisan test
+  Tests: 2 skipped, 4559 passed (35190 assertions)
+  Duration: 271.26s
+  Failures: 0
+
+Certification (section 20): READY WITH KNOWN NON-BLOCKING GAPS
+
+Repository: READY TO MERGE after human review of this PR.
+Production: NOT claimed "safe to deploy" until the production-verification
+list in section 9/10 is checked on the live host. Migrations in this PR are
+additive. Do not rewrite git history without a separate owner decision.
+
+============================================================
+2. EVERY PR #26 / #27 FINDING
+============================================================
+
+C1  Unauthenticated GET /setup-migrate-xK9mP2 and /setup-seed-xK9mP2
+    Severity: CRITICAL
+    Verification: CONFIRMED on main (routes/web.php closures, web middleware
+      only, Artisan::call migrate --force / db:seed --force).
+    Action: CODE-FIXED — routes deleted. Schema/seed is CLI-only
+      (scripts/lib/live-remote-apply.sh `php artisan migrate --force`).
+    Files: routes/web.php
+    Tests: tests/Feature/Security/SetupRoutesRemovedTest.php (LOCALLY-VERIFIED)
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+C2  GET /demo-login/{role} unauthenticated privileged login
+    Severity: CRITICAL (chained with seeder default password)
+    Verification: CONFIRMED — AuthenticatedSessionController::demoLogin
+      logged in admin@test.com super_admin with no env guard.
+    Action: CODE-FIXED — DEMO_ROLES is company_admin|demo only; abort 404
+      unless APP_ENV=local AND DEMO_LOGIN_ENABLED; refuse super_admin /
+      company_id-less users even when enabled. DatabaseSeeder refuses
+      production unless SEED_DEFAULT_PASSWORD is explicitly set.
+    Files: routes/web.php, AuthenticatedSessionController.php, config/app.php,
+      .env.example, database/seeders/DatabaseSeeder.php
+    Tests: tests/Feature/Security/DemoLoginFailClosedTest.php (LOCALLY-VERIFIED)
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+H1  PRA double-submit race
+    Severity: HIGH
+    Verification: CONFIRMED — sendInvoice refusal checks were non-atomic;
+      AgentController::submitResult could overwrite an existing fiscal number.
+    Action: CODE-FIXED — Cache::lock('pra:submit:{id}', 90) around the HTTP
+      leg; re-read + resubmissionRefusal under the lock; contended call
+      returns IN_PROGRESS without changing pra_status (retryable). Agent
+      submitResult refuses a different fiscal number (already_submitted).
+      pendingInvoices excludes rows that already have a fiscal number.
+      fiscal_device (agentHandlesPra) still returns queued_for_agent before
+      the lock/HTTP. No unique index added (legacy data risk) — follow-up.
+    Files: PraIntegrationService.php, AgentController.php
+    Tests: tests/Feature/PraSubmitIdempotencyTest.php (12 tests, LOCALLY-VERIFIED)
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+    Follow-up: unique index on pra_invoice_number after a production data audit
+      (PRODUCTION-VERIFICATION-REQUIRED)
+
+H2  Agent API key plaintext lookup
+    Severity: HIGH
+    Verification: CONFIRMED — AgentAuth SQL equality on companies.agent_api_key;
+      /api/agent/* had no throttle.
+    Action: CODE-FIXED (safe portion) — agent_api_key_hash column + backfill
+      migration; lookup by sha256 then hash_equals; legacy plaintext heals
+      once; $hidden on Company; throttle:agent-api 600/min; failed auth 60/min
+      per IP. Plaintext column KEPT so in-field agents and the owner copy-key
+      UI keep working.
+    Files: AgentAuth.php, AgentApiKey.php, Company.php, AppServiceProvider.php,
+      AgentManagementController.php, FbrAgentController.php,
+      database/migrations/2026_11_26_100000_add_agent_api_key_hash_to_companies.php,
+      routes/web.php, tests/TestCase.php
+    Tests: tests/Feature/AgentAuthHardeningTest.php (LOCALLY-VERIFIED)
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+    Deferred: drop plaintext column (NOT FIXED / DEFERRED — would break agents)
+
+H3  backup.sql in repository
+    Severity: HIGH (data exposure)
+    Verification: CONFIRMED — tracked since dfd29270 (2026-03-24), ~715KB,
+      INSERT into users/subscriptions/sessions/security_logs + bcrypt hashes.
+      Contents were not printed. Required by no current test. scripts/private-backup.sh
+      already excluded it from private archives.
+    Action: CODE-FIXED for HEAD — git rm from tree, .gitignore, CPANEL_SETUP.md
+      no longer tells operators to import it.
+    Files: backup.sql (deleted), .gitignore, CPANEL_SETUP.md
+    Status: FIXED IN CODE for HEAD. PRODUCTION-VERIFICATION-REQUIRED /
+      NOT FIXED for git history — deleting HEAD does not un-publish dfd29270.
+      History rewrite / secret rotation is a separate owner decision.
+
+M1  Super admin dual path (AdminUser vs User)
+    Severity: MEDIUM (authorization inconsistency)
+    Verification: INTENTIONAL SEPARATION, not a merge candidate. AdminUser
+      (guard admin) is SaaS. User.role=super_admin is a legacy web identity
+      and cannot satisfy admin.auth. InvoiceController still special-cases
+      web super_admin when CompanyScope is off — that is the legacy DI path,
+      not a SaaS panel bypass.
+    Action: NOT merged. Hardened with regression tests. Demo-login no longer
+      mints this identity.
+    Files: tests/Feature/Security/SuperAdminDualPathTest.php
+           docs/architecture/07-authentication.md
+    Status: NOT APPLICABLE as a merge / FIXED as a regression pin (LOCALLY-VERIFIED)
+
+M2  fbr_logs tenant isolation
+    Severity: HIGH-in-audit, verified MEDIUM/SAFE-by-relationship
+    Verification: table has invoice_id, no company_id. Tenant surfaces resolve
+      through Invoice (CompanyScope). No tenant route takes a log id.
+      SaaS admin cross-tenant is by design.
+    Action: no company_id column added. Tests pin both tenant surfaces
+      (invoice page + DI status API).
+    Files: tests/Feature/FbrLogTenantIsolationTest.php
+    Status: PROVEN SAFE with tests / LOCALLY-VERIFIED
+    (no redundant schema change)
+
+M3  PosController::reports local tab + FbrPosController::reports branch leak
+    Severity: MEDIUM
+    Verification: CONFIRMED — local bill list lacked BranchContextService;
+      FBR tiles were company_id+date only while CSV used applyToQuery.
+    Action: CODE-FIXED — local list taps applyToQuery; FBR tiles/analytics
+      share fbrReportBranchScope with CSV. Owner ALL sentinel preserved.
+    Files: PosController.php, FbrPosController.php
+    Tests: PosReportsLocalTabBranchScopeTest.php, FbrPosReportsBranchScopeTest.php
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+M4  Healthcare money writes skip hasAccess
+    Severity: MEDIUM
+    Verification: CONFIRMED — health routes had no plan.limit; CheckPlanLimit
+      ERPS quota is a no-op; hasAccess has an ERPS billable arm.
+    Action: CODE-FIXED — HealthSubscriptionLock on money POST routes only
+      (billing charge, IPD charge, pharmacy sale/purchase/supplier payment).
+      GET reads still work.
+    Files: HealthSubscriptionLock.php, routes/web.php
+    Tests: HealthSubscriptionLockTest.php
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+M5  DI API store skips hasAccess
+    Severity: MEDIUM
+    Verification: CONFIRMED — store() checked quota only.
+    Action: CODE-FIXED — DiApiSubscriptionAccess on create/submit route;
+      status endpoint stays readable when locked.
+    Files: DiApiSubscriptionAccess.php, routes/web.php
+    Tests: DiApiSubscriptionAccessTest.php
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+M6  Blanket pos/* CSRF exemption
+    Severity: MEDIUM
+    Verification: CONFIRMED and INTENTIONAL — Android/WebView/Kotlin post
+      session cookies without a CSRF token. Bearer APIs (agent, rider, caller,
+      di, live-ops) and webhooks are stateless — CSRF is not their control.
+    Action: exemption KEPT. Defence-in-depth RejectCrossSitePosWrites:
+      Sec-Fetch-Site=cross-site or Origin host mismatch → 403. Missing
+      headers still allowed (WebView compatibility).
+    Files: bootstrap/app.php, RejectCrossSitePosWrites.php
+    Tests: PosCsrfDefenceTest.php
+    Status: FIXED IN CODE (defence) / exemption documented / LOCALLY-VERIFIED
+
+    CSRF classification (exempt paths):
+      pos/*              cookie-session POS panel — CSRF exempt; new Origin/Sec-Fetch-Site guard
+      api/agent/*        Bearer / X-Agent-Key — CSRF N/A; AgentAuth + throttle
+      api/rider-app/*    Bearer rider token — CSRF N/A
+      api/caller-app/*   caller app token — CSRF N/A
+      api/di/*           Bearer DI API key — CSRF N/A; DiApiAuth + hasAccess on store
+      api/live-ops/*     X-Live-Ops-Token — CSRF N/A; hash_equals
+      webhooks/whatsapp/* Meta callbacks — CSRF N/A; HMAC when wa_app_secret set
+      bio-sync/*/iclock/*, iclock/*  device ADMS — CSRF N/A
+
+M7  WhatsApp webhook POST unsigned
+    Severity: MEDIUM
+    Verification: CONFIRMED — GET verify used hash_equals; POST did not.
+    Action: CODE-FIXED — companies.wa_app_secret (encrypted). If set, POST
+      requires valid X-Hub-Signature-256. If unset, accept + log (legacy).
+      GET challenge unchanged. Secret never echoed in the settings form.
+    Files: WhatsAppWebhookController.php, Company.php, CompanySettingsController.php,
+      whatsapp-settings.blade.php, migration 2026_11_26_100100_*
+    Tests: WhatsAppWebhookSignatureTest.php
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+    PRODUCTION-VERIFICATION-REQUIRED: configure wa_app_secret on live companies
+      that use WhatsApp Cloud API.
+
+M8  Settings whole-column JSON races
+    Severity: MEDIUM
+    Verification: CONFIRMED historically (Local prefs wipe). Writers still
+      did load-mutate-save of the whole JSON column.
+    Action: CODE-FIXED — Company::mergeJsonColumn() lockForUpdate + re-read.
+      Converted PRA/FBR receipt, printer, telemetry, LiveOps rebind, profile,
+      public profile, and partial feature-flag writers.
+    Files: Company.php, PosController.php, FbrPosController.php, AgentController.php,
+      ProfileController.php, PublicProfileController.php, LiveOpsRemediationService.php
+    Tests: CompanySettingsJsonMergeTest.php + existing PraReceiptSettingsDoubleSaveTest
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+M9  Print duplication + stranded jobs
+    Severity: MEDIUM
+    Verification: CONFIRMED — housekeeping requeued stale `printing` even after
+      content was fetched (possible second physical print).
+    Action: CODE-FIXED — content_fetched_at stamped on first content GET.
+      Stale printing + fetched → failed (unconfirmed_after_print_content_fetched).
+      Stale printing + never fetched → existing requeue. Agent printer.js unchanged.
+    Files: AgentController.php, PosPrintJob.php, config/print.php,
+      migration 2026_11_25_100000_*
+    Tests: PrintJobDuplicateGuardTest.php (LOCALLY-VERIFIED)
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+M10 Pending print jobs never expire
+    Severity: MEDIUM/LOW
+    Verification: CONFIRMED — unstamped pending never aged out; purge only
+      done/failed > 7 days.
+    Action: CODE-FIXED — pending unstamped older than
+      config('print.pending_expiry_hours') (default 24) → failed expired_unclaimed.
+      Never deleted.
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+L1  Live Ops 500 message leak
+    Severity: LOW
+    Verification: CONFIRMED — LiveOpsRunnerController returned $e->getMessage().
+    Action: CODE-FIXED — generic message + correlation_id; Log::error with
+      context. InvalidArgumentException 422 domain messages preserved.
+    Files: LiveOpsRunnerController.php
+    Tests: LiveOpsRunnerErrorLeakTest.php
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+L2  Gateway secret !== compare
+    Severity: LOW
+    Verification: CONFIRMED — agent-realtime-gateway/gateway.js X-Wake-Secret.
+    Action: CODE-FIXED — crypto.timingSafeEqual via secretMatches().
+    Files: gateway.js, test/wake-secret.test.js
+    Tests: node --test test/wake-secret.test.js  (3 passed, LOCALLY-VERIFIED
+      after npm install ws in that package)
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+L3  Password min:6
+    Severity: LOW
+    Verification: CONFIRMED on CompanyUserController, Admin* company/franchise
+      create, POS/FBR team and rider password fields. Other paths already used
+      Password::defaults().
+    Action: CODE-FIXED for NEW passwords only — Password::defaults() (min 8).
+      Existing hashes still authenticate (tested).
+    Files: CompanyUserController.php, AdminController.php, AdminCompanyController.php,
+      AdminFranchiseController.php, PosController.php, FbrPosController.php,
+      PosRiderController.php, FbrPosRiderController.php
+    Tests: CompanyUserPasswordPolicyTest.php
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+L4  NestPOS offline UUID race
+    Severity: LOW
+    Verification: CONFIRMED — pre-check then UNIQUE collision could 500.
+    Action: CODE-FIXED — QueryException unique (MySQL 1062 / sqlite) on
+      pos_txn_offline_uuid_unique replays the existing row. Other integrity
+      errors still error.
+    Files: PosController.php
+    Tests: PosOfflineUuidRaceTest.php
+    Status: FIXED IN CODE / LOCALLY-VERIFIED
+
+L5  ForceHttps middleware unwired
+    Severity: LOW / docs contradiction
+    Verification: CONFIRMED — class exists, not in bootstrap/app.php.
+      AppServiceProvider already forceScheme(https) from X-Forwarded-Proto
+      and APP_URL. TrustProxies proto-only.
+    Action: NOT enabled (would guess Cloudflare/proxy behaviour). Docs corrected.
+    Status: NOT FIXED (intentional) / PRODUCTION-VERIFICATION-REQUIRED
+      (Apache/Cloudflare redirect + HSTS on the live host)
+
+L6  Mobile/PWA cache version on Actions deploy
+    Severity: MEDIUM for PWA staleness, LOW for security
+    Verification: CONFIRMED — deploy-live.sh commits a CACHE_VERSION bump;
+      Actions path cannot commit. Live would keep the SHA's sw.js version
+      across deploys of new SHAs if the file did not change in git.
+    Action: CODE-FIXED — live-remote-apply.sh stamps served public/sw.js
+      CACHE_VERSION as taxnest-<UTC date>-<sha8> after checkout; restores
+      the file before the next exact-SHA checkout. Same-SHA re-run is
+      deterministic.
+    Files: scripts/lib/live-remote-apply.sh, scripts/tests/ci-deploy-production-check.sh,
+      docs/ops/github-production-deploy.md, docs/architecture/21-deployment.md
+    Tests: bash scripts/tests/ci-deploy-production-check.sh → ALL CHECKS PASSED
+    Status: FIXED IN CODE / LOCALLY-VERIFIED (script). First live stamp is
+      PRODUCTION-VERIFICATION-REQUIRED.
+
+L7  Franchise IDOR
+    Severity: UNKNOWN in audit
+    Verification: PROVEN NOT APPLICABLE — /franchise/* has no id parameters;
+      queries constrained to companies.franchise_id = auth franchise id.
+    Action: tests pin the shape so a future id route cannot land silently.
+    Files: FranchiseIdorTest.php (no controller permission broadening)
+    Status: NOT APPLICABLE / LOCALLY-VERIFIED
+
+L8  Raw SQL / mass assignment
+    Severity: sweep
+    Verification: no CONFIRMED request-interpolated SQL or fill($request->all())
+      found. Invoice sort columns are whitelisted. FIELD() uses intval.
+    Action: classification file written. RestaurantPosController::payOrder
+      logs $request->all() — POTENTIAL log noise, not a credential leak.
+    Files: docs/architecture/maps/15-raw-sql-mass-assignment-sweep.txt
+    Status: NO CONFIRMED FIX REQUIRED
+
+L9  Orphan jobs SendInvoiceToFbrJob / CheckTokenExpiryJob
+    Severity: LOW
+    Verification: CONFIRMED orphan (no dispatch/schedule). InvoiceController
+      imported SendInvoiceToFbrJob unused. CheckFbrTokenExpiryJob is scheduled.
+    Action: classes KEPT (@deprecated) so historical queue payloads still
+      deserialize. Unused import removed.
+    Status: NOT REMOVED (queue compatibility) / documented
+    PRODUCTION-VERIFICATION-REQUIRED: inspect live jobs/failed_jobs for these
+      class names before any future delete.
+
+L10 Agent portal 404
+    Severity: LOW
+    Verification: INTENTIONAL — AgentPortalAuthController returns 404;
+      distributors are referral-only.
+    Action: documented in 07-authentication.md. Not restored.
+    Status: NOT APPLICABLE (intentional)
+
+L11 Documentation drift
+    Severity: LOW
+    Action: heartbeat 60s→30s in pra-agent/README.md; ForceHttps status;
+      PWA Actions stamp; print claimed_at/printed_at (those columns do not
+      exist); landing stats now count pra_status submitted+success;
+      four-product note already in 02-three-products.md; contradiction 25
+      heartbeat marked resolved.
+    Status: FIXED (docs) / LOCALLY-VERIFIED by reading code
+
+L12 Failed jobs / queue safety
+    Severity: LOW
+    Verification: local/test queue is sync (phpunit.xml). No production
+      queue inspection.
+    Status: PRODUCTION-VERIFICATION-REQUIRED (section 9)
+
+============================================================
+3. CRITICAL SECURITY FIXES
+============================================================
+
+- Removed HTTP migrate/seed. LOCALLY-VERIFIED: SetupRoutesRemovedTest.
+- Demo-login fail-closed. LOCALLY-VERIFIED: DemoLoginFailClosedTest.
+- Seeder production guard without SEED_DEFAULT_PASSWORD.
+
+============================================================
+4. HIGH-RISK FIXES
+============================================================
+
+- PRA submit lock + agent fiscal idempotency. PraSubmitIdempotencyTest.
+- Agent key hash + throttle. AgentAuthHardeningTest.
+- backup.sql untracked at HEAD (history remains).
+
+============================================================
+5. MEDIUM-RISK FIXES
+============================================================
+
+- Local tab + FBR report branch scope.
+- Health money + DI API hasAccess.
+- WhatsApp HMAC when secret configured.
+- Settings JSON merge.
+- Print duplicate / pending expiry.
+- POS cross-site write guard.
+- Actions PWA CACHE_VERSION stamp.
+
+============================================================
+6. LOW-RISK FIXES
+============================================================
+
+- Live Ops 500 leak.
+- Gateway timing-safe secret.
+- Password::defaults() on new-password paths.
+- NestPOS UUID collision replay.
+- Orphan job deprecation comments.
+- Docs drift corrections.
+
+============================================================
+7. DOCUMENTATION CORRECTIONS
+============================================================
+
+- docs/architecture/07-authentication.md — agent hash, demo-login, 404 portal
+- docs/architecture/16-printing-devices.md — content_fetched_at semantics
+- docs/architecture/18-settings.md — mergeJsonColumn
+- docs/architecture/21-deployment.md — live sw.js stamp
+- docs/architecture/22-security.md — ForceHttps not wired
+- docs/architecture/25-known-legacy-and-contradictions.md — heartbeat resolved
+- docs/architecture/maps/15-raw-sql-mass-assignment-sweep.txt — new
+- docs/ops/github-production-deploy.md — PWA stamp row
+- pra-agent/README.md — 30s heartbeat
+- CPANEL_SETUP.md — do not import backup.sql
+- .env.example — DEMO_LOGIN_ENABLED, SEED_DEFAULT_PASSWORD notes
+
+============================================================
+8. FINDINGS INTENTIONALLY NOT CHANGED AND WHY
+============================================================
+
+- Dual Super Admin identities: two different models/guards by design.
+- Agent portal 404: distributors are referral-only.
+- Orphan job classes: queue deserialization.
+- Agent API key plaintext column: in-field agents + owner copy UI.
+- ForceHttps middleware: proxy/Cloudflare already in play; not guessed.
+- CSRF exemption on pos/*: WebView/Kotlin cannot send the token; Origin guard
+  added instead of restoring CSRF.
+- fbr_logs.company_id: invoice_id is the authoritative tenant link.
+- Unique index on pra_invoice_number: may fail on legacy production data.
+- WhatsApp unsigned fallback when wa_app_secret empty: backward compatible.
+- IndexedDB/offline schema rewrite: no confirmed code bug; not in scope to
+  rewrite mobile architecture. PWA cache bump on Actions WAS a confirmed
+  deploy gap and is fixed.
+
+============================================================
+9. PRODUCTION-ONLY UNKNOWNS
+============================================================
+
+These were NOT inspected (no production access):
+
+P1  Live Apache/Cloudflare HTTPS redirect, HSTS, and whether X-Forwarded-Proto
+    is present on app PHP. ForceHttps remains unwired on purpose.
+P2  Whether live companies have WhatsApp Cloud API configured and need
+    wa_app_secret filled so POST signatures start being enforced.
+P3  Whether live `jobs` / `failed_jobs` contain serialized SendInvoiceToFbrJob
+    or CheckTokenExpiryJob.
+P4  Whether live companies.agent_api_key rows backfill cleanly (migration is
+    additive and idempotent; still verify after first migrate).
+P5  Whether any live shop still bookmarks /demo-login/super_admin or
+    /setup-migrate-xK9mP2 (they will 404/redirect; confirm nothing else
+    depended on them).
+P6  Git history still contains backup.sql at dfd29270. Assume hashes/emails
+    in that blob are disclosed to anyone with repo read. Rotation of those
+    credentials is an owner ops task, not performed here.
+P7  First Actions deploy after merge should log
+    "REMOTE_STEP: sw.js CACHE_VERSION stamped …" — confirm on the live apply log.
+P8  Desktop agents in the field: heartbeat 30s already; they keep using the
+    same plaintext key. Hash column is a server-side mirror.
+
+============================================================
+10. SECURITY POSTURE AFTER REMEDIATION
+============================================================
+
+HTTP surface can no longer run migrate/seed or mint a platform super_admin
+via demo-login. Agent keys are compared in constant time after a hash lookup.
+Live Ops errors no longer return exception text. WhatsApp POSTs can be HMAC
+gated. POS cookie writes from a browser-labelled cross-site request are
+rejected.
+
+Remaining residual:
+  - plaintext agent keys still in DB (hashed lookup is the control)
+  - unsigned WhatsApp until secrets are configured
+  - git-history dump
+  - HTTPS enforcement is proxy-side, unverified here
+
+============================================================
+11. TENANT / BRANCH ISOLATION AFTER REMEDIATION
+============================================================
+
+- CompanyScope + currentCompanyId unchanged.
+- FBR log reads pinned through Invoice.
+- NestPOS local tab and FBR report tiles now use the same branch rule as the
+  rest of reporting (owner ALL = company-wide; manager pivot cannot jump).
+- Franchise portal still has no id parameters.
+- SuperAdminDualPathTest: SaaS admin session does not satisfy tenant guards;
+  web super_admin cannot open /admin/*.
+
+============================================================
+12. PRA / FBR / DI INTEGRITY AFTER REMEDIATION
+============================================================
+
+- PRA: one in-flight submit per bill; fiscal number is sticky; fiscal_device
+  still never hits HTTP from sendInvoice.
+- FBR POS: report money is branch-scoped like CSV.
+- DI: API create/submit requires hasAccess; status remains readable.
+- Landing marketing counts now include pra_status submitted (code wrote
+  'submitted', never 'success').
+
+============================================================
+13. PRINTING / AGENT RELIABILITY AFTER REMEDIATION
+============================================================
+
+- Content fetched ⇒ no automatic reprint on lost result.
+- Content never fetched ⇒ safe requeue (attempts < 3).
+- Unclaimed pending ⇒ failed after 24h, retained.
+- Agent auth throttled; long-poll still holds (AgentAuthHardeningTest).
+- Wake secret compare is timing-safe.
+
+============================================================
+14. BILLING / HEALTHCARE AFTER REMEDIATION
+============================================================
+
+- Locked ERPS companies cannot POST charges/payments/pharmacy sales.
+- Locked DI API companies cannot create invoices; can still poll status.
+- Lifetime override still unlocks (tested).
+
+============================================================
+15. QUEUE / STATE INTEGRITY
+============================================================
+
+- phpunit queue driver: sync. No failed_jobs observed locally.
+- Orphan job classes retained.
+- Print job state machine now distinguishes not-started / claimed-unknown /
+  confirmed / failed as required.
+- PRA IN_PROGRESS is not a permanent lock (90s TTL; no status written).
+
+============================================================
+16. DEPLOYMENT SAFETY
+============================================================
+
+- No production deploy was performed.
+- Migrations are additive/nullable (content_fetched_at, agent_api_key_hash,
+  wa_app_secret) with column guards.
+- live-remote-apply.sh still checkouts exact SHA, migrate --force, then
+  stamps sw.js in the working tree only.
+- ci-deploy-production-check.sh: ALL CHECKS PASSED (LOCALLY-VERIFIED).
+
+Fixes that must NOT be deployed without separate owner approval:
+  1. Git history rewrite / BFG of backup.sql — NOT in this PR. Do not treat
+     HEAD deletion as a secret purge.
+  2. Dropping companies.agent_api_key — NOT in this PR.
+  3. Enabling DEMO_LOGIN_ENABLED anywhere but a local laptop — must stay false.
+  4. Turning on ForceHttps middleware — not in this PR; needs proxy proof.
+
+============================================================
+17. FULL TEST EVIDENCE
+============================================================
+
+Commands and results on this VM (2026-09-08):
+
+A. Targeted security / integrity (LOCALLY-VERIFIED, all pass)
+
+  php artisan test tests/Feature/Security
+    17 passed (DemoLogin, SetupRoutes, SuperAdminDualPath)
+
+  php artisan test tests/Feature/PosCsrfDefenceTest.php \
+    tests/Feature/CompanySettingsJsonMergeTest.php \
+    tests/Feature/FbrPosReportsBranchScopeTest.php \
+    tests/Feature/PosReportsLocalTabBranchScopeTest.php \
+    tests/Feature/PraSubmitIdempotencyTest.php \
+    tests/Feature/PosOfflineUuidRaceTest.php
+    37 passed (130 assertions)
+
+  php artisan test tests/Feature/AgentAuthHardeningTest.php \
+    tests/Feature/WhatsAppWebhookSignatureTest.php \
+    tests/Feature/CompanyUserPasswordPolicyTest.php \
+    tests/Feature/PrintJobDuplicateGuardTest.php \
+    tests/Feature/LiveOps/LiveOpsRunnerErrorLeakTest.php \
+    tests/Feature/FbrLogTenantIsolationTest.php \
+    tests/Feature/DiApiSubscriptionAccessTest.php \
+    tests/Feature/HealthSubscriptionLockTest.php \
+    tests/Feature/FranchiseIdorTest.php
+    (all pass after is_active / HTML-404 assertion fixes)
+
+B. Full suite
+
+  php artisan test
+  Tests:    2 skipped, 4559 passed (35190 assertions)
+  Duration: 271.26s
+  Failures: 0
+
+C. Deploy static check
+
+  bash scripts/tests/ci-deploy-production-check.sh
+  ALL CHECKS PASSED
+
+D. Gateway
+
+  cd agent-realtime-gateway && npm install && node --test test/wake-secret.test.js
+  tests 3, pass 3, fail 0
+  (full `npm test` also runs gateway.test.js, which needs the same `ws` install;
+   that file was pre-existing and is not part of this change's new coverage)
+
+E. Adversarial re-check of CRITICAL/HIGH after the fixes (code + tests)
+
+  setup route access     FIXED / LOCALLY-VERIFIED
+  demo login             FIXED / LOCALLY-VERIFIED
+  tenant leakage         FBR logs + DI invoice + franchise pinned
+  branch leakage         POS local tab + FBR tiles pinned
+  PRA duplicate          lock + agent overwrite pinned
+  print duplicate        fetched→failed pinned
+  agent authentication   hash + throttle pinned
+  billing bypass         DI API + Health money pinned
+  impersonation          SuperAdminDualPath + existing LiveOps tests
+  franchise IDOR         no id routes; constrained queries pinned
+
+============================================================
+18. REMAINING RISKS
+============================================================
+
+- Git history dump (backup.sql).
+- Plaintext agent keys at rest until a coordinated rotation.
+- Unsigned WhatsApp webhooks until wa_app_secret is set.
+- HTTPS/HSTS on the live edge not verified from this VM.
+- Cache lock for PRA: if a cache store without locks is used in production,
+  sendInvoice degrades to pre-fix behaviour (logged). phpunit uses array
+  cache which supports locks. PRODUCTION-VERIFICATION-REQUIRED: CACHE_STORE
+  on live (redis/database/file all support locks in Laravel).
+- Physical print "unconfirmed" jobs require a human reprint — that is the
+  safe choice, not a silent retry.
+
+============================================================
+19. RECOMMENDED FUTURE WORK
+============================================================
+
+1. Owner decision: rotate any credentials that ever lived in backup.sql and
+   optionally rewrite git history (separate, high-caution operation).
+2. After all agents talk to a hashed-only server: stop writing plaintext
+   agent_api_key and stop displaying it after first copy.
+3. Configure wa_app_secret on live WhatsApp companies; then consider fail-
+   closed when secret is missing.
+4. Confirm live CACHE_STORE supports locks; optionally add a unique index
+   on pra_invoice_number after a duplicate audit.
+5. Confirm live HTTPS/HSTS; only then consider wiring ForceHttps.
+6. After live queue drain: delete orphan job classes.
+7. Redact RestaurantPosController::payOrder request payload logs.
+
+============================================================
+20. FINAL CERTIFICATION
+============================================================
+
+READY WITH KNOWN NON-BLOCKING GAPS
+
+Meaning:
+  - No confirmed CRITICAL HTTP vulnerability remains in application code.
+  - Full local suite is green (4559 passed, 2 skipped, 0 failed).
+  - Remaining items are production-config, git-history, or deferred
+    compatible migrations — they are documented, not hidden.
+
+READY TO MERGE: YES, for human review of PR #28 (draft until the owner
+marks it ready). Do not auto-merge from this agent.
+
+SAFE TO DEPLOY TO PRODUCTION: NOT CLAIMED from this VM.
+  Deploy is reasonable AFTER:
+    - human review of this PR
+    - Environment approval on deploy-production
+    - P1–P8 in section 9 acknowledged
+  The code changes themselves are fail-closed and additive.
+
+Must NOT deploy without separate owner approval:
+  - git-history purge of backup.sql (not in this PR)
+  - dropping agent_api_key (not in this PR)
+  - DEMO_LOGIN_ENABLED=true (must stay off in production)
+  - enabling ForceHttps (not in this PR)
+
+============================================================
+APPENDIX A — COMMITS AND FILES
+============================================================
+
+origin/main: e175e157
+code:        0e84c34b  74 files, +5922 / -8654 (bulk of deletions = backup.sql)
+
+Changed paths (relative to main):
+
+.env.example
+.gitignore
+CPANEL_SETUP.md
+agent-realtime-gateway/gateway.js
+agent-realtime-gateway/test/wake-secret.test.js
+app/Http/Controllers/AdminController.php
+app/Http/Controllers/AgentController.php
+app/Http/Controllers/AgentManagementController.php
+app/Http/Controllers/Api/LiveOpsRunnerController.php
+app/Http/Controllers/Auth/AuthenticatedSessionController.php
+app/Http/Controllers/CompanySettingsController.php
+app/Http/Controllers/CompanyUserController.php
+app/Http/Controllers/FbrAgentController.php
+app/Http/Controllers/FbrPosController.php
+app/Http/Controllers/FbrPosRiderController.php
+app/Http/Controllers/InvoiceController.php
+app/Http/Controllers/PosController.php
+app/Http/Controllers/PosRiderController.php
+app/Http/Controllers/ProfileController.php
+app/Http/Controllers/PublicProfileController.php
+app/Http/Controllers/SaasAdmin/AdminCompanyController.php
+app/Http/Controllers/SaasAdmin/AdminFranchiseController.php
+app/Http/Controllers/WhatsAppWebhookController.php
+app/Http/Middleware/AgentAuth.php
+app/Http/Middleware/DiApiSubscriptionAccess.php
+app/Http/Middleware/HealthSubscriptionLock.php
+app/Http/Middleware/RejectCrossSitePosWrites.php
+app/Jobs/CheckTokenExpiryJob.php
+app/Jobs/SendInvoiceToFbrJob.php
+app/Models/Company.php
+app/Models/PosPrintJob.php
+app/Providers/AppServiceProvider.php
+app/Services/LiveOps/LiveOpsRemediationService.php
+app/Services/PraIntegrationService.php
+app/Support/AgentApiKey.php
+backup.sql                                          (deleted from HEAD)
+bootstrap/app.php
+config/app.php
+config/print.php
+database/migrations/2026_11_25_100000_add_content_fetched_at_to_pos_print_jobs.php
+database/migrations/2026_11_26_100000_add_agent_api_key_hash_to_companies.php
+database/migrations/2026_11_26_100100_add_wa_app_secret_to_companies.php
+database/seeders/DatabaseSeeder.php
+docs/architecture/07-authentication.md
+docs/architecture/16-printing-devices.md
+docs/architecture/18-settings.md
+docs/architecture/21-deployment.md
+docs/architecture/22-security.md
+docs/architecture/25-known-legacy-and-contradictions.md  (this report commit)
+docs/architecture/maps/15-raw-sql-mass-assignment-sweep.txt
+docs/architecture/33-master-remediation-final-report.txt (this file)
+docs/ops/github-production-deploy.md
+pra-agent/README.md
+resources/views/company/whatsapp-settings.blade.php
+routes/web.php
+scripts/lib/live-remote-apply.sh
+scripts/tests/ci-deploy-production-check.sh
+tests/Feature/AgentAuthHardeningTest.php
+tests/Feature/CompanySettingsJsonMergeTest.php
+tests/Feature/CompanyUserPasswordPolicyTest.php
+tests/Feature/DiApiSubscriptionAccessTest.php
+tests/Feature/FbrLogTenantIsolationTest.php
+tests/Feature/FbrPosReportsBranchScopeTest.php
+tests/Feature/FranchiseIdorTest.php
+tests/Feature/HealthSubscriptionLockTest.php
+tests/Feature/LiveOps/LiveOpsRunnerErrorLeakTest.php
+tests/Feature/PosCsrfDefenceTest.php
+tests/Feature/PosOfflineUuidRaceTest.php
+tests/Feature/PosReportsLocalTabBranchScopeTest.php
+tests/Feature/PraSubmitIdempotencyTest.php
+tests/Feature/PrintJobDuplicateGuardTest.php
+tests/Feature/Security/DemoLoginFailClosedTest.php
+tests/Feature/Security/SetupRoutesRemovedTest.php
+tests/Feature/Security/SuperAdminDualPathTest.php
+tests/Feature/WhatsAppWebhookSignatureTest.php
+tests/TestCase.php
+
+============================================================
+APPENDIX B — NEW CRITICAL/HIGH/MEDIUM/LOW FOUND DURING REMEDIATION
+============================================================
+
+No new CRITICAL findings.
+
+HIGH (deferred, not introduced): git history still contains backup.sql
+  (pre-existing; documented).
+
+MEDIUM: landing marketing counter used pra_status='success' which the writer
+  never stores. CODE-FIXED in routes/web.php (whereIn submitted+success).
+  Not a tenant leak.
+
+LOW: RestaurantPosController::payOrder logs $request->all() — POTENTIAL log
+  noise. Not changed (avoid pay-path risk in this PR).
+
+============================================================
+END OF REPORT
+============================================================

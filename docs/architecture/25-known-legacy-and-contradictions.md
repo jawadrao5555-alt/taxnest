@@ -32,7 +32,9 @@ Two jobs / two column names; only `CheckFbrTokenExpiryJob` scheduled. `CheckToke
 
 ## CONTRADICTION — Agent heartbeat interval
 
-`pra-agent/README.md` may say 60s; `agent.js` uses **30s**. Code wins.
+RESOLVED in this remediation: `pra-agent/README.md` now matches `agent.js`
+(`setInterval(heartbeat, 30000)` = 30s). Historical docs that still say 60s
+are stale.
 
 ## CONTRADICTION — Day-close “6AM auto”
 

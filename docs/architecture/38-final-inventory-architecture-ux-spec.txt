@@ -1,6 +1,9 @@
 TaxNest / NestPOS — FINAL inventory architecture + UX spec
 ==========================================================
 Date: 2026-09-08
+Updated: 2026-09-08 (owner decisions locked; forensic review of this
+         document accepted; spec-only amendment — no application code)
+
 Mode: DESIGN SPEC ONLY. No code, schema, routes, migrations, tests,
       production, or PR changes in this turn.
 
@@ -10,13 +13,39 @@ Sources synthesized (not repeated as separate investigations)
   2. Bulk stock-in matching / clearance audit
      docs/architecture/37-bulk-stock-in-matching-clearance-audit.txt
   3. Re-read of posting code in this checkout (citations below)
+  4. Forensic review of this document (accepted 2026-09-08)
 
 How to read
   [VERIFIED]  current code
   [CHALLENGE] prior recommendation that this spec changes
   [SPEC]      definitive build decision
-  [OWNER]     must not be coded until the owner picks
+  [OWNER]     locked owner decision (no longer open)
   [UNKNOWN]   not in this checkout / needs production check
+
+
+================================================================
+LOCKED OWNER DECISIONS (2026-09-08)
+================================================================
+
+These replace the previous open [OWNER] list. Implementers must not
+re-open them.
+
+  1. Stock-In “Update Cost” checkbox default = OFF.
+  2. “Save Supplier Code as Ingredient Code” default = OFF.
+  3. Stock-In clearance must survive logout/refresh → persistent
+     staging (not session-only). Schema for staging is created when
+     Stock-In is implemented, not in this spec-only turn.
+  4. Do not ship multi-branch Stock-In until the ingredient_stocks
+     branch-seeding / heal issue is safely resolved.
+  5. Ingredients and Recipes must appear inside the Inventory
+     navigation. Keep all existing /pos/restaurant/* routes.
+  6. Historical kitchen food-cost restatement is deferred. Do not
+     redesign IngredientController::kitchenReport in this phase.
+  7. Ingredient transfers are deferred.
+  8. Same Ingredient + Branch + Reference occurring multiple times
+     in one Stock-In file: SUM those lines before idempotency/posting.
+     Do not silently drop a second legitimate line.
+
 
 ================================================================
 0. BOUNDARIES (non-negotiable)
@@ -85,7 +114,9 @@ Receipt Display (/pos/receipt-settings) is print settings, not inventory.
 leave Ingredients under Restaurant. That keeps the owner hunting in
 two menus to receive rice vs see rice.
 
-[SPEC] One Inventory family, existing routes kept (aliases OK)
+[OWNER / SPEC] Ingredients and Recipes MUST appear inside the
+Inventory navigation. Existing routes stay (aliases OK). Do not
+delete /pos/restaurant/ingredients or /pos/restaurant/recipes.
 
   Inventory
     Dashboard          existing pos.inventory.dashboard
@@ -95,24 +126,33 @@ two menus to receive rice vs see rice.
     Stock In           NEW sibling of Stock Check
     Adjust             existing pos.inventory.adjust    (one-off items)
     Transfers          existing pos.inventory.transfers
+                       (finished-goods only; ingredient transfers
+                       deferred — owner decision 7)
     Stock Check        existing pos.inventory.stock-check.*
     Movements          existing pos.inventory.movements
     Low stock          existing pos.inventory.low-stock
     Kitchen report     existing pos.restaurant.kitchen-report
+                       (report math unchanged this phase —
+                       owner decision 6)
 
-  Do NOT delete /pos/restaurant/ingredients or recipes routes.
-  Add the same links into the Inventory sidebar group and the purple
+  Also add Ingredients / Recipes / Stock In to the purple inventory
   tab bars (see pos/inventory/adjust-stock.blade.php tabs).
+  Restaurant sidebar links may remain as duplicates for old muscle
+  memory.
 
   Cashiers stay out: PosAdminOnly + assertNotCashier
     [VERIFIED] PosInventoryController::assertNotCashier
                Ingredient routes sit inside PosAdminOnly
                routes/web.php ~1119 and ~1241
 
-  Feature gates
-    inventory pages: feature:inventory,relevant + company.inventory_enabled
-    ingredients/recipes/kitchen stock-in: feature:recipes
+  Feature gates (row-level for Stock-In; see §4 and §6)
+    Inventory pages / ITEM Stock-In:
+      feature:inventory,relevant + company.inventory_enabled
+    Ingredients / Recipes pages / INGREDIENT Stock-In:
+      feature:recipes
       PosFeatureService::DEPENDENCIES recipes => [inventory]
+    A mixed Stock-In file MUST process ITEM rows when inventory is
+    on even if recipes is off. Do not reject the whole file.
 
 
 ================================================================
@@ -140,7 +180,8 @@ two menus to receive rice vs see rice.
     sale deducts inventory_stocks for that pos_product
 
 [SPEC] Inventory Master Excel maintains ONLY this graph.
-       Stock-In Excel never inserts product_recipes or pos_products.
+       Stock-In Excel never inserts product_recipes or pos_products
+       (and never inserts ingredients — unmatched Stock-In is clearance).
 
 
 ================================================================
@@ -151,26 +192,16 @@ Compared formats
   A. Keep today’s TWO files (product Excel + recipe Excel)
   B. Recipe-shaped sheet only (BOM lines; infer products)
   C. Row Type sheet PRODUCT | INGREDIENT | RECIPE
-     (investigation inventory-single-sheet-receipt-control §8)
 
-[CHALLENGE] Format B looks simpler but cannot represent a sellable
-item with no recipe (Coke, water). Recipe Excel today also
-AUTO-CREATES ingredients (IngredientController::importRecipes) which
-is acceptable for MASTER and forbidden for STOCK-IN.
-
-[CHALLENGE] Investigation §8 put “Cost per Unit” on RECIPE rows
-because recipes_template.xlsx has that column. Current importer
-applies cost ONLY when creating an ingredient, never on reuse
-(IngredientController::importRecipes ~577–590). Dual cost writers
-(RECIPE row vs INGREDIENT row) would surprise the owner.
-
-[SPEC] Format C, tightened.
+[SPEC] Format C. Exactly ONE sheet. Row Type required:
+PRODUCT | INGREDIENT | RECIPE. No stock quantity columns.
 
 Sheet name: Master
 File: nestpos_inventory_master.xlsx
-One sheet. Never CSV as the default (Pizza Master 8.9E+12 —
+Never CSV as the default (Pizza Master 8.9E+12 —
 PosController::downloadProductTemplate comments).
-SKU / Product Code / Ingredient Code columns: Excel TEXT.
+SKU / Product Code / Ingredient Code columns: Excel TEXT
+  (NumberFormat FORMAT_TEXT + setCellValueExplicit string).
 
 Header row 1 (exact titles; importer must also accept aliases)
 
@@ -193,17 +224,62 @@ Header row 1 (exact titles; importer must also accept aliases)
   Q  Active
 
 Row Type (required): PRODUCT | INGREDIENT | RECIPE
-  (case-insensitive; Urdu/English aliases later if needed)
+  (case-insensitive)
 
 Which columns apply
-  PRODUCT:    B–J, Q
-  INGREDIENT: K–O, Q     (N Cost per Unit lives HERE only)
+  PRODUCT:    B–J, Q     required: Row Type, Product Name, Price
+  INGREDIENT: K–O, Q     required: Row Type, Ingredient Name,
+                         Ingredient Unit
+                         (N Cost per Unit lives HERE only)
   RECIPE:     B, C, K, L, M, P, Q
+              required: Row Type, Product Name or Product Code,
+                        Ingredient Name, Quantity Needed
               Quantity Needed = per 1 sold unit
               RECIPE must NOT write cost_per_unit
               RECIPE may create a missing ingredient at cost 0
-              if and only if no match; owner then edits cost on
-              the INGREDIENT row or the Ingredients screen
+              IFF no match AND the INGREDIENT pass did not already
+              create it (see processing order below)
+
+Forbidden on this sheet
+  Qty on hand, opening stock, received qty, supplier, PO/PUR number,
+  branch, rate-as-purchase, receipt printer flags, stock-check counts.
+
+---------------------------------------------------------------------------
+3.A  MASTER IMPORT PROCESSING ORDER  [SPEC — required]
+---------------------------------------------------------------------------
+
+  Pass 1: all INGREDIENT rows
+  Pass 2: all PRODUCT rows
+  Pass 3: all RECIPE rows
+
+  Empty / Misal: rows are skipped in every pass.
+
+  Why: if RECIPE ran first it would auto-create Rice at cost 0,
+  then the INGREDIENT row would fight it. Ingredient-first lets
+  cost / code / min stock land before BOM lines attach.
+
+---------------------------------------------------------------------------
+3.B  INGREDIENT UNIT-CHANGE RULE  [SPEC — required]
+---------------------------------------------------------------------------
+
+  On INGREDIENT match (existing row):
+    If the file’s Ingredient Unit differs from ingredients.unit
+    AND (the ingredient is used in any product_recipes row
+         OR ingredients.current_stock is not 0
+         OR any ingredient_stocks.quantity is not 0):
+      treat the row as INVALID
+      do not change the unit
+      do not post any other field from that row
+      tell the owner to correct the file to the existing unit
+
+  conversion_factor is unused in RecipeInventoryService.
+  [VERIFIED] no conversion_factor reads in that class.
+  Silently changing kg → g would make quantity_needed 0.25 mean
+  0.25 g instead of 0.25 kg.
+
+  New ingredients (no match): unit is taken from the file and must
+  be in RecipeInventoryService::UNITS
+  (kg, g, ltr, ml, pcs, dozen, pack).
 
 Matching (reuse existing precedence)
   Product: barcode → SKU → name
@@ -214,10 +290,6 @@ Matching (reuse existing precedence)
               test_existing_ingredient_reused_by_name_and_unit)
   Recipe: unique (product_id, ingredient_id) upsert quantity_needed
     ProductRecipe unique index
-
-Forbidden on this sheet
-  Qty on hand, opening stock, received qty, supplier, PO/PUR number,
-  branch, rate-as-purchase, receipt printer flags, stock-check counts.
 
 Sample rows: prefix Product Name or Ingredient Name with “Misal:”
   [VERIFIED] RECIPE_SAMPLE_MARKER in IngredientController
@@ -230,17 +302,44 @@ Caps
 Gates
   PRODUCT rows: excel_enabled (PosController::planGate)
   INGREDIENT / RECIPE rows: feature:recipes
-  Whole file refused if recipes off and any RECIPE/INGREDIENT row
-  is present.
+  A file that also contains PRODUCT rows while recipes is off:
+    import PRODUCT rows; skip INGREDIENT/RECIPE with a reason
+    (same spirit as Stock-In mixed-file gates — do not refuse
+    a valid product-only path).
 
 Idempotency of MASTER re-upload
   PRODUCT match → update catalog fields, never add stock
-  INGREDIENT match → update name/unit/cost/min/active/code
+  INGREDIENT match → update name/code/cost/min/active
+                    never change unit if §3.B fires
                     never call adjustIngredientStock
   RECIPE match → update quantity_needed (+ recipe_version increment
                  as importRecipes already does)
 
+---------------------------------------------------------------------------
+3.C  TEMPLATE MUST BE EASY FOR A RESTAURANT OWNER  [SPEC]
+---------------------------------------------------------------------------
+
+  The downloaded nestpos_inventory_master.xlsx MUST include:
+
+  - Frozen header (row 1 freezePane)
+  - Row Type data-validation dropdown: PRODUCT, INGREDIENT, RECIPE
+  - Required vs optional marked in header comments and a top
+    Instructions block (rows above the header, or a note row
+    that the importer skips — importer starts at the header
+    titled “Row Type”. Preferred: a separate non-imported
+    “Instructions” area above row 1 is fragile; put instructions
+    on a frozen row-1 comment AND a clearly labelled sample
+    block the importer already knows how to skip via Misal:)
+  - Sample blocks (Misal: prefix), including ALL of:
+      PRODUCT with no recipe (Misal: Coke 500ml)
+      INGREDIENT (Misal: Basmati Rice)
+      RECIPE (Misal: Large Pizza + Pizza Dough)
+  - TEXT format on Product Code and Ingredient Code
+  - Unused cells for that Row Type left blank (do not put
+    Quantity Needed on a PRODUCT sample)
+
 Example (Pizza / Burger / Wings / Coke / Rice)
+  (production template prefixes samples with Misal:)
 
 Row Type   | Product Name     | Product Code | Price | Category | Ingredient Name | Ing Code | Ing Unit | Cost/Unit | Min Stock | Qty Needed
 PRODUCT    | Large Pizza      | PZ-001       | 1200  | Pizza    |                 |          |          |           |           |
@@ -261,10 +360,7 @@ RECIPE     | Chicken Burger   | BG-001       |       |          | Chicken Patty 
 RECIPE     | Hot Wings 10pc   | WG-010       |       |          | Chicken Wings   | ING-WNG  | kg       |           |           | 0.45
 RECIPE     | Hot Wings 10pc   | WG-010       |       |          | Wing Sauce      | ING-SAU  | g        |           |           | 40
 
-Units on RECIPE must equal Ingredient Unit. conversion_factor is
-unused in RecipeInventoryService. [VERIFIED] no conversion_factor
-reads in that class. 250 g on a kg rice ingredient would consume
-250 kg per plate.
+Units on RECIPE must equal Ingredient Unit.
 
 Legacy files
   [SPEC] Keep downloading today’s pos_products_template.xlsx and
@@ -304,17 +400,68 @@ Compared
   upload → review → explicit Post, posting through existing
   kitchen/product adjust services. Not a second ledger.
 
+---------------------------------------------------------------------------
+4.A  FEATURE GATES (row-level)  [SPEC — required]
+---------------------------------------------------------------------------
+
+  ITEM / product Stock-In rows:
+    require inventory (feature:inventory,relevant +
+    company.inventory_enabled + excel not required)
+  INGREDIENT Stock-In rows:
+    require recipes (feature:recipes, which already depends on
+    inventory)
+
+  Mixed file:
+    process each row under ITS gate
+    skip/refuse INGREDIENT rows with reason “Recipes module OFF”
+    still allow ITEM rows to match and post
+    never reject a valid ITEM path merely because recipes is disabled
+
+---------------------------------------------------------------------------
+4.B  MULTI-BRANCH SHIP RULE  [OWNER / SPEC — required]
+---------------------------------------------------------------------------
+
+  Do NOT ship multi-branch Stock-In until
+  RecipeInventoryService::changeIngredientBranchStock seeding
+  (insert quantity = company current_stock then add delta) and the
+  missing ingredient_stocks heal (healLegacyRows does not touch
+  ingredient_stocks) are safely resolved.
+
+  Until that Phase 0/2b work is done:
+    if BranchStockService::isMultiBranch(company) → Stock-In
+    refuses with a clear message; no silent head-office dump
+    if the company has no branches → Stock-In is allowed
+    (writeBranchId returns null; only ingredients.current_stock
+     / inventory_stocks.branch_id NULL move — current behaviour)
+
+  When multi-branch Stock-In IS enabled later:
+    Branch selection is REQUIRED on the screen
+    Never silently use null / all-branches
+    Refuse viewingAllBranches (copy FBR stock_edit_pick_branch)
+    actorCanUse enforced
+    Pass that branchId into adjustIngredientStock (5th argument);
+    today’s ingredient modal passes null — Stock-In must not copy that
+
+---------------------------------------------------------------------------
+4.C  SCREEN FLOW
+---------------------------------------------------------------------------
+
   Inventory → Stock In
-    1. Pick Branch if company is multi-branch
-       (refuse all-branches, same as FBR
-        FbrPosController panelStockBranchId / stock_edit_pick_branch)
-    2. Enter Reference (supplier bill / delivery note) — required
-    3. Upload Excel
-    4. See MATCHED / NEEDS CLEARANCE / INVALID
-    5. Resolve NEEDS CLEARANCE (pick existing ingredient or item)
-    6. Review qty × rate totals
-    7. Post
-    8. Unposted INVALID rows remain visible; they never hit stock
+    1. Gate: inventory on. If file will contain INGREDIENT rows,
+       recipes must be on for those rows (§4.A).
+    2. If multi-branch and heal not shipped: refuse (§4.B).
+    3. If multi-branch and heal shipped: Pick Branch (required).
+       Never null / all-branches.
+    4. Enter Reference (supplier bill / delivery note) — required
+    5. Upload Excel → persist a staging batch (§7)
+    6. See MATCHED / NEEDS CLEARANCE / INVALID
+    7. Resolve NEEDS CLEARANCE (pick existing ingredient or item)
+    8. Refresh / re-match after master data changes (§7)
+    9. Check the rows to post (selected-row posting)
+   10. Review qty × rate totals of SELECTED MATCHED rows
+   11. Post selected MATCHED rows only
+   12. INVALID / unselected / ungated rows remain on the batch;
+       they never hit stock
 
   Keep one-off Adjust (items) and Ingredients → Adjust Stock
   for a single bag at the door.
@@ -342,8 +489,11 @@ Header row 1
   K  Notes
 
 Line Type: INGREDIENT | ITEM
-  INGREDIENT → kitchen ledger
-  ITEM       → pos_products / inventory_stocks (Coke, retail chicken)
+  INGREDIENT → kitchen ledger (requires recipes)
+  ITEM       → pos_products / inventory_stocks (requires inventory)
+               Unit is pos_products.uom (e.g. NOS), NOT
+               RecipeInventoryService::UNITS. Do not mark Coke NOS
+               INVALID against kitchen units.
 
 Aliases the importer MUST accept so a distributor file drops in
   C also: item code, sku, code
@@ -354,9 +504,10 @@ Aliases the importer MUST accept so a distributor file drops in
   I also: bill no, invoice, supplier invoice, reference
 
 Branch / Reference
-  If the screen already captured Branch + Reference, columns H–I
-  are optional overrides per row. Blank → use the screen values.
-  Multi-branch with both screen and file blank → INVALID.
+  Screen values are the batch defaults.
+  Per-row H–I override when filled.
+  Multi-branch (once shipped): blank screen AND blank file Branch
+  → INVALID. Never default to null.
 
 TEXT on B and C.
 
@@ -371,6 +522,9 @@ INGREDIENT | RICE-25      | RICE-25            | Basmati Rice       | 500 | kg  
 INGREDIENT | CHK-01       | CHK-01             | Chicken            | 200 | kg   | 650  | Gulberg | INV-88
 INGREDIENT | OIL-20       | OIL-20             | Cooking Oil        | 100 | ltr  | 550  | Gulberg | INV-88
 ITEM       | DK-500       |                    | Coke 500ml         | 24  | NOS  | 55   | Gulberg | INV-88
+
+If the same file also has a second rice line 200 kg INV-88 Gulberg,
+those two rice lines are SUMMED to 700 kg before post (§12).
 
 
 ================================================================
@@ -387,14 +541,11 @@ ITEM       | DK-500       |                    | Coke 500ml         | 24  | NOS 
     PosController::importProducts
 
 [CHALLENGE] Audit 37 v1 “on first clearance, write supplier code
-into empty ingredients.code”. That silently turns a distributor SKU
-into the shop’s canonical code. IngredientController treats code as
-the shop identity. Two suppliers, or a shop that already uses ING-001,
-get collisions. Do not auto-write.
+into empty ingredients.code”. Rejected as default (owner decision 2).
 
 [SPEC] Stock-In match order (company-scoped)
 
-  INGREDIENT lines
+  INGREDIENT lines  (skipped with reason if recipes off)
     1. NestPOS Code exact, case-insensitive, unique-in-company
        If 0 hits → try 2. If 2+ hits → AMBIGUOUS (no unique DB index)
     2. Exact name + unit (strtolower trim), same as
@@ -402,19 +553,17 @@ get collisions. Do not auto-write.
        Unit on the file MUST equal ingredients.unit
        (no kg↔g; RecipeInventoryService ignores conversion_factor)
     3. Stop. Never name-only. Never fuzzy.
-       Recipe import’s name-only fallback when unit is blank is
-       too loose for stock. [CHALLENGE of copying importRecipes]
 
-  ITEM lines
+  ITEM lines  (skipped with reason if inventory off)
     1. NestPOS Code against barcode then SKU
     2. Exact name
     3. Stop. No fuzzy.
+    Unit compared to pos_products.uom, not kitchen UNITS.
 
   Supplier Item Code is NOT primary identity in v1.
-  It is shown on the clearance row so a human can recognise RICE-25.
   Optional: tick “Save as Ingredient Code” only if ingredients.code
-  is empty AND the uniqueness check used by IngredientController passes.
-  Default off.
+  is empty AND the uniqueness check used by IngredientController
+  passes. Default OFF (owner decision 2).
 
 Confidence
   step 1 unique hit = MATCHED (auto-tick, still listed)
@@ -423,33 +572,66 @@ Confidence
 
 
 ================================================================
-7. CLEARANCE WORKFLOW
+7. CLEARANCE WORKFLOW — PERSISTENT STAGING  [SPEC — required]
 ================================================================
 
 Pattern to copy: PosStockCheckController::importSheet + show + post
-  Import does not change live qty. Post does, once, while open.
+  Import does not change live qty. Post does, once.
 
-[SPEC]
+[OWNER] Clearance must survive logout/refresh. Session-only staging
+is forbidden.
 
-  Upload → staging in the session/cache of THIS request cycle or a
-  short-lived cache keyed by company + user (implementation detail).
-  Do not invent a stock_in_batches table in v1 unless staging across
-  refresh is required. [OWNER] if the owner wants to close the laptop
-  and finish clearance tomorrow, that needs a table — see §B.
+[SPEC] Persistent staging (table(s) added at Stock-In implementation,
+not in this spec-only turn). Minimum contract:
 
-  Each row
-    MATCHED          checkbox on, editable off unless they unmatch
-    NEEDS CLEARANCE  dropdown of existing ingredients/items
-                     + link “Create on Ingredients page” (new tab)
-                     NO create-inline from this screen in v1
-    INVALID          qty ≤ 0, unknown unit, missing branch, bad type
-                     cannot post
+  Batch
+    company_id
+    created_by
+    branch_id          (null only when company has no branches)
+    reference          (required; supplier bill)
+    update_cost        (bool; default false)
+    save_supplier_code (bool; default false)
+    status             open | posted | cancelled
+    original_filename
+    timestamps
 
-  Post button enabled only when every remaining selected row is
-  MATCHED (cleared). INVALID rows stay behind.
+  Line
+    batch_id
+    source_row_no      (Excel row, for errors)
+    line_type          INGREDIENT | ITEM
+    supplier_item_code
+    supplier_item_name
+    nestpos_code_raw
+    qty, unit, rate
+    branch_id override nullable
+    reference override nullable
+    match_status       MATCHED | NEEDS_CLEARANCE | INVALID | SKIPPED_GATE
+    matched_ingredient_id nullable
+    matched_product_id nullable
+    invalid_reason nullable
+    selected           bool (checked for post)
+    collapsed_into_line_id nullable  (if summed into another line)
+    posted_at nullable
+    movement_id nullable
 
-  After Post: flash counts; link to Ingredients list / Stock list /
-  Movements.
+Must support
+  - stored uploaded workbook identity (filename + parse result)
+  - matched / unmatched / invalid / skipped-gate status
+  - selected-row posting (Post checked MATCHED lines only;
+    INVALID and unselected stay on the batch)
+  - Refresh / Re-match after the owner creates an ingredient on
+    the Ingredients page (re-run §6 on unposted lines; keep
+    human clearance picks unless the picked id vanished)
+  - safe retry: posting is one DB transaction per Post click;
+    failure rolls back qty AND does not set posted_at
+  - no duplicate stock posting: §12 key after SUM
+  - logout/refresh: reopen /pos/inventory/stock-in/{batch}
+    (name at implementation) and continue
+
+Post button
+  Enabled when at least one SELECTED line is MATCHED and unposted.
+  Does not require the entire file to be matched.
+  INVALID rows are never selected for post.
 
 
 ================================================================
@@ -458,47 +640,28 @@ Pattern to copy: PosStockCheckController::importSheet + show + post
 
 [VERIFIED] No mapping table.
 
-[SPEC] v1: no new table.
+[SPEC] v1: no new mapping table.
   Identity = NestPOS Ingredient Code / Item SKU-barcode.
   Supplier Item Code is a label on the Stock-In row only.
-  Optional save-as-code (default off) as §6.
+  “Save as Ingredient Code” default OFF (owner decision 2).
 
 [SPEC] v2 (later, only if two distributors share one rice):
   mapping table (company_id, supplier_id, supplier_item_code)
-  → ingredient_id. Requires suppliers UI on NestPOS, which does
-  not exist today (suppliers routes are auth/DI + FBR).
-  Do not build v2 until a real shop has two codes for one ingredient.
-
-[CHALLENGE] Audit 37 “auto-fill empty code on first clear” — rejected
-as the default. Too easy to poison the master.
+  → ingredient_id. Not this phase.
 
 
 ================================================================
 9. NEW INGREDIENT HANDLING
 ================================================================
 
-Compared
-  A. Auto-create from Stock-In (like importRecipes)
-  B. Unmatched / Needs Clearance
-  C. Auto-create only if NestPOS Code is new
-
-[CHALLENGE] A is what Recipe Excel does. That is correct for MASTER
-(BOM cannot exist without the ingredient). It is wrong for STOCK
-(a typo “Basmatti Rice” would mint a second master and post 500 kg
-onto the wrong row; sales would still consume the real Rice).
-
-[SPEC] B for Stock-In.
+[SPEC] Stock-In never auto-creates ingredients.
   Tomato Sauce TOM-99 with no master → NEEDS CLEARANCE.
   Owner creates it via Ingredients store() or Master Excel, then
-  maps the row. Stock posts only after that.
-
-  C is still auto-create; rejected for Stock-In.
+  Refresh / re-match on the open batch, then maps the row.
 
   Master Excel INGREDIENT / RECIPE rows MAY create ingredients
-  (that is master data). current_stock stays 0
-  (IngredientController::store already posts opening through
-  adjustIngredientStock only when the create FORM sends current_stock;
-  Master Excel must pass 0).
+  (master data). current_stock stays 0. Never call
+  adjustIngredientStock from Master import.
 
 
 ================================================================
@@ -522,24 +685,23 @@ onto the wrong row; sales would still consume the real Rice).
     RecipeInventoryService::changeIngredientBranchStock
     ($initialQuantity often = company before qty)
 
-[SPEC]
-  Stock-In: if BranchStockService::isMultiBranch, Branch is required
-  on the screen. All-branches view → refuse (copy FBR
-  stock_edit_pick_branch).
-  actorCanUse enforced (PosInventoryController::assertBranchAllowed).
-  Single-shop: hide Branch; writeBranchId returns null; only
-  ingredients.current_stock moves (current behaviour).
+[SPEC] / [OWNER decision 4]
+  Explicit branch selection is REQUIRED for multi-branch Stock-In.
+  Never silently use null or all-branches for a multi-branch company.
+
+  v1 Stock-In ships only for companies where
+  BranchStockService::isMultiBranch is false.
+
+  Multi-branch Stock-In is a later increment AFTER the seed/heal
+  issue is fixed. Then: required branch picker, actorCanUse,
+  pass branchId into adjustIngredientStock, refuse all-branches.
 
   Also add a branch picker to the existing ingredient Adjust modal
-  so one-off +10 kg cannot land on the wrong shop. Same
-  BranchStockService helpers as adjust-stock.blade.php.
+  as part of that same multi-branch increment (not required to
+  ship Phase 1 Master Excel).
 
   One ingredient, many branches: one master row, many stock rows.
   Incoming bulk never creates a second Rice ingredient for DHA.
-
-[OWNER] Whether to heal legacy NULL ingredient_stocks onto head
-office before enabling multi-branch Stock-In (gap vs
-BranchStockService::healLegacyRows).
 
 
 ================================================================
@@ -566,33 +728,30 @@ VERIFIED CURRENT BEHAVIOR
     InventoryService::addStock blends only for purchase/opening
       (FBR path)
 
-PROPOSED FUTURE BEHAVIOR
-  [CHALLENGE] Audit 37 “v1 always write latest rate into
-  cost_per_unit” would make every rice delivery restate the kitchen
-  food-cost report. That contradicts current adjust, which leaves
-  cost alone.
+PROPOSED FUTURE BEHAVIOR  (this phase)
+  [OWNER] “Update Cost” checkbox default = OFF.
 
-  [SPEC] Stock-In default = qty only, cost unchanged
+  Stock-In default = qty only, cost_per_unit unchanged
     (same as today’s ingredient adjust).
 
-  Optional per-batch checkbox: “Also update ingredient cost”
-    If ticked: write Rate into ingredients.cost_per_unit (latest).
-    Always store Rate in ingredient_movements.snapshot JSON
-    even when the checkbox is off, so the movement remembers kharid.
+  If the owner ticks “Also update ingredient cost”:
+    write Rate into ingredients.cost_per_unit (latest).
+    This WILL restate kitchenReport historical totals because
+    that report uses live cost. Do not redesign kitchenReport
+    in this phase (owner decision 6).
+
+  Always store Rate in ingredient_movements.snapshot JSON
+  even when the checkbox is off.
 
   ITEM lines with Rate: use the SAME weighted-average block as
     PosInventoryController::adjustStock add+purchase_price.
     Never type=set. Never TYPE_PURCHASE.
 
-  Do not add avg/last columns to ingredient_stocks in v1 (schema).
-
-[OWNER] Default of the cost checkbox (off vs on).
-[OWNER] Whether kitchenReport should later use snapshot rates
-        instead of live cost_per_unit (report change, not stock-in).
+  Do not add avg/last columns to ingredient_stocks in this phase.
 
 
 ================================================================
-12. DUPLICATE / IDEMPOTENCY
+12. DUPLICATE / IDEMPOTENCY + LEDGER METADATA
 ================================================================
 
 [VERIFIED]
@@ -600,8 +759,7 @@ PROPOSED FUTURE BEHAVIOR
     reference_type = pos_return OR pos_transaction
     even for ingredient_adjustment
     RecipeInventoryService::writeIngredientLedger ~812
-  So audit 37’s “look up reference_number STOCKIN:…” can collide
-  with a bill number and cannot distinguish types today.
+  Today’s adjustIngredientStock writes reference_number = ''.
 
   Product movements already use reference_type = 'adjustment'
     PosInventoryController::adjustStock
@@ -612,26 +770,72 @@ PROPOSED FUTURE BEHAVIOR
     test_repeated_ingredients_are_combined_and_sale_is_idempotent
   Stock adjust / ingredient adjust / opening are NOT idempotent.
 
-[CHALLENGE] Using only reference_number without reference_type
-is unsafe given the hardcoded pos_transaction.
+[SPEC] Stock-In must NOT pretend to be a pos_transaction.
 
-[SPEC]
-  Extend the kitchen posting helper (same class, not a new engine)
-  so Stock-In can pass:
-    reference_type   = 'stock_in'
-    reference_number = '{companyReference}'
-    snapshot         = {reason, delta, rate, supplier_item_code, line}
-  Unique post key:
-    company_id + reference_type + reference_number
-    + ingredient_id (or product_id) + branch_id
-  Second Post with the same key: skip that line (no-op), report
-  “already received”.
-  Failed Post (transaction rollback): nothing written, retry safe.
-  Same file, new Reference: treated as a new delivery — operator
-  must type a new bill number on purpose.
+Required semantics before implementation:
 
-  Product Stock-In lines: reference_type = 'stock_in' on
-  inventory_movements (today adjust writes 'adjustment').
+  Kitchen Stock-In movement (ingredient_movements)
+    type             = ingredient_adjustment
+                       (existing RecipeInventoryService::MOVEMENT_ADJUSTMENT)
+    reference_type   = 'stock_in'     NEVER 'pos_transaction'
+    reference_id     = staging batch id (or 0 if not yet available)
+    reference_number = batch.reference
+                       (the operator’s bill / delivery note, after
+                       per-row override)
+    snapshot JSON    = {
+                         reason: 'Stock-In',
+                         delta, rate, supplier_item_code,
+                         source_row_nos, collapsed_qty
+                       }
+
+  Item Stock-In movement (inventory_movements)
+    type             = adjustment_in
+    reference_type   = 'stock_in'     NEVER 'adjustment' for this path
+    reference_id     = staging batch id
+    reference_number = batch.reference
+    notes            = reason + optional supplier name
+
+  Extending writeIngredientLedger to ACCEPT reference_type /
+  reference_number is required at Stock-In implementation.
+  That is a small change to the existing helper, not a new engine.
+
+---------------------------------------------------------------------------
+12.A  SUM THEN IDEMPOTENCY  [OWNER decision 8 / SPEC]
+---------------------------------------------------------------------------
+
+  Inside one staging batch, before Post:
+
+    Group unposted SELECTED MATCHED lines by
+      line_type + matched_id (ingredient_id or product_id)
+      + branch_id + reference_number
+
+    If a group has more than one source row:
+      qty  = SUM(qty)
+      rate = qty-weighted average of rates that are present,
+             else the sole present rate, else 0
+      keep all source_row_nos on the snapshot
+      mark extras collapsed_into_line_id
+      post ONCE for the group
+
+    Example: INV-88 Gulberg Rice 500 kg + Rice 200 kg → one post
+    of +700 kg. Do not drop the 200 kg line.
+
+  After collapse, the unique posted key is:
+
+    company_id
+    + reference_type 'stock_in'
+    + reference_number
+    + ingredient_id OR product_id
+    + branch_id (or the null-branch token for single-shop)
+
+  Second Post of the same key (same batch retry or a new batch
+  with the same Reference for that item+branch): skip, report
+  “already received”. No second qty write.
+
+  Failed Post (transaction rollback): posted_at stays null; retry
+  safe.
+
+  Same file, new Reference: treated as a new delivery.
 
 
 ================================================================
@@ -641,19 +845,25 @@ is unsafe given the hardcoded pos_transaction.
 [SPEC] Hard rules
 
   1. Master Excel never calls adjustIngredientStock / addStock.
-  2. Stock-In never inserts pos_products, ingredients (except the
-     owner left the screen and created one), or product_recipes.
+  2. Stock-In never inserts pos_products, ingredients, or
+     product_recipes.
   3. Stock-In never uses adjust type=set.
-  4. Qty must be > 0. Unit must equal master unit.
-  5. Unmatched / INVALID never post.
-  6. Multi-branch: explicit branch + actorCanUse.
+  4. Qty must be > 0. Kitchen unit must equal ingredients.unit.
+     Item unit compared to pos_products.uom.
+  5. Unmatched / INVALID / SKIPPED_GATE never post.
+  6. Multi-branch: do not ship until heal/seed is fixed; then
+     explicit branch + actorCanUse; never null/all-branches.
   7. Kitchen stock cannot go below zero on adjust
      (already thrown in adjustIngredientStock).
   8. Do not post TYPE_PURCHASE / PurchaseOrder from NestPOS Stock-In.
-  9. One DB transaction per Post of the selected MATCHED rows.
- 10. TEXT codes; .xlsx only as the shop-facing file.
+  9. One DB transaction per Post of the selected collapsed MATCHED rows.
+ 10. TEXT codes; .xlsx as the shop-facing file.
  11. Cashiers cannot Post.
  12. Do not send NestPOS kitchen files to /fbr-pos/stock/purchase.
+ 13. Ledger reference_type for Stock-In is stock_in, never
+     pos_transaction.
+ 14. SUM duplicate Ingredient+Branch+Reference lines in-file
+     before the idempotency key.
 
 [VERIFIED] Ingredient opening on the create FORM still posts
 through adjustIngredientStock — keep that; do not also put opening
@@ -685,22 +895,21 @@ FBR / DI only (do not call from NestPOS Stock-In)
   FbrPosStockController::storePurchase / voidPurchase
   SupplierController::receivePurchaseOrder
 
-[SPEC] Stock-In is a controller + view that CALLS
-adjustIngredientStock and the adjustStock add-path (extract a
-private/shared method if needed). It does not introduce
-InventoryMovement types beyond existing adjustment_in and
-ingredient_adjustment (reference_type stock_in is metadata, not a
-new engine).
+[SPEC] Stock-In is a controller + view + staging tables that CALLS
+adjustIngredientStock (with explicit branchId when multi-branch is
+later enabled) and the adjustStock add-path. It does not introduce
+new movement *types* beyond ingredient_adjustment and adjustment_in.
+reference_type stock_in is metadata on those existing types.
 
 
 ================================================================
 15. WHAT MUST REMAIN SEPARATE FROM INVENTORY MASTER
 ================================================================
 
-  Stock-In Excel and Post
+  Stock-In Excel, staging, and Post
   /pos/inventory/adjust
   Ingredient Adjust modal
-  Transfers + receive
+  Transfers + receive (finished-goods; ingredient transfers deferred)
   Stock Check Excel (Line ID, Physical Count)
   FBR Receive Stock / PUR- purchase_orders
   DI /purchase-orders
@@ -708,6 +917,7 @@ new engine).
   pos_transactions / cash_received
   Khata wasooli receipts
   Health pharmacy batches
+  kitchenReport costing redesign (deferred)
 
   Opening stock belongs on create/adjust, not on Master re-import.
 
@@ -717,45 +927,57 @@ new engine).
 ================================================================
 
 Phase 0 — Safety before any Excel writes stock
-  Document (this spec).
-  Optional but strongly recommended: branch picker on ingredient
-  Adjust modal; refuse all-branches writes
-  (closes RecipeInventoryService silent head-office path).
-  [OWNER] ingredient_stocks healLegacy equivalent.
+  This spec.
+  Multi-branch Stock-In is NOT in Phase 1 or Phase 2a.
+  Heal / changeIngredientBranchStock seed fix is a prerequisite
+  of Phase 2b (multi-branch Stock-In), not of Phase 1 Master.
 
-Phase 1 — Inventory Master Excel (no stock)
-  Template download + import on Ingredients/Recipes (and a link
-  from Products).
-  Row Type PRODUCT | INGREDIENT | RECIPE as §3.
+Phase 1 — Inventory Master Excel (no stock)  [READY TO IMPLEMENT]
+  Template download + import.
+  One sheet, Row Type PRODUCT | INGREDIENT | RECIPE as §3.
+  Processing order INGREDIENT → PRODUCT → RECIPE.
+  Unit-change rule §3.B.
+  Template UX §3.C (frozen header, dropdown, Misal: samples
+  including Coke / Rice / Pizza recipe).
   Reuse PosController product match + IngredientController recipe
   upsert. current_stock always 0 on create from this file.
   Keep old product/recipe templates parsing.
+  Inventory nav: add Ingredients + Recipes links (existing routes).
   Tests analogous to PosProductExcelThirdScheduleTest and
   PosRecipeExcelImportTest (Misal:, name|unit reuse, recipe upsert,
-  no stock movement rows).
+  unit-change INVALID, no stock movement rows, pass order).
 
-Phase 2 — Stock-In UI wrapping existing services
-  Screen + StockIn.xlsx as §4–§7.
+Phase 2a — Stock-In for single-shop companies
+  Persistent staging (§7)
+  Screen + StockIn.xlsx as §4–§5
+  Feature gates row-level (§4.A)
   INGREDIENT lines → adjustIngredientStock
   ITEM lines → adjust add-path
-  Idempotency via reference_type stock_in (§12) — requires a small
-  extension of writeIngredientLedger to accept reference_type,
-  not a new table.
-  Default: do not change cost_per_unit.
-  Tests: match hierarchy, unit mismatch, duplicate reference,
-  unmatched does not create ingredient, branch refusal,
-  rollback on exception.
+  reference_type = stock_in (§12)
+  SUM then idempotency (§12.A)
+  Update Cost default OFF; save-as-code default OFF
+  Refuse if isMultiBranch
+  Tests: match hierarchy, unit mismatch, in-file sum, duplicate
+  reference no-op, unmatched does not create ingredient, mixed file
+  with recipes off still posts ITEM, rollback, staging survives
+  new session
 
-Phase 3 — Inventory IA
-  Sidebar + tab bars: Ingredients, Recipes, Stock In next to
-  Stock Check. Do not remove restaurant routes.
+Phase 2b — Multi-branch Stock-In
+  Only after seed/heal is resolved
+  Required branch picker; never null/all-branches
+  Pass branchId into adjustIngredientStock
+  Branch picker on ingredient Adjust modal
+  actorCanUse
+
+Phase 3 — Tab bars / remaining IA polish
+  Stock In next to Stock Check on every inventory tab bar
+  (nav Ingredients/Recipes already in Phase 1)
 
 Phase 4 — Only if a shop needs it
   Supplier mapping table
   Weighted-average field on ingredients (schema)
-  kitchenReport snapshot costing
-  Ingredient transfers (today transfer is products only —
-  PosInventoryController::storeTransfer)
+  kitchenReport snapshot costing (deferred by owner)
+  Ingredient transfers (deferred by owner)
 
 Do not implement FBR PO clone, GRN table, or a second ledger
 in any phase.
@@ -765,60 +987,58 @@ in any phase.
 CHALLENGES vs PRIOR REPORTS (summary)
 ================================================================
 
-  1. Do not put receiving on the Master sheet
-     — KEPT (both prior reports). Confirmed: re-import would
-       double-post; product Excel has no stock columns.
+  1. Do not put receiving on the Master sheet — KEPT.
 
-  2. Row Type Master format — KEPT, with cost only on INGREDIENT
-     rows (changed from investigation §8/§9).
+  2. Row Type Master format — KEPT. Cost only on INGREDIENT rows.
+     Processing order and unit-change rule added after review.
 
-  3. New Stock-In UI wrapping old services — KEPT, but do NOT
-     extend adjust-stock.blade.php itself (it is pos_products-only).
-     Pattern = Stock Check, not FBR purchase.
+  3. New Stock-In UI wrapping old services — KEPT. Pattern =
+     Stock Check + persistent staging, not FBR purchase.
 
-  4. Auto-write supplier code into ingredients.code — REJECTED
-     as default (changed from audit 37 §9).
+  4. Auto-write supplier code — REJECTED default (owner 2).
 
-  5. Always update cost_per_unit from Rate — REJECTED as default
-     (changed from audit 37 §10). Matches current
-     IngredientController::adjustStock.
+  5. Always update cost_per_unit from Rate — REJECTED default
+     (owner 1). kitchenReport redesign deferred (owner 6).
 
   6. Idempotency by reference_number alone — REJECTED.
-     writeIngredientLedger hardcodes reference_type. Extend it.
+     reference_type stock_in required. SUM in-file first (owner 8).
 
-  7. FBR Receive Stock as NestPOS kitchen receive — REJECTED
-     (both reports). Reconfirmed.
+  7. FBR Receive Stock as NestPOS kitchen receive — REJECTED.
 
+  8. Session staging — REJECTED (owner 3). Persistent staging.
 
-================================================================
-A. READY TO IMPLEMENT  (after owner signs this spec)
-================================================================
+  9. Ship multi-branch Stock-In in v1 — REJECTED until heal
+     (owner 4).
 
-  Inventory Master Excel format in §3
-  Stock-In Excel format in §5
-  Match hierarchy in §6 (code, then name+unit, no fuzzy)
-  Unmatched = clearance, no auto-create from Stock-In
-  Post through RecipeInventoryService::adjustIngredientStock
-    and PosInventoryController adjust add-path
-  Keep FBR Receive Stock isolated
-  Keep Adjust / Transfer / Stock Check as they are
-  Two files: Master vs Stock-In
-  Default Stock-In does not edit recipes or product prices
+ 10. ITEM Stock-In requires recipes — REJECTED. Row-level gates.
 
 
 ================================================================
-B. OWNER DECISION REQUIRED
+A. READY TO IMPLEMENT
 ================================================================
 
-  1. Stock-In cost checkbox default: OFF (this spec) vs ON (latest).
-  2. Optional “Save supplier code as Ingredient Code” default: OFF.
-  3. Whether clearance must survive a logout (needs a staging table).
-  4. Heal NULL ingredient_stocks onto head office before
-     multi-branch Stock-In.
-  5. Whether to move Ingredients/Recipes into the Inventory sidebar
-     in Phase 3 or leave them only under Restaurant.
-  6. Later: kitchenReport live cost vs snapshot (restatement).
-  7. Later: ingredient-level branch transfers (not in v1).
+  Phase 1 Inventory Master Excel (§3 including 3.A, 3.B, 3.C)
+  Inventory nav aliases for Ingredients + Recipes (existing routes)
+  Two-file rule: Master never posts stock
+  FBR Receive Stock remains isolated
+
+  Phase 2a Stock-In is specified but MUST NOT start until Phase 1
+  is done; it also needs staging schema at implementation time
+  and the writeIngredientLedger reference_type extension.
+
+
+================================================================
+B. OWNER DECISIONS
+================================================================
+
+  All eight items in “LOCKED OWNER DECISIONS” at the top of this
+  file are closed. Do not re-ask them.
+
+  Still deferred (intentionally not this phase):
+    kitchenReport snapshot costing
+    ingredient-level branch transfers
+    supplier mapping table (v2)
+    multi-branch Stock-In (blocked on heal/seed)
 
 
 ================================================================
@@ -832,6 +1052,7 @@ C. UNKNOWN / PRODUCTION VERIFICATION
      no mixed rows.
   3. ingredient_stocks vs current_stock drift on multi-branch
      shops (changeIngredientBranchStock seed-with-before).
+     Blocks Phase 2b only.
   4. Whether excel_enabled shops that have recipes=off still need
      PRODUCT-only Master import (yes per this spec).
   5. Unit aliases in the wild (ltr vs liter) — not in
@@ -852,25 +1073,30 @@ what exactly should we build?
 
   1. Inventory Master.xlsx (one sheet, Row Type
      PRODUCT / INGREDIENT / RECIPE)
+     Pass order INGREDIENT → PRODUCT → RECIPE.
      Creates and updates the menu, the kitchen catalog, and the BOM.
      Safe to re-upload. Never posts stock.
+     Refuse ingredient unit change when BOM or stock exists.
 
   2. Inventory → Stock In (new page beside Stock Check)
-     + StockIn.xlsx
-     Matches supplier lines to existing ingredients/items
-     (code, then exact name+unit), clears exceptions by picking
-     an existing master row, then Posts through
-     RecipeInventoryService::adjustIngredientStock and the existing
-     product Adjust-add path.
-     Requires Branch when there are branches, and a bill Reference
-     so the same file cannot land twice.
+     + StockIn.xlsx + persistent staging
+     ITEM rows if inventory is on; INGREDIENT rows if recipes is on.
+     Matches supplier lines (code, then exact name+unit), clears
+     exceptions, SUMs duplicate Ingredient+Branch+Reference lines,
+     then Posts through RecipeInventoryService::adjustIngredientStock
+     and the existing product Adjust-add path with
+     reference_type = stock_in.
+     Single-shop first. Multi-branch only after heal/seed is fixed,
+     with an explicit branch picker (never null/all-branches).
 
   3. Leave in place: Ingredients Adjust for one bag, item Adjust
-     for one crate, Transfers, Stock Check, FBR Receive Stock
-     (FBR catalog only).
+     for one crate, Transfers (items), Stock Check, FBR Receive
+     Stock (FBR catalog only). Put Ingredients and Recipes in the
+     Inventory nav without deleting restaurant routes.
 
   That is the whole system: master data on one sheet, stock
   transactions on another, sales already consuming recipes into
   ingredient stock.
 
-End of spec. No implementation performed.
+End of spec. No implementation performed in this turn.
+)

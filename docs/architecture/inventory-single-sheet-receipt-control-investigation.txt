@@ -1,0 +1,978 @@
+TaxNest / NestPOS — Receipt Control investigation
+=================================================
+Purpose: Before any SINGLE-SHEET Excel Inventory Master work, determine what
+         “Receipt Control” means in the EXISTING system, and whether it belongs
+         on a Products + Ingredients + Recipes master sheet.
+
+Date of investigation: 2026-09-08
+Scope: code, schema, migrations, routes, controllers, services, models, views,
+       tests, lang files, architecture docs, nestpos-book, Madadgar knowledge.
+Mode: INVESTIGATION ONLY. No code, schema, migration, test, Actions, or
+      production changes were made. No PR.
+
+How to read this file
+---------------------
+Every claim is tagged:
+
+  [VERIFIED FROM CODE]  Observed in source / migrations / tests / lang / docs
+                        that ship with the app.
+  [INFERRED]            Reasonable reading of that evidence; not a named
+                        identifier in the repo.
+  [UNKNOWN]             Not present; cannot be determined from this checkout.
+
+Authority order matches docs/architecture/README.md: running code first.
+
+
+================================================================
+0. HEADLINE FINDING
+================================================================
+
+[VERIFIED FROM CODE]
+The exact phrases “Receipt Control”, “receipt control”, and identifier
+receipt_control do NOT exist anywhere in:
+
+  app/  resources/  lang/  docs/  tests/  routes/
+
+A whole-tree search of those trees (excluding public/downloads zip and
+node_modules) returned ZERO hits.
+
+Therefore this report cannot point at a class, table, route, or setting
+literally named Receipt Control. Inventing one would violate the brief.
+
+What DOES exist are several DIFFERENT “receipt / receive / received”
+families. They must not be collapsed into one concept.
+
+[INFERRED]
+Given the brief (NestPOS Inventory Master for Products + Ingredients +
+Recipes), the operational question is almost certainly about GOODS IN
+(maal wasool / stock received / purchase), not thermal bill printing.
+The closest NestPOS implementations of goods-in are documented in
+sections 2–5. They are not titled Receipt Control.
+
+[UNKNOWN]
+Whether the owner’s spoken phrase “Receipt Control” maps 1:1 to
+(a) Receipt Display print settings,
+(b) FBR POS “Receive Stock”,
+(c) NestPOS stock adjust with reason “New Purchase”,
+(d) NestPOS branch-transfer receive (“wasool ho gaya”),
+or (e) a feature that lives only in owner conversation / a doc not in
+this repo.
+
+
+================================================================
+1. OCCURRENCE MAP (every family actually used)
+================================================================
+
+1.A  Literal “Receipt Control”
+------------------------------
+[VERIFIED FROM CODE] Not found.
+
+1.B  Customer / thermal BILL “receipt”  (dominant NestPOS UI meaning)
+---------------------------------------------------------------------
+[VERIFIED FROM CODE]
+
+Named UI: “Receipt Display Options” / “Receipt Display”
+  lang: pos.card_receipt_display = “Receipt Display”
+  lang: pos.card_receipt_display_desc =
+        “Control the address, NTN, phone & footer message on receipts”
+  Route: GET|POST /pos/receipt-settings  → PosController::receiptSettings
+         name pos.receipt-settings
+  View:  resources/views/pos/receipt-settings.blade.php
+  Customize card: resources/views/pos/customize.blade.php
+  Guard: pos.auth + PosAdminOnly group; cashiers abort 403
+         (“Only POS administrators can change receipt settings.”)
+  Comments in code explicitly say “owner” (22 Jul 2026, 21 Aug 2026).
+
+Print templates:
+  resources/views/pos/receipts/receipt_80mm.blade.php
+  resources/views/pos/receipts/receipt_58mm.blade.php
+  Support: App\Support\PosReceiptThemes
+
+Company / settings surface (not inventory):
+  companies columns and JSON receipt prefs
+    receipt_align_center, receipt_left_margin_mm, receipt_printer_size,
+    receipt_footer_note, pos_receipt_show_tax, delivery_receipt_print_on_assign, …
+  Docs: docs/architecture/16-printing-devices.md
+        docs/architecture/18-settings.md
+        docs/nestpos-book.md  “Receipt Settings (/pos/receipt-settings)”
+        resources/madadgar/knowledge-pos.md
+
+Sale-time cash box (also named “received”, but money not stock):
+  lang: pos.cash_received_toggle_sub
+  pos_transactions.cash_received / change_due
+  Printed on the customer receipt when enabled.
+
+FBR POS twin:
+  /fbr-pos/receipt-settings
+  comments: “Receipt Display toggles (owner, 22 Jul 2026)”
+
+This family is PRINT / DISPLAY CONTROL of the customer bill.
+It has no Product / Ingredient / Recipe / stock-movement coupling
+beyond what already prints on a sold bill.
+
+1.C  Khata “wasooli receipt”  (customer payment slip)
+-----------------------------------------------------
+[VERIFIED FROM CODE]
+  Route: GET /khata/wasooli/{entry}/receipt
+         FbrPosKhataController::wasooliReceipt
+         name fbrpos.khata.wasooli.receipt
+  Lang: pos.wasooli_receipt_title, pos.wasooli_print_rasid, …
+  Meaning: customer credit collection (udhaar/wasooli), not inventory.
+
+1.D  Goods receiving — FBR POS “Stock & Purchase” / “Receive Stock”
+-------------------------------------------------------------------
+[VERIFIED FROM CODE]
+
+This is the only shopkeeper-facing module whose button is literally
+“Receive Stock”.
+
+  Lang:
+    pos.nav_stock_purchase     = “Stock & Purchase”
+    pos.stock_page_title       = “Stock & Purchase”
+    pos.stock_receive_btn      = “Receive Stock”
+    pos.stock_mov_type_purchase = “Purchase received”
+    Flash: “Stock receive ho gaya — {PUR-…}”
+
+  Controller: App\Http\Controllers\FbrPosStockController
+    Comment on the class:
+      “Purchase entry = one-shot ‘stock received’ (PO created as RECEIVED
+       and stock added immediately) — small retailers don't do
+       draft/ordered flows.”
+    storePurchase()  POST /fbr-pos/stock/purchase
+                     name fbrpos.stock.purchase
+                     middleware plan.limit:inventory
+    voidPurchase()   POST /fbr-pos/stock/purchase/{id}/void
+
+  Product-form twin (same PO shape):
+    FbrPosController::recordProductFormPurchase
+    FbrPosController::applyEditStockAdjustment  action=add with supplier
+    Comment: “recorded as a RECEIVED purchase (same shape as … Stock &
+              Purchase page)”
+
+  View: resources/views/fbr-pos/stock.blade.php
+
+  Numbering: po_number = 'PUR-' . date('ymd') . '-' . random(4)
+  Status:    PurchaseOrder::STATUS_RECEIVED immediately
+  Movements: InventoryMovement::TYPE_PURCHASE via InventoryService::addStock
+  Cost:      SupplierLedgerService::computeLines → net_unit_cost
+             (bonus qty + discounts spread over paid+bonus units)
+             updates avg_purchase_price / last_purchase_price (kharid)
+  Branch:    goods land in ONE shop; all-branches view refused
+  Roles:     assertNotCashier — cashiers/viewers cannot receive stock
+
+  Tests:
+    tests/Feature/FbrPosStockPurchaseVoidTest.php
+    tests/Feature/FbrPosStockPurchasesSearchTest.php
+    tests/Feature/FbrPosBranchStockTest.php
+    tests/Feature/FbrPosSupplierLedgerTest.php
+    tests/Feature/FbrPosProductFullEditTest.php
+      test_edit_add_stock_books_purchase_movement
+
+THIS MODULE IS FBR POS, not NestPOS (PRA). It uses the shared `products`
+table (DI/FBR catalog), not `pos_products`.
+
+1.E  Goods receiving — Digital Invoicing panel (web guard)
+----------------------------------------------------------
+[VERIFIED FROM CODE]
+
+  Routes (middleware auth — NOT pos.auth):
+    GET  /purchase-orders
+    POST /purchase-orders                      storePurchaseOrder  STATUS_DRAFT
+    POST /purchase-orders/{id}/receive         receivePurchaseOrder
+    POST /purchase-orders/{id}/cancel
+    /suppliers CRUD
+
+  Controller: App\Http\Controllers\SupplierController
+  View:       resources/views/inventory/purchase-orders.blade.php
+              button title “Receive Stock”
+  Numbering:  PO-00001 style (sequential)
+  Catalog:    App\Models\Product (DI `products` table)
+  Receive:    remaining qty → InventoryService::addStock TYPE_PURCHASE
+              item.received_quantity = quantity
+              status = received, received_date = today
+  Cancel:     blocked if already received
+
+NestPOS restaurant cashiers never hit these routes (wrong guard).
+
+1.F  NestPOS product stock IN  — stock ADJUST, not a PO
+-------------------------------------------------------
+[VERIFIED FROM CODE]
+
+NestPOS has NO /pos/.../purchase or /pos/.../suppliers route.
+
+Inbound finished-goods qty is recorded at:
+
+  GET|POST /pos/inventory/adjust
+  PosInventoryController::adjustStock
+  view: resources/views/pos/inventory/adjust-stock.blade.php
+
+  Types: add / remove / set
+  On add: optional purchase_price updates avg_purchase_price + last_purchase_price
+  Movement type written: TYPE_ADJUSTMENT_IN or TYPE_ADJUSTMENT_OUT
+                         (NOT TYPE_PURCHASE)
+  reference_type: 'adjustment'
+  Also writes inventory_adjustments row.
+
+  Reason dropdown includes the string “New Purchase”
+    (lang pos.reason_new_purchase)
+
+Shopkeeper docs treat this as THE NestPOS restock path:
+
+  docs/nestpos-book.md Baab 12
+  resources/madadgar/knowledge-pos.md
+  MadadgarLocalEngine stock answer
+
+  “Stock adjust: product chunein → Add (+) / Remove (−) / Set Exact (=)
+   → quantity → (Add par purchase price) → Reason (New Purchase, …)”
+
+So in NestPOS, “new purchase / receive stock” is a labelled ADJUSTMENT,
+not a PurchaseOrder.
+
+1.G  NestPOS branch-transfer RECEIVE  (“wasool ho gaya”)
+--------------------------------------------------------
+[VERIFIED FROM CODE]
+
+  POST /pos/inventory/transfer/{movement}/receive
+  name pos.inventory.transfer.receive
+  PosInventoryController::receiveTransfer
+  Task 1434
+
+  Comment: destination branch clicks “wasool ho gaya”. ONLY then does
+           maal land in the receiving branch’s sellable stock.
+           received_quantity may be LESS than sent (road loss).
+
+  Columns on inventory_movements (TRANSFER_OUT row):
+    transfer_status: in_transit | received | cancelled
+    received_quantity
+  Migration: database/migrations/2026_08_22_120000_add_transfer_state_to_inventory_movements.php
+
+  Workflow:
+    storeTransfer → TRANSFER_OUT, status in_transit (stock leaves source)
+    receiveTransfer → status received, TRANSFER_IN at dest, cost blended
+    cancelTransfer → goods return to source; not allowed after received
+
+  UI: resources/views/pos/inventory/transfer.blade.php
+  Tests: tests/Feature/PosBranchStockTest.php
+         (in-transit, shortfall, cancel, concurrent receive, schema-drift)
+
+This is inter-BRANCH receipt, not supplier receipt. It does not create
+PurchaseOrder rows. It does not touch ingredients.
+
+1.H  NestPOS kitchen ingredient stock IN
+----------------------------------------
+[VERIFIED FROM CODE]
+
+No supplier, no PO, no GRN.
+
+  POST /pos/restaurant/ingredients              IngredientController::store
+       opening qty → RecipeInventoryService::adjustIngredientStock
+       reason “Opening kitchen stock”
+  POST /pos/restaurant/ingredients/{id}/adjust  IngredientController::adjustStock
+       free-text reason; ledger type ingredient_adjustment
+
+  Ledgers:
+    ingredients.current_stock          (company mirror)
+    ingredient_stocks                  (per branch)
+    ingredient_movements.type          = 'ingredient_adjustment'
+
+There is no ingredient equivalent of FBR storePurchase.
+
+1.I  Health / pharmacy goods received
+-------------------------------------
+[VERIFIED FROM CODE]
+  HealthPharmacyPurchaseController / HealthPharmacyStockService
+  HealthBatchMovement::TYPE_PURCHASE
+  HealthPostingService comment: “Goods received from a supplier.”
+  Batches: received_quantity on health_medicine_batches
+
+Out of NestPOS restaurant Inventory Master scope (different product line).
+
+1.J  Terminology that does NOT exist
+------------------------------------
+[VERIFIED FROM CODE]
+  GRN / grn_  — not used in app/, resources/, lang/, docs/, tests/, routes/
+  “goods received” as a NestPOS label — not used
+    (only HealthPostingService comment)
+  receipt_control setting key — not used
+  A Recipe model — not used (BOM lives in product_recipes)
+
+
+================================================================
+2. WHAT THE OWNER’S “RECEIPT CONTROL” CANNOT BE PROVED TO BE
+================================================================
+
+[VERIFIED FROM CODE]
+No module, nav item, permission, or Excel sheet is named Receipt Control.
+
+[INFERRED — ranked by closeness of LANGUAGE vs closeness of INVENTORY]
+
+Rank 1 — closest OWNER-NAMED “receipt + control” wording
+  Receipt Display / Receipt Settings.
+  The English description literally says “Control the … on receipts”.
+  Code comments attribute the feature to the owner (Jul/Aug 2026).
+  This is print layout. It is unrelated to Products/Ingredients/Recipes
+  master data.
+
+Rank 2 — closest INVENTORY feature whose UI says “Receive”
+  FBR POS Stock & Purchase → Receive Stock
+  (one-shot RECEIVED purchase_orders + TYPE_PURCHASE movements).
+  Not mounted under NestPOS /pos/*.
+
+Rank 3 — closest NESTPOS goods-in feature
+  /pos/inventory/adjust with reason “New Purchase”
+  + optional purchase_price (kharid / avg cost).
+  Movement type is adjustment_in, not purchase.
+
+Rank 4 — NestPOS word “wasool / received”
+  Branch transfer receive (received_quantity / TRANSFER_RECEIVED).
+
+Rank 5 — DI /inventory purchase-orders receive
+  Two-step DRAFT → Receive. Web guard. `products` table.
+
+[UNKNOWN]
+Which of the above (if any) the owner intends when they say
+“Receipt Control” in conversation. The repo does not record that phrase.
+
+
+================================================================
+3. FEATURE INVENTORY (for the goods-in family, since the Excel
+   master is an inventory design)
+================================================================
+
+3.1  FBR POS Receive Stock  (section 1.D)
+-----------------------------------------
+Models
+  PurchaseOrder, PurchaseOrderItem, PurchaseReturn, PurchaseReturnItem,
+  Supplier, SupplierPayment, InventoryStock, InventoryMovement, Product
+  (FBR/DI catalog)
+
+Tables
+  purchase_orders, purchase_order_items, suppliers, supplier_payments
+  (Task 1580 ledger cols), inventory_stocks, inventory_movements
+  Optional pharmacy batch tables when Pharmacy Mode is on.
+
+Migrations (selected)
+  2026_02_17_150000_create_inventory_module.php     (base PO + stock)
+  2026_08_06_100000_add_fbr_retail_core_features.php
+  2026_09_06_170000_fbr_pos_supplier_ledger.php
+  2026_08_22_120000_add_transfer_state_to_inventory_movements.php
+    (transfer only; not PO)
+
+Controllers / services
+  FbrPosStockController::{storePurchase,voidPurchase,…}
+  FbrPosController::{recordProductFormPurchase, applyEditStockAdjustment,
+                     applyProductStockFields}
+  InventoryService::addStock / reverse purchase (void)
+  SupplierLedgerService::computeLines, recordPayment, audit
+  PharmacyBatchService::receive (optional)
+  BranchStockService (branch land + mirror)
+
+Routes
+  POST /fbr-pos/stock/purchase
+  POST /fbr-pos/stock/purchase/{id}/void
+  (plus stock page GET under feature:inventory,relevant / plan.limit:inventory)
+
+UI
+  resources/views/fbr-pos/stock.blade.php  Alpine purchase form + void
+
+Permissions
+  fbrpos.auth; assertNotCashier; plan.limit:inventory;
+  companies.inventory_enabled derived from feature flag (class comment)
+
+Branch / company
+  company_id on every row; purchase lands in one branch_id;
+  confined manager cannot receive/void another shop’s bill
+
+Stock movements
+  TYPE_PURCHASE on receive; purchase_void reverse on void;
+  avg/last kharid maintained
+
+Supplier
+  Optional on the form; required if paid_amount > 0
+  Quick-add from product form (Task 1261)
+
+Cost / rate
+  Printed unit_price vs net_unit_cost after bonus + discounts
+  last_purchase_price / avg_purchase_price on inventory_stocks
+  Sale munafa snapshots historical cost, not live kharid
+  (FbrPosController comments: “kharid-rate edit must not retro-rewrite”)
+
+Numbering
+  PUR-YYMMDD-XXXX  unique per company (unique company_id+po_number)
+
+Status / workflow
+  Created already STATUS_RECEIVED (no draft/ordered in FBR UI)
+  DI panel uses draft → receive instead (same tables, different UI)
+
+Edit / void / delete
+  No line-edit of a received PO in the FBR UI traced here
+  Void: only fully received; blocked if returns posted;
+  reverses stock; payments stay as credit (ledger tests)
+  Cannot cancel received DI POs
+
+Reports
+  Stock page purchase history + search
+  Supplier statement PDF (FbrPosSupplierLedgerController)
+  Munafa report (needs kharid)
+
+Tests
+  See section 1.D list
+
+Excel
+  NONE for purchases. Product Excel is catalog-only (section 7).
+
+3.2  NestPOS product adjust  (section 1.F)
+------------------------------------------
+Models
+  PosProduct, InventoryStock, InventoryMovement, InventoryAdjustment
+  (no PurchaseOrder on this path)
+
+Controller
+  PosInventoryController::adjustStock
+
+Routes (inside PosAdminOnly + feature:inventory,relevant)
+  /pos/inventory, /stock, /movements, /low-stock, /adjust,
+  /transfer (+ receive/cancel), /min-stock, /toggle
+  /pos/inventory/stock-check*  (physical count, separate Excel)
+
+UI
+  pos/inventory/adjust-stock.blade.php
+  pos/inventory/stock.blade.php, movements, dashboard, transfer, stock-check
+
+Permissions
+  pos.auth; PosAdminOnly (cashiers blocked via assertNotCashier on writes);
+  company.inventory_enabled; feature recipes depends on inventory
+  (PosFeatureService::DEPENDENCIES recipes => [inventory])
+
+Branch
+  BranchStockService::writeBranchId / actorCanUse
+  pos_products.stock_quantity is COMPANY TOTAL mirror
+
+Movements
+  adjustment_in / adjustment_out
+  Reason string may be “New Purchase” but type is still adjustment
+
+Supplier
+  None on this form
+
+Cost
+  Optional purchase_price on Add only; weighted average
+
+Numbering / status
+  None (no PO)
+
+Edit / void
+  Adjustments are new rows; no void-of-purchase API on NestPOS
+
+Reports
+  /pos/inventory/movements (filter includes type Purchase in the book,
+   but NestPOS adjust does not write type=purchase — see INFERRED below)
+  /pos/inventory/low-stock
+
+Tests
+  tests/Feature/PosBranchStockTest.php (transfers + branch stock)
+  Stock-check tests (physical count, not purchase)
+
+3.3  NestPOS ingredient + recipe
+--------------------------------
+Models
+  Ingredient, ProductRecipe (NOT a Recipe model), IngredientMovement
+  RecipeInventoryService
+
+Tables
+  ingredients, ingredient_stocks, ingredient_movements,
+  product_recipes, recipe_consumptions, prepared_returns
+
+Migrations
+  2026_03_28_193300_create_ingredients_table.php
+  2026_03_28_193300_create_product_recipes_table.php
+    unique (product_id, ingredient_id)
+    product_id → pos_products
+  2026_08_27_200000_create_recipe_kitchen_inventory.php
+
+Controllers
+  IngredientController (CRUD ingredients, recipes, Excel import, kitchen report)
+  RecipeInventoryService (sale consume, returns, adjust)
+
+Routes
+  /pos/restaurant/ingredients*
+  /pos/restaurant/recipes*
+  /pos/restaurant/kitchen-report
+  middleware feature:recipes (implies inventory)
+
+Stock on sale
+  Recipe items consume INGREDIENTS, not pos_products stock
+  Non-recipe items consume inventory_stocks
+  (RecipeInventoryService class docblock)
+
+Kitchen inbound
+  Only adjustIngredientStock (opening or manual). No PO.
+
+Reports
+  IngredientController::kitchenReport  (food cost from current cost_per_unit
+   × historical recipe_consumptions qty)
+
+Excel
+  recipes_template.xlsx / importRecipes  (Task 1162)
+  Columns: Product Name, Product Code (SKU/Barcode), Ingredient Name,
+           Unit, Quantity Needed, Cost per Unit (optional)
+  Duplicate product+ingredient UPDATES quantity
+  Sample rows prefixed “Misal:” are skipped
+  Does NOT gate on excel_enabled (unlike product Excel)
+  Tests: tests/Feature/PosRecipeExcelImportTest.php
+         tests/Feature/RecipeKitchenInventoryServiceTest.php
+
+Units
+  RecipeInventoryService::UNITS = kg,g,ltr,ml,pcs,dozen,pack
+  conversion_factor stored/edited; consume math does not use it
+  [INFERRED from prior forensic pass + current adjust/consume code path]
+
+3.4  NestPOS transfer receive  (section 1.G)
+--------------------------------------------
+Covered above. Inter-branch only. received_quantity on TRANSFER_OUT.
+Cost travels with the goods (blendCost at destination).
+
+
+================================================================
+4. HOW “RECEIVING” INTERACTS WITH CATALOG OBJECTS
+================================================================
+
+All of the following is [VERIFIED FROM CODE] unless marked otherwise.
+
+Product (NestPOS) = pos_products / PosProduct
+  Sale without a recipe: deducts inventory_stocks + mirrors
+    pos_products.stock_quantity
+  Sale with a recipe: does NOT reduce finished-goods stock; consumes
+    ingredients instead
+  NestPOS inbound: adjustStock (adjustment_in) OR transfer receive
+  Product Excel import/export: Name, Price, Description, Category, SKU,
+    Barcode, Tax Rate %, Unit (UOM), Tax Exempt, Third Schedule
+    — NO stock, supplier, PO, or recipe columns
+
+Product (FBR/DI) = products / Product
+  FBR Receive Stock and DI PO receive write inventory_stocks against
+    THIS catalog, TYPE_PURCHASE
+  No recipe FKs on this table
+  [INFERRED] FBR universal view hardcodes recipes => false
+             (from prior forensic notes; not re-opened here as a
+             NestPOS Excel constraint)
+
+Ingredient
+  Company-scoped; code unique per company (when column present)
+  current_stock + ingredient_stocks
+  Inbound ONLY via adjustIngredientStock
+  No supplier_id column on ingredients
+
+Recipe / ProductRecipe
+  BOM lines only: product_id, ingredient_id, quantity_needed per 1 sold unit,
+  recipe_version, is_active
+  Unique (product_id, ingredient_id)
+  No yield, no scrap, no receipt of a “finished dish” into ingredient stock
+  Historical sales: live BOM for non-deal consume; recipe_consumptions
+    snapshot protects returns; deals freeze recipe_snapshot
+
+Ingredient Stock vs Inventory Stock
+  Two ledgers on purpose (RecipeInventoryService docblock)
+  A dish cannot be counted twice
+  Stock-check Excel lists both: Type = Raw Material | Item
+
+Supplier
+  Shared suppliers table, company_id
+  Used by FBR Stock & Purchase, DI purchase-orders, Health pharmacy
+  NOT wired to NestPOS /pos/inventory/adjust
+  NOT wired to IngredientController
+
+Purchase / Receiving
+  NestPOS: not a first-class PO workflow
+  FBR POS: one-shot RECEIVED PO
+  DI: draft PO then receive
+  Health: pharmacy batches + shared POs
+
+Stock Movements
+  inventory_movements types:
+    purchase, sale, adjustment_in, adjustment_out,
+    return_in, return_out, transfer_in, transfer_out,
+    opening, recipe_sale, recipe_return
+  ingredient_movements types:
+    recipe_sale, recipe_return, ingredient_adjustment
+
+[INFERRED]
+nestpos-book says movements filter includes “Purchase”. NestPOS adjust
+writes adjustment_in even when reason is “New Purchase”. A type=purchase
+row on a NestPOS company would only appear if some other writer
+(InventoryService::addStock TYPE_PURCHASE) ran — NestPOS UI does not.
+
+
+================================================================
+5. CLASSIFICATION (A/B/C/D) — BASED ONLY ON CODE
+================================================================
+
+There is no single module named Receipt Control. Split by product:
+
+NestPOS (the Excel master target)
+  Goods-in of SELLABLE products:
+    C) stock adjustment mechanism
+       (/pos/inventory/adjust, reason may be “New Purchase”)
+    plus a SEPARATE A) inter-branch receipt workflow
+       (/pos/inventory/transfer/.../receive)
+    NOT B) purchase/receiving (no NestPOS PO UI)
+
+  Goods-in of INGREDIENTS:
+    C) stock adjustment only
+       (opening on create + /ingredients/{id}/adjust)
+
+  Customer bill “receipt”:
+    D) print / display settings (/pos/receipt-settings)
+       plus cash_received on the sale
+
+FBR POS
+  B) purchase/receiving as one-shot RECEIVED PO
+     with optional C) correct-qty as adjustment_in/out on product edit
+     and A) is not the primary receive path
+
+DI panel
+  B) purchase/receiving, two-step draft → receive
+
+Health
+  B) pharmacy purchase/batch receive (separate product)
+
+[INFERRED]
+If the owner’s phrase is inventory-shaped, NestPOS “Receipt Control”
+in practice is C (adjust / New Purchase) and must not be confused with
+FBR’s B (PUR- documents) or with D (thermal Receipt Display).
+
+
+================================================================
+6. DOES IT BELONG ON THE SINGLE-SHEET INVENTORY MASTER?
+================================================================
+
+Recommendation: NO.
+
+[VERIFIED FROM CODE] reasons it must stay OUTSIDE the
+Product / Ingredient / Recipe master import:
+
+1. Existing NestPOS Product Excel is catalog-only. It has never imported
+   stock qty, supplier, PO number, received date, or movement type.
+   (PosController::downloadProductTemplate / importProducts)
+
+2. Existing Recipe Excel is BOM-only. It find-or-creates ingredients and
+   upserts product_recipes. It does not post ingredient_movements except
+   indirectly if a brand-new ingredient were given stock — and the
+   importer does not take opening stock as a column.
+   Headers: Product Name, Product Code, Ingredient Name, Unit,
+            Quantity Needed, Cost per Unit (optional)
+
+3. Receiving (wherever it exists) is TRANSACTIONAL:
+   dated, numbered (PUR-/PO-), statused, voidable, branch-scoped,
+   supplier-scoped, and it writes ledgers. A master sheet is
+   IDEMPOTENT catalog/BOM. Mixing them would re-receive stock on
+   every re-import unless a complex “alreadyStocked” guard were copied
+   from FBR product-form opening logic — which NestPOS product Excel
+   does not have.
+
+4. NestPOS product inbound and ingredient inbound use DIFFERENT
+   ledgers and movement types. One “Receipt” column could not post
+   correctly without a row-type that is already the job of Stock Adjust
+   / Ingredient Adjust / (FBR) Receive Stock screens.
+
+5. Receipt Display (the only owner-attributed “control … on receipts”
+   feature) is a COMPANY setting, not a per-row inventory field.
+
+6. Branch transfer receive requires an in-transit TRANSFER_OUT id.
+   That cannot be expressed as a catalog row.
+
+7. FBR purchase void, bonus qty, invoice discount, and supplier ledger
+   paid_amount have no meaning on a recipe BOM line.
+
+[INFERRED]
+Opening stock on FIRST create of an ingredient (current_stock on
+IngredientController::store) is the only catalog-adjacent inbound.
+Even that is posted through the adjustment ledger so it is not counted
+twice. Putting live Opening Stock on a re-importable master sheet is
+unsafe unless the importer copies the FBR “alreadyStocked / never
+duplicates on edit re-save” rule. Safer: leave opening stock to the
+existing adjust screens (or a future dedicated receiving sheet).
+
+[UNKNOWN]
+Whether a LATER, separate Excel for FBR/DI purchases is desired.
+That would not be the Inventory Master.
+
+
+If the answer were forced YES (not recommended)
+-----------------------------------------------
+Minimum columns that would even be able to POST like current NestPOS
+adjust (NOT FBR PO), still a bad fit on the same sheet:
+
+  Row Type, Item Code, Qty In, Unit Cost (kharid), Branch, Reason,
+  Date, Notes
+
+That is a movement sheet, not a master. 5–10 example rows would look
+like transactions (2026-09-01, Cheese 5 kg @ 1200, New Purchase) sitting
+next to BOM lines (Large Pizza needs 120 g cheese). The current Recipe
+Excel already proves the shopkeeper sheet is BOM-shaped, not GRN-shaped.
+
+No example receiving rows are given as a proposed master format,
+because the recommendation is to keep them out.
+
+
+================================================================
+7. EXISTING EXCEL IMPORT / EXPORT — REUSE?
+================================================================
+
+[VERIFIED FROM CODE]
+
+NestPOS Product Excel
+  Template/export: pos_products_template.xlsx / pos_products_export.xlsx
+  Gate: planGate('excel_enabled')  Business+
+  Columns listed in §4
+  Match on import: barcode → SKU → name
+  Tests: tests/Feature/PosProductExcelThirdScheduleTest.php
+  MUST reuse this terminology for product columns (Name, Price, SKU,
+  Barcode, Tax Rate %, Unit (UOM), Tax Exempt, Third Schedule)
+
+NestPOS Recipe Excel
+  recipes_template.xlsx
+  Gate: feature:recipes only (no excel_enabled check in IngredientController)
+  Columns listed in §3.3
+  Tests: tests/Feature/PosRecipeExcelImportTest.php
+  MUST reuse: Product Name, Product Code (SKU/Barcode), Ingredient Name,
+  Unit, Quantity Needed, Cost per Unit (optional)
+  Sample marker “Misal:” must keep working
+  Upsert rule: duplicate product+ingredient updates qty, never errors
+
+NestPOS Stock-Check Excel  (NOT a master, NOT receiving)
+  /pos/inventory/stock-check/{id}/sheet  download
+  /pos/inventory/stock-check/{id}/import import
+  Columns: Line ID, Type, Code, Item, Unit,
+           System Qty (Should Be), Physical Count, Reason, Notes
+  Type values: “Raw Material” | “Item”
+  This is physical COUNT, posted through StockCheckService, not purchase.
+  Do not reuse as receipt/PO import.
+
+FBR Product Excel
+  Twin of NestPOS product Excel against `products`
+  Still no purchase columns
+  Tests: tests/Feature/FbrPosProductExcelThirdScheduleTest.php
+
+FBR / DI / NestPOS purchase receive
+  NO Excel import/export for PurchaseOrder / Receive Stock was found.
+
+DI invoice Excel, HS master, Health setup, biometric, annexure
+  Unrelated to NestPOS kitchen inventory master.
+
+[INFERRED]
+A unified single-sheet master should SPEAK the existing Product + Recipe
+Excel dialects (same header aliases, TEXT SKU/Barcode, Misal: samples,
+5000/2000 row caps, company-scoped match). It should NOT invent GRN /
+Receipt No / Supplier Invoice columns, because no NestPOS importer
+understands them and FBR receiving is a different panel.
+
+
+================================================================
+8. RECOMMENDED SINGLE-SHEET FORMAT (master only)
+================================================================
+
+Goal: one sheet a shopkeeper can fill for Pizza / Burger / Wings that
+creates/updates:
+  - pos_products (sellable dishes)
+  - ingredients (raw)
+  - product_recipes (BOM: qty per 1 sold unit)
+
+Do NOT include: PO numbers, suppliers, received qty, transfer status,
+receipt printer toggles, live stock, or stock-check physical counts.
+
+Suggested headers (keep existing names where they already exist):
+
+  A  Row Type          PRODUCT | INGREDIENT | RECIPE
+  B  Product Name      (PRODUCT + RECIPE)
+  C  Product Code      SKU/Barcode (TEXT) — existing Recipe + Product alias
+  D  Price             PRODUCT only (menu rate)
+  E  Category          PRODUCT only
+  F  Description       PRODUCT only
+  G  Tax Rate %        PRODUCT only
+  H  Unit (UOM)        PRODUCT sale unit (existing product Excel)
+  I  Tax Exempt        Yes/No
+  J  Third Schedule    Yes/No
+  K  Ingredient Name   INGREDIENT + RECIPE
+  L  Ingredient Code   optional, ingredients.code
+  M  Ingredient Unit   kg|g|ltr|ml|pcs|dozen|pack  (RecipeInventoryService::UNITS)
+  N  Cost per Unit     ingredient cost_per_unit; Recipe Excel already has this
+  O  Min Stock         ingredient min_stock_level (threshold, not a receipt)
+  P  Quantity Needed   RECIPE only, per 1 sold unit
+  Q  Active            Yes/No for product/ingredient/recipe line
+
+Rules to preserve from current importers
+  - SKU/Barcode columns FORMAT_TEXT
+  - Match product: barcode → SKU → name (product Excel)
+  - Match recipe product: code → name (recipe Excel)
+  - Ingredient find-or-create by name+unit (recipe Excel)
+  - RECIPE duplicate (product, ingredient) UPDATES quantity_needed
+  - Do not seed ingredients.current_stock from this sheet on re-import
+  - Company lock + quota for PRODUCT creates (product Excel already does)
+  - feature:recipes requires inventory; do not import RECIPE if recipes off
+  - Sample rows: keep “Misal:” (or equivalent explicit marker)
+
+Opening stock / receiving
+  Leave to /pos/inventory/adjust (products) and
+  /pos/restaurant/ingredients/{id}/adjust (ingredients).
+  Optional later: a SECOND sheet/file named after the real UI
+  (“Stock Adjust” or, if FBR, “Receive Stock”) — never “Receipt Control”
+  unless the owner names a new module in code.
+
+
+================================================================
+9. EXAMPLE SINGLE-SHEET LAYOUT (catalog + BOM only)
+================================================================
+
+Row Type | Product Name        | Product Code | Price | Category | Ingredient Name | Ing. Unit | Cost/Unit | Qty Needed | Min Stock
+PRODUCT  | Large Pizza         | PZ-001       | 1200  | Pizza    |                 |           |           |            |
+PRODUCT  | Chicken Burger      | BG-001       | 450   | Burger   |                 |           |           |            |
+PRODUCT  | Hot Wings 10pc      | WG-010       | 650   | Wings    |                 |           |           |            |
+INGREDIENT|                    |              |       |          | Pizza Dough     | g         | 0.15      |            | 2000
+INGREDIENT|                    |              |       |          | Mozzarella      | g         | 1.20      |            | 1000
+INGREDIENT|                    |              |       |          | Burger Bun      | pcs       | 15        |            | 50
+INGREDIENT|                    |              |       |          | Chicken Patty   | pcs       | 60        |            | 40
+INGREDIENT|                    |              |       |          | Chicken Wings   | kg        | 650       |            | 10
+INGREDIENT|                    |              |       |          | Wing Sauce      | g         | 0.40      |            | 500
+RECIPE   | Large Pizza         | PZ-001       |       |          | Pizza Dough     | g         |           | 350        |
+RECIPE   | Large Pizza         | PZ-001       |       |          | Mozzarella      | g         |           | 120        |
+RECIPE   | Chicken Burger      | BG-001       |       |          | Burger Bun      | pcs       |           | 1          |
+RECIPE   | Chicken Burger      | BG-001       |       |          | Chicken Patty   | pcs       |           | 1          |
+RECIPE   | Hot Wings 10pc      | WG-010       |       |          | Chicken Wings   | kg        |           | 0.45       |
+RECIPE   | Hot Wings 10pc      | WG-010       |       |          | Wing Sauce      | g         |           | 40         |
+
+Notes on this example
+  - Qty Needed is per 1 sold unit (product_recipes.quantity_needed).
+  - Wings 0.45 kg ≈ 450 g for a 10pc portion; sauce 40 g. Illustrative,
+    not a production recipe.
+  - No Receive Qty, no Supplier, no PUR-/PO- number, no received_date.
+  - Cost per Unit on INGREDIENT rows is live cost_per_unit (kitchen
+    report uses current cost × historical consume qty).
+  - Cost on RECIPE rows is optional in today’s importer; it may update
+    ingredient cost when provided — preserve that behaviour, do not
+    treat it as a purchase receipt.
+
+
+================================================================
+10. RISKS / INVARIANTS TO PRESERVE
+================================================================
+
+[VERIFIED FROM CODE]
+
+1. Two stock ledgers: recipe dish → ingredients; non-recipe → inventory_stocks.
+   Never deduct both for the same sold line.
+
+2. product_recipes unique (product_id, ingredient_id). Import must upsert.
+
+3. quantity_needed is per 1 sold unit. No yield field exists — do not invent one.
+
+4. conversion_factor is stored but unused in consume math. Do not assume
+   Excel units auto-convert.
+
+5. NestPOS product inbound is adjustment_in, not TYPE_PURCHASE.
+   Do not post PUR- documents from a NestPOS master import.
+
+6. FBR Receive Stock writes PurchaseOrder STATUS_RECEIVED + TYPE_PURCHASE
+   against `products`, not `pos_products`. Do not cross-wire catalogs
+   (docs/architecture/24-architectural-invariants.md: DI ↔ POS isolation).
+
+7. Company_id on every row. Branch writes must use BranchStockService
+   actorCanUse / writeBranchId. All-branches view must not silently
+   dump stock into head office (FBR already refuses).
+
+8. Cashiers cannot receive/adjust/transfer (assertNotCashier / PosAdminOnly).
+
+9. Ingredient adjust cannot drive current_stock below zero.
+
+10. Transfer receive is single-consumption under lockForUpdate; cannot
+    receive twice; cannot receive more than sent; cancel after receive
+    is forbidden (make a new transfer back).
+
+11. FBR purchase void: only received; not if returns exist; kharid fallback
+    skips voided purchases; payments are not deleted.
+
+12. Sale munafa / recipe consume snapshots must not be rewritten by a
+    later cost edit (kharid / cost_per_unit).
+
+13. Product Excel TEXT barcodes; never CSV as the default (Pizza Master
+    8.9E+12 incident — comments in PosController).
+
+14. Recipe sample rows skipped only via explicit “Misal:” marker, never
+    by inferring “Chicken Burger” is fake.
+
+15. recipes feature depends on inventory. Master import of RECIPE_LINE
+    while recipes/inventory is off would 403 at the route layer today.
+
+16. Printed tickets remain ENGLISH; Receipt Display prefs are company
+    JSON — do not store them on inventory rows
+    (invariant 16; settings preservation invariant 15).
+
+17. Stock-check Excel is a count worksheet keyed by Line ID, not a
+    catalog. Do not merge it into the master.
+
+[INFERRED]
+Re-importing Opening Stock on the master would double-post
+ingredient_adjustment / adjustment_in rows. That is the main reason
+receiving/opening must stay off the sheet.
+
+
+================================================================
+FINAL ANSWERS (A–E)
+================================================================
+
+A) Exact meaning of Receipt Control in current NestPOS
+   [VERIFIED FROM CODE] There is no feature, table, route, or string
+   named “Receipt Control”.
+
+   Closest OWNER-NAMED receipt feature:
+     Receipt Display / /pos/receipt-settings — company print toggles
+     (description: “Control the address, NTN, phone & footer message
+     on receipts”). This is not inventory.
+
+   Closest NestPOS INVENTORY “receive” behaviours:
+     1. Stock Adjust (/pos/inventory/adjust), often reason “New Purchase”,
+        movement type adjustment_in — this is how sellable stock is
+        received today.
+     2. Ingredient adjust / opening kitchen stock — how raw stock is
+        received today.
+     3. Branch transfer receive (wasool ho gaya / received_quantity) —
+        how stock is received FROM ANOTHER BRANCH.
+
+   Closest TaxNest “Receive Stock” module (not NestPOS routes):
+     FBR POS Stock & Purchase one-shot RECEIVED purchase_orders
+     (PUR-…, TYPE_PURCHASE). DI panel has a draft→receive twin on the
+     same tables.
+
+   [INFERRED] In an Inventory Master conversation, “Receipt Control”
+   most likely refers to goods-in. In NestPOS that is stock/ingredient
+   ADJUSTMENT, not a GRN/PO document. Do not implement a new GRN
+   concept under that name.
+
+B) Whether it belongs in the single-sheet master
+   NO. Keep Product / Ingredient / Recipe (catalog + BOM) on the sheet.
+   Keep receiving, transfers, stock-check, supplier bills, and receipt
+   printer settings on their existing screens (and existing Excels
+   where they already exist: recipes, products, stock-check).
+
+C) Recommended final columns
+   Row Type, Product Name, Product Code (TEXT), Price, Category,
+   Description, Tax Rate %, Unit (UOM), Tax Exempt, Third Schedule,
+   Ingredient Name, Ingredient Code, Ingredient Unit, Cost per Unit,
+   Min Stock, Quantity Needed, Active.
+   Reuse current Product Excel + Recipe Excel names/aliases.
+   Omit supplier, PO/PUR number, received qty, received date, branch
+   transfer status, and receipt-printer flags.
+
+D) Example single-sheet layout
+   See section 9 (Pizza / Burger / Wings PRODUCT + INGREDIENT + RECIPE
+   rows). No receiving rows.
+
+E) Important risks / invariants
+   See section 10. Highest: two ledgers; NestPOS inbound is adjustment
+   not PO; do not double-post stock on re-import; do not mix FBR
+   `products` receiving into NestPOS `pos_products` recipes; preserve
+   existing Excel dialects.
+
+End of investigation.
+No implementation performed.
+)

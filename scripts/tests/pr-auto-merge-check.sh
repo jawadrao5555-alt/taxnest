@@ -104,15 +104,15 @@ if [ -f "$PC" ]; then
     && ok "PR checks retriggers on ready_for_review" \
     || bad "PR checks must include pull_request type ready_for_review"
 
-  grep -q 'deploy-unattended-safety-check.sh' "$PC" \
-    && ok "PR checks runs deploy-unattended-safety-check.sh" \
-    || bad "PR checks must run unattended deploy safety checks"
-
   if grep -vE '^\s*#' "$PC" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY'; then
     bad "PR checks must not use the production Environment or SSH secret"
   else
     ok "PR checks has no production Environment/secret"
   fi
+
+  grep -q 'deploy-unattended-safety-check.sh' "$PC" \
+    && ok "PR checks runs deploy-unattended-safety-check.sh" \
+    || bad "PR checks must run unattended deploy safety checks"
 fi
 
   if [ -f "$DP" ]; then

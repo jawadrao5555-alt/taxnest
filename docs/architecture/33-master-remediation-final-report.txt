@@ -7,7 +7,7 @@ Branch: cursor/master-remediation-0f83
 PR: https://github.com/jawadrao5555-alt/taxnest/pull/28
 Base: origin/main @ e175e157 (Add final architecture mastery proof from code tracing. #25)
 Code commit: 0e84c34b Harden TaxNest security and architecture gaps from the master audits.
-This report commit: (see git log on this branch after this file lands)
+This report commit: 2eaf04fe (file content pinned on this SHA; the pin-update commit that follows is metadata only).
 
 Evidence classes used throughout:
   CODE-FIXED                      — change is in this branch

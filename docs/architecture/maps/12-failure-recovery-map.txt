@@ -1,0 +1,108 @@
+TAXNEST MAP 12 — FAILURE / RECOVERY MAP
+=======================================
+Authority: code on main e175e157. Format: failure → detection → automatic
+recovery → manual recovery → gap.
+
+NESTPOS SALE
+- DB write fails mid storeInvoice → transaction rollback; client keeps IDB
+  bill (tries++) → retry on 'online'/30s tick → replay by offline_uuid.
+  Gap: concurrent duplicate POST returns error not replay (FBR handles 1062).
+- PRA endpoint down (cloud mode) → sendInvoice catch → pra_status 'offline'
+  (or 'pending' when agentHandlesPra) → SyncPosOfflineInvoicesJob every 2 min
+  retries offline|pending unless agent seen <10 min → UI failed-bills retry;
+  Live Ops RETRY_ONE_PRA_INVOICE sets pending. Gap: no lock → double submit
+  possible when two senders race.
+- fiscal_device agent absent → bills stay 'pending'; agent later pulls
+  pending-invoices → posts to localhost:8524 → submit-result. Sync job skips
+  while agent fresh; after 10 min it would try server send BUT
+  agentHandlesPra early-return keeps it pending (never server-posts).
+  Manual: bring agent online.
+- PRA response delayed → curl timeout → 'offline'/'pending' → retried;
+  submission_hash guard tries to avoid re-issuing; pra_invoice_number set →
+  refuse resend.
+- Reporting-OFF final → pra_status NULL; nothing to recover; day-close
+  sweep does not send.
+
+FBR POS SALE
+- IMS fails → fbr_status 'failed'/'offline' → RetryFbrPosSubmissionJob
+  (tries 3, backoff 10/20/30) + SyncFbrPosOfflineInvoicesJob every 2 min (cap
+  MAX_AUTO_RETRY 5) → UI fail queue manual retry (resets auto count).
+- config_error → permanent until settings fixed (no auto retry).
+- Token expired → CheckFbrTokenExpiryJob 06:00 notification; manual token.
+
+DI INVOICE
+- FBR fail → invoice status failed / fbr_status failed; manual resubmit;
+  BulkSubmitInvoiceJob CAS reclaim; RetryFailedFbrInvoicesJob only when
+  feature flag and manually dispatched (not scheduled).
+- Request repeats on API → client_reference unique → 409/replay.
+
+PRINTING
+- Agent offline at enqueue → 409 (Company::agentOnline 2-min window); popup
+  print fallback in UI.
+- Job pending, counter offline >120s, job >90s → housekeeping on next claim:
+  bill/proof → unstamp + company default printer; KOT → re-stamp to online
+  device with same printer name else failed; test → failed.
+- Job 'printing' >2 min (result lost) → requeue pending (attempts<3) else
+  failed timeout. Gap: paper already printed → duplicate.
+- Wake gateway down → publisher logs, enqueue unaffected; agent long-poll
+  still claims (1.5-8s cadence).
+- Pending unstamped jobs → no TTL; claimed whenever any company agent polls.
+- Manual: shop re-print for failed KOT/test; check printer inventory
+  (pos_agent_devices printers list refreshed every 5 min).
+
+DESKTOP AGENT
+- Heartbeat miss → quick retry 3s/8s; company.agent_last_seen stale → UI
+  offline; pos:agent-offline-alerts every 30 min.
+- Key regenerated in panel → 401 → agent needs new key (manual).
+- Update zip fails → stays on current version; FORCE_AGENT_UPDATE_ADVERTISE
+  only re-advertises when newer release exists.
+- Offline PRA callbacks → ~/.taxnest-pra-agent/pending-callbacks.json drained
+  later.
+- Local Core cloud unreachable → domain runs locally; outbox NDJSON drained by
+  CloudSyncClient; local receipts DL-… PRA PENDING.
+
+QUEUE / SCHEDULER
+- Worker stopped → jobs accumulate in database queue; QueueHeartbeatJob
+  every 5 min stamps system_settings; watchdog mails AdminUsers. Offline
+  syncs (2 min) stop → bills remain offline/pending until worker returns.
+- Scheduler stopped → auto day-close, syncs, reminders stop; no self-heal in
+  repo (systemd/cron external — UNKNOWN).
+- Job retries → tries/backoff per job; failed_jobs table; failed() hooks
+  mark batch/import states.
+- Tenant context lost in queue → NOT POSSIBLE by construction (IDs only).
+
+BILLING
+- Subscription expires mid-operation → next plan.limit-gated request denied
+  with lock reason; in-flight completes; provisionals (POS) unaffected by
+  quota; company.approval unaffected.
+- Payment proof upload → instant 10-day temporary override; admin
+  approve/reject; reject revokes proof-owned temporary.
+- Expired temporary/grace → reconcileExpiredGrants (CheckTrialExpiryJob
+  03:00 / admin list) may set company pending.
+
+BRANCH / COMPANY CONTEXT
+- Branch session key lost (new login) → BranchContextService default branch /
+  ALL for owner; offline bill carries offline_branch_id (company-checked).
+- currentCompanyId unbound → CompanyScope no-op (CLI/admin) → callers must
+  pass company explicitly; POS models always explicit.
+- DI normal user has no currentBranchId bind from CompanyIsolation (only
+  super_admin path).
+
+IMPERSONATION
+- Admin session expires during impersonation → ReadOnlyImpersonation orphan
+  cleanup logs out panel guard and forgets flag on next request.
+- Manage-as write → audited; stop → panel logout only.
+
+LIVE OPS
+- Command not picked up → live_ops_agent_commands expire after TTL 30 min.
+- Remediation execute throws → status failed; idempotent re-execute returns
+  stored result; verification COMPANY_HEALTH after success.
+
+BROWSER REFRESH MID-SALE
+- Cart in localStorage rpos_cart_{user}_{company}; IDB queue persists;
+  PWA update apply deferred while tnPwaUpdateHold.
+
+DEPLOY
+- Remote apply failure → exit 90-94; site left in maintenance; rollback per
+  deployment/ROLLBACK.md (manual). Migrations irreversible by policy
+  (forward-only).

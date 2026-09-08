@@ -1,0 +1,80 @@
+TAXNEST MAP 11 — SECURITY FINDINGS MAP
+======================================
+Authority: code on main e175e157. Source: docs/architecture/32-*.txt Section 27.
+Nothing here has been fixed. Severity = code-level; production exposure UNKNOWN
+unless stated.
+
+CRITICAL
+- G1 GET /setup-migrate-xK9mP2, GET /setup-seed-xK9mP2 — routes/web.php:2745-2765
+  closures; middleware ["web"] only (probe-proven); Artisan migrate/db:seed
+  --force; seeder resets admin@test.com (users.role super_admin) password to
+  env SEED_DEFAULT_PASSWORD default; unconditional registration; no tests.
+- G2 GET /demo-login/{role} — routes/web.php:118-119 →
+  AuthenticatedSessionController::demoLogin:44-65; logs in admin@test.com /
+  company_admin@test.com / demo@taxnest.pk if present; no env guard.
+  CHAIN: G1 seed creates the user → G2 logs in → web User super_admin.
+- Effect of web User.role=super_admin: RoleMiddleware:19 bypass;
+  CompanyScope:35 disabled; RateLimitByCompany:20 bypass; CompanyIsolation:21
+  null-company allowed; InvoiceController:488,648,680 any-company invoice;
+  routes/web.php:739-750 platform tax-override rules. Cannot enter /admin/*
+  (admin guard).
+
+HIGH
+- G3 AgentAuth.php:20-22 — companies.agent_api_key plaintext, SQL equality,
+  /api/agent/* unthrottled; key shared by all counters.
+- G4 Dual super_admin — AdminUser::isSuperAdmin (admin_users) vs live
+  User.role=super_admin path (web). String checks and method checks diverge.
+- G5 backup.sql at repo root (~715KB; contents not inspected).
+- G6 PRA double-submit race — PraIntegrationService::sendInvoice 274-334
+  non-atomic guards; no UNIQUE(pra_invoice_number) in repo migrations.
+
+MEDIUM
+- G7 POST /webhooks/whatsapp/{company} — no X-Hub-Signature/HMAC
+  (WhatsAppWebhookController::receive).
+- G8 Duplicate print — AgentController housekeeping 1442-1455 requeues
+  'printing' >2 min up to attempts 3 without printed-ack marker.
+- G9 Report branch gaps — PosController::reports local tab 6826-6837;
+  FbrPosController::reports 5822-5843 + buildFbrReportRangeAnalytics
+  6602-6605 (CSV export 6273-6285 is branch-aware).
+- G10 pos/* blanket CSRF exemption on cookie sessions (bootstrap
+  validateCsrfTokens except).
+- G11 Whole-column JSON settings writers (pos_printer_settings,
+  feature_flags, invoice_display_prefs, public_profile_settings) —
+  PosController, FbrPosController, ProfileController, AgentController,
+  LiveOpsRemediationService, PublicProfileController.
+- G12 Health money routes: no plan.limit; only company.approval.
+- G13 DI API /api/di/v1/invoices: PlanLimitService quota but no
+  SubscriptionAccessService::hasAccess.
+- G14 One session cookie for 7 guards; secure=null; same_site lax;
+  ForceHttps middleware unregistered (scheme via proxy header).
+
+LOW
+- G15 LiveOpsRunnerController::execute returns $e->getMessage() on 500.
+- G16 agent-realtime-gateway/gateway.js:99 wake secret compared with !==.
+- G17 'success' vs 'submitted' vocabulary (web.php:195-196;
+  FbrPosController:3178 vs FbrService:2355).
+- G18 CompanyUserController password min:6.
+- G19 NestPOS offline_uuid concurrent race → error, not replay (FBR handles).
+- G20 Pending unstamped print jobs never expire.
+- /__diag/infrastructure exposes db host/user (behind admin guard).
+
+POSITIVE CONTROLS (proven)
+- DI API key SHA-256 + hash_equals + throttle + client_reference idempotency.
+- Rider/caller tokens hashed, rotate per login.
+- Live Ops runner token >=32 chars hash_equals; high_denied enforced at
+  propose/approve/execute; REGENERATE_AGENT_API_KEY denied; no shell/SQL/
+  artisan in Live Ops PHP; agent strips shell keys; redaction.
+- fiscal_device: server never posts to PRA (PraIntegrationService 327-334).
+- Impersonation: super-admin only; readonly enforced; identity swaps blocked;
+  orphan cleanup; full-mode writes audited.
+- Uploads mime/size validated; private disks for proofs/clinical; downloads
+  company-scoped.
+- No Symfony Process/proc_open/eval; shell_exec only escaped rasterize +
+  CLI backup.
+- Jobs never read auth()/session for tenant.
+
+REMEDIATION ORDER (proposal only)
+1 G1+G2 remove routes + 404 tests + edge block + seeded-user audit.
+2 G5 owner decision on backup.sql.
+3 G6, G9, G7, G3, G8.
+4 G10-G14 design reviews. 5 LOW + docs.

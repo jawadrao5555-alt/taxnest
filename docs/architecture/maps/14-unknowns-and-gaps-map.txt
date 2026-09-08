@@ -1,0 +1,85 @@
+TAXNEST MAP 14 — UNKNOWNS AND GAPS MAP
+======================================
+Authority: docs/architecture/32-*.txt. Items here CANNOT be proven from the
+repository alone or were not exhaustively traced. Each has the cheapest next
+step. Never resolve these against production without owner approval.
+
+PRODUCTION-ONLY UNKNOWNS (need operator, read-only)
+U1 Edge exposure of /setup-migrate-xK9mP2, /setup-seed-xK9mP2,
+   /demo-login/* (Cloudflare WAF / vhost) — inspect edge rules + access logs.
+U2 Existence of seeded users on production: admin@test.com,
+   company_admin@test.com, jawad@test.com, demo@taxnest.pk; any users.role
+   = super_admin rows — read-only SELECT count.
+U3 SEED_DEFAULT_PASSWORD set on production? — env key presence only.
+U4 Live QUEUE_CONNECTION and which taxnest-queue@ units are enabled.
+U5 jobs/failed_jobs rows referencing SendInvoiceToFbrJob / CheckTokenExpiryJob
+   (blocks safe deletion).
+U6 Extra indexes on live MariaDB beyond repo migrations (e.g. UNIQUE
+   pra_invoice_number).
+U7 APP_DEBUG / session secure cookie behaviour behind the proxy.
+U8 PRINT_REALTIME_GATEWAY_* set? (wake path active or not).
+U9 Duplicate-print and PRA double-submit frequency (pra_logs / print job
+   attempts>1 sampling).
+U10 backup.sql contents (deliberately NOT inspected) — owner decision.
+U11 ZFC company live receipt prefs state.
+U12 Which AdminUser roles besides super_admin are used day-to-day.
+U13 pra-proxy / pra-relay deployments in the field.
+
+REPO-RESOLVABLE BUT NOT YET EXHAUSTIVELY TRACED
+R1 Every whereRaw/DB::raw with request-derived input across 161 controllers
+   (sampled SAFE).
+R2 Every User::create/update call for $request->all() style mass assignment
+   (User $fillable includes company_id/role/pos_role/health_role).
+R3 branches.is_active enforcement at every call-site.
+R4 Franchise controllers deep IDOR.
+R5 Whether any health controller calls SubscriptionAccessService::hasAccess
+   before money writes (no plan.limit on health routes).
+R6 DI API vs panel behaviour under temporary override allowance.
+R7 KOT stranded re-stamp path dedicated Feature test (none found).
+R8 sw.js CACHE_VERSION bump on Actions deploy path (scripts/
+   ci-deploy-production.sh) — read script.
+R9 Full PosController (~15k lines) / FbrPosController (~9k lines) inline
+   role checks (89 / 61 pattern hits) — per-endpoint matrix.
+R10 Complete Health PATH_MAP / ROLE_CAPABILITIES transcription.
+R11 Restaurant/KDS/table state model; HR/payroll; Madadgar content.
+R12 Waiter WebView offline without Local Core pairing when cloud is down.
+R13 Rider DeliveryOutbox on-disk format.
+R14 AutoCloseDayPos → day-close PRA sweep full call graph.
+R15 DI multi-branch UI reliance on missing currentBranchId bind for normal
+   users.
+
+CONFIRMED GAPS REQUIRING CODE (proposal only; not done)
+C1 Remove setup-* and demo-login routes + 404 tests.
+C2 PRA submit atomicity (lockForUpdate / unique fiscal number).
+C3 Branch filters: PosController::reports local tab; FbrPosController::
+   reports + range analytics.
+C4 WhatsApp webhook HMAC.
+C5 Agent API key hashing + throttle.
+C6 Printed-but-unacked marker to stop duplicate prints.
+C7 Live Ops execute generic 500 message.
+C8 CompanyUserController password rule alignment.
+
+DOCUMENTATION CORRECTIONS (pending; do not silently edit prior PRs)
+D1 pos_print_jobs has no claimed_at/printed_at; status 'printing'.
+D2 No users.active_branch_id column; session key.
+D3 ForceHttps unregistered.
+D4 pra-agent README heartbeat 60s → 30s; poll 5s.
+D5 CheckPlanLimit DI comment lifetime → monthly.
+D6 AdminCompanyController impersonate docblock VIEW-ONLY → view|full.
+D7 Landing stats 'success' → 'submitted'.
+D8 docs/12 pra_status add local, exempt_internal.
+D9 DI cycles: SELLABLE_CYCLES annual only.
+D10 "three products" → four.
+D11 reconcileExpiredGrants IS scheduled (CheckTrialExpiryJob).
+D12 Queue units taxnest-queue@{default,zip,bulk} known from repo.
+
+RESOLVED THIS AUDIT (were UNKNOWN before)
+- IndexedDB schemas (tn_pos_offline v2 bills+customers; tn_fbrpos_offline v1).
+- Offline conflict model (UUID idempotency + unique index + replay; no merge).
+- reconcileExpiredGrants scheduler caller.
+- Queue worker unit names.
+- Stranded print exact thresholds (90s job age, 120s device offline, 2 min
+  printing timeout, 3 attempts, 7-day purge).
+- Live Ops command set + agent handler location (live-ops-commands.js).
+- Agent update mechanism (custom zip, not electron-updater).
+- Local Core storage (encrypted NDJSON, not SQLite).

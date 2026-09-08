@@ -1,0 +1,111 @@
+TAXNEST MAP 13 — FUTURE BUG TRACE MAP
+=====================================
+Authority: code on main e175e157. Use: symptom → first files to open →
+authoritative field → tests to run. Line numbers approximate (drift expected).
+
+STEP 0 (always): identify product_type (companies.product_type) → guard
+(di=web, pos=pos, fbrpos=fbrpos, erps=health) → company binding
+(CompanyIsolation / PosAuth / FbrPosAuth / HealthAuth / DiApiAuth) → branch
+(BranchContextService session 'active_branch_id') → billing state
+(SubscriptionAccessService::hasAccess).
+
+WRONG TAX (POS) → PosController::storeInvoice ~3278-3309, 3719-3725;
+App\Services\PosTaxMath; App\Services\PosTaxRule; PraIntegrationService::
+generatePayload 163-212; resources/views/pos/universal.blade.php ~5440-5482
+→ pos_transactions.tax_amount/total_amount → tests Pos*Tax*, Pra*.
+WRONG TAX (FBR POS) → FbrPosController::store 2555-2775 (2dp) → tests FbrPos*.
+WRONG TAX (DI) → InvoiceController::store 343-350 (client tax) →
+FbrService::buildPayload → FbrPayloadPrecisionTest.
+
+WRONG BRANCH → BranchContextService (stampBranchId/applyToQuery),
+PosController 3644-3647, PosController::reports 6826-6837 (local tab gap),
+FbrPosController::reports 5822-5843 → *.branch_id → PosBranchIsolationTest,
+PosMultiBranchScopeTest.
+
+WRONG COMPANY → CompanyScope (66 models) vs explicit company_id (POS/FBR);
+check auth()->user()->role==='super_admin' (bypass); AgentAuth company →
+Phase3LoginIsolationTest, PosCashierSalesIsolationTest.
+
+PRA PENDING / OFFLINE → pos_transactions.pra_status; Company::agentHandlesPra;
+PraIntegrationService::sendInvoice 274-436, storePraResponse 546-597;
+SyncPosOfflineInvoicesJob 45-78; AgentController::pendingInvoices 577-664,
+submitResult 722-823 → pra_logs → Pra* tests, fiscal_device tests.
+PRA DUPLICATE → same + submission_hash; no lock → add concurrency test.
+
+FBR POS STATUS → fbr_pos_transactions.fbr_status; FbrService::
+submitFbrPosTransaction ~2150-2355; SyncFbrPosOfflineInvoicesJob;
+RetryFbrPosSubmissionJob; AgentController fbr result ~504-889 → fbr_pos_logs.
+
+DI FBR STATUS → invoices.status/fbr_status; InvoiceController::submitToFbrSync
+~2441-2582; FbrService::resolveDiToken 1059-1090; fbr_logs (invoice_id only).
+
+OFFLINE QUEUE NOT DRAINING → pos/universal.blade.php IDB tn_pos_offline
+~5912-6460 (tries>=50, 401/419, 403 quota); fbr-pos/universal.blade.php
+~4649-4939; storeInvoice replay 3171-3193 → OfflineQueueReportTest,
+OfflinePlanGateTest.
+
+PRINT NOT HAPPENING → PosController::apiCreatePrintJob ~948 (409 when agent
+offline; silent_print_enabled); pos_print_jobs.status; AgentController::
+claimPrintJobs 1118-1258; printJobsHousekeeping 1339-1455; printJobResult
+1828+; Company::printerSettings 839+; resolveUserPrintDevice 909-936;
+KotPrintService::deviceStampFor 251-263; pra-agent/src/printer.js →
+PosPrintJobDeviceRoutingTest, PrintJobLongPollTest, PosTestPrintJobTest.
+DUPLICATE PRINT → housekeeping 1442-1455 requeue path.
+
+AGENT OFFLINE → companies.agent_last_seen; pos_agent_devices.last_seen_at;
+pra-agent/src/agent.js 253-266, 579-580 (30s heartbeat); AgentAuth.php →
+AgentHeartbeat* tests.
+AGENT COMMAND STUCK → live_ops_agent_commands; LiveOpsAgentCommandService;
+AgentController::liveOpsHeartbeatExtras, commandResult;
+pra-agent/src/live-ops-commands.js 64-99 → LiveOpsAgentCommandChannelTest.
+AGENT UPDATE → AgentController::agentUpdateInfo; companies.
+agent_force_update_at; pra-agent/main.js handleAgentUpdate 82+.
+
+SETTINGS LOST → Company JSON columns; PosController::receiptSettings 360-480
+(pos vs pos_local presence guards), printer settings ~676-843,
+updateFeatureSettings 2986+; FbrPosController 4329/4380/5213/5360/7061;
+ProfileController 82; AgentController 1057/1097; LiveOpsRemediationService
+447 → PraReceiptSettingsDoubleSaveTest, PosLocalPrefsWipeRepairMigrationTest.
+
+BILLING BLOCK → CheckPlanLimit; SubscriptionAccessService::hasAccess 57-172;
+PlanLimitService::canCreate*; CompanyApproval → Pos*Plan*,
+PosMonthlyBillQuotaPathsTest, SignupTrialSubscriptionTest.
+BILLING BYPASS → DiInvoiceApiController::store 137 (no hasAccess); health
+routes (no plan.limit); RestaurantPosController::payOrder.
+
+HEALTH MONEY → HealthChargeService post/reverse 44-223; HealthBillingService
+createBill/finalize/recordPayment/reversePayment 586+; HealthPostingService;
+HealthLedgerService::reverse 281+; HealthIpdBillingService; HealthAuditObserver
+→ HealthAccountsSettlementsTest, HealthIpdOperationsTest.
+HEALTH ACCESS → HealthAuth 30-98; HealthAccessService ROLES 41-53,
+ROLE_CAPABILITIES 62-190, PATH_MAP 463-498; HealthScopeService 40-201.
+
+IMPERSONATION AUDIT → AdminCompanyController::impersonate 537-637,
+stopImpersonation 643-662, lockImpersonation 670-688;
+ReadOnlyImpersonation; LogImpersonatedWrites 36-68; admin_audit_logs →
+ImpersonationLoginLockoutTest.
+
+API AUTH → AgentAuth (plaintext key); DiApiAuth (SHA-256 dik_);
+PosRiderTrackingController::riderFromToken; PosCallerIdController::
+companyFromToken; LiveOpsRunnerController::authorizeRunner 16-25; bootstrap
+validateCsrfTokens except list.
+
+LIVE OPS → config/live_ops.php; AdminLiveOpsController::gate 29-32;
+LiveOpsRemediationService riskFor 30-39, propose 50, approve 122, execute
+182, dispatch 230-258; LiveOpsDiagnosticsService; LiveOpsRedactor;
+live_ops_audit_events → tests/Feature/LiveOps/*.
+
+SETUP ROUTE / DEMO LOGIN HIT → routes/web.php:2745-2765, 118-119;
+AuthenticatedSessionController::demoLogin 44-65; DatabaseSeeder → users table
+seeded emails; access logs (operator).
+
+QUEUE SILENT → config/queue.php; routes/console.php schedule; failed_jobs;
+system_settings queue_last_heartbeat; taxnest-queue@{default,zip,bulk} units.
+
+DEPLOY BROKE → .github/workflows/deploy-production.yml →
+scripts/ci-deploy-production.sh → scripts/lib/live-remote-apply.sh (exit
+90-94) → scripts/ci-live-verify.sh markers → deployment/ROLLBACK.md.
+
+PWA STALE → public/sw.js CACHE_VERSION; resources/views/components/
+pwa-update.blade.php; bump in scripts/deploy-live.sh (legacy) — confirm
+Actions path.

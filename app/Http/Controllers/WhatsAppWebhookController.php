@@ -20,8 +20,11 @@ use Illuminate\Support\Facades\Log;
  *    Statuses only move FORWARD (read never downgrades to delivered); failed
  *    always wins and captures Meta's error message.
  *
- * Public + CSRF-exempt ('webhooks/*'); always answers 200 to POSTs so Meta
- * does not disable the subscription over transient app errors.
+ * Public + CSRF-exempt ('webhooks/*'); answers 200 to every POST that passes
+ * the signature gate (even on processing errors) so Meta does not disable the
+ * subscription over transient app errors. When the company has a Meta App
+ * Secret stored (wa_app_secret) the POST must carry a valid
+ * X-Hub-Signature-256 or it is refused with 401.
  */
 class WhatsAppWebhookController extends Controller
 {
@@ -47,6 +50,10 @@ class WhatsAppWebhookController extends Controller
 
     public function receive(Request $request, int $company)
     {
+        if (!$this->signatureAcceptable($request, $company)) {
+            return response()->json(['error' => 'Invalid webhook signature'], 401);
+        }
+
         try {
             foreach ((array) $request->input('entry', []) as $entry) {
                 foreach ((array) ($entry['changes'] ?? []) as $change) {
@@ -60,6 +67,51 @@ class WhatsAppWebhookController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Meta signs every POST: X-Hub-Signature-256: sha256=HMAC_SHA256(app_secret, raw body).
+     *
+     * With a stored App Secret the signature is mandatory and checked in
+     * constant time. Without one (legacy / not yet configured) the POST is
+     * still accepted so existing subscriptions keep working, but each hit is
+     * logged as unsigned — configure the secret in WhatsApp Settings to close
+     * this. No secret material is ever logged.
+     */
+    private function signatureAcceptable(Request $request, int $companyId): bool
+    {
+        $c = Company::find($companyId);
+        try {
+            $secret = $c ? (string) $c->wa_app_secret : '';
+        } catch (\Throwable $e) {
+            // Stored secret cannot be decrypted (APP_KEY rotated?) — a secret
+            // WAS configured, so fail closed rather than silently unsigned.
+            Log::error("WA webhook rejected (company {$companyId}): stored wa_app_secret is undecryptable — re-save it in WhatsApp Settings.");
+            return false;
+        }
+
+        if ($secret === '') {
+            Log::info("WA webhook accepted UNSIGNED (company {$companyId}): no wa_app_secret configured — set it in WhatsApp Settings to enforce X-Hub-Signature-256.");
+            return true;
+        }
+
+        $header = (string) $request->header('X-Hub-Signature-256', '');
+        if ($header === '' || !str_starts_with($header, 'sha256=')) {
+            Log::warning("WA webhook rejected (company {$companyId}): X-Hub-Signature-256 missing or malformed.", [
+                'ip' => $request->ip(),
+            ]);
+            return false;
+        }
+
+        $expected = hash_hmac('sha256', $request->getContent(), $secret);
+        if (!hash_equals($expected, strtolower(substr($header, 7)))) {
+            Log::warning("WA webhook rejected (company {$companyId}): X-Hub-Signature-256 mismatch.", [
+                'ip' => $request->ip(),
+            ]);
+            return false;
+        }
+
+        return true;
     }
 
     private function applyStatus(int $companyId, array $status): void

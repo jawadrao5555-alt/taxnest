@@ -38,6 +38,19 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Desktop-agent API (/api/agent/*): volume limit keyed by the presented
+        // key (sha1 — never the raw key in cache keys), falling back to IP when
+        // no key is sent. Generous on purpose: one company key is shared by
+        // every counter's agent (heartbeat 30s, PRA sync 5s, print long-poll
+        // every ~1.5-8s, printer report 5min). Brute-force on the 401 path is
+        // throttled separately per IP inside AgentAuth (successes never count).
+        \Illuminate\Support\Facades\RateLimiter::for('agent-api', function (\Illuminate\Http\Request $request) {
+            $key = $request->bearerToken() ?: $request->header('X-Agent-Key');
+            $by = $key ? 'agent-key:' . sha1((string) $key) : 'agent-ip:' . $request->ip();
+
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(600)->by($by);
+        });
+
         // Allow any view to be used as an anonymous component (e.g.
         // <x-dynamic-component :component="'pos.archive.layout'"> resolves to
         // resources/views/pos/archive/layout.blade.php). Required by the

@@ -10,9 +10,8 @@
 2. Naya database banayein: `taxnest_db`
 3. Naya user banayein: `taxnest_user` with strong password
 4. User ko database mein add karein (ALL PRIVILEGES)
-5. `backup.sql` import karein:
-   - **PostgreSQL:** cPanel > Terminal > `psql -U taxnest_user -d taxnest_db < backup.sql`
-   - **MySQL:** cPanel > phpMyAdmin > Import > `backup.sql` select karein
+5. Schema banayein: `php artisan migrate --force` (repo mein ab koi `backup.sql` nahi hai — database dumps
+   repository mein commit nahi hote; production data sirf `scripts/private-backup.sh` ke private archive se restore hota hai)
 
 ## Step 3: Environment File (.env)
 1. `.env.example` ko `.env` rename karein

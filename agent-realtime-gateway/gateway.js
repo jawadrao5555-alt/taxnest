@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const http = require('node:http');
 const { WebSocketServer, WebSocket } = require('ws');
 
@@ -29,6 +30,18 @@ function normalizeCompanyId(value) {
   if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null;
   const normalized = Number(value);
   return Number.isSafeInteger(normalized) ? normalized : null;
+}
+
+// Constant-time secret check. A plain !== short-circuits on the first
+// differing byte, which lets a caller on the loopback measure how much of
+// the wake secret it has guessed. Length must match before timingSafeEqual
+// (it throws otherwise); an unset secret never matches anything.
+function secretMatches(provided, expected) {
+  if (typeof provided !== 'string' || typeof expected !== 'string' || expected === '') return false;
+  const a = Buffer.from(provided, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 function responseJson(res, status, payload) {
@@ -96,7 +109,7 @@ function createGateway(options = {}) {
       return responseJson(res, 200, { ok: true, connections: sockets.size, metrics });
     }
     if (req.method !== 'POST' || pathname !== '/internal/wake') return responseJson(res, 404, { error: 'not_found' });
-    if (!config.wakeSecret || req.headers['x-wake-secret'] !== config.wakeSecret) return responseJson(res, 401, { error: 'unauthorized' });
+    if (!secretMatches(req.headers['x-wake-secret'], config.wakeSecret)) return responseJson(res, 401, { error: 'unauthorized' });
     let raw = '';
     req.setEncoding('utf8');
     req.on('data', (chunk) => {
@@ -213,4 +226,4 @@ if (require.main === module) {
   process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
 }
 
-module.exports = { createGateway, bearerOrAgentKey, normalizeCompanyId };
+module.exports = { createGateway, bearerOrAgentKey, normalizeCompanyId, secretMatches };

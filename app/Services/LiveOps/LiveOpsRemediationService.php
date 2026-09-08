@@ -437,14 +437,15 @@ class LiveOpsRemediationService
             }
         }
 
-        $settings = $company->pos_printer_settings ?? [];
-        if (!is_array($settings)) {
-            $settings = [];
-        }
-        $settings['receipt_printer'] = $printer;
+        // Only receipt_printer is rebound; merged onto the FRESH row under a lock
+        // (Company::mergeJsonColumn) so an agent printers report or a panel save
+        // landing meanwhile keeps its keys. Raw map, no reshaping — as before.
         $company->timestamps = false;
         try {
-            $company->update(['pos_printer_settings' => $settings]);
+            $company->mergeJsonColumn('pos_printer_settings', function (array $settings) use ($printer): array {
+                $settings['receipt_printer'] = $printer;
+                return $settings;
+            });
         } finally {
             $company->timestamps = true;
         }

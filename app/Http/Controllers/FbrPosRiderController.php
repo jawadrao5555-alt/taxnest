@@ -197,7 +197,9 @@ class FbrPosRiderController extends Controller
 
         $request->validate([
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($existing?->id)],
-            'password' => $existing ? ['nullable', 'string', 'min:6', 'max:100'] : ['required', 'string', 'min:6', 'max:100'],
+            'password' => $existing
+                ? ['nullable', 'string', 'max:100', \Illuminate\Validation\Rules\Password::defaults()]
+                : ['required', 'string', 'max:100', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $action = DB::transaction(function () use ($request, $companyId, $rider) {

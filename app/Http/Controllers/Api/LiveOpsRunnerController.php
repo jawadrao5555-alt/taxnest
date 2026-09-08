@@ -3,9 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\LiveOpsRemediationRequest;
 use App\Services\LiveOps\LiveOpsDiagnosticsService;
 use App\Services\LiveOps\LiveOpsRemediationService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Token-gated runner API for GitHub Actions trusted jobs.
@@ -93,9 +97,35 @@ class LiveOpsRunnerController extends Controller
                 'executor' => $request->input('executor', 'github-actions'),
             ]);
         } catch (\InvalidArgumentException $e) {
+            // Domain guard messages (expired / not approved / high-risk blocked)
+            // are intentionally surfaced to the runner.
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['ok' => false, 'error' => 'Remediation request not found'], 404);
         } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
+            // Unexpected failures must not leak internals (SQL, paths, hosts)
+            // to the runner. The full exception goes to the log under a
+            // correlation id the runner can quote back.
+            $correlationId = (string) Str::uuid();
+            $companyId = null;
+            try {
+                $companyId = LiveOpsRemediationRequest::where('action_id', $actionId)->value('company_id');
+            } catch (\Throwable $ignored) {
+                // Lookup is best-effort context for the log only.
+            }
+            Log::error('LIVE_OPS remediation execution failed', [
+                'correlation_id' => $correlationId,
+                'action_id' => $actionId,
+                'company_id' => $companyId,
+                'executor' => $request->input('executor', 'github-actions'),
+                'exception' => $e,
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'error' => 'Remediation execution failed',
+                'correlation_id' => $correlationId,
+            ], 500);
         }
 
         return response()->json(['ok' => true, 'remediation' => $row]);

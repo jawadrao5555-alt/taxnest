@@ -79,7 +79,7 @@ class AdminCompanyController extends Controller
             'franchise_id' => 'nullable|exists:franchises,id',
             'agent_id' => 'nullable|exists:agents,id',
             'admin_email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail($request->input('product_type'))],
-            'admin_password' => 'required|string|min:6',
+            'admin_password' => ['required', 'string', \Illuminate\Validation\Rules\Password::defaults()],
             'admin_name' => 'required|string|max:255',
         ], \App\Services\LoginIdentifierResolver::cnicMessages());
 
@@ -242,7 +242,7 @@ class AdminCompanyController extends Controller
             'fbr_pos_enabled' => 'nullable|boolean',
             'fbr_pos_environment' => 'nullable|in:sandbox,production',
             'fbr_pos_id' => 'nullable|string|max:100',
-            'admin_password' => 'nullable|string|min:6|max:100',
+            'admin_password' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rules\Password::defaults()],
             'admin_email' => 'nullable|email|max:255',
         ], \App\Services\LoginIdentifierResolver::cnicMessages());
 
@@ -478,7 +478,7 @@ class AdminCompanyController extends Controller
         $company = Company::withTrashed()->findOrFail($id);
 
         $request->validate([
-            'new_password' => 'required|string|min:6|max:100',
+            'new_password' => ['required', 'string', 'max:100', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $companyAdmin = $this->findCompanyAdmin($id);
@@ -1379,7 +1379,7 @@ class AdminCompanyController extends Controller
         $request->validate([
             'products'       => 'required|array|min:1',
             'products.*'     => 'required|' . \App\Support\ProductCatalog::validationRule(),
-            'admin_password' => 'nullable|string|min:6',
+            'admin_password' => ['nullable', 'string', \Illuminate\Validation\Rules\Password::defaults()],
             'erps_vertical'  => 'nullable|string|max:50',
         ]);
 

@@ -202,7 +202,7 @@ class AdminController extends Controller
             'address' => 'nullable|string|max:500',
             'admin_name' => 'nullable|string|max:255',
             'admin_email' => ['nullable', 'email', \App\Support\IdentityScope::uniqueEmail($request->input('product_type'))],
-            'admin_password' => 'nullable|string|min:6',
+            'admin_password' => ['nullable', 'string', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $company = Company::create(array_merge(
@@ -432,7 +432,7 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail(\App\Support\IdentityScope::ofCompanyId($request->input('company_id')))],
-            'password' => 'required|string|min:6',
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::defaults()],
             'role' => 'required|in:super_admin,company_admin,employee,viewer',
             'company_id' => 'nullable|exists:companies,id',
         ]);

@@ -55,6 +55,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Demo login switch (local development only)
+    |--------------------------------------------------------------------------
+    |
+    | GET /demo-login/{role} is a seeded-tenant shortcut for local development.
+    | It is ignored (404) unless APP_ENV=local AND this flag is true. Never
+    | enable in production.
+    |
+    */
+
+    'demo_login_enabled' => (bool) env('DEMO_LOGIN_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |

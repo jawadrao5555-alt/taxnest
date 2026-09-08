@@ -16,6 +16,14 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * @deprecated ORPHAN — not dispatched anywhere in current code (DI submits
+ * synchronously via FbrService inside InvoiceController; PRA/POS use their own
+ * services). Kept ONLY so historical serialized payloads in `jobs` /
+ * `failed_jobs` can still deserialize for inspection / `queue:retry`.
+ * Do not add new dispatch sites. Remove after production queues are verified
+ * empty of this class (see docs/architecture/33-master-remediation-final-report.txt).
+ */
 class SendInvoiceToFbrJob implements ShouldQueue
 {
     use Queueable;

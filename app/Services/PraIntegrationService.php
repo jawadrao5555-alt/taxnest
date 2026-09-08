@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\PosTransaction;
 use App\Models\PraLog;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -334,6 +335,116 @@ class PraIntegrationService
             ];
         }
 
+        // DOUBLE-SUBMIT GUARD. The refusal checks above are read-then-act: two
+        // senders racing on the same bill (SyncPosOfflineInvoicesJob + an F11
+        // retry, restaurant settle + a replayed POST, ...) both pass them and
+        // both POST to PRA — two fiscal numbers for one sale. A per-bill mutex
+        // around the HTTP leg serialises them; the loser sees the winner's
+        // fiscal number on the fresh re-read and refuses. Cache lock (not a DB
+        // row lock): the call can block up to ~8s and must never pin a row in
+        // an open transaction for that long. TTL 90s = a stuck holder frees
+        // itself; no state is written on a contended call, so a legitimate
+        // retry a moment later works exactly as before.
+        $lock = null;
+        $acquired = true;
+        try {
+            $lock = Cache::lock(self::submitLockKey($transaction), 90);
+            $acquired = (bool) $lock->get();
+        } catch (\Throwable $e) {
+            // A cache store without lock support must degrade to today's
+            // behaviour (submission goes ahead), never block every bill.
+            Log::warning('PRA: submit lock unavailable — proceeding without lock', [
+                'transaction_id' => $transaction->id,
+                'error' => $e->getMessage(),
+            ]);
+            $lock = null;
+            $acquired = true;
+        }
+
+        if (!$acquired) {
+            Log::info('PRA: submission already in progress for this bill — skipped', [
+                'transaction_id' => $transaction->id,
+                'company_id' => $this->company->id,
+            ]);
+            return [
+                'success' => false,
+                'response_code' => 'IN_PROGRESS',
+                'in_progress' => true,
+                'message' => 'PRA submission for this bill is already in progress — please wait a moment and check its status.',
+            ];
+        }
+
+        try {
+            // Re-read under the lock: a concurrent winner may have finished
+            // between the checks above and this point. Its verdict stands.
+            $fresh = PosTransaction::withoutGlobalScope('hide_archived')->find($transaction->id);
+            if ($fresh && ($refusal = $this->resubmissionRefusal($fresh))) {
+                $adopt = array_intersect_key($fresh->getAttributes(), array_flip([
+                    'pra_status', 'pra_invoice_number', 'pra_response_code', 'pra_qr_code', 'pra_error_message',
+                ]));
+                $transaction->forceFill($adopt)->syncOriginalAttributes(array_keys($adopt));
+                Log::info('PRA: concurrent submission already settled this bill — not resubmitting', [
+                    'transaction_id' => $transaction->id,
+                    'pra_status' => $fresh->pra_status,
+                    'pra_invoice_number' => $fresh->pra_invoice_number,
+                ]);
+                return $refusal;
+            }
+
+            return $this->transmitToPra($transaction);
+        } finally {
+            if ($lock) {
+                try {
+                    $lock->release();
+                } catch (\Throwable $e) {
+                    // TTL expiry covers a failed release.
+                }
+            }
+        }
+    }
+
+    /** Cache lock key serialising PRA submissions of one bill (see sendInvoice). */
+    public static function submitLockKey(PosTransaction $transaction): string
+    {
+        return 'pra:submit:' . $transaction->id;
+    }
+
+    /**
+     * The resubmission refusals sendInvoice() applies before contacting PRA,
+     * re-runnable against a freshly loaded row: already fiscalised, a
+     * provisional ('local') bill, or a hash twin that already carries a
+     * fiscal number. NULL = nothing stands in the way of submitting.
+     */
+    private function resubmissionRefusal(PosTransaction $transaction): ?array
+    {
+        if (trim((string) ($transaction->pra_invoice_number ?? '')) !== '') {
+            return ['success' => false, 'already_submitted' => true, 'message' => 'Invoice already submitted to PRA. PRA Invoice #: ' . $transaction->pra_invoice_number];
+        }
+
+        if ($transaction->pra_status === 'local') {
+            return ['success' => false, 'message' => 'Local invoice cannot be synced to PRA'];
+        }
+
+        if ($transaction->submission_hash) {
+            $duplicate = PosTransaction::where('submission_hash', $transaction->submission_hash)
+                ->where('id', '!=', $transaction->id)
+                ->whereNotNull('pra_invoice_number')
+                ->exists();
+            if ($duplicate) {
+                return ['success' => false, 'message' => 'Duplicate submission detected via hash'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The HTTP leg of sendInvoice(): payload → PraLog → PRAL IMS (direct or via
+     * relay) → storePraResponse. Only ever entered while the per-bill submit
+     * lock is held.
+     */
+    private function transmitToPra(PosTransaction $transaction): array
+    {
         $payload = $this->generatePayload($transaction);
 
         $praLog = PraLog::create([

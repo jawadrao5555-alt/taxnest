@@ -215,10 +215,13 @@ class CompanySettingsController extends Controller
         }
 
         $hasToken = !empty($company->wa_api_token);
+        // Only "configured or not" reaches the view — the secret itself never does.
+        $hasAppSecret = !empty($company->getRawOriginal('wa_app_secret'));
 
         return view('company.whatsapp-settings', [
             'company' => $company,
             'hasToken' => $hasToken,
+            'hasAppSecret' => $hasAppSecret,
             'webhookUrl' => url('/webhooks/whatsapp/' . $company->id),
             'defaultTemplate' => \App\Services\WhatsAppBusinessApi::DEFAULT_TEMPLATE,
         ]);
@@ -238,6 +241,8 @@ class CompanySettingsController extends Controller
             'wa_template_name' => 'nullable|string|max:100',
             'wa_attach_pdf' => 'nullable|boolean',
             'wa_webhook_verify_token' => 'nullable|string|max:100',
+            'wa_app_secret' => 'nullable|string|max:255',
+            'wa_app_secret_clear' => 'nullable|boolean',
         ]);
 
         $data = [
@@ -252,6 +257,18 @@ class CompanySettingsController extends Controller
         $token = trim((string) $request->input('wa_api_token'));
         if ($token !== '') {
             $data['wa_api_token'] = Crypt::encryptString($token);
+        }
+
+        // Meta App Secret (webhook X-Hub-Signature-256): blank = keep, explicit
+        // clear = remove (webhook falls back to unsigned/legacy acceptance).
+        // Stored through the model's 'encrypted' cast.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'wa_app_secret')) {
+            $appSecret = trim((string) $request->input('wa_app_secret'));
+            if ($request->boolean('wa_app_secret_clear')) {
+                $data['wa_app_secret'] = null;
+            } elseif ($appSecret !== '') {
+                $data['wa_app_secret'] = $appSecret;
+            }
         }
 
         // Enabling direct send without credentials would silently dead-end

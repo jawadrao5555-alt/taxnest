@@ -357,7 +357,6 @@ class PosController extends Controller
                 'rp_delivery_receipt_present' => 'nullable|in:1',
                 'rp_delivery_receipt_on_assign' => 'nullable|in:1',
             ]);
-            $prefs = $company->invoice_display_prefs ?? [];
             // Stale-form guard, per display set (Task 1377 — owner 21 Aug 2026).
             // Each block below is a WHOLESALE rewrite driven by checkbox presence,
             // so a POST from an outdated copy of this page (the service worker used
@@ -381,103 +380,112 @@ class PosController extends Controller
                 'lp_show_mobile', 'lp_show_cashier', 'lp_show_footer',
                 'lp_show_business_name', 'lp_show_developed_by', 'lp_show_tax',
             ]);
-            // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
-            if ($rpPresent) {
-                $prefs['pos'] = [
-                    'show_address' => $request->has('rp_show_address'),
-                    'show_ntn' => $request->has('rp_show_ntn'),
-                    'show_email' => $request->has('rp_show_email'),
-                    'show_mobile' => $request->has('rp_show_mobile'),
-                    'show_cashier' => $request->has('rp_show_cashier'),
-                    'show_footer' => $request->has('rp_show_footer'),
-                    'show_business_name' => $request->has('rp_show_business_name'),
-                    'show_developed_by' => $request->has('rp_show_developed_by'),
-                    'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
-                    // show_verify_line (Aug 2026): "Scan with PRA Sahulat App" under the QR.
-                    // Checkbox present = ON; absent = OFF. Default ON matches legacy behaviour.
-                    'show_verify_line' => $request->has('rp_show_verify_line'),
+            // Lost-update guard (Sep 2026): the three sets below are written through
+            // Company::mergeJsonColumn(), which re-reads invoice_display_prefs under a
+            // row lock and applies THIS closure to the fresh copy. A PRA save racing a
+            // Local save (or a style save) no longer carries a stale whole-column
+            // snapshot over the other request's keys — the historical wipe that
+            // migration 2026_09_07_000000_repair_wiped_pos_local_receipt_prefs repaired.
+            // Only the read-modify-write moved; every key rule below is unchanged.
+            $mutatePrefs = function (array $prefs) use ($request, $rpPresent, $lpPresent): array {
+                // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
+                if ($rpPresent) {
+                    $prefs['pos'] = [
+                        'show_address' => $request->has('rp_show_address'),
+                        'show_ntn' => $request->has('rp_show_ntn'),
+                        'show_email' => $request->has('rp_show_email'),
+                        'show_mobile' => $request->has('rp_show_mobile'),
+                        'show_cashier' => $request->has('rp_show_cashier'),
+                        'show_footer' => $request->has('rp_show_footer'),
+                        'show_business_name' => $request->has('rp_show_business_name'),
+                        'show_developed_by' => $request->has('rp_show_developed_by'),
+                        'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
+                        // show_verify_line (Aug 2026): "Scan with PRA Sahulat App" under the QR.
+                        // Checkbox present = ON; absent = OFF. Default ON matches legacy behaviour.
+                        'show_verify_line' => $request->has('rp_show_verify_line'),
+                    ];
+                }
+                // Local (L-series) receipt set — owner request Jul 2026: PRA and Local
+                // bills each get their OWN full display set (incl. its own show_tax).
+                if ($lpPresent) {
+                    $prefs['pos_local'] = [
+                        'show_address' => $request->has('lp_show_address'),
+                        'show_ntn' => $request->has('lp_show_ntn'),
+                        'show_email' => $request->has('lp_show_email'),
+                        'show_mobile' => $request->has('lp_show_mobile'),
+                        'show_cashier' => $request->has('lp_show_cashier'),
+                        'show_footer' => $request->has('lp_show_footer'),
+                        'show_business_name' => $request->has('lp_show_business_name'),
+                        'show_developed_by' => $request->has('lp_show_developed_by'),
+                        'show_tax' => $request->has('lp_show_tax'),
+                        'footer_text' => trim((string) $request->input('lp_footer_text', '')) ?: null,
+                    ];
+                }
+                // Print Style (Pizza Master Jul 2026): GLOBAL like paper size — bold
+                // whole-receipt font + logo size/placement. Applies to both bill types.
+                // Receipt Themes (Task 712): the form now submits a named theme
+                // (rp_receipt_theme) that PosReceiptThemes maps onto the SAME
+                // bold/logo keys. Re-saving the already-active theme is a no-op on
+                // the stored pair (plain opt-out shops keep their exact combo).
+                // Legacy fallback: an old cached form (or a scripted POST) that
+                // still sends rp_style_bold/rp_logo_style keeps working; a POST
+                // with NEITHER present leaves the company's current pair untouched.
+                // Both fallbacks derive from the FRESH prefs handed to this closure.
+                $curStyle = Company::receiptStyleFrom($prefs);
+                $origStyle = is_array($prefs['pos_style'] ?? null) ? $prefs['pos_style'] : [];
+                $theme = $request->input('rp_receipt_theme');
+                if (\App\Support\PosReceiptThemes::isValid($theme)) {
+                    $styleBoldLogo = \App\Support\PosReceiptThemes::apply($theme, $curStyle);
+                } elseif ($request->filled('rp_logo_style') || $request->has('rp_style_bold')) {
+                    $styleBoldLogo = [
+                        'bold' => $request->has('rp_style_bold'),
+                        'logo' => $request->input('rp_logo_style', 'side') === 'center' ? 'center' : 'side',
+                    ];
+                } else {
+                    $styleBoldLogo = [
+                        'bold' => (bool) ($curStyle['bold'] ?? true),
+                        'logo' => ($curStyle['logo'] ?? 'center') === 'side' ? 'side' : 'center',
+                    ];
+                }
+                // bold/logo: always read-modify-write via the fresh style so a bare/stale
+                // POST never silently resets them (e.g. theme-picker not in old cached form).
+                $prefs['pos_style'] = [
+                    'bold' => $styleBoldLogo['bold'],
+                    'logo' => $styleBoldLogo['logo'],
                 ];
-            }
-            // Local (L-series) receipt set — owner request Jul 2026: PRA and Local
-            // bills each get their OWN full display set (incl. its own show_tax).
-            if ($lpPresent) {
-                $prefs['pos_local'] = [
-                    'show_address' => $request->has('lp_show_address'),
-                    'show_ntn' => $request->has('lp_show_ntn'),
-                    'show_email' => $request->has('lp_show_email'),
-                    'show_mobile' => $request->has('lp_show_mobile'),
-                    'show_cashier' => $request->has('lp_show_cashier'),
-                    'show_footer' => $request->has('lp_show_footer'),
-                    'show_business_name' => $request->has('lp_show_business_name'),
-                    'show_developed_by' => $request->has('lp_show_developed_by'),
-                    'show_tax' => $request->has('lp_show_tax'),
-                    'footer_text' => trim((string) $request->input('lp_footer_text', '')) ?: null,
-                ];
-            }
-            // Print Style (Pizza Master Jul 2026): GLOBAL like paper size — bold
-            // whole-receipt font + logo size/placement. Applies to both bill types.
-            // Receipt Themes (Task 712): the form now submits a named theme
-            // (rp_receipt_theme) that PosReceiptThemes maps onto the SAME
-            // bold/logo keys. Re-saving the already-active theme is a no-op on
-            // the stored pair (plain opt-out shops keep their exact combo).
-            // Legacy fallback: an old cached form (or a scripted POST) that
-            // still sends rp_style_bold/rp_logo_style keeps working; a POST
-            // with NEITHER present leaves the company's current pair untouched.
-            $curStyle = $company->posReceiptStyle();
-            $theme = $request->input('rp_receipt_theme');
-            if (\App\Support\PosReceiptThemes::isValid($theme)) {
-                $styleBoldLogo = \App\Support\PosReceiptThemes::apply($theme, $curStyle);
-            } elseif ($request->filled('rp_logo_style') || $request->has('rp_style_bold')) {
-                $styleBoldLogo = [
-                    'bold' => $request->has('rp_style_bold'),
-                    'logo' => $request->input('rp_logo_style', 'side') === 'center' ? 'center' : 'side',
-                ];
-            } else {
-                $styleBoldLogo = [
-                    'bold' => (bool) ($curStyle['bold'] ?? true),
-                    'logo' => ($curStyle['logo'] ?? 'center') === 'side' ? 'side' : 'center',
-                ];
-            }
-            // bold/logo: always read-modify-write via posReceiptStyle() so a bare/stale
-            // POST never silently resets them (e.g. theme-picker not in old cached form).
-            $prefs['pos_style'] = [
-                'bold' => $styleBoldLogo['bold'],
-                'logo' => $styleBoldLogo['logo'],
-            ];
-            // Checkbox-based pos_style keys (show_logo, logo_finals_only, show_menu_qr)
-            // and pdf_paper are only written when rp_pos_style_present is in the request,
-            // meaning the form was freshly rendered and the user's intent is known.
-            // A stale/cached form without the marker must never silently reset these to
-            // their unchecked defaults — mirrors the rp_verify_present guard on the FBR page.
-            if ($request->has('rp_pos_style_present')) {
-                // PDF Download Paper (customer video Jul 2026): 'thermal' = exact
-                // roll-width PDF page (default); 'a4' = real A4 page, receipt strip
-                // top-left — fixes right-shifted/clipped prints on office printers.
-                $prefs['pos_style']['pdf_paper'] = $request->input('rp_pdf_paper') === 'a4' ? 'a4' : 'thermal';
-                // show_logo (Task #292): master logo toggle. Default ON (checkbox
-                // present = on; absent = off). When off, logo never prints on any receipt.
-                $prefs['pos_style']['show_logo'] = $request->has('rp_show_logo');
-                // Logo on finals only: sub-option under show_logo — when ON, logo prints
-                // only on final/PRA bills; suppressed on local/provisional bills.
-                $prefs['pos_style']['logo_finals_only'] = $request->has('rp_logo_finals_only');
-                // show_menu_qr (Task #292): master QR toggle. When off, neither the
-                // Menu QR nor the invoice JSON fallback QR prints. PRA fiscal QR unaffected.
-                $prefs['pos_style']['show_menu_qr'] = $request->has('rp_show_menu_qr');
-            } else {
-                // Stale form — preserve whatever is currently stored.
-                // $curStyle does not carry pdf_paper (posReceiptStyle() omits it) and
-                // $prefs['pos_style'] has already been overwritten with just bold+logo,
-                // so read pdf_paper directly from the company's persisted prefs.
-                $origPrefsStyle = $company->invoice_display_prefs ?? [];
-                $origStyle = is_array($origPrefsStyle['pos_style'] ?? null)
-                    ? $origPrefsStyle['pos_style'] : [];
-                $prefs['pos_style']['pdf_paper']        = $origStyle['pdf_paper']       ?? 'thermal';
-                $prefs['pos_style']['show_logo']        = $curStyle['show_logo']         ?? true;
-                $prefs['pos_style']['logo_finals_only'] = $curStyle['logo_finals_only']  ?? false;
-                $prefs['pos_style']['show_menu_qr']     = $curStyle['show_menu_qr']      ?? true;
-            }
+                // Checkbox-based pos_style keys (show_logo, logo_finals_only, show_menu_qr)
+                // and pdf_paper are only written when rp_pos_style_present is in the request,
+                // meaning the form was freshly rendered and the user's intent is known.
+                // A stale/cached form without the marker must never silently reset these to
+                // their unchecked defaults — mirrors the rp_verify_present guard on the FBR page.
+                if ($request->has('rp_pos_style_present')) {
+                    // PDF Download Paper (customer video Jul 2026): 'thermal' = exact
+                    // roll-width PDF page (default); 'a4' = real A4 page, receipt strip
+                    // top-left — fixes right-shifted/clipped prints on office printers.
+                    $prefs['pos_style']['pdf_paper'] = $request->input('rp_pdf_paper') === 'a4' ? 'a4' : 'thermal';
+                    // show_logo (Task #292): master logo toggle. Default ON (checkbox
+                    // present = on; absent = off). When off, logo never prints on any receipt.
+                    $prefs['pos_style']['show_logo'] = $request->has('rp_show_logo');
+                    // Logo on finals only: sub-option under show_logo — when ON, logo prints
+                    // only on final/PRA bills; suppressed on local/provisional bills.
+                    $prefs['pos_style']['logo_finals_only'] = $request->has('rp_logo_finals_only');
+                    // show_menu_qr (Task #292): master QR toggle. When off, neither the
+                    // Menu QR nor the invoice JSON fallback QR prints. PRA fiscal QR unaffected.
+                    $prefs['pos_style']['show_menu_qr'] = $request->has('rp_show_menu_qr');
+                } else {
+                    // Stale form — preserve whatever is currently stored.
+                    // $curStyle does not carry pdf_paper (receiptStyleFrom() omits it) and
+                    // $prefs['pos_style'] has already been overwritten with just bold+logo,
+                    // so pdf_paper comes from $origStyle (the fresh stored pos_style).
+                    $prefs['pos_style']['pdf_paper']        = $origStyle['pdf_paper']       ?? 'thermal';
+                    $prefs['pos_style']['show_logo']        = $curStyle['show_logo']         ?? true;
+                    $prefs['pos_style']['logo_finals_only'] = $curStyle['logo_finals_only']  ?? false;
+                    $prefs['pos_style']['show_menu_qr']     = $curStyle['show_menu_qr']      ?? true;
+                }
+
+                return $prefs;
+            };
             $companyUpdates = [
-                'invoice_display_prefs' => $prefs,
                 // Paper size (owner request Jul 2026): same column PRA Settings writes —
                 // last save from either page wins. Missing/invalid input keeps 80mm default.
                 'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
@@ -609,7 +617,8 @@ class PosController extends Controller
                 && in_array($request->input('rp_local_number_style'), ['serial', 'token', 'daily'], true)) {
                 $companyUpdates['local_number_style'] = $request->input('rp_local_number_style');
             }
-            $company->update($companyUpdates);
+            // One locked UPDATE: fresh-row prefs merge + the scalar columns above.
+            $company->mergeJsonColumn('invoice_display_prefs', $mutatePrefs, $companyUpdates);
             return redirect()->route('pos.receipt-settings')->with('success', __('pos.receipt_display_settings_saved'));
         }
 
@@ -644,9 +653,6 @@ class PosController extends Controller
                 'print_confirm_ask' => 'nullable|boolean',
             ]);
 
-            $settings = $company->printerSettings();
-            $known = collect($settings['available_printers'])->pluck('name')->all();
-
             // Stale-form guard (Task 1393 — same shape as the PRA Receipt Settings
             // page, Task 1377). Every value below is rebuilt wholesale from what the
             // request happens to carry, so a POST that never carried this form at all
@@ -663,25 +669,6 @@ class PosController extends Controller
                 'silent_print_enabled', 'print_confirm_ask', 'counter_kot_enabled',
                 'receipt_printer', 'kot_printer', 'counter_kot_printer',
             ]);
-
-            if ($psPresent) {
-                // Only accept printers the agent actually reported (or blank = unset).
-                $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
-                $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
-                // Task 1194 — KOT-family picks ride the UNION picker: a value may
-                // carry its owning counter ("uid::name", validated against THAT
-                // device's own reported list) or stay a legacy plain name (company-
-                // wide list check, exactly as before). Invalid = silent unset,
-                // same rule the plain names always had.
-                $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
-                $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
-                $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
-                // Counter KOT Copy (dine-in only): printer + its own ON/OFF tick.
-                $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
-                $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
-                $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
-                $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
-            }
 
             // Task 1166 — per-counter devices: persist the multi-counter section
             // BEFORE the master eligibility check so a shop configured ONLY with
@@ -703,18 +690,46 @@ class PosController extends Controller
                     $hasDevicePrinter = false;
                 }
             }
-            if ($psPresent) {
-                $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
-                    && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
-                // Task 565: opt-in Yes/No print-confirm dialog — independent of the
-                // silent-print master (works for iframe/popup shops too).
-                $settings['print_confirm_ask'] = $request->boolean('print_confirm_ask');
-            }
-            // Manual save = deliberate choice — the sale-screen one-click prompt
-            // must never nag this shop again (even if they chose to stay OFF).
-            $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
 
-            $company->update(['pos_printer_settings' => $settings]);
+            // Lost-update guard (Sep 2026): the routing keys are merged onto the
+            // FRESH pos_printer_settings row under a lock (Company::mergeJsonColumn),
+            // so this save can no longer overwrite an available_printers list the
+            // agent reported (or a LiveOps rebind) between page load and POST.
+            // Same normalized-shape rebuild and key rules as before.
+            $company->mergeJsonColumn('pos_printer_settings', function (array $current) use ($request, $validated, $company, $psPresent, $hasDevicePrinter): array {
+                $settings = Company::printerSettingsFrom($current);
+                $known = collect($settings['available_printers'])->pluck('name')->all();
+
+                if ($psPresent) {
+                    // Only accept printers the agent actually reported (or blank = unset).
+                    $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
+                    $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
+                    // Task 1194 — KOT-family picks ride the UNION picker: a value may
+                    // carry its owning counter ("uid::name", validated against THAT
+                    // device's own reported list) or stay a legacy plain name (company-
+                    // wide list check, exactly as before). Invalid = silent unset,
+                    // same rule the plain names always had.
+                    $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
+                    $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
+                    $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
+                    // Counter KOT Copy (dine-in only): printer + its own ON/OFF tick.
+                    $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
+                    $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
+                    $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
+                    $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+
+                    $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
+                        && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
+                    // Task 565: opt-in Yes/No print-confirm dialog — independent of the
+                    // silent-print master (works for iframe/popup shops too).
+                    $settings['print_confirm_ask'] = $request->boolean('print_confirm_ask');
+                }
+                // Manual save = deliberate choice — the sale-screen one-click prompt
+                // must never nag this shop again (even if they chose to stay OFF).
+                $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
+
+                return $settings;
+            });
 
             return redirect()->route('pos.printer-settings')->with('success', __('pos.printer_settings_saved'));
         }
@@ -825,22 +840,33 @@ class PosController extends Controller
         if (!$company) { abort(404); }
 
         $validated = $request->validate(['action' => 'required|in:enable,dismiss']);
-        $settings = $company->printerSettings();
 
+        // Both writes merge onto the FRESH row (Company::mergeJsonColumn) so a
+        // printers report landing between page load and click is never erased.
         if ($validated['action'] === 'dismiss') {
-            $settings['prompt_dismissed_at'] = now()->toIso8601String();
-            $company->update(['pos_printer_settings' => $settings]);
+            $company->mergeJsonColumn('pos_printer_settings', function (array $current): array {
+                $settings = Company::printerSettingsFrom($current);
+                $settings['prompt_dismissed_at'] = now()->toIso8601String();
+                return $settings;
+            });
             return response()->json(['success' => true]);
         }
 
-        $pick = self::smartPrinterPick($settings['available_printers']);
+        $pick = null;
+        $company->mergeJsonColumn('pos_printer_settings', function (array $current) use (&$pick): ?array {
+            $settings = Company::printerSettingsFrom($current);
+            $pick = self::smartPrinterPick($settings['available_printers']);
+            if (!$pick) {
+                return null; // no confident pick — leave the column untouched
+            }
+            $settings['receipt_printer'] = $pick;
+            $settings['silent_print_enabled'] = true;
+            $settings['prompt_dismissed_at'] = now()->toIso8601String();
+            return $settings;
+        });
         if (!$pick) {
             return response()->json(['success' => false, 'reason' => 'no_confident_pick'], 409);
         }
-        $settings['receipt_printer'] = $pick;
-        $settings['silent_print_enabled'] = true;
-        $settings['prompt_dismissed_at'] = now()->toIso8601String();
-        $company->update(['pos_printer_settings' => $settings]);
 
         return response()->json(['success' => true, 'printer' => $pick]);
     }
@@ -3060,6 +3086,51 @@ class PosController extends Controller
         return redirect()->route('pos.features')->with('success', __('pos.features_reset_defaults', ['category' => $category]));
     }
 
+    /**
+     * Offline-first replay answer: the SAME success payload the original sync
+     * would have produced, for a bill that is already stored under this
+     * offline_uuid. Shared by the pre-insert replay guard and the race-loser
+     * recovery in storeInvoice so both paths stay byte-identical for the
+     * client's queue drain (replayed:true = delete the queue entry).
+     */
+    private function offlineReplayResponse(Request $request, PosTransaction $existing)
+    {
+        $replayMessage = __('pos.invoice_already_synced', ['number' => $existing->invoice_number]);
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'replayed' => true,
+                'transaction_id' => $existing->id,
+                'invoice_number' => $existing->invoice_number,
+                'total_amount' => (float) $existing->total_amount,
+                'pra_invoice_number' => $existing->pra_invoice_number,
+                'pra_status' => $existing->pra_status,
+                'message' => $replayMessage,
+            ]);
+        }
+        return redirect()->route('pos.transaction.show', $existing->id)->with('success', $replayMessage);
+    }
+
+    /**
+     * True when a QueryException is the unique(company_id, offline_uuid) index
+     * on pos_transactions rejecting a duplicate — and nothing else. MySQL names
+     * the index in its 1062 message (pos_txn_offline_uuid_unique); SQLite (test
+     * schemas) reports "UNIQUE constraint failed: pos_transactions.company_id,
+     * pos_transactions.offline_uuid". Any other integrity error stays an error.
+     */
+    public static function isOfflineUuidCollision(\Illuminate\Database\QueryException $e): bool
+    {
+        if ((string) $e->getCode() !== '23000') {
+            return false;
+        }
+        $message = $e->getMessage();
+        if (str_contains($message, 'pos_txn_offline_uuid_unique')) {
+            return true;
+        }
+        return str_contains($message, 'UNIQUE constraint failed')
+            && str_contains($message, 'pos_transactions.offline_uuid');
+    }
+
     public function storeInvoice(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -3176,20 +3247,7 @@ class PosController extends Controller
                 ->where('offline_uuid', $offlineUuid)
                 ->first();
             if ($existing) {
-                $replayMessage = __('pos.invoice_already_synced', ['number' => $existing->invoice_number]);
-                if ($request->wantsJson()) {
-                    return response()->json([
-                        'success' => true,
-                        'replayed' => true,
-                        'transaction_id' => $existing->id,
-                        'invoice_number' => $existing->invoice_number,
-                        'total_amount' => (float) $existing->total_amount,
-                        'pra_invoice_number' => $existing->pra_invoice_number,
-                        'pra_status' => $existing->pra_status,
-                        'message' => $replayMessage,
-                    ]);
-                }
-                return redirect()->route('pos.transaction.show', $existing->id)->with('success', $replayMessage);
+                return $this->offlineReplayResponse($request, $existing);
             }
         }
 
@@ -3837,6 +3895,32 @@ class PosController extends Controller
             // transaction starts. Preserve Laravel's normal client-validation
             // contract while still rolling back any reservation/write.
             throw $e;
+        } catch (\Illuminate\Database\QueryException $qe) {
+            DB::rollBack();
+            // RACE-LOSER RECOVERY (mirror of FbrPosController::store): two
+            // requests carrying the same offline_uuid at the same instant both
+            // pass the app-level replay guard above (neither row exists yet);
+            // one wins the INSERT, the other trips unique(company_id,
+            // offline_uuid). Without this the loser surfaced as a raw 500 the
+            // sync engine could not tell from a real failure — the entry stayed
+            // queued and the cashier saw an error for a bill that was saved.
+            // Recovery: re-read the winner and answer exactly like the replay
+            // guard. Every OTHER QueryException keeps the generic 500 below.
+            if ($offlineUuidColumnExists && self::isOfflineUuidCollision($qe)) {
+                $winner = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->where('offline_uuid', $offlineUuid)
+                    ->first();
+                if ($winner) {
+                    Log::info('POS offline race-loser recovered', ['company' => $companyId, 'uuid' => $offlineUuid, 'winner_id' => $winner->id]);
+                    return $this->offlineReplayResponse($request, $winner);
+                }
+            }
+            $errMsg = __('pos.failed_create_invoice', ['error' => $qe->getMessage()]);
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $errMsg], 500);
+            }
+            return back()->withInput()->with('error', $errMsg);
         } catch (\Exception $e) {
             DB::rollBack();
             $errMsg = __('pos.failed_create_invoice', ['error' => $e->getMessage()]);
@@ -6826,6 +6910,12 @@ class PosController extends Controller
             $localBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
+                // Same branch choke point as every aggregate above (Task 1347
+                // via applyReportFilters): the active branch, legacy NULL rows
+                // kept, no-op for the owner's "all branches" view. Without it
+                // the list under the branch-scoped totals showed EVERY
+                // branch's local bills.
+                ->tap(fn ($q) => app(\App\Services\BranchContextService::class)->applyToQuery($q, 'branch_id'))
                 // Same non-reported set as applyReportFilters — SINGLE predicate
                 // (Task 647): exempt_internal is excluded regardless of mode.
                 ->tap(fn ($q) => PosTransaction::applyStreamTab($q, 'local'))
@@ -9271,7 +9361,7 @@ class PosController extends Controller
             'name' => 'required|string|max:100',
             'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail('pos')],
             'phone' => 'nullable|string|max:20',
-            'password' => 'required|string|min:6',
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::defaults()],
             'pos_role' => 'nullable|in:pos_cashier,pos_manager,pos_kitchen,pos_waiter,pos_delivery',
             // Task 529: optional short login name — staff can log in with it
             // instead of the full email (LoginIdentifierResolver already
@@ -9578,7 +9668,7 @@ class PosController extends Controller
             // Item #7 (owner, Jul 2026): optional password RESET from the team edit
             // row — stored hashes are irreversible, so "view password" is impossible;
             // the admin sets a NEW one instead. Blank = keep the current password.
-            'password' => 'nullable|string|min:6|max:100',
+            'password' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rules\Password::defaults()],
             // Task 529: admin can set/change the member's login username from
             // the edit row (own row exempt from the unique check).
             'username' => \App\Services\LoginIdentifierResolver::usernameRules($cashier->id, 'pos'),
@@ -12683,21 +12773,24 @@ class PosController extends Controller
 
             // Receipt display preferences (per-company, POS product scope)
             if ($request->has('receipt_prefs_submitted')) {
-                $prefs = $company->invoice_display_prefs ?? [];
                 // Task 769 / Task 800: merge-preserve keys owned by receipt-settings
                 // (show_verify_line, show_cashier, show_business_name, show_developed_by,
                 // show_tax …) — a wholesale rewrite here would silently erase them.
                 // Mirror of FbrPosController::businessProfile's array_merge pattern.
-                $posExisting = is_array($prefs['pos'] ?? null) ? $prefs['pos'] : [];
-                $prefs['pos'] = array_merge($posExisting, [
-                    'show_address' => $request->has('rp_show_address'),
-                    'show_ntn' => $request->has('rp_show_ntn'),
-                    'show_email' => $request->has('rp_show_email'),
-                    'show_mobile' => $request->has('rp_show_mobile'),
-                    'show_footer' => $request->has('rp_show_footer'),
-                    'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
-                ]);
-                $data['invoice_display_prefs'] = $prefs;
+                // Merged onto the FRESH row under a lock (Company::mergeJsonColumn) so
+                // a concurrent receipt-settings save of pos_local/pos_style survives.
+                $company->mergeJsonColumn('invoice_display_prefs', function (array $prefs) use ($request): array {
+                    $posExisting = is_array($prefs['pos'] ?? null) ? $prefs['pos'] : [];
+                    $prefs['pos'] = array_merge($posExisting, [
+                        'show_address' => $request->has('rp_show_address'),
+                        'show_ntn' => $request->has('rp_show_ntn'),
+                        'show_email' => $request->has('rp_show_email'),
+                        'show_mobile' => $request->has('rp_show_mobile'),
+                        'show_footer' => $request->has('rp_show_footer'),
+                        'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
+                    ]);
+                    return $prefs;
+                });
             }
 
             if ($request->hasFile('logo')) {

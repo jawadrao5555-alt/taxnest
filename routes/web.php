@@ -115,8 +115,10 @@ Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('
 Route::get('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'verify'])->whereNumber('company')->withoutMiddleware($statelessMachine);
 Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'receive'])->whereNumber('company')->withoutMiddleware($statelessMachine);
 
+// Local-development convenience only. The controller fails closed (404) unless
+// APP_ENV=local AND DEMO_LOGIN_ENABLED=true; privileged roles are never offered.
 Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
-    ->where('role', 'super_admin|company_admin|demo');
+    ->where('role', 'company_admin|demo');
 
 // Infrastructure diagnostic. It used to sit on /health, which is wrong twice
 // over: that prefix now belongs to the Nest ERPS Healthcare panel, and the payload
@@ -192,8 +194,9 @@ Route::get('/', function () {
         $stats = \Illuminate\Support\Facades\Cache::remember('landing_stats', 600, function () {
             return [
                 'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
-                    + \App\Models\PosTransaction::where('pra_status', 'success')->count()
-                    + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->count(),
+                    // PRA writes 'submitted' (never 'success'); FBR POS writes 'success'.
+                    + \App\Models\PosTransaction::whereIn('pra_status', ['submitted', 'success'])->count()
+                    + \App\Models\FbrPosTransaction::whereIn('fbr_status', ['submitted', 'success'])->count(),
                 'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
             ];
         });
@@ -1834,9 +1837,9 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         // ── Purchasing & suppliers ──
         Route::get('/purchases', [HealthPharmacyPurchaseController::class, 'index'])->name('health.pharmacy.purchases');
         Route::middleware('health.can:pharmacy.manage')->group(function () {
-            Route::post('/purchases', [HealthPharmacyPurchaseController::class, 'store'])->name('health.pharmacy.purchases.store');
+            Route::post('/purchases', [HealthPharmacyPurchaseController::class, 'store'])->middleware(\App\Http\Middleware\HealthSubscriptionLock::class)->name('health.pharmacy.purchases.store');
             Route::post('/suppliers', [HealthPharmacyPurchaseController::class, 'storeSupplier'])->name('health.pharmacy.suppliers.store');
-            Route::post('/supplier-payments', [HealthPharmacyPurchaseController::class, 'storePayment'])->name('health.pharmacy.supplier-payments.store');
+            Route::post('/supplier-payments', [HealthPharmacyPurchaseController::class, 'storePayment'])->middleware(\App\Http\Middleware\HealthSubscriptionLock::class)->name('health.pharmacy.supplier-payments.store');
         });
 
         // ── Batch stock control ──
@@ -1867,7 +1870,7 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         Route::get('/sales/{id}/receipt', [HealthPharmacySaleController::class, 'receipt'])->name('health.pharmacy.sales.receipt');
         Route::middleware('health.can:pharmacy.dispense')->group(function () {
             Route::get('/counter', [HealthPharmacySaleController::class, 'counter'])->name('health.pharmacy.counter');
-            Route::post('/counter', [HealthPharmacySaleController::class, 'store'])->name('health.pharmacy.counter.store');
+            Route::post('/counter', [HealthPharmacySaleController::class, 'store'])->middleware(\App\Http\Middleware\HealthSubscriptionLock::class)->name('health.pharmacy.counter.store');
             Route::get('/counter/batches', [HealthPharmacySaleController::class, 'batches'])->name('health.pharmacy.counter.batches');
             Route::post('/sales/{id}/return', [HealthPharmacySaleController::class, 'refund'])->name('health.pharmacy.sales.return');
         });
@@ -2004,7 +2007,8 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
             Route::post('/ipd/beds/{id}/status', [HealthWardController::class, 'setBedStatus'])->whereNumber('id')->name('health.ipd.bed-status');
         });
 
-        Route::middleware('health.can:ipd.charge')->group(function () {
+        // Money posting: subscription lock (hasAccess) on top of the capability.
+        Route::middleware(['health.can:ipd.charge', \App\Http\Middleware\HealthSubscriptionLock::class])->group(function () {
             Route::post('/ipd/admissions/{id}/charges', [HealthAdmissionController::class, 'storeCharge'])->whereNumber('id')->name('health.ipd.charges.store');
             Route::post('/ipd/admissions/{id}/charges/{chargeId}/reverse', [HealthAdmissionController::class, 'reverseCharge'])->whereNumber('id')->whereNumber('chargeId')->name('health.ipd.charges.reverse');
             Route::post('/ipd/admissions/{id}/payments', [HealthAdmissionController::class, 'storePayment'])->whereNumber('id')->name('health.ipd.payments.store');
@@ -2203,7 +2207,9 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         });
 
         /* Money movement — the counter's own rights. */
-        Route::middleware('health.can:billing.charge')->group(function () {
+        // Money posting: subscription lock (hasAccess) on top of the capability —
+        // GETs inside this group are untouched, only the writes are refused.
+        Route::middleware(['health.can:billing.charge', \App\Http\Middleware\HealthSubscriptionLock::class])->group(function () {
             Route::post('/patient/{id}/sync', [HealthBillingController::class, 'syncCharges'])->whereNumber('id')->name('health.billing.sync');
             Route::post('/patient/{id}/charges', [HealthBillingController::class, 'storeCharge'])->whereNumber('id')->name('health.billing.charges.store');
             Route::post('/charges/{id}/reverse', [HealthBillingController::class, 'reverseCharge'])->whereNumber('id')->name('health.billing.charges.reverse');
@@ -2742,27 +2748,12 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/riders/{id}/login', [\App\Http\Controllers\FbrPosRiderController::class, 'saveLogin'])->name('fbrpos.riders.login');
 });
 
-Route::get('/setup-migrate-xK9mP2', function () {
-    try {
-        Artisan::call('migrate', ['--force' => true]);
-        $output = Artisan::output();
-        Artisan::call('config:clear');
-        Artisan::call('view:clear');
-        return '<pre>Migration Output:\n' . $output . '\n\nConfig & View cache cleared.\nDone! Now delete this route from routes/web.php</pre>';
-    } catch (\Exception $e) {
-        return '<pre>Error: ' . $e->getMessage() . '</pre>';
-    }
-});
-
-Route::get('/setup-seed-xK9mP2', function () {
-    try {
-        Artisan::call('db:seed', ['--force' => true]);
-        $output = Artisan::output();
-        return '<pre>Seed Output:\n' . $output . '\nDone!</pre>';
-    } catch (\Exception $e) {
-        return '<pre>Error: ' . $e->getMessage() . '</pre>';
-    }
-});
+// Schema/seed changes are CLI-only: `php artisan migrate --force` runs inside
+// scripts/lib/live-remote-apply.sh during the GitHub Actions deploy, and
+// `php artisan db:seed` is a local/dev command. The former web-reachable
+// /setup-migrate-* and /setup-seed-* closures were removed (unauthenticated
+// GET could run migrate/seed --force); tests/Feature/Security/SetupRoutesRemovedTest
+// guards against their return.
 
 // --------------------------------------------------------
 // AGENT API (TaxNest Desktop Sync Agent)
@@ -2812,8 +2803,11 @@ Route::prefix('api/caller-app/v1')->middleware(['throttle:600,1'])->withoutMiddl
 // Versioned v1; key managed at /company/api-access; CSRF-exempt via
 // bootstrap/app.php ('api/di/*'). Suspended/pending companies rejected by di.api.
 Route::prefix('api/di/v1')->middleware(['di.api', 'throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
+    // Billable endpoint: subscription access gate (same hasAccess() decision
+    // CheckPlanLimit applies to the panel) sits ONLY here — status stays readable
+    // for a locked company so an ERP can still reconcile what it already filed.
     Route::post('/invoices', [\App\Http\Controllers\Api\DiInvoiceApiController::class, 'store'])
-        ->middleware('throttle:60,1')->name('diapi.invoices.store');
+        ->middleware([\App\Http\Middleware\DiApiSubscriptionAccess::class, 'throttle:60,1'])->name('diapi.invoices.store');
     Route::get('/invoices/status', [\App\Http\Controllers\Api\DiInvoiceApiController::class, 'status'])->name('diapi.invoices.status');
 });
 
@@ -2826,7 +2820,10 @@ Route::prefix('api/live-ops/v1')->middleware(['throttle:30,1'])->withoutMiddlewa
     Route::post('/remediate/{actionId}/execute', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'execute']);
 });
 
-Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {
+// throttle:agent-api (AppServiceProvider) — 600/min per presented key, before
+// agent.auth so unauthenticated floods are bounded too. The v2 group below
+// keeps its own per-route throttles and is NOT double-wrapped.
+Route::prefix('api/agent')->middleware(['throttle:agent-api', 'agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {
     // Local realtime gateway credential exchange; deliberately sessionless.
     Route::get('/realtime-auth', [\App\Http\Controllers\AgentController::class, 'realtimeAuth']);
     Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);

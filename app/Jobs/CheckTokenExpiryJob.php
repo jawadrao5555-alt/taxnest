@@ -10,6 +10,12 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated ORPHAN — superseded by CheckFbrTokenExpiryJob (scheduled in
+ * routes/console.php). Not dispatched or scheduled anywhere. Kept ONLY so
+ * historical serialized payloads in `jobs` / `failed_jobs` still deserialize.
+ * Do not add new dispatch sites.
+ */
 class CheckTokenExpiryJob implements ShouldQueue
 {
     use Queueable;

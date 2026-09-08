@@ -108,10 +108,16 @@ class AgentManagementController extends Controller
             // desktopConfig calls must not each write a different key (last
             // write wins = one agent gets a dead key). Conditional UPDATE —
             // only the FIRST writer lands; everyone reads the winning key back.
+            $newKey = 'tnk_' . Str::random(48);
             $update = [
-                'agent_api_key' => 'tnk_' . Str::random(48),
+                'agent_api_key' => $newKey,
                 'agent_enabled' => true,
             ];
+            // Query-builder update bypasses the model's saving hook — mirror
+            // the sha256 hash explicitly so AgentAuth can find the key.
+            if (\App\Support\AgentApiKey::hashColumnAvailable()) {
+                $update['agent_api_key_hash'] = \App\Support\AgentApiKey::hash($newKey);
+            }
             if ($hasSubmitsCol) {
                 $update['agent_submits_pra'] = false;
             }

@@ -4261,72 +4261,76 @@ class FbrPosController extends Controller
                 'rp_delivery_receipt_on_assign' => 'nullable|in:1',
             ]);
 
-            $prefs = $company->invoice_display_prefs ?? [];
-            $style = is_array($prefs['pos_style'] ?? null) ? $prefs['pos_style'] : [];
+            // Lost-update guard (Sep 2026): merged onto the FRESH row under a lock
+            // (Company::mergeJsonColumn) — a PRA receipt-settings or business-
+            // profile save racing this POST keeps its keys. Key rules unchanged.
+            $company->mergeJsonColumn('invoice_display_prefs', function (array $prefs) use ($request): array {
+                $style = is_array($prefs['pos_style'] ?? null) ? $prefs['pos_style'] : [];
 
-            // Preserve keys we don't touch on this page (show_logo, logo_finals_only,
-            // show_menu_qr, pdf_paper) so saving here never clobbers PRA settings.
-            // Receipt Themes (Task 712): the form submits a named theme mapped by
-            // PosReceiptThemes (single truth, shared with PRA receipt-settings) onto
-            // the same bold/logo keys; re-saving the active theme never rewrites the
-            // stored pair. Legacy rp_style_bold/rp_logo_style POSTs keep working; a
-            // POST with neither leaves the company's current pair untouched.
-            $theme = $request->input('rp_receipt_theme');
-            if (\App\Support\PosReceiptThemes::isValid($theme)) {
-                $pair = \App\Support\PosReceiptThemes::apply($theme, $company->posReceiptStyle());
-                $style['bold'] = $pair['bold'];
-                $style['logo'] = $pair['logo'];
-            } elseif ($request->filled('rp_logo_style') || $request->has('rp_style_bold')) {
-                $style['bold'] = $request->has('rp_style_bold');
-                $style['logo'] = $request->input('rp_logo_style', 'center') === 'side' ? 'side' : 'center';
-            }
+                // Preserve keys we don't touch on this page (show_logo, logo_finals_only,
+                // show_menu_qr, pdf_paper) so saving here never clobbers PRA settings.
+                // Receipt Themes (Task 712): the form submits a named theme mapped by
+                // PosReceiptThemes (single truth, shared with PRA receipt-settings) onto
+                // the same bold/logo keys; re-saving the active theme never rewrites the
+                // stored pair. Legacy rp_style_bold/rp_logo_style POSTs keep working; a
+                // POST with neither leaves the company's current pair untouched.
+                $theme = $request->input('rp_receipt_theme');
+                if (\App\Support\PosReceiptThemes::isValid($theme)) {
+                    $pair = \App\Support\PosReceiptThemes::apply($theme, Company::receiptStyleFrom($prefs));
+                    $style['bold'] = $pair['bold'];
+                    $style['logo'] = $pair['logo'];
+                } elseif ($request->filled('rp_logo_style') || $request->has('rp_style_bold')) {
+                    $style['bold'] = $request->has('rp_style_bold');
+                    $style['logo'] = $request->input('rp_logo_style', 'center') === 'side' ? 'side' : 'center';
+                }
 
-            $prefs['pos_style'] = $style;
-
-            // Task 769: "Scan with FBR Tax Asaan App" verify-line toggle — stored
-            // in the 'fbrpos' set (merge-preserve the business-profile keys).
-            // Gated on the rp_verify_present marker so a stale cached form that
-            // predates the checkbox can never silently flip the line OFF.
-            if ($request->has('rp_verify_present')) {
-                $fbrSet = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
-                $fbrSet['show_verify_line'] = $request->has('rp_show_verify_line');
-                $prefs['fbrpos'] = $fbrSet;
-            }
-
-            // Task 1263: PRA-parity receipt display prefs — stored in the 'fbrpos'
-            // set (merge-preserve show_verify_line + the business-profile keys,
-            // which also writes some of these; last save from either page wins,
-            // same convention as PRA Settings vs receipt-settings paper size).
-            // Gated on rp_fbr_display_present so a stale cached form that
-            // predates these checkboxes can never silently flip them all OFF.
-            if ($request->has('rp_fbr_display_present')) {
-                $fbrSet = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
-                $fbrSet['show_address']       = $request->has('rp_show_address');
-                $fbrSet['show_ntn']           = $request->has('rp_show_ntn');
-                $fbrSet['show_email']         = $request->has('rp_show_email');
-                $fbrSet['show_mobile']        = $request->has('rp_show_mobile');
-                $fbrSet['show_cashier']       = $request->has('rp_show_cashier');
-                $fbrSet['show_footer']        = $request->has('rp_show_footer');
-                $fbrSet['show_business_name'] = $request->has('rp_show_business_name');
-                $fbrSet['show_developed_by']  = $request->has('rp_show_developed_by');
-                // Customer-copy tax display only — amounts submitted to FBR are
-                // never affected (mirrors the PRA pos_receipt_show_tax rule).
-                $fbrSet['show_tax']           = $request->has('rp_show_tax');
-                $fbrSet['footer_text']        = trim((string) $request->input('rp_footer_text', '')) ?: null;
-                $prefs['fbrpos'] = $fbrSet;
-            }
-
-            // Task 1263: show_logo master switch — pos_style is shared with PRA
-            // receipts; $style above is a read-modify-write copy, so untouched
-            // keys (logo_finals_only, show_menu_qr, pdf_paper) survive. Gated on
-            // its own presence marker (mirrors PRA's rp_pos_style_present).
-            if ($request->has('rp_pos_style_present')) {
-                $style = $prefs['pos_style'];
-                $style['show_logo'] = $request->has('rp_show_logo');
                 $prefs['pos_style'] = $style;
-            }
 
-            $company->invoice_display_prefs = $prefs;
+                // Task 769: "Scan with FBR Tax Asaan App" verify-line toggle — stored
+                // in the 'fbrpos' set (merge-preserve the business-profile keys).
+                // Gated on the rp_verify_present marker so a stale cached form that
+                // predates the checkbox can never silently flip the line OFF.
+                if ($request->has('rp_verify_present')) {
+                    $fbrSet = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
+                    $fbrSet['show_verify_line'] = $request->has('rp_show_verify_line');
+                    $prefs['fbrpos'] = $fbrSet;
+                }
+
+                // Task 1263: PRA-parity receipt display prefs — stored in the 'fbrpos'
+                // set (merge-preserve show_verify_line + the business-profile keys,
+                // which also writes some of these; last save from either page wins,
+                // same convention as PRA Settings vs receipt-settings paper size).
+                // Gated on rp_fbr_display_present so a stale cached form that
+                // predates these checkboxes can never silently flip them all OFF.
+                if ($request->has('rp_fbr_display_present')) {
+                    $fbrSet = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
+                    $fbrSet['show_address']       = $request->has('rp_show_address');
+                    $fbrSet['show_ntn']           = $request->has('rp_show_ntn');
+                    $fbrSet['show_email']         = $request->has('rp_show_email');
+                    $fbrSet['show_mobile']        = $request->has('rp_show_mobile');
+                    $fbrSet['show_cashier']       = $request->has('rp_show_cashier');
+                    $fbrSet['show_footer']        = $request->has('rp_show_footer');
+                    $fbrSet['show_business_name'] = $request->has('rp_show_business_name');
+                    $fbrSet['show_developed_by']  = $request->has('rp_show_developed_by');
+                    // Customer-copy tax display only — amounts submitted to FBR are
+                    // never affected (mirrors the PRA pos_receipt_show_tax rule).
+                    $fbrSet['show_tax']           = $request->has('rp_show_tax');
+                    $fbrSet['footer_text']        = trim((string) $request->input('rp_footer_text', '')) ?: null;
+                    $prefs['fbrpos'] = $fbrSet;
+                }
+
+                // Task 1263: show_logo master switch — pos_style is shared with PRA
+                // receipts; $style above is a read-modify-write copy, so untouched
+                // keys (logo_finals_only, show_menu_qr, pdf_paper) survive. Gated on
+                // its own presence marker (mirrors PRA's rp_pos_style_present).
+                if ($request->has('rp_pos_style_present')) {
+                    $style = $prefs['pos_style'];
+                    $style['show_logo'] = $request->has('rp_show_logo');
+                    $prefs['pos_style'] = $style;
+                }
+
+                return $prefs;
+            });
 
             // Task 1263: paper size — FBR's own print_paper_size column (also
             // editable on business-profile; last save wins). NOTE: FBR PDF
@@ -4375,9 +4379,13 @@ class FbrPosController extends Controller
             // pattern) so a stale/bare second POST cannot silently flip the
             // setting OFF when the user has deliberately enabled it.
             if ($request->has('rp_print_confirm_present')) {
-                $pset = $company->printerSettings();
-                $pset['print_confirm_ask'] = $request->has('rp_print_confirm');
-                $company->pos_printer_settings = $pset;
+                // Fresh-row merge: agent telemetry / printer-settings saves racing
+                // this POST keep their keys (Company::mergeJsonColumn).
+                $company->mergeJsonColumn('pos_printer_settings', function (array $current) use ($request): array {
+                    $pset = Company::printerSettingsFrom($current);
+                    $pset['print_confirm_ask'] = $request->has('rp_print_confirm');
+                    return $pset;
+                });
             }
             // Same shop-level delivery default as PRA POS. Do not let a stale
             // receipt settings form silently turn an owner's choice off.
@@ -5159,12 +5167,17 @@ class FbrPosController extends Controller
             // here would leave a historically inconsistent shop (say KOT on with
             // no kitchen) marked as a restaurant while the runtime resolves all
             // of its restaurant features back off.
+            // Fresh-row merge (Company::mergeJsonColumn): the single flag is
+            // flipped on the CURRENT map and the master columns re-derived from it
+            // in the same UPDATE — identical to featureUpdates(), minus the race.
             if (!$enabled) {
-                $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
-                if (!empty($flags['kitchen_notes'])) {
+                $company->mergeJsonColumn('feature_flags', function (array $flags): ?array {
+                    if (empty($flags['kitchen_notes'])) {
+                        return null; // nothing to clear — leave the map untouched
+                    }
                     $flags['kitchen_notes'] = false;
-                    $company->update(\App\Services\PosFeatureService::featureUpdates($flags));
-                }
+                    return \App\Services\PosFeatureService::normalize($flags);
+                }, fn (array $flags) => \App\Services\PosFeatureService::masterSwitches($flags));
             }
 
             return response()->json(['success' => true, 'enabled' => (bool) $company->kitchen_printer_enabled]);
@@ -5176,42 +5189,47 @@ class FbrPosController extends Controller
         // cards disappear, so a stale true would silently spring back to life
         // on the next upgrade and start blocking sales on expired batches.
         if (in_array($feature, ['pharmacy', 'batch_expiry', 'loose_sale'], true)) {
-            $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
-
-            if ($feature === 'pharmacy') {
-                $flags['pharmacy'] = $enabled;
-                if ($enabled) {
-                    // Batch/expiry is the whole point of the module and it needs
-                    // inventory underneath it — a pharmacy that switches the mode
-                    // on and finds no batch tracking has been sold nothing.
-                    $flags['inventory'] = true;
-                    $flags['batch_expiry'] = true;
+            // Fresh-row merge (Company::mergeJsonColumn): the family flip lands on
+            // the CURRENT map, master columns re-derived in the same UPDATE.
+            $needsPharmacy = false;
+            $flags = $company->mergeJsonColumn('feature_flags', function (array $flags) use ($feature, $enabled, &$needsPharmacy): ?array {
+                if ($feature === 'pharmacy') {
+                    $flags['pharmacy'] = $enabled;
+                    if ($enabled) {
+                        // Batch/expiry is the whole point of the module and it needs
+                        // inventory underneath it — a pharmacy that switches the mode
+                        // on and finds no batch tracking has been sold nothing.
+                        $flags['inventory'] = true;
+                        $flags['batch_expiry'] = true;
+                    } else {
+                        $flags['batch_expiry'] = false;
+                        $flags['loose_sale'] = false;
+                        // 'inventory' is deliberately LEFT ALONE: plenty of shops ran
+                        // stock long before pharmacy mode, and this click was about
+                        // pharmacy, not about emptying their inventory module.
+                    }
                 } else {
-                    $flags['batch_expiry'] = false;
-                    $flags['loose_sale'] = false;
-                    // 'inventory' is deliberately LEFT ALONE: plenty of shops ran
-                    // stock long before pharmacy mode, and this click was about
-                    // pharmacy, not about emptying their inventory module.
+                    // A child cannot be switched on while the master is off — the UI
+                    // hides its card entirely, so an accepted ON would be a success
+                    // message for something the shop can never see.
+                    if ($enabled && empty($flags['pharmacy'])) {
+                        $needsPharmacy = true;
+                        return null; // no write
+                    }
+                    $flags[$feature] = $enabled;
+                    if ($feature === 'batch_expiry' && $enabled) {
+                        $flags['inventory'] = true;
+                    }
                 }
-            } else {
-                // A child cannot be switched on while the master is off — the UI
-                // hides its card entirely, so an accepted ON would be a success
-                // message for something the shop can never see.
-                if ($enabled && empty($flags['pharmacy'])) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => __('pos.fbr_feat_needs_pharmacy'),
-                    ], 422);
-                }
-                $flags[$feature] = $enabled;
-                if ($feature === 'batch_expiry' && $enabled) {
-                    $flags['inventory'] = true;
-                }
-            }
 
-            $flags = \App\Services\PosFeatureService::normalize($flags);
-            $company->update(['feature_flags' => $flags]
-                + \App\Services\PosFeatureService::masterSwitches($flags));
+                return \App\Services\PosFeatureService::normalize($flags);
+            }, fn (array $flags) => \App\Services\PosFeatureService::masterSwitches($flags));
+            if ($needsPharmacy) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('pos.fbr_feat_needs_pharmacy'),
+                ], 422);
+            }
             \App\Services\PosFeatureService::flushGateCaches();
 
             // Report what actually STUCK, never what was asked for.
@@ -5238,18 +5256,20 @@ class FbrPosController extends Controller
         }
 
         $flag  = $feature === 'delivery' ? 'delivery' : 'kitchen_notes';
-        $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
-        $flags[$flag] = $enabled;
+        // Fresh-row merge (Company::mergeJsonColumn) — same resolve + master-column
+        // derivation as featureUpdates(), applied to the CURRENT map under a lock.
+        $flags = $company->mergeJsonColumn('feature_flags', function (array $flags) use ($flag, $feature, $enabled): array {
+            $flags[$flag] = $enabled;
 
-        // PosFeatureService::DEPENDENCIES — delivery requires customer_profile.
-        // Without this line normalize() switches delivery straight back off and
-        // the card would flip back on the next page load with no explanation.
-        if ($feature === 'delivery' && $enabled) {
-            $flags['customer_profile'] = true;
-        }
+            // PosFeatureService::DEPENDENCIES — delivery requires customer_profile.
+            // Without this line normalize() switches delivery straight back off and
+            // the card would flip back on the next page load with no explanation.
+            if ($feature === 'delivery' && $enabled) {
+                $flags['customer_profile'] = true;
+            }
 
-        $flags = \App\Services\PosFeatureService::normalize($flags);
-        $company->update(\App\Services\PosFeatureService::featureUpdates($flags));
+            return \App\Services\PosFeatureService::normalize($flags);
+        }, fn (array $flags) => \App\Services\PosFeatureService::masterSwitches($flags));
 
         // Report what actually STUCK after normalization, never what was asked for.
         return response()->json(['success' => true, 'enabled' => (bool) ($flags[$flag] ?? false)]);
@@ -5305,9 +5325,6 @@ class FbrPosController extends Controller
                 'counter_kot_enabled' => 'nullable|boolean',
             ]);
 
-            $settings = $company->printerSettings();
-            $known = collect($settings['available_printers'])->pluck('name')->all();
-
             // Stale-form guard (Task 1393 — mirrors the PRA printer-settings page and
             // the PRA Receipt Settings page, Task 1377). Every value below is rebuilt
             // wholesale from what the request happens to carry, so a POST that never
@@ -5321,19 +5338,6 @@ class FbrPosController extends Controller
                 'silent_print_enabled', 'counter_kot_enabled',
                 'receipt_printer', 'kot_printer', 'counter_kot_printer',
             ]);
-
-            if ($psPresent) {
-                // Only accept printers the agent actually reported (or blank = unset).
-                $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
-                $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
-                $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
-                $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
-                $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
-                $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
-                $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
-                $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
-                $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
-            }
 
             // Multi-counter section BEFORE the master eligibility check (a shop
             // configured only with per-counter printers can still enable silent).
@@ -5349,15 +5353,36 @@ class FbrPosController extends Controller
                     $hasDevicePrinter = false;
                 }
             }
-            if ($psPresent) {
-                $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
-                    && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
-            }
-            // print_confirm_ask: PRESERVED as-is (owned by FBR receipt-settings).
-            // Manual save = deliberate choice — never nag with the one-click prompt.
-            $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
 
-            $company->update(['pos_printer_settings' => $settings]);
+            // Lost-update guard (Sep 2026): routing keys merged onto the FRESH row
+            // under a lock (Company::mergeJsonColumn) — an agent printers report or
+            // LiveOps rebind landing mid-edit is no longer overwritten. Same
+            // normalized-shape rebuild and key rules as before.
+            $company->mergeJsonColumn('pos_printer_settings', function (array $current) use ($request, $validated, $company, $psPresent, $hasDevicePrinter): array {
+                $settings = Company::printerSettingsFrom($current);
+                $known = collect($settings['available_printers'])->pluck('name')->all();
+
+                if ($psPresent) {
+                    // Only accept printers the agent actually reported (or blank = unset).
+                    $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
+                    $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
+                    $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
+                    $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
+                    $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
+                    $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
+                    $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
+                    $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
+                    $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+
+                    $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
+                        && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
+                }
+                // print_confirm_ask: PRESERVED as-is (owned by FBR receipt-settings).
+                // Manual save = deliberate choice — never nag with the one-click prompt.
+                $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
+
+                return $settings;
+            });
 
             return redirect()->route('fbrpos.printer-settings')->with('success', __('pos.printer_settings_saved'));
         }
@@ -5819,17 +5844,28 @@ class FbrPosController extends Controller
         // reports convention): SIGNED money sums, SALES-only bill counts.
         [$signExpr, $saleRowExpr] = $this->fbrReturnNettingExprs();
 
+        // Branch scoping — the SAME rule exportReportCsv applies, so the screen
+        // and the CSV it offers always agree (a requested branch must be one
+        // this user may see; otherwise the active branch context, legacy NULL
+        // rows kept, owner's "all branches" = company-wide). The four tiles
+        // below used to be company_id + date only, i.e. every branch's money
+        // under one branch's heading.
+        $branchScope = $this->fbrReportBranchScope($request, Auth::guard('fbrpos')->user());
+
         $todayStats = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->tap(fn ($q) => $this->whereBizDate($q, $bizToday))
             ->selectRaw("COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue, COALESCE(SUM(({$signExpr}) * tax_amount),0) as tax, COALESCE(SUM(({$signExpr}) * discount_amount),0) as discount")
             ->first();
 
         $monthStats = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->tap($monthScope)
             ->selectRaw("COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue, COALESCE(SUM(({$signExpr}) * tax_amount),0) as tax, COALESCE(SUM(({$signExpr}) * discount_amount),0) as discount")
             ->first();
 
         $dailySales = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->tap($monthScope)
             ->selectRaw($this->bizDateExpr() . " as date, COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue")
             ->groupByRaw($this->bizDateExpr())
@@ -5837,6 +5873,7 @@ class FbrPosController extends Controller
             ->get();
 
         $paymentBreakdown = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->tap($monthScope)
             ->selectRaw("payment_method, COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue")
             ->groupBy('payment_method')
@@ -5848,10 +5885,30 @@ class FbrPosController extends Controller
         $rangeAnalytics = null;
         if (\App\Services\PosFeatureService::planAllows($company, 'analytics_enabled')) {
             [$from, $to] = $this->resolveFbrReportRange($request);
-            $rangeAnalytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
+            $rangeAnalytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user(), $branchScope);
         }
 
         return view('fbr-pos.reports', compact('company', 'todayStats', 'monthStats', 'dailySales', 'paymentBreakdown', 'rangeAnalytics'));
+    }
+
+    /**
+     * Branch predicate for the FBR sales-report surfaces — one rule for the
+     * screen tiles, the range analytics and exportReportCsv: an explicitly
+     * requested branch_id must be accessible to THIS user (admin = all,
+     * manager = pivot branches, cashier = own branch only) and is applied
+     * exactly; otherwise the active branch context applies (legacy NULL rows
+     * stay visible; the owner's "all branches" view = no filter), the same
+     * convention as BranchContextService::applyToQuery everywhere else.
+     */
+    private function fbrReportBranchScope(Request $request, $user): \Closure
+    {
+        $branchCtx = app(\App\Services\BranchContextService::class);
+        if ($request->filled('branch_id')) {
+            $requestedBranch = (int) $request->branch_id;
+            abort_unless(!$user || $branchCtx->canAccess($requestedBranch), 403, __('pos.access_denied'));
+            return fn ($q) => $q->where('branch_id', $requestedBranch);
+        }
+        return fn ($q) => $branchCtx->applyToQuery($q);
     }
 
     /**
@@ -6363,7 +6420,7 @@ class FbrPosController extends Controller
         $request->validate([
             'name' => 'required|string|max:100',
             'email' => ['required', 'email', 'max:150', \App\Support\IdentityScope::uniqueEmail('fbrpos')],
-            'password' => 'required|string|min:6|max:100',
+            'password' => ['required', 'string', 'max:100', \Illuminate\Validation\Rules\Password::defaults()],
             'pos_role' => 'required|in:pos_cashier,pos_manager',
             'default_branch_id' => 'nullable|integer',
             // Task 529 (twin of PRA storeCashier): optional short login name —
@@ -6413,7 +6470,7 @@ class FbrPosController extends Controller
         $request->validate([
             'name' => 'required|string|max:100',
             'email' => ['required', 'email', 'max:150', \App\Support\IdentityScope::uniqueEmail('fbrpos', $member->id)],
-            'password' => 'nullable|string|min:6|max:100',
+            'password' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rules\Password::defaults()],
             'pos_role' => 'required|in:pos_cashier,pos_manager',
             'default_branch_id' => 'nullable|integer',
             // Task 529: set/change username from the edit row (own row exempt).
@@ -6579,9 +6636,14 @@ class FbrPosController extends Controller
      * edit must not retro-rewrite a past range's profit. Lines without a
      * stored snapshot are cost-unknown and excluded (coverage_pct shows it).
      */
-    private function buildFbrReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, $user): object
+    private function buildFbrReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, $user, ?\Closure $branchScope = null): object
     {
         $isAdminView = $user && $user->role === 'company_admin';
+
+        // Branch scoping (same rule as the report tiles / CSV). Callers that
+        // pass nothing (analytics PDF) get the active-branch convention, so a
+        // branch's PDF carries that branch's figures — never the whole company.
+        $branchScope ??= fn ($q) => app(\App\Services\BranchContextService::class)->applyToQuery($q);
 
         // Return / credit-note rows are EXCLUDED from the range deep-dive
         // entirely (Task 591 — same convention as the PRA range analytics):
@@ -6600,6 +6662,7 @@ class FbrPosController extends Controller
         };
 
         $transactions = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->whereBetween('created_at', [$from, $to])
             ->tap($excludeReturns)
             ->get(['id', 'created_at', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method', 'fbr_status']);
@@ -6723,6 +6786,7 @@ class FbrPosController extends Controller
         $prevFrom = $from->copy()->subDays($days)->startOfDay();
         $prevTo = $from->copy()->subDay()->endOfDay();
         $prevRow = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
             ->whereBetween('created_at', [$prevFrom, $prevTo])
             ->tap($excludeReturns)
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
@@ -7002,10 +7066,8 @@ class FbrPosController extends Controller
             // Receipt Display toggles (owner, 22 Jul 2026): stored under the
             // 'fbrpos' key of invoice_display_prefs — same generic set the PRA
             // receipt-settings page uses ('pos'/'pos_local' keys untouched).
-            $prefs = $company->invoice_display_prefs ?? [];
             // Task 769: merge-preserve keys owned by other pages (show_verify_line
             // lives on receipt-settings) — a wholesale rewrite here would erase them.
-            $fbrExisting = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
             // Stale-form guard (Task 1393 — same shape as the PRA Receipt Settings
             // page, Task 1377). This block is a WHOLESALE rewrite driven by checkbox
             // presence, so a POST from an outdated copy of this page silently switched
@@ -7020,13 +7082,20 @@ class FbrPosController extends Controller
                 'rd_show_cashier', 'rd_show_footer',
             ]);
             if ($rdPresent) {
-                $prefs['fbrpos'] = array_merge($fbrExisting, [
-                    'show_address' => $request->has('rd_show_address'),
-                    'show_ntn' => $request->has('rd_show_ntn'),
-                    'show_mobile' => $request->has('rd_show_phone'),
-                    'show_cashier' => $request->has('rd_show_cashier'),
-                    'show_footer' => $request->has('rd_show_footer'),
-                ]);
+                // Merged onto the FRESH row under a lock (Company::mergeJsonColumn) so
+                // a concurrent receipt-settings save (pos_style / fbrpos verify line)
+                // is never overwritten by this request's stale snapshot.
+                $company->mergeJsonColumn('invoice_display_prefs', function (array $prefs) use ($request): array {
+                    $fbrExisting = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
+                    $prefs['fbrpos'] = array_merge($fbrExisting, [
+                        'show_address' => $request->has('rd_show_address'),
+                        'show_ntn' => $request->has('rd_show_ntn'),
+                        'show_mobile' => $request->has('rd_show_phone'),
+                        'show_cashier' => $request->has('rd_show_cashier'),
+                        'show_footer' => $request->has('rd_show_footer'),
+                    ]);
+                    return $prefs;
+                });
             }
 
             // Print position (Task 828, Aug 2026): receipt_* columns are now the
@@ -7058,7 +7127,6 @@ class FbrPosController extends Controller
                 // fill() safe when the columns are absent (e.g. SQLite test schema
                 // that hasn't run the Aug-14 migration yet).
                 'receipt_footer_note' => $validated['receipt_footer_note'] ?? null,
-                'invoice_display_prefs' => $prefs,
             ]);
 
             // Task 579: owner-facing CNIC — stored as plain digits (login

@@ -38,3 +38,8 @@ tools/video-pipeline/out/
 !.env.example
 attached_assets/
 pra-agent-*.zip
+
+# Database dumps must never be committed (removed from HEAD Sep 2026; history still contains dfd29270).
+backup.sql
+*.sql.gz
+/storage/backups/

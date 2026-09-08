@@ -18,6 +18,16 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // This seeder (re)creates well-known development accounts with a
+        // repository-default password. Refuse to do that on a production
+        // database unless the operator deliberately supplied a password.
+        if (app()->environment('production') && env('SEED_DEFAULT_PASSWORD') === null) {
+            throw new \RuntimeException(
+                'DatabaseSeeder refused: APP_ENV=production without SEED_DEFAULT_PASSWORD. '
+                . 'Set SEED_DEFAULT_PASSWORD explicitly or run only the seeder you need (e.g. --class=PricingPlanSeeder).'
+            );
+        }
+
         $this->call(PricingPlanSeeder::class);
         $professionalPlan = PricingPlan::where('name', 'Business')->first();
 

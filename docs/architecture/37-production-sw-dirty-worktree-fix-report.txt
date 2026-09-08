@@ -1,0 +1,192 @@
+TAXNEST — PRODUCTION public/sw.js DIRTY WORKTREE FIX
+docs/architecture/37-production-sw-dirty-worktree-fix-report.txt
+
+Date: 2026-09-08
+Trigger: Deploy Production #16 (Actions run 34203238375) after PR #30
+Base: origin/main @ fa34526f (PR #30 Elaan SHA-qualified titles)
+Scope: live dirty-worktree preflight classification only.
+       No production SSH from this agent, no skip_elaan, no Environment
+       or secret changes, no apply-job cancel-in-progress: true, no
+       auto-stash / reset / checkout / clean in the new preflight.
+
+============================================================
+1. OBSERVED FAILURE
+============================================================
+
+Deploy Production #16 (after PR #30 merged):
+
+  TARGET_SHA        fa34526f5479d66f1d97bd8363449c5648dd632d  (PR #30)
+  origin/main tip   same (stale/non-tip SHA guard PASS)
+  live HEAD         aecc864da32d357d34dc02bb473706a8a2c34070  (PR #28, successful Deploy #14)
+  skip_elaan        false
+
+Sequence that did run:
+  - SSH connectivity / preflight started
+  - Elaan insert created AppUpdate #266 (SHA-qualified title) — PASS
+  - Elaan freshness — PASS
+  - then CI fail-closed BEFORE remote_apply:
+
+      Live worktree has MODIFIED tracked files: M public/sw.js
+      CI DEPLOY FAILED: live tree dirty — reconcile first. Not auto-stashing.
+
+No exact-SHA checkout, no migrate, no live mutation from #16.
+
+============================================================
+2. ROOT CAUSE
+============================================================
+
+PR #28 (aecc864d, Deploy Production #14) added an Actions-only PWA stamp
+in scripts/lib/live-remote-apply.sh:
+
+  After exact-SHA checkout (working tree only, never committed):
+    CACHE_VERSION = 'taxnest-<UTC YYYYMMDD>-<sha8>'
+    comment: stamped on live by live-remote-apply.sh from the deployed SHA
+
+  Restore is `git checkout -- public/sw.js` at the START of the NEXT
+  remote_apply (DO_PULL=1), so the next checkout is not blocked by a
+  dirty file — once apply is reached.
+
+scripts/ci-deploy-production.sh (and scripts/deploy-live.sh) ran a
+generic porcelain dirty check BEFORE remote_apply. That check did not
+exempt the stamp. It treated every tracked `M` as unexpected and
+fail-closed with "Not auto-stashing."
+
+Timeline:
+  #14  aecc864d  apply succeeded, left public/sw.js dirty with the stamp
+  #15  0adfa7c1  died at Elaan (PR #30's predecessor class of bug) —
+                 never reached the dirty check
+  #16  fa34526f  Elaan #266 + freshness PASS, then died on the leftover
+                 stamp from #14
+
+The dirty check is therefore BEFORE the code that would restore the
+stamp. The modification is intentional on the Actions path and is
+NOT supposed to be committed. It is supposed to remain as a served
+working-tree stamp until the next apply restores and restamps.
+
+Committed public/sw.js on main is still the deploy-live auto-bump:
+  taxnest-20260907-043308-2476f770
+
+This agent did not SSH, so the live hunk was not read. Porcelain from
+#16 showed only `M public/sw.js`, which is consistent with the leftover
+stamp, but is not proof that no extra hunk exists.
+
+============================================================
+3. DID PR #28 CAUSE / CONTRIBUTE?
+============================================================
+
+Yes. PR #28 introduced the working-tree stamp and the restore-on-next-
+apply design, without teaching the CI/manual dirty preflight that this
+one leftover is expected. PR #30 did not change sw.js handling; it only
+let #16 get past Elaan far enough to hit this pre-existing trap.
+
+============================================================
+4. EXACT FIX
+============================================================
+
+Classify on the runner (Python). Live is only queried for
+`git status --porcelain` and, if needed, `git diff HEAD -- public/sw.js`.
+No live git mutation in preflight.
+
+  1. Ignore untracked (??).
+  2. No tracked dirty paths → allow (CLEAN).
+  3. Any tracked dirty path other than public/sw.js → fail closed.
+  4. Only public/sw.js: allow ONLY if the unified diff content is
+     exactly one minus CACHE_VERSION line and one plus line matching
+       const CACHE_VERSION = 'taxnest-YYYYMMDD-<8 hex>';
+       // stamped on live by live-remote-apply.sh from the deployed SHA
+     Anything else (extra hunks, timestamp-format bump, missing stamp
+     comment, empty diff, delete/rename) → fail closed.
+  5. SSH failure while reading status/diff → fail closed (stronger than
+     the previous `|| true` empty-DIRTY skip).
+
+Callers (ci-deploy-production.sh, deploy-live.sh) still fail with
+"Not auto-stashing." remote_apply still restores then restamps.
+.github/workflows/deploy-production.yml is unchanged (PR #29/#30
+invariants intact).
+
+============================================================
+5. WHY THE FIX IS SAFE
+============================================================
+
+- Does not weaken the dirty-worktree guard: unexpected files and
+  unexpected sw.js hunks still fail closed.
+- Does not auto-stash, reset, checkout, or clean in preflight, so an
+  unknown live edit cannot be discarded by this change.
+- Does not weaken exact-SHA checkout, origin/main tip equality,
+  ancestor check, Elaan insert/freshness, or Environment approval.
+- The allow-list is the stamp fingerprint from live-remote-apply.sh,
+  not "any dirty public/sw.js".
+- Restore remains inside remote_apply, after this check, immediately
+  before `git checkout -B main $TARGET_SHA`.
+
+============================================================
+6. TESTS / EVIDENCE
+============================================================
+
+  bash scripts/tests/live-dirty-worktree-classify-check.sh     ALL CHECKS PASSED
+  bash scripts/tests/ci-deploy-production-check.sh             ALL CHECKS PASSED
+      (includes nested Elaan, stale-SHA, and this classifier)
+  bash scripts/tests/deploy-stale-sha-guard-check.sh           ALL PASS
+  bash scripts/tests/automerge-deploy-handoff-check.sh         ALL PASS
+  bash scripts/tests/pr-auto-merge-check.sh                    ALL CHECKS PASSED
+  bash scripts/tests/issue-to-live-check.sh                    ALL PASS
+  php artisan test                                             2 skipped, 4559 passed
+                                                               (35190 assertions), 0 failed
+
+Proven by live-dirty-worktree-classify-check.sh:
+  - Deploy #16 reconstruction (M public/sw.js + stamp-only diff) allows
+  - unrelated dirty tracked files block
+  - stamp + extra sw.js hunk blocks
+  - no git stash/reset/checkout/clean in the new files
+  - Elaan + tip + exact-SHA + cancel-in-progress:false still present
+
+PR: https://github.com/jawadrao5555-alt/taxnest/pull/31 (draft; not merged)
+This agent did not trigger Deploy Production.
+
+============================================================
+7. PRODUCTION RECONCILIATION (OWNER / OPS)
+============================================================
+
+This agent did not SSH and did not read the live diff. Treat the current
+live public/sw.js as potentially containing a real manual edit until
+owner/ops inspects:
+
+  cd /var/www/taxnest   # or LIVE_DIR from scripts/lib/live-host.sh
+  git status --porcelain -- public/sw.js
+  git diff HEAD -- public/sw.js
+
+If the diff is SOLELY the live-remote-apply CACHE_VERSION stamp line
+(taxnest-YYYYMMDD-<sha8> + the stamp comment): no destructive command
+is required. After this PR is merged and approved, the next Deploy
+Production will classify it as expected, restore it inside remote_apply,
+checkout the new SHA, and restamp.
+
+If the diff contains ANY other hunk: do NOT git reset --hard, stash,
+checkout, or clean. Reconcile the unknown edit first (commit it
+upstream, or decide deliberately). This PR will keep failing closed
+on that tree, which is the correct behavior.
+
+Do not use skip_elaan. Do not trigger Deploy Production from a Cloud
+Agent. Do not merge this PR from the agent.
+
+============================================================
+8. FILES CHANGED
+============================================================
+
+  scripts/lib/live-dirty-worktree-classify.py          (new)
+  scripts/lib/live-dirty-worktree.sh                   (new)
+  scripts/ci-deploy-production.sh
+  scripts/deploy-live.sh
+  scripts/tests/live-dirty-worktree-classify-check.sh  (new)
+  scripts/tests/ci-deploy-production-check.sh
+  deploy/elaan.yml
+  docs/ops/github-production-deploy.md
+  docs/architecture/21-deployment.md
+  docs/architecture/37-production-sw-dirty-worktree-fix-report.txt (this file)
+
+============================================================
+9. FINAL VERDICT
+============================================================
+
+READY FOR REVIEW — production untouched, secrets not accessed,
+no Deploy Production run triggered by this agent, PR not merged.

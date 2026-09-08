@@ -7,15 +7,18 @@ flowchart LR
   PR[PR to main] --> Checks[pr-checks.yml]
   Checks --> Auto[enable-pr-auto-merge.yml]
   Auto --> Merge[squash merge]
-  Merge --> Deploy[deploy-production.yml]
-  Deploy --> Env[GitHub Environment production approval]
-  Env --> SSH[SSH to VPS]
+  Merge --> Gate[deploy-production.yml gate job]
+  Gate --> Env[GitHub Environment production approval]
+  Env --> SSH[deploy job SSH to VPS]
   SSH --> Script[ci-deploy-production.sh]
   Script --> Elaan[elaan insert]
   Script --> Verify[ci-live-verify.sh]
 ```
 
-Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
+**FACT:** `gate` requires the requested SHA to equal the current `origin/main` **tip** (not merely an ancestor) before Environment approval. Stale Environment-waiting runs are cancelled; in-flight SSH is never cancelled (`deploy` concurrency `production-deploy` + `cancel-in-progress: false`). Environment approval remains mandatory. Elaan remains fail-closed.
+
+Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
+Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`.
 
 ## PWA cache bust on the Actions path
 

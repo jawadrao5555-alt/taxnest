@@ -29,6 +29,8 @@ Issue (owner)
   → PR checks → automatic squash-merge (cursor/*)
   → Enable PR auto-merge dispatches Deploy Production with exact squash SHA
     (workflow_dispatch; required because GITHUB_TOKEN merges suppress push workflows)
+  → Deploy Production **gate**: SHA must be current origin/main tip; stale
+    Environment-waiting runs are cancelled (SSH in_progress is never cancelled)
   → GitHub Environment "production" MANUAL approval (owner — not the agent)
   → Actions SSH (PRODUCTION_SSH_PRIVATE_KEY) applies exact target_sha
   → Actions runs scripts/ci-live-verify.sh (SHA + NestPOS markers; LIVE_QA_PASS)
@@ -64,8 +66,9 @@ Local browser tests remain fail-closed against production URLs/IPs
 
 Preserved deploy invariants:
 
-- Exact-SHA checkout (`github.sha`)
-- Concurrency group `production-deploy` (`cancel-in-progress: false`)
+- Exact-SHA checkout (`github.sha` / `inputs.target_sha`) and **origin/main tip** equality
+- Concurrency group `production-deploy` on the SSH/apply job (`cancel-in-progress: false`)
+- Cancellable pre-apply `gate` (`production-deploy-gate`) so a newer tip can supersede a stale approval wait
 - Elaan freshness + idempotent insert (`deploy/elaan.yml`)
 - Never use `skip_elaan` merely to bypass a failure
 - Never bypass Environment approval

@@ -87,9 +87,17 @@ if [ -f "$DP" ]; then
     bad "live-verify must set EXPECTED_SHA from resolved SHA"
   fi
 
-  grep -q 'merge-base --is-ancestor' "$DP" \
+  grep -q 'merge-base --is-ancestor\|deploy_require_on_main_history\|deploy_guard_main_tip\|deploy-main-tip-guard.sh' "$DP" \
     && ok "Deploy Production refuses SHAs not on origin/main" \
     || bad "Deploy Production must ancestry-check target SHA on main"
+
+  grep -q 'deploy_require_origin_main_tip\|deploy_guard_main_tip' "$DP" \
+    && ok "Deploy Production refuses non-tip origin/main SHAs" \
+    || bad "Deploy Production must require exact origin/main tip"
+
+  grep -q 'needs.gate.outputs.sha\|needs: gate' "$DP" \
+    && ok "Deploy Production apply job is gated on the pre-apply tip check" \
+    || bad "apply job must need the gate job"
 
   grep -q 'environment: production' "$DP" \
     && ok "Deploy Production keeps environment: production" \

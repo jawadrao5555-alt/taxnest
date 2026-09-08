@@ -92,6 +92,10 @@ if [ -f "$PC" ]; then
     && ok "PR checks runs issue-to-live-check.sh" \
     || bad "PR checks must run issue-to-live-check.sh"
 
+  grep -q 'ci-deploy-production-check.sh' "$PC" \
+    && ok "PR checks runs ci-deploy-production-check.sh" \
+    || bad "PR checks must run production deploy safety checks"
+
   if grep -vE '^\s*#' "$PC" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY'; then
     bad "PR checks must not use the production Environment or SSH secret"
   else

@@ -1,0 +1,303 @@
+TAXNEST — PRODUCTION DEPLOYMENT STALE-SHA + CONCURRENCY FIX
+docs/architecture/35-production-deployment-stale-sha-fix-report.txt
+
+Date: 2026-09-08
+Base: origin/main @ aecc864d (last successful production SHA at planning time)
+Scope: narrowly defined pipeline fix only. No application/company data changes.
+       No production SSH, no workflow_dispatch of Deploy Production, no
+       Environment/settings/secret mutations, no skip_elaan policy change.
+
+============================================================
+1. PROBLEM
+============================================================
+
+Forensic audit (docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt)
+reconstructed Deploy Production #10 → #13 → #14:
+
+  - #10 waited ~12h for GitHub Environment "production" approval and held
+    concurrency group production-deploy the whole time.
+  - #11/#12/#13 were cancelled as pending ("higher priority waiting request").
+  - #14 queued behind #10.
+  - After approval, #10 attempted non-tip SHA d39c3122 and failed Elaan
+    before SSH. #14 then deployed intended tip aecc864d.
+
+High-priority gap: an approval-waiting run occupies the SSH concurrency
+slot; a stale SHA that is still an ancestor of main could reach apply if
+Elaan happened to pass.
+
+============================================================
+2. ROOT CAUSE
+============================================================
+
+.github/workflows/deploy-production.yml used a SINGLE job with:
+
+  concurrency:
+    group: production-deploy
+    cancel-in-progress: false
+  environment: production
+
+GitHub treats Environment-approval wait as occupying that group. Pending
+successors are cancelled; the occupant is not. The SHA guard only required
+"on origin/main history" (merge-base ancestor), not equality with the tip.
+
+This was expected GitHub semantics, not an outage. Exact-SHA + live ancestor
+checks still prevented rollback. The design did not prevent a non-tip
+forward SHA or an hours-long queue blocker.
+
+============================================================
+3. EXACT IMPLEMENTATION
+============================================================
+
+A. Split jobs (same workflow file; not a new deploy system)
+
+  job gate  — Refuse stale / non-tip SHA
+    - NO environment: production (no secrets, starts immediately)
+    - permissions: contents: read, actions: write (cancel waiting runs only)
+    - concurrency: production-deploy-gate / cancel-in-progress: true
+    - resolve exact SHA (dispatch target_sha or push github.sha)
+    - checkout that SHA
+    - scripts/lib/deploy-main-tip-guard.sh:
+        HEAD == SHA
+        ref is refs/heads/main
+        SHA is ancestor of origin/main          (existing layer)
+        SHA == origin/main tip                  (new layer)
+    - ONLY IF tip check passed: cancel other deploy-production.yml runs
+      with status=waiting (scripts/lib/cancel-stale-waiting-production-deploys.sh
+      + scripts/lib/select-stale-waiting-deploy-runs.py)
+
+  job deploy — Deploy main commit to production
+    - needs: gate
+    - environment: production   (MANUAL required reviewers UNCHANGED)
+    - concurrency: production-deploy / cancel-in-progress: false
+    - pin SHA from needs.gate.outputs.sha (must match inputs / github.sha)
+    - checkout exact SHA
+    - deploy_guard_main_tip AGAIN (stale approved run fail-closed)
+    - scripts/ci-deploy-production.sh (Elaan + SSH apply)
+    - scripts/ci-live-verify.sh
+
+B. Workflow-level concurrency REMOVED
+   so gate is not stuck behind an approval occupant.
+
+C. ci-deploy-production.sh
+   After history check, deploy_require_origin_main_tip BEFORE SSH preflight,
+   Elaan insert, and remote_apply.
+
+D. workflow_dispatch target_sha retained for exact-SHA traceability.
+   Non-tip values fail closed with a diagnostic. Empty target_sha still
+   uses github.sha and still must equal the tip at run time.
+
+E. enable-pr-auto-merge.yml
+   Unchanged. Still dispatches exact squash/merge SHA. If main moves
+   before approval, that SHA becomes non-tip and fail-closes; the newer
+   handoff can proceed.
+
+============================================================
+4. CONCURRENCY BEHAVIOR BEFORE / AFTER
+============================================================
+
+BEFORE
+  One group, one job, cancel-in-progress: false.
+  Approval wait == occupant. Newer pending runs cancelled. Occupant not
+  cancelled. Newest deploy waits for the oldest approval request.
+
+AFTER
+  gate group (cancellable): newest tip's gate wins; older gates cancelled.
+  deploy group (not cancellable): at most one Environment-approved SSH.
+  Additionally, a proven-tip gate cancels foreign runs in status=waiting
+  so an abandoned approval request cannot hold production-deploy.
+
+  in_progress SSH is never cancelled by concurrency or by the cancel script.
+
+============================================================
+5. STALE SHA BEHAVIOR BEFORE / AFTER
+============================================================
+
+BEFORE
+  SHA must be on origin/main history. Intermediate (non-tip) SHA could
+  proceed to Elaan/SSH after approval. #10 is the exhibit.
+
+AFTER
+  SHA must equal origin/main tip at gate AND after approval AND inside
+  ci-deploy-production.sh before SSH. Ancestor-but-not-tip is rejected.
+  Manual historical SHA cannot mutate production via this workflow.
+
+============================================================
+6. ENVIRONMENT APPROVAL BEHAVIOR
+============================================================
+
+REMAINS REQUIRED.
+
+Only job deploy has environment: production. Therefore:
+  - PRODUCTION_SSH_PRIVATE_KEY and LIVE_QA_PASS stay Environment secrets.
+  - Required reviewers still gate SSH. Cloud Agent still cannot approve.
+  - Gate cannot read those secrets.
+  - We did not put environment: production on two jobs, which would have
+    demanded a second approval and could re-create a waiting occupant on
+    the SSH concurrency group.
+
+No GitHub Environment settings, reviewers, or secrets were changed by
+this work.
+
+============================================================
+7. ELAAN BEHAVIOR
+============================================================
+
+UNCHANGED.
+
+skip_elaan still defaults to false. No new skip path.
+Insert + freshness still run inside ci-deploy-production.sh after SSH
+connectivity, before remote_apply.
+
+The new tip guard runs BEFORE Elaan so a stale SHA fails without inserting
+or depending on announcement freshness (the #10 failure mode).
+
+Same-SHA rerun of the current tip still uses the existing same-SHA Elaan
+rules (scripts/lib/elaan-freshness-eval.py).
+
+============================================================
+8. AUTO-MERGE HANDOFF
+============================================================
+
+enable-pr-auto-merge.yml still:
+  - squash/merge
+  - createWorkflowDispatch deploy-production.yml
+  - inputs.target_sha = exact merge SHA
+  - ref: main
+  - no production secrets
+
+At dispatch time that SHA is (or just was) origin/main tip. If another
+commit lands before approval:
+  - older run fail-closes at gate or post-approval tip check
+  - newer run's gate can cancel the older waiting run
+  - newer SHA is what can be approved and applied
+
+============================================================
+9. SECURITY INVARIANTS PRESERVED
+============================================================
+
+- Environment production + required reviewers: YES
+- No approval bypass: YES
+- Elaan fail-closed: YES
+- No new skip_elaan / --no-elaan behavior: YES
+- SSH serialized; cancel-in-progress: false on apply: YES
+- Exact SHA checkout: YES
+- Wrong-SHA / non-main history guard: YES
+- Live HEAD ancestor of TARGET (non-rollback): YES
+- Post-apply live HEAD == TARGET + ci-live-verify: YES
+- Production secrets not in Cloud Agent / auto-merge / gate job: YES
+- StrictHostKeyChecking=yes + live-known-hosts: YES
+- Deploy Production never git-pushes: YES
+
+Adversarial review (in-scope):
+  - Older SHA after newer main: rejected at three layers (gate, post-approval,
+    ci-deploy-production.sh).
+  - Environment bypass: gate has no secrets; deploy still has environment.
+  - Elaan bypass: not added.
+  - Two SSH applies: deploy concurrency cancel-in-progress: false + existing
+    remote flock.
+  - Non-main commit: history guard still rejects.
+  - Stale auto-merge SHA: fail-closed; newer handoff can proceed.
+  - Manual historical SHA: fail-closed; target_sha input kept for traceability.
+  - Cancel script cancelling SSH: selector allows ONLY status=waiting;
+    in_progress/queued/pending/completed ignored; current run id skipped;
+    tip check MUST pass before cancel is invoked.
+
+============================================================
+10. TESTS AND RESULTS
+============================================================
+
+All of these were run locally. None of them SSH, deploy, or call GitHub
+Actions production workflows.
+
+  bash scripts/tests/deploy-stale-sha-guard-check.sh
+    ALL PASS
+    (tip allowed; ancestor-not-tip rejected; non-main rejected;
+     checkout mismatch rejected; selector cancels only status=waiting;
+     YAML: gate has no Environment/secrets and is cancellable;
+     deploy keeps environment: production and cancel-in-progress: false)
+
+  bash scripts/tests/ci-deploy-production-check.sh
+    ALL CHECKS PASSED
+    (includes nested Elaan parser/idempotency/same-SHA freshness + stale-SHA)
+
+  bash scripts/tests/automerge-deploy-handoff-check.sh
+    ALL PASS
+
+  bash scripts/tests/pr-auto-merge-check.sh
+    ALL CHECKS PASSED
+
+  bash scripts/tests/issue-to-live-check.sh
+    ALL PASS
+
+  php artisan test
+    4558 passed, 2 skipped, 1 failed, 35176 assertions, 272.38s
+    Failure: Tests\Feature\FbrPosSupplierLedgerTest::
+      test_return_against_bill_moves_stock_out_and_credits_the_ledger
+    Assertion: statement row kind order ['purchase','payment','return']
+      vs expected ['purchase','return','payment'] (same-second SQLite order).
+    Isolation re-run of FbrPosSupplierLedgerTest: 19 passed / 0 failed.
+    No PHP application code is in this change set. Pre-existing flake.
+    Totals/closing balance assertions in that test are unrelated to deploy.
+
+No GitHub Actions production workflow was triggered.
+No VPS / SSH test.
+
+============================================================
+11. FILES CHANGED
+============================================================
+
+  .github/workflows/deploy-production.yml
+  .github/workflows/pr-checks.yml
+  scripts/ci-deploy-production.sh
+  scripts/lib/deploy-main-tip-guard.sh                 (new)
+  scripts/lib/cancel-stale-waiting-production-deploys.sh (new)
+  scripts/lib/select-stale-waiting-deploy-runs.py      (new)
+  scripts/tests/deploy-stale-sha-guard-check.sh        (new)
+  scripts/tests/ci-deploy-production-check.sh
+  scripts/tests/automerge-deploy-handoff-check.sh
+  scripts/tests/issue-to-live-check.sh
+  docs/ops/github-production-deploy.md
+  docs/ops/cloud-agent-issue-to-live.md
+  docs/architecture/21-deployment.md
+  docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt
+  docs/architecture/35-production-deployment-stale-sha-fix-report.txt (this file)
+
+============================================================
+12. REMAINING LIMITATIONS
+============================================================
+
+L1  If an apply job is already in_progress (SSH started), a newer tip waits
+    for that apply to finish, then fail-closes or deploys the new tip. We
+    deliberately do not cancel in-flight apply.
+
+L2  status=queued/pending (approved, waiting for the SSH slot) is not
+    cancelled. Those runs hit the post-approval tip guard and fail closed
+    before SSH if they are no longer tip. Occupancy is minutes, not hours.
+
+L3  GitHub Environment wait timer is still an owner UI setting (not YAML).
+    Forgotten approvals of a *current tip* can still sit until approved,
+    rejected, or replaced by a newer tip's waiting-cancel.
+
+L4  Rollback of live to an older SHA is not available through this
+    workflow anymore (by design). Use deployment/ROLLBACK.md.
+
+L5  Cancel API uses GITHUB_TOKEN with actions: write on the gate job only.
+    If listing/cancel returns a non-200, the gate warns and continues; the
+    tip guards still prevent stale SSH. Owner can reject the old request.
+
+L6  Two Environment jobs were avoided on purpose (GitHub requires a new
+    approval per job). Do not add environment: production to gate without
+    a plan for double-approval + SSH-slot occupancy.
+
+============================================================
+13. FINAL VERDICT
+============================================================
+
+READY FOR REVIEW
+
+The HIGH PRIORITY pipeline gap is addressed without weakening Environment
+approval, Elaan, exact-SHA, ancestor/non-rollback, live verify, or
+serialized SSH apply.
+
+Production was not touched. Secrets were not accessed. No deployment was
+triggered by this change set.

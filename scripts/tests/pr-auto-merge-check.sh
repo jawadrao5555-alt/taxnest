@@ -34,6 +34,10 @@ if [ -f "$AM" ]; then
     && ok "auto-merge is limited to cursor/ Cloud Agent branches" \
     || bad "auto-merge must filter cursor/ branches"
 
+  grep -q 'skip draft' "$AM" && grep -q 'pr.draft' "$AM" \
+    && ok "auto-merge skips draft PRs" \
+    || bad "auto-merge must skip drafts"
+
   grep -q 'head.repo.full_name' "$AM" \
     && ok "auto-merge ignores forks" \
     || bad "auto-merge must refuse fork PRs"
@@ -96,6 +100,10 @@ if [ -f "$PC" ]; then
     && ok "PR checks runs ci-deploy-production-check.sh" \
     || bad "PR checks must run production deploy safety checks"
 
+  grep -q 'ready_for_review' "$PC" \
+    && ok "PR checks retriggers on ready_for_review" \
+    || bad "PR checks must include pull_request type ready_for_review"
+
   if grep -vE '^\s*#' "$PC" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY'; then
     bad "PR checks must not use the production Environment or SSH secret"
   else
@@ -139,6 +147,12 @@ if [ -f "$ROOT/scripts/tests/automerge-deploy-handoff-check.sh" ]; then
   bash "$ROOT/scripts/tests/automerge-deploy-handoff-check.sh" \
     && ok "automerge-deploy-handoff-check nested run" \
     || bad "automerge-deploy-handoff-check nested run failed"
+fi
+
+if [ -f "$ROOT/scripts/tests/automerge-ready-for-review-check.sh" ]; then
+  bash "$ROOT/scripts/tests/automerge-ready-for-review-check.sh" \
+    && ok "automerge-ready-for-review-check nested run" \
+    || bad "automerge-ready-for-review-check nested run failed"
 fi
 
 echo ""

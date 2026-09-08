@@ -1,12 +1,21 @@
 # Lightweight PR checks. Does not deploy, SSH, or read production secrets.
 # Mark this workflow as a required status check on main so GitHub auto-merge
 # waits for it (auto-merge must not run against an empty check gate).
+#
+# types must be explicit: GitHub's pull_request default is only
+# opened / synchronize / reopened. ready_for_review is NOT default, so a
+# draft that becomes Ready after checks already passed never re-runs this
+# workflow, and Enable PR auto-merge (workflow_run of this workflow) never
+# sees the now-ready PR. Keep the default three AND ready_for_review.
+# Do not add a broad pull_request trigger to enable-pr-auto-merge.yml
+# (that would run the write-token job from the PR branch).
 
 name: PR checks
 
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read

@@ -34,3 +34,5 @@ jobs:
         run: bash scripts/tests/automerge-deploy-handoff-check.sh
       - name: Production deploy workflow safety checks
         run: bash scripts/tests/ci-deploy-production-check.sh
+      - name: Unattended Deploy Production safety checks
+        run: bash scripts/tests/deploy-unattended-safety-check.sh

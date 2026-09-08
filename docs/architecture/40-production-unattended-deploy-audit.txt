@@ -1,0 +1,135 @@
+TAXNEST — UNATTENDED PRODUCTION DEPLOY (ENVIRONMENT APPROVAL BOTTLENECK)
+
+Date: 2026-09-08
+Scope: DEPLOYMENT ARCHITECTURE ONLY. No Inventory Master Excel / Stock-In /
+       FBR / PRA / application / schema / route changes. No production SSH.
+       Did not approve, cancel, or retrigger Deploy Production run
+       34244350968 (PR #32 waiting on Environment production reviewers).
+
+Verdict: SAFE TO IMPLEMENT the Environment split below.
+         NOT safe to clear required reviewers on Environment `production`.
+         NOT safe to drop `environment:` from Deploy Production (secrets
+         would empty, or would have to become repository secrets).
+         NOT safe to auto-approve with a GitHub token.
+
+============================================================
+1. CURRENT APPROVAL BOTTLENECK
+============================================================
+
+Observed (2026-09-08, run 34244350968, SHA c70340aa = origin/main tip):
+
+  gate  "Refuse stale / non-tip SHA"  SUCCESS
+  deploy "Deploy main commit to production"  WAITING
+  live-verify  not started
+
+GitHub Environment `production` protection_rules:
+  - required_reviewers: jawadrao5555-alt
+  - branch_policy: custom, selected branch `main` only
+  - can_admins_bypass: true
+
+YAML `jobs.deploy.environment: production` is what attaches the job to that
+Environment. Required reviewers are Settings, not YAML. Secrets
+PRODUCTION_SSH_PRIVATE_KEY and LIVE_QA_PASS are Environment-scoped.
+
+The same Environment is also used by:
+  .github/workflows/live-ops-diagnose.yml
+  .github/workflows/live-ops-remediate.yml
+
+Live Ops remediations already require OWNER_APPROVES_LIVE_OPS_FIX, but that
+phrase is in-repo. Environment required reviewers are the remaining human
+gate for Live Ops SSH/API mutations.
+
+============================================================
+2. FORENSIC FINDINGS
+============================================================
+
+Already-automated Deploy Production safety (must keep):
+
+  - gate job: no Environment, no secrets; SHA resolve; deploy_guard_main_tip
+    (checkout match, on main history, MUST equal origin/main tip)
+  - cancel-stale-waiting-production-deploys.sh after tip proof
+    (waiting only; never in_progress)
+  - deploy job: concurrency production-deploy, cancel-in-progress: false
+  - tip re-check immediately before SSH
+  - ci-deploy-production.sh: tip again, dirty-worktree preflight, Elaan
+    insert + freshness, live-remote-apply.sh flock + exact SHA
+  - ci-live-verify.sh mandatory in the same job
+  - rollback is deployment/ROLLBACK.md (not auto)
+
+No Deploy Production risk-classification gate existed. Live Ops has tiers
+in docs/ops/live-ops-security.md — different path.
+
+High-risk workflow_dispatch inputs if reviewers disappear on the SAME
+Environment: skip_elaan and allow_settings. Auto-merge only sends
+target_sha. Any repo writer could dispatch skip_elaan=true.
+
+Rejected alternatives:
+  A) Remove environment: from deploy job
+     → secrets empty unless moved to repository secrets (forbidden)
+  B) Clear required reviewers on Environment `production`
+     → Live Ops diagnose/remediate would also auto-start (forbidden)
+  C) Token auto-approve pending deployments
+     → forbidden workaround; weakens the Environment boundary
+  D) Invent a new Deploy Production "risk policy" with extra Environments
+     for every change class — no evidence this exists; do not invent it
+
+GitHub Environment protection is per-Environment, not per-workflow.
+That coupling is the actual design constraint.
+
+============================================================
+3. SAFEST DESIGN (IMPLEMENTED IN REPO)
+============================================================
+
+Split Environments:
+
+  production-deploy  — Deploy Production SSH + LIVE_QA_PASS
+                       secrets + main-only branch policy
+                       NO required reviewers
+                       protection = repository fail-closed gates
+
+  production         — Live Ops diagnose/remediate
+                       KEEP required reviewers
+                       KEEP OWNER_APPROVES_LIVE_OPS_FIX
+
+Unattended Deploy Production additionally:
+  - refuses skip_elaan (fail-closed in gate AND again in deploy)
+  - refuses allow_settings
+  - hardcodes SKIP_ELAAN=false and ALLOW_SETTINGS empty; never passes
+    --no-elaan / --allow-settings
+  - never auto-approves Environments
+  - keeps every prior SHA / concurrency / Elaan / dirty-tree / live-verify
+    / rollback invariant
+
+Emergency Elaan skip or settings-column allow-list: owner workstation
+scripts/deploy-live.sh only.
+
+This change does NOT deploy. It does NOT affect already-started run
+34244350968 (that run's workflow snapshot still uses environment:
+production and will keep waiting until a human approves or cancels it).
+
+Owner must create Environment `production-deploy` and copy
+PRODUCTION_SSH_PRIVATE_KEY + LIVE_QA_PASS into it, restrict to branch
+`main`, and add ZERO required reviewers. Until those secrets exist,
+new Deploy Production runs fail closed on empty key (no SSH).
+
+Do NOT remove required reviewers from Environment `production`.
+Do NOT approve run 34244350968 as part of this change.
+
+============================================================
+4. INVARIANTS PRESERVED
+============================================================
+
+1. Never deploy a non-tip/stale SHA          (gate + pre-SSH + script)
+2. Exact current origin/main SHA             (deploy_require_origin_main_tip)
+3. Never deploy unmerged code                (must be origin/main tip)
+4. Serialized SSH/apply                      (production-deploy, cancel-in-progress: false)
+5. Fail-closed                               (empty key, tip, Elaan, dirty tree)
+6. Elaan freshness/idempotency               (unchanged; skip refused)
+7. Dirty production worktree protection      (unchanged)
+8. Live HEAD exact-SHA verification          (unchanged)
+9. Post-deploy live verification             (ci-live-verify.sh still mandatory)
+10. Rollback safety                          (ROLLBACK.md, not auto)
+11. No production SSH credentials to Cloud Agent
+12. No arbitrary Cloud Agent production shell
+13. No bypass of security merely to drop approval
+14. No broad GitHub token / repository-secret workaround

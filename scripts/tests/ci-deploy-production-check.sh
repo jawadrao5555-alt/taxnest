@@ -25,9 +25,15 @@ DL="$ROOT/scripts/deploy-live.sh"
 
 # --- workflow shape
 if [ -f "$WF" ]; then
-  grep -q 'environment: production' "$WF" \
-    && ok "workflow uses environment: production" \
-    || bad "workflow missing environment: production"
+  grep -qE '^[[:space:]]+environment: production-deploy[[:space:]]*$' "$WF" \
+    && ok "workflow uses environment: production-deploy" \
+    || bad "workflow missing environment: production-deploy"
+
+  if grep -E '^[[:space:]]+environment: production[[:space:]]*$' "$WF" >/dev/null; then
+    bad "Deploy Production must not use environment: production (Live Ops reviewers)"
+  else
+    ok "Deploy Production does not share Environment production with Live Ops"
+  fi
 
   grep -q 'PRODUCTION_SSH_PRIVATE_KEY' "$WF" \
     && ok "workflow references PRODUCTION_SSH_PRIVATE_KEY" \
@@ -54,6 +60,10 @@ if [ -f "$WF" ]; then
   grep -q 'cancel-stale-waiting-production-deploys.sh' "$WF" \
     && ok "workflow cancels stale Environment-waiting runs" \
     || bad "workflow must cancel status=waiting Deploy Production runs from the gate"
+
+  grep -q 'skip_elaan is refused' "$WF" \
+    && ok "workflow refuses skip_elaan on the unattended path" \
+    || bad "workflow must fail-closed when skip_elaan is set"
 
   grep -qE 'branches:[[:space:]]*$|[[:space:]]+- main' "$WF" \
     && ok "workflow triggers on main" \
@@ -273,7 +283,7 @@ fi
 
 # --- docs
 if [ -f "$DOC" ]; then
-  for needle in 'environment' 'production' 'PRODUCTION_SSH_PRIVATE_KEY' 'taxnest-production-deploy' 'nayatel_vps_key' 'ROLLBACK.md' 'required reviewers' 'deploy/elaan.yml' 'elaan-insert'; do
+  for needle in 'environment' 'production-deploy' 'PRODUCTION_SSH_PRIVATE_KEY' 'taxnest-production-deploy' 'nayatel_vps_key' 'ROLLBACK.md' 'required reviewers' 'deploy/elaan.yml' 'elaan-insert'; do
     grep -qi "$needle" "$DOC" || bad "docs missing mention of: $needle"
   done
   ok "docs cover Environment, secret, key, reviewers, rollback, Elaan spec"
@@ -324,6 +334,12 @@ if [ -f "$ROOT/scripts/tests/live-dirty-worktree-classify-check.sh" ]; then
   bash "$ROOT/scripts/tests/live-dirty-worktree-classify-check.sh" \
     && ok "live dirty-worktree / sw.js stamp classification checks passed" \
     || bad "live dirty-worktree / sw.js stamp classification checks failed"
+fi
+
+if [ -f "$ROOT/scripts/tests/deploy-unattended-safety-check.sh" ]; then
+  bash "$ROOT/scripts/tests/deploy-unattended-safety-check.sh" \
+    && ok "unattended Deploy Production safety checks passed" \
+    || bad "unattended Deploy Production safety checks failed"
 fi
 
 echo ""

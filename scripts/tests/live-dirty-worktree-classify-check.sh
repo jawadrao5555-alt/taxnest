@@ -225,9 +225,9 @@ fi
 grep -q 'cancel-in-progress: false' "$WF" \
   && ok "deploy job still does not cancel in-progress apply" \
   || bad "must not weaken cancel-in-progress: false"
-grep -q 'environment: production' "$WF" \
-  && ok "workflow still uses environment: production" \
-  || bad "must not drop environment: production"
+grep -qE '^[[:space:]]+environment: production-deploy[[:space:]]*$' "$WF" \
+  && ok "workflow still uses environment: production-deploy" \
+  || bad "must not drop environment: production-deploy"
 
 # skip_elaan remains opt-in
 if grep -E 'skip_elaan.*=.*true' "$CI" | grep -v 'SKIP_ELAAN' >/dev/null; then

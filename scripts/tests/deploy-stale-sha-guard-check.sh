@@ -62,14 +62,17 @@ def blob(name):
 
 gate, deploy = blob("gate"), blob("deploy")
 
-def has_env_production(b):
-    return bool(re.search(r"(?m)^\s+environment:\s+production\s*$", b))
+def has_env(b, name):
+    return bool(re.search(r"(?m)^\s+environment:\s+" + name + r"\s*$", b))
 
-if has_env_production(gate):
-    print("gate must NOT use environment: production (must start without occupying approval)", file=sys.stderr)
+if has_env(gate, "production") or has_env(gate, "production-deploy"):
+    print("gate must NOT use an Environment (must start without occupying approval/secrets)", file=sys.stderr)
     sys.exit(1)
-if not has_env_production(deploy):
-    print("deploy must keep environment: production", file=sys.stderr)
+if has_env(deploy, "production"):
+    print("deploy must NOT use environment: production (Live Ops reviewers live there)", file=sys.stderr)
+    sys.exit(1)
+if not has_env(deploy, "production-deploy"):
+    print("deploy must keep environment: production-deploy", file=sys.stderr)
     sys.exit(1)
 
 if "PRODUCTION_SSH_PRIVATE_KEY" in gate:

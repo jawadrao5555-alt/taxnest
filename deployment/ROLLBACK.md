@@ -6,7 +6,7 @@ address; the retired host is still powered on and will happily accept a `git
 reset` and report success while every shop keeps using the real server.
 
 Production deploys after merge to `main` are intended to run through GitHub
-Actions (Environment `production`). See `docs/ops/github-production-deploy.md`.
+Actions (Environment `production-deploy`). See `docs/ops/github-production-deploy.md`.
 **This rollback document remains the authority for recovering a bad release** —
 Actions does not auto-rollback.
 

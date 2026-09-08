@@ -99,9 +99,9 @@ if [ -f "$DP" ]; then
     && ok "Deploy Production apply job is gated on the pre-apply tip check" \
     || bad "apply job must need the gate job"
 
-  grep -q 'environment: production' "$DP" \
-    && ok "Deploy Production keeps environment: production" \
-    || bad "must keep Environment production"
+  grep -qE '^[[:space:]]+environment: production-deploy[[:space:]]*$' "$DP" \
+    && ok "Deploy Production keeps environment: production-deploy" \
+    || bad "must keep Environment production-deploy"
 
   grep -q 'production-deploy' "$DP" \
     && ok "Deploy Production keeps concurrency group" \

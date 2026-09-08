@@ -185,7 +185,7 @@ import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 if re.search(r"(?m)^concurrency:", text):
     sys.exit(1)
-if "environment: production" not in text:
+if "environment: production-deploy" not in text:
     sys.exit(1)
 if "cancel-in-progress: false" not in text:
     sys.exit(1)

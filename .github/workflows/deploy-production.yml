@@ -8,8 +8,11 @@
 #
 # Flow:
 #   → job "gate" (no Environment, no secrets): resolve SHA, require it equals
-#     current origin/main TIP, cancel other runs WAITING for production approval
-#   → job "deploy": GitHub Environment "production" required reviewers (MANUAL)
+#     current origin/main TIP, refuse skip_elaan/allow_settings, cancel other
+#     runs WAITING for an Environment (legacy production reviewers or a
+#     re-added wait)
+#   → job "deploy": GitHub Environment "production-deploy" (secrets + main-only
+#     branch policy; NO required reviewers — protection is repository gates)
 #   → SSH as taxnest-production-deploy → insert deploy/elaan.yml (if present)
 #   → Elaan freshness gate → apply exact TARGET_SHA on the VPS
 #   → post-deploy live verification (scripts/ci-live-verify.sh)
@@ -22,13 +25,21 @@
 #   - gate concurrency (production-deploy-gate, cancel-in-progress: true) lets a
 #     newer tip supersede an older pre-apply run; does NOT cancel in-flight SSH
 #   - deploy concurrency (production-deploy, cancel-in-progress: false) serializes
-#     Environment-approved SSH/apply. NEVER set cancel-in-progress: true here.
-#   - Non-tip SHA fails closed BEFORE Environment approval and BEFORE SSH
-#   - Stale approved SHA fails closed again immediately before SSH
+#     Environment-scoped SSH/apply. NEVER set cancel-in-progress: true here.
+#   - Non-tip SHA fails closed BEFORE Environment secrets and BEFORE SSH
+#   - Stale SHA fails closed again immediately before SSH
 #   - Live QA password stays in Environment secret LIVE_QA_PASS
 #   - Deploy SHA is pinned (push: github.sha / dispatch: inputs.target_sha)
+#   - skip_elaan and allow_settings are refused on this workflow (fail-closed).
+#     Emergency Elaan skip / settings-column allow-list is the owner workstation
+#     path: scripts/deploy-live.sh. Do not re-enable those inputs on the
+#     unattended path.
+#   - Environment "production" (required reviewers) is reserved for Live Ops.
+#     Do not point this workflow back at "production" — that reintroduces the
+#     human approval bottleneck and couples deploy to Live Ops reviewers.
+#   - Never auto-approve Environment deployments with a GitHub token.
 #
-# Required Environment secrets:
+# Required Environment secrets (GitHub Environment name: production-deploy):
 #   PRODUCTION_SSH_PRIVATE_KEY
 #   LIVE_QA_PASS
 #
@@ -50,11 +61,11 @@ on:
         required: false
         default: ""
       skip_elaan:
-        description: "Emergency only — skip Elaan (What's New) freshness gate"
+        description: "REFUSED — emergency Elaan skip is not allowed on the unattended Deploy Production path. Use scripts/deploy-live.sh on an owner workstation."
         type: boolean
         default: false
       allow_settings:
-        description: "Comma-separated settings columns this deploy may intentionally change"
+        description: "REFUSED — settings-column allow-list is not allowed on the unattended Deploy Production path. Use scripts/deploy-live.sh on an owner workstation."
         type: string
         default: ""
 
@@ -104,6 +115,23 @@ jobs:
             exit 1
           fi
 
+      - name: Guard — refuse skip_elaan / allow_settings on the unattended path
+        run: |
+          set -euo pipefail
+          SKIP="${{ github.event.inputs.skip_elaan || 'false' }}"
+          ALLOW="${{ github.event.inputs.allow_settings || '' }}"
+          if [ "$SKIP" = "true" ] || [ "$SKIP" = "1" ]; then
+            echo "CI DEPLOY FAILED: skip_elaan is refused on unattended Deploy Production." >&2
+            echo "Elaan freshness stays fail-closed. Emergency skip is scripts/deploy-live.sh --no-elaan on an owner workstation (not this workflow, not a Cloud Agent)." >&2
+            exit 1
+          fi
+          if [ -n "$ALLOW" ]; then
+            echo "CI DEPLOY FAILED: allow_settings is refused on unattended Deploy Production." >&2
+            echo "A settings-column mutation must fail closed here. Emergency allow-list is scripts/deploy-live.sh --allow-settings=... on an owner workstation." >&2
+            exit 1
+          fi
+          echo "Unattended path OK — skip_elaan false, allow_settings empty."
+
       - name: Checkout exact deploy commit
         uses: actions/checkout@v4
         with:
@@ -131,7 +159,7 @@ jobs:
     name: Deploy main commit to production
     needs: gate
     runs-on: ubuntu-latest
-    environment: production
+    environment: production-deploy
     concurrency:
       group: production-deploy
       cancel-in-progress: false
@@ -142,6 +170,8 @@ jobs:
           set -euo pipefail
           DEPLOY_SHA="${{ needs.gate.outputs.sha }}"
           INPUT_SHA="${{ github.event.inputs.target_sha || '' }}"
+          SKIP="${{ github.event.inputs.skip_elaan || 'false' }}"
+          ALLOW="${{ github.event.inputs.allow_settings || '' }}"
           case "$DEPLOY_SHA" in
             *[!0-9a-fA-F]*|"")
               echo "Gate did not output a valid SHA" >&2
@@ -162,6 +192,14 @@ jobs:
             echo "Refusing deploy: gate SHA $DEPLOY_SHA != github.sha $GITHUB_SHA" >&2
             exit 1
           fi
+          if [ "$SKIP" = "true" ] || [ "$SKIP" = "1" ]; then
+            echo "Refusing deploy: skip_elaan reached the SSH job (gate should have refused)" >&2
+            exit 1
+          fi
+          if [ -n "$ALLOW" ]; then
+            echo "Refusing deploy: allow_settings reached the SSH job (gate should have refused)" >&2
+            exit 1
+          fi
           echo "sha=${DEPLOY_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact deploy commit
@@ -170,7 +208,7 @@ jobs:
           ref: ${{ steps.resolve.outputs.sha }}
           fetch-depth: 0
 
-      - name: Guard — refuse stale SHA after Environment approval (before SSH)
+      - name: Guard — refuse stale SHA after Environment start (before SSH)
         run: |
           set -euo pipefail
           DEPLOY_SHA="${{ steps.resolve.outputs.sha }}"
@@ -186,22 +224,23 @@ jobs:
         env:
           TARGET_SHA: ${{ steps.resolve.outputs.sha }}
           PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
-          SKIP_ELAAN: ${{ github.event.inputs.skip_elaan || 'false' }}
-          ALLOW_SETTINGS: ${{ github.event.inputs.allow_settings || '' }}
+          SKIP_ELAAN: "false"
+          ALLOW_SETTINGS: ""
         run: |
           set -euo pipefail
           if [ -z "${PRODUCTION_SSH_PRIVATE_KEY}" ]; then
-            echo "PRODUCTION_SSH_PRIVATE_KEY is empty — configure it on the GitHub Environment 'production'." >&2
+            echo "PRODUCTION_SSH_PRIVATE_KEY is empty — configure it on the GitHub Environment 'production-deploy' (not a repository secret, not Environment 'production')." >&2
             exit 1
           fi
-          EXTRA_ARGS=()
-          if [ "${SKIP_ELAAN}" = "true" ] || [ "${SKIP_ELAAN}" = "1" ]; then
-            EXTRA_ARGS+=(--no-elaan)
+          if [ "${SKIP_ELAAN}" != "false" ] && [ "${SKIP_ELAAN}" != "0" ]; then
+            echo "SKIP_ELAAN must stay false on unattended Deploy Production" >&2
+            exit 1
           fi
           if [ -n "${ALLOW_SETTINGS}" ]; then
-            EXTRA_ARGS+=(--allow-settings="${ALLOW_SETTINGS}")
+            echo "ALLOW_SETTINGS must stay empty on unattended Deploy Production" >&2
+            exit 1
           fi
-          bash scripts/ci-deploy-production.sh --target-sha="${TARGET_SHA}" "${EXTRA_ARGS[@]}"
+          bash scripts/ci-deploy-production.sh --target-sha="${TARGET_SHA}"
 
       - name: Post-deploy live verification (SHA + NestPOS markers)
         env:

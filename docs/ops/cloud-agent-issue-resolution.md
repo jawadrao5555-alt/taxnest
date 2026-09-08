@@ -38,9 +38,9 @@ All reproduction, MariaDB work, destructive fixtures, and Chrome verification
 use the **protected local development environment only**
 (`taxnest_dev` / `taxnest_staging` on `127.0.0.1`/`localhost`).
 
-Production deploy remains a **separate Desktop / GitHub Actions**
-responsibility (manual Environment approval). Auto-merge of a `cursor/*` PR
-is **not** production approval.
+Production deploy remains a **separate GitHub Actions**
+responsibility (Environment `production-deploy`, repository fail-closed gates,
+no Cloud Agent SSH). Auto-merge of a `cursor/*` PR is **not** an SSH credential.
 
 ---
 
@@ -218,7 +218,7 @@ Local PR evidence is not the end of ownership. Continue with:
 
 → **`docs/ops/cloud-agent-issue-to-live.md`**
 
-Merge → Deploy Production (manual Environment approval) → live SHA + NestPOS
+Merge → Deploy Production (`production-deploy` gates) → live SHA + NestPOS
 marker verify → self-heal on failure (max 3 iterations). Cloud Agents remain
 production-secret-free.
 

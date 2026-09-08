@@ -89,7 +89,7 @@ if [ -f "$DP" ]; then
   grep -q 'ci-live-verify.sh' "$DP" && ok "Deploy Production runs ci-live-verify.sh" || bad "Deploy Production missing live verify step"
   grep -q 'LIVE_QA_PASS' "$DP" && ok "Deploy Production wires LIVE_QA_PASS secret" || bad "Deploy Production missing LIVE_QA_PASS"
   grep -q 'target_sha' "$DP" && ok "Deploy Production accepts target_sha handoff" || bad "Deploy Production missing target_sha"
-  grep -q 'environment: production' "$DP" && ok "Deploy Production keeps environment: production" || bad "lost environment: production"
+  grep -qE '^[[:space:]]+environment: production-deploy[[:space:]]*$' "$DP" && ok "Deploy Production keeps environment: production-deploy" || bad "lost environment: production-deploy"
   grep -q 'concurrency:' "$DP" && grep -q 'production-deploy' "$DP" \
     && ok "Deploy Production keeps concurrency protection" || bad "concurrency protection missing"
   grep -q 'deploy_guard_main_tip\|deploy_require_origin_main_tip' "$DP" \

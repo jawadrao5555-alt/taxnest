@@ -12,9 +12,11 @@
 # last deploy marker (unchanged).
 #
 # SAME SHA rerun (live HEAD == target SHA == marker commit): when the
-# time-based count is zero, PASS only if deploy/elaan.yml's exact title still
-# exists as a published pos/all AppUpdate. Does not re-date or duplicate.
-# Unrelated old announcements do not satisfy the gate. skip_elaan is not used.
+# time-based count is zero, PASS only if the SHA-qualified published title
+# (deploy/elaan.yml title + " [deploy <TARGET_SHA>]") still exists as a
+# published pos/all AppUpdate. Does not re-date or duplicate.
+# Unrelated old announcements (including the same human title from an older
+# SHA) do not satisfy the gate. skip_elaan is not used.
 
 elaan_committed_spec_path() {
   if [ -f "$ROOT/deploy/elaan.yml" ]; then
@@ -31,6 +33,24 @@ elaan_committed_title() {
   python3 "$ROOT/scripts/lib/elaan-spec-parse.py" "$SPEC" 2>/dev/null \
     | python3 -c 'import json,sys; print(json.load(sys.stdin).get("title",""))' \
     || true
+}
+
+# Published title used on live for this TARGET_SHA (CI --deploy-sha).
+# Fail closed (return 1) if the SHA cannot be qualified — never fall back to
+# the unqualified human title (that is Deploy Production #15).
+elaan_published_title() {
+  local RAW SHA QUALIFIED
+  RAW=$(elaan_committed_title)
+  SHA="${1:-}"
+  RAW="${RAW%"${RAW##*[![:space:]]}"}"
+  [ -n "$RAW" ] || return 0
+  if [ -z "$SHA" ]; then
+    printf '%s\n' "$RAW"
+    return 0
+  fi
+  QUALIFIED=$(python3 "$ROOT/scripts/lib/elaan-deploy-title.py" qualify --title "$RAW" --sha "$SHA") \
+    || return 1
+  printf '%s\n' "$QUALIFIED"
 }
 
 elaan_freshness_check() {
@@ -109,7 +129,8 @@ EOFELAAN
   if [ "$COUNT" -lt 1 ] 2>/dev/null \
     && [ -n "$LIVE_HEAD" ] && [ -n "$TARGET_SHA" ] \
     && [ "$LIVE_HEAD" = "$TARGET_SHA" ] && [ "$MARKER_COMMIT" = "$TARGET_SHA" ]; then
-    TITLE=$(elaan_committed_title)
+    TITLE=$(elaan_published_title "$TARGET_SHA") \
+      || fail "elaan same-SHA title check: could not qualify deploy/elaan.yml title with TARGET_SHA"
     TITLE="${TITLE%"${TITLE##*[![:space:]]}"}"
     if [ -n "$TITLE" ]; then
       local TITLE_B64 TITLE_OUT TITLE_RC

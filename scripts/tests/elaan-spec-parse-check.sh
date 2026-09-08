@@ -83,15 +83,15 @@ raw = subprocess.check_output([sys.executable, parse, path], text=True)
 d = json.loads(raw)
 title = d["title"]
 # Titles already known to exist (or have existed) on live from prior CI inserts.
-# Reusing any of these is a successful insert no-op and will NOT pass the
-# NEW-SHA time-based freshness gate. Keep this list in sync when a new
-# production Elaan ships so the next PR cannot accidentally reuse it.
+# Human titles may repeat across SHAs; CI publishes "{title} [deploy {sha}]".
+# Keep this list so a PR does not *also* reuse a confusing human title.
 KNOWN_LIVE_OR_RETIRED_TITLES = {
     "Daily L001 ke liye roz Reset dabana zaroori nahi",
     "What's New ab approved production deploy ke saath aata hai",
     "Production update — exact approved commit ab live par aata hai",
     "Production update — same-SHA Elaan rerun ab fresh gate ke saath safe hai",
-    "Production update — NestPOS live-verify login redirect ab clear fail deta hai",
+    "Production update — live-verify login redirect ab clear fail deta hai",
+    "Production update — NestPOS Live Ops diagnose aur owner-approved fix ab ready hai",
 }
 assert title not in KNOWN_LIVE_OR_RETIRED_TITLES, title
 assert d["audience"] in ("pos", "all")
@@ -123,6 +123,11 @@ PY
 
 grep -q 'insert_committed_elaan_spec' "$CI" && ok "CI sources committed spec insert" || bad "CI missing insert_committed_elaan_spec"
 grep -q 'elaan-insert.sh' "$CI" && ok "CI uses existing elaan-insert.sh" || bad "CI must call elaan-insert.sh"
+if grep -q -- '--deploy-sha=' "$CI"; then
+  ok "CI qualifies Elaan insert with --deploy-sha"
+else
+  bad "CI must pass --deploy-sha so a new SHA cannot no-op an old AppUpdate"
+fi
 if grep -q 'skip_elaan set — not inserting' "$CI"; then
   ok "skip_elaan skips committed insert"
 else

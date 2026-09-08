@@ -168,8 +168,15 @@ insert_committed_elaan_spec() {
     echo "Freshness check still requires a published pos/all AppUpdate after the last deploy marker."
     return 0
   fi
-  echo "Inserting $SPEC via scripts/elaan-insert.sh (idempotent; existing exact title is a successful no-op, will not re-date Daily L001)."
-  bash "$ROOT/scripts/elaan-insert.sh" --from-file "$SPEC" \
+  case "$TARGET_SHA" in
+    ""|*[!0-9a-fA-F]*) fail "TARGET_SHA missing — refusing Elaan insert without a deploy SHA" ;;
+  esac
+  if [ "${#TARGET_SHA}" -ne 40 ]; then
+    fail "TARGET_SHA must be 40 hex chars to qualify the Elaan title"
+  fi
+  echo "Inserting $SPEC via scripts/elaan-insert.sh --deploy-sha=$TARGET_SHA"
+  echo "(published title is spec title + [deploy SHA]; existing exact published title is a no-op, never re-dated)."
+  bash "$ROOT/scripts/elaan-insert.sh" --from-file "$SPEC" --deploy-sha="$TARGET_SHA" \
     || fail "committed Elaan spec insert failed — fix deploy/elaan.yml or use skip_elaan for emergencies"
 }
 

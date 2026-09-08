@@ -9,10 +9,12 @@ Rules:
   - Time-fresh published pos/all rows (created_at > marker) always PASS
     for both new and same SHA.
   - SAME-SHA rerun (live HEAD == target SHA == marker commit) may PASS
-    only when the committed deploy/elaan.yml title still exists as a
-    published pos/all AppUpdate. Unrelated old announcements do NOT count.
+    only when the SHA-qualified published title still exists as a
+    published pos/all AppUpdate. Unrelated old announcements (including
+    the same human title from an older SHA) do NOT count.
   - NEW SHA with no time-fresh row FAIL (unchanged).
   - ELAAN_EXISTS alone is never treated as fresh.
+  - Title-match on a NEW SHA never PASSes without time_fresh_count >= 1.
 """
 from __future__ import annotations
 

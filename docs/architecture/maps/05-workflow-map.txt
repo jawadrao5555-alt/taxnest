@@ -1,0 +1,38 @@
+TAXNEST MAP 05 — WORKFLOW MAP
+=============================
+
+NESTPOS SALE
+screen → POST /pos/invoice/store → pos.auth → currentCompanyId/branch
+→ PosController::storeInvoice → PosTaxRule/PosTaxMath → persist pos_transactions
+→ reporting ON? pending PRA : OFF final NULL status
+→ agentHandlesPra? leave pending : PraIntegrationService::sendInvoice
+→ optional POST print-jobs → pos_print_jobs → agent claim/print
+→ day close /pos/day-close or pos:auto-dayclose
+
+DI INVOICE
+login web → create/store InvoiceController → plan limits
+→ submit → submitToFbrSync → FbrService → fbr_logs + invoice status
+→ bulk: SeedBulkSubmitBatchJob → BulkSubmitInvoiceJob → same sync
+→ API: /api/di/v1 submit mode
+ORPHAN path: SendInvoiceToFbrJob (not dispatched)
+
+FBR POS SALE
+fbrpos.auth → POST /fbr-pos/store → FbrPosController::store (2dp money)
+→ pharmacy/catalogue deps → IMS submit or agent pending
+→ RetryFbrPosSubmissionJob / SyncFbrPosOfflineInvoicesJob
+
+HEALTHCARE
+health.auth → patients → appointments/check-in → visits
+→ charges (HealthChargeService::post) → bills → pay
+→ HealthPostingService journals
+→ corrections via reverse/adjust (never delete charge)
+
+IMPERSONATION
+admin companies show → POST impersonate mode=view|full
+→ dual-guard session → panel as company_admin
+→ readonly middleware OR audited writes → lock/stop
+
+LIVE OPS
+super_admin /admin/live-ops OR runner API
+→ diagnose/propose → approve phrase → execute allow-listed action
+→ optional agent pending_commands

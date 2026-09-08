@@ -1,0 +1,52 @@
+TAXNEST MAP 04 — PRODUCT BOUNDARY MAP
+=====================================
+
+Canonical: ProductCatalog::TYPES = di | pos | fbrpos | erps
+NestErps verticals: health (legacy stored product_type health accepted)
+
+DI (di)
+- Guard: web
+- Login: /login
+- UI: root panel (no /di prefix for app)
+- Fiscal: FBR DI API via submitToFbrSync
+- Mobile: di-app
+- Unique: consultant, AI reader, white-label, HS intelligence
+- Billing: multi-cycle toggles
+
+NESTPOS (pos)
+- Guard: pos
+- Login: /pos/login
+- UI: /pos/*
+- Fiscal: PRA cloud or fiscal_device via Desktop Agent
+- Mobile: pos-app + caller/rider/waiter
+- Desktop: pra-agent
+- Unique: restaurant, Madadgar, Live Ops, local bills, whole-rupee
+- Billing: annual packages
+
+FBR POS (fbrpos)
+- Guard: fbrpos
+- Login: /fbr-pos/login
+- UI: /fbr-pos/* (universal sale only)
+- Fiscal: FBR IMS / agent
+- Mobile: fbr-pos-app
+- Unique: pharmacy, DRAP catalogue, supplier ledger
+- Rounding: decimals (2dp)
+
+NEST ERPS (erps)
+- Guard: health (HealthAuth/HealthCan; NestErps PRODUCT_TYPES erps|health)
+- Paths: /health/*, hub /nest-erps; bootstrap hardcodes health/ redirects
+- Vertical column: erps_vertical; live vertical HEALTH only in NestErps::VERTICALS
+- Models: HealthPatient/Visit/Admission/PharmacySale/Charge/Journal (CompanyScope)
+- Unique: OPD/IPD/pharmacy/accounts/HR/audit + HealthAccessService PATH_MAP
+- Mobile shell: not found
+- Extension: registry INTENDED shared plumbing; still needs routes/auth/PATH_MAP/models
+- Live Ops config currently product_types=['pos'] only
+
+ISOLATION
+- No cross-login between product guards for ordinary users
+- Same human may own multiple companies (one per product)
+- company_groups = admin insight only
+
+HISTORICAL CONTRADICTIONS
+- "Three products" comments vs four TYPES
+- standalone edition retired

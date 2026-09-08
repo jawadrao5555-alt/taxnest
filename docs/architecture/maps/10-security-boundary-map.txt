@@ -1,0 +1,48 @@
+TAXNEST MAP 10 — SECURITY BOUNDARY MAP
+======================================
+
+TRUST BOUNDARIES
+1. Browser session per guard
+2. admin_users vs users tables
+3. Company agent API keys
+4. DI API tokens
+5. Live Ops runner token (Environment/server only)
+6. GitHub Environment secrets for deploy/Live Ops
+
+POSITIVE CONTROLS
+- Multi-guard product isolation
+- currentCompanyId + CompanyScope (where applied) + explicit filters
+- Impersonation readonly + orphan cleanup
+- Live Ops high_denied allow-list
+- Desktop Agent command allow-list (no remote shell)
+- CSRF on most web forms; ForceHttps; rate limits
+- Redaction in Live Ops diagnostics
+
+CONFIRMED RISK (CODE)
+- GET /setup-migrate-xK9mP2 and /setup-seed-xK9mP2 unauthenticated --force
+  (production reachability UNKNOWN — verify edge/nginx)
+
+HIGH
+- Dual isSuperAdmin (AdminUser vs User)
+- fbr_logs without company_id
+- Credential surfaces (agent key, runner token) blast radius
+- fiscal_device regression would allow server PRA submit
+
+MEDIUM
+- CSRF exemptions on bearer APIs (must remain token-strong)
+- shell_exec in AI PDF rasterize; DatabaseBackup exec CLI
+- Child tables without company_id (parent-join discipline)
+- Branch filter misses on some report aggregates
+- Dead agent portal routes still registered
+
+MUST NOT (INVARIANTS)
+- Invent staff multi-company pivot
+- Invent parallel Live Ops auth
+- Weaken tenant filters for convenience
+- Autonomously remediate REGENERATE_AGENT_API_KEY
+- Commit secrets to public repo
+
+IMPERSONATION BOUNDARY
+- View: blocks writes
+- Manage: real writes + admin audit
+- Exit: panel logout only; never session invalidate

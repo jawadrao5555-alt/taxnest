@@ -1,0 +1,47 @@
+TAXNEST MAP 03 — AUTH / ROLE MAP
+================================
+
+GUARDS (config/auth.php)
+- web → users / User → DI
+- pos → users / User → NestPOS
+- fbrpos → users / User → FBR POS
+- health → users / User → Nest ERPS Healthcare
+- admin → admin_users / AdminUser → SaaS
+- franchise → franchises / Franchise
+- agent → agents / Agent (portal DEAD 404)
+
+NON-GUARD AUTH
+- AgentAuth: API key → Company (Desktop Agent)
+- DiApiAuth: dik_{companyId}_… tokens
+- Live Ops runner: X-Live-Ops-Token
+- Rider/Caller app bearer tokens
+
+IDENTITIES
+1. SaaS AdminUser — /admin; isSuperAdmin for privileged ops
+2. Company User — one company_id; product_type scoped uniqueness
+3. User.role=super_admin — rare; RoleMiddleware/CompanyScope bypass; NOT Live Ops
+4. Desktop Sync Agent — companies.agent_api_key
+5. Distributor Agent — agents table; portal 404
+
+NESTPOS ROLES
+- company_admin / pos_admin / pos_manager (isPosAdmin)
+- pos_cashier (+ custom access)
+- pos_kitchen / pos_waiter / pos_delivery / pos_rider (confined; often limit-exempt)
+- archive_viewer / local_viewer (portals)
+- canRequeueExemptPra excludes pos_manager
+
+HEALTH ROLES
+- users.health_role + health_permissions
+- HealthAccessService::can + HealthScopeService branch/department
+
+AUTHORIZATION STYLE
+Scattered middleware/helpers/services/asserts — NO Policies/Gates
+
+IMPERSONATION
+- Dual-guard: admin + panel
+- mode=view readonly; mode=full audited writes
+- Exit stops panel only
+
+LIVE OPS AUTH
+- AdminUser::isSuperAdmin only
+- Managers/viewers cannot use /admin/live-ops

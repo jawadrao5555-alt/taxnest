@@ -1,0 +1,78 @@
+TAXNEST MAP 01 — ROUTE MAP
+==========================
+Authority: routes/web.php, routes/auth.php, bootstrap/app.php
+Named routes ~1324 in web.php. No routes/api.php (APIs inside web.php).
+
+SURFACE GROUPS
+--------------
+DI WEB (guard web)
+- Login: GET/POST /login (routes/auth.php)
+- Panel group middleware: auth, company, rate_limit_company, company.approval
+- Invoices/products/compliance/company settings under root paths
+- Consultant: /consultant/* inside DI auth group
+- API: /api/di/v1/* middleware di.api (CSRF exempt)
+
+NESTPOS (guard pos)
+- Middleware group: pos.auth, company.approval; prefix /pos
+- Sale: POST /pos/invoice/store (pos.invoice.store) + plan.limit:invoices
+- Print: POST /pos/api/print-jobs
+- Day close: /pos/day-close*
+- Restaurant nested routes under /pos
+- ~360 Route:: in pos bodies; named prefix pos.* ~376
+
+FBR POS (guard fbrpos)
+- Middleware: fbrpos.auth, company.approval; prefix /fbr-pos
+- Sale: POST /fbr-pos/store
+- Pharmacy/catalogue/stock/riders nested
+- ~251 Route::; named fbrpos.* ~260
+
+HEALTH / NEST ERPS (guard health)
+- Login /health/login; panel middleware health.auth, company.approval
+- Nested pharmacy, billing, accounts, ipd, operations
+- ~272 Route::; named health.* ~276
+- Compat: /healthcare, /nest-erps
+
+SAAS ADMIN (guard admin)
+- /admin/login; group middleware admin.auth
+- Companies, plans, subscriptions, franchises, consultants, agents, live-ops,
+  live-activity, support-inbox, settings, audit, …
+- Impersonation: POST /admin/companies/{id}/impersonate
+  POST /admin/impersonation/stop|lock
+- Live Ops: /admin/live-ops*
+- Named saas.* ~106 + admin.* ~87
+
+FRANCHISE (guard franchise)
+- /franchise/login + dashboard/companies/subscriptions/revenue
+
+AGENT PORTAL (guard agent intended)
+- /agent/* routes exist BUT controllers return 404 (DEAD)
+- agent.portal.auth aliased but not applied on group
+
+DESKTOP AGENT API
+- /api/agent/* middleware agent.auth (CSRF exempt)
+- /api/agent/v2/* + agent.core.enabled
+
+LIVE OPS RUNNER API
+- /api/live-ops/v1/* throttle; X-Live-Ops-Token
+
+MOBILE APIS
+- /api/rider-app/v1/*, /api/caller-app/v1/* (CSRF exempt)
+
+SHIMS
+- /di → /digital-invoice 301
+- health root → health.dashboard
+
+CRITICAL UNAUTHENTICATED (code; routes/web.php:2745-2765; NO middleware)
+- GET /setup-migrate-xK9mP2 → Artisan migrate --force + cache/view clear
+- GET /setup-seed-xK9mP2 → Artisan db:seed --force
+Production nginx exposure: UNKNOWN
+
+MIDDLEWARE ALIASES
+company, role, rate_limit_company, pos.auth, fbrpos.auth, health.auth,
+health.module, health.can, admin.auth, agent.auth, agent.core.enabled, di.api,
+franchise.auth, agent.portal.auth, plan.limit, company.approval, restaurant.only,
+feature
+
+WEB APPEND STACK
+ReadOnlyImpersonation → LogImpersonatedWrites → ConsultantSwitchGuard →
+SetPosLocale → MarkNewFeaturesSeen

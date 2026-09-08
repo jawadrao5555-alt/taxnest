@@ -1,0 +1,45 @@
+TAXNEST MAP 08 — INTEGRATION MAP
+================================
+
+PRA / PRAL
+- Service: PraIntegrationService → ims.pral.com.pk
+- Modes: cloud direct vs fiscal_device (agent local IMS)
+- Helpers: pra-relay, company pra_proxy_url / pra-proxy
+- Logs: pra_logs
+- Sync: SyncPosOfflineInvoicesJob; agent pending-invoices/submit-result
+- Live Ops: RETRY_ONE_PRA_INVOICE
+
+FBR DI
+- Service: FbrService DI endpoints
+- Path: InvoiceController::submitToFbrSync (SYNC)
+- Logs: fbr_logs (no company_id column)
+- Bulk: BulkSubmitInvoiceJob → same sync
+- ORPHAN: SendInvoiceToFbrJob
+
+FBR POS IMS
+- FbrService IMS URLs; fbr_pos_token
+- FbrPosController::store; RetryFbrPosSubmissionJob; SyncFbrPosOfflineInvoicesJob
+- Logs: fbr_pos_logs
+
+WHATSAPP
+- Meta Cloud API per company + webhook
+- Central SystemSetting number for owner alerts
+- Many POS sends = wa.me deep links (PkPhone)
+
+EMAIL
+- Domain SMTP; admin override; MailHealth; sync mailables common
+
+OPENAI
+- AI Invoice Reader (DI)
+
+CLOUDFLARE
+- rocket-loader / settings check commands
+
+DRAP
+- medicine catalogue sync job/command
+
+SMS
+- NOT PRESENT as provider integration
+
+PAYMENT RAILS
+- Payment proofs (bank evidence), not card gateway

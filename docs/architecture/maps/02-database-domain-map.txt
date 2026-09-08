@@ -1,0 +1,63 @@
+TAXNEST MAP 02 — DATABASE DOMAIN MAP
+====================================
+~270 Schema::create tables; 520 migrations; 236+ models.
+
+SAAS CORE
+- companies (tenant root; product_type; erps_vertical; agent_*; JSON prefs)
+- users (company_id; role; pos_role; health_role; default_branch_id)
+- admin_users (platform; role)
+- branches + branch_user (pivot access_level)
+- franchises, agents (distributor)
+- company_groups, company_group_members, company_identity_keys, exclusions
+- pricing_plans, subscriptions, subscription_invoices/payments, payment_proofs
+- system_settings, system_controls, company_usage_stats
+- sessions, jobs, job_batches, failed_jobs, cache*
+
+DI
+- invoices (+ branch_id), invoice_items (parent FK only), invoice_deliveries
+- invoice_import_*, invoice_bulk_submissions, invoice_zip_exports, invoice_activity_logs
+- products, customer_profiles, customer_ledgers, ai_invoice_parses
+- fbr_logs (NO company_id — invoice_id only)
+- hs_* / global_hs_master / compliance_* / override_* / vendor_risk_profiles
+
+NESTPOS
+- pos_transactions (+ branch_id), pos_transaction_items, pos_payments
+- pos_print_jobs (target_printer SNAPSHOT; device_uid; status)
+- pos_agent_devices (company_id+device_uid unique)
+- pra_logs (company_id)
+- restaurant_*, pos_riders, pos_deals*, pos_held_sales, day_close reports
+- inventory/purchase/supplier/pharmacy-pos/medicine_catalogue*
+- agent_core_* tables
+
+FBR POS
+- fbr_pos_transactions (+ branch_id), items, logs, terminals, shifts, deals
+- fbr_day_close_reports, fbr_customer_ledgers, khata
+- GLOBAL reference: fbr_hs_codes, fbr_rates, fbr_sros, fbr_uoms, …
+
+HEALTH / ERPS
+- health_patients, visits, appointments, doctors, departments
+- health_charges (+ adjustments), bills, payments, admissions, beds
+- health_journals/lines, accounts, expenses, HR/attendance
+- health_audit_*; health_department_user pivot
+
+LIVE OPS
+- live_ops_audit_events, live_ops_diagnostic_reports
+- live_ops_remediation_requests, live_ops_agent_commands
+
+AUDIT / SECURITY
+- admin_audit_logs, audit_logs, anomaly_logs, security_logs (user_id only)
+- audit_packs
+
+COMPANYSCOPE (~69 models)
+Mostly Health* + Invoice, Product, Branch, CustomerProfile.
+POS/FBR/LiveOps models: company_id column, NO global scope (caller filters).
+
+PIVOTS (Eloquent BTM)
+branch_user; company_group_members; health_department_user; health_medicine_substitutes
+
+DATA CLASSES
+AUTHORITATIVE: identity, fiscal numbers, subscriptions, posted charges
+DERIVED: billableCount, ledger balances, sale prices
+CACHE/STATE: agent_last_seen, job status, pending fiscal statuses
+SNAPSHOT: target_printer, line tax_rate, quote snapshots
+AUDIT: *_logs / audit tables

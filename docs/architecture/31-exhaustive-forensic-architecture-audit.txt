@@ -1,0 +1,962 @@
+TAXNEST — EXHAUSTIVE FORENSIC REVERSE-ENGINEERING & ZERO-GAP ARCHITECTURE AUDIT
+==============================================================================
+
+Primary deliverable: docs/architecture/31-exhaustive-forensic-architecture-audit.txt
+Supporting maps: docs/architecture/maps/01..10-*.txt
+Authority: ACTUAL CODE on main (includes PR #24 + PR #25 docs as maps only)
+Mission constraints: investigation-only; no application code changes; no deploy;
+no production access; no secrets; no schema changes; no deletions
+
+Inspection method: dependency/reference searches + call-chain traces + migration/
+model inventory + targeted PHPUnit. Repository is too large for literal
+file-by-file human reading of every line (520 migrations, 236 models, 161
+controllers, 2900-line web.php). Surfaces not exhaustively line-walked are
+marked UNKNOWN or PARTIAL.
+
+
+PART 0 — EXECUTIVE CERTIFICATION SNAPSHOT
+-----------------------------------------
+
+Overall understanding is deep enough to investigate most future issues without
+another broad discovery, but NOT "zero-gap" absolute. Gaps remain in production
+runtime topology, some child-table IDOR assumptions, and ultra-large controllers
+(PosController / FbrPosController).
+
+Final morning-style decision (see Part 34): READY WITH TARGETED GAPS
+
+
+PART 1 — COMPLETE REPOSITORY INVENTORY
+--------------------------------------
+
+TOP-LEVEL DIRECTORIES (ACTIVE unless noted)
+- app/ — Laravel domain (ACTIVE)
+- bootstrap/ — app bootstrap + middleware aliases (ACTIVE)
+- config/ — 15 PHP configs (ACTIVE)
+- database/migrations|seeders|factories|schema (ACTIVE)
+- routes/ — web.php (2900 lines), auth.php, console.php (ACTIVE); no routes/api.php
+- resources/views|js|css|madadgar|whats-new (ACTIVE)
+- public/ — assets, downloads, sw.js PWA (ACTIVE)
+- tests/Feature (~434) + Unit (~30) (ACTIVE)
+- scripts/ — deploy, Live Ops, browser QA, checks (ACTIVE)
+- .github/workflows — 6 workflows (ACTIVE)
+- deploy/ + deployment/ — Elaan + legacy deploy artifacts (ACTIVE + LEGACY mix)
+- docs/architecture|ops|play|qa (ACTIVE docs)
+- pra-agent/ — Electron Desktop Agent (ACTIVE)
+- agent-realtime-gateway/ — WS wake (ACTIVE, opt-in)
+- pra-proxy/ + pra-relay/ — PRA connectivity helpers (ACTIVE/LEGACY mix by shop)
+- pos-app/, di-app/, fbr-pos-app/, caller-app/, rider-app/, waiter-app/ (ACTIVE clients)
+- tools/ — video pipeline etc. (ACTIVE tooling)
+- lang/ — en/ur/rur (ACTIVE)
+- exports/ — local export artifacts (workspace local; not architecture truth)
+- replit-holding/, .replit*, replit.md, replit.nix (LEGACY env + ACTIVE product map doc)
+- routes-update.zip (LEGACY leftover; not runtime)
+- fbr_retry.php, fbr_retry_loop.sh, fbr_single_try.php (LEGACY one-offs; ORPHAN from app)
+- backup.sql (LEGACY dump artifact)
+
+COUNTS (FACT)
+- Models: 236–237 PHP files under app/Models
+- Controllers: 161 under Controllers tree (103 top-level + SaasAdmin 19 + Health 16 + …)
+- Middleware: 29
+- Services: 191
+- Jobs: 20
+- Commands: 41
+- Mail: 5
+- Observers: 2 (InvoiceItemObserver, HealthAuditObserver)
+- Providers: 1 (AppServiceProvider) — inline Auth Login/Failed listeners
+- Migrations: 520; Schema::create unique tables ~270–272
+- Views: ~533 blade files
+- Named routes in web.php: ~1324
+- Policies dir: ABSENT
+- Events/Listeners dirs: ABSENT
+- Repositories dir: ABSENT
+
+CLASSIFICATION NOTES
+- ACTIVE: primary Laravel app + pra-agent + scheduled jobs + Actions deploy
+- LEGACY: Replit connectors, agent portal 404, orphan jobs, setup-* routes,
+  routes-update.zip, standalone fbr_retry.php
+- ORPHANED (proven no external dispatch): SendInvoiceToFbrJob, CheckTokenExpiryJob
+- DEAD/UNREFERENCED: AgentPortal* handlers always 404 (routes still registered)
+- UNKNOWN: whether production nginx still exposes /setup-migrate-xK9mP2
+
+
+PART 2 — COMPLETE DATABASE FORENSICS
+------------------------------------
+
+Scale: ~270 Schema::create tables across migrations.
+
+DOMAIN GROUPS (heuristic by name + usage)
+- SAAS: companies, users, admin_users, branches, branch_user, franchises, agents,
+  pricing_plans, subscriptions, payment_proofs, company_groups*, system_settings,
+  admin_audit_logs, sessions, jobs, …
+- DI: invoices, invoice_items, invoice_deliveries, fbr_logs, customer_profiles,
+  products, hs_*, compliance_*, ai_invoice_*, …
+- POS: pos_transactions, pos_transaction_items, pos_payments, pos_print_jobs,
+  pos_agent_devices, pra_logs, restaurant_*, pos_riders, inventory/supplier tables, …
+- FBR POS: fbr_pos_transactions*, fbr_pos_logs, fbr_day_close_reports, reference
+  fbr_* catalogs (GLOBAL), medicine_catalogue*, …
+- HEALTH/ERPS: health_* (~70 tables) patients/visits/charges/bills/journals/HR/audit
+- LIVE_OPS: live_ops_audit_events, live_ops_diagnostic_reports,
+  live_ops_remediation_requests, live_ops_agent_commands
+
+KEY TABLE NOTES
+companies — tenant root; product_type AUTHORITATIVE; erps_vertical; agent_*;
+  pra_connection_mode; pos_printer_settings JSON; invoice_display_prefs JSON;
+  soft deletes present in model usage
+users — company_id AUTHORITATIVE; role + pos_role + health_role; default_branch_id;
+  NO Eloquent belongsToMany back to branches (asymmetric vs Branch::users)
+admin_users — platform; role super_admin/admin; NO company_id
+branches / branch_user — intra-company; Branch uses CompanyScope; pivot access_level
+subscriptions / pricing_plans — entitlement AUTHORITATIVE; quote SNAPSHOT;
+  pricing_plans catalog has NO company_id
+pos_transactions — company_id + branch_id; pra_* mix AUTHORITATIVE result + CACHE state;
+  NO CompanyScope; NO branch() relation method (column still stamped)
+pos_print_jobs — company_id; target_printer SNAPSHOT; device_uid; status CACHE;
+  afterCommit wake hook
+pos_agent_devices — (company_id, device_uid) unique identity AUTHORITATIVE
+invoices — CompanyScope YES; company_id + branch_id; FBR number AUTHORITATIVE once set
+fbr_logs — NO company_id (invoice_id only) — POTENTIAL RISK if queried by id alone
+pra_logs — company_id YES
+health_charges — CompanyScope YES; reverse fields; never delete semantics in service
+live_ops_* — company_id YES; platform/admin tables; no CompanyScope
+
+PIVOTS (Eloquent belongsToMany found: 4)
+- branch_user
+- company_group_members
+- health_department_user
+- health_medicine_substitutes
+
+DANGEROUS / NON-OBVIOUS TENANT LINKS
+- Child tables without company_id (invoice_items, pos_transaction_items, pos_payments,
+  fbr_pos_transaction_items) — tenant via parent FK only
+- fbr_logs without company_id
+- security_logs user_id only
+- Global catalogs intentionally non-tenant (fbr_hs_codes, medicine_catalogue, …)
+
+AUTHORITATIVE vs DERIVED vs CACHE vs SNAPSHOT vs AUDIT
+- AUTHORITATIVE: company identity, subscription overrides, fiscal numbers, posted charges
+- DERIVED: billableCount, supplier ledger balances, sale campaign prices
+- CACHE/STATE: agent_last_seen, print job status/claim_token, pending pra/fbr statuses
+- SNAPSHOT: print target_printer, line tax_rate at sale, distributor_quote_snapshot
+- AUDIT: *_logs, admin_audit_logs, live_ops_audit_events, health_audit_*
+
+Migration semantic drift (examples)
+- Nest ERPS: stored 'health' → 'erps' with erps_vertical (NestErps::PRODUCT_TYPES)
+- token_expiry_date vs token_expires_at (orphan CheckTokenExpiryJob vs live job)
+- Standalone POS edition retired; pricing_plans may still hold standalone historically
+
+
+PART 3 — COMPLETE ROUTE MAP
+---------------------------
+
+Entry registration: bootstrap withRouting(web, commands, health:/up).
+API routes live INSIDE routes/web.php (no separate api.php).
+
+APPROXIMATE SURFACE (web.php Route:: counts by prefix body)
+- admin ~214 (includes live-ops, companies, plans, agents, …)
+- pos ~360 (restaurant nested)
+- fbr-pos ~251
+- health ~272
+- franchise ~4 (+ login)
+- agent portal ~5 (DEAD handlers 404)
+- api/agent ~15 (v1 + v2)
+- api/di/v1 ~2
+- api/live-ops/v1 ~4
+- consultant ~9 (inside DI auth group)
+- api/rider-app/v1, api/caller-app/v1 present
+- DI panel: large unprefixed auth+company group
+
+Named-route prefix frequencies (samples): pos 376, health 276, fbrpos 260,
+saas 106, admin 87, invoices 47, …
+
+MIDDLEWARE ALIASES (bootstrap/app.php)
+company, role, rate_limit_company, pos.auth, fbrpos.auth, health.auth,
+health.module, health.can, admin.auth, agent.auth, agent.core.enabled, di.api,
+franchise.auth, agent.portal.auth (unused on agent prefix group), plan.limit,
+company.approval, restaurant.only, feature
+
+WEB GROUP APPEND
+ReadOnlyImpersonation, LogImpersonatedWrites, ConsultantSwitchGuard,
+SetPosLocale, MarkNewFeaturesSeen
+
+SHIMS / ALIASES
+- /di → /digital-invoice 301
+- /healthcare → Nest ERPS landing compatibility
+- FBR universal sale is ONLY live sale screen; classic create blade SHIM/DEAD file
+
+CRITICAL OPEN ROUTES (CODE FACT)
+- GET /setup-migrate-xK9mP2 — Artisan::call migrate --force + cache clear; NO AUTH
+- GET /setup-seed-xK9mP2 — Artisan::call db:seed --force; NO AUTH
+Classification: CONFIRMED RISK in code exposure terms; production reachability UNKNOWN
+(may be blocked by reverse proxy — not proven locally)
+
+
+PART 4 — COMPLETE AUTHENTICATION MODEL
+--------------------------------------
+
+Guards (config/auth.php):
+web→users/User; pos→users/User; fbrpos→users/User; health→users/User;
+admin→admin_users/AdminUser; franchise→franchises/Franchise; agent→agents/Agent
+
+Login routes (panel-specific):
+/login (DI web), /pos/login, /fbr-pos/login, /health/login, /admin/login,
+/franchise/login, /agent/login (404 body)
+
+Password reset broker: users only (not admin/franchise/agent)
+
+Desktop Agent auth: AgentAuth middleware — Bearer/X-Agent-Key → companies.agent_api_key
+  (NOT the agent guard)
+
+Identity destinations:
+- AdminUser: /admin/* SaaS; may dual-session impersonate into panels
+- Company User: only own product panel matching product_type + company_id
+- User.role=super_admin: RoleMiddleware/CompanyScope bypass on web User — RARE;
+  NOT Live Ops actor
+- Desktop Agent: /api/agent/*
+- Distributor Agent: theoretically /agent/* but controllers 404
+
+
+PART 5 — COMPLETE AUTHORIZATION FORENSICS
+-----------------------------------------
+
+Style: SCATTERED (middleware + helpers + services + controller asserts).
+NO Laravel Policies/Gates.
+
+Mechanisms found:
+- PosAuth role path confinement (kitchen/waiter/rider/viewers)
+- PosAdminOnly, PosAccessService custom grants
+- RoleMiddleware allow-list + User.super_admin bypass
+- HealthAccessService::can + health.can middleware + health_permissions JSON
+- AdminUser::isSuperAdmin vs User::isSuperAdmin (DUAL — HIGH cognitive risk)
+- CheckPlanLimit / PlanLimitService / SubscriptionAccessService
+- CompanyIsolation product redirects
+- ReadOnlyImpersonation write block
+- Live Ops gate isSuperAdmin
+- FeatureEnabled / RestaurantOnly / HealthModuleEnabled
+
+Role matrix (NestPOS, simplified FACT):
+- company_admin / pos_admin / pos_manager: admin-equivalent via isPosAdmin
+- pos_manager EXCLUDED from canRequeueExemptPra
+- pos_cashier: confined; optional custom access
+- archive_viewer / local_viewer: portal confinement
+- viewer role: DI read-oriented
+
+Inconsistencies:
+- Dual super_admin helpers
+- Agent portal auth middleware registered but unused on routes
+- UI may hide controls that server still must enforce (security ≠ UI)
+
+
+PART 6 — COMPLETE TENANT ISOLATION FORENSICS
+--------------------------------------------
+
+currentCompanyId sources: PosAuth/FbrPosAuth/HealthAuth/CompanyIsolation/DiApiAuth;
+AgentController may bind locally for render.
+
+CompanyScope: ~66–69 models with addGlobalScope(CompanyScope) (Branch, CustomerProfile,
+Invoice, Product, + ~62 Health*). Scope no-ops when currentCompanyId unbound;
+bypasses if web auth()->user()->role === 'super_admin'.
+~125 models with company_id WITHOUT CompanyScope (POS/FBR/LiveOps — explicit filter required).
+
+Jobs: sampled Jobs do NOT use auth()/currentCompanyId; they carry entity IDs and
+read company_id from rows — CONFIRMED SAFE pattern for isolation.
+
+FINDINGS
+- CONFIRMED SAFE: DiApiAuth hash binding; AgentAuth key→company; Live Ops explicit
+  company_id + NestPOS assert; impersonation single company_id; PRA day-close branch
+  choke; applyReportFilters branch on many POS reports; print claim company_id
+- POTENTIAL RISK: POS models without CompanyScope (caller must filter);
+  child tables without company_id; fbr_logs without company_id;
+  PRA PosController::reports() local bills path missing branch filter;
+  FBR reports aggregates / range analytics company-wide while CSV applies branch;
+  Live Ops runner token compromise = platform-wide (by design)
+- CONFIRMED RISK: unauthenticated /setup-migrate-xK9mP2 and /setup-seed-xK9mP2
+  in routes/web.php (if reachable in an environment)
+- UNKNOWN: production exposure of setup routes; every child-table controller IDOR check
+
+
+PART 7 — COMPLETE BRANCH ARCHITECTURE
+-------------------------------------
+
+BranchContextService:
+- SESSION_KEY active_branch_id
+- ALL sentinel for owner company-wide (getActiveBranchId → null filter)
+- Manager: branch_user multi-branch
+- Cashier/employee: default_branch_id locked
+- stampBranchId used on sale/stock/restaurant/agent-core lease paths
+
+Who can switch: owners/admins (and managers with >1 accessible branch).
+Jobs generally do NOT carry branch context unless stamped on the row at create time.
+Print jobs are device_uid scoped more than branch scoped.
+
+
+PART 8 — COMPLETE PRODUCT ARCHITECTURE
+--------------------------------------
+
+Canonical ProductCatalog::TYPES = di, pos, fbrpos, erps
+NestErps: fourth product; vertical health; legacy stored 'health' accepted
+
+PRODUCT DI
+- guard web; login /login; FBR DI sync submitToFbrSync; di-app; consultant console
+
+PRODUCT NestPOS (pos)
+- guard pos; /pos; PraIntegrationService; pra-agent; Live Ops; whole-rupee; pos-app
+  + caller/rider/waiter
+
+PRODUCT FBR POS (fbrpos)
+- guard fbrpos; /fbr-pos; FbrService IMS; decimals; pharmacy/catalogue; fbr-pos-app
+
+PRODUCT Nest ERPS (erps)
+- vertical health; guard health; /health; HealthAccessService; health_* DB;
+  no dedicated Android shell found
+
+Historical contradictions: "three products" comments vs four TYPES; standalone retired
+
+
+PART 9 — BUSINESS LOGIC FORENSICS
+---------------------------------
+
+Rules live primarily in services + fat controllers + model helpers + DB uniques.
+
+Examples of source-of-truth locations:
+- Tax NestPOS: PosTaxRule + PosTaxMath + storeInvoice
+- Reporting-OFF finals: PosController storeInvoice branch (pra NULL, mode pra)
+- fiscal_device: Company::agentHandlesPra + PraIntegrationService early-return
+- Offline sale idempotency: offline_uuid unique(company_id, offline_uuid)
+- Health charges: HealthChargeService::reverse (never delete)
+- Supplier balances: SupplierLedgerService only
+- Day close wash policy: Pos day-close services/controllers (fiscal never washed)
+- Seat/invoice limits: PlanLimitService
+- Access overrides: SubscriptionAccessService::hasAccess order
+
+
+PART 10 — TAX CALCULATION FORENSICS
+-----------------------------------
+
+NestPOS:
+- Exclusive: round tax and total whole rupee in PosController::storeInvoice
+- Inclusive: PosTaxMath::inclusiveHeader — total whole rupee; tax_amount may be 2dp
+- Rate: PosTaxRule::getRateForMethod; snapshots on lines
+- PRA payload: PraIntegrationService absorbs paisa into largest line to match total
+
+FBR POS:
+- round money to 2dp; measure UoMs allow qty decimals; NO PosTaxMath
+
+DI:
+- Invoice tax fields + FbrService payload validation; not PosTaxMath
+
+Duplicate implementations: POS vs FBR POS tax math intentionally diverge (product rule).
+
+
+PART 11 — COMPLETE PRA FORENSICS
+--------------------------------
+
+Paths capable of PRA-related effects:
+1. PosController::storeInvoice → sendInvoice OR queue pending for agent
+2. PraIntegrationService::sendInvoice (cloud curl; fiscal_device early-return)
+3. SyncPosOfflineInvoicesJob
+4. Agent pending-invoices + submit-result
+5. Manual retry / Live Ops RETRY_ONE_PRA_INVOICE
+6. Artisan pra:requeue-exempt-internal (ops command)
+
+Server submit FORBIDDEN when pra_connection_mode=fiscal_device (double gate).
+Server submit PERMITTED in cloud mode when not agentHandlesPra().
+Reporting OFF finals: no submit; pra_status NULL.
+
+
+PART 12 — COMPLETE FBR / IMS FORENSICS
+--------------------------------------
+
+DI FBR: InvoiceController::submitToFbrSync → FbrService; fbr_logs; bulk jobs call same sync.
+ORPHAN: SendInvoiceToFbrJob (unused import only).
+
+FBR POS IMS: FbrPosController::store → FbrService::submitFbrPosTransaction;
+fiscal_device queues for agent; RetryFbrPosSubmissionJob; SyncFbrPosOfflineInvoicesJob.
+Token: dedicated fbr_pos_token (no DI fallback) per service comments.
+
+Token expiry: CheckFbrTokenExpiryJob scheduled; CheckTokenExpiryJob ORPHAN.
+
+
+PART 13 — COMPLETE PRINTING FORENSICS
+-------------------------------------
+
+UI/API → PosController::apiCreatePrintJob → pos_print_jobs
+(target_printer + device_uid SNAPSHOT) → PosPrintJob created hook afterCommit
+→ PrintJobWakePublisher (opt-in loopback) → agent long-poll claim → content HTML
+→ silent print → result.
+
+SoT: job row for that print attempt; company printer JSON for routing defaults;
+device receipt_printer for counter.
+
+Stranded rescue (AgentController housekeeping): may rewrite bill/proof target_printer
+to company default when stamped device offline >90s; KOT retargets same printer name
+on another online counter; test jobs fail rather than retarget.
+CONFIRMED SAFE for company isolation; intentional retarget semantics.
+
+
+PART 14 — COMPLETE DESKTOP AGENT FORENSICS
+------------------------------------------
+
+pra-agent Electron: heartbeat setInterval 30000 (CODE); README says 60s (DOC CONTRADICTION).
+Sync poll 5000ms. Auth API key. Device UID registration. Printers report.
+pending_commands from heartbeat; ACK/result via /command-result.
+Commands allow-list: STATUS_REFRESH, RESYNC, UPLOAD_REDACTED_LOGS, TEST_PRINT,
+PRINTER_REFRESH, SAFE_AGENT_RESTART.
+Risk: SAFE/LOW for status/resync/logs/printer refresh; TEST_PRINT medium operational;
+SAFE_AGENT_RESTART controlled relaunch; DENIED: arbitrary shell/SQL (not in allow-list).
+Local Core / offline LAN present in codebase. Realtime wake optional.
+Distinct from distributor agents table.
+
+
+PART 15 — COMPLETE MOBILE/PWA FORENSICS
+---------------------------------------
+
+Android shells are repo-root *-app/ trees (Gradle, no npm package.json). PWA
+assets under public/; Blade panels under resources/views/{pos,fbr-pos}.
+
+CODE-PROVEN CLIENT MAP
+- pos-app: applicationId pk.taxnest.pos; WebView cookie session;
+  START_URL https://taxnest.pk/pos/login; FCM POST /pos/app/fcm-token and clear
+  /api/pos-app/fcm-token/clear (Push.kt). Offline = WebView cache + Blade localStorage.
+- fbr-pos-app: pk.taxnest.fbrpos; cookie WebView; START_URL /fbr-pos/login;
+  FCM /fbr-pos/app/fcm-token + /api/fbr-pos-app/fcm-token/clear.
+- di-app: pk.taxnest.di; cookie WebView; START_URL /login; version check
+  /api/app-version; no FCM Push.kt in tree.
+- caller-app: pk.taxnest.callerid; Bearer in SharedPreferences; API base
+  /api/caller-app/v1; also LAN Bearer to Desktop Agent (LanClient).
+- rider-app: pk.taxnest.rider; Bearer; /api/rider-app/v1 (routes/web.php prefix).
+- waiter-app: pk.taxnest.waiter; dual auth — WebView cookies to /pos/waiter +
+  Local Core device Bearer in EncryptedSharedPreferences.
+
+PWA: public/sw.js registered from layouts pos-app, fbr-pos-app, app (scope /).
+Manifests: manifest-pos.json (scope /pos/), manifest-fbrpos.json (/fbr-pos/),
+manifest.json (DI /). Cache API buckets STATIC/RUNTIME/SALE/TABLES/WAITER.
+CSRF exempt for api/agent, rider-app, caller-app, di, live-ops (bootstrap).
+
+UNKNOWN / PARTIAL: exact IndexedDB schemas inside Local Core waiter/POS JS;
+full offline sync conflict resolution across all flavors of caller-app.
+
+
+PART 16 — COMPLETE ERPS/HEALTHCARE FORENSICS
+--------------------------------------------
+
+NestErps (App\Support\NestErps): PRODUCT_TYPE='erps'; PRODUCT_TYPES=['erps','health'];
+VERTICAL_COLUMN='erps_vertical'; LANDING_PATH='/nest-erps'; live vertical HEALTH only
+in VERTICALS. Registry comments claim new vertical = VERTICALS + screens/routes/
+guard/lang without new product_type/billing/admin allow-list.
+
+HIDDEN DEPENDENCIES (registry alone is NOT sufficient — CODE FACT):
+- Hardcoded /health/* route group + health.auth (routes/web.php ~1746+)
+- bootstrap/app.php hardcodes health/ redirects; aliases health.auth→HealthAuth,
+  health.can→HealthCan; config/auth.php guard 'health'
+- HealthPanel::GUARD='health' + product check via NestErps
+- HealthAuth + HealthAccessService PATH_MAP (healthcare-specific capabilities)
+- HealthScopeService branch/department scoping
+- SubscriptionAccessService billable callable per vertical; ProductCatalog login
+  null for ERPS; Admin company create erps_vertical; Impersonation NestErps::guardFor
+- Full Health* model/migration/service surface
+
+Key models (all CompanyScope): HealthPatient, HealthVisit (OPD), HealthAdmission
+(IPD), HealthPharmacySale, HealthCharge, HealthJournal — no unprefixed Patient/
+Visit/Charge classes.
+
+Verdict: registry is the INTENDED shared plumbing extension point; a new vertical
+still needs substantial module code (routes, guard wiring, capability PATH_MAP,
+scope service, models). Live Ops config currently scopes product_types=>['pos'] only.
+
+
+PART 17 — COMPLETE BILLING FORENSICS
+------------------------------------
+
+Flow: pricing_plans → subscriptions → payment_proofs → admin approve →
+SubscriptionAccessService::hasAccess → PlanLimitService / plan.limit middleware.
+
+SubscriptionAccessService methods: localizedLockReason, hasAccess, trialStatus,
+paidEndingReminder, overrideReminder, reconcileExpiredGrants.
+hasAccess order (code): lifetime → usage_free (invoice cap) → temporary|grace
+while override_until future → else active + end_date + trial + plan-less fail-closed.
+Expired temporary/grace falls through; reconcileExpiredGrants clears lapsed grants
+and may flip company to pending. Scheduled caller of reconcile: UNKNOWN (not in
+routes/console.php).
+
+Instant proof grant: PaymentProofController auto-grants 10-day override_type=
+temporary on first upload.
+
+PlanLimitService gates: canCreateInvoice, canCreatePosBill, canCreateFbrPosBill,
+canAddPosUser/User/FbrTerminal/Branch, remainingProductAllowance, getEffectiveLimits.
+Middleware alias plan.limit → CheckPlanLimit (bootstrap); applied on DI/POS/FBRPOS
+create routes throughout web.php.
+
+Payment proof entry: customer POST …/payment-proof; AdminPaymentProofController
+index/download/approve/reject (approve branches: extra-branch / POS addon /
+AI pages / plan renewal).
+
+Bypass risks: lifetime override; usage_free unlimited null cap; feature flags
+independent of subscription; UNKNOWN full enumeration of every admin override path.
+
+
+PART 18 — COMPLETE SETTINGS FORENSICS
+-------------------------------------
+
+Precedence (practical): .env/config defaults < system_settings (SystemSetting::get/set
+platform KV: trials, WhatsApp, what's-new, heartbeats) < company columns/JSON
+< branch/user overrides < plan feature gates.
+Branch JSON settings column: UNKNOWN (no Branch settings hits in model scan).
+
+Company JSON columns: pos_printer_settings, feature_flags, invoice_display_prefs,
+public_profile_settings.
+
+DANGEROUS WHOLE-COLUMN REPLACE WRITERS (race/stomp):
+- pos_printer_settings: PosController, FbrPosController, AgentController telemetry,
+  LiveOpsRemediationService
+- feature_flags: PosFeatureService, FbrPosController, admin/POS feature forms
+- invoice_display_prefs: PosController, FbrPosController, ProfileController
+  (in-memory merge then whole-column write — concurrent writers can clobber keys)
+- public_profile_settings: PublicProfileController
+
+PRA receipt keys: invoice_display_prefs['pos'] (+ legacy) show_* flags;
+pos_local set; pos_style (bold/logo/pdf); columns pos_receipt_show_tax,
+receipt_printer_size, receipt_footer_note, pra_number_style/local_number_style.
+Printer routing via printerSettings(): silent_print_enabled, receipt_printer,
+kot_printer, counter_kot_*, available_printers, …
+PosSettingsSnapshot deny-list guards deploy regressions.
+
+
+PART 19 — COMPLETE QUEUE + SCHEDULER FORENSICS
+----------------------------------------------
+
+Authority: routes/console.php (no app/Console/Kernel.php).
+20 jobs under app/Jobs:
+- Named queues: BulkSubmitInvoiceJob + SeedBulkSubmitBatchJob + SyncMedicineCatalogueJob
+  → bulk; PrerenderInvoicePdfsJob / BuildAuditPackJob / BuildInvoiceZipJob → zip
+- Default queue: ProcessInvoiceImportBatchJob, RetryFailedFbrInvoicesJob,
+  QueueHeartbeatJob, NightlyComplianceCronJob, SyncPosOfflineInvoicesJob,
+  SyncFbrPosOfflineInvoicesJob, CheckTrialExpiryJob, ProcessBulkAiImageJob,
+  RetryFbrPosSubmissionJob, IntelligenceProcessingJob, ComplianceScoringJob,
+  CheckFbrTokenExpiryJob, + orphans below
+
+Schedule highlights: QueueHeartbeatJob everyFiveMinutes; NightlyComplianceCronJob
+02:30; CheckFbrTokenExpiryJob 06:00; SyncPos/FbrPosOffline everyTwoMinutes;
+CheckTrialExpiryJob 03:00; plus Schedule::command dayclose/alerts/prune/etc.
+
+ORPHANS (proven):
+- SendInvoiceToFbrJob — imported in InvoiceController but no ::dispatch; DI uses
+  submitToFbrSync
+- CheckTokenExpiryJob — superseded by CheckFbrTokenExpiryJob; not scheduled
+
+Tenant context: jobs carry IDs; CONFIRMED SAFE pattern in sampled jobs.
+Risk class: future jobs that call app('currentCompanyId') in queue (not present now).
+
+
+PART 20 — COMPLETE STATE-MACHINE FORENSICS
+------------------------------------------
+
+PRA pra_status: null | local | pending | submitted | failed | offline (+ variants)
+  Transitions from storeInvoice / sendInvoice / agent / sync job
+FBR DI invoice status: draft/processing/success/fail/pending_verification (see model)
+FBR POS fbr_status: pending/offline/failed/submitted family + agent queue
+Print jobs: pending → claimed → done|failed (attempts)
+Agent commands: pending → acked → succeeded|failed|expired
+Subscriptions: active + override_type state machine
+Impersonation: session flag present/absent; mode view|full; orphan cleanup
+Health charges: posted → reversed/adjusted (terminal delete forbidden)
+Day close: open business day → closed report rows
+
+
+PART 21 — COMPLETE AUDIT FORENSICS
+----------------------------------
+
+admin_audit_logs — SaaS + impersonation start/stop/lock + full-access writes
+audit_logs — company SHA256 trail
+pra_logs / fbr_logs / fbr_pos_logs — fiscal
+live_ops_audit_events — Live Ops
+health_audit_* — Healthcare observer/engine
+invoice_deliveries / activity — DI sends
+
+Impersonated writes distinguishable via LogImpersonatedWrites →
+"Full-access change while impersonating".
+
+Gaps (SHOULD audit but not obviously always audited): UNKNOWN completeness for
+every settings JSON write; some agent device telemetry intentionally avoids
+bumping companies.updated_at (fingerprint).
+
+
+PART 22 — LIVE OPS FORENSICS
+----------------------------
+
+Cloud Agent = planner; Runner token / Environment = trusted execution;
+AdminLiveOpsController = AdminUser::isSuperAdmin() browser path only;
+Desktop Agent = allow-listed cmds.
+
+Desktop pending command allow-list (config/live_ops.php): STATUS_REFRESH, RESYNC,
+UPLOAD_REDACTED_LOGS, TEST_PRINT, PRINTER_REFRESH, SAFE_AGENT_RESTART
+(Electron relaunch only — no arbitrary shell).
+
+Remediation tiers (LiveOpsRemediationService::riskFor + config):
+- low: ENQUEUE_TEST_PRINT, FORCE_AGENT_UPDATE_ADVERTISE, REFRESH_OPERATIONAL_STATE,
+  RETRY_ONE_PRA_INVOICE
+- medium: REBIND_ASSIGNED_PRINTER, ENQUEUE_AGENT_COMMAND
+- high_denied (rejected at propose/approve/execute): REGENERATE_AGENT_API_KEY,
+  DISABLE_COMPANY_AGENT, DESTRUCTIVE_DB_REPAIR, BULK_BILLING_CHANGE, ARBITRARY_SQL,
+  ARBITRARY_SHELL, ARBITRARY_ARTISAN, SSH, CREDENTIAL_CHANGE
+
+Print-job types on AgentController (separate from Live Ops command_type):
+test|bill|proof|kot|kot_void|fbr_bill|fbr_kot.
+
+Uses existing AdminUser + companies search — NO parallel company switcher /
+staff pivot. Tests LiveOpsAuthorizationTest A–F. Live Ops product_types scoped
+to ['pos'] in config.
+
+
+PART 23 — API CONTRACT FORENSICS
+--------------------------------
+
+Major APIs:
+- /api/agent/* AgentAuth key
+- /api/agent/v2/* AgentCoreEnabled
+- /api/di/v1/* DiApiAuth dik_ tokens
+- /api/live-ops/v1/* runner token
+- /api/rider-app/v1/* /api/caller-app/v1/*
+- WhatsApp webhooks
+
+Breaking-change risks: agent heartbeat fields; print job claim protocol;
+DI client_reference idempotency; Live Ops allow-lists.
+
+
+PART 24 — FRONTEND / UI FORENSICS
+---------------------------------
+
+Blade-heavy; Alpine/JS on sale screens (pos/universal, fbr-pos/universal).
+UI hide ≠ security (PosAuth/PosAdminOnly/server validation are real gates).
+Admin companies show View as / Manage as forms.
+Live Ops UI only in admin layout for super_admin nav.
+
+
+PART 25 — SECURITY FORENSICS
+----------------------------
+
+Positive: multi-guard isolation; impersonation orphan cleanup; readonly mode;
+Live Ops high deny; agent allow-list; CSRF on most web forms; ForceHttps;
+rate limits; redaction in Live Ops.
+
+CONFIRMED RISK (code):
+- Unauthenticated setup-migrate / setup-seed GET routes with --force
+
+HIGH:
+- Dual isSuperAdmin confusion
+- Runner token / agent API key compromise impact
+- fbr_logs without company_id (IDOR if mis-queried)
+
+MEDIUM:
+- CSRF exemptions on agent/mobile/DI/live-ops APIs (expected for bearer APIs;
+  must stay token-strong)
+- shell_exec in AiInvoiceReaderService (PDF rasterize) — intended but sensitive
+- DatabaseBackup exec on CLI
+
+Do not exploit production; findings are local code inspection only.
+
+
+PART 26 — DEPLOYMENT + INFRASTRUCTURE FORENSICS
+-----------------------------------------------
+
+CURRENT intended path (docs/ops/github-production-deploy.md + architecture/21):
+pr-checks.yml → enable-pr-auto-merge.yml (inputs.target_sha) → merge main →
+deploy-production.yml (Environment production manual reviewers) →
+scripts/ci-deploy-production.sh → scripts/lib/live-remote-apply.sh → Elaan →
+ci-live-verify.sh
+
+Workflows present: build-agent.yml, deploy-production.yml, enable-pr-auto-merge.yml,
+live-ops-diagnose.yml, live-ops-remediate.yml, pr-checks.yml; deploy/elaan.yml
+What's New gate.
+
+LEGACY / still-present manual: scripts/deploy-live.sh (Replit/manual; prefers
+Actions when configured; uses .local/ssh/nayatel_vps_key — NOT Actions path);
+deployment/* (htaccess/index/ROLLBACK); Replit holding; CPANEL_SETUP.md.
+
+Contradiction: healthcare-pilot-runbook claims GitHub push deploys nothing
+(vs Actions Environment-gated deploy above).
+
+
+PART 27 — TEST ARCHITECTURE FORENSICS
+-------------------------------------
+
+Heavily tested: Live Ops auth, print device routing, impersonation lockout,
+plan limits, health billing isolation, many FBR POS day-close/pharmacy features.
+
+Weak / dangerous untested classes (PARTIAL observation):
+- setup-* route absence of auth (no test asserting 404/removal found in this pass)
+- every child-table IDOR
+- production deploy path itself
+- full SendInvoiceToFbrJob non-use beyond static analysis
+
+PR CI (pr-checks.yml) does NOT run full PHPUnit — DOCUMENTATION/OPS gap.
+
+
+PART 28 — DEAD CODE / ORPHAN / LEGACY FORENSICS
+----------------------------------------------
+
+ORPHAN (proven): SendInvoiceToFbrJob, CheckTokenExpiryJob
+DEAD handlers: AgentPortalAuthController / AgentPortalController (404)
+LEGACY: routes-update.zip, fbr_retry.php*, Replit connectors, replit-holding,
+  classic FBR create blade SHIM, standalone plan type
+DO NOT DELETE in this mission.
+
+
+PART 29 — CROSS-MODULE DEPENDENCY GRAPH
+---------------------------------------
+
+Central hubs (blast radius if changed):
+Company, User, AdminUser, ProductCatalog, NestErps, SubscriptionAccessService,
+PlanLimitService, BranchContextService, CompanyScope, PosController,
+PosTaxMath/PosTaxRule, PraIntegrationService, FbrService, PosPrintJob,
+AgentController, pra-agent, ReadOnlyImpersonation/LogImpersonatedWrites,
+AdminLiveOpsController/LiveOps*, HealthAccessService/HealthScopeService
+
+Changing ProductCatalog types without NestErps/admin create/impersonation arms
+breaks login routing.
+
+
+PART 30 — FAILURE / RECOVERY FORENSICS
+--------------------------------------
+
+DB write fail: request errors; jobs retry per tries/backoff
+External API fail: PRA/FBR mark failed/offline/pending_verification; sync jobs retry
+Network/agent gone: print jobs pending/stranded rescue; PRA fiscal_device stays pending
+Queue worker stop: backlog until worker returns (UNKNOWN supervisor units)
+Browser refresh: offline_uuid prevents duplicate POS sale
+Subscription expires: CheckPlanLimit / hasAccess deny new billable creates
+Branch context lost: stampBranchId / ALL sentinel behaviors
+Company context lost in queue: safe if job uses row company_id; unsafe if auth()-based
+  (not found in current jobs)
+
+
+PART 31 — REPLICATION TEST
+--------------------------
+
+Another team would need from this audit + maps:
+layers, 4 products, guards, roles, DB groups, workflows, PRA/FBR dual paths,
+print/agent protocol, billing hasAccess, health reverse-not-delete, impersonation
+dual-guard, Live Ops allow-lists, deploy Actions path, security invariants.
+
+Still missing for perfect rebuild:
+- Exact production .env feature flags and secrets topology
+- Full UI interaction specs / UX copy
+- Historical data migration one-offs not in migrations
+- Complete mobile offline schemas
+- Missing .agents/memory topics referenced by replit.md
+
+
+PART 32 — ADVERSARIAL SELF-TEST (25+ Q&A)
+----------------------------------------
+
+Q1 Can a POS user access DI?
+A No — PosAuth requires product_type pos; CompanyIsolation redirects other products.
+
+Q2 Can a manager access another branch?
+A Only if that branch is in branch_user; otherwise no. Some report paths may still
+  show company-wide local bills (POTENTIAL RISK).
+
+Q3 Can SaaS Super Admin become a company user?
+A Yes via impersonate — logs into company_admin on panel guard; admin session remains.
+
+Q4 Manage as Company exact behavior?
+A mode=full, readonly=false; writes allowed; audited by LogImpersonatedWrites.
+
+Q5 Can fiscal_device submit from Laravel?
+A No — agentHandlesPra true + sendInvoice early-return before curl.
+
+Q6 Who owns printer routing?
+A Enqueue-time stamp on pos_print_jobs from user device / company defaults;
+  stranded rescue may retarget bills.
+
+Q7 Print job when agent disappears?
+A Stays pending; after 90s may rescue/fail per type rules.
+
+Q8 Can queued jobs lose company context?
+A Current jobs use entity IDs — SAFE pattern. Hypothetical auth()-based job would risk.
+
+Q9 Can billing be bypassed?
+A Lifetime/usage_free overrides; feature flags; not generally anonymous bypass.
+
+Q10 Can offline invoice be duplicated?
+A offline_uuid unique per company blocks duplicate POS sales.
+
+Q11 Who owns PRA status?
+A pos_transactions.pra_status written by storeInvoice/PraIntegrationService/agent/sync.
+
+Q12 Who owns FBR status?
+A DI invoice fields + fbr_logs; FBR POS fbr_pos_transactions + fbr_pos_logs.
+
+Q13 Which fields are snapshots?
+A tax rates on lines, print target_printer, distributor_quote_snapshot, etc.
+
+Q14 What happens when settings saved?
+A Column/JSON updates; must merge prefs; PosSettingsSnapshot guards deploys.
+
+Q15 Which audit records impersonated write?
+A admin_audit_logs via LogImpersonatedWrites.
+
+Q16 Desktop Agent identity?
+A Company agent_api_key via AgentAuth — not users table.
+
+Q17 Can distributor Agent access company data?
+A Portal 404; model exists; no live portal access path.
+
+Q18 Branch disabled?
+A Branch is_active; exact all call-site enforcement PARTIAL/UNKNOWN without full grep.
+
+Q19 Subscription expires mid-operation?
+A New limited actions blocked by plan.limit/hasAccess; in-flight behavior depends path.
+
+Q20 Product↔guard mapping?
+A di=web, pos=pos, fbrpos=fbrpos, erps/health=health.
+
+Q21 Same human multiple product companies?
+A Separate companies rows; optional company_groups admin insight; separate logins.
+
+Q22 User super_admin vs AdminUser super_admin?
+A Different tables/guards; Live Ops/impersonation use AdminUser only.
+
+Q23 Deployment authority?
+A GitHub Actions deploy-production + Environment approval (current); deploy-live.sh legacy.
+
+Q24 Legacy code examples?
+A Orphan FBR job, agent portal 404, setup routes, Replit leftovers, README heartbeat.
+
+Q25 What cannot be proven locally?
+A Production reachability of setup routes; live gateway adoption; worker unit names;
+  whether any queue still holds SendInvoiceToFbrJob payloads.
+
+Q26 Can Viewer use Live Ops?
+A No — redirect login or 403 (tests E).
+
+Q27 Does Live Ops invent company switcher?
+A No — search/status + super_admin only.
+
+Q28 Health charge delete?
+A Forbidden; reverse/adjust only.
+
+
+PART 33 — FINAL GAP REGISTER
+----------------------------
+
+CRITICAL
+1) Unauthenticated /setup-migrate-xK9mP2 and /setup-seed-xK9mP2
+   Evidence: routes/web.php ~2745-2765
+   Impact: anyone who can hit the URL may migrate/seed with --force
+   Product: platform; Users: all; Security: CRITICAL if exposed
+   Code change required: YES (future mission) — remove or auth-gate
+   Next: verify production routing blocks these; remove from web.php
+
+HIGH
+2) Dual AdminUser::isSuperAdmin vs User::isSuperAdmin
+3) fbr_logs lacks company_id (child-tenant via invoice only)
+4) fiscal_device / agentHandlesPra consistency must never regress
+5) Live Ops / agent credential compromise impact surface
+
+MEDIUM
+6) Orphan SendInvoiceToFbrJob + unused import
+7) Orphan CheckTokenExpiryJob
+8) PRA local-bills report branch filter miss (POTENTIAL)
+9) FBR reports aggregates branch miss vs CSV (POTENTIAL)
+10) Agent portal dead routes still registered
+11) PosPrintJob stranded target_printer rewrite surprise for operators
+12) PR CI without full PHPUnit
+
+LOW
+13) Impersonation stop audit always says Stopped view-as
+14) AdminCompanyController impersonate docblock incomplete
+
+DOCUMENTATION ONLY
+15) pra-agent README heartbeat 60s vs code 30s
+16) three vs four products wording
+17) healthcare runbook deploy contradiction
+18) replit.md references missing .agents/memory/
+19) root README stock Laravel
+
+UNKNOWN
+20) Production exposure of setup routes
+21) Live LIVE_OPS_RUNNER_TOKEN presence
+22) Complete child-table IDOR audit
+23) Mobile offline DB schemas
+24) Queue supervisor unit names
+25) Whether any historic job payloads reference orphan jobs
+
+
+PART 34 — FINAL ARCHITECTURE CERTIFICATION
+------------------------------------------
+
+1) Investigate future issues without another broad discovery? YES for most areas.
+2) Safely propose a code fix? YES with targeted re-trace of the touched call chain.
+3) Predict tenant/branch/security side effects? YES for known patterns; caution on
+   fat controllers and child tables.
+4) Trace production ops failures from symptoms? YES for PRA/print/agent/Live Ops/
+   billing; weaker for infra-only failures without server access.
+5) Still genuinely unknown? Production topology, setup-route exposure, full IDOR
+   sweep, mobile offline internals, missing memory topics.
+
+Do NOT claim fully understood.
+
+
+FINAL CONFIDENCE SCORES
+-----------------------
+
+Overall TaxNest understanding: 84/100
+Database/domain understanding: 82/100
+Product understanding: 90/100
+Auth/authorization understanding: 88/100
+Tenant/branch isolation understanding: 85/100
+Business-rule understanding: 83/100
+PRA/FBR understanding: 88/100
+Queue/agent/printing understanding: 87/100
+Billing understanding: 84/100
+Healthcare/ERPS understanding: 78/100
+Live Ops understanding: 90/100
+Deployment/operations understanding: 80/100
+Security understanding: 86/100
+Ability to safely investigate future bugs: 85/100
+Ability to safely propose fixes: 82/100
+
+
+FINAL RECOMMENDATION
+--------------------
+
+READY WITH TARGETED GAPS
+
+Priority follow-ups (investigation/fix missions, not this commit):
+1. Confirm and remove/auth-gate setup-migrate/setup-seed routes
+2. Quarantine orphan FBR jobs in a dedicated cleanup PR after queue audit
+3. Fix README heartbeat docs
+4. Branch-filter consistency on PRA local bills + FBR report aggregates
+5. Restore or stop referencing .agents/memory
+
+
+TEST EVIDENCE (THIS MISSION)
+----------------------------
+
+Command:
+php artisan test --filter='LiveOpsAuthorization|ImpersonationLoginLockout|PrintJobDevice|DiInvoiceApi|CompanyScope|BranchContext|agentHandlesPra|fiscal_device|SendInvoiceToFbr'
+
+Result: 43 passed (231 assertions)
+Includes: LiveOpsAuthorizationTest A–F, ImpersonationLoginLockoutTest,
+PosPrintJobDeviceRoutingTest (incl. stranded rescue), FBR fiscal_device day-close tests
+
+Not run: full suite; browser smoke; production verify
+
+
+FILES CREATED
+-------------
+
+docs/architecture/31-exhaustive-forensic-architecture-audit.txt
+docs/architecture/maps/01-route-map.txt
+docs/architecture/maps/02-database-domain-map.txt
+docs/architecture/maps/03-auth-role-map.txt
+docs/architecture/maps/04-product-boundary-map.txt
+docs/architecture/maps/05-workflow-map.txt
+docs/architecture/maps/06-queue-agent-print-map.txt
+docs/architecture/maps/07-billing-map.txt
+docs/architecture/maps/08-integration-map.txt
+docs/architecture/maps/09-audit-state-map.txt
+docs/architecture/maps/10-security-boundary-map.txt
+
+
+END OF EXHAUSTIVE FORENSIC ARCHITECTURE AUDIT

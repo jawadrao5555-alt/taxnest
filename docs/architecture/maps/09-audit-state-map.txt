@@ -1,0 +1,34 @@
+TAXNEST MAP 09 — AUDIT / STATE MAP
+=================================
+
+AUDIT STORES
+- admin_audit_logs — SaaS actions; impersonation; Live Ops mirror; full-access writes
+- audit_logs — company immutable SHA256
+- pra_logs — NestPOS PRA traffic
+- fbr_logs — DI FBR traffic (tenant via invoice_id)
+- fbr_pos_logs — FBR POS IMS traffic
+- live_ops_audit_events — diagnostics/remediation/commands
+- health_audit_* — Healthcare
+- invoice_deliveries / invoice_activity — DI buyer send
+- security_logs — user_id oriented
+
+IMPERSONATION AUDIT
+- Started view-as (read-only) / Started manage-as (FULL ACCESS)
+- Locked view-as to read-only
+- Stopped view-as (wording even after manage-as)
+- Full-access change while impersonating (LogImpersonatedWrites)
+
+STATE MACHINES (summary)
+PRA: null|local|pending|submitted|failed|offline
+Print: pending→claimed→done|failed
+Agent cmd: pending→acked→succeeded|failed|expired
+Remediation: proposed→approved→executed|rejected
+Subscription overrides: lifetime|usage_free|temporary|grace|none
+Health charge: posted→reversed/adjusted (no delete)
+Company: status + company_status gates
+
+DATA CLASS QUICK REF
+AUTHORITATIVE fiscal numbers / subscriptions / posted charges
+CACHE pending statuses / claim tokens / last_seen
+SNAPSHOT target_printer / tax_rate on lines
+AUDIT all *_logs above

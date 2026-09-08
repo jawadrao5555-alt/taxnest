@@ -1,0 +1,37 @@
+TAXNEST MAP 07 — BILLING MAP
+============================
+
+ENTITIES
+- pricing_plans (catalog; product_type; limits; features; erps_vertical)
+- subscriptions (company↔plan; active; dates; override_*; quote SNAPSHOT)
+- payment_proofs (evidence; admin approve/reject; auto_access_until)
+- sale_campaigns (DERIVED sale_price)
+
+ACCESS AUTHORITY
+SubscriptionAccessService::hasAccess order:
+1. lifetime → allow
+2. usage_free → allow until free_invoice_limit
+3. temporary | grace → allow while override_until future
+4. else normal active/end_date/trial rules
+
+QUOTAS
+PlanLimitService + middleware plan.limit:*
+billableCount product-specific (POS txns, FBR POS txns, DI counted invoices,
+ERPS vertical callable)
+
+PRODUCT DIFFERENCES
+- DI: monthly↔annual cycles with discounts
+- NestPOS: annual packages; provisionals free until promoted
+- FBR POS: annual-style packages
+- Nest ERPS: erps + vertical modules
+
+ENFORCEMENT POINTS
+CheckPlanLimit, InvoiceController/Di API canCreateInvoice, POS/FBR quick-create,
+feature services (restaurant_enabled column etc.)
+
+UI RULE (replit.md)
+Lifetime + Temporary preferred; grace/usage_free retired in UI but legacy honored
+
+BYPASS / EDGE
+Lifetime override; unlimited -1 limits; feature flag independent of plan;
+UNKNOWN full matrix of admin grant buttons vs legacy rows

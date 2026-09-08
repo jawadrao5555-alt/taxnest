@@ -1,0 +1,47 @@
+TAXNEST MAP 06 — QUEUE / AGENT / PRINT MAP
+==========================================
+
+QUEUE DRIVER
+- Production narrative: database queue
+- Tests: QUEUE_CONNECTION=sync
+- Named queues observed: default, bulk, zip, catalogue self-queue
+
+JOBS (20)
+ACTIVE (18): QueueHeartbeat, NightlyCompliance, CheckFbrTokenExpiry,
+SyncPosOfflineInvoices, SyncFbrPosOfflineInvoices, CheckTrialExpiry,
+ProcessInvoiceImportBatch, SeedBulkSubmitBatch, BulkSubmitInvoice,
+ComplianceScoring, IntelligenceProcessing, BuildAuditPack, BuildInvoiceZip,
+PrerenderInvoicePdfs, ProcessBulkAiImage, SyncMedicineCatalogue,
+RetryFailedFbrInvoices, RetryFbrPosSubmission
+ORPHAN (2): SendInvoiceToFbrJob (no dispatch; DI uses submitToFbrSync),
+CheckTokenExpiryJob (not scheduled; live = CheckFbrTokenExpiryJob)
+Queues: bulk (BulkSubmit*, SyncMedicineCatalogue); zip (Prerender/Build*Zip/AuditPack);
+default for sync/heartbeat/trial/FBR retry. Authority: routes/console.php (no Kernel.php).
+Print job types on AgentController: test|bill|proof|kot|kot_void|fbr_bill|fbr_kot.
+SAFE_AGENT_RESTART = Electron relaunch only (no arbitrary shell).
+
+SCHEDULER (routes/console.php)
+- every 2 min: POS/FBR offline sync, uptime watch
+- every 5 min: queue heartbeat, pdf cache, mysql health
+- hourly: auto day-close POS/FBR, zip/pdf prune
+- daily: compliance, trial, token expiry, reminders, prunes, IPD charges
+- weekly: catalogue sync + 15-min resume watchdog
+
+DESKTOP AGENT
+- Auth: AgentAuth API key
+- Heartbeat: 30s CODE (README 60s DOC WRONG)
+- Sync poll: 5s
+- Devices: pos_agent_devices
+- Commands allow-list: STATUS_REFRESH, RESYNC, UPLOAD_REDACTED_LOGS,
+  TEST_PRINT, PRINTER_REFRESH, SAFE_AGENT_RESTART
+- Results: POST /api/agent/command-result
+
+PRINT PATH
+enqueue apiCreatePrintJob → pos_print_jobs (target_printer SNAPSHOT, device_uid)
+→ afterCommit PrintJobWakePublisher (opt-in gateway)
+→ claim GET /api/agent/print-jobs → content → silent print → result
+Stranded rescue may rewrite bill/proof target_printer to company default
+
+DISTRIBUTOR AGENTS
+- Table agents / guard agent — portal controllers hard 404
+- Do not confuse with Desktop Agent

@@ -94,6 +94,11 @@
         <span>{{ __('pos.stock_check') }}<span class="block text-[10px] font-normal opacity-70">{{ __('pos.stock_check_nav_hint') }}</span></span>
         <x-new-badge feature="stock_check" class="ml-auto" />
     </a>
+
+    <a href="{{ route('pos.inventory.stock-in.index') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.inventory.stock-in.*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/></svg>
+        <span>{{ __('pos.stock_in') }}<span class="block text-[10px] font-normal opacity-70">{{ __('pos.stock_in_nav_hint') }}</span></span>
+    </a>
     @endif
 
     @php

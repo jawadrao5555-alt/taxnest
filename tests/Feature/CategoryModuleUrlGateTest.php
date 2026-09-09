@@ -117,7 +117,7 @@ class CategoryModuleUrlGateTest extends TestCase
             'feature_flags' => json_encode(['inventory' => true]),
         ]);
         $stylist = $this->owner($salon);
-        foreach (['/pos/inventory', '/pos/inventory/stock', '/pos/inventory/stock-check', '/pos/inventory/transfer'] as $url) {
+        foreach (['/pos/inventory', '/pos/inventory/stock', '/pos/inventory/stock-check', '/pos/inventory/stock-in', '/pos/inventory/transfer'] as $url) {
             $this->actingAs($stylist, 'pos')->get($url)
                 ->assertRedirect('/pos/dashboard')
                 ->assertSessionHas('error', __('pos.feature_not_for_business'));

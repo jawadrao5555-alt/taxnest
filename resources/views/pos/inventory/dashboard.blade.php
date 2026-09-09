@@ -51,6 +51,20 @@
         <p class="mt-4 text-xs font-medium text-purple-800 dark:text-purple-200">{{ __('pos.stock_check_safety_note') }}</p>
     </section>
 
+    <section class="mb-6 rounded-2xl border-2 border-teal-200 dark:border-teal-800 bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-900/20 dark:to-emerald-900/20 p-5 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-teal-700 dark:text-teal-300">{{ __('pos.stock_in') }}</p>
+                <h2 class="mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.stock_in_dashboard_title') }}</h2>
+                <p class="mt-1 max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">{{ __('pos.stock_in_sub') }}</p>
+            </div>
+            <a href="{{ route('pos.inventory.stock-in.index') }}" class="shrink-0 inline-flex items-center justify-center rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-teal-700">
+                {{ __('pos.stock_in') }}
+                <svg class="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+    </section>
+
     <section class="mb-6 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-5 shadow-sm">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div>

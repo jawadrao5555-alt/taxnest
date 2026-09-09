@@ -56,6 +56,7 @@ use App\Http\Controllers\IngredientController;
 use App\Http\Controllers\PosInventoryController;
 use App\Http\Controllers\PosInventoryMasterController;
 use App\Http\Controllers\PosStockCheckController;
+use App\Http\Controllers\PosStockInController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
@@ -1214,6 +1215,16 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
             Route::post('/inventory/stock-check/{id}/post', [PosStockCheckController::class, 'post'])->whereNumber('id')->name('pos.inventory.stock-check.post');
             Route::post('/inventory/stock-check/{id}/cancel', [PosStockCheckController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-check.cancel');
             Route::get('/inventory/stock-check/{id}/pdf', [PosStockCheckController::class, 'pdf'])->whereNumber('id')->name('pos.inventory.stock-check.pdf');
+            // NestPOS Stock-In Excel Phase 2a — single-shop receiving. Persistent
+            // staging. Not Master Excel. Cashiers cannot POST (controller).
+            Route::get('/inventory/stock-in', [PosStockInController::class, 'index'])->name('pos.inventory.stock-in.index');
+            Route::get('/inventory/stock-in/template', [PosStockInController::class, 'template'])->name('pos.inventory.stock-in.template');
+            Route::post('/inventory/stock-in', [PosStockInController::class, 'store'])->name('pos.inventory.stock-in.store');
+            Route::get('/inventory/stock-in/{id}', [PosStockInController::class, 'show'])->whereNumber('id')->name('pos.inventory.stock-in.show');
+            Route::post('/inventory/stock-in/{id}/rematch', [PosStockInController::class, 'rematch'])->whereNumber('id')->name('pos.inventory.stock-in.rematch');
+            Route::post('/inventory/stock-in/{id}/lines/{line}/map', [PosStockInController::class, 'mapLine'])->whereNumber('id')->whereNumber('line')->name('pos.inventory.stock-in.map');
+            Route::post('/inventory/stock-in/{id}/post', [PosStockInController::class, 'post'])->whereNumber('id')->name('pos.inventory.stock-in.post');
+            Route::post('/inventory/stock-in/{id}/cancel', [PosStockInController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-in.cancel');
         });
         Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');
         Route::post('/team/cashier', [PosController::class, 'storeCashier'])->name('pos.team.store-cashier');

@@ -144,6 +144,7 @@ Sale screen ki mazeed cheezein:
 
 ## Inventory / Stock (/pos/inventory)
 - Inventory ON/OFF: /pos/features (ya /pos/customize ka Inventory Tracking toggle). OFF ho to nav mein grey "OFF" badge; pages POS Features par redirect hote hain. OFF = Simple Mode (Manual button + quick-create milta hai).
+- Stock-In Excel (/pos/inventory/stock-in): supplier ka maal receive — INGREDIENT (recipes ON) ya ITEM. Unmatched rows clearance mein jati hain, khud ingredient/product nahi bante, aur Post ke baghair stock nahi badalta. Master Excel catalog ke liye hai, stock receive ke liye nahi. Multi-branch shops par Stock-In abhi band hai.
 - Stock list (/pos/inventory/stock): search + status filter (All/Low/Out); har product ka stock level bar, min level, average cost, stock value; min level inline edit hota hai.
 - Stock adjust: /pos/inventory/adjust — product chunein → type: Add (+) / Remove (−) / Set Exact (=) → quantity → (Add par purchase price) → Reason (New Purchase, Physical Count, Damaged/Expired waghera) → Notes → save.
 - Movements (/pos/inventory/movements): har tabdeeli ka log — filters: type (Sale/Purchase/Adjustment/Opening), product, date range; har row mein qty +/- aur balance-after.

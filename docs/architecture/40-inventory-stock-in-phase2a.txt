@@ -1,0 +1,26 @@
+NestPOS Stock-In Excel — Phase 2a (single-shop)
+
+Status: IMPLEMENTED on this branch. Spec:
+  docs/architecture/38-final-inventory-architecture-ux-spec.txt
+
+What shipped
+  /pos/inventory/stock-in
+  nestpos_stock_in.xlsx  sheet StockIn
+  Persistent staging: pos_stock_in_batches + pos_stock_in_lines
+  Match: ingredient code → exact name+unit; item barcode/SKU → exact name
+  Unmatched / INVALID / SKIPPED_GATE never post
+  Post: RecipeInventoryService::adjustIngredientStock
+        + PosInventoryController ADD path (TYPE_ADJUSTMENT_IN)
+  Ledger reference_type = stock_in  (not pos_transaction, not purchase)
+  In-file SUM then idempotency on
+    company + stock_in + reference_number + ingredient/product + branch
+  Cost update default OFF; save supplier code as ingredient code default OFF
+  Cashiers cannot POST (isPosCashier)
+  Multi-branch companies are refused; no partial stage/post
+
+Out of scope (do not add in a follow-up to this file)
+  Phase 2b multi-branch Stock-In
+  ingredient_stocks seed/heal
+  FBR purchase, GRN, PO, TYPE_PURCHASE, type=set
+  Master Excel stock receiving
+  automatic ingredient creation, fuzzy match

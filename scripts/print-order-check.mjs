@@ -6,8 +6,8 @@
 // KOT job is enqueued IMMEDIATELY (it needs no fiscal number) and never waits
 // behind praPrintGrace() — owner voice note 16 Aug 2026: KOT reached the
 // kitchen seconds late because it queued behind the receipt's bounded fiscal
-// grace + enqueue roundtrip. The receipt must STILL be enqueued afterwards
-// (grace respected so it carries the PRA number).
+// grace + enqueue roundtrip. The receipt must be enqueued first without
+// waiting behind the non-blocking PRA grace probe.
 import { readFileSync } from 'node:fs';
 
 const blade = readFileSync(new URL('../resources/views/pos/universal.blade.php', import.meta.url), 'utf8');
@@ -79,11 +79,13 @@ await sleep(50);
 if (events.length < 2) fail(`expected receipt + kot enqueues, got: ${JSON.stringify(events)}`);
 if (!events.includes('kot')) fail(`KOT never enqueued: ${JSON.stringify(events)}`);
 if (!events.includes('bill')) fail(`receipt never enqueued: ${JSON.stringify(events)}`);
-// Task 994: KOT must NOT wait behind praPrintGrace (first probe is 1.2s out).
-// A KOT enqueued after ~1s means it queued behind the fiscal grace again.
+// Receipt must remain first, and neither job may wait behind praPrintGrace
+// (the first probe is 1.2s out).
+if (events[0] !== 'bill' || events[1] !== 'kot') {
+  fail(`receipt/KOT order regressed: ${JSON.stringify(events)}`);
+}
+if (times.bill > times.kot) fail(`KOT enqueued before receipt: ${JSON.stringify(events)}`);
 if (times.kot > 1000) fail(`KOT delayed behind fiscal grace (${times.kot}ms after chain start): ${JSON.stringify(events)}`);
-// Receipt must still respect grace: bill enqueued AFTER the pending→submitted
-// probe resolved (i.e. after the first 1.2s grace wait), never before.
-if (times.bill < 1000) fail(`receipt skipped fiscal grace (enqueued at ${times.bill}ms while pra_status was pending)`);
+if (times.bill > 1000) fail(`receipt blocked behind fiscal grace (${times.bill}ms while pra_status was pending)`);
 
-console.log(`PRINT-ORDER OK: silent fast path enqueued ${JSON.stringify(events)} — KOT immediate (${times.kot}ms), receipt after grace (${times.bill}ms).`);
+console.log(`PRINT-ORDER OK: silent fast path enqueued ${JSON.stringify(events)} — receipt first (${times.bill}ms), KOT after (${times.kot}ms), PRA grace non-blocking.`);

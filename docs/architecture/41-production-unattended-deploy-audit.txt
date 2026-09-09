@@ -1,10 +1,13 @@
 TAXNEST — UNATTENDED PRODUCTION DEPLOY (ENVIRONMENT APPROVAL BOTTLENECK)
 
-Date: 2026-09-08
+Date: 2026-09-08 (rebased onto origin/main 0cfdf6cf on 2026-09-09)
 Scope: DEPLOYMENT ARCHITECTURE ONLY. No Inventory Master Excel / Stock-In /
        FBR / PRA / application / schema / route changes. No production SSH.
        Did not approve, cancel, or retrigger Deploy Production run
        34244350968 (PR #32 waiting on Environment production reviewers).
+Owner created GitHub Environment `production-deploy` (2026-09-09): no required
+reviewers, no wait timer, main-only branch policy, secrets
+PRODUCTION_SSH_PRIVATE_KEY + LIVE_QA_PASS. Environment `production` unchanged.
 
 Verdict: SAFE TO IMPLEMENT the Environment split below.
          NOT safe to clear required reviewers on Environment `production`.

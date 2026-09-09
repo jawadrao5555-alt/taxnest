@@ -232,10 +232,9 @@ class PosAgentPraStatusPollTest extends TestCase
         $this->assertNotFalse($start);
         $script = substr($blade, $start);
 
-        $this->assertSame(1, substr_count($script, 'var printAttemptUuid;'));
-        $this->assertStringContainsString('print_attempt_uuid: printAttemptUuid', $script);
-        $this->assertStringContainsString('body: JSON.stringify(payload)', $script);
-        $this->assertStringContainsString('enqueue().then(function (retryOk)', $script);
+        $this->assertStringContainsString('window.NestPosPrintAttempt.billPayload(txnId)', $script);
+        $this->assertStringContainsString('body: JSON.stringify(samePayload)', $script);
+        $this->assertStringContainsString('if (decision.fallbackAllowed) fallback();', $script);
     }
 
     // ── 2. FBR twin endpoint ──────────────────────────────────────────────

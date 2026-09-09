@@ -4658,6 +4658,7 @@ $jsEnc = function ($value, $fallback = '[]') {
     return $json === false ? $fallback : $json;
 };
 @endphp
+<script src="/js/pos-print-attempt.js?v=20260909"></script>
 <script>
 // OFFLINE-FIRST BOOT (Jul 2026): server-side fingerprint of everything baked
 // into this page (user, company, screen file, catalog, settings). The SW may
@@ -6219,12 +6220,7 @@ function restaurantPos() {
             return 'off-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
         },
         _newPrintAttemptUuid() {
-            try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
-            // RFC 4122 v4-compatible fallback for older WebViews.
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-                const r = Math.floor(Math.random() * 16);
-                return (c === 'x' ? r : ((r & 0x3) | 0x8)).toString(16);
-            });
+            return window.NestPosPrintAttempt.newUuid();
         },
         // Task 994: fetch with a HARD timeout — a hung hold/pay request must
         // surface an error within seconds, not after the browser's multi-minute
@@ -11607,6 +11603,56 @@ function restaurantPos() {
             }
         },
         async _trySilentPrintInner(payload, _retry = true) {
+            if (payload && payload.type === 'bill' && payload.print_attempt_uuid && window.NestPosPrintAttempt) {
+                if (!window.NestPosPrintAttempt.canDispatch(navigator.onLine)) {
+                    const local = window.NestPosLocal && await window.NestPosLocal.printQueue.enqueue(
+                        String(payload.transaction_id),
+                        { document: payload }
+                    );
+                    return (local && local.success)
+                        ? { success: true, local: true, pending: true }
+                        : false;
+                }
+
+                const decision = await window.NestPosPrintAttempt.run({
+                    payload,
+                    retryDelay: 1200,
+                    send: async (samePayload) => {
+                        const res = await fetch('/pos/api/print-jobs', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: JSON.stringify(samePayload),
+                        });
+                        if (!res.ok) {
+                            // 5xx may be an upstream failure after the DB commit;
+                            // only a semantic 4xx proves this attempt was rejected.
+                            return res.status >= 500
+                                ? {}
+                                : { definitiveFailure: true, retryable: false };
+                        }
+                        const data = await res.json().catch(() => null);
+                        return (data && data.success)
+                            ? { accepted: true, data: data }
+                            : {};
+                    }
+                });
+                if (decision.state === 'accepted') return decision.data;
+                if (decision.state === 'accepted_unknown') {
+                    const local = window.NestPosLocal && await window.NestPosLocal.printQueue.enqueue(
+                        String(payload.transaction_id),
+                        { document: payload }
+                    );
+                    this.printBeacon('silent-print-accepted-unknown', {
+                        type: payload.type,
+                        transaction_id: payload.transaction_id,
+                    });
+                    return (local && local.success)
+                        ? { success: true, local: true, pending: true, accepted_unknown: true }
+                        : { success: true, accepted_unknown: true };
+                }
+                return false;
+            }
+
             try {
                 const res = await fetch('/pos/api/print-jobs', {
                     method: 'POST',

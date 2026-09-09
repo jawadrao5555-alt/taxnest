@@ -1015,50 +1015,62 @@ class PosController extends Controller
             if (!$deviceRoute && !$settings['receipt_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
-            // Task 1197: query-side creator constraint — an isolated cashier
-            // cannot silent-print a peer's bill receipt; peer IDs mirror
-            // not_found (same no-existence-oracle stance as pra-status).
-            // KOT/proof branches stay shared: kitchen slips are the shared
-            // restaurant workflow (explicitly out of isolation scope).
-            $exists = PosTransaction::withoutGlobalScope('hide_archived')
-                ->where('company_id', $companyId)
-                ->where('id', (int) $validated['transaction_id'])
-                ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, $user))
-                ->exists();
-            if (!$exists) {
+            $billResult = DB::transaction(function () use ($companyId, $validated, $user, $deviceRoute, $settings) {
+                // Lock the exact finalized transaction before the dedupe check.
+                // Concurrent retry/double-press requests for this bill serialize
+                // here, so only one can observe "no active job" and create it.
+                // Task 1197 isolation remains part of the locked lookup.
+                $transaction = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->where('id', (int) $validated['transaction_id'])
+                    ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, $user))
+                    ->lockForUpdate()
+                    ->first(['id']);
+                if (!$transaction) {
+                    return ['not_found' => true];
+                }
+
+                // Impatient double-press guard (Malik Chicken Broast, 23 Jul 2026):
+                // laser/agent latency means the paper can take ~20s to come out, so
+                // cashiers press Print again and get a duplicate physical copy.
+                // If this SAME bill is already queued/printing (job < 2 min old —
+                // matches the agent's stale-requeue window), don't enqueue a second
+                // copy; report success with a deduped flag so the UI can explain.
+                // Once the job is done, a fresh press = legitimate reprint (allowed).
+                // The transaction row lock makes this transaction-scoped guard atomic
+                // across users/devices without changing the existing reprint policy.
+                $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                    ->where('type', 'bill')
+                    ->where('transaction_id', (int) $transaction->id)
+                    ->whereIn('status', ['pending', 'printing'])
+                    ->where('created_at', '>=', now()->subMinutes(2))
+                    ->orderByDesc('id')
+                    ->first();
+                if ($inFlight) {
+                    return ['job' => $inFlight, 'deduped' => true];
+                }
+
+                $job = \App\Models\PosPrintJob::create([
+                    'company_id' => $companyId,
+                    'type' => 'bill',
+                    'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
+                    'device_uid' => $deviceRoute['device_uid'] ?? null,
+                    'transaction_id' => (int) $transaction->id,
+                    'status' => 'pending',
+                    'created_by' => $user->id,
+                ]);
+
+                return ['job' => $job, 'deduped' => false];
+            });
+
+            if (!empty($billResult['not_found'])) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
             }
-            // Impatient double-press guard (Malik Chicken Broast, 23 Jul 2026):
-            // laser/agent latency means the paper can take ~20s to come out, so
-            // cashiers press Print again and get a duplicate physical copy.
-            // If this SAME bill is already queued/printing (job < 2 min old —
-            // matches the agent's stale-requeue window), don't enqueue a second
-            // copy; report success with a deduped flag so the UI can explain.
-            // Once the job is done, a fresh press = legitimate reprint (allowed).
-            // Task 1166: the dedupe key deliberately stays TRANSACTION-scoped
-            // (not per-device) — a second press for the same bill from another
-            // counter within the window is still a duplicate physical copy of
-            // one bill, exactly what this guard exists to prevent.
-            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
-                ->where('type', 'bill')
-                ->where('transaction_id', (int) $validated['transaction_id'])
-                ->whereIn('status', ['pending', 'printing'])
-                ->where('created_at', '>=', now()->subMinutes(2))
-                ->orderByDesc('id')
-                ->first();
-            if ($inFlight) {
-                return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
-            }
-            $job = \App\Models\PosPrintJob::create([
-                'company_id' => $companyId,
-                'type' => 'bill',
-                'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
-                'device_uid' => $deviceRoute['device_uid'] ?? null,
-                'transaction_id' => (int) $validated['transaction_id'],
-                'status' => 'pending',
-                'created_by' => $user->id,
+            return response()->json([
+                'success' => true,
+                'job_id' => $billResult['job']->id,
+                ...($billResult['deduped'] ? ['deduped' => true] : []),
             ]);
-            return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
         // ── PROOF BILL (ZFC 28 Jul 2026): pre-bill on the RECEIPT printer —

@@ -20,8 +20,9 @@ use Tests\TestCase;
  * Agent-handled companies (Company::agentHandlesPra) save finals as
  * pra_status='pending'; the Desktop Agent submits within seconds. The sale
  * screen popup polls a tiny status endpoint to flip the badge to PRA VERIFIED,
- * show the fiscal number and reload the receipt iframe — and the first print
- * gets a bounded grace. Server pieces under lock here:
+ * show the fiscal number and reload the receipt iframe. Printing does not wait
+ * behind that bounded refresh because pending receipts are explicitly labelled.
+ * Server pieces under lock here:
  *
  *   1. GET /pos/transaction/{id}/pra-status (apiPraStatus): returns the live
  *      pra_status + pra_invoice_number; company-scoped (cross-company = 404).
@@ -202,6 +203,26 @@ class PosAgentPraStatusPollTest extends TestCase
         $res = $controller->apiPraStatus($ownId);
         $this->assertStringContainsString('no-store', (string) $res->headers->get('Cache-Control'),
             'a cached pending response would wedge the popup poll forever');
+    }
+
+    public function test_pending_pra_refresh_does_not_block_receipt_enqueue(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/universal.blade.php'));
+        $this->assertNotFalse($blade);
+
+        $start = strpos($blade, 'async _printReceiptInner(onAfterPrint)');
+        $end = strpos($blade, 'printKitchenTicket(', $start);
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($end);
+        $receiptPath = substr($blade, $start, $end - $start);
+
+        $this->assertStringContainsString('this.praPrintGrace().catch(() => {});', $receiptPath);
+        $this->assertStringNotContainsString('await this.praPrintGrace()', $receiptPath);
+        $this->assertStringContainsString(
+            "trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId })",
+            $receiptPath,
+            'the exact finalized transaction must still be enqueued once through the existing guarded endpoint'
+        );
     }
 
     // ── 2. FBR twin endpoint ──────────────────────────────────────────────

@@ -350,6 +350,31 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame('Manager-POS80', $job->target_printer);
     }
 
+    public function test_repeated_bill_enqueue_reuses_one_active_transaction_scoped_job(): void
+    {
+        $txn = $this->seedTransaction();
+
+        $first = $this->createBillJob($this->adminId, $txn)
+            ->assertOk()
+            ->assertJson(['success' => true]);
+        $second = $this->createBillJob($this->cashierId, $txn)
+            ->assertOk()
+            ->assertJson(['success' => true, 'deduped' => true]);
+
+        $this->assertSame($first->json('job_id'), $second->json('job_id'));
+        $this->assertSame(
+            1,
+            DB::table('pos_print_jobs')
+                ->where('company_id', $this->companyId)
+                ->where('transaction_id', $txn)
+                ->whereIn('status', ['pending', 'printing'])
+                ->count()
+        );
+
+        $controller = file_get_contents(app_path('Http/Controllers/PosController.php'));
+        $this->assertStringContainsString('->lockForUpdate()', $controller);
+    }
+
     public function test_assigned_but_offline_counter_falls_back_to_company_default(): void
     {
         $this->seedDevice('dev-c1', ['last_seen_at' => now()->subMinutes(10)]);

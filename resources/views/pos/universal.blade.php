@@ -11668,12 +11668,12 @@ function restaurantPos() {
             }
         },
         async _printReceiptInner(onAfterPrint) {
-            // Task 655: agent-mode fiscal grace — bill abhi 'pending' hai to chand
-            // seconds ka bounded intezar (submit aa jaye to PEHLI slip par hi PRA
-            // fiscal number chapta hai), warna jo bhi haalat hai usi par print.
-            // Kabhi block nahi hota; manual, auto-chain aur silent print teeno
-            // isi raste se guzarte hain.
-            await this.praPrintGrace();
+            // Keep the PRA badge/receipt iframe refresh running, but never hold the
+            // physical receipt behind it. A pending receipt already carries the
+            // explicit "being reported to PRA" clarifier; fiscal submission remains
+            // unchanged and the exact finalized transaction is still what the
+            // server renders when the agent fetches this job.
+            this.praPrintGrace().catch(() => {});
             const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             const txnId = this.lastTransactionId;
@@ -13262,10 +13262,10 @@ function restaurantPos() {
                 el.src = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '' : '/receipt') + '?_pra=' + Date.now();
             } catch (e) { /* best-effort — popup badge is already correct */ }
         },
-        // Bounded pehla-print grace (max ~4.8s): bill abhi 'pending' ho to print
-        // se pehle submit ka mauqa do. Status flip milte hi state update ho kar
-        // foran wapas; warna timeout par pending slip hi chal padti hai —
-        // counter ki raftar kabhi block nahi hoti. Errors silent.
+        // Bounded background fiscal refresh (max ~4.8s): bill abhi 'pending' ho
+        // to status/receipt popup ko fresh rakho, magar physical print-job enqueue
+        // ko kabhi is poll ke peeche mat roko. Pending receipt par localized
+        // "being reported to PRA" clarifier pehle se maujood hai. Errors silent.
         async praPrintGrace() {
             if (this.lastPraStatus !== 'pending' || !this.lastTransactionId || this.lastIsOffline) return;
             const txnId = this.lastTransactionId;

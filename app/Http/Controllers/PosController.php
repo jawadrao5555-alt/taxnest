@@ -982,6 +982,7 @@ class PosController extends Controller
         $validated = $request->validate([
             'type' => 'required|in:bill,kot,proof',
             'transaction_id' => 'required_if:type,bill|nullable|integer',
+            'print_attempt_uuid' => 'nullable|uuid',
             // kot: restaurant_order_id OR transaction_id (order-less delivery bills)
             'restaurant_order_id' => 'required_if:type,proof|nullable|integer',
             'delta' => 'nullable|boolean',
@@ -995,12 +996,6 @@ class PosController extends Controller
         ]);
 
         $settings = $company->printerSettings();
-        if (!$settings['silent_print_enabled']) {
-            return response()->json(['success' => false, 'reason' => 'disabled'], 409);
-        }
-        if (!$company->agentOnline()) {
-            return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
-        }
 
         // Task 1166 — per-counter routing (bill + proof only; KOT/kitchen
         // routing is deliberately untouched): if the pressing cashier is
@@ -1012,65 +1007,131 @@ class PosController extends Controller
 
         // ── BILL: single job, receipt printer (unchanged behavior) ─────────
         if ($validated['type'] === 'bill') {
-            if (!$deviceRoute && !$settings['receipt_printer']) {
-                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
-            }
-            $billResult = DB::transaction(function () use ($companyId, $validated, $user, $deviceRoute, $settings) {
-                // Lock the exact finalized transaction before the dedupe check.
-                // Concurrent retry/double-press requests for this bill serialize
-                // here, so only one can observe "no active job" and create it.
-                // Task 1197 isolation remains part of the locked lookup.
-                $transaction = PosTransaction::withoutGlobalScope('hide_archived')
-                    ->where('company_id', $companyId)
-                    ->where('id', (int) $validated['transaction_id'])
-                    ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, $user))
-                    ->lockForUpdate()
-                    ->first(['id']);
-                if (!$transaction) {
-                    return ['not_found' => true];
+            $printAttemptUuid = trim((string) ($validated['print_attempt_uuid'] ?? ''));
+            try {
+                $billResult = DB::transaction(function () use ($company, $companyId, $validated, $user, $deviceRoute, $settings, $printAttemptUuid) {
+                    // Lock the exact finalized transaction before the dedupe check.
+                    // Concurrent retry/double-press requests for this bill serialize
+                    // here, so only one can observe "no active job" and create it.
+                    // Task 1197 isolation remains part of the locked lookup.
+                    $transaction = PosTransaction::withoutGlobalScope('hide_archived')
+                        ->where('company_id', $companyId)
+                        ->where('id', (int) $validated['transaction_id'])
+                        ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, $user))
+                        ->lockForUpdate()
+                        ->first(['id']);
+                    if (!$transaction) {
+                        return ['not_found' => true];
+                    }
+
+                    // One browser print attempt keeps one UUID across its network/5xx
+                    // retries. Reuse that exact job in every terminal/non-terminal
+                    // status. A different transaction under the same company may not
+                    // borrow the key or learn the existing job id.
+                    if ($printAttemptUuid !== '') {
+                        $sameAttempt = \App\Models\PosPrintJob::where('company_id', $companyId)
+                            ->where('print_attempt_uuid', $printAttemptUuid)
+                            ->first();
+                        if ($sameAttempt) {
+                            if ((int) $sameAttempt->transaction_id !== (int) $transaction->id
+                                || $sameAttempt->type !== 'bill') {
+                                return ['idempotency_conflict' => true];
+                            }
+                            return ['job' => $sameAttempt, 'deduped' => true];
+                        }
+                    }
+
+                    // Availability is mutable and applies only to a NEW attempt.
+                    // A retry of an existing UUID was returned above regardless of
+                    // status, so it can never fall through to an iframe duplicate
+                    // merely because the agent/printer changed after request one.
+                    if (!$settings['silent_print_enabled']) {
+                        return ['unavailable' => 'disabled'];
+                    }
+                    if (!$company->agentOnline()) {
+                        return ['unavailable' => 'agent_offline'];
+                    }
+                    if (!$deviceRoute && !$settings['receipt_printer']) {
+                        return ['unavailable' => 'no_printer'];
+                    }
+
+                    // Legacy cached browser tabs do not send a UUID. Preserve their
+                    // existing pending/printing guard and iframe fallback behavior.
+                    if ($printAttemptUuid === '') {
+                        $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                            ->where('type', 'bill')
+                            ->where('transaction_id', (int) $transaction->id)
+                            ->whereIn('status', ['pending', 'printing'])
+                            ->where('created_at', '>=', now()->subMinutes(2))
+                            ->orderByDesc('id')
+                            ->first();
+                        if ($inFlight) {
+                            return ['job' => $inFlight, 'deduped' => true];
+                        }
+                    }
+
+                    $job = \App\Models\PosPrintJob::create([
+                        'company_id' => $companyId,
+                        'type' => 'bill',
+                        'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
+                        'device_uid' => $deviceRoute['device_uid'] ?? null,
+                        'transaction_id' => (int) $transaction->id,
+                        ...($printAttemptUuid !== '' ? ['print_attempt_uuid' => $printAttemptUuid] : []),
+                        'status' => 'pending',
+                        'created_by' => $user->id,
+                    ]);
+
+                    return ['job' => $job, 'deduped' => false];
+                });
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($printAttemptUuid === '' || !self::isPrintAttemptUuidCollision($e)) {
+                    throw $e;
                 }
 
-                // Impatient double-press guard (Malik Chicken Broast, 23 Jul 2026):
-                // laser/agent latency means the paper can take ~20s to come out, so
-                // cashiers press Print again and get a duplicate physical copy.
-                // If this SAME bill is already queued/printing (job < 2 min old —
-                // matches the agent's stale-requeue window), don't enqueue a second
-                // copy; report success with a deduped flag so the UI can explain.
-                // Once the job is done, a fresh press = legitimate reprint (allowed).
-                // The transaction row lock makes this transaction-scoped guard atomic
-                // across users/devices without changing the existing reprint policy.
-                $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
-                    ->where('type', 'bill')
-                    ->where('transaction_id', (int) $transaction->id)
-                    ->whereIn('status', ['pending', 'printing'])
-                    ->where('created_at', '>=', now()->subMinutes(2))
-                    ->orderByDesc('id')
+                // A request on another transaction can race past a different row
+                // lock, but the company-scoped unique index is authoritative.
+                // Recover the committed winner after the losing transaction rolls
+                // back, and never return it for a different transaction.
+                $winner = \App\Models\PosPrintJob::where('company_id', $companyId)
+                    ->where('print_attempt_uuid', $printAttemptUuid)
                     ->first();
-                if ($inFlight) {
-                    return ['job' => $inFlight, 'deduped' => true];
+                if (!$winner) {
+                    throw $e;
                 }
-
-                $job = \App\Models\PosPrintJob::create([
-                    'company_id' => $companyId,
-                    'type' => 'bill',
-                    'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
-                    'device_uid' => $deviceRoute['device_uid'] ?? null,
-                    'transaction_id' => (int) $transaction->id,
-                    'status' => 'pending',
-                    'created_by' => $user->id,
-                ]);
-
-                return ['job' => $job, 'deduped' => false];
-            });
+                if ($winner->type !== 'bill'
+                    || (int) $winner->transaction_id !== (int) $validated['transaction_id']) {
+                    return response()->json([
+                        'success' => false,
+                        'reason' => 'idempotency_conflict',
+                    ], 409);
+                }
+                $billResult = ['job' => $winner, 'deduped' => true];
+            }
 
             if (!empty($billResult['not_found'])) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            if (!empty($billResult['idempotency_conflict'])) {
+                return response()->json(['success' => false, 'reason' => 'idempotency_conflict'], 409);
+            }
+            if (!empty($billResult['unavailable'])) {
+                return response()->json([
+                    'success' => false,
+                    'reason' => $billResult['unavailable'],
+                ], 409);
             }
             return response()->json([
                 'success' => true,
                 'job_id' => $billResult['job']->id,
                 ...($billResult['deduped'] ? ['deduped' => true] : []),
             ]);
+        }
+
+        if (!$settings['silent_print_enabled']) {
+            return response()->json(['success' => false, 'reason' => 'disabled'], 409);
+        }
+        if (!$company->agentOnline()) {
+            return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
         }
 
         // ── PROOF BILL (ZFC 28 Jul 2026): pre-bill on the RECEIPT printer —
@@ -1408,6 +1469,22 @@ class PosController extends Controller
         }
         $counterCopy();
         return response()->json(['success' => true, 'job_ids' => $jobIds]);
+    }
+
+    public static function isPrintAttemptUuidCollision(\Illuminate\Database\QueryException $e): bool
+    {
+        if ((string) $e->getCode() !== '23000') {
+            return false;
+        }
+
+        $message = $e->getMessage();
+        if (str_contains($message, 'pos_print_jobs_company_attempt_unique')) {
+            return true;
+        }
+
+        return str_contains($message, 'UNIQUE constraint failed')
+            && str_contains($message, 'pos_print_jobs.company_id')
+            && str_contains($message, 'pos_print_jobs.print_attempt_uuid');
     }
 
     /**

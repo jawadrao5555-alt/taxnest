@@ -6218,6 +6218,14 @@ function restaurantPos() {
             try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
             return 'off-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
         },
+        _newPrintAttemptUuid() {
+            try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+            // RFC 4122 v4-compatible fallback for older WebViews.
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.floor(Math.random() * 16);
+                return (c === 'x' ? r : ((r & 0x3) | 0x8)).toString(16);
+            });
+        },
         // Task 994: fetch with a HARD timeout — a hung hold/pay request must
         // surface an error within seconds, not after the browser's multi-minute
         // default (owner report 16 Aug 2026: "error aya bohat der baad"). Safe
@@ -11657,17 +11665,20 @@ function restaurantPos() {
 
         async printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            // One invocation = one intentional print attempt. trySilentPrint's
+            // internal network/5xx retries reuse this exact payload and UUID.
+            const printAttemptUuid = this._newPrintAttemptUuid();
             // Task 779: poore printReceipt ko print-WORK ginti mein rakho — praPrintGrace
             // ke intezar ke doran na timers hote hain na handlers, aur tables-first
             // navigation us khali gap mein page badal kar print kaat sakti thi.
             this.printWorkInFlight++;
             try {
-                return await this._printReceiptInner(onAfterPrint);
+                return await this._printReceiptInner(onAfterPrint, printAttemptUuid);
             } finally {
                 this.printWorkInFlight--;
             }
         },
-        async _printReceiptInner(onAfterPrint) {
+        async _printReceiptInner(onAfterPrint, printAttemptUuid) {
             // Keep the PRA badge/receipt iframe refresh running, but never hold the
             // physical receipt behind it. A pending receipt already carries the
             // explicit "being reported to PRA" clarifier; fiscal submission remains
@@ -11690,7 +11701,11 @@ function restaurantPos() {
                 // actually reached the queue (or fallen back). runAutoPrintChain's
                 // silent fast path awaits this before creating the KOT job —
                 // receipt-first → KOT-after holds even under network/agent latency.
-                const ok = await this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId });
+                const ok = await this.trySilentPrint({
+                    type: 'bill',
+                    transaction_id: txnId,
+                    print_attempt_uuid: printAttemptUuid,
+                });
                 if (ok) {
                     // deduped = this bill is ALREADY on its way to the printer
                     // (double-press guard) — tell the cashier to wait, no 2nd copy.
@@ -12335,7 +12350,8 @@ function restaurantPos() {
                 + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'bill', transaction_id: txnId }).then(ok => {
+                const printAttemptUuid = this._newPrintAttemptUuid();
+                this.trySilentPrint({ type: 'bill', transaction_id: txnId, print_attempt_uuid: printAttemptUuid }).then(ok => {
                     if (ok) {
                         this.showToast(ok.deduped ? window.TXT.bill_already_printing : window.TXT.receipt_sent_to_printer, ok.deduped ? 'info' : 'success');
                     } else {
@@ -12516,7 +12532,8 @@ function restaurantPos() {
             const done = () => { setTimeout(() => { this.reprintBusyId = null; }, 800); };
             const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', done);
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'bill', transaction_id: bill.id }).then(ok => {
+                const printAttemptUuid = this._newPrintAttemptUuid();
+                this.trySilentPrint({ type: 'bill', transaction_id: bill.id, print_attempt_uuid: printAttemptUuid }).then(ok => {
                     if (ok) {
                         if (ok.deduped) this.showToast(window.TXT.bill_already_printing, 'info');
                         else this.showToast(window.TXT.receipt_sent_prefix + (bill.pra_invoice_number || bill.invoice_number), 'success');

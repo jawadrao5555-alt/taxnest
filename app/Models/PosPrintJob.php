@@ -15,6 +15,7 @@ class PosPrintJob extends Model
         'type',
         'target_printer',
         'transaction_id',
+        'print_attempt_uuid',
         'restaurant_order_id',
         'render_query',
         'status',

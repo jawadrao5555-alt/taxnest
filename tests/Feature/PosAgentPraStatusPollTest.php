@@ -210,7 +210,7 @@ class PosAgentPraStatusPollTest extends TestCase
         $blade = file_get_contents(resource_path('views/pos/universal.blade.php'));
         $this->assertNotFalse($blade);
 
-        $start = strpos($blade, 'async _printReceiptInner(onAfterPrint)');
+        $start = strpos($blade, 'async _printReceiptInner(onAfterPrint, printAttemptUuid)');
         $end = strpos($blade, 'printKitchenTicket(', $start);
         $this->assertNotFalse($start);
         $this->assertNotFalse($end);
@@ -219,10 +219,23 @@ class PosAgentPraStatusPollTest extends TestCase
         $this->assertStringContainsString('this.praPrintGrace().catch(() => {});', $receiptPath);
         $this->assertStringNotContainsString('await this.praPrintGrace()', $receiptPath);
         $this->assertStringContainsString(
-            "trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId })",
+            'print_attempt_uuid: printAttemptUuid',
             $receiptPath,
-            'the exact finalized transaction must still be enqueued once through the existing guarded endpoint'
+            'the exact finalized transaction print attempt must carry one stable retry key'
         );
+    }
+
+    public function test_delivery_board_receipt_retry_reuses_one_print_attempt_uuid(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/deliveries.blade.php'));
+        $start = strpos($blade, "if(\$deliveryReceiptId = session('delivery_receipt_to_print'))");
+        $this->assertNotFalse($start);
+        $script = substr($blade, $start);
+
+        $this->assertSame(1, substr_count($script, 'var printAttemptUuid;'));
+        $this->assertStringContainsString('print_attempt_uuid: printAttemptUuid', $script);
+        $this->assertStringContainsString('body: JSON.stringify(payload)', $script);
+        $this->assertStringContainsString('enqueue().then(function (retryOk)', $script);
     }
 
     // ── 2. FBR twin endpoint ──────────────────────────────────────────────

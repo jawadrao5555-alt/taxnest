@@ -1150,6 +1150,25 @@ function tnCustLoc() {
 // when silent printing is unavailable.
 (function () {
     var txnId = {{ (int) $deliveryReceiptId }};
+    var printAttemptUuid;
+    try {
+        printAttemptUuid = crypto && crypto.randomUUID ? crypto.randomUUID() : null;
+    } catch (e) {
+        printAttemptUuid = null;
+    }
+    if (!printAttemptUuid) {
+        printAttemptUuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.floor(Math.random() * 16);
+            return (c === 'x' ? r : ((r & 0x3) | 0x8)).toString(16);
+        });
+    }
+    // One redirect-triggered print attempt owns one UUID. A network/5xx retry
+    // reuses this payload; a later intentional action gets a fresh page/script.
+    var payload = {
+        type: 'bill',
+        transaction_id: txnId,
+        print_attempt_uuid: printAttemptUuid
+    };
     var fallback = function () {
         var frame = document.createElement('iframe');
         frame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-9999px;top:-9999px';
@@ -1157,19 +1176,31 @@ function tnCustLoc() {
         document.body.appendChild(frame);
         window.setTimeout(function () { frame.remove(); }, 180000);
     };
-    fetch('{{ route('pos.api.print-jobs') }}', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': {{ Js::from(csrf_token()) }}
-        },
-        body: JSON.stringify({ type: 'bill', transaction_id: txnId })
-    }).then(function (response) {
-        return response.json().catch(function () { return null; }).then(function (data) {
-            if (!response.ok || !data || !data.success) fallback();
+    var enqueue = function () {
+        return fetch('{{ route('pos.api.print-jobs') }}', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': {{ Js::from(csrf_token()) }}
+            },
+            body: JSON.stringify(payload)
+        }).then(function (response) {
+            return response.json().catch(function () { return null; }).then(function (data) {
+                return !!(response.ok && data && data.success);
+            });
+        }).catch(function () {
+            return false;
         });
-    }).catch(fallback);
+    };
+    enqueue().then(function (ok) {
+        if (ok) return;
+        window.setTimeout(function () {
+            enqueue().then(function (retryOk) {
+                if (!retryOk) fallback();
+            });
+        }, 1200);
+    });
 })();
 </script>
 @endif

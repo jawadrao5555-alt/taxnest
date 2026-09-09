@@ -74,7 +74,7 @@ flowchart TB
 | `pos-app/`, `di-app/`, `fbr-pos-app/`, `caller-app/`, `rider-app/`, `waiter-app/` | Mobile/companion clients |
 | `docs/ops/` | Deploy / Live Ops / runbooks |
 | `tests/` | PHPUnit Feature + Unit |
-| `.github/workflows/` | PR checks, auto-merge, production deploy, Live Ops, agent build |
+| `.github/workflows/` | PR checks, owner merge+deploy, production deploy, Live Ops, agent build |
 
 ## Scale signals (FACT, approximate)
 

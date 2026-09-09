@@ -4,8 +4,11 @@ Permanent production deploy path after code is already on `main`:
 
 ```
 Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS-visible changes)
-  → PR checks (no deploy) → GitHub squash auto-merge after required checks
-  → Enable PR auto-merge dispatches Deploy Production with inputs.target_sha=<squash SHA>
+  → PR checks (no deploy) → STOP for owner
+  → Owner runs Actions workflow "Owner Merge & Deploy" with
+    pull_number + expected_head_sha + confirm exactly "Approved — Merge & Deploy"
+  → squash merge pinned to that head SHA → exact squash SHA must be origin/main tip
+  → workflow_dispatch Deploy Production with inputs.target_sha=<squash SHA>
     (GITHUB_TOKEN merges do not start push workflows; workflow_dispatch does)
   → OR a human push to main starts Deploy Production with github.sha
   → GitHub Actions workflow ".github/workflows/deploy-production.yml"
@@ -21,20 +24,28 @@ Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS
   → scripts/ci-live-verify.sh (live HEAD == TARGET_SHA + NestPOS markers)
 ```
 
-Deploy Production **never** pushes to `main` and **never** runs on `pull_request`. Auto-merge of a PR is not an SSH credential. Agents and CI must not treat a green PR-checks run as permission to SSH. Normal trusted deploys must **not** wait for a human Environment reviewer. Live Ops stays on a **separate** Environment (`production`) that **keeps** required reviewers.
+Deploy Production **never** pushes to `main` and **never** runs on `pull_request`.
+Cursor auto-merge is **disabled**. Green PR checks are not permission to merge or
+SSH. Normal trusted deploys must **not** wait for a human Environment reviewer
+on `production-deploy`. Live Ops stays on a **separate** Environment
+(`production`) that **keeps** required reviewers.
 
-## Auto-merge → Deploy Production handoff
+## Owner Merge & Deploy → Deploy Production handoff
 
 GitHub suppresses new workflow runs for most events caused by `GITHUB_TOKEN`
-(including the `push` that follows an Actions `pulls.merge` squash). That is why
-cursor/* auto-merges after PR #14/#15 did not start Deploy Production.
+(including the `push` that follows an Actions `pulls.merge` squash).
 
 Supported handoff (no Cloud Agent secrets):
 
-1. `.github/workflows/enable-pr-auto-merge.yml` squash-merges (or waits for native auto-merge).
-2. It reads the **exact squash/merge commit SHA** on `main`.
-3. It calls `actions.createWorkflowDispatch` on `deploy-production.yml` with `inputs.target_sha=<that SHA>`.
-4. `workflow_dispatch` is exempt from GITHUB_TOKEN event suppression, so Deploy Production starts.
+1. Owner runs `.github/workflows/owner-merge-and-deploy.yml` (`workflow_dispatch`)
+   with `pull_number`, `expected_head_sha`, and confirm `Approved — Merge & Deploy`.
+   How-to: `docs/ops/owner-merge-and-deploy.md`.
+2. The job squash-merges **only** a Ready, same-repo `cursor/*` PR to `main`
+   whose head SHA still matches and whose **PR checks / validate** succeeded.
+3. It reads the **exact squash/merge commit SHA** on `main` and refuses if that
+   SHA is not the current `origin/main` **tip**.
+4. It calls `workflow_dispatch` on `deploy-production.yml` with
+   `inputs.target_sha=<that SHA>` only (never `skip_elaan` / `allow_settings`).
 5. Deploy Production **gate** checks out that SHA and refuses it unless it is
    **exactly** the current `origin/main` tip (ancestor-only is not enough).
    `skip_elaan` / `allow_settings` fail closed here. The gate then cancels other
@@ -44,19 +55,22 @@ Supported handoff (no Cloud Agent secrets):
    applies that SHA, then runs `ci-live-verify.sh` with the same SHA. Never
    auto-approve Environment deployments with a GitHub token.
 
-Static proof: `bash scripts/tests/automerge-deploy-handoff-check.sh`.
+`.github/workflows/enable-pr-auto-merge.yml` is **retired**: it no longer merges
+or dispatches. Static proof: `bash scripts/tests/owner-merge-and-deploy-check.sh`.
 
-## Cloud Agent PR auto-merge vs production deploy vs Live Ops
+## Owner merge vs production deploy vs Live Ops
 
 These are separate gates:
 
 | Gate | What happens | Who/what waits |
 |---|---|---|
-| PR checks + GitHub auto-merge | Enables **squash** auto-merge on same-repo `cursor/*` PRs to `main` after `.github/workflows/pr-checks.yml` succeeds (`enablePullRequestAutoMerge`). Does not use `PRODUCTION_SSH_PRIVATE_KEY` or any production Environment. | GitHub required status checks (configure **PR checks / validate** as required on `main`). |
+| PR checks | `.github/workflows/pr-checks.yml` on `cursor/*` PRs. Does not merge or deploy. | Agent + owner review the report. |
+| Owner Merge & Deploy | Explicit Actions `workflow_dispatch` with confirmation phrase. Squash-merges one approved PR and hands the exact squash SHA to Deploy Production. | **Owner** (this is the merge/deploy initiation). |
 | Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on **push to `main`** (or `workflow_dispatch` with exact tip SHA) | Repository fail-closed gates: exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
 | Live Ops (`production`) | `live-ops-diagnose.yml` / `live-ops-remediate.yml` | Required reviewers on Environment `production` — **keep MANUAL**. Also `OWNER_APPROVES_LIVE_OPS_FIX` for mutations. |
 
-One-time repo settings: Settings → General → **Allow auto-merge** and **Allow squash merging**. Do not give Cloud Agent production SSH keys or Environment secrets.
+Do not give Cloud Agent production SSH keys or Environment secrets. Cloud Agents
+must not merge PRs or dispatch Owner Merge & Deploy.
 
 ## What you must configure in GitHub (manual)
 
@@ -82,7 +96,7 @@ Two Environments exist on purpose. GitHub Environment protection is **per Enviro
 
 5. **Do not** store or use the old Replit key (`.local/ssh/nayatel_vps_key`) in Actions.
 
-6. Protect `main` with a ruleset that **requires** the status check **PR checks / validate** so squash auto-merge cannot land a commit whose latest checks failed. Optional: also require PR reviews.
+6. Protect `main` with a ruleset that **requires** the status check **PR checks / validate** so Owner Merge & Deploy cannot land a commit whose latest checks failed. Optional: also require PR reviews.
 
 7. **Never** auto-approve Environment deployments with a GitHub token. **Never** move production SSH/QA secrets to repository secrets merely to skip reviewers.
 
@@ -92,7 +106,7 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 
 | Step | Behavior |
 |---|---|
-| Trigger | `push` to `main`, or `workflow_dispatch` on `main` (auto-merge handoff passes `target_sha`) |
+| Trigger | `push` to `main`, or `workflow_dispatch` on `main` (Owner Merge & Deploy handoff passes `target_sha`) |
 | Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA. **Must equal current `origin/main` tip** at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. |
 | Concurrency | **No workflow-level group.** `gate` uses `production-deploy-gate` with `cancel-in-progress: true` (newer tip supersedes older pre-apply). `deploy` uses `production-deploy` with `cancel-in-progress: false` — at most one SSH/apply; in-flight apply is never cancelled. After a SHA proves it is the tip, `gate` cancels other runs whose status is `waiting` (never `in_progress`). |
 | Gate | Job `deploy` uses `environment: production-deploy` (secrets + main-only branch policy; **no required reviewers**). Job `gate` does **not** use an Environment (no secrets, starts immediately, fail-closed on non-tip and on `skip_elaan`/`allow_settings`). |
@@ -109,7 +123,7 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 
 Manual `workflow_dispatch` inputs:
 
-- `target_sha` — exact 40-char **current origin/main tip** to deploy (used by auto-merge handoff). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not SSH. Leave empty only for emergency dispatch of `github.sha`, which still must equal the tip at run time.
+- `target_sha` — exact 40-char **current origin/main tip** to deploy (used by Owner Merge & Deploy handoff). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not SSH. Leave empty only for emergency dispatch of `github.sha`, which still must equal the tip at run time.
 - `skip_elaan` — **refused** on this workflow (fail-closed). Emergency skip is `scripts/deploy-live.sh --no-elaan` on an owner workstation, never Cloud Agent, never a token auto-approve.
 - `allow_settings` — **refused** on this workflow (fail-closed). Emergency allow-list is `scripts/deploy-live.sh --allow-settings=...` on an owner workstation.
 
@@ -142,13 +156,17 @@ Host identity is pinned in `scripts/lib/live-known-hosts`. Host metadata (IP, pa
 
 ## Issue → live (Cloud Agent)
 
-After a `cursor/*` PR merges, follow **`docs/ops/cloud-agent-issue-to-live.md`**:
+After a `cursor/*` PR is **Ready** and green, the owner follows
+**`docs/ops/owner-merge-and-deploy.md`**, then
+**`docs/ops/cloud-agent-issue-to-live.md`**:
 
-- Auto-merge squash + `workflow_dispatch` handoff starts Deploy Production with the exact squash SHA (GITHUB_TOKEN merges do not fire `push` workflows)
+- Owner Merge & Deploy squash + `workflow_dispatch` handoff starts Deploy Production with the exact squash SHA (GITHUB_TOKEN merges do not fire `push` workflows)
+- Cursor does **not** auto-merge. Green PR checks are not permission to merge.
 - Normal deploys do **not** wait for Environment reviewers (`production-deploy` has none)
 - Actions runs post-deploy `ci-live-verify.sh` (SHA + NestPOS markers)
-- Cloud Agents observe with `bash scripts/cloud-issue-to-live-observe.sh` (secret-free)
-- On live-verify failure: autonomous fix→PR→redeploy cycle (max 3); never claim LIVE VERIFIED early
+- Cloud Agents observe with `bash scripts/cloud-issue-to-live-observe.sh` (secret-free) only after the owner has merged
+- On live-verify failure: new PR then STOP for owner (max 3); never claim LIVE VERIFIED early
+- Owner-merge proof: `bash scripts/tests/owner-merge-and-deploy-check.sh`
 - Handoff static proof: `bash scripts/tests/automerge-deploy-handoff-check.sh`
 - Unattended-path proof: `bash scripts/tests/deploy-unattended-safety-check.sh`
 

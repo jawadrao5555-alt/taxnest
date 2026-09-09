@@ -176,15 +176,22 @@ if not (tip < ssh < elaan < apply_):
 sys.exit(0)
 PY
 
-# Auto-merge handoff intact
-grep -q 'createWorkflowDispatch' "$AM" && grep -q 'target_sha' "$AM" \
-  && ok "auto-merge still dispatches exact target_sha" \
-  || bad "auto-merge handoff broken"
-
-if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|environment:\s*production'; then
-  bad "auto-merge must still not hold production secrets"
+# Owner merge handoff intact; automatic Cursor merge must not dispatch
+OM="$ROOT/.github/workflows/owner-merge-and-deploy.yml"
+SH="$ROOT/scripts/owner-merge-and-deploy.sh"
+if grep -q 'createWorkflowDispatch' "$AM"; then
+  bad "retired auto-merge must not dispatch Deploy Production"
 else
-  ok "auto-merge still production-secret-free"
+  ok "retired auto-merge does not dispatch"
+fi
+grep -q 'inputs\[target_sha\]' "$SH" \
+  && ok "owner merge still dispatches exact target_sha" \
+  || bad "owner-merge handoff broken"
+
+if grep -vE '^\s*#' "$AM" "$OM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS'; then
+  bad "merge-initiation workflows must still not hold production secrets"
+else
+  ok "merge-initiation workflows still production-secret-free"
 fi
 
 # --------------------------------------------------------------------------- Git fixture: tip vs ancestor-not-tip

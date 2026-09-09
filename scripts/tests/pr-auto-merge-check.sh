@@ -1,5 +1,6 @@
 #!/bin/bash
-# Static validation for Cloud Agent PR auto-merge + PR checks workflows.
+# Static validation: Cursor auto-merge is disabled; PR checks still run;
+# owner-triggered merge+deploy is the only initiation path.
 # Does NOT SSH, deploy, or require secrets.
 # Usage: bash scripts/tests/pr-auto-merge-check.sh
 set -uo pipefail
@@ -10,76 +11,40 @@ ok()  { echo "PASS: $*"; }
 bad() { echo "FAIL: $*" >&2; FAILS=$((FAILS+1)); }
 
 AM="$ROOT/.github/workflows/enable-pr-auto-merge.yml"
+OM="$ROOT/.github/workflows/owner-merge-and-deploy.yml"
 PC="$ROOT/.github/workflows/pr-checks.yml"
 DP="$ROOT/.github/workflows/deploy-production.yml"
 
 [ -f "$AM" ] || bad "missing $AM"
+[ -f "$OM" ] || bad "missing $OM"
 [ -f "$PC" ] || bad "missing $PC"
 [ -f "$DP" ] || bad "missing $DP"
 
 if [ -f "$AM" ]; then
-  grep -q 'enablePullRequestAutoMerge' "$AM" \
-    && ok "auto-merge workflow uses GitHub native enablePullRequestAutoMerge" \
-    || bad "auto-merge workflow must call enablePullRequestAutoMerge"
-
-  grep -q 'mergeMethod: SQUASH' "$AM" \
-    && ok "auto-merge method is SQUASH" \
-    || bad "auto-merge must use SQUASH"
-
-  grep -q 'workflow_run' "$AM" \
-    && ok "auto-merge listens on workflow_run of PR checks (default-branch, after checks pass)" \
-    || bad "auto-merge should use workflow_run so it runs from main after PR checks"
-
-  grep -q "startsWith('cursor/')" "$AM" || grep -q "startsWith(\"cursor/\")" "$AM" \
-    && ok "auto-merge is limited to cursor/ Cloud Agent branches" \
-    || bad "auto-merge must filter cursor/ branches"
-
-  grep -q 'skip draft' "$AM" && grep -q 'pr.draft' "$AM" \
-    && ok "auto-merge skips draft PRs" \
-    || bad "auto-merge must skip drafts"
-
-  grep -q 'head.repo.full_name' "$AM" \
-    && ok "auto-merge ignores forks" \
-    || bad "auto-merge must refuse fork PRs"
-
-  grep -q 'workflows: \["PR checks"\]' "$AM" \
-    && ok "auto-merge is gated on the PR checks workflow succeeding" \
-    || bad "auto-merge must run only after workflow PR checks"
-
-  grep -q "pulls.merge" "$AM" && grep -q "merge_method: 'squash'" "$AM" \
-    && ok "CLEAN PRs fall back to REST squash merge" \
-    || bad "workflow must squash-merge when GitHub rejects auto-merge for CLEAN status"
-
-  grep -q 'clean status' "$AM" \
-    && ok "workflow handles GraphQL 'Pull request is in clean status'" \
-    || bad "workflow must catch GitHub CLEAN auto-merge rejection"
-
-  grep -q 'run.head_sha' "$AM" \
-    && ok "squash merge is pinned to the PR-checks head SHA" \
-    || bad "workflow must pin merge sha to workflow_run.head_sha"
-
-  grep -q "mergeable_state === 'clean'" "$AM" \
-    && ok "already-clean mergeable PRs squash without waiting on auto-merge" \
-    || bad "workflow must treat mergeable_state clean as squash-now"
-
-  if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS|environment:\s*production|deploy-live\.sh|ci-deploy-production\.sh'; then
-    bad "auto-merge workflow must not reference production deploy secrets or apply scripts"
+  if grep -qE 'enablePullRequestAutoMerge|pulls\.merge|createWorkflowDispatch' "$AM"; then
+    bad "enable-pr-auto-merge.yml must not auto-merge or dispatch deploy"
   else
-    ok "auto-merge workflow has no production secrets/apply scripts"
+    ok "automatic Cursor merge is disabled"
   fi
 
-  grep -q 'createWorkflowDispatch' "$AM" \
-    && ok "auto-merge hands off via createWorkflowDispatch" \
-    || bad "auto-merge must workflow_dispatch Deploy Production after GITHUB_TOKEN squash"
+  grep -q 'workflow_run' "$AM" \
+    && ok "retired auto-merge still listens on workflow_run of PR checks (default-branch)" \
+    || bad "keep workflow_run so this file never gains a pull_request write-token trigger"
 
-  grep -q 'target_sha' "$AM" \
-    && ok "auto-merge passes target_sha for exact-SHA deploy" \
-    || bad "auto-merge must pass target_sha"
+  grep -q "workflows: \[\"PR checks\"\]" "$AM" || grep -q "workflows: \['PR checks'\]" "$AM" \
+    && ok "retired listener is gated on PR checks" \
+    || bad "retired workflow must still name PR checks"
+
+  if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS|environment:\s*production|deploy-live\.sh|ci-deploy-production\.sh'; then
+    bad "retired auto-merge workflow must not reference production deploy secrets or apply scripts"
+  else
+    ok "retired auto-merge workflow has no production secrets/apply scripts"
+  fi
 
   if grep -vE '^\s*#' "$AM" | grep -qiE 'actions/checkout'; then
-    bad "auto-merge workflow must not checkout PR code"
+    bad "retired auto-merge workflow must not checkout PR code"
   else
-    ok "auto-merge workflow does not checkout untrusted code"
+    ok "retired auto-merge workflow does not checkout untrusted code"
   fi
 fi
 
@@ -113,6 +78,10 @@ if [ -f "$PC" ]; then
   grep -q 'deploy-unattended-safety-check.sh' "$PC" \
     && ok "PR checks runs deploy-unattended-safety-check.sh" \
     || bad "PR checks must run unattended deploy safety checks"
+
+  grep -q 'owner-merge-and-deploy-check.sh' "$PC" \
+    && ok "PR checks runs owner-merge-and-deploy-check.sh" \
+    || bad "PR checks must run owner merge/deploy safety checks"
 fi
 
   if [ -f "$DP" ]; then
@@ -133,7 +102,7 @@ fi
     || bad "Deploy Production must pass LIVE_QA_PASS into live verify"
 
   grep -q 'target_sha' "$DP" \
-    && ok "Deploy Production accepts target_sha for auto-merge handoff" \
+    && ok "Deploy Production accepts target_sha for owner-merge handoff" \
     || bad "Deploy Production must accept workflow_dispatch target_sha"
 
   grep -q 'steps.resolve.outputs.sha' "$DP" \
@@ -157,6 +126,12 @@ if [ -f "$ROOT/scripts/tests/automerge-ready-for-review-check.sh" ]; then
   bash "$ROOT/scripts/tests/automerge-ready-for-review-check.sh" \
     && ok "automerge-ready-for-review-check nested run" \
     || bad "automerge-ready-for-review-check nested run failed"
+fi
+
+if [ -f "$ROOT/scripts/tests/owner-merge-and-deploy-check.sh" ]; then
+  bash "$ROOT/scripts/tests/owner-merge-and-deploy-check.sh" \
+    && ok "owner-merge-and-deploy-check nested run" \
+    || bad "owner-merge-and-deploy-check nested run failed"
 fi
 
 echo ""

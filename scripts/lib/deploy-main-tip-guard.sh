@@ -93,8 +93,8 @@ CI DEPLOY FAILED: requested SHA is not the current origin/main tip.
   origin/main tip: $origin_main
 
 A newer main commit exists. This run will NOT SSH, insert Elaan, or mutate
-production. Dispatch Deploy Production for the current tip (auto-merge
-handoff or workflow_dispatch target_sha=$origin_main).
+production. Dispatch Deploy Production for the current tip (Owner Merge &
+Deploy handoff or workflow_dispatch target_sha=$origin_main).
 
 Historical / rollback deploys are not done by this workflow.
 Use deployment/ROLLBACK.md.

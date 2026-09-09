@@ -1,13 +1,12 @@
 # Lightweight PR checks. Does not deploy, SSH, or read production secrets.
-# Mark this workflow as a required status check on main so GitHub auto-merge
-# waits for it (auto-merge must not run against an empty check gate).
+# Mark this workflow as a required status check on main.
 #
 # types must be explicit: GitHub's pull_request default is only
 # opened / synchronize / reopened. ready_for_review is NOT default, so a
 # draft that becomes Ready after checks already passed never re-runs this
-# workflow, and Enable PR auto-merge (workflow_run of this workflow) never
-# sees the now-ready PR. Keep the default three AND ready_for_review.
-# Do not add a broad pull_request trigger to enable-pr-auto-merge.yml
+# workflow. Keep the default three AND ready_for_review so the owner sees
+# fresh checks before Owner Merge & Deploy.
+# Do not add a pull_request trigger to owner-merge-and-deploy.yml
 # (that would run the write-token job from the PR branch).
 
 name: PR checks
@@ -30,9 +29,11 @@ jobs:
         run: bash scripts/tests/pr-auto-merge-check.sh
       - name: Issue-to-live workflow safety checks
         run: bash scripts/tests/issue-to-live-check.sh
-      - name: Auto-merge → Deploy Production handoff checks
+      - name: Auto-merge disabled / owner-handoff checks
         run: bash scripts/tests/automerge-deploy-handoff-check.sh
       - name: Production deploy workflow safety checks
         run: bash scripts/tests/ci-deploy-production-check.sh
       - name: Unattended Deploy Production safety checks
         run: bash scripts/tests/deploy-unattended-safety-check.sh
+      - name: Owner Merge & Deploy safety checks
+        run: bash scripts/tests/owner-merge-and-deploy-check.sh

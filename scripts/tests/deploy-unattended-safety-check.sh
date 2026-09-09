@@ -220,7 +220,7 @@ print("invariants ok")
 PY
 
 # --------------------------------------------------------------------------- Cloud Agent remains production-secret-free
-for f in "$OBSERVE" "$LIVE_REQ" "$LIVE_REM" "$AM"; do
+for f in "$OBSERVE" "$LIVE_REQ" "$LIVE_REM" "$AM" "$ROOT/.github/workflows/owner-merge-and-deploy.yml"; do
   [ -f "$f" ] || continue
   if grep -vE '^\s*#' "$f" | grep -qE 'secrets\.PRODUCTION_SSH_PRIVATE_KEY|PRODUCTION_SSH_PRIVATE_KEY:'; then
     bad "$(basename "$f") must not hold PRODUCTION_SSH_PRIVATE_KEY"
@@ -240,17 +240,19 @@ else
   bad "must not drop OWNER_APPROVES_LIVE_OPS_FIX"
 fi
 
-# Auto-merge still only dispatches target_sha (no skip_elaan)
-python3 - "$AM" <<'PY' && ok "auto-merge handoff sends only target_sha" || bad "auto-merge must not dispatch skip_elaan/allow_settings"
+# Owner merge (not retired auto-merge) dispatches only target_sha
+SH="$ROOT/scripts/owner-merge-and-deploy.sh"
+python3 - "$AM" "$SH" <<'PY' && ok "owner handoff sends only target_sha; auto-merge does not dispatch" || bad "must not dispatch skip_elaan/allow_settings; auto-merge must stay retired"
 import sys
-text = open(sys.argv[1], encoding="utf-8").read()
-if "createWorkflowDispatch" not in text or "target_sha" not in text:
+am, sh = (open(p, encoding="utf-8").read() for p in sys.argv[1:])
+if "createWorkflowDispatch" in am or "pulls.merge" in am or "enablePullRequestAutoMerge" in am:
+    print("retired auto-merge still merges/dispatches", file=sys.stderr)
     sys.exit(1)
-# The inputs object in dispatchDeployProduction should not include skip_elaan
-idx = text.find("createWorkflowDispatch")
-window = text[idx:idx+800]
-if "skip_elaan" in window or "allow_settings" in window:
-    print("dispatch must not send skip_elaan/allow_settings", file=sys.stderr)
+if "inputs[target_sha]" not in sh:
+    print("owner script must dispatch target_sha", file=sys.stderr)
+    sys.exit(1)
+if "skip_elaan" in sh or "allow_settings" in sh:
+    print("owner dispatch must not send skip_elaan/allow_settings", file=sys.stderr)
     sys.exit(1)
 sys.exit(0)
 PY

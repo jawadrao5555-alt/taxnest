@@ -23,6 +23,7 @@ class LiveOpsDiagnosticsService
     public function __construct(
         private LiveOpsRedactor $redactor,
         private LiveOpsAuditService $audit,
+        private LiveOpsPlatformHealth $platform,
     ) {
     }
 
@@ -47,14 +48,20 @@ class LiveOpsDiagnosticsService
             'COMPANY_HEALTH' => $this->companyHealth($this->requireCompanyId($companyId)),
             'BILLING_SUMMARY' => $this->billingSummary($dateFrom, $dateTo, $companyId),
             'BILLING_BY_COMPANY' => $this->billingByCompany($dateFrom, $dateTo),
-            'PRA_HEALTH' => $this->praHealth($this->requireCompanyId($companyId), $dateFrom, $dateTo),
+            'PRA_HEALTH' => $companyId
+                ? $this->praHealth($this->requireCompanyId($companyId), $dateFrom, $dateTo)
+                : $this->praHealthFleet($dateFrom, $dateTo),
             'AGENT_HEALTH' => $companyId
                 ? $this->agentHealth($companyId)
                 : $this->agentFleetHealth(),
             'PRINTER_HEALTH' => $this->printerHealth($this->requireCompanyId($companyId)),
-            'ERROR_SUMMARY' => $this->errorSummary($this->requireCompanyId($companyId), $dateFrom, $dateTo),
+            'ERROR_SUMMARY' => $companyId
+                ? $this->errorSummary($this->requireCompanyId($companyId), $dateFrom, $dateTo)
+                : $this->errorSummaryFleet($dateFrom, $dateTo),
             'COMPANY_DIAGNOSTIC' => $this->companyDiagnostic($this->requireCompanyId($companyId), $dateFrom, $dateTo),
             'PROBLEMATIC_COMPANIES' => $this->problematicCompanies($dateFrom, $dateTo),
+            'SERVER_HEALTH' => $this->serverHealth(),
+            'DAILY_OPS' => $this->dailyOps($dateFrom, $dateTo),
             default => throw new \InvalidArgumentException("Unhandled operation: {$operation}"),
         };
 
@@ -698,6 +705,496 @@ class LiveOpsDiagnosticsService
         ];
     }
 
+    /**
+     * Fleet ERROR_SUMMARY — PRA/print/agent errors plus application/queue signals.
+     * Company attribution only; no cross-tenant payload dumps.
+     */
+    private function errorSummaryFleet(Carbon $from, Carbon $to): array
+    {
+        $max = (int) config('live_ops.limits.max_error_lines', 40);
+        $errors = [];
+        $praFailedByCompany = [];
+        $printFailedByCompany = [];
+
+        if (Schema::hasTable('pos_transactions')) {
+            $praRows = DB::table('pos_transactions as t')
+                ->join('companies as c', 'c.id', '=', 't.company_id')
+                ->whereIn('c.product_type', config('live_ops.product_types', ['pos']))
+                ->where(function ($w) {
+                    $suffix = config('live_ops.exclude_email_suffix', '@scaletest.pk');
+                    $w->whereNull('c.email')->orWhere('c.email', 'not like', '%'.$suffix);
+                })
+                ->where('t.status', 'completed')
+                ->where('t.pra_status', 'failed')
+                ->whereBetween(DB::raw($this->billingDayExpr()), [$from->toDateString(), $to->toDateString()])
+                ->orderByDesc('t.id')
+                ->limit($max)
+                ->get(['t.id', 't.company_id', 'c.name as company_name', 't.pra_error_message', 't.created_at']);
+
+            foreach ($praRows as $row) {
+                $cid = (int) $row->company_id;
+                $praFailedByCompany[$cid] = ($praFailedByCompany[$cid] ?? 0) + 1;
+                $msg = $this->redactor->redactString((string) ($row->pra_error_message ?? ''));
+                if ($msg !== '') {
+                    $errors[] = [
+                        'source' => 'pra',
+                        'company_id' => $cid,
+                        'company_name' => $row->company_name,
+                        'ref' => 'txn:'.$row->id,
+                        'message' => $msg,
+                        'at' => $row->created_at,
+                    ];
+                }
+            }
+        }
+
+        if (Schema::hasTable('pos_print_jobs')) {
+            $printRows = DB::table('pos_print_jobs as j')
+                ->join('companies as c', 'c.id', '=', 'j.company_id')
+                ->whereIn('c.product_type', config('live_ops.product_types', ['pos']))
+                ->where('j.status', 'failed')
+                ->where('j.created_at', '>=', $from->copy()->startOfDay())
+                ->where('j.created_at', '<=', $to->copy()->endOfDay())
+                ->orderByDesc('j.id')
+                ->limit($max)
+                ->get(['j.id', 'j.company_id', 'c.name as company_name', 'j.error', 'j.created_at']);
+
+            foreach ($printRows as $row) {
+                $cid = (int) $row->company_id;
+                $printFailedByCompany[$cid] = ($printFailedByCompany[$cid] ?? 0) + 1;
+                $msg = $this->redactor->redactString((string) ($row->error ?? ''));
+                if ($msg !== '') {
+                    $errors[] = [
+                        'source' => 'print',
+                        'company_id' => $cid,
+                        'company_name' => $row->company_name,
+                        'ref' => 'job:'.$row->id,
+                        'message' => $msg,
+                        'at' => $row->created_at,
+                    ];
+                }
+            }
+        }
+
+        $agentUpdateErrors = $this->posCompaniesQuery()
+            ->whereNotNull('agent_update_error')
+            ->where('agent_update_error', '!=', '')
+            ->limit(20)
+            ->get(['id', 'name', 'agent_update_error', 'agent_update_at']);
+        foreach ($agentUpdateErrors as $c) {
+            $errors[] = [
+                'source' => 'agent_update',
+                'company_id' => $c->id,
+                'company_name' => $c->name,
+                'ref' => 'company:'.$c->id,
+                'message' => $this->redactor->redactString((string) $c->agent_update_error),
+                'at' => optional($c->agent_update_at)?->toIso8601String(),
+            ];
+        }
+
+        $app = $this->platform->application();
+        $queue = $this->platform->queue();
+
+        return [
+            'scope' => 'global',
+            'errors' => array_slice($errors, 0, $max),
+            'pra_failed_companies' => count($praFailedByCompany),
+            'pra_failed_count' => array_sum($praFailedByCompany),
+            'print_failed_companies' => count($printFailedByCompany),
+            'print_failed_count' => array_sum($printFailedByCompany),
+            'agent_update_error_count' => $agentUpdateErrors->count(),
+            'application' => [
+                'laravel_log' => $app['laravel_log'],
+                'log_health_failure' => $app['log_health_failure'],
+            ],
+            'failed_jobs_count' => $queue['failed_jobs_count'],
+            'failed_jobs_availability' => $queue['failed_jobs_availability'],
+            'failed_job_samples' => $queue['failed_job_samples'],
+        ];
+    }
+
+    private function praHealthFleet(Carbon $from, Carbon $to): array
+    {
+        if (!Schema::hasTable('pos_transactions')) {
+            return [
+                'scope' => 'global',
+                'counts' => [],
+                'companies_with_failures' => [],
+                'companies_with_pending' => [],
+                'duplicate_invoice_numbers' => [],
+            ];
+        }
+
+        $dateExpr = $this->billingDayExpr();
+        $base = DB::table('pos_transactions as t')
+            ->join('companies as c', 'c.id', '=', 't.company_id')
+            ->whereIn('c.product_type', config('live_ops.product_types', ['pos']))
+            ->where(function ($w) {
+                $suffix = config('live_ops.exclude_email_suffix', '@scaletest.pk');
+                $w->whereNull('c.email')->orWhere('c.email', 'not like', '%'.$suffix);
+            })
+            ->where('t.status', 'completed')
+            ->whereBetween(DB::raw($dateExpr), [$from->toDateString(), $to->toDateString()]);
+
+        $row = (clone $base)->selectRaw("
+            SUM(CASE WHEN t.pra_status = 'submitted' THEN 1 ELSE 0 END) as submitted,
+            SUM(CASE WHEN t.pra_status = 'failed' THEN 1 ELSE 0 END) as failed,
+            SUM(CASE WHEN t.pra_status = 'pending' THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN t.pra_status = 'offline' THEN 1 ELSE 0 END) as offline,
+            SUM(CASE WHEN t.pra_status = 'local' OR t.pra_status IS NULL THEN 1 ELSE 0 END) as local_or_null,
+            COUNT(*) as completed
+        ")->first();
+
+        $failCompanies = (clone $base)
+            ->where('t.pra_status', 'failed')
+            ->select('t.company_id', 'c.name', DB::raw('COUNT(*) as fail_count'))
+            ->groupBy('t.company_id', 'c.name')
+            ->orderByDesc('fail_count')
+            ->limit(50)
+            ->get()
+            ->map(fn ($r) => [
+                'company_id' => (int) $r->company_id,
+                'name' => $r->name,
+                'fail_count' => (int) $r->fail_count,
+            ])->all();
+
+        $pendingCompanies = (clone $base)
+            ->whereIn('t.pra_status', ['pending', 'offline'])
+            ->select('t.company_id', 'c.name', 't.pra_status', DB::raw('COUNT(*) as open_count'))
+            ->groupBy('t.company_id', 'c.name', 't.pra_status')
+            ->orderByDesc('open_count')
+            ->limit(50)
+            ->get()
+            ->map(fn ($r) => [
+                'company_id' => (int) $r->company_id,
+                'name' => $r->name,
+                'pra_status' => $r->pra_status,
+                'open_count' => (int) $r->open_count,
+            ])->all();
+
+        $duplicates = [];
+        if (Schema::hasColumn('pos_transactions', 'pra_invoice_number')) {
+            $duplicates = (clone $base)
+                ->whereNotNull('t.pra_invoice_number')
+                ->where('t.pra_invoice_number', '!=', '')
+                ->select('t.company_id', 'c.name', 't.pra_invoice_number', DB::raw('COUNT(*) as dup_count'))
+                ->groupBy('t.company_id', 'c.name', 't.pra_invoice_number')
+                ->havingRaw('COUNT(*) > 1')
+                ->orderByDesc('dup_count')
+                ->limit(20)
+                ->get()
+                ->map(fn ($r) => [
+                    'company_id' => (int) $r->company_id,
+                    'name' => $r->name,
+                    'pra_invoice_number' => $r->pra_invoice_number,
+                    'dup_count' => (int) $r->dup_count,
+                ])->all();
+        }
+
+        return [
+            'scope' => 'global',
+            'counts' => [
+                'completed' => (int) ($row->completed ?? 0),
+                'submitted' => (int) ($row->submitted ?? 0),
+                'failed' => (int) ($row->failed ?? 0),
+                'pending' => (int) ($row->pending ?? 0),
+                'offline' => (int) ($row->offline ?? 0),
+                'local_or_null' => (int) ($row->local_or_null ?? 0),
+            ],
+            'companies_with_failures' => $failCompanies,
+            'companies_with_pending' => $pendingCompanies,
+            'duplicate_invoice_numbers' => $duplicates,
+            'note' => 'Fleet aggregates only. Duplicate invoice numbers are same-company repeats in the date range — not a fiscal mutation.',
+        ];
+    }
+
+    private function serverHealth(): array
+    {
+        return [
+            'server' => $this->platform->server(),
+            'application' => $this->platform->application(),
+            'database' => $this->platform->database(),
+            'queue' => $this->platform->queue(),
+            'scheduler' => $this->platform->scheduler(),
+            'websocket' => $this->platform->websocket(),
+            'performance' => $this->platform->performance(),
+            'note' => 'Read-only host/process/DB signals. Missing values are UNKNOWN. No services were restarted.',
+        ];
+    }
+
+    private function companyActivity(Carbon $from, Carbon $to): array
+    {
+        $limit = (int) config('live_ops.limits.max_companies_in_report', 200);
+        $all = $this->posCompaniesQuery()
+            ->limit($limit)
+            ->get(['id', 'name', 'status', 'company_status', 'agent_enabled']);
+
+        $active = $all->filter(function ($c) {
+            $statusOk = ($c->status ?? 'approved') === 'approved' || $c->status === null;
+            $cs = $c->company_status ?? 'active';
+
+            return $statusOk && ($cs === 'active' || $cs === null);
+        });
+
+        $billing = $this->billingSummary($from, $to, null);
+        $problematic = $this->problematicCompanies($from, $to);
+        $agents = $this->agentFleetHealth();
+
+        return [
+            'in_scope_count' => $all->count(),
+            'active_enabled_count' => $active->count(),
+            'agent_enabled_count' => $all->where('agent_enabled', true)->count(),
+            'companies_with_billing' => $billing['totals']['company_count'] ?? 0,
+            'zero_billing_count' => count($problematic['zero_billing'] ?? []),
+            'zero_billing' => $problematic['zero_billing'] ?? [],
+            'problematic' => [
+                'offline_agents' => $problematic['offline_agents'] ?? [],
+                'pra_failures' => $problematic['pra_failures'] ?? [],
+                'print_failures' => $problematic['print_failures'] ?? [],
+            ],
+            'agents' => $agents,
+        ];
+    }
+
+    private function dailyOps(Carbon $from, Carbon $to): array
+    {
+        $server = $this->platform->server();
+        $application = $this->platform->application();
+        $database = $this->platform->database();
+        $queue = $this->platform->queue();
+        $scheduler = $this->platform->scheduler();
+        $websocket = $this->platform->websocket();
+        $performance = $this->platform->performance();
+        $security = $this->platform->security($from, $to);
+        $billing = $this->billingByCompany($from, $to);
+        $activity = $this->companyActivity($from, $to);
+        $pra = $this->praHealthFleet($from, $to);
+        $errors = $this->errorSummaryFleet($from, $to);
+        $agents = $activity['agents'];
+
+        $sections = [
+            'server_health' => $server,
+            'application_health' => $application,
+            'database_health' => $database,
+            'queue_worker_health' => $queue,
+            'scheduler_health' => $scheduler,
+            'websocket_agent_health' => [
+                'websocket' => $websocket,
+                'agents' => $agents,
+            ],
+            'company_activity' => [
+                'in_scope_count' => $activity['in_scope_count'],
+                'active_enabled_count' => $activity['active_enabled_count'],
+                'agent_enabled_count' => $activity['agent_enabled_count'],
+                'companies_with_billing' => $activity['companies_with_billing'],
+                'zero_billing_count' => $activity['zero_billing_count'],
+            ],
+            'billing_by_company' => $billing,
+            'zero_billing_companies' => $activity['zero_billing'],
+            'problematic_companies' => $activity['problematic'],
+            'pra_transaction_health' => $pra,
+            'errors' => $errors,
+            'performance' => $performance,
+            'security_auth' => $security,
+        ];
+
+        $overall = $this->composeOverallStatus($sections);
+
+        return $sections + [
+            'overall' => $overall,
+            'unknown_observability_gaps' => $overall['unknown'],
+            'recommended_owner_actions' => $overall['recommended_owner_actions'],
+            'remediation_note' => 'Diagnosis never executes fixes. Owner must explicitly approve a low/medium allow-listed remediation.',
+        ];
+    }
+
+    /**
+     * Facts vs inference: CRITICAL/ATTENTION only from measured evidence.
+     * UNKNOWN gaps never invent a failure.
+     *
+     * @param  array<string, mixed>  $sections
+     * @return array{status: string, summary: string, reasons: array, unknown: list<string>, recommended_owner_actions: list<string>}
+     */
+    private function composeOverallStatus(array $sections): array
+    {
+        $critical = [];
+        $attention = [];
+        $unknown = [];
+        $actions = [];
+
+        $db = $sections['database_health'] ?? [];
+        if (($db['connection_ok'] ?? null) === false) {
+            $critical[] = 'Database ping failed.';
+            $actions[] = 'Check MariaDB on the production host (owner SSH / system panel). Do not use Live Ops Remediate for this.';
+        }
+        if (($db['threads_availability'] ?? '') === 'unknown') {
+            $unknown[] = 'MariaDB thread/max_connection gauges (information_schema not available on this engine).';
+        } elseif (is_numeric($db['threads_pct'] ?? null) && (float) $db['threads_pct'] >= 80) {
+            $attention[] = 'MariaDB threads_connected is high (≥80% of max_connections).';
+        }
+
+        $disk = $sections['server_health']['disk'] ?? [];
+        if (($disk['availability'] ?? '') === 'measured' && is_numeric($disk['used_pct'] ?? null)) {
+            if ((float) $disk['used_pct'] >= 95) {
+                $critical[] = 'Disk used ≥95%.';
+                $actions[] = 'Free disk on the production host; Live Ops will not delete files.';
+            } elseif ((float) $disk['used_pct'] >= 85) {
+                $attention[] = 'Disk used ≥85%.';
+            }
+        } else {
+            $unknown[] = 'Disk usage.';
+        }
+
+        $cpu = $sections['server_health']['cpu'] ?? [];
+        if (($cpu['availability'] ?? '') !== 'measured') {
+            $unknown[] = 'CPU load average.';
+        } elseif (isset($cpu['load']['1m'], $cpu['nproc']) && is_numeric($cpu['nproc']) && (int) $cpu['nproc'] > 0) {
+            if ((float) $cpu['load']['1m'] >= ((int) $cpu['nproc'] * 4)) {
+                $attention[] = '1-minute load is ≥4× nproc (measured; not proof of an outage).';
+            }
+        }
+
+        $mem = $sections['server_health']['memory'] ?? [];
+        if (($mem['availability'] ?? '') !== 'measured') {
+            $unknown[] = 'RAM / MemAvailable.';
+        } elseif (is_numeric($mem['used_pct'] ?? null) && (float) $mem['used_pct'] >= 90) {
+            $attention[] = 'Memory used ≥90%.';
+        }
+
+        $procs = $sections['server_health']['processes'] ?? [];
+        foreach (['php_fpm' => 'PHP-FPM', 'apache' => 'Apache/httpd', 'mariadb' => 'MariaDB/mysqld'] as $key => $label) {
+            $row = $procs[$key] ?? [];
+            if (($row['availability'] ?? '') !== 'measured') {
+                $unknown[] = $label.' process scan.';
+            }
+        }
+
+        $queue = $sections['queue_worker_health'] ?? [];
+        if (($queue['heartbeat_availability'] ?? '') === 'unknown') {
+            $unknown[] = 'Queue worker heartbeat (SystemSetting queue_last_heartbeat).';
+        } elseif ($queue['heartbeat_stale'] === true) {
+            $attention[] = 'Queue worker heartbeat is stale.';
+            $actions[] = 'Confirm taxnest-queue / queue:work is running. Do not restart from this diagnostic.';
+        }
+        if (($queue['failed_jobs_availability'] ?? '') === 'measured' && (int) ($queue['failed_jobs_count'] ?? 0) > 0) {
+            $attention[] = 'failed_jobs table has '.(int) $queue['failed_jobs_count'].' row(s).';
+        } elseif (($queue['failed_jobs_availability'] ?? '') !== 'measured') {
+            $unknown[] = 'failed_jobs table.';
+        }
+
+        $sched = $sections['scheduler_health'] ?? [];
+        if (($sched['heartbeat_availability'] ?? '') === 'unknown') {
+            $unknown[] = 'Scheduler heartbeat (SystemSetting scheduler_last_heartbeat).';
+        } elseif ($sched['heartbeat_stale'] === true) {
+            $attention[] = 'Scheduler heartbeat is stale.';
+            $actions[] = 'Confirm crontab php artisan schedule:run.';
+        }
+
+        $ws = $sections['websocket_agent_health']['websocket'] ?? [];
+        if (($ws['availability'] ?? '') !== 'measured') {
+            $unknown[] = 'WebSocket gateway /health ('.$this->unknownReason($ws).').';
+        } elseif (($ws['ok'] ?? null) === false || (isset($ws['http_status']) && (int) $ws['http_status'] >= 500)) {
+            $attention[] = 'WebSocket gateway /health did not report ok.';
+        }
+
+        $perf = $sections['performance'] ?? [];
+        if (($perf['availability'] ?? '') !== 'measured') {
+            $unknown[] = 'Public HTTP timing probes (/up, /pos/login).';
+        } else {
+            foreach ($perf['probes'] ?? [] as $name => $probe) {
+                if (!($probe['reached'] ?? false)) {
+                    $unknown[] = "HTTP probe {$name} did not complete.";
+                    continue;
+                }
+                $status = (int) ($probe['status'] ?? 0);
+                if ($name === 'public_up' && $status >= 500) {
+                    $critical[] = '/up returned HTTP '.$status.'.';
+                } elseif ($status >= 500) {
+                    $attention[] = "{$name} returned HTTP {$status}.";
+                }
+                if (is_numeric($probe['ms'] ?? null) && (int) $probe['ms'] >= 3000) {
+                    $attention[] = "{$name} TTFB/total ≥3000ms (measured ".$probe['ms'].'ms).';
+                }
+            }
+        }
+
+        $pra = $sections['pra_transaction_health'] ?? [];
+        $praFailed = (int) ($pra['counts']['failed'] ?? 0);
+        if ($praFailed > 0) {
+            $attention[] = "PRA failed invoices in range: {$praFailed}.";
+        }
+        if (!empty($pra['duplicate_invoice_numbers'])) {
+            $attention[] = 'Duplicate PRA invoice numbers detected (same company, date range). Inference: possible retry/race — not proof of fiscal corruption.';
+        }
+
+        $agents = $sections['websocket_agent_health']['agents']['counts'] ?? [];
+        $longOffline = (int) ($agents['long_offline'] ?? 0);
+        if ($longOffline > 0) {
+            $attention[] = "Long-offline agents: {$longOffline}.";
+        }
+
+        $appLog = $sections['application_health']['laravel_log'] ?? [];
+        if (($appLog['availability'] ?? '') !== 'measured') {
+            $unknown[] = 'laravel.log tail scan.';
+        } elseif ((int) ($appLog['critical_count'] ?? 0) > 0) {
+            $attention[] = 'laravel.log tail contains CRITICAL/ALERT/EMERGENCY lines.';
+        } elseif ((int) ($appLog['error_count'] ?? 0) > 0) {
+            $attention[] = 'laravel.log tail contains ERROR lines.';
+        }
+        if (!empty($sections['application_health']['log_health_failure'])) {
+            $attention[] = 'LogHealth daily probe is in a failure state.';
+        }
+
+        $sec = $sections['security_auth'] ?? [];
+        if (!empty($sec['demo_login_exposed_in_production'])) {
+            $critical[] = 'DEMO_LOGIN_ENABLED is on while APP_ENV is production — demo-login must stay fail-closed.';
+            $actions[] = 'Set DEMO_LOGIN_ENABLED=false on production (config only; this diagnostic did not change it).';
+        }
+        if (($sec['debug'] ?? false) === true && in_array((string) ($sec['app_env'] ?? ''), ['production', 'prod'], true)) {
+            $attention[] = 'APP_DEBUG is true in a production-like environment.';
+        }
+        if (($sec['failed_login_availability'] ?? '') !== 'measured') {
+            $unknown[] = 'security_logs failed_login counts.';
+        } elseif ((int) ($sec['failed_login_count'] ?? 0) >= 20) {
+            $attention[] = 'failed_login count in range is ≥20 (counts only; IPs omitted).';
+        }
+
+        $unknown = array_values(array_unique($unknown));
+        $status = 'GREEN';
+        if ($critical) {
+            $status = 'CRITICAL';
+        } elseif ($attention) {
+            $status = 'ATTENTION';
+        }
+
+        $summary = match ($status) {
+            'CRITICAL' => 'Measured critical signals: '.implode(' ', $critical),
+            'ATTENTION' => 'Measured attention signals: '.implode(' ', $attention),
+            default => 'No measured critical/attention signals. UNKNOWN gaps are listed separately and are not failures.',
+        };
+
+        if (!$actions) {
+            $actions[] = 'No automatic remediation. Re-run DAILY_OPS after any owner change. Company-level drills use COMPANY_DIAGNOSTIC.';
+        }
+
+        return [
+            'status' => $status,
+            'summary' => $summary,
+            'reasons' => [
+                'critical' => $critical,
+                'attention' => $attention,
+            ],
+            'unknown' => $unknown,
+            'recommended_owner_actions' => $actions,
+            'legend' => 'GREEN/ATTENTION/CRITICAL use measured facts only. UNKNOWN means the signal could not be collected safely.',
+        ];
+    }
+
+    private function unknownReason(array $row): string
+    {
+        return (string) ($row['reason'] ?? 'not measured');
+    }
+
     private function inferRootCause(array $company, array $pra, array $agent, array $printer, array $errors): string
     {
         $online = $company['company']['agent_online'] ?? false;
@@ -772,8 +1269,14 @@ class LiveOpsDiagnosticsService
         if (isset($payload['agents']) && is_array($payload['agents'])) {
             return count($payload['agents']);
         }
-        if (isset($payload['errors']) && is_array($payload['errors'])) {
+        if (isset($payload['errors']['errors']) && is_array($payload['errors']['errors'])) {
+            return count($payload['errors']['errors']);
+        }
+        if (isset($payload['errors']) && is_array($payload['errors']) && array_is_list($payload['errors'])) {
             return count($payload['errors']);
+        }
+        if (isset($payload['company_activity']['in_scope_count'])) {
+            return (int) $payload['company_activity']['in_scope_count'];
         }
         if (isset($payload['company'])) {
             return 1;
@@ -803,6 +1306,24 @@ class LiveOpsDiagnosticsService
                 count($payload['offline_agents'] ?? []),
                 count($payload['pra_failures'] ?? []),
                 count($payload['zero_billing'] ?? [])
+            ),
+            'ERROR_SUMMARY' => sprintf(
+                'Errors: %d lines, PRA-fail %d, print-fail %d.',
+                count($payload['errors'] ?? []),
+                (int) ($payload['pra_failed_count'] ?? 0),
+                (int) ($payload['print_failed_count'] ?? 0)
+            ),
+            'PRA_HEALTH' => sprintf(
+                'PRA: submitted %d, failed %d, pending %d.',
+                (int) ($payload['counts']['submitted'] ?? 0),
+                (int) ($payload['counts']['failed'] ?? 0),
+                (int) ($payload['counts']['pending'] ?? 0)
+            ),
+            'SERVER_HEALTH' => 'Server health snapshot (read-only).',
+            'DAILY_OPS' => sprintf(
+                'DAILY_OPS %s — %s',
+                $payload['overall']['status'] ?? 'UNKNOWN',
+                $payload['overall']['summary'] ?? 'completed.'
             ),
             default => $operation.' completed.',
         };

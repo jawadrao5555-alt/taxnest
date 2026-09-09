@@ -33,7 +33,29 @@ Owner approval phrase: `OWNER_APPROVES_LIVE_OPS_FIX`
 
 ## Diagnostic operations
 
-`COMPANY_HEALTH`, `BILLING_SUMMARY`, `BILLING_BY_COMPANY`, `PRA_HEALTH`, `AGENT_HEALTH`, `PRINTER_HEALTH`, `ERROR_SUMMARY`, `COMPANY_DIAGNOSTIC`, `PROBLEMATIC_COMPANIES`
+See `docs/ops/live-ops-daily-report.md` for scope (GLOBAL / COMPANY / DUAL), required inputs, payload, and UNKNOWN gaps.
+
+| Operation | Scope |
+|-----------|--------|
+| `DAILY_OPS` | GLOBAL — one daily production health report |
+| `SERVER_HEALTH` | GLOBAL — host/app/DB/queue/scheduler/WS/HTTP |
+| `BILLING_BY_COMPANY` | GLOBAL |
+| `PROBLEMATIC_COMPANIES` | GLOBAL |
+| `ERROR_SUMMARY` | DUAL (fleet when company blank) |
+| `PRA_HEALTH` | DUAL |
+| `AGENT_HEALTH` | DUAL |
+| `BILLING_SUMMARY` | DUAL |
+| `COMPANY_HEALTH` | COMPANY |
+| `PRINTER_HEALTH` | COMPANY |
+| `COMPANY_DIAGNOSTIC` | COMPANY |
+
+```bash
+# Daily fleet report (preferred)
+bash scripts/cloud-live-ops-request.sh --operation=DAILY_OPS
+
+# Investigate one shop
+bash scripts/cloud-live-ops-request.sh --operation=COMPANY_DIAGNOSTIC --company-id=35
+```
 
 ## Remediation allow-list
 

@@ -202,6 +202,44 @@ abstract class LiveOpsTestCase extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('system_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('key')->unique();
+            $table->text('value');
+            $table->string('description')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->nullable();
+            $table->text('connection')->nullable();
+            $table->text('queue')->nullable();
+            $table->longText('payload')->nullable();
+            $table->longText('exception')->nullable();
+            $table->timestamp('failed_at')->useCurrent();
+        });
+
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue')->default('default');
+            $table->longText('payload')->nullable();
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at')->default(0);
+            $table->unsignedInteger('created_at')->default(0);
+        });
+
+        Schema::create('security_logs', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('action');
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->json('metadata')->nullable();
+            $table->timestamp('created_at')->useCurrent();
+        });
+
         DB::table('admin_users')->insert([
             'name' => 'Live Ops Admin',
             'email' => 'liveops-admin@taxnest.test',

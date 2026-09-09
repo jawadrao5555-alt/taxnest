@@ -39,3 +39,5 @@ jobs:
         run: bash scripts/tests/owner-merge-and-deploy-check.sh
       - name: Live Ops SSH host-key pin checks
         run: bash scripts/tests/live-ops-ssh-hostkey-check.sh
+      - name: Live Ops daily-ops allow-list checks
+        run: bash scripts/tests/live-ops-daily-ops-check.sh

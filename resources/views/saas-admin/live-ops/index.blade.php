@@ -45,13 +45,14 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <h2 class="text-sm font-semibold text-white mb-3">Run diagnostic</h2>
+            <p class="text-[11px] text-gray-500 mb-3"><strong>DAILY_OPS</strong> is the all-company daily report (no company id). <strong>SERVER_HEALTH</strong> is host/app/DB/queue only. Company-scoped ops (<code>COMPANY_HEALTH</code>, <code>COMPANY_DIAGNOSTIC</code>, <code>PRINTER_HEALTH</code>) still need a company. Dual ops (<code>ERROR_SUMMARY</code>, <code>PRA_HEALTH</code>, <code>AGENT_HEALTH</code>, <code>BILLING_SUMMARY</code>) are fleet-wide when company is blank.</p>
             <form method="post" action="{{ route('saas.admin.live-ops.diagnose') }}" class="space-y-3">
                 @csrf
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">Operation</label>
                     <select name="operation" class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                         @foreach($operations as $op)
-                            <option value="{{ $op }}" @selected($op === 'COMPANY_DIAGNOSTIC')>{{ $op }}</option>
+                            <option value="{{ $op }}" @selected($op === 'DAILY_OPS')>{{ $op }}</option>
                         @endforeach
                     </select>
                 </div>

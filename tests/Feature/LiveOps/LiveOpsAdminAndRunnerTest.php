@@ -24,10 +24,25 @@ class LiveOpsAdminAndRunnerTest extends LiveOpsTestCase
         $this->actingAs($staff, 'admin')->get('/admin/live-ops')->assertStatus(403);
     }
 
+    public function test_runner_api_daily_ops_without_company(): void
+    {
+        Config::set('live_ops.runner_token', str_repeat('c', 40));
+        $this->makeCompany('Fleet Shop');
+        $this->postJson('/api/live-ops/v1/diagnose', [
+            'operation' => 'DAILY_OPS',
+            'requester' => 'actions',
+        ], [
+            'X-Live-Ops-Token' => str_repeat('c', 40),
+        ])->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('report.operation', 'DAILY_OPS')
+            ->assertJsonPath('report.scope.company_id', null);
+    }
+
     public function test_admin_index_and_company_diagnostic(): void
     {
         $id = $this->makeCompany('UI Shop');
-        $this->actingAsAdmin()->get('/admin/live-ops')->assertOk()->assertSee('Live Ops');
+        $this->actingAsAdmin()->get('/admin/live-ops')->assertOk()->assertSee('Live Ops')->assertSee('DAILY_OPS');
         $this->actingAsAdmin()->get('/admin/live-ops/company/'.$id)
             ->assertOk()
             ->assertSee('Diagnostic report')

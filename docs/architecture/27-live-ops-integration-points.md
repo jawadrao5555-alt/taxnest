@@ -62,7 +62,7 @@ Use `live_ops_audit_events` + mirror `AdminAuditLog` where appropriate (`LiveOps
 
 ## Billing / health data
 
-Diagnostics already read subscriptions, agent telemetry, PRA failures, print failures via `LiveOpsDiagnosticsService`. Prefer these readers over raw SQL from agents.
+Diagnostics already read subscriptions, agent telemetry, PRA failures, print failures, and (DAILY_OPS / SERVER_HEALTH) read-only host/queue/log signals via `LiveOpsDiagnosticsService` + `LiveOpsPlatformHealth`. Prefer these readers over raw SQL from agents.
 
 ## Runner / Cloud Agent split
 

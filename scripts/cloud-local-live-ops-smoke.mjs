@@ -181,8 +181,8 @@ async function main() {
         else bad('audit trail empty or missing');
 
         // Diagnostics printer/PRA forms present
-        if (/PRINTER_HEALTH|PRA_HEALTH|COMPANY_DIAGNOSTIC/.test(idx)) ok('printer/PRA diagnostic ops listed');
-        else bad('printer/PRA ops missing');
+        if (/PRINTER_HEALTH|PRA_HEALTH|COMPANY_DIAGNOSTIC|DAILY_OPS|SERVER_HEALTH/.test(idx)) ok('printer/PRA/daily diagnostic ops listed');
+        else bad('printer/PRA/daily ops missing');
 
         const hard = (diag?.pageErrors || []).filter((e) => !/favicon/i.test(e));
         if (hard.length) {

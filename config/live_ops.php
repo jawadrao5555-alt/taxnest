@@ -25,6 +25,51 @@ return [
         'ERROR_SUMMARY',
         'COMPANY_DIAGNOSTIC',
         'PROBLEMATIC_COMPANIES',
+        'SERVER_HEALTH',
+        'DAILY_OPS',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Operation scope (company required vs global vs dual)
+    |--------------------------------------------------------------------------
+    | company = company_id or resolvable company_name required
+    | global  = fleet/platform; company_id ignored
+    | dual    = company-scoped when a company is provided, else fleet
+    */
+    'operation_scopes' => [
+        'COMPANY_HEALTH' => 'company',
+        'BILLING_SUMMARY' => 'dual',
+        'BILLING_BY_COMPANY' => 'global',
+        'PRA_HEALTH' => 'dual',
+        'AGENT_HEALTH' => 'dual',
+        'PRINTER_HEALTH' => 'company',
+        'ERROR_SUMMARY' => 'dual',
+        'COMPANY_DIAGNOSTIC' => 'company',
+        'PROBLEMATIC_COMPANIES' => 'global',
+        'SERVER_HEALTH' => 'global',
+        'DAILY_OPS' => 'global',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Platform health (read-only; no mutation)
+    |--------------------------------------------------------------------------
+    */
+    'platform' => [
+        'http_probes' => filter_var(env('LIVE_OPS_HTTP_PROBES', true), FILTER_VALIDATE_BOOLEAN),
+        'http_probes_in_tests' => false,
+        'http_timeout_seconds' => 5,
+        'public_url' => env('LIVE_URL', env('APP_URL')),
+        'websocket_health_url' => env('LIVE_OPS_WS_HEALTH_URL', 'http://127.0.0.1:6101/health'),
+        'log_scan_bytes' => 262144,
+        'systemd_in_tests' => false,
+        'systemd_units' => [
+            'php_fpm' => env('LIVE_FPM_SERVICE', 'php-fpm'),
+            'apache' => env('LIVE_APACHE_SERVICE', 'httpd'),
+            'mariadb' => env('LIVE_MARIADB_SERVICE', 'mariadb'),
+            'queue' => env('LIVE_QUEUE_SERVICE', 'taxnest-queue'),
+        ],
     ],
 
     /*

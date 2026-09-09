@@ -4,15 +4,15 @@
 # NEVER uses production SSH/DB/QA secrets.
 #
 # Usage:
-#   bash scripts/cloud-live-ops-request.sh --operation=COMPANY_DIAGNOSTIC --company-id=35
+#   bash scripts/cloud-live-ops-request.sh --operation=DAILY_OPS
 #   bash scripts/cloud-live-ops-request.sh --operation=BILLING_BY_COMPANY --date-from=2026-09-07 --date-to=2026-09-07
-#   bash scripts/cloud-live-ops-request.sh --operation=PROBLEMATIC_COMPANIES
+#   bash scripts/cloud-live-ops-request.sh --operation=COMPANY_DIAGNOSTIC --company-id=35
 #
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-OPERATION="COMPANY_DIAGNOSTIC"
+OPERATION="DAILY_OPS"
 COMPANY_ID=""
 COMPANY_NAME=""
 DATE_FROM=""
@@ -34,8 +34,16 @@ for arg in "$@"; do
 done
 
 case "$OPERATION" in
-  COMPANY_HEALTH|BILLING_SUMMARY|BILLING_BY_COMPANY|PRA_HEALTH|AGENT_HEALTH|PRINTER_HEALTH|ERROR_SUMMARY|COMPANY_DIAGNOSTIC|PROBLEMATIC_COMPANIES) ;;
+  DAILY_OPS|SERVER_HEALTH|COMPANY_HEALTH|BILLING_SUMMARY|BILLING_BY_COMPANY|PRA_HEALTH|AGENT_HEALTH|PRINTER_HEALTH|ERROR_SUMMARY|COMPANY_DIAGNOSTIC|PROBLEMATIC_COMPANIES) ;;
   *) echo "Disallowed operation: $OPERATION" >&2; exit 1 ;;
+esac
+case "$OPERATION" in
+  COMPANY_HEALTH|PRINTER_HEALTH|COMPANY_DIAGNOSTIC)
+    if [ -z "$COMPANY_ID" ] && [ -z "$COMPANY_NAME" ]; then
+      echo "company_id or company_name is required for $OPERATION" >&2
+      exit 1
+    fi
+    ;;
 esac
 
 if ! command -v gh >/dev/null 2>&1; then

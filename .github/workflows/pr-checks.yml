@@ -37,3 +37,5 @@ jobs:
         run: bash scripts/tests/deploy-unattended-safety-check.sh
       - name: Owner Merge & Deploy safety checks
         run: bash scripts/tests/owner-merge-and-deploy-check.sh
+      - name: Live Ops SSH host-key pin checks
+        run: bash scripts/tests/live-ops-ssh-hostkey-check.sh

@@ -82,6 +82,10 @@ if [ -f "$PC" ]; then
   grep -q 'owner-merge-and-deploy-check.sh' "$PC" \
     && ok "PR checks runs owner-merge-and-deploy-check.sh" \
     || bad "PR checks must run owner merge/deploy safety checks"
+
+  grep -q 'live-ops-ssh-hostkey-check.sh' "$PC" \
+    && ok "PR checks runs live-ops-ssh-hostkey-check.sh" \
+    || bad "PR checks must run Live Ops SSH host-key pin checks"
 fi
 
   if [ -f "$DP" ]; then

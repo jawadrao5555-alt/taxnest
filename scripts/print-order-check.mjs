@@ -29,7 +29,7 @@ function extractMethod(startPattern) {
 
 const srcChain = extractMethod(/runAutoPrintChain\(orderId, orderType = null/);
 const srcPrint = extractMethod(/async printReceipt\(onAfterPrint\)/);
-const srcInner = extractMethod(/async _printReceiptInner\(onAfterPrint\)/);
+const srcInner = extractMethod(/async _printReceiptInner\(onAfterPrint(?:,\s*printAttemptUuid)?\)/);
 const srcGrace = extractMethod(/async praPrintGrace\(\)/);
 
 // Build a component with the REAL extracted methods + minimal stubs.
@@ -52,6 +52,7 @@ const comp = Object.assign({
   // stubs
   kdsHandlesKot: () => false,
   printBeacon: () => {}, showToast: () => {}, openPrintConfirm: () => {},
+  _newPrintAttemptUuid: () => 'qa-print-attempt',
   queuePrintTimer: (fn) => fn(),
   $nextTick: (fn) => fn(),
   // DEFERRED enqueue (review catch): the real trySilentPrint is a network

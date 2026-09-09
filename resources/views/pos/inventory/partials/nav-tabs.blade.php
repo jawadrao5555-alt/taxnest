@@ -1,4 +1,4 @@
-{{-- Shared NestPOS inventory tab strip. Pass $active: dashboard|stock|movements|low-stock|adjust|transfers|stock-check|ingredients|recipes|master --}}
+{{-- Shared NestPOS inventory tab strip. Pass $active: dashboard|stock|movements|low-stock|adjust|transfers|stock-check|stock-in|ingredients|recipes|master --}}
 @php
     $invActive = $active ?? '';
     $tabOn = 'px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm';
@@ -26,5 +26,6 @@
     <a href="{{ route('pos.inventory.transfers') }}" class="{{ $invActive === 'transfers' ? $tabOn : $tabOff }}">{{ __('pos.branch_transfer') }}</a>
     @endif
     <a href="{{ route('pos.inventory.stock-check.index') }}" class="{{ $invActive === 'stock-check' ? $tabOn : $tabOff }}">{{ __('pos.stock_check') }}<x-new-badge feature="stock_check" class="ml-1" /></a>
+    <a href="{{ route('pos.inventory.stock-in.index') }}" class="{{ $invActive === 'stock-in' ? $tabOn : $tabOff }}">{{ __('pos.stock_in') }}</a>
     <a href="{{ route('pos.inventory-master') }}" class="{{ $invActive === 'master' ? $tabOn : $tabOff }}">{{ __('pos.inventory_master') }}</a>
 </div>

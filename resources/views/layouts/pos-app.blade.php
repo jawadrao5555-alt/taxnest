@@ -923,6 +923,10 @@
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 00-2-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012 2h2a2 2 0 012-2M9 5a2 2 0 012 2h2m-6 7l2 2 4-4"/></svg>
                                         {{ __('pos.stock_check') }}
                                     </a>
+                                    <a href="{{ route('pos.inventory.stock-in.index') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+                                        {{ __('pos.stock_in') }}
+                                    </a>
                                     @endif
                                     {{-- Per-branch stock (Task 1354): only worth showing to somebody who
                                          has TWO branches to move maal between, and never to a cashier. --}}

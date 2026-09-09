@@ -578,10 +578,11 @@ class RecipeInventoryService
 
     public static function adjustIngredientStock(
         int $companyId, int $ingredientId, float $delta, ?int $userId = null,
-        ?int $branchId = null, string $reason = 'Manual kitchen stock adjustment'
+        ?int $branchId = null, string $reason = 'Manual kitchen stock adjustment',
+        array $ledger = []
     ): array {
         return DB::transaction(function () use (
-            $companyId, $ingredientId, $delta, $userId, $branchId, $reason
+            $companyId, $ingredientId, $delta, $userId, $branchId, $reason, $ledger
         ) {
             $ingredient = Ingredient::where('company_id', $companyId)
                 ->where('id', $ingredientId)->lockForUpdate()->firstOrFail();
@@ -596,9 +597,15 @@ class RecipeInventoryService
                 $companyId, $ingredientId, $resolvedBranch, $delta,
                 $delta >= 0 ? $before : null
             );
+            $meta = array_merge(['reason' => $reason, 'delta' => $delta], $ledger['snapshot'] ?? []);
             self::writeIngredientLedger(
                 $companyId, $ingredientId, $resolvedBranch, self::MOVEMENT_ADJUSTMENT,
-                abs($delta), $after, $ingredientId, '', ['reason' => $reason, 'delta' => $delta], $userId
+                abs($delta), $after,
+                (int) ($ledger['reference_id'] ?? $ingredientId),
+                (string) ($ledger['reference_number'] ?? ''),
+                $meta,
+                $userId,
+                $ledger['reference_type'] ?? null
             );
             return ['before' => $before, 'after' => $after];
         });
@@ -799,9 +806,11 @@ class RecipeInventoryService
         int $referenceId,
         string $referenceNumber,
         ?array $meta,
-        ?int $userId
+        ?int $userId,
+        ?string $referenceType = null
     ): void {
         if (!Schema::hasTable('ingredient_movements')) return;
+        $resolvedType = $referenceType ?: (str_contains($type, 'return') ? 'pos_return' : 'pos_transaction');
         DB::table('ingredient_movements')->insert([
             'company_id' => $companyId,
             'ingredient_id' => $ingredientId,
@@ -809,7 +818,7 @@ class RecipeInventoryService
             'type' => $type,
             'quantity' => $quantity,
             'balance_after' => $balance,
-            'reference_type' => str_contains($type, 'return') ? 'pos_return' : 'pos_transaction',
+            'reference_type' => $resolvedType,
             'reference_id' => $referenceId,
             'reference_number' => $referenceNumber,
             'snapshot' => $meta ? json_encode($meta) : null,

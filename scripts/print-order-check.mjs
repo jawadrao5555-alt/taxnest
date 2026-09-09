@@ -6,8 +6,8 @@
 // KOT job is enqueued IMMEDIATELY (it needs no fiscal number) and never waits
 // behind praPrintGrace() — owner voice note 16 Aug 2026: KOT reached the
 // kitchen seconds late because it queued behind the receipt's bounded fiscal
-// grace + enqueue roundtrip. The receipt must be enqueued first without
-// waiting behind the non-blocking PRA grace probe.
+// grace + enqueue roundtrip. KOT stays immediate, and the receipt must also
+// enqueue without waiting behind the non-blocking PRA grace probe.
 import { readFileSync } from 'node:fs';
 
 const blade = readFileSync(new URL('../resources/views/pos/universal.blade.php', import.meta.url), 'utf8');
@@ -79,13 +79,12 @@ await sleep(50);
 if (events.length < 2) fail(`expected receipt + kot enqueues, got: ${JSON.stringify(events)}`);
 if (!events.includes('kot')) fail(`KOT never enqueued: ${JSON.stringify(events)}`);
 if (!events.includes('bill')) fail(`receipt never enqueued: ${JSON.stringify(events)}`);
-// Receipt must remain first, and neither job may wait behind praPrintGrace
+// KOT remains immediate, and neither job may wait behind praPrintGrace
 // (the first probe is 1.2s out).
-if (events[0] !== 'bill' || events[1] !== 'kot') {
+if (events[0] !== 'kot' || events[1] !== 'bill') {
   fail(`receipt/KOT order regressed: ${JSON.stringify(events)}`);
 }
-if (times.bill > times.kot) fail(`KOT enqueued before receipt: ${JSON.stringify(events)}`);
 if (times.kot > 1000) fail(`KOT delayed behind fiscal grace (${times.kot}ms after chain start): ${JSON.stringify(events)}`);
 if (times.bill > 1000) fail(`receipt blocked behind fiscal grace (${times.bill}ms while pra_status was pending)`);
 
-console.log(`PRINT-ORDER OK: silent fast path enqueued ${JSON.stringify(events)} — receipt first (${times.bill}ms), KOT after (${times.kot}ms), PRA grace non-blocking.`);
+console.log(`PRINT-ORDER OK: silent fast path enqueued ${JSON.stringify(events)} — KOT immediate (${times.kot}ms), receipt non-blocking (${times.bill}ms).`);

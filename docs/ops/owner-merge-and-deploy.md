@@ -14,7 +14,8 @@ available.
 
 ## Confirmation phrases
 
-Exactly one of (match spaces and case; em dash `—`, not a hyphen):
+After this file is on `origin/main`, exactly one of (match spaces and case;
+em dash `—`, not a hyphen):
 
 ```
 Approved — Merge & Deploy
@@ -24,6 +25,13 @@ Approved, put it live
 ```
 
 `Approved - Merge & Deploy` (hyphen) is **rejected**.
+
+**Actions checks out `main`, not the PR branch.** `scripts/owner-merge-and-deploy-request.sh`
+runs `origin/main`'s `decide()` before dispatch. A phrase that exists only on a
+feature branch is **not** live yet. Until this PR is squash-merged, origin/main
+accepts only `Approved — Merge & Deploy`. Do not send `Deploy kar do` to the
+Actions workflow on `main` until that alias is in `origin/main`'s
+`scripts/lib/owner-merge-and-deploy.py`.
 
 ## Steps (workflow is already on `main`)
 
@@ -88,5 +96,7 @@ start Deploy Production directly:
 
 The agent must re-verify the PR number, Ready state, required checks, unchanged
 HEAD SHA, `main` target, and mergeability; show those exact values; then run
-`scripts/owner-merge-and-deploy-request.sh`. It must **not** invent a
-`gh pr merge`.
+`scripts/owner-merge-and-deploy-request.sh`. That script gates confirm on
+**origin/main** `decide()` (what Actions will run). It must **not** invent a
+`gh pr merge`. If origin/main rejects an alias that only exists on the PR,
+use the phrase origin/main currently accepts (today: `Approved — Merge & Deploy`).

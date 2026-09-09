@@ -136,6 +136,76 @@ grep -q 'HTTP 403' "$REQ" && grep -q 'exit 3' "$REQ" \
 grep -q 'Deploy kar do' "$REQ" && grep -q 'Live kar do' "$REQ" \
   && ok "request script documents owner confirm aliases" \
   || bad "request script must list confirm aliases"
+grep -q -- '--payload-only' "$REQ" && grep -q -- '--payload-only' "$LIB" \
+  && ok "request script builds payload locally then gates on origin/main decide()" \
+  || bad "must use --payload-only plus origin/main --input-json"
+# Working-tree decide() must not be the Actions gate (aliases on a PR are not live yet).
+if grep -vE '^\s*#|--payload-only' "$REQ" | grep -A20 'decide-main.py' | grep -q -- '--input-json'; then
+  ok "Actions-gate decide() is origin/main copy via --input-json"
+else
+  bad "must pass payload to origin/main decide() with --input-json"
+fi
+
+python3 - "$LIB" <<'PY' && ok "this branch accepts all four owner confirm aliases" || bad "CONFIRM_ALIASES missing an owner phrase"
+import pathlib, sys
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+for needle in (
+    "Approved — Merge & Deploy",
+    "Deploy kar do",
+    "Live kar do",
+    "Approved, put it live",
+):
+    if needle not in text:
+        print("missing", needle, file=sys.stderr)
+        sys.exit(1)
+sys.exit(0)
+PY
+
+MAIN_LIB=$(git show origin/main:scripts/lib/owner-merge-and-deploy.py 2>/dev/null || true)
+if [ -n "$MAIN_LIB" ]; then
+  python3 - "$LIB" <<'PY' && ok "branch vs origin/main confirm gate is explicit" || bad "failed to compare origin/main confirm gate"
+import json, pathlib, subprocess, sys, tempfile, os
+branch_py = sys.argv[1]
+root = str(pathlib.Path(branch_py).resolve().parents[1])
+sha = "a" * 40
+payload = {
+    "confirm": "Deploy kar do",
+    "expected_head_sha": sha,
+    "owner": "o",
+    "repo": "r",
+    "origin_main_sha": "c" * 40,
+    "check_runs": [{"name": "validate", "conclusion": "success", "status": "completed"}],
+    "pr": {
+        "draft": False,
+        "merged": False,
+        "mergeable": True,
+        "mergeable_state": "clean",
+        "base": {"ref": "main"},
+        "head": {"ref": "cursor/example-0f83", "sha": sha, "repo": {"full_name": "o/r"}},
+    },
+    "successful_deploy_shas": [],
+}
+with tempfile.TemporaryDirectory() as tmp:
+    path = os.path.join(tmp, "payload.json")
+    open(path, "w", encoding="utf-8").write(json.dumps(payload))
+    branch = subprocess.run(["python3", branch_py, "--input-json", path], capture_output=True, text=True)
+    main = subprocess.run(["git", "show", "origin/main:scripts/lib/owner-merge-and-deploy.py"], capture_output=True, text=True)
+    if main.returncode != 0:
+        sys.exit(1)
+    main_py = os.path.join(tmp, "main.py")
+    open(main_py, "w", encoding="utf-8").write(main.stdout)
+    origin = subprocess.run(["python3", main_py, "--input-json", path], capture_output=True, text=True)
+    b = json.loads(branch.stdout)
+    o = json.loads(origin.stdout)
+    if b.get("action") != "merge_and_dispatch":
+        print("branch must accept Deploy kar do", b, file=sys.stderr)
+        sys.exit(1)
+    # origin/main may already have aliases after this PR lands; either reject or accept is OK,
+    # but the request script must not assume the working tree is what Actions runs.
+    print(f"branch action={b.get('action')} origin/main action={o.get('action')}")
+sys.exit(0)
+PY
+fi
 
 # --------------------------------------------------------------------------- Decision library (fixture matrix)
 python3 "$LIB" --self-test \

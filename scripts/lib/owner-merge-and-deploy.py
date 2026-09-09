@@ -439,6 +439,9 @@ def main(argv: list[str]) -> int:
             _flag(argv, "main-sha"),
             success,
         )
+        if "--payload-only" in argv:
+            print(json.dumps(payload, indent=2))
+            return 0
     else:
         raw = None
         if "--input-json" in argv:

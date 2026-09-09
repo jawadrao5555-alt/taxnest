@@ -4,7 +4,9 @@
 # After the owner EXPLICITLY approves in chat (canonical phrase or an
 # allow-listed alias), the Cloud Agent runs this script. It:
 #   1. Re-reads the PR (number, READY, targets main, mergeable, HEAD SHA).
-#   2. Runs the same decide() gates as GitHub Actions (dry, no mutate).
+#   2. Builds a decide() payload, then runs origin/main's
+#      scripts/lib/owner-merge-and-deploy.py (the copy Actions checks out).
+#      The working-tree copy may list extra aliases that are not live yet.
 #   3. Prints the exact PR number and HEAD SHA being sent.
 #   4. Attempts `gh workflow run owner-merge-and-deploy.yml`.
 #
@@ -31,10 +33,11 @@ Usage:
   scripts/owner-merge-and-deploy-request.sh <pull_number> <expected_head_sha> [confirm_phrase]
 
 Default confirm phrase: Approved — Merge & Deploy
-Allow-listed aliases (must match exactly, including spaces/case):
+Intended aliases (live only after they exist on origin/main):
   Deploy kar do
   Live kar do
   Approved, put it live
+Actions checks out main, so origin/main decide() is authoritative.
 EOF
 }
 
@@ -115,8 +118,20 @@ print(f"==> origin/main tip {sys.argv[2]}")
 print()
 PY
 
-set +e
+echo "==> Actions checks out origin/main decide() (not this PR branch)"
+if ! git fetch origin main >/dev/null 2>&1; then
+  echo "ERROR: cannot fetch origin/main; refuse to dispatch (cannot prove confirm)." >&2
+  exit 2
+fi
+if ! git show origin/main:scripts/lib/owner-merge-and-deploy.py > "$TMP/decide-main.py"; then
+  echo "ERROR: cannot read origin/main:scripts/lib/owner-merge-and-deploy.py" >&2
+  exit 2
+fi
+echo "    origin/main=$(git rev-parse origin/main)"
+echo
+
 python3 "$ROOT/scripts/lib/owner-merge-and-deploy.py" \
+  --payload-only \
   --pr-json "$TMP/pr.json" \
   --checks-json "$TMP/checks.json" \
   --confirm "$CONFIRM" \
@@ -124,14 +139,17 @@ python3 "$ROOT/scripts/lib/owner-merge-and-deploy.py" \
   --owner "$OWNER" \
   --repo "$NAME" \
   --main-sha "$MAIN_SHA" \
-  > "$TMP/decision.json"
+  > "$TMP/payload.json"
+
+set +e
+python3 "$TMP/decide-main.py" --input-json "$TMP/payload.json" > "$TMP/decision.json"
 DECIDE_RC=$?
 set -e
 
 python3 - "$TMP/decision.json" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1], encoding="utf-8"))
-print(f"==> decide() action={d.get('action')} ok={d.get('action') != 'reject'}")
+print(f"==> origin/main decide() action={d.get('action')} ok={d.get('action') != 'reject'}")
 print(f"    {d.get('reason')}")
 print()
 PY
@@ -139,7 +157,10 @@ cat "$TMP/decision.json"
 echo
 
 if [[ "${DECIDE_RC}" -eq 2 ]]; then
-  echo "ERROR: Owner Merge & Deploy request rejected. Do not merge. Do not deploy." >&2
+  echo "ERROR: origin/main Owner Merge & Deploy rejected this request." >&2
+  echo "Actions checks out main, not this PR branch. Do not merge. Do not deploy." >&2
+  echo "If this is a confirmation-phrase reject, re-run with a phrase origin/main currently accepts." >&2
+  echo "Canonical phrase on older main: Approved — Merge & Deploy" >&2
   exit 2
 fi
 if [[ "${DECIDE_RC}" -ne 0 ]]; then
@@ -149,7 +170,8 @@ fi
 
 ACTION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("action") or "")' "$TMP/decision.json")"
 if [[ "${ACTION}" == "reject" ]]; then
-  echo "ERROR: Owner Merge & Deploy request rejected. Do not merge. Do not deploy." >&2
+  echo "ERROR: origin/main Owner Merge & Deploy rejected this request. Do not merge. Do not deploy." >&2
+  echo "Actions checks out main, not this PR branch." >&2
   exit 2
 fi
 

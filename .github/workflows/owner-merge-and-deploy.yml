@@ -8,12 +8,14 @@
 # pull_number / expected_head_sha / confirm. Agents must never gh pr merge,
 # never use the GitHub PR Merge button, and never dispatch Deploy Production.
 #
-# Confirm input must be exactly one allow-listed phrase:
+# Confirm input must be exactly one allow-listed phrase **on the workflow
+# ref (main)**. This file's alias list is live only after it is on main:
 #   Approved — Merge & Deploy
 #   Deploy kar do
 #   Live kar do
 #   Approved, put it live
 # Hyphen "Approved - Merge & Deploy" is rejected.
+# scripts/owner-merge-and-deploy-request.sh runs origin/main decide() first.
 #
 # Flow:
 #   verify phrase + cursor/* + not draft + targets main + expected head SHA

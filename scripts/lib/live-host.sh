@@ -19,7 +19,11 @@
 # Addressed by IP on purpose. Either public hostname is one DNS edit away from
 # silently pointing our deploy at a different machine. The IP is the machine.
 LIVE_SSH_KEY="${LIVE_SSH_KEY:-/home/runner/workspace/.local/ssh/nayatel_vps_key}"
-LIVE_KNOWN_HOSTS="${LIVE_KNOWN_HOSTS:-/home/runner/workspace/scripts/lib/live-known-hosts}"
+# Pinned known_hosts next to this file (committed ED25519 for 115.186.164.126).
+# Do not default to /home/runner/workspace — GitHub Actions checkout is
+# $GITHUB_WORKSPACE (typically /home/runner/work/<repo>/<repo>).
+_LIVE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIVE_KNOWN_HOSTS="${LIVE_KNOWN_HOSTS:-${_LIVE_LIB_DIR}/live-known-hosts}"
 LIVE_SSH_USER="${LIVE_SSH_USER:-jawadrao5555}"
 LIVE_SSH_IP="${LIVE_SSH_IP:-115.186.164.126}"
 LIVE_SSH_HOST="${LIVE_SSH_USER}@${LIVE_SSH_IP}"
@@ -48,6 +52,7 @@ LIVE_SETTINGS_BASE="${LIVE_SETTINGS_BASE:-${LIVE_STATE_DIR}/.taxnest-settings-be
 LIVE_SSH_OPTS=(-i "$LIVE_SSH_KEY" -p "$LIVE_SSH_PORT" -o BatchMode=yes
                -o ConnectTimeout=15
                -o UserKnownHostsFile="$LIVE_KNOWN_HOSTS"
+               -o GlobalKnownHostsFile=/dev/null
                -o StrictHostKeyChecking=yes)
 
 live_ssh() { timeout "${LIVE_SSH_TIMEOUT:-120}" ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_SSH_HOST" "$@"; }

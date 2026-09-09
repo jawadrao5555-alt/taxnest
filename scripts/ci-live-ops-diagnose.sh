@@ -33,18 +33,34 @@ PY
   exit 0
 fi
 
-# shellcheck source=lib/live-host.sh
-source "$ROOT/scripts/lib/live-host.sh"
-live_host_assert_not_retired
+# SSH fallback: same host-key pin as Deploy Production. Never ssh-keyscan.
+# Never print PRODUCTION_SSH_PRIVATE_KEY.
 KEY_TMPDIR=$(mktemp -d)
+chmod 700 "$KEY_TMPDIR"
 trap 'rm -rf "$KEY_TMPDIR"' EXIT
+umask 077
 printf '%s\n' "${PRODUCTION_SSH_PRIVATE_KEY:?}" > "$KEY_TMPDIR/taxnest-production-deploy"
 chmod 600 "$KEY_TMPDIR/taxnest-production-deploy"
 export LIVE_SSH_KEY="$KEY_TMPDIR/taxnest-production-deploy"
-LIVE_SSH_OPTS=(-i "$LIVE_SSH_KEY" -p "$LIVE_SSH_PORT" -o BatchMode=yes
-               -o ConnectTimeout=15
-               -o UserKnownHostsFile="$LIVE_KNOWN_HOSTS"
-               -o StrictHostKeyChecking=yes)
+export LIVE_KNOWN_HOSTS="$ROOT/scripts/lib/live-known-hosts"
+# shellcheck source=lib/live-host.sh
+source "$ROOT/scripts/lib/live-host.sh"
+live_host_assert_not_retired
+require_live_key
+case " ${LIVE_SSH_OPTS[*]} " in
+  *" StrictHostKeyChecking=yes "*) ;;
+  *) echo "LIVE_SSH_OPTS must include StrictHostKeyChecking=yes" >&2; exit 1 ;;
+esac
+case " ${LIVE_SSH_OPTS[*]} " in
+  *" UserKnownHostsFile=$LIVE_KNOWN_HOSTS "*) ;;
+  *) echo "LIVE_SSH_OPTS must pin UserKnownHostsFile to $LIVE_KNOWN_HOSTS" >&2; exit 1 ;;
+esac
+case " ${LIVE_SSH_OPTS[*]} " in
+  *" StrictHostKeyChecking=no "*|*" StrictHostKeyChecking=accept-new "*)
+    echo "refusing weakened host-key checking" >&2
+    exit 1
+    ;;
+esac
 
 REMOTE=$(OPERATION="$OPERATION" COMPANY_ID="${COMPANY_ID:-}" COMPANY_NAME="${COMPANY_NAME:-}" \
   DATE_FROM="${DATE_FROM:-}" DATE_TO="${DATE_TO:-}" REQUESTER="${REQUESTER:-github-actions}" \

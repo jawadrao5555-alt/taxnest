@@ -6,6 +6,8 @@
 # Secrets stay in GitHub Environment "production".
 # Prefer HTTPS runner API when LIVE_OPS_RUNNER_TOKEN + LIVE_OPS_BASE_URL are set;
 # otherwise SSH + php artisan live-ops:diagnose (fixed allow-listed args only).
+# SSH uses committed scripts/lib/live-known-hosts + StrictHostKeyChecking=yes.
+# Never ssh-keyscan; never StrictHostKeyChecking=no.
 
 name: Live Ops Diagnose
 

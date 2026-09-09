@@ -40,7 +40,8 @@ Issue (owner)
     "Live kar do" | "Approved, put it live"
   → squash merge pinned to that head SHA; squash SHA must equal origin/main tip
   → Owner Merge & Deploy dispatches Deploy Production with exact squash SHA
-    (workflow_dispatch; required because GITHUB_TOKEN merges suppress push workflows)
+    (workflow_dispatch; required because GITHUB_TOKEN merges suppress push workflows,
+    and Deploy Production does not listen on push)
     Do not click Merge on the PR page. Do not start Deploy Production yourself.
   → Deploy Production **gate**: refuse GitHub merge-commits; SHA must be current
     origin/main tip; skip_elaan/allow_settings refused; stale waiting runs cancelled
@@ -60,11 +61,11 @@ keys, merge from the PR page, dispatch Deploy Production, approve Live Ops, or
 run authenticated live smoke itself. After explicit chat approval it may only
 run `scripts/owner-merge-and-deploy-request.sh`.
 
-GitHub PR Merge-button merge commits on `main` are **refused** by Deploy
-Production. Do not use the PR Merge button when Owner Merge & Deploy is
-available. Non-token pushes of a non-merge-commit tip still start Deploy
-Production via the `push` trigger (same `production-deploy` Environment + exact
-SHA + live-verify).
+GitHub PR Merge-button landings on `main` do **not** start Deploy Production
+(this workflow is `workflow_dispatch` only). Do not use the PR Merge button
+when Owner Merge & Deploy is available. Emergency tip-of-main deploy is an
+owner Actions `workflow_dispatch` of Deploy Production with `target_sha` set
+to the current origin/main tip (or empty, still fail-closed if main moved).
 
 ---
 

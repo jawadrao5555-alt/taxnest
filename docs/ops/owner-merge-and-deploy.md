@@ -53,9 +53,10 @@ Approved, put it live
 Do **not** approve Environment `production` for this path. That Environment is
 Live Ops only.
 
-Do **not** click **Merge** on the PR page. Merge-commit pushes to `main` are
-refused by Deploy Production. GitHub UI squash/rebase still fires `push` deploy
-and bypasses SHA pinning in this workflow — do not use them.
+Do **not** click **Merge** on the PR page. Deploy Production does **not** start
+on `push`, so a UI merge will not go live. Use Owner Merge & Deploy so the
+squash SHA is pinned and dispatched. GitHub UI squash/rebase still bypasses
+that pin if you later emergency-dispatch the resulting tip — do not use them.
 
 ## What the workflow rejects
 

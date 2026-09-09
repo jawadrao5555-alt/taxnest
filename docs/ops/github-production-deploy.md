@@ -10,7 +10,7 @@ Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS
   → workflow_dispatch Deploy Production with inputs.target_sha=<squash SHA>
     (GITHUB_TOKEN merges do not start push workflows; workflow_dispatch does)
   → GitHub Actions workflow ".github/workflows/deploy-production.yml"
-    (push of a GitHub merge commit is refused; do not use the PR Merge button)
+    (workflow_dispatch only — GitHub PR Merge button does not auto-deploy)
   → job "gate": requested SHA must equal current origin/main tip; skip_elaan
     and allow_settings are refused; stale waiting runs are cancelled
     (in_progress SSH is never cancelled)
@@ -68,7 +68,7 @@ These are separate gates:
 |---|---|---|
 | PR checks | `.github/workflows/pr-checks.yml` on `cursor/*` PRs. Does not merge or deploy. | Agent + owner review the report. |
 | Owner Merge & Deploy | Explicit Actions `workflow_dispatch` with confirmation phrase. Squash-merges one approved PR and hands the exact squash SHA to Deploy Production. | **Owner** (this is the merge/deploy initiation). |
-| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on **push to `main`** of a non-merge-commit tip (or `workflow_dispatch` with exact tip SHA). GitHub PR merge-commits are refused. | Repository fail-closed gates: refuse merge-commits, exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
+| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` **`workflow_dispatch` only** (Owner Merge & Deploy handoff with exact tip SHA, or owner emergency dispatch). Does not run on `push` or `pull_request`. GitHub PR merge-commits are still refused if dispatched. | Repository fail-closed gates: refuse merge-commits, exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
 | Live Ops (`production`) | `live-ops-diagnose.yml` / `live-ops-remediate.yml` | Required reviewers on Environment `production` — **keep MANUAL**. Also `OWNER_APPROVES_LIVE_OPS_FIX` for mutations. |
 
 Do not give Cloud Agent production SSH keys or Environment secrets. Cloud Agents
@@ -110,8 +110,8 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 
 | Step | Behavior |
 |---|---|
-| Trigger | `push` to `main`, or `workflow_dispatch` on `main` (Owner Merge & Deploy handoff passes `target_sha`) |
-| Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA. **Must equal current `origin/main` tip** at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. |
+| Trigger | `workflow_dispatch` on `main` only (Owner Merge & Deploy handoff passes `target_sha`). **Not** `push`. **Not** `pull_request`. |
+| Deploy SHA | `workflow_dispatch` with `target_sha` → that exact 40-char SHA; empty `target_sha` → `github.sha` (emergency). **Must equal current `origin/main` tip** at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. GitHub merge-commits are refused. |
 | Concurrency | **No workflow-level group.** `gate` uses `production-deploy-gate` with `cancel-in-progress: true` (newer tip supersedes older pre-apply). `deploy` uses `production-deploy` with `cancel-in-progress: false` — at most one SSH/apply; in-flight apply is never cancelled. After a SHA proves it is the tip, `gate` cancels other runs whose status is `waiting` (never `in_progress`). |
 | Gate | Job `deploy` uses `environment: production-deploy` (secrets + main-only branch policy; **no required reviewers**). Job `gate` does **not** use an Environment (no secrets, starts immediately, fail-closed on non-tip and on `skip_elaan`/`allow_settings`). |
 | Checkout | Exact deploy SHA (resolved), full history |

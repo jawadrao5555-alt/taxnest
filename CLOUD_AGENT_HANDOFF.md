@@ -114,7 +114,7 @@ Do not commit `.env`. Do not use production credentials in Cloud Agent VMs.
 
 ## Production deploy (GitHub Actions)
 
-After a `cursor/` PR is squash-merged to `main` by **Owner Merge & Deploy**, production deploys via GitHub Actions on Environment `production-deploy` — **not** by the Cloud Agent SSHing to the VPS, and **not** via the GitHub PR Merge button. Owner approval of the PR is not an SSH credential. Merge-commit pushes are refused.
+After a `cursor/` PR is squash-merged to `main` by **Owner Merge & Deploy**, production deploys via GitHub Actions on Environment `production-deploy` — **not** by the Cloud Agent SSHing to the VPS, and **not** via the GitHub PR Merge button. Owner approval of the PR is not an SSH credential. Deploy Production is `workflow_dispatch` only (no `push` auto-deploy). Merge-commits are refused if dispatched.
 
 - Workflow: `.github/workflows/deploy-production.yml`
 - Environment: `production-deploy` (secrets + `main`-only branch policy; **no required reviewers**)

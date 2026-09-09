@@ -73,13 +73,17 @@ if [ -f "$WF" ]; then
     && ok "workflow refuses GitHub PR merge-commits" \
     || bad "workflow must refuse Merge-button merge-commits"
 
-  grep -qE 'branches:[[:space:]]*$|[[:space:]]+- main' "$WF" \
-    && ok "workflow triggers on main" \
-    || bad "workflow should trigger on main"
-
-  grep -q 'workflow_dispatch' "$WF" \
-    && ok "workflow supports workflow_dispatch" \
-    || bad "workflow missing workflow_dispatch"
+  python3 - "$WF" <<'PY' && ok "workflow is workflow_dispatch only (no push / pull_request)" || bad "Deploy Production trigger must be workflow_dispatch only"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"(?ms)^on:\n(.*?)(?=^permissions:|^concurrency:|^jobs:)", text)
+on = m.group(1) if m else ""
+if "workflow_dispatch:" not in on:
+    print("missing workflow_dispatch", file=sys.stderr); sys.exit(1)
+if re.search(r"(?m)^\s*push:", on) or re.search(r"(?m)^\s*pull_request:", on):
+    print("must not auto-trigger on push or pull_request", file=sys.stderr); sys.exit(1)
+sys.exit(0)
+PY
 
   grep -q 'ref: \${{ steps.resolve.outputs.sha }}' "$WF" \
     && ok "checkout pins exact resolved deploy SHA" \

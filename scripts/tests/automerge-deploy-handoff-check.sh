@@ -99,11 +99,24 @@ if [ -f "$DP" ]; then
     && ok "Deploy Production still runs ci-live-verify" \
     || bad "must keep post-deploy live verify"
 
-  grep -A3 '^on:' "$DP" | grep -q 'push:' \
-    && ok "Deploy Production still triggers on push to main" \
-    || bad "must keep push-to-main trigger for non-token pushes"
+  python3 - "$DP" <<'PY' && ok "Deploy Production is workflow_dispatch only (no push auto-deploy)" || bad "Deploy Production must not auto-deploy on push"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"(?ms)^on:\n(.*?)(?=^permissions:|^concurrency:|^jobs:)", text)
+on = m.group(1) if m else ""
+if "workflow_dispatch:" not in on:
+    print("missing workflow_dispatch", file=sys.stderr); sys.exit(1)
+if re.search(r"(?m)^\s*push:", on):
+    print("push trigger would auto-deploy GitHub UI merges", file=sys.stderr); sys.exit(1)
+if re.search(r"(?m)^\s*pull_request:", on):
+    print("must not run on pull_request", file=sys.stderr); sys.exit(1)
+sys.exit(0)
+PY
+  grep -q 'Deploy Production does not run on push' "$DP" \
+    && ok "resolve step fail-closes if a push event is reintroduced" \
+    || bad "resolve must refuse push events"
   grep -q 'Merge pull request' "$DP" && grep -q 'rev-list --parents' "$DP" \
-    && ok "push/dispatch path refuses GitHub merge-commits" \
+    && ok "dispatch path refuses GitHub merge-commits" \
     || bad "Deploy Production must refuse Merge pull request merge-commits"
 fi
 

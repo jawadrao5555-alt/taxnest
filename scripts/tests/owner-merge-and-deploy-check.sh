@@ -155,6 +155,17 @@ grep -q 'group: production-deploy' "$DP" && grep -q 'cancel-in-progress: false' 
   grep -q 'Merge pull request' "$DP" && grep -q 'rev-list --parents' "$DP" \
     && ok "Deploy Production refuses GitHub PR merge-commits" \
     || bad "must refuse Merge-button merge-commits on Deploy Production"
+  python3 - "$DP" <<'PY' && ok "Deploy Production does not auto-deploy on push to main" || bad "must not keep on.push (PR Merge button bypass)"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r"(?ms)^on:\n(.*?)(?=^permissions:|^concurrency:|^jobs:)", text)
+on = m.group(1) if m else ""
+if re.search(r"(?m)^\s*push:", on):
+    sys.exit(1)
+if "workflow_dispatch:" not in on:
+    sys.exit(1)
+sys.exit(0)
+PY
 grep -qE '^[[:space:]]+environment: production[[:space:]]*$' "$DIAG" \
   && grep -qE '^[[:space:]]+environment: production[[:space:]]*$' "$REM" \
   && ok "Live Ops still uses Environment production" \

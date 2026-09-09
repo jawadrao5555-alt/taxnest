@@ -29,9 +29,11 @@ Issue (owner)
   → PR checks → automatic squash-merge (cursor/*)
   → Enable PR auto-merge dispatches Deploy Production with exact squash SHA
     (workflow_dispatch; required because GITHUB_TOKEN merges suppress push workflows)
-  → Deploy Production **gate**: SHA must be current origin/main tip; stale
-    Environment-waiting runs are cancelled (SSH in_progress is never cancelled)
-  → GitHub Environment "production" MANUAL approval (owner — not the agent)
+  → Deploy Production **gate**: SHA must be current origin/main tip;
+    skip_elaan/allow_settings refused; stale waiting runs cancelled
+    (SSH in_progress is never cancelled)
+  → GitHub Environment "production-deploy" (secrets + main-only branch policy;
+    no required reviewers — repository fail-closed gates)
   → Actions SSH (PRODUCTION_SSH_PRIVATE_KEY) applies exact target_sha
   → Actions runs scripts/ci-live-verify.sh (SHA + NestPOS markers; LIVE_QA_PASS)
   → PASS ⇒ may say LIVE VERIFIED (cite SHA + Actions URL)
@@ -40,11 +42,12 @@ Issue (owner)
 
 Cloud Agent **hands** the main commit to the protected deploy workflow via
 auto-merge plus an explicit `workflow_dispatch` of Deploy Production with
-`inputs.target_sha` set to the squash commit. The agent does **not** approve
-the Environment, hold SSH keys, or run authenticated live smoke itself.
+`inputs.target_sha` set to the squash commit. The agent does **not** hold SSH
+keys, approve Live Ops, or run authenticated live smoke itself.
 
 Human merges / non-token pushes to `main` still start Deploy Production via
-the normal `push` trigger (same Environment + exact SHA + live-verify).
+the normal `push` trigger (same `production-deploy` Environment + exact SHA +
+live-verify).
 
 ---
 
@@ -52,8 +55,8 @@ the normal `push` trigger (same Environment + exact SHA + live-verify).
 
 | Secret / capability | Where it lives | Cloud Agent |
 |---|---|---|
-| `PRODUCTION_SSH_PRIVATE_KEY` | Environment `production` | **Never** |
-| `LIVE_QA_PASS` | Environment `production` | **Never** |
+| `PRODUCTION_SSH_PRIVATE_KEY` | Environment `production-deploy` (deploy) / `production` (Live Ops) | **Never** |
+| `LIVE_QA_PASS` | Environment `production-deploy` | **Never** |
 | Production `.env` / DB / FBR / PRA tokens | VPS only | **Never** |
 | Customer credentials | — | **Never** |
 | Local Chrome BASE_URL | loopback only | Required |
@@ -68,10 +71,10 @@ Preserved deploy invariants:
 
 - Exact-SHA checkout (`github.sha` / `inputs.target_sha`) and **origin/main tip** equality
 - Concurrency group `production-deploy` on the SSH/apply job (`cancel-in-progress: false`)
-- Cancellable pre-apply `gate` (`production-deploy-gate`) so a newer tip can supersede a stale approval wait
+- Cancellable pre-apply `gate` (`production-deploy-gate`) so a newer tip can supersede a stale wait
 - Elaan freshness + idempotent insert (`deploy/elaan.yml`)
-- Never use `skip_elaan` merely to bypass a failure
-- Never bypass Environment approval
+- Never use `skip_elaan` merely to bypass a failure (unattended path **refuses** it)
+- Never hold production SSH/QA secrets; never auto-approve Environments with a token
 - Never destructive customer-data tests on production
 - Rollback remains `deployment/ROLLBACK.md` (not auto-invoked by Cloud Agent)
 
@@ -97,13 +100,16 @@ commit that fixed the reported issue. Public `/up` alone is insufficient.
 
 ### One-time owner setup
 
-On GitHub → Settings → Environments → `production`, add secret:
+On GitHub → Settings → Environments → `production-deploy`, add secrets:
 
 - `LIVE_QA_PASS` — password for the standing live QA NestPOS login
   (`qa.fullaudit@taxnest.com.pk`), same identity historically used by
   `scripts/live-screen-smoke.sh`
+- `PRODUCTION_SSH_PRIVATE_KEY` — dedicated `taxnest-production-deploy` key
 
-`PRODUCTION_SSH_PRIVATE_KEY` remains required as before.
+Do **not** add required reviewers on `production-deploy`. Restrict deployment
+branches to `main`. Live Ops continues to use Environment `production`
+(required reviewers).
 
 ---
 
@@ -112,7 +118,11 @@ On GitHub → Settings → Environments → `production`, add secret:
 1. Subscribe to PR checks / CI (`cursor-subscriptions`) — do not busy-poll.
 2. After squash-merge to `main`, observe Deploy Production with
    `bash scripts/cloud-issue-to-live-observe.sh --sha=<merged-sha>`.
-3. Owner must still **manually approve** Environment `production` when prompted.
+3. Normal Deploy Production on `production-deploy` does **not** wait for a
+   human Environment reviewer. Do **not** approve Live Ops (`production`)
+   unless the owner asked for a Live Ops mutation. Do **not** approve or
+   cancel an already-waiting legacy `production` Deploy Production run unless
+   the owner explicitly asks.
 4. If Actions **succeeds** (deploy + live-verify): report **LIVE VERIFIED** with
    SHA + workflow URL + what markers were covered.
 5. If Actions **fails**: enter the self-heal cycle below. Do **not** say DONE /

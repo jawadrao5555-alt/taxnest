@@ -29,7 +29,8 @@ PHPUnit passed. The original reported issue must have been re-tested successfull
 **[`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md)**.
 Auto-merge squash-merges, then **workflow_dispatch** hands the exact squash SHA
 to Deploy Production (GITHUB_TOKEN merges do not start push workflows).
-Environment approval stays **manual**. Actions runs `scripts/ci-live-verify.sh`.
+Normal deploys use Environment `production-deploy` (no required reviewers;
+repository fail-closed gates). Actions runs `scripts/ci-live-verify.sh`.
 On failure, run the self-heal cycle (max **3** iterations). Say **LIVE VERIFIED**
 only after that Actions step passes. Observe with
 `bash scripts/cloud-issue-to-live-observe.sh` (secret-free).
@@ -42,8 +43,9 @@ only. Secrets stay in Environment `production`. Diagnosis ≠ approval.
 **Production is out of bounds for the agent process:** never access/modify/deploy
 production directly; never use production credentials, live customer data,
 production DB, FBR/PRA production tokens, or production SSH keys. Deploy remains
-GitHub Actions + manual Environment approval. Cloud Agents never receive
-`PRODUCTION_SSH_PRIVATE_KEY` or `LIVE_QA_PASS`.
+GitHub Actions on Environment `production-deploy` (secrets never in the agent).
+Cloud Agents never receive `PRODUCTION_SSH_PRIVATE_KEY` or `LIVE_QA_PASS`.
+Live Ops Environment `production` keeps required reviewers.
 
 ## Product map
 
@@ -63,7 +65,7 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 6. Commit only the task’s intentional changes.
 7. Push the feature branch to GitHub.
 8. Open a PR targeting **`main`**.
-9. **Do not click Merge** and do not approve the production Environment. After **PR checks** succeed, Actions requests GitHub **native squash auto-merge**. GitHub still waits for any required status checks and does not bypass them. Landing on `main` then starts **Deploy Production**, which still waits for **manual** Environment approval.
+9. **Do not click Merge** and do not approve Live Ops Environment `production`. After **PR checks** succeed, Actions requests GitHub **native squash auto-merge**. GitHub still waits for any required status checks and does not bypass them. Landing on `main` then starts **Deploy Production** on Environment `production-deploy` (no required reviewers; repository fail-closed gates).
 10. If a change is wrong, **preserve branch/PR history** so the change can be safely reverted. Do not force-rewrite shared history to hide mistakes.
 
 ## Testing
@@ -105,16 +107,16 @@ Do not commit `.env`. Do not use production credentials in Cloud Agent VMs.
 
 ## Production deploy (GitHub Actions)
 
-After a `cursor/` PR is squash-merged to `main` (GitHub auto-merge after checks, or a manual merge), production is intended to deploy via GitHub Actions + **manual** Environment approval — **not** by the Cloud Agent SSHing to the VPS. Auto-merge of the PR is not production approval.
+After a `cursor/` PR is squash-merged to `main` (GitHub auto-merge after checks, or a manual merge), production is intended to deploy via GitHub Actions on Environment `production-deploy` — **not** by the Cloud Agent SSHing to the VPS. Auto-merge of the PR is not an SSH credential.
 
 - Workflow: `.github/workflows/deploy-production.yml`
-- Environment: `production` (required reviewers approve)
+- Environment: `production-deploy` (secrets + `main`-only branch policy; **no required reviewers**)
 - Secret: `PRODUCTION_SSH_PRIVATE_KEY` (dedicated `taxnest-production-deploy` key only)
 - Docs: `docs/ops/github-production-deploy.md`
 - Rollback: `deployment/ROLLBACK.md`
-- **What's New / Elaan:** for a POS-visible production change, put a unique spec in `deploy/elaan.yml` (see `deploy/elaan.example.yml`). After the owner approves the GitHub Environment, Actions inserts that `AppUpdate` on live via `scripts/elaan-insert.sh`. Agents must **not** write production `app_updates` or SSH to the VPS. Never reuse the Daily L001 title. Infra-only deploys may omit the spec; the freshness gate still applies unless the owner uses emergency `skip_elaan`.
+- **What's New / Elaan:** for a POS-visible production change, put a unique spec in `deploy/elaan.yml` (see `deploy/elaan.example.yml`). Actions inserts that `AppUpdate` on live via `scripts/elaan-insert.sh`. Agents must **not** write production `app_updates` or SSH to the VPS. Never reuse the Daily L001 title. Unattended Deploy Production **refuses** `skip_elaan`.
 
-Agents must **not** click Merge, approve the Environment, or run a real production deploy unless the owner explicitly instructs them to. They also must **not** receive production SSH keys, production secrets, live database access, or customer credentials.
+Agents must **not** click Merge, approve Live Ops Environment `production`, or run a real production deploy unless the owner explicitly instructs them to. They also must **not** receive production SSH keys, production secrets, live database access, or customer credentials.
 
 ## PR auto-merge (GitHub native, squash)
 
@@ -123,7 +125,7 @@ Permanent workflow (applies to **future** Cloud Agent PRs once these files are o
 1. Agent opens a non-draft, same-repo PR to `main` from a `cursor/*` branch.
 2. `.github/workflows/pr-checks.yml` runs (no production secrets, no deploy).
 3. On success, `.github/workflows/enable-pr-auto-merge.yml` (`workflow_run` on the default branch) requests GitHub **native squash auto-merge**. If GitHub reports the PR is already **CLEAN** (mergeable, nothing left to wait for), `enablePullRequestAutoMerge` is rejected with "Pull request is in clean status"; the workflow then squash-merges that same PR-checks SHA. It still cannot skip required checks: GitHub’s merge API refuses a blocked PR, and the job only runs after **PR checks** succeeded.
-4. Push to `main` may start **Deploy Production**, which still uses Environment `production` and waits for the owner’s **manual** approval before any SSH.
+4. Push to `main` may start **Deploy Production** on Environment `production-deploy` (no required reviewers; exact-SHA + Elaan + live-verify still apply). Live Ops stays on Environment `production` with required reviewers.
 
 Owner GitHub settings (one-time): **Allow auto-merge**, **Allow squash merging**, and a ruleset/branch protection that requires the **PR checks / validate** job on `main`. Without that required check, GitHub may squash as soon as auto-merge is enabled (which is only after PR checks already succeeded).
 

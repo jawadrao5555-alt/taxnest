@@ -9,9 +9,11 @@ Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS
     (GITHUB_TOKEN merges do not start push workflows; workflow_dispatch does)
   → OR a human push to main starts Deploy Production with github.sha
   → GitHub Actions workflow ".github/workflows/deploy-production.yml"
-  → job "gate": requested SHA must equal current origin/main tip; stale waiting
-    Environment-approval runs are cancelled (in_progress SSH is never cancelled)
-  → GitHub Environment "production" (required reviewers approve — MANUAL)
+  → job "gate": requested SHA must equal current origin/main tip; skip_elaan
+    and allow_settings are refused; stale waiting runs are cancelled
+    (in_progress SSH is never cancelled)
+  → GitHub Environment "production-deploy" (secrets + main-only branch policy;
+    no required reviewers — protection is repository fail-closed gates)
   → job "deploy": re-check tip, then SSH with dedicated deploy key "taxnest-production-deploy"
   → insert committed Elaan spec on live (scripts/elaan-insert.sh, idempotent)
   → existing Elaan freshness gate
@@ -19,7 +21,7 @@ Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS
   → scripts/ci-live-verify.sh (live HEAD == TARGET_SHA + NestPOS markers)
 ```
 
-Deploy Production **never** pushes to `main` and **never** runs on `pull_request`. Auto-merge of a PR is not production approval. Agents and CI must not treat a green PR-checks run as permission to SSH or skip Environment reviewers.
+Deploy Production **never** pushes to `main` and **never** runs on `pull_request`. Auto-merge of a PR is not an SSH credential. Agents and CI must not treat a green PR-checks run as permission to SSH. Normal trusted deploys must **not** wait for a human Environment reviewer. Live Ops stays on a **separate** Environment (`production`) that **keeps** required reviewers.
 
 ## Auto-merge → Deploy Production handoff
 
@@ -35,55 +37,69 @@ Supported handoff (no Cloud Agent secrets):
 4. `workflow_dispatch` is exempt from GITHUB_TOKEN event suppression, so Deploy Production starts.
 5. Deploy Production **gate** checks out that SHA and refuses it unless it is
    **exactly** the current `origin/main` tip (ancestor-only is not enough).
-   It then cancels other Deploy Production runs that are still `waiting` for
-   Environment approval. Job `deploy` keeps Environment approval + concurrency
-   group `production-deploy` with `cancel-in-progress: false`, re-checks the
-   tip, applies that SHA, then runs `ci-live-verify.sh` with the same SHA.
+   `skip_elaan` / `allow_settings` fail closed here. The gate then cancels other
+   Deploy Production runs that are still `waiting`. Job `deploy` uses
+   Environment `production-deploy` (secrets only) + concurrency group
+   `production-deploy` with `cancel-in-progress: false`, re-checks the tip,
+   applies that SHA, then runs `ci-live-verify.sh` with the same SHA. Never
+   auto-approve Environment deployments with a GitHub token.
 
 Static proof: `bash scripts/tests/automerge-deploy-handoff-check.sh`.
 
-## Cloud Agent PR auto-merge vs production approval
+## Cloud Agent PR auto-merge vs production deploy vs Live Ops
 
 These are separate gates:
 
 | Gate | What happens | Who/what waits |
 |---|---|---|
-| PR checks + GitHub auto-merge | Enables **squash** auto-merge on same-repo `cursor/*` PRs to `main` after `.github/workflows/pr-checks.yml` succeeds (`enablePullRequestAutoMerge`). Does not use `PRODUCTION_SSH_PRIVATE_KEY` or Environment `production`. | GitHub required status checks (configure **PR checks / validate** as required on `main`). |
-| Production Environment | `.github/workflows/deploy-production.yml` on **push to `main`** (or `workflow_dispatch`) | Required reviewers on Environment `production` — **keep MANUAL**. |
+| PR checks + GitHub auto-merge | Enables **squash** auto-merge on same-repo `cursor/*` PRs to `main` after `.github/workflows/pr-checks.yml` succeeds (`enablePullRequestAutoMerge`). Does not use `PRODUCTION_SSH_PRIVATE_KEY` or any production Environment. | GitHub required status checks (configure **PR checks / validate** as required on `main`). |
+| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on **push to `main`** (or `workflow_dispatch` with exact tip SHA) | Repository fail-closed gates: exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
+| Live Ops (`production`) | `live-ops-diagnose.yml` / `live-ops-remediate.yml` | Required reviewers on Environment `production` — **keep MANUAL**. Also `OWNER_APPROVES_LIVE_OPS_FIX` for mutations. |
 
 One-time repo settings: Settings → General → **Allow auto-merge** and **Allow squash merging**. Do not give Cloud Agent production SSH keys or Environment secrets.
 
 ## What you must configure in GitHub (manual)
 
-1. **Environment name:** `production`  
-   Repo → Settings → Environments → New environment → name exactly `production`.
+Two Environments exist on purpose. GitHub Environment protection is **per Environment, not per workflow**. Putting Deploy Production and Live Ops on the same Environment made every normal deploy wait for a human click.
 
-2. **Required reviewers:** add yourself (and any other owners) so every production deploy waits for explicit approval. This is the production gate.
+1. **Deploy Environment name:** `production-deploy`  
+   Repo → Settings → Environments → New environment → name exactly `production-deploy`.
 
-3. **Environment secrets:**
+2. **Do not add required reviewers** on `production-deploy`. That was the repetitive bottleneck. Safety is the repository gates above, plus:
+
+   - Deployment branches: **selected branches / `main` only** (already the model on `production`)
+   - Secrets stay **Environment-scoped** (never repository-wide `PRODUCTION_SSH_PRIVATE_KEY` / `LIVE_QA_PASS`)
+
+3. **`production-deploy` secrets:**
    - Name (exact): `PRODUCTION_SSH_PRIVATE_KEY`
    - Value: the **private** half of the dedicated VPS deploy key whose public key comment is `taxnest-production-deploy`
-   - Scope: Environment `production` only (not a repository-wide secret unless you intentionally want that — prefer Environment)
+   - Scope: Environment `production-deploy` only
    - Name (exact): `LIVE_QA_PASS`
    - Value: password for the standing live NestPOS QA login (`qa.fullaudit@taxnest.com.pk`) used **only** by `scripts/ci-live-verify.sh` after deploy
-   - Scope: Environment `production` only — **never** give this to Cloud Agents
+   - Scope: Environment `production-deploy` only — **never** give this to Cloud Agents
 
-4. **Do not** store or use the old Replit key (`.local/ssh/nayatel_vps_key`) in Actions.
+4. **Live Ops Environment `production`:** keep **required reviewers**. Copy the SSH key here only if Live Ops still SSHs (plus `LIVE_OPS_RUNNER_TOKEN` / `LIVE_OPS_BASE_URL` as today). Do **not** remove `production` reviewers to “make deploy faster” — that would auto-start Live Ops remediations.
 
-5. Protect `main` with a ruleset that **requires** the status check **PR checks / validate** so squash auto-merge cannot land a commit whose latest checks failed. Optional: also require PR reviews. Production Environment approval stays independent and **manual**.
+5. **Do not** store or use the old Replit key (`.local/ssh/nayatel_vps_key`) in Actions.
+
+6. Protect `main` with a ruleset that **requires** the status check **PR checks / validate** so squash auto-merge cannot land a commit whose latest checks failed. Optional: also require PR reviews.
+
+7. **Never** auto-approve Environment deployments with a GitHub token. **Never** move production SSH/QA secrets to repository secrets merely to skip reviewers.
+
+If `production-deploy` secrets are missing, Deploy Production fail-closes (empty `PRODUCTION_SSH_PRIVATE_KEY`) and does not SSH. That is safer than waiting on Live Ops reviewers.
 
 ## What the workflow does
 
 | Step | Behavior |
 |---|---|
 | Trigger | `push` to `main`, or `workflow_dispatch` on `main` (auto-merge handoff passes `target_sha`) |
-| Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA. **Must equal current `origin/main` tip** at gate time and again after Environment approval, immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. |
-| Concurrency | **No workflow-level group.** `gate` uses `production-deploy-gate` with `cancel-in-progress: true` (newer tip supersedes older pre-apply). `deploy` uses `production-deploy` with `cancel-in-progress: false` — at most one SSH/apply; in-flight apply is never cancelled. After a SHA proves it is the tip, `gate` cancels other runs whose status is `waiting` (Environment approval only — never `in_progress`). |
-| Gate | Job `deploy` uses `environment: production` → GitHub waits for required reviewers. Job `gate` does **not** use the Environment (no secrets, starts immediately, fail-closed on non-tip). |
+| Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA. **Must equal current `origin/main` tip** at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. |
+| Concurrency | **No workflow-level group.** `gate` uses `production-deploy-gate` with `cancel-in-progress: true` (newer tip supersedes older pre-apply). `deploy` uses `production-deploy` with `cancel-in-progress: false` — at most one SSH/apply; in-flight apply is never cancelled. After a SHA proves it is the tip, `gate` cancels other runs whose status is `waiting` (never `in_progress`). |
+| Gate | Job `deploy` uses `environment: production-deploy` (secrets + main-only branch policy; **no required reviewers**). Job `gate` does **not** use an Environment (no secrets, starts immediately, fail-closed on non-tip and on `skip_elaan`/`allow_settings`). |
 | Checkout | Exact deploy SHA (resolved), full history |
 | SSH | Writes `PRODUCTION_SSH_PRIVATE_KEY` to a temp file (mode 600), uses `scripts/lib/live-known-hosts` + `StrictHostKeyChecking=yes` |
-| Elaan spec | If `deploy/elaan.yml` is in the commit, `scripts/elaan-insert.sh --from-file --deploy-sha=$TARGET_SHA` creates a published `AppUpdate` whose **title is `{spec title} [deploy {40-char SHA}]`**. A new SHA therefore cannot no-op against an older row with the same human title (Deploy Production #15 / AppUpdate #265). Idempotent on the **qualified** title: same-SHA retry is `ELAAN_EXISTS` (not duplicated or re-dated). The reserved Daily L001 title is rejected. `skip_elaan` skips this insert. |
-| Elaan gate | Freshness check: a published `pos`/`all` row must have `created_at` after the last deploy marker for a **new** SHA. A **same-SHA** rerun/refresh (live HEAD and marker commit both equal the TARGET_SHA) may pass only when that SHA-qualified published title still exists as a published `pos`/`all` AppUpdate — the same human title from an older SHA does not count, and existing titles are never re-dated or duplicated. Infra-only deploys omit `deploy/elaan.yml` and use `skip_elaan`, or insert on live after the last marker. |
+| Elaan spec | If `deploy/elaan.yml` is in the commit, `scripts/elaan-insert.sh --from-file --deploy-sha=$TARGET_SHA` creates a published `AppUpdate` whose **title is `{spec title} [deploy {40-char SHA}]`**. A new SHA therefore cannot no-op against an older row with the same human title (Deploy Production #15 / AppUpdate #265). Idempotent on the **qualified** title: same-SHA retry is `ELAAN_EXISTS` (not duplicated or re-dated). The reserved Daily L001 title is rejected. Unattended Deploy Production **refuses** `skip_elaan`. |
+| Elaan gate | Freshness check: a published `pos`/`all` row must have `created_at` after the last deploy marker for a **new** SHA. A **same-SHA** rerun/refresh (live HEAD and marker commit both equal the TARGET_SHA) may pass only when that SHA-qualified published title still exists as a published `pos`/`all` AppUpdate — the same human title from an older SHA does not count, and existing titles are never re-dated or duplicated. Infra-only deploys omit `deploy/elaan.yml` only when a qualifying published row already exists; unattended Deploy Production **cannot** skip this gate. |
 | Apply | `scripts/ci-deploy-production.sh` → shared `scripts/lib/live-remote-apply.sh` |
 | Live verify | Same job runs `scripts/ci-live-verify.sh`: live HEAD == deploy SHA, `/up` 200, NestPOS QA login + feature markers (not merely HTTP 200). Uses Environment secrets `PRODUCTION_SSH_PRIVATE_KEY` + `LIVE_QA_PASS`. Failure fails the workflow — Cloud Agents must start a new diagnosis cycle (`docs/ops/cloud-agent-issue-to-live.md`). |
 | Semantics | Same remote core as `deploy-live.sh`: flock lock, maintenance `artisan down` (200), exact-SHA checkout, composer if needed, migrate only when the gap includes migrations, config/route/view cache rebuild, ownership + SELinux repair, PHP-FPM reload with OPcache proof, `taxnest-queue` restart, `artisan up`, homepage 200, cache-fresh probe, deploy marker. Fail closed (site stays in maintenance on apply failure). |
@@ -93,9 +109,9 @@ One-time repo settings: Settings → General → **Allow auto-merge** and **Allo
 
 Manual `workflow_dispatch` inputs:
 
-- `target_sha` — exact 40-char **current origin/main tip** to deploy (used by auto-merge handoff). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not wait for approval or SSH. Leave empty only for emergency dispatch of `github.sha`, which still must equal the tip at run time.
-- `skip_elaan` — emergency only; skips **both** committed-spec insert and the What's New freshness gate
-- `allow_settings` — same meaning as `deploy-live.sh --allow-settings=...`
+- `target_sha` — exact 40-char **current origin/main tip** to deploy (used by auto-merge handoff). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not SSH. Leave empty only for emergency dispatch of `github.sha`, which still must equal the tip at run time.
+- `skip_elaan` — **refused** on this workflow (fail-closed). Emergency skip is `scripts/deploy-live.sh --no-elaan` on an owner workstation, never Cloud Agent, never a token auto-approve.
+- `allow_settings` — **refused** on this workflow (fail-closed). Emergency allow-list is `scripts/deploy-live.sh --allow-settings=...` on an owner workstation.
 
 ## Committed Elaan spec (`deploy/elaan.yml`)
 
@@ -105,7 +121,7 @@ For a production-bound PR that should announce a change:
 
 1. Copy `deploy/elaan.example.yml` → `deploy/elaan.yml` (or edit the existing file).
 2. Prefer a **new human title**. Never reuse `Daily L001 ke liye roz Reset dabana zaroori nahi`. CI always appends ` [deploy {TARGET_SHA}]` before insert, so a new SHA cannot reuse an older AppUpdate even if the human title is unchanged. Same-SHA Actions reruns no-op that qualified title (no re-date, no duplicate).
-3. After Environment approval, Actions inserts the SHA-qualified row on live, then the freshness gate must still pass. A new SHA needs a **time-fresh** row (the insert just created it). `ELAAN_EXISTS` on an old human title is **not** freshness.
+3. After the tip/Elaan gates pass, Actions inserts the SHA-qualified row on live, then the freshness gate must still pass. A new SHA needs a **time-fresh** row (the insert just created it). `ELAAN_EXISTS` on an old human title is **not** freshness.
 
 The freshness gate counts `audience IN ('pos','all')` only. An `fbr_pos`-only spec will insert but will **not** satisfy the gate.
 
@@ -115,36 +131,41 @@ The freshness gate counts `audience IN ('pos','all')` only. An `fbr_pos`-only sp
 
 | Key | Role |
 |---|---|
-| `taxnest-production-deploy` | Dedicated VPS authorized_keys entry for CI. Private key → GitHub Environment secret `PRODUCTION_SSH_PRIVATE_KEY` only. |
+| `taxnest-production-deploy` | Dedicated VPS authorized_keys entry for CI. Private key → GitHub Environment `production-deploy` secret `PRODUCTION_SSH_PRIVATE_KEY` only (Live Ops may hold a copy on Environment `production`). |
 | `.local/ssh/nayatel_vps_key` | Legacy Replit manual path for `scripts/deploy-live.sh`. **Not used by Actions.** |
 
 Host identity is pinned in `scripts/lib/live-known-hosts`. Host metadata (IP, paths, services) lives in `scripts/lib/live-host.sh`.
 
 ## Relationship to `scripts/deploy-live.sh`
 
-`deploy-live.sh` remains the manual/Replit one-command deploy (local preflights, optional SW bump, push workspace HEAD to `main`, then remote apply). Both paths call `scripts/lib/live-remote-apply.sh` for the remote mutation core. Prefer the GitHub Actions path once the Environment secret and reviewers are configured.
+`deploy-live.sh` remains the manual/Replit one-command deploy (local preflights, optional SW bump, push workspace HEAD to `main`, then remote apply). Both paths call `scripts/lib/live-remote-apply.sh` for the remote mutation core. Prefer the GitHub Actions path once Environment `production-deploy` secrets and the `main`-only branch policy are configured. Use `deploy-live.sh` for emergencies that need `--no-elaan` or `--allow-settings`.
 
 ## Issue → live (Cloud Agent)
 
 After a `cursor/*` PR merges, follow **`docs/ops/cloud-agent-issue-to-live.md`**:
 
 - Auto-merge squash + `workflow_dispatch` handoff starts Deploy Production with the exact squash SHA (GITHUB_TOKEN merges do not fire `push` workflows)
-- Environment approval stays **manual**
+- Normal deploys do **not** wait for Environment reviewers (`production-deploy` has none)
 - Actions runs post-deploy `ci-live-verify.sh` (SHA + NestPOS markers)
 - Cloud Agents observe with `bash scripts/cloud-issue-to-live-observe.sh` (secret-free)
 - On live-verify failure: autonomous fix→PR→redeploy cycle (max 3); never claim LIVE VERIFIED early
 - Handoff static proof: `bash scripts/tests/automerge-deploy-handoff-check.sh`
+- Unattended-path proof: `bash scripts/tests/deploy-unattended-safety-check.sh`
 
 ## Rollback
 
 Rollback is unchanged and is **not** automated by this workflow. Follow `deployment/ROLLBACK.md`.
 
-## Safety checklist for reviewers
+## Safety checklist (automated; owner spot-checks on failure)
 
-Before approving a production Environment deployment:
+The unattended path already fail-closes unless:
 
-- Confirm the commit is the **current** `origin/main` tip (not an older merge). If main has moved, reject / ignore the request and approve the newest Deploy Production run instead.
-- Confirm migrations / settings impact are expected
-- Confirm an Elaan exists for this deploy (`deploy/elaan.yml` in the commit, or a live insert after the last marker) unless this is an explicit emergency with `skip_elaan`
+- The commit is the **current** `origin/main` tip (not an older merge / not unmerged)
+- Elaan freshness passes (`deploy/elaan.yml` insert + published pos/all row). `skip_elaan` is refused here.
+- Live dirty worktree is clean or only the expected `public/sw.js` stamp
+- Exact-SHA apply + `ci-live-verify.sh` succeed
+- `skip_elaan` / `allow_settings` were not set
 
 If a deploy fail-closes on a dirty live `public/sw.js` whose `git diff HEAD -- public/sw.js` is **not** solely the live-remote-apply `CACHE_VERSION` stamp, treat it as a real live edit. Do not `git reset --hard`, stash, or checkout until that diff is understood. If the diff **is** solely that stamp, no destructive reconciliation is required — the classifier allows it and `remote_apply` restores then restamps.
+
+Live Ops Environment `production` still has **required reviewers**. Do not approve Live Ops remediations unless you intend a mutation.

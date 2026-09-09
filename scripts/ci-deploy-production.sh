@@ -81,7 +81,7 @@ elif [ -n "${LIVE_SSH_KEY:-}" ] && [ -f "${LIVE_SSH_KEY}" ]; then
       ;;
   esac
 else
-  fail "PRODUCTION_SSH_PRIVATE_KEY is not set (GitHub Environment secret 'production') and no safe LIVE_SSH_KEY file was provided"
+  fail "PRODUCTION_SSH_PRIVATE_KEY is not set (GitHub Environment secret 'production-deploy') and no safe LIVE_SSH_KEY file was provided"
 fi
 
 # Always use the pinned known-hosts from this checkout — never an empty known-hosts file.
@@ -150,9 +150,10 @@ LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
   || fail "cannot reach live server over SSH (or live git repo broken)"
 echo "live HEAD (before): $LIVE_HEAD_BEFORE"
 
-# After Environment approval + proven SSH, insert the committed spec (if any)
+# After proven SSH, insert the committed spec (if any)
 # using the existing elaan-insert.sh path. Then the unchanged freshness gate
-# still has to pass. skip_elaan skips BOTH insert and the gate (emergency).
+# still has to pass. Unattended Deploy Production refuses skip_elaan; the
+# workstation path scripts/deploy-live.sh --no-elaan remains the emergency skip.
 insert_committed_elaan_spec() {
   step "Committed Elaan spec (deploy/elaan.yml) — insert on live if present"
   if [ "$NO_ELAAN" = "1" ] || [ "${SKIP_ELAAN:-}" = "1" ] || [ "${SKIP_ELAAN:-}" = "true" ]; then

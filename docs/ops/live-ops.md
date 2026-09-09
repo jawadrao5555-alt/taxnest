@@ -7,7 +7,8 @@ Restores practical LIVE NestPOS PRA ops (investigate → explain → owner-direc
 | Role | May do | Must not |
 |------|--------|----------|
 | Cloud Agent | Request diagnostics / propose remediations via `gh workflow`; read redacted artifacts; explain | Hold prod secrets; execute mutations silently; arbitrary SQL/shell |
-| GitHub Environment `production` | Run allow-listed artisan/API with secrets after manual approval | Accept freeform commands from agents |
+| GitHub Environment `production` | Live Ops only: allow-listed artisan/API with secrets after **manual** required-reviewer approval | Accept freeform commands from agents; host Deploy Production |
+| GitHub Environment `production-deploy` | Deploy Production SSH/apply/live-verify after repository fail-closed gates (no required reviewers) | Repository-wide secrets; `skip_elaan`; Cloud Agent SSH |
 | Super-admin `/admin/live-ops` | Same diagnostics + approve/execute in browser | Expose secrets to Cloud Agent env |
 | Desktop Agent | Execute allow-listed `pending_commands` from heartbeat | Arbitrary remote shell |
 

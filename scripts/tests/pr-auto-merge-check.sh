@@ -109,12 +109,16 @@ if [ -f "$PC" ]; then
   else
     ok "PR checks has no production Environment/secret"
   fi
+
+  grep -q 'deploy-unattended-safety-check.sh' "$PC" \
+    && ok "PR checks runs deploy-unattended-safety-check.sh" \
+    || bad "PR checks must run unattended deploy safety checks"
 fi
 
   if [ -f "$DP" ]; then
-  grep -q 'environment: production' "$DP" \
-    && ok "Deploy Production still uses environment: production" \
-    || bad "must not remove production Environment from deploy workflow"
+  grep -qE '^[[:space:]]+environment: production-deploy[[:space:]]*$' "$DP" \
+    && ok "Deploy Production still uses environment: production-deploy" \
+    || bad "must not remove production-deploy Environment from deploy workflow"
 
   grep -q 'PRODUCTION_SSH_PRIVATE_KEY' "$DP" \
     && ok "Deploy Production still uses PRODUCTION_SSH_PRIVATE_KEY" \

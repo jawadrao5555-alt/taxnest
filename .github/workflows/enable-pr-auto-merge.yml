@@ -17,8 +17,10 @@
 #   (GitHub event suppression). workflow_dispatch IS allowed from GITHUB_TOKEN.
 #   After a successful squash, this job dispatches Deploy Production with
 #   inputs.target_sha = the exact squash commit on main. Deploy Production
-#   still uses Environment "production" (manual approval) + exact-SHA apply
-#   + ci-live-verify. Concurrency group production-deploy serializes deploys.
+#   still uses Environment "production-deploy" (secrets + main-only branch
+#   policy; no required reviewers) + exact-SHA apply + ci-live-verify.
+#   Concurrency group production-deploy serializes deploys. Live Ops stays
+#   on Environment "production" with required reviewers.
 #
 # GitHub GraphQL enablePullRequestAutoMerge fails with
 # "Pull request is in clean status" when mergeable_state is CLEAN.

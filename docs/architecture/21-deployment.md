@@ -8,17 +8,17 @@ flowchart LR
   Checks --> Auto[enable-pr-auto-merge.yml]
   Auto --> Merge[squash merge]
   Merge --> Gate[deploy-production.yml gate job]
-  Gate --> Env[GitHub Environment production approval]
+  Gate --> Env[GitHub Environment production-deploy secrets]
   Env --> SSH[deploy job SSH to VPS]
   SSH --> Script[ci-deploy-production.sh]
   Script --> Elaan[elaan insert]
   Script --> Verify[ci-live-verify.sh]
 ```
 
-**FACT:** `gate` requires the requested SHA to equal the current `origin/main` **tip** (not merely an ancestor) before Environment approval. Stale Environment-waiting runs are cancelled; in-flight SSH is never cancelled (`deploy` concurrency `production-deploy` + `cancel-in-progress: false`). Environment approval remains mandatory. Elaan remains fail-closed. CI publishes `{deploy/elaan.yml title} [deploy {TARGET_SHA}]` so a new SHA cannot no-op against an older AppUpdate with the same human title.
+**FACT:** `gate` requires the requested SHA to equal the current `origin/main` **tip** (not merely an ancestor) before any Environment secrets. `skip_elaan` and `allow_settings` are refused on this workflow. Stale waiting runs are cancelled; in-flight SSH is never cancelled (`deploy` concurrency `production-deploy` + `cancel-in-progress: false`). Environment `production-deploy` holds deploy secrets and must **not** have required reviewers. Live Ops stays on Environment `production` **with** required reviewers (GitHub protection is per-Environment). Elaan remains fail-closed. CI publishes `{deploy/elaan.yml title} [deploy {TARGET_SHA}]` so a new SHA cannot no-op against an older AppUpdate with the same human title.
 
 Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `scripts/lib/elaan-deploy-title.py`, `scripts/lib/live-dirty-worktree.sh`, `scripts/lib/live-dirty-worktree-classify.py`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
-Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`, `docs/architecture/36-elaan-freshness-idempotency-fix-report.txt`, `docs/architecture/37-production-sw-dirty-worktree-fix-report.txt`.
+Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`, `docs/architecture/36-elaan-freshness-idempotency-fix-report.txt`, `docs/architecture/37-production-sw-dirty-worktree-fix-report.txt`, `docs/architecture/41-production-unattended-deploy-audit.txt`.
 
 ## PWA cache bust on the Actions path
 
@@ -49,7 +49,7 @@ exact-SHA checkout, then restamps.
 
 ## Live Ops workflows
 
-`live-ops-diagnose.yml`, `live-ops-remediate.yml` — Environment approval; Cloud Agent is planner only.
+`live-ops-diagnose.yml`, `live-ops-remediate.yml` — Environment `production` **required reviewers**; Cloud Agent is planner only. Deploy Production uses a **different** Environment (`production-deploy`) so removing deploy reviewers cannot auto-start Live Ops.
 
 ## Agent build
 

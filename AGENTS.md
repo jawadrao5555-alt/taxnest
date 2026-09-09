@@ -19,7 +19,8 @@ PHPUnit passed.
 
 After the PR merges, continue with the **issue → live** chain
 ([`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md)):
-PR auto-merge → protected Deploy Production (owner Environment approval) →
+PR auto-merge → protected Deploy Production (`production-deploy` secrets,
+repository fail-closed gates, no human reviewer) →
 Actions live-verify → self-heal loops on failure (max 3). Cloud Agents stay
 **production-secret-free**; say **LIVE VERIFIED** only after Actions
 `ci-live-verify.sh` passes.
@@ -42,9 +43,10 @@ Actions live-verify → self-heal loops on failure (max 3). Cloud Agents stay
 Cloud Agents **MUST NEVER** access, modify, or deploy production; must never
 use production credentials, live customer data, production DB, FBR/PRA
 production tokens, or production SSH keys. Browser/DB testing is
-**loopback / local disposable DB only**. Production deploy is GitHub Actions +
-manual Environment approval — not the Cloud Agent. Authenticated live smoke
-runs only in Actions (`LIVE_QA_PASS` Environment secret).
+**loopback / local disposable DB only**. Production deploy is GitHub Actions on
+Environment `production-deploy` (secrets never in the Cloud Agent). Authenticated live smoke
+runs only in Actions (`LIVE_QA_PASS` Environment secret). Live Ops Environment
+`production` keeps required reviewers.
 
 ## Live Ops (NestPOS PRA)
 

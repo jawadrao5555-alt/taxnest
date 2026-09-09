@@ -4,7 +4,7 @@
 
 1. Cloud Agents never receive production SSH keys, DB URLs/credentials, `LIVE_QA_PASS`, agent API keys, PRA passwords, private keys, or `LIVE_OPS_RUNNER_TOKEN`.
 2. Diagnosis never auto-triggers remediation.
-3. Explicit owner instruction is required before any mutation (`OWNER_APPROVES_LIVE_OPS_FIX` + Environment approval and/or admin UI).
+3. Explicit owner instruction is required before any mutation (`OWNER_APPROVES_LIVE_OPS_FIX` + Environment `production` required reviewers and/or admin UI). Deploy Production is a **different** Environment (`production-deploy`) and must not share this reviewer list.
 4. No arbitrary SQL, shell, or artisan from agent-supplied strings.
 5. Tenant isolation: company-scoped reads/writes always filter `company_id` (+ NestPOS `product_type=pos` scope).
 6. Redact secrets/tokens/passwords/cookies/private keys from reports and audit metadata.

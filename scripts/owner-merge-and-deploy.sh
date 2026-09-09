@@ -6,6 +6,7 @@
 #     --pull-number=N \
 #     --expected-head-sha=40char \
 #     --confirm='Approved — Merge & Deploy'
+#   aliases: 'Deploy kar do' | 'Live kar do' | 'Approved, put it live'
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"

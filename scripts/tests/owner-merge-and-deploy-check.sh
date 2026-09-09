@@ -77,6 +77,8 @@ for needle in ("pull_number", "expected_head_sha", "confirm"):
         print("missing input", needle, file=sys.stderr); sys.exit(1)
 if "Approved — Merge & Deploy" not in text:
     print("missing confirmation phrase", file=sys.stderr); sys.exit(1)
+if "Deploy kar do" not in text or "Live kar do" not in text or "Approved, put it live" not in text:
+    print("missing owner confirm aliases", file=sys.stderr); sys.exit(1)
 if "group: owner-merge-and-deploy" not in text:
     print("missing owner concurrency group", file=sys.stderr); sys.exit(1)
 if "cancel-in-progress: false" not in text:
@@ -108,6 +110,25 @@ grep -q 'sha=' "$SH" && grep -q 'expected-head-sha' "$SH" \
   && ok "squash merge is pinned to expected head SHA" \
   || bad "must pin pulls.merge sha to expected head"
 bash -n "$SH" && ok "owner-merge-and-deploy.sh bash -n" || bad "bash -n owner-merge-and-deploy.sh"
+python3 - "$LIB" "$OM" "$SH" <<'PY' && ok "python/workflow/script share all four owner confirm aliases" || bad "confirm aliases not consistent across python/workflow/script"
+import pathlib, sys
+lib, om, sh = (pathlib.Path(p).read_text(encoding="utf-8") for p in sys.argv[1:])
+needles = (
+    "Approved — Merge & Deploy",
+    "Deploy kar do",
+    "Live kar do",
+    "Approved, put it live",
+)
+for needle in needles:
+    for label, text in (("python", lib), ("workflow", om), ("script", sh)):
+        if needle not in text:
+            print(f"missing {needle!r} in {label}", file=sys.stderr)
+            sys.exit(1)
+if "Approved - Merge & Deploy" not in lib:
+    print("self-test must still mention hyphen reject", file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
+PY
 
 # --------------------------------------------------------------------------- Decision library (fixture matrix)
 python3 "$LIB" --self-test \

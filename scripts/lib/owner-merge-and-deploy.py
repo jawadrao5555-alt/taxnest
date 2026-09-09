@@ -14,8 +14,21 @@ import re
 import sys
 
 CONFIRM_PHRASE = "Approved — Merge & Deploy"
+# Actions confirm input AND owner chat. Hyphen variant stays rejected.
+CONFIRM_ALIASES = frozenset(
+    {
+        CONFIRM_PHRASE,
+        "Deploy kar do",
+        "Live kar do",
+        "Approved, put it live",
+    }
+)
 VALIDATE_CHECK_NAME = "validate"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _confirm_ok(value: str) -> bool:
+    return (value or "").strip() in CONFIRM_ALIASES
 
 
 def _norm_sha(value: str | None) -> str:
@@ -41,10 +54,10 @@ def decide(payload: dict) -> dict:
       noop              — already merged and that tip already deployed successfully
     """
     confirm = (payload.get("confirm") or "").strip()
-    if confirm != CONFIRM_PHRASE:
+    if not _confirm_ok(confirm):
         return {
             "action": "reject",
-            "reason": "confirmation phrase mismatch — required exactly: Approved — Merge & Deploy",
+            "reason": "confirmation phrase mismatch — required exactly: Approved — Merge & Deploy (or an allow-listed owner alias)",
             "dispatch_sha": None,
         }
 
@@ -247,6 +260,9 @@ def _self_test() -> int:
 
     bad_phrase = dict(good, confirm="Approved - Merge & Deploy")
     check("wrong phrase rejected", bad_phrase, "reject")
+
+    for alias in ("Deploy kar do", "Live kar do", "Approved, put it live"):
+        check(f"alias accepted: {alias}", dict(good, confirm=alias), "merge_and_dispatch")
 
     draft = dict(good, pr={**base_pr, "draft": True})
     check("draft rejected", draft, "reject")

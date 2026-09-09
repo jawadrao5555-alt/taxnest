@@ -3,8 +3,13 @@
 # Cursor Cloud Agents prepare cursor/* PRs and STOP. They must not merge or
 # dispatch this workflow (and typically cannot: workflow_dispatch 403).
 #
-# Owner runs this workflow from the Actions tab after saying
-# "Approved — Merge & Deploy" (the confirmation input must match exactly).
+# Owner runs this workflow from the Actions tab after an allow-listed
+# confirm phrase (exact match, including spaces/case):
+#   Approved — Merge & Deploy
+#   Deploy kar do
+#   Live kar do
+#   Approved, put it live
+# Hyphen "Approved - Merge & Deploy" is rejected.
 #
 # Flow:
 #   verify phrase + cursor/* + not draft + targets main + expected head SHA
@@ -39,7 +44,7 @@ on:
         required: true
         type: string
       confirm:
-        description: "Must be exactly: Approved — Merge & Deploy"
+        description: "Exactly one of: Approved — Merge & Deploy | Deploy kar do | Live kar do | Approved, put it live"
         required: true
         type: string
 

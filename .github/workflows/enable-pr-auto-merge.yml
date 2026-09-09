@@ -36,4 +36,5 @@ jobs:
           echo "PR checks succeeded for SHA ${{ github.event.workflow_run.head_sha }}."
           echo "Owner must run Actions workflow 'Owner Merge & Deploy' with:"
           echo "  pull_number, expected_head_sha, confirm='Approved — Merge & Deploy'"
+          echo "  aliases: 'Deploy kar do' | 'Live kar do' | 'Approved, put it live'"
           echo "This job does not merge, dispatch Deploy Production, or hold secrets."

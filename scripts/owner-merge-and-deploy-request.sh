@@ -90,7 +90,12 @@ echo
 
 echo "==> Fetch PR #${PULL_NUMBER} and origin/main tip (read-only)"
 gh api "repos/${REPO}/pulls/${PULL_NUMBER}" > "$TMP/pr.json"
-HEAD_SHA="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["head"]["sha"])' "$TMP/pr.json")"
+HEAD_SHA="$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1], encoding="utf-8")).get("head") or {}).get("sha") or "")' "$TMP/pr.json")"
+HEAD_SHA="$(printf '%s' "$HEAD_SHA" | tr 'A-F' 'a-f')"
+if [[ "$HEAD_SHA" != "$EXPECTED_HEAD_SHA" ]]; then
+  echo "ERROR: PR HEAD SHA changed (live=${HEAD_SHA} expected=${EXPECTED_HEAD_SHA}). Fail closed." >&2
+  exit 2
+fi
 gh api "repos/${REPO}/commits/${HEAD_SHA}/check-runs?per_page=100" > "$TMP/checks.json"
 MAIN_SHA="$(gh api "repos/${REPO}/commits/main" --jq .sha)"
 
@@ -172,6 +177,15 @@ ACTION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encodin
 if [[ "${ACTION}" == "reject" ]]; then
   echo "ERROR: origin/main Owner Merge & Deploy rejected this request. Do not merge. Do not deploy." >&2
   echo "Actions checks out main, not this PR branch." >&2
+  exit 2
+fi
+
+echo "==> Re-fetch PR #${PULL_NUMBER} immediately before dispatch (fail closed if HEAD moved)"
+gh api "repos/${REPO}/pulls/${PULL_NUMBER}" > "$TMP/pr.predispatch.json"
+LIVE_HEAD="$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1], encoding="utf-8")).get("head") or {}).get("sha") or "")' "$TMP/pr.predispatch.json")"
+LIVE_HEAD="$(printf '%s' "$LIVE_HEAD" | tr 'A-F' 'a-f')"
+if [[ "$LIVE_HEAD" != "$EXPECTED_HEAD_SHA" ]]; then
+  echo "ERROR: PR HEAD SHA changed immediately before dispatch (live=${LIVE_HEAD} expected=${EXPECTED_HEAD_SHA}). Fail closed." >&2
   exit 2
 fi
 

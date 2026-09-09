@@ -1,13 +1,11 @@
 # Deploy production (Nayatel VPS) via GitHub Actions
 #
 # Triggers:
-#   workflow_dispatch with inputs.target_sha — the ONLY production start path.
-#   Owner Merge & Deploy squash-merges then dispatches this workflow with the
-#   exact squash SHA. GITHUB_TOKEN merges do not start push workflows, and this
-#   workflow does not listen on push, so the GitHub PR Merge button cannot
-#   auto-deploy.
-#   Leave target_sha empty only for emergency tip-of-main dispatch (still
-#   fail-closed if main moved). Do not re-add on.push.
+#   workflow_dispatch with REQUIRED inputs.target_sha — the ONLY production
+#   start path. Owner Merge & Deploy squash-merges then dispatches this
+#   workflow with the exact squash SHA. No on.push: GitHub Merge / Squash /
+#   Rebase cannot auto-deploy. Empty target_sha is refused (no github.sha
+#   emergency fallback). Do not re-add on.push.
 #
 # Flow:
 #   → job "gate" (no Environment, no secrets): resolve SHA, refuse GitHub
@@ -33,8 +31,9 @@
 #   - Non-tip SHA fails closed BEFORE Environment secrets and BEFORE SSH
 #   - Stale SHA fails closed again immediately before SSH
 #   - Live QA password stays in Environment secret LIVE_QA_PASS
-#   - Deploy SHA is pinned (workflow_dispatch: inputs.target_sha, or empty
-#     emergency dispatch → github.sha). Push events are refused.
+#   - Deploy SHA is pinned to required workflow_dispatch inputs.target_sha
+#     (40-char hex, must equal origin/main tip). Empty SHA and push events
+#     are refused. No github.sha emergency fallback.
 #   - skip_elaan and allow_settings are refused on this workflow (fail-closed).
 #     Emergency Elaan skip / settings-column allow-list is the owner workstation
 #     path: scripts/deploy-live.sh. Do not re-enable those inputs on the
@@ -58,10 +57,9 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: "Exact current origin/main commit SHA to deploy (Owner Merge & Deploy handoff). Non-tip SHAs fail closed. Leave empty only for emergency tip-of-main dispatch (still fail-closed if main moved)."
+        description: "REQUIRED 40-char origin/main tip SHA from Owner Merge & Deploy. Empty / github.sha fallback is refused."
         type: string
-        required: false
-        default: ""
+        required: true
       skip_elaan:
         description: "REFUSED — emergency Elaan skip is not allowed on the unattended Deploy Production path. Use scripts/deploy-live.sh on an owner workstation."
         type: boolean
@@ -92,32 +90,34 @@ jobs:
         run: |
           set -euo pipefail
           EVENT="${GITHUB_EVENT_NAME}"
-          INPUT_SHA="${{ github.event.inputs.target_sha || '' }}"
-          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$INPUT_SHA" ]; then
-            case "$INPUT_SHA" in
-              *[!0-9a-fA-F]*|"")
-                echo "Invalid target_sha input: ${INPUT_SHA}" >&2
-                exit 1
-                ;;
-            esac
-            if [ "${#INPUT_SHA}" -ne 40 ]; then
-              echo "target_sha must be a full 40-char commit SHA (got ${#INPUT_SHA} chars)" >&2
-              exit 1
-            fi
-            echo "Deploy SHA source=workflow_dispatch inputs.target_sha"
-            echo "sha=${INPUT_SHA}" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT" = "push" ]; then
+          INPUT_SHA="$(printf '%s' "${{ github.event.inputs.target_sha || '' }}" | tr 'A-F' 'a-f')"
+          if [ "$EVENT" = "push" ]; then
             echo "CI DEPLOY FAILED: Deploy Production does not run on push." >&2
             echo "Use Actions workflow Owner Merge & Deploy (squash + exact-SHA dispatch)." >&2
-            echo "Do not click Merge on the PR page." >&2
+            echo "Do not click Merge / Squash / Rebase on the PR page." >&2
             exit 1
-          elif [ "$EVENT" = "workflow_dispatch" ]; then
-            echo "Deploy SHA source=workflow_dispatch empty target_sha → github.sha (emergency; still must equal origin/main tip at run time)"
-            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          else
+          fi
+          if [ "$EVENT" != "workflow_dispatch" ]; then
             echo "Unsupported event ${EVENT}" >&2
             exit 1
           fi
+          if [ -z "$INPUT_SHA" ]; then
+            echo "CI DEPLOY FAILED: target_sha is required. Empty github.sha emergency dispatch is refused." >&2
+            echo "Owner Merge & Deploy must pass the exact squash SHA. Workstation emergency is scripts/deploy-live.sh." >&2
+            exit 1
+          fi
+          case "$INPUT_SHA" in
+            *[!0-9a-f]*|"")
+              echo "Invalid target_sha input: ${INPUT_SHA}" >&2
+              exit 1
+              ;;
+          esac
+          if [ "${#INPUT_SHA}" -ne 40 ]; then
+            echo "target_sha must be a full 40-char commit SHA (got ${#INPUT_SHA} chars)" >&2
+            exit 1
+          fi
+          echo "Deploy SHA source=workflow_dispatch inputs.target_sha"
+          echo "sha=${INPUT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Guard — refuse skip_elaan / allow_settings on the unattended path
         run: |
@@ -188,12 +188,12 @@ jobs:
         id: resolve
         run: |
           set -euo pipefail
-          DEPLOY_SHA="${{ needs.gate.outputs.sha }}"
-          INPUT_SHA="${{ github.event.inputs.target_sha || '' }}"
+          DEPLOY_SHA="$(printf '%s' "${{ needs.gate.outputs.sha }}" | tr 'A-F' 'a-f')"
+          INPUT_SHA="$(printf '%s' "${{ github.event.inputs.target_sha || '' }}" | tr 'A-F' 'a-f')"
           SKIP="${{ github.event.inputs.skip_elaan || 'false' }}"
           ALLOW="${{ github.event.inputs.allow_settings || '' }}"
           case "$DEPLOY_SHA" in
-            *[!0-9a-fA-F]*|"")
+            *[!0-9a-f]*|"")
               echo "Gate did not output a valid SHA" >&2
               exit 1
               ;;
@@ -202,15 +202,16 @@ jobs:
             echo "Gate SHA must be 40 chars" >&2
             exit 1
           fi
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "$INPUT_SHA" ]; then
-            if [ "$INPUT_SHA" != "$DEPLOY_SHA" ]; then
-              echo "Refusing deploy: gate SHA $DEPLOY_SHA != inputs.target_sha $INPUT_SHA" >&2
-              exit 1
-            fi
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
+            echo "Refusing deploy: only workflow_dispatch is allowed (got ${GITHUB_EVENT_NAME})" >&2
+            exit 1
           fi
-          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            echo "Refusing deploy: push events are not an allowed Deploy Production trigger." >&2
-            echo "Use Owner Merge & Deploy (workflow_dispatch target_sha)." >&2
+          if [ -z "$INPUT_SHA" ]; then
+            echo "Refusing deploy: empty target_sha reached the SSH job" >&2
+            exit 1
+          fi
+          if [ "$INPUT_SHA" != "$DEPLOY_SHA" ]; then
+            echo "Refusing deploy: gate SHA $DEPLOY_SHA != inputs.target_sha $INPUT_SHA" >&2
             exit 1
           fi
           if [ "$SKIP" = "true" ] || [ "$SKIP" = "1" ]; then

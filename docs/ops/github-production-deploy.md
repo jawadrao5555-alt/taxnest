@@ -68,7 +68,7 @@ These are separate gates:
 |---|---|---|
 | PR checks | `.github/workflows/pr-checks.yml` on `cursor/*` PRs. Does not merge or deploy. | Agent + owner review the report. |
 | Owner Merge & Deploy | Explicit Actions `workflow_dispatch` with confirmation phrase. Squash-merges one approved PR and hands the exact squash SHA to Deploy Production. | **Owner** (this is the merge/deploy initiation). |
-| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` **`workflow_dispatch` only** (Owner Merge & Deploy handoff with exact tip SHA, or owner emergency dispatch). Does not run on `push` or `pull_request`. GitHub PR merge-commits are still refused if dispatched. | Repository fail-closed gates: refuse merge-commits, exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
+| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` **`workflow_dispatch` only** (Owner Merge & Deploy handoff with exact tip SHA). Does not run on `push` or `pull_request`. GitHub PR merge-commits are refused. Empty `target_sha` is refused (no `github.sha` fallback). A human with Actions write can still dispatch a **valid 40-char current origin/main tip** SHA; that is not the supported path — use Owner Merge & Deploy (`dispatch_only` retries the current tip). | Repository fail-closed gates: refuse merge-commits, exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
 | Live Ops (`production`) | `live-ops-diagnose.yml` / `live-ops-remediate.yml` | Required reviewers on Environment `production` — **keep MANUAL**. Also `OWNER_APPROVES_LIVE_OPS_FIX` for mutations. |
 
 Do not give Cloud Agent production SSH keys or Environment secrets. Cloud Agents
@@ -111,7 +111,7 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 | Step | Behavior |
 |---|---|
 | Trigger | `workflow_dispatch` on `main` only (Owner Merge & Deploy handoff passes `target_sha`). **Not** `push`. **Not** `pull_request`. |
-| Deploy SHA | `workflow_dispatch` with `target_sha` → that exact 40-char SHA; empty `target_sha` → `github.sha` (emergency). **Must equal current `origin/main` tip** at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. GitHub merge-commits are refused. |
+| Deploy SHA | `workflow_dispatch` with **required** `target_sha` → that exact 40-char SHA. Empty `target_sha` is **refused** (no `github.sha` emergency fallback). **Must equal current `origin/main` tip** at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. GitHub merge-commits are refused. |
 | Concurrency | **No workflow-level group.** `gate` uses `production-deploy-gate` with `cancel-in-progress: true` (newer tip supersedes older pre-apply). `deploy` uses `production-deploy` with `cancel-in-progress: false` — at most one SSH/apply; in-flight apply is never cancelled. After a SHA proves it is the tip, `gate` cancels other runs whose status is `waiting` (never `in_progress`). |
 | Gate | Job `deploy` uses `environment: production-deploy` (secrets + main-only branch policy; **no required reviewers**). Job `gate` does **not** use an Environment (no secrets, starts immediately, fail-closed on non-tip and on `skip_elaan`/`allow_settings`). |
 | Checkout | Exact deploy SHA (resolved), full history |
@@ -127,7 +127,7 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 
 Manual `workflow_dispatch` inputs:
 
-- `target_sha` — exact 40-char **current origin/main tip** to deploy (used by Owner Merge & Deploy handoff). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not SSH. Leave empty only for emergency dispatch of `github.sha`, which still must equal the tip at run time.
+- `target_sha` — **required** exact 40-char **current origin/main tip** to deploy (Owner Merge & Deploy passes the squash SHA). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not SSH. Empty `target_sha` is **refused** — there is no `github.sha` emergency fallback. Workstation emergency apply is `scripts/deploy-live.sh`, not this workflow. Retry of the current tip after a squash is Owner Merge & Deploy `dispatch_only`.
 - `skip_elaan` — **refused** on this workflow (fail-closed). Emergency skip is `scripts/deploy-live.sh --no-elaan` on an owner workstation, never Cloud Agent, never a token auto-approve.
 - `allow_settings` — **refused** on this workflow (fail-closed). Emergency allow-list is `scripts/deploy-live.sh --allow-settings=...` on an owner workstation.
 

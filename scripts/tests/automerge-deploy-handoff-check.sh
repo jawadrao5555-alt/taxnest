@@ -112,6 +112,19 @@ if re.search(r"(?m)^\s*pull_request:", on):
     print("must not run on pull_request", file=sys.stderr); sys.exit(1)
 sys.exit(0)
 PY
+  python3 - "$DP" <<'PY' && ok "Deploy Production target_sha is required (no empty/github.sha emergency)" || bad "must require target_sha and refuse github.sha fallback"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(r"(?m)^(\s+)target_sha:\n((?:\1[ \t]+\S.*\n)+)", text)
+body = block.group(2) if block else ""
+if not block or not re.search(r"(?m)^\s+required:\s*true\s*$", body):
+    print("target_sha must be required: true", file=sys.stderr); sys.exit(1)
+if re.search(r"(?m)^\s+default:", body):
+    print("target_sha must not default empty", file=sys.stderr); sys.exit(1)
+if "${{ github.sha }}" in text:
+    print("must not use github.sha as deploy SHA", file=sys.stderr); sys.exit(1)
+sys.exit(0)
+PY
   grep -q 'Deploy Production does not run on push' "$DP" \
     && ok "resolve step fail-closes if a push event is reintroduced" \
     || bad "resolve must refuse push events"
@@ -124,6 +137,9 @@ if [ -f "$DOC" ]; then
   grep -qi 'Owner Merge & Deploy\|Approved — Merge & Deploy' "$DOC" \
     && ok "issue-to-live doc describes owner-triggered merge" \
     || bad "issue-to-live doc must describe Owner Merge & Deploy"
+  grep -qi 'empty `target_sha` is refused' "$DOC" \
+    && ok "issue-to-live doc refuses empty target_sha" \
+    || bad "issue-to-live doc must refuse empty target_sha"
   grep -q 'owner-merge-and-deploy-request.sh' "$DOC" \
     && ok "issue-to-live doc names the request script" \
     || bad "issue-to-live doc must name owner-merge-and-deploy-request.sh"

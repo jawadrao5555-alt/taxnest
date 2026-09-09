@@ -19,7 +19,7 @@
 #   - Does not use skip_elaan
 #
 # Required env (Actions Environment "production"):
-#   EXPECTED_SHA                 — github.sha just deployed
+#   EXPECTED_SHA                 — exact SHA just deployed (Actions: required target_sha)
 #   PRODUCTION_SSH_PRIVATE_KEY   — or LIVE_SSH_KEY file path
 #   LIVE_QA_PASS                 — password for LIVE_QA_LOGIN
 #

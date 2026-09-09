@@ -109,10 +109,22 @@ if grep -q 'skip_elaan' "$SH" || grep -q 'allow_settings' "$SH"; then
 else
   ok "owner dispatch does not send skip_elaan/allow_settings"
 fi
-grep -q 'sha=' "$SH" && grep -q 'expected-head-sha' "$SH" \
-  && ok "squash merge is pinned to expected head SHA" \
-  || bad "must pin pulls.merge sha to expected head"
-bash -n "$SH" && ok "owner-merge-and-deploy.sh bash -n" || bad "bash -n owner-merge-and-deploy.sh"
+  grep -q 'sha=' "$SH" && grep -q 'expected-head-sha' "$SH" \
+    && ok "squash merge is pinned to expected head SHA" \
+    || bad "must pin pulls.merge sha to expected head"
+  grep -qE 'expected-head-sha must be a 40-character hex SHA' "$SH" \
+    && ok "owner merge script requires 40-char expected-head-sha" \
+    || bad "must reject non-40-char expected-head-sha in the merge script"
+  grep -q 'immediately before squash' "$SH" && grep -q 'pr.premerge.json' "$SH" \
+    && ok "owner merge re-GETs PR HEAD immediately before pulls.merge" \
+    || bad "must revalidate PR HEAD immediately before merge"
+  grep -q 'squash SHA is not a 40-character hex' "$SH" \
+    && ok "owner merge refuses non-hex squash SHA before dispatch" \
+    || bad "must validate squash SHA is 40-char hex before Deploy Production"
+  grep -q 'SHA must be a 40-character hex value' "$SH" \
+    && ok "dispatch_deploy refuses empty/unsafe SHA" \
+    || bad "dispatch_deploy must refuse empty/non-hex SHA"
+  bash -n "$SH" && ok "owner-merge-and-deploy.sh bash -n" || bad "bash -n owner-merge-and-deploy.sh"
 
 # --------------------------------------------------------------------------- Request helper (Phase 2, no mutate except workflow_dispatch attempt)
 bash -n "$REQ" && ok "owner-merge-and-deploy-request.sh bash -n" \
@@ -136,6 +148,13 @@ grep -q 'HTTP 403' "$REQ" && grep -q 'exit 3' "$REQ" \
 grep -q 'Deploy kar do' "$REQ" && grep -q 'Live kar do' "$REQ" \
   && ok "request script documents owner confirm aliases" \
   || bad "request script must list confirm aliases"
+grep -q 'pr.predispatch.json' "$REQ" \
+  && ok "request script re-GETs PR HEAD immediately before dispatch" \
+  || bad "request script must revalidate PR HEAD immediately before dispatch"
+grep -q 'Auto-merge disabled' "$AM" \
+  && grep -q 'Deploy kar do' "$AM" && grep -q 'Live kar do' "$AM" && grep -q 'Approved, put it live' "$AM" \
+  && ok "retired auto-merge lists owner confirm aliases" \
+  || bad "retired auto-merge must list the four confirm aliases"
 grep -q -- '--payload-only' "$REQ" && grep -q -- '--payload-only' "$LIB" \
   && ok "request script builds payload locally then gates on origin/main decide()" \
   || bad "must use --payload-only plus origin/main --input-json"
@@ -234,6 +253,23 @@ if re.search(r"(?m)^\s*push:", on):
     sys.exit(1)
 if "workflow_dispatch:" not in on:
     sys.exit(1)
+sys.exit(0)
+PY
+  python3 - "$DP" <<'PY' && ok "Deploy Production requires 40-char target_sha (no github.sha fallback)" || bad "target_sha must be required; empty/github.sha fallback must be refused"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(r"(?m)^(\s+)target_sha:\n((?:\1[ \t]+\S.*\n)+)", text)
+if not block:
+    print("missing target_sha input", file=sys.stderr); sys.exit(1)
+body = block.group(2)
+if not re.search(r"(?m)^\s+required:\s*true\s*$", body):
+    print("target_sha must be required: true", file=sys.stderr); sys.exit(1)
+if re.search(r"(?m)^\s+default:", body):
+    print("target_sha must not have a default (empty emergency path)", file=sys.stderr); sys.exit(1)
+if "${{ github.sha }}" in text:
+    print("must not use github.sha as a deploy SHA source", file=sys.stderr); sys.exit(1)
+if "Empty github.sha emergency dispatch is refused" not in text:
+    print("gate must refuse empty github.sha emergency dispatch", file=sys.stderr); sys.exit(1)
 sys.exit(0)
 PY
 grep -qE '^[[:space:]]+environment: production[[:space:]]*$' "$DIAG" \

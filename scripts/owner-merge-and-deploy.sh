@@ -6,6 +6,13 @@
 #     --pull-number=N \
 #     --expected-head-sha=40char \
 #     --confirm='Approved — Merge & Deploy'
+# Confirm aliases (exact, case-sensitive; hyphen variant is rejected):
+#   Approved — Merge & Deploy
+#   Deploy kar do
+#   Live kar do
+#   Approved, put it live
+# Re-GETs the PR immediately before pulls.merge. Squash SHA must be 40-char
+# hex and equal origin/main tip before Deploy Production dispatch.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
@@ -24,6 +31,9 @@ done
 
 [ -n "$PULL" ] || { echo "missing --pull-number" >&2; exit 2; }
 echo "$PULL" | grep -Eq '^[0-9]+$' || { echo "pull_number must be numeric" >&2; exit 2; }
+[ -n "$EXPECTED" ] || { echo "missing --expected-head-sha" >&2; exit 2; }
+EXPECTED="$(printf '%s' "$EXPECTED" | tr 'A-F' 'a-f')"
+echo "$EXPECTED" | grep -Eq '^[0-9a-f]{40}$' || { echo "expected-head-sha must be a 40-character hex SHA (got: ${EXPECTED})" >&2; exit 2; }
 [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ] || { echo "GH_TOKEN required" >&2; exit 2; }
 
 REPO="${GITHUB_REPOSITORY:-}"
@@ -68,9 +78,15 @@ if [ "$ACTION" = "reject" ] || [ "$DECIDE_RC" -eq 2 ]; then
 fi
 
 dispatch_deploy() {
-  local sha="$1"
+  local sha
+  sha="$(printf '%s' "$1" | tr 'A-F' 'a-f')"
+  echo "$sha" | grep -Eq '^[0-9a-f]{40}$' || {
+    echo "REFUSING deploy: SHA must be a 40-character hex value (got: ${sha})" >&2
+    exit 1
+  }
   echo "==> Verify ${sha} is current origin/main tip"
   TIP=$(gh api "repos/${REPO}/commits/main" --jq .sha)
+  TIP="$(printf '%s' "$TIP" | tr 'A-F' 'a-f')"
   python3 - "$TIP" "$sha" <<'PY'
 import sys
 tip, sha = sys.argv[1].lower(), sys.argv[2].lower()
@@ -96,6 +112,18 @@ if [ "$ACTION" = "dispatch_only" ]; then
 fi
 
 PIN="${MERGE_HEAD:-$EXPECTED}"
+PIN="$(printf '%s' "$PIN" | tr 'A-F' 'a-f')"
+echo "$PIN" | grep -Eq '^[0-9a-f]{40}$' || { echo "merge pin is not a 40-character hex SHA (got: ${PIN})" >&2; exit 1; }
+
+echo "==> Re-fetch PR #${PULL} immediately before squash (fail closed if HEAD moved)"
+gh api "repos/${REPO}/pulls/${PULL}" > "$TMP/pr.premerge.json"
+LIVE_HEAD=$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1], encoding="utf-8")).get("head") or {}).get("sha") or "")' "$TMP/pr.premerge.json")
+LIVE_HEAD="$(printf '%s' "$LIVE_HEAD" | tr 'A-F' 'a-f')"
+if [ "$LIVE_HEAD" != "$PIN" ]; then
+  echo "PR HEAD changed immediately before merge (live=${LIVE_HEAD} pin=${PIN}) — fail closed" >&2
+  exit 1
+fi
+
 echo "==> Squash-merge PR #${PULL} pinned to $PIN"
 gh api --method PUT "repos/${REPO}/pulls/${PULL}/merge" \
   -f merge_method=squash \
@@ -105,8 +133,12 @@ import json, sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
 if not data.get("merged"):
     raise SystemExit("squash merge response missing merged=true")
-print(data["sha"])
+print((data.get("sha") or "").strip().lower())
 PY
 MERGE_SHA=$(cat "$TMP/merge.sha")
 echo "==> squash SHA $MERGE_SHA"
+echo "$MERGE_SHA" | grep -Eq '^[0-9a-f]{40}$' || {
+  echo "merge succeeded but squash SHA is not a 40-character hex value (got: ${MERGE_SHA})" >&2
+  exit 1
+}
 dispatch_deploy "$MERGE_SHA"

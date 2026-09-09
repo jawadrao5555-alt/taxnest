@@ -10,7 +10,7 @@
 #     before any SSH). Ancestor-only is not enough. Rollback is ROLLBACK.md.
 #
 # Required:
-#   TARGET_SHA                 — exact commit to place on live (usually github.sha)
+#   TARGET_SHA                 — exact commit to place on live (Actions: required workflow_dispatch target_sha)
 #   PRODUCTION_SSH_PRIVATE_KEY — private key for taxnest-production-deploy
 #                                (GitHub Environment secret; never commit it)
 #   OR LIVE_SSH_KEY            — path to an already-written key file (tests)

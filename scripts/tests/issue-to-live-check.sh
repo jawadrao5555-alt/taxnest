@@ -99,7 +99,19 @@ if [ -f "$DP" ]; then
     && ok "Deploy Production keeps concurrency protection" || bad "concurrency protection missing"
   grep -q 'deploy_guard_main_tip\|deploy_require_origin_main_tip' "$DP" \
     && ok "Deploy Production refuses non-tip SHA" || bad "Deploy Production missing origin/main tip guard"
-  grep -q 'github.sha' "$DP" && ok "Deploy Production still uses github.sha" || bad "exact SHA wiring missing"
+  python3 - "$DP" <<'PY' && ok "Deploy Production refuses empty target_sha (no github.sha fallback)" || bad "must not use github.sha as deploy SHA; empty target_sha must be refused"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+if "${{ github.sha }}" in text:
+    print("github.sha must not be a deploy SHA source", file=sys.stderr); sys.exit(1)
+block = re.search(r"(?m)^(\s+)target_sha:\n((?:\1[ \t]+\S.*\n)+)", text)
+body = block.group(2) if block else ""
+if not block or not re.search(r"(?m)^\s+required:\s*true\s*$", body):
+    print("target_sha must be required: true", file=sys.stderr); sys.exit(1)
+if "Empty github.sha emergency dispatch is refused" not in text:
+    print("gate must refuse empty emergency dispatch", file=sys.stderr); sys.exit(1)
+sys.exit(0)
+PY
   if grep -q 'pull_request' "$DP"; then
     bad "Deploy Production must not run on pull_request"
   else

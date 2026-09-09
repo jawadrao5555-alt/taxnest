@@ -85,6 +85,30 @@ if re.search(r"(?m)^\s*push:", on) or re.search(r"(?m)^\s*pull_request:", on):
 sys.exit(0)
 PY
 
+  python3 - "$WF" <<'PY' && ok "target_sha is required with no github.sha / empty fallback" || bad "must require target_sha and refuse empty/github.sha emergency path"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(r"(?m)^(\s+)target_sha:\n((?:\1[ \t]+\S.*\n)+)", text)
+if not block:
+    print("missing target_sha input", file=sys.stderr); sys.exit(1)
+body = block.group(2)
+if not re.search(r"(?m)^\s+required:\s*true\s*$", body):
+    print("target_sha must be required: true", file=sys.stderr); sys.exit(1)
+if re.search(r"(?m)^\s+default:", body):
+    print("target_sha must not have a default", file=sys.stderr); sys.exit(1)
+if "${{ github.sha }}" in text:
+    print("must not resolve deploy SHA from github.sha", file=sys.stderr); sys.exit(1)
+needles = (
+    "target_sha is required",
+    "Empty github.sha emergency dispatch is refused",
+    "empty target_sha reached the SSH job",
+)
+for needle in needles:
+    if needle not in text:
+        print("missing refuse path:", needle, file=sys.stderr); sys.exit(1)
+sys.exit(0)
+PY
+
   grep -q 'ref: \${{ steps.resolve.outputs.sha }}' "$WF" \
     && ok "checkout pins exact resolved deploy SHA" \
     || bad "checkout must pin ref to steps.resolve.outputs.sha"
@@ -299,6 +323,14 @@ if [ -f "$DOC" ]; then
     grep -qi "$needle" "$DOC" || bad "docs missing mention of: $needle"
   done
   ok "docs cover Environment, secret, key, reviewers, rollback, Elaan spec"
+  if grep -qiE 'empty `target_sha` → `github.sha`|Leave empty only for emergency' "$DOC"; then
+    bad "docs must not describe empty github.sha emergency dispatch"
+  else
+    ok "docs do not describe empty github.sha emergency dispatch"
+  fi
+  grep -qi 'empty `target_sha` is refused\|Empty `target_sha` is \*\*refused\*\*' "$DOC" \
+    && ok "docs state empty target_sha is refused" \
+    || bad "docs must state empty target_sha is refused"
 fi
 
 # --- handoff pointer

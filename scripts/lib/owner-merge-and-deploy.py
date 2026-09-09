@@ -300,8 +300,18 @@ def _self_test() -> int:
     bad_phrase = dict(good, confirm="Approved - Merge & Deploy")
     check("wrong phrase rejected", bad_phrase, "reject")
 
+    check("empty confirm rejected", dict(good, confirm=""), "reject")
+    check("whitespace confirm rejected", dict(good, confirm="   "), "reject")
+    check("lowercase alias rejected", dict(good, confirm="deploy kar do"), "reject")
+    check("uppercase alias rejected", dict(good, confirm="DEPLOY KAR DO"), "reject")
+    check("padded canonical accepted", dict(good, confirm="  Approved — Merge & Deploy  "), "merge_and_dispatch")
+
     for alias in ("Deploy kar do", "Live kar do", "Approved, put it live"):
         check(f"alias accepted: {alias}", dict(good, confirm=alias), "merge_and_dispatch")
+        check(f"padded alias accepted: {alias}", dict(good, confirm=f"  {alias}  "), "merge_and_dispatch")
+
+    check("short expected SHA rejected", dict(good, expected_head_sha="abc123"), "reject")
+    check("empty expected SHA rejected", dict(good, expected_head_sha=""), "reject")
 
     api_payload = payload_from_github_api(
         {

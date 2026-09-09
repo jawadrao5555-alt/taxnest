@@ -64,7 +64,8 @@ Live Ops only.
 Do **not** click **Merge** on the PR page. Deploy Production does **not** start
 on `push`, so a UI merge will not go live. Use Owner Merge & Deploy so the
 squash SHA is pinned and dispatched. GitHub UI squash/rebase still bypasses
-that pin if you later emergency-dispatch the resulting tip — do not use them.
+that pin if someone later dispatches the resulting tip SHA by hand — do not
+use them. Empty `target_sha` on Deploy Production is refused.
 
 ## What the workflow rejects
 

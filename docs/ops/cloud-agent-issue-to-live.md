@@ -55,7 +55,7 @@ Issue (owner)
 ```
 
 The owner **hands** the main commit to the protected deploy workflow via
-**Owner Merge & Deploy** plus an explicit `workflow_dispatch` of Deploy Production
+**Owner Merge & Deploy**, which `workflow_dispatch`es Deploy Production
 with `inputs.target_sha` set to the squash commit. The agent does **not** hold SSH
 keys, merge from the PR page, dispatch Deploy Production, approve Live Ops, or
 run authenticated live smoke itself. After explicit chat approval it may only
@@ -63,9 +63,9 @@ run `scripts/owner-merge-and-deploy-request.sh`.
 
 GitHub PR Merge-button landings on `main` do **not** start Deploy Production
 (this workflow is `workflow_dispatch` only). Do not use the PR Merge button
-when Owner Merge & Deploy is available. Emergency tip-of-main deploy is an
-owner Actions `workflow_dispatch` of Deploy Production with `target_sha` set
-to the current origin/main tip (or empty, still fail-closed if main moved).
+when Owner Merge & Deploy is available. Empty `target_sha` is refused (no
+`github.sha` fallback). Retry of the current origin/main tip is Owner Merge
+& Deploy `dispatch_only`. Workstation emergency apply is `scripts/deploy-live.sh`.
 
 ---
 
@@ -87,7 +87,7 @@ Local browser tests remain fail-closed against production URLs/IPs
 
 Preserved deploy invariants:
 
-- Exact-SHA checkout (`github.sha` / `inputs.target_sha`) and **origin/main tip** equality
+- Exact-SHA checkout (`inputs.target_sha` only; empty / `github.sha` fallback refused) and **origin/main tip** equality
 - Concurrency group `production-deploy` on the SSH/apply job (`cancel-in-progress: false`)
 - Cancellable pre-apply `gate` (`production-deploy-gate`) so a newer tip can supersede a stale wait
 - Elaan freshness + idempotent insert (`deploy/elaan.yml`)
@@ -103,7 +103,7 @@ Preserved deploy invariants:
 After a successful remote apply, **the same** Deploy Production job runs
 `scripts/ci-live-verify.sh`, which must:
 
-1. Confirm live `git rev-parse HEAD` **equals** `EXPECTED_SHA` / `github.sha`
+1. Confirm live `git rev-parse HEAD` **equals** `EXPECTED_SHA` (the required `target_sha`)
 2. Confirm public `/up` returns 200
 3. Login as the standing **live QA** company (Environment secret `LIVE_QA_PASS`)
 4. Assert NestPOS feature markers (dashboard / sale / extended pages) — **not**

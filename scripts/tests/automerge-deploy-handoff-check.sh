@@ -101,13 +101,19 @@ if [ -f "$DP" ]; then
 
   grep -A3 '^on:' "$DP" | grep -q 'push:' \
     && ok "Deploy Production still triggers on push to main" \
-    || bad "must keep push-to-main trigger for human merges"
+    || bad "must keep push-to-main trigger for non-token pushes"
+  grep -q 'Merge pull request' "$DP" && grep -q 'rev-list --parents' "$DP" \
+    && ok "push/dispatch path refuses GitHub merge-commits" \
+    || bad "Deploy Production must refuse Merge pull request merge-commits"
 fi
 
 if [ -f "$DOC" ]; then
   grep -qi 'Owner Merge & Deploy\|Approved — Merge & Deploy' "$DOC" \
     && ok "issue-to-live doc describes owner-triggered merge" \
     || bad "issue-to-live doc must describe Owner Merge & Deploy"
+  grep -q 'owner-merge-and-deploy-request.sh' "$DOC" \
+    && ok "issue-to-live doc names the request script" \
+    || bad "issue-to-live doc must name owner-merge-and-deploy-request.sh"
   grep -qi 'workflow_dispatch\|GITHUB_TOKEN' "$DOC" \
     && ok "issue-to-live doc mentions GITHUB_TOKEN/workflow_dispatch" \
     || bad "issue-to-live doc must still mention workflow_dispatch"

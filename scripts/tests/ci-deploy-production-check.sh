@@ -65,6 +65,14 @@ if [ -f "$WF" ]; then
     && ok "workflow refuses skip_elaan on the unattended path" \
     || bad "workflow must fail-closed when skip_elaan is set"
 
+  grep -q 'ci-live-verify.sh' "$WF" \
+    && ok "workflow runs post-deploy live verify" \
+    || bad "workflow missing ci-live-verify"
+
+  grep -q 'Merge pull request' "$WF" && grep -q 'rev-list --parents' "$WF" \
+    && ok "workflow refuses GitHub PR merge-commits" \
+    || bad "workflow must refuse Merge-button merge-commits"
+
   grep -qE 'branches:[[:space:]]*$|[[:space:]]+- main' "$WF" \
     && ok "workflow triggers on main" \
     || bad "workflow should trigger on main"

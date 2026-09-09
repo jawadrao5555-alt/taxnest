@@ -42,40 +42,17 @@ gh run list --repo "$REPO" --workflow 'Deploy Production' --status success --lim
   --json headSha,conclusion --jq '[.[] | select(.conclusion=="success") | .headSha] | unique' \
   > "$TMP/success.json" 2>/dev/null || echo '[]' > "$TMP/success.json"
 
-python3 - "$TMP" "$CONFIRM" "$EXPECTED" "$OWNER" "$NAME" "$MAIN_SHA" <<'PY' > "$TMP/payload.json"
-import json, sys
-tmpdir, confirm, expected, owner, repo, main_sha = sys.argv[1:]
-pr_obj = json.load(open(f"{tmpdir}/pr.json", encoding="utf-8"))
-checks_raw = json.load(open(f"{tmpdir}/checks.json", encoding="utf-8"))
-checks = checks_raw.get("check_runs") if isinstance(checks_raw, dict) else checks_raw
-success = json.load(open(f"{tmpdir}/success.json", encoding="utf-8"))
-payload = {
-    "confirm": confirm,
-    "expected_head_sha": expected,
-    "owner": owner,
-    "repo": repo,
-    "origin_main_sha": main_sha,
-    "check_runs": checks,
-    "successful_deploy_shas": success,
-    "pr": {
-        "draft": pr_obj.get("draft"),
-        "merged": pr_obj.get("merged"),
-        "mergeable": pr_obj.get("mergeable"),
-        "mergeable_state": pr_obj.get("mergeable_state"),
-        "merge_commit_sha": pr_obj.get("merge_commit_sha"),
-        "base": {"ref": (pr_obj.get("base") or {}).get("ref")},
-        "head": {
-            "ref": (pr_obj.get("head") or {}).get("ref"),
-            "sha": (pr_obj.get("head") or {}).get("sha"),
-            "repo": {"full_name": ((pr_obj.get("head") or {}).get("repo") or {}).get("full_name")},
-        },
-    },
-}
-json.dump(payload, sys.stdout)
-PY
-
 set +e
-python3 "$ROOT/scripts/lib/owner-merge-and-deploy.py" --input-json "$TMP/payload.json" > "$TMP/decision.json"
+python3 "$ROOT/scripts/lib/owner-merge-and-deploy.py" \
+  --pr-json "$TMP/pr.json" \
+  --checks-json "$TMP/checks.json" \
+  --success-json "$TMP/success.json" \
+  --confirm "$CONFIRM" \
+  --expected-head-sha "$EXPECTED" \
+  --owner "$OWNER" \
+  --repo "$NAME" \
+  --main-sha "$MAIN_SHA" \
+  > "$TMP/decision.json"
 DECIDE_RC=$?
 set -e
 cat "$TMP/decision.json"

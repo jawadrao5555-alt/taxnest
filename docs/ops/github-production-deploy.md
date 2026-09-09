@@ -4,14 +4,13 @@ Permanent production deploy path after code is already on `main`:
 
 ```
 Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS-visible changes)
-  → PR checks (no deploy) → STOP for owner
-  → Owner runs Actions workflow "Owner Merge & Deploy" with
-    pull_number + expected_head_sha + confirm exactly "Approved — Merge & Deploy"
-  → squash merge pinned to that head SHA → exact squash SHA must be origin/main tip
+  → PR checks (no deploy)   → STOP for owner
+  → Owner Merge & Deploy (request script or Actions UI; not the PR Merge button)
+  → squash merge pinned to that head SHA
   → workflow_dispatch Deploy Production with inputs.target_sha=<squash SHA>
     (GITHUB_TOKEN merges do not start push workflows; workflow_dispatch does)
-  → OR a human push to main starts Deploy Production with github.sha
   → GitHub Actions workflow ".github/workflows/deploy-production.yml"
+    (push of a GitHub merge commit is refused; do not use the PR Merge button)
   → job "gate": requested SHA must equal current origin/main tip; skip_elaan
     and allow_settings are refused; stale waiting runs are cancelled
     (in_progress SSH is never cancelled)
@@ -37,9 +36,12 @@ GitHub suppresses new workflow runs for most events caused by `GITHUB_TOKEN`
 
 Supported handoff (no Cloud Agent secrets):
 
-1. Owner runs `.github/workflows/owner-merge-and-deploy.yml` (`workflow_dispatch`)
-   with `pull_number`, `expected_head_sha`, and confirm `Approved — Merge & Deploy`.
-   How-to: `docs/ops/owner-merge-and-deploy.md`.
+1. After explicit owner approval, run `scripts/owner-merge-and-deploy-request.sh`
+   or click Actions → Owner Merge & Deploy (`workflow_dispatch`) with
+   `pull_number`, `expected_head_sha`, and an allow-listed confirm phrase
+   (`Approved — Merge & Deploy`, `Deploy kar do`, `Live kar do`, or
+   `Approved, put it live`). How-to: `docs/ops/owner-merge-and-deploy.md`.
+   Do not use the GitHub PR Merge button.
 2. The job squash-merges **only** a Ready, same-repo `cursor/*` PR to `main`
    whose head SHA still matches and whose **PR checks / validate** succeeded.
 3. It reads the **exact squash/merge commit SHA** on `main` and refuses if that
@@ -66,11 +68,13 @@ These are separate gates:
 |---|---|---|
 | PR checks | `.github/workflows/pr-checks.yml` on `cursor/*` PRs. Does not merge or deploy. | Agent + owner review the report. |
 | Owner Merge & Deploy | Explicit Actions `workflow_dispatch` with confirmation phrase. Squash-merges one approved PR and hands the exact squash SHA to Deploy Production. | **Owner** (this is the merge/deploy initiation). |
-| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on **push to `main`** (or `workflow_dispatch` with exact tip SHA) | Repository fail-closed gates: exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
+| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on **push to `main`** of a non-merge-commit tip (or `workflow_dispatch` with exact tip SHA). GitHub PR merge-commits are refused. | Repository fail-closed gates: refuse merge-commits, exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
 | Live Ops (`production`) | `live-ops-diagnose.yml` / `live-ops-remediate.yml` | Required reviewers on Environment `production` — **keep MANUAL**. Also `OWNER_APPROVES_LIVE_OPS_FIX` for mutations. |
 
 Do not give Cloud Agent production SSH keys or Environment secrets. Cloud Agents
-must not merge PRs or dispatch Owner Merge & Deploy.
+must not merge PRs from the PR page or dispatch Deploy Production. After
+explicit owner approval they run `scripts/owner-merge-and-deploy-request.sh`
+(Owner Merge & Deploy only).
 
 ## What you must configure in GitHub (manual)
 

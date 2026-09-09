@@ -1,10 +1,19 @@
 # Owner Merge & Deploy — explicit owner initiation only.
 #
-# Cursor Cloud Agents prepare cursor/* PRs and STOP. They must not merge or
-# dispatch this workflow (and typically cannot: workflow_dispatch 403).
+# Cursor Cloud Agents prepare cursor/* PRs and STOP (Phase 1).
+# After explicit owner approval in chat, they run
+# scripts/owner-merge-and-deploy-request.sh (Phase 2). That script re-validates
+# the PR + SHA and attempts workflow_dispatch of THIS workflow. Cloud Agent gh
+# is typically HTTP 403; then the owner clicks Run workflow with the printed
+# pull_number / expected_head_sha / confirm. Agents must never gh pr merge,
+# never use the GitHub PR Merge button, and never dispatch Deploy Production.
 #
-# Owner runs this workflow from the Actions tab after saying
-# "Approved — Merge & Deploy" (the confirmation input must match exactly).
+# Confirm input must be exactly one allow-listed phrase:
+#   Approved — Merge & Deploy
+#   Deploy kar do
+#   Live kar do
+#   Approved, put it live
+# Hyphen "Approved - Merge & Deploy" is rejected.
 #
 # Flow:
 #   verify phrase + cursor/* + not draft + targets main + expected head SHA
@@ -39,7 +48,7 @@ on:
         required: true
         type: string
       confirm:
-        description: "Must be exactly: Approved — Merge & Deploy"
+        description: "Exactly one of: Approved — Merge & Deploy | Deploy kar do | Live kar do | Approved, put it live"
         required: true
         type: string
 

@@ -257,7 +257,7 @@ production-secret-free.
 
 - `CLOUD_AGENT_HANDOFF.md` — entrypoint; points here for issue work  
 - `docs/ops/cloud-agent-issue-to-live.md` — owner merge → deploy → live-verify → new-PR self-heal  
-- `docs/ops/owner-merge-and-deploy.md` — Actions UI: Approved — Merge & Deploy  
+- `docs/ops/owner-merge-and-deploy.md` — Owner Merge & Deploy + request script  
 - `docs/ops/cloud-agent-local-browser-qa.md` — fail-closed Chrome tooling  
 - `docs/ops/cloud-agent-development.md` — bootstrap  
 - `docs/ops/cloud-agent-architecture.md` — invariants  

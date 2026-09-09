@@ -38,7 +38,10 @@ if [ -f "$DOC" ]; then
     'Exact-SHA' \
     'concurrency' \
     'Owner Merge & Deploy' \
-    'Approved — Merge & Deploy'
+    'Approved — Merge & Deploy' \
+    'owner-merge-and-deploy-request.sh' \
+    'Deploy kar do' \
+    'Merge button'
   do
     grep -qi "$needle" "$DOC" && ok "issue-to-live doc mentions: $needle" || bad "issue-to-live doc missing: $needle"
   done

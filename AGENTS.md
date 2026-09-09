@@ -17,14 +17,17 @@ one focused `cursor/*` PR with evidence.
 Do **not** claim DONE / FIXED / VERIFIED merely because code changed or
 PHPUnit passed.
 
-After the PR is green, **STOP** for the owner. The **issue → live** chain
+After the PR is green, **STOP** for the owner (Phase 1). Do not merge, do not
+enable auto-merge, do not deploy, do not SSH. The **issue → live** chain
 ([`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md))
-is: Owner Merge & Deploy (`docs/ops/owner-merge-and-deploy.md`) →
+is: explicit owner approval → `scripts/owner-merge-and-deploy-request.sh` /
+Owner Merge & Deploy (`docs/ops/owner-merge-and-deploy.md`) →
 protected Deploy Production (`production-deploy` secrets, repository
 fail-closed gates, no human Environment reviewer) → Actions live-verify →
 self-heal via a **new** PR on failure (max 3), then STOP again. Cloud Agents
-stay **production-secret-free** and must **not** merge or deploy; say
-**LIVE VERIFIED** only after Actions `ci-live-verify.sh` passes.
+stay **production-secret-free**; they must **not** merge from the PR page or
+dispatch Deploy Production. Say **LIVE VERIFIED** only after Actions
+`ci-live-verify.sh` passes.
 
 ## Entrypoints
 
@@ -33,7 +36,7 @@ stay **production-secret-free** and must **not** merge or deploy; say
 | `CLOUD_AGENT_HANDOFF.md` | Git/PR/deploy boundary + links |
 | `docs/ops/cloud-agent-issue-resolution.md` | **DEFAULT** local issue-resolution workflow |
 | `docs/ops/cloud-agent-issue-to-live.md` | **Issue → live** owner merge/deploy/verify/self-heal |
-| `docs/ops/owner-merge-and-deploy.md` | Owner Actions UI: Approved — Merge & Deploy |
+| `docs/ops/owner-merge-and-deploy.md` | Owner Merge & Deploy + request script (Phase 2) |
 | `docs/ops/cloud-agent-development.md` | Local/Cloud bootstrap (MariaDB) |
 | `docs/ops/cloud-agent-local-browser-qa.md` | Fail-closed Chrome UI smoke |
 | `docs/ops/cloud-agent-architecture.md` | Non-secret invariants |

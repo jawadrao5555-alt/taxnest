@@ -4,6 +4,7 @@
 Pure function + CLI. Does NOT call GitHub, SSH, or read secrets.
 Usage:
   python3 scripts/lib/owner-merge-and-deploy.py --input-json payload.json
+  python3 scripts/lib/owner-merge-and-deploy.py --pr-json pr.json --checks-json checks.json ...
   python3 scripts/lib/owner-merge-and-deploy.py --self-test
 Exit 0 with JSON on stdout for allow/noop; exit 2 with JSON for reject.
 """
@@ -14,8 +15,21 @@ import re
 import sys
 
 CONFIRM_PHRASE = "Approved — Merge & Deploy"
+# Actions confirm input AND owner chat → request-script. Hyphen variant stays rejected.
+CONFIRM_ALIASES = frozenset(
+    {
+        CONFIRM_PHRASE,
+        "Deploy kar do",
+        "Live kar do",
+        "Approved, put it live",
+    }
+)
 VALIDATE_CHECK_NAME = "validate"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _confirm_ok(value: str) -> bool:
+    return (value or "").strip() in CONFIRM_ALIASES
 
 
 def _norm_sha(value: str | None) -> str:
@@ -31,6 +45,44 @@ def _is_validate_check(name: str) -> bool:
     return n == VALIDATE_CHECK_NAME or n.endswith("/ " + VALIDATE_CHECK_NAME) or n == "pr checks / validate"
 
 
+def payload_from_github_api(
+    pr_obj: dict,
+    checks_raw: dict | list | None,
+    confirm: str,
+    expected_head_sha: str,
+    owner: str,
+    repo: str,
+    origin_main_sha: str,
+    successful_deploy_shas: list | None = None,
+) -> dict:
+    """Normalize GitHub PR + check-runs API JSON into decide() payload."""
+    checks = checks_raw.get("check_runs") if isinstance(checks_raw, dict) else checks_raw
+    return {
+        "confirm": confirm,
+        "expected_head_sha": expected_head_sha,
+        "owner": owner,
+        "repo": repo,
+        "origin_main_sha": origin_main_sha,
+        "check_runs": checks or [],
+        "successful_deploy_shas": successful_deploy_shas or [],
+        "pr": {
+            "draft": pr_obj.get("draft"),
+            "merged": pr_obj.get("merged"),
+            "mergeable": pr_obj.get("mergeable"),
+            "mergeable_state": pr_obj.get("mergeable_state"),
+            "merge_commit_sha": pr_obj.get("merge_commit_sha"),
+            "base": {"ref": (pr_obj.get("base") or {}).get("ref")},
+            "head": {
+                "ref": (pr_obj.get("head") or {}).get("ref"),
+                "sha": (pr_obj.get("head") or {}).get("sha"),
+                "repo": {
+                    "full_name": ((pr_obj.get("head") or {}).get("repo") or {}).get("full_name"),
+                },
+            },
+        },
+    }
+
+
 def decide(payload: dict) -> dict:
     """Return {action, reason, dispatch_sha, merge_head_sha}.
 
@@ -41,10 +93,10 @@ def decide(payload: dict) -> dict:
       noop              — already merged and that tip already deployed successfully
     """
     confirm = (payload.get("confirm") or "").strip()
-    if confirm != CONFIRM_PHRASE:
+    if not _confirm_ok(confirm):
         return {
             "action": "reject",
-            "reason": "confirmation phrase mismatch — required exactly: Approved — Merge & Deploy",
+            "reason": "confirmation phrase mismatch — required exactly: Approved — Merge & Deploy (or an allow-listed owner alias)",
             "dispatch_sha": None,
         }
 
@@ -248,6 +300,32 @@ def _self_test() -> int:
     bad_phrase = dict(good, confirm="Approved - Merge & Deploy")
     check("wrong phrase rejected", bad_phrase, "reject")
 
+    for alias in ("Deploy kar do", "Live kar do", "Approved, put it live"):
+        check(f"alias accepted: {alias}", dict(good, confirm=alias), "merge_and_dispatch")
+
+    api_payload = payload_from_github_api(
+        {
+            "draft": False,
+            "merged": False,
+            "mergeable": True,
+            "mergeable_state": "clean",
+            "base": {"ref": "main"},
+            "head": {
+                "ref": "cursor/example-0f83",
+                "sha": sha,
+                "repo": {"full_name": "o/r"},
+            },
+        },
+        {"check_runs": [{"name": "validate", "conclusion": "success", "status": "completed"}]},
+        CONFIRM_PHRASE,
+        sha,
+        "o",
+        "r",
+        main,
+        [],
+    )
+    check("payload_from_github_api happy", api_payload, "merge_and_dispatch")
+
     draft = dict(good, pr={**base_pr, "draft": True})
     check("draft rejected", draft, "reject")
 
@@ -318,6 +396,25 @@ def _self_test() -> int:
     return fails
 
 
+def _flag(argv: list[str], name: str, required: bool = True) -> str:
+    flag = f"--{name}"
+    if flag not in argv:
+        if required:
+            print(f"missing {flag}", file=sys.stderr)
+            sys.exit(2)
+        return ""
+    i = argv.index(flag)
+    if i + 1 >= len(argv):
+        print(f"missing value for {flag}", file=sys.stderr)
+        sys.exit(2)
+    return argv[i + 1]
+
+
+def _load_json_file(path: str):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def main(argv: list[str]) -> int:
     if "--self-test" in argv:
         fails = _self_test()
@@ -327,17 +424,33 @@ def main(argv: list[str]) -> int:
         print("owner-merge-and-deploy.py self-test: ALL PASS")
         return 0
 
-    raw = None
-    if "--input-json" in argv:
-        i = argv.index("--input-json")
-        path = argv[i + 1] if i + 1 < len(argv) else "-"
-        if path == "-":
-            raw = sys.stdin.read()
-        else:
-            raw = open(path, encoding="utf-8").read()
+    if "--pr-json" in argv:
+        success = []
+        success_path = _flag(argv, "success-json", required=False)
+        if success_path:
+            success = _load_json_file(success_path)
+        payload = payload_from_github_api(
+            _load_json_file(_flag(argv, "pr-json")),
+            _load_json_file(_flag(argv, "checks-json")),
+            _flag(argv, "confirm"),
+            _flag(argv, "expected-head-sha"),
+            _flag(argv, "owner"),
+            _flag(argv, "repo"),
+            _flag(argv, "main-sha"),
+            success,
+        )
     else:
-        raw = sys.stdin.read()
-    payload = json.loads(raw)
+        raw = None
+        if "--input-json" in argv:
+            i = argv.index("--input-json")
+            path = argv[i + 1] if i + 1 < len(argv) else "-"
+            if path == "-":
+                raw = sys.stdin.read()
+            else:
+                raw = open(path, encoding="utf-8").read()
+        else:
+            raw = sys.stdin.read()
+        payload = json.loads(raw)
     result = decide(payload)
     print(json.dumps(result, indent=2))
     return 0 if result["action"] != "reject" else 2

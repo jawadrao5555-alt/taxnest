@@ -1,13 +1,17 @@
 # Deploy production (Nayatel VPS) via GitHub Actions
 #
 # Triggers:
-#   1) push to main — human merges / non-GITHUB_TOKEN pushes
+#   1) push to main — non-GITHUB_TOKEN pushes of a non-merge-commit tip
+#      (Owner Merge & Deploy squash uses GITHUB_TOKEN, so it does NOT fire this
+#      push path; it workflow_dispatches with inputs.target_sha instead).
+#      GitHub PR Merge-button merge commits are refused after checkout.
 #   2) workflow_dispatch with inputs.target_sha — required handoff after
 #      Owner Merge & Deploy squash (GITHUB_TOKEN merges suppress push workflows;
 #      workflow_dispatch is exempt). target_sha MUST be the exact squash commit.
 #
 # Flow:
-#   → job "gate" (no Environment, no secrets): resolve SHA, require it equals
+#   → job "gate" (no Environment, no secrets): resolve SHA, refuse GitHub
+#     merge-commits / "Merge pull request #N" subjects, require SHA equals
 #     current origin/main TIP, refuse skip_elaan/allow_settings, cancel other
 #     runs WAITING for an Environment (legacy production reviewers or a
 #     re-added wait)
@@ -137,6 +141,22 @@ jobs:
         with:
           ref: ${{ steps.resolve.outputs.sha }}
           fetch-depth: 0
+
+      - name: Guard — refuse GitHub PR merge-commit deploys
+        run: |
+          set -euo pipefail
+          SUBJECT="$(git log -1 --format=%s)"
+          PARENTS="$(git rev-list --parents -n 1 HEAD | awk '{print NF-1}')"
+          if [ "${PARENTS}" -gt 1 ] || printf '%s' "${SUBJECT}" | grep -Eq '^Merge pull request #[0-9]+'; then
+            echo "CI DEPLOY FAILED: GitHub PR Merge-button / merge-commit deploys are refused." >&2
+            echo "Use Actions workflow Owner Merge & Deploy (squash + exact-SHA dispatch)." >&2
+            echo "Do not click Merge on the PR page when that workflow is available." >&2
+            echo "  HEAD=$(git rev-parse HEAD)" >&2
+            echo "  parents=${PARENTS}" >&2
+            echo "  subject=${SUBJECT}" >&2
+            exit 1
+          fi
+          echo "Deploy SHA is not a GitHub merge commit (parents=${PARENTS})."
 
       - name: Guard — refuse wrong SHA / non-main history / non-tip
         run: |

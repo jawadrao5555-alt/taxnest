@@ -1,46 +1,65 @@
 # Owner Merge & Deploy
 
 Cursor Cloud Agents implement, test, and open **one focused `cursor/*` PR**, then
-**STOP**. They must not merge and must not dispatch production deploy.
+**STOP**. They must not merge, must not click the GitHub PR Merge button, and
+must not dispatch **Deploy Production**.
 
-The owner initiates merge+deploy with an auditable GitHub Actions
-`workflow_dispatch` (not a chat workaround). Cloud Agent `gh` typically cannot
-create `workflow_dispatch` events (HTTP 403).
+Production merge+deploy is initiated only by the GitHub Actions workflow
+**Owner Merge & Deploy** (`workflow_dispatch`). After explicit owner approval
+in chat, the agent runs `scripts/owner-merge-and-deploy-request.sh`, which
+re-validates the PR and SHA and attempts that dispatch. Cloud Agent `gh` is
+typically HTTP 403; then the owner clicks **Run workflow** with the printed
+values. Do **not** use the GitHub PR Merge button when this workflow is
+available.
 
-## Confirmation phrase
+## Confirmation phrases
 
-Exactly:
+Exactly one of (match spaces and case; em dash `—`, not a hyphen):
 
 ```
 Approved — Merge & Deploy
+Deploy kar do
+Live kar do
+Approved, put it live
 ```
 
-(em dash `—`, not a hyphen.)
+`Approved - Merge & Deploy` (hyphen) is **rejected**.
 
-## Steps (after the implementation PR for this workflow is already on `main`)
+## Steps (workflow is already on `main`)
 
 1. Wait until the feature PR is **Ready** (not draft), targets **`main`**, branch
    starts with **`cursor/`**, and **PR checks / validate** is green on the current
    head SHA.
 2. Copy the PR **number** and the full 40-character **head SHA**.
-3. GitHub → **Actions** → **Owner Merge & Deploy** → **Run workflow**.
-4. Branch: **`main`** (this selects the workflow file on `main`).
-5. Inputs:
-   - `pull_number`: the PR number
-   - `expected_head_sha`: that 40-char head SHA
-   - `confirm`: `Approved — Merge & Deploy`
-6. Run. The job squash-merges **only if** the head SHA still matches, then
+3. After an explicit approval phrase in chat, the agent runs:
+
+   ```bash
+   bash scripts/owner-merge-and-deploy-request.sh <pull_number> <expected_head_sha> '<confirm phrase>'
+   ```
+
+   That prints the exact PR number and HEAD SHA being sent. Exit **0** means
+   dispatch was accepted. Exit **3** means gates passed but `workflow_dispatch`
+   is 403 — owner clicks **Run workflow** with the printed fill-ins. Exit **2**
+   means reject: do not merge, do not deploy.
+4. If the owner runs it from the Actions tab instead:
+   GitHub → **Actions** → **Owner Merge & Deploy** → **Run workflow**.
+   Branch: **`main`**. Inputs: `pull_number`, `expected_head_sha`, `confirm`.
+5. The job squash-merges **only if** the head SHA still matches, then
    verifies the squash commit is the current `origin/main` tip, then
    `workflow_dispatch`es **Deploy Production** with `inputs.target_sha` only.
-7. Watch **Deploy Production**. Environment `production-deploy` has **no
+6. Watch **Deploy Production**. Environment `production-deploy` has **no
    reviewer wait**. Live-verify must pass before anyone says LIVE VERIFIED.
 
 Do **not** approve Environment `production` for this path. That Environment is
 Live Ops only.
 
+Do **not** click **Merge** on the PR page. Merge-commit pushes to `main` are
+refused by Deploy Production. GitHub UI squash/rebase still fires `push` deploy
+and bypasses SHA pinning in this workflow — do not use them.
+
 ## What the workflow rejects
 
-- Wrong confirmation phrase
+- Wrong confirmation phrase (including the hyphen variant)
 - Draft PRs
 - Non-`cursor/` branches
 - Forks
@@ -55,25 +74,18 @@ Duplicate approval of a PR that is **already** the current main tip is
 idempotent: it dispatches Deploy Production again, or no-ops if that SHA already
 had a successful Deploy Production run.
 
-## First landing of this workflow (chicken-and-egg)
+## Chat command (Phase 2)
 
-Until `owner-merge-and-deploy.yml` exists on `main`, this Actions workflow
-cannot run. The PR that introduces it must be squash-merged **once** by a human
-with permission to land on `main`.
+These chat phrases are authorization to **initiate Owner Merge & Deploy** for
+the reported PR + SHA — not to merge from the PR page, not to SSH, and not to
+start Deploy Production directly:
 
-**Do not mark that implementation PR Ready while `enable-pr-auto-merge.yml` on
-`main` still squash-merges Ready `cursor/*` PRs** — the retired workflow on
-`main` would auto-land it. Keep it **draft**, then land it with a local
-`git merge --squash` (or equivalent admin merge) onto `main`, **or** mark Ready
-only when you accept that the *current* main auto-merge will be the one-time
-bootstrap that disables itself.
+- `Approved — Merge & Deploy`
+- `Deploy kar do`
+- `Live kar do`
+- `Approved, put it live`
 
-After that squash is on `main`, future PRs use the steps above. GitHub does not
-merge draft PRs from the UI, so later feature PRs should be marked Ready
-**after** this workflow is on `main` (auto-merge is then retired).
-
-## Chat command
-
-If the owner types `Approved — Merge & Deploy` in Cursor chat, the agent must
-**not** invent a merge. Point the owner at this Actions workflow and the PR
-number + head SHA from the PR report.
+The agent must re-verify the PR number, Ready state, required checks, unchanged
+HEAD SHA, `main` target, and mergeability; show those exact values; then run
+`scripts/owner-merge-and-deploy-request.sh`. It must **not** invent a
+`gh pr merge`.

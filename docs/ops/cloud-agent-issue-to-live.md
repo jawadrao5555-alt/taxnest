@@ -9,14 +9,16 @@ Companion docs:
 |---|---|
 | Local reproduce → fix → PR | `docs/ops/cloud-agent-issue-resolution.md` |
 | Local Chrome | `docs/ops/cloud-agent-local-browser-qa.md` |
-| Owner Merge & Deploy | `docs/ops/owner-merge-and-deploy.md`, `.github/workflows/owner-merge-and-deploy.yml` |
+| Owner Merge & Deploy | `docs/ops/owner-merge-and-deploy.md`, `.github/workflows/owner-merge-and-deploy.yml`, `scripts/owner-merge-and-deploy-request.sh` |
 | Retired merge-on-green | `.github/workflows/enable-pr-auto-merge.yml` (logs only; does not merge) |
 | Production deploy | `docs/ops/github-production-deploy.md` |
 | Rollback | `deployment/ROLLBACK.md` |
 
 This document adds the **post-PR** half: owner-approved squash merge → hand to
 Deploy Production → live smoke → self-heal via a **new** PR — while keeping
-Cloud Agents **production-secret-free**. Cursor does **not** merge or deploy.
+Cloud Agents **production-secret-free**. Cursor does **not** merge from the PR
+page, does **not** SSH, and does **not** dispatch Deploy Production. After
+explicit owner approval it may run `scripts/owner-merge-and-deploy-request.sh`.
 
 ---
 
@@ -29,14 +31,19 @@ Issue (owner)
   → full php artisan test (+ npm build if assets)
   → one focused cursor/* PR with evidence
   → PR checks (still run; ready_for_review retriggers checks)
-  → STOP — wait for explicit owner approval
-  → Owner runs Actions workflow "Owner Merge & Deploy" with
-    pull_number + expected_head_sha + confirm exactly "Approved — Merge & Deploy"
+  → STOP — wait for explicit owner approval (Phase 1 stop rule)
+  → Agent re-verifies PR number, Ready, required checks, unchanged HEAD SHA,
+    targets main, mergeable; shows those values; runs
+    scripts/owner-merge-and-deploy-request.sh
+    (or owner clicks Actions → Owner Merge & Deploy with the same inputs)
+    confirm one of: "Approved — Merge & Deploy" | "Deploy kar do" |
+    "Live kar do" | "Approved, put it live"
   → squash merge pinned to that head SHA; squash SHA must equal origin/main tip
   → Owner Merge & Deploy dispatches Deploy Production with exact squash SHA
     (workflow_dispatch; required because GITHUB_TOKEN merges suppress push workflows)
-  → Deploy Production **gate**: SHA must be current origin/main tip;
-    skip_elaan/allow_settings refused; stale waiting runs cancelled
+    Do not click Merge on the PR page. Do not start Deploy Production yourself.
+  → Deploy Production **gate**: refuse GitHub merge-commits; SHA must be current
+    origin/main tip; skip_elaan/allow_settings refused; stale waiting runs cancelled
     (SSH in_progress is never cancelled)
   → GitHub Environment "production-deploy" (secrets + main-only branch policy;
     no required reviewers — repository fail-closed gates)
@@ -49,12 +56,15 @@ Issue (owner)
 The owner **hands** the main commit to the protected deploy workflow via
 **Owner Merge & Deploy** plus an explicit `workflow_dispatch` of Deploy Production
 with `inputs.target_sha` set to the squash commit. The agent does **not** hold SSH
-keys, merge PRs, dispatch deploy, approve Live Ops, or run authenticated live
-smoke itself.
+keys, merge from the PR page, dispatch Deploy Production, approve Live Ops, or
+run authenticated live smoke itself. After explicit chat approval it may only
+run `scripts/owner-merge-and-deploy-request.sh`.
 
-Human merges / non-token pushes to `main` still start Deploy Production via
-the normal `push` trigger (same `production-deploy` Environment + exact SHA +
-live-verify).
+GitHub PR Merge-button merge commits on `main` are **refused** by Deploy
+Production. Do not use the PR Merge button when Owner Merge & Deploy is
+available. Non-token pushes of a non-merge-commit tip still start Deploy
+Production via the `push` trigger (same `production-deploy` Environment + exact
+SHA + live-verify).
 
 ---
 
@@ -124,15 +134,16 @@ branches to `main`. Live Ops continues to use Environment `production`
 
 1. Subscribe to PR checks / CI (`cursor-subscriptions`) — do not busy-poll.
 2. When **PR checks / validate** is green, report the PR number, the full
-   40-character head SHA, and the owner steps in
-   `docs/ops/owner-merge-and-deploy.md`.
-3. **STOP.** Do **not** merge. Do **not** dispatch **Owner Merge & Deploy** or
-   **Deploy Production**. Chat phrase `Approved — Merge & Deploy` is **not**
-   permission for the agent to merge (Cloud Agent `gh` cannot
-   `workflow_dispatch` anyway).
-4. After the owner has merged and deployed, observe Deploy Production with
-   `bash scripts/cloud-issue-to-live-observe.sh --sha=<merged-sha>` if the owner
-   asks, or in a follow-up that starts after that merge.
+   40-character head SHA, and **STOP** (Phase 1).
+3. After an **explicit** owner approval phrase, re-verify Ready / checks /
+   unchanged HEAD SHA / `main` / mergeable, show those exact values, then run
+   `bash scripts/owner-merge-and-deploy-request.sh <PR> <HEAD_SHA> '<phrase>'`.
+   Do **not** `gh pr merge`. Do **not** click Merge on the PR page. Do **not**
+   dispatch **Deploy Production**. If dispatch is HTTP 403, print the Actions
+   UI fill-ins from `docs/ops/owner-merge-and-deploy.md`.
+4. After Owner Merge & Deploy has merged and dispatched, observe Deploy
+   Production with `bash scripts/cloud-issue-to-live-observe.sh --sha=<merged-sha>`
+   if the owner asks, or in a follow-up that starts after that merge.
 5. Normal Deploy Production on `production-deploy` does **not** wait for a
    human Environment reviewer. Do **not** approve Live Ops (`production`)
    unless the owner asked for a Live Ops mutation. Do **not** approve or
@@ -258,6 +269,7 @@ Never use those phrases merely because code changed, PHPUnit passed, or a PR mer
 |---|---|---|
 | Local NestPOS smoke | Cloud | `BASE_URL=http://127.0.0.1:8000 node scripts/cloud-local-ui-smoke.mjs` |
 | Observe deploy/verify | Cloud | `bash scripts/cloud-issue-to-live-observe.sh --sha=…` |
+| Initiate owner merge+deploy (after explicit approval) | Cloud | `bash scripts/owner-merge-and-deploy-request.sh <PR> <SHA> '<phrase>'` |
 | Live verify | Actions only | `scripts/ci-live-verify.sh` |
 | Static guardrail | Anyone | `bash scripts/tests/issue-to-live-check.sh` |
 | Policy static | Anyone | `bash scripts/tests/cloud-agent-issue-resolution-check.sh` |

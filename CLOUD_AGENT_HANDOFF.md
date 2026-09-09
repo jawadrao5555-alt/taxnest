@@ -27,16 +27,20 @@ PHPUnit passed. The original reported issue must have been re-tested successfull
 
 **Issue → live (after the PR):** follow
 **[`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md)**.
-After PR checks pass, **STOP**. The owner runs **Owner Merge & Deploy**
-([`docs/ops/owner-merge-and-deploy.md`](docs/ops/owner-merge-and-deploy.md))
-with phrase `Approved — Merge & Deploy`. That squash-merges, then
+After PR checks pass, **STOP** (Phase 1). Do not merge, do not enable
+auto-merge, do not deploy, do not SSH. After an **explicit** owner approval
+phrase, run `scripts/owner-merge-and-deploy-request.sh` (Phase 2) — see
+[`docs/ops/owner-merge-and-deploy.md`](docs/ops/owner-merge-and-deploy.md).
+That is authorization to initiate **Owner Merge & Deploy** only (re-verify PR
+number + HEAD SHA first). Owner Merge & Deploy squash-merges, then
 **workflow_dispatch** hands the exact squash SHA to Deploy Production
-(GITHUB_TOKEN merges do not start push workflows). Normal deploys use
-Environment `production-deploy` (no required reviewers; repository fail-closed
-gates). Actions runs `scripts/ci-live-verify.sh`. On failure, open a **new** PR
-and STOP again (max **3** iterations). Say **LIVE VERIFIED** only after that
-Actions step passes. Observe with `bash scripts/cloud-issue-to-live-observe.sh`
-(secret-free). Do **not** merge or dispatch deploy from the Cloud Agent.
+(GITHUB_TOKEN merges do not start push workflows). Do **not** click Merge on
+the PR page. Normal deploys use Environment `production-deploy` (no required
+reviewers; repository fail-closed gates). Actions runs
+`scripts/ci-live-verify.sh`. On failure, open a **new** PR and STOP again
+(max **3** iterations). Say **LIVE VERIFIED** only after that Actions step
+passes. Observe with `bash scripts/cloud-issue-to-live-observe.sh`
+(secret-free). Do **not** `gh pr merge` or dispatch **Deploy Production**.
 
 **Live Ops (NestPOS PRA investigate → explain → owner-approved fix):**
 [`docs/ops/live-ops.md`](docs/ops/live-ops.md). Cloud Agents use
@@ -68,7 +72,7 @@ Owner focus is **NestPOS PRA** unless the owner explicitly expands scope. Do not
 6. Commit only the task’s intentional changes.
 7. Push the feature branch to GitHub.
 8. Open a PR targeting **`main`**.
-9. **Do not click Merge**, do not dispatch **Owner Merge & Deploy** or **Deploy Production**, and do not approve Live Ops Environment `production`. After **PR checks** succeed, report the PR number + head SHA and **STOP**. The owner runs **Owner Merge & Deploy**. That squash-merges and starts **Deploy Production** on Environment `production-deploy` (no required reviewers; repository fail-closed gates).
+9. After **PR checks** succeed, report the PR number + head SHA and **STOP**. Do **not** click Merge, do **not** enable auto-merge, do **not** dispatch **Deploy Production**, do **not** SSH, and do **not** approve Live Ops Environment `production`. **Phase 2** starts only after an explicit owner approval phrase: run `scripts/owner-merge-and-deploy-request.sh` with that PR number + HEAD SHA (show both first). If dispatch is 403, print the Actions UI fill-ins. Owner Merge & Deploy squash-merges and starts **Deploy Production** on Environment `production-deploy` (no required reviewers; repository fail-closed gates).
 10. If a change is wrong, **preserve branch/PR history** so the change can be safely reverted. Do not force-rewrite shared history to hide mistakes.
 
 ## Testing
@@ -110,7 +114,7 @@ Do not commit `.env`. Do not use production credentials in Cloud Agent VMs.
 
 ## Production deploy (GitHub Actions)
 
-After a `cursor/` PR is squash-merged to `main` by **Owner Merge & Deploy** (or a human merge), production is intended to deploy via GitHub Actions on Environment `production-deploy` — **not** by the Cloud Agent SSHing to the VPS. Owner approval of the PR is not an SSH credential.
+After a `cursor/` PR is squash-merged to `main` by **Owner Merge & Deploy**, production deploys via GitHub Actions on Environment `production-deploy` — **not** by the Cloud Agent SSHing to the VPS, and **not** via the GitHub PR Merge button. Owner approval of the PR is not an SSH credential. Merge-commit pushes are refused.
 
 - Workflow: `.github/workflows/deploy-production.yml`
 - Environment: `production-deploy` (secrets + `main`-only branch policy; **no required reviewers**)
@@ -128,8 +132,8 @@ Permanent workflow (applies to **future** Cloud Agent PRs once these files are o
 1. Agent opens a same-repo PR to `main` from a `cursor/*` branch, then **stops**.
 2. `.github/workflows/pr-checks.yml` still runs (no production secrets, no deploy), including on `ready_for_review`.
 3. `.github/workflows/enable-pr-auto-merge.yml` is **retired**: it only logs. It does not squash-merge and does not dispatch Deploy Production.
-4. The owner runs `.github/workflows/owner-merge-and-deploy.yml` from the Actions tab (`workflow_dispatch`) with `pull_number`, `expected_head_sha`, and confirm exactly `Approved — Merge & Deploy`. How-to: `docs/ops/owner-merge-and-deploy.md`. Chat cannot substitute for that Actions run (Cloud Agent `gh` is 403 on `workflow_dispatch`; agents must not invent a merge).
-5. That job squash-merges only a Ready, same-repo `cursor/*` PR whose head SHA still matches and whose **validate** check succeeded, verifies the squash SHA is the current `origin/main` tip, then `workflow_dispatch`es **Deploy Production** with **only** `inputs.target_sha`. Environment `production-deploy` stays unattended. Live Ops stays on Environment `production` with required reviewers.
+4. After an explicit owner approval phrase (`Approved — Merge & Deploy`, `Deploy kar do`, `Live kar do`, or `Approved, put it live`), the agent re-verifies the PR (Ready, targets `main`, required checks green, HEAD SHA unchanged, mergeable), shows the exact PR number + HEAD SHA, and runs `scripts/owner-merge-and-deploy-request.sh`. That attempts `workflow_dispatch` of `.github/workflows/owner-merge-and-deploy.yml`. If `gh` is HTTP 403, print the Actions UI fill-ins; the owner clicks **Run workflow**. How-to: `docs/ops/owner-merge-and-deploy.md`. Agents must **not** `gh pr merge` or use the GitHub PR Merge button.
+5. That job squash-merges only a Ready, same-repo `cursor/*` PR whose head SHA still matches and whose **validate** check succeeded, verifies the squash SHA is the current `origin/main` tip, then `workflow_dispatch`es **Deploy Production** with **only** `inputs.target_sha`. Environment `production-deploy` stays unattended. Live Ops stays on Environment `production` with required reviewers. Do not start Deploy Production yourself after this workflow begins.
 
 Owner GitHub settings: **Allow squash merging**, and a ruleset/branch protection that requires the **PR checks / validate** job on `main`. Native GitHub auto-merge is no longer part of the Cursor path.
 

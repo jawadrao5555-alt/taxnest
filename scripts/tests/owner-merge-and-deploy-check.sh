@@ -16,8 +16,9 @@ DIAG="$ROOT/.github/workflows/live-ops-diagnose.yml"
 REM="$ROOT/.github/workflows/live-ops-remediate.yml"
 LIB="$ROOT/scripts/lib/owner-merge-and-deploy.py"
 SH="$ROOT/scripts/owner-merge-and-deploy.sh"
+REQ="$ROOT/scripts/owner-merge-and-deploy-request.sh"
 
-for f in "$AM" "$OM" "$PC" "$DP" "$LIB" "$SH" "$DIAG" "$REM"; do
+for f in "$AM" "$OM" "$PC" "$DP" "$LIB" "$SH" "$REQ" "$DIAG" "$REM"; do
   [ -f "$f" ] || bad "missing $f"
 done
 
@@ -77,6 +78,10 @@ for needle in ("pull_number", "expected_head_sha", "confirm"):
         print("missing input", needle, file=sys.stderr); sys.exit(1)
 if "Approved — Merge & Deploy" not in text:
     print("missing confirmation phrase", file=sys.stderr); sys.exit(1)
+if "Deploy kar do" not in text or "Live kar do" not in text or "Approved, put it live" not in text:
+    print("missing owner confirm aliases", file=sys.stderr); sys.exit(1)
+if "owner-merge-and-deploy-request.sh" not in text:
+    print("missing request-script pointer", file=sys.stderr); sys.exit(1)
 if "group: owner-merge-and-deploy" not in text:
     print("missing owner concurrency group", file=sys.stderr); sys.exit(1)
 if "cancel-in-progress: false" not in text:
@@ -109,6 +114,29 @@ grep -q 'sha=' "$SH" && grep -q 'expected-head-sha' "$SH" \
   || bad "must pin pulls.merge sha to expected head"
 bash -n "$SH" && ok "owner-merge-and-deploy.sh bash -n" || bad "bash -n owner-merge-and-deploy.sh"
 
+# --------------------------------------------------------------------------- Request helper (Phase 2, no mutate except workflow_dispatch attempt)
+bash -n "$REQ" && ok "owner-merge-and-deploy-request.sh bash -n" \
+  || bad "bash -n owner-merge-and-deploy-request.sh"
+grep -q 'workflow run owner-merge-and-deploy.yml' "$REQ" \
+  && ok "request script dispatches Owner Merge & Deploy only" \
+  || bad "request script must gh workflow run owner-merge-and-deploy.yml"
+if grep -vE '^\s*#' "$REQ" | grep -qE 'gh pr merge|pulls/.*/merge|workflow run deploy-production'; then
+  bad "request script must not merge PRs or dispatch Deploy Production"
+else
+  ok "request script does not merge or dispatch Deploy Production"
+fi
+if grep -E '^\s*ssh |live_ssh ' "$REQ" | grep -vqE '^\s*#'; then
+  bad "request script must not SSH"
+else
+  ok "request script does not SSH"
+fi
+grep -q 'HTTP 403' "$REQ" && grep -q 'exit 3' "$REQ" \
+  && ok "request script fail-closes on workflow_dispatch 403 with Actions fill-ins" \
+  || bad "request script must document HTTP 403 / exit 3"
+grep -q 'Deploy kar do' "$REQ" && grep -q 'Live kar do' "$REQ" \
+  && ok "request script documents owner confirm aliases" \
+  || bad "request script must list confirm aliases"
+
 # --------------------------------------------------------------------------- Decision library (fixture matrix)
 python3 "$LIB" --self-test \
   && ok "owner-merge decision self-test (phrase, cursor/, draft, main, checks, SHA, idempotent, stale)" \
@@ -121,9 +149,12 @@ grep -qE '^[[:space:]]+environment: production-deploy[[:space:]]*$' "$DP" \
 grep -q 'group: production-deploy' "$DP" && grep -q 'cancel-in-progress: false' "$DP" \
   && ok "production deploy remains serialized (cancel-in-progress false)" \
   || bad "must keep serialized production-deploy concurrency"
-grep -q 'deploy_guard_main_tip' "$DP" \
-  && ok "stale/non-tip SHA still rejected on Deploy Production" \
-  || bad "must keep tip guard"
+  grep -q 'deploy_guard_main_tip' "$DP" \
+    && ok "stale/non-tip SHA still rejected on Deploy Production" \
+    || bad "must keep tip guard"
+  grep -q 'Merge pull request' "$DP" && grep -q 'rev-list --parents' "$DP" \
+    && ok "Deploy Production refuses GitHub PR merge-commits" \
+    || bad "must refuse Merge-button merge-commits on Deploy Production"
 grep -qE '^[[:space:]]+environment: production[[:space:]]*$' "$DIAG" \
   && grep -qE '^[[:space:]]+environment: production[[:space:]]*$' "$REM" \
   && ok "Live Ops still uses Environment production" \

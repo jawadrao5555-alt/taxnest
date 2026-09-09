@@ -54,7 +54,7 @@ Guards are isolated — no cross-login except admin auto-detect rules documented
 ## Testing expectations
 
 - **DEFAULT issue workflow:** `docs/ops/cloud-agent-issue-resolution.md` (reproduce → root-cause fix → re-test original failure → evidence → PR).
-- **Issue → live:** `docs/ops/cloud-agent-issue-to-live.md` (auto-merge → Environment-gated deploy → `ci-live-verify.sh` → self-heal; max 3 iterations).
+- **Issue → live:** `docs/ops/cloud-agent-issue-to-live.md` (PR + STOP for owner → Owner Merge & Deploy → unattended `production-deploy` → `ci-live-verify.sh` → self-heal via a new PR; max 3 iterations).
 - Primary gate: `php artisan test` (sqlite `:memory:` via `phpunit.xml`).
 - After NestPOS changes: targeted Feature tests under `tests/Feature/Pos*`.
 - Local Chrome UI smoke (Cloud Agent): `docs/ops/cloud-agent-local-browser-qa.md` — loopback only; fictional `videodemo@nestpos.pk` shop; `DevStagingGuard` allows `taxnest_dev` \| `taxnest_staging`.
@@ -64,7 +64,7 @@ Guards are isolated — no cross-login except admin auto-detect rules documented
 ## Deploy / Git (summary)
 
 - Feature work only on `cursor/*` branches; PR to `main`; do not commit on `main`.
-- Production: GitHub Actions + Environment `production` approval + `PRODUCTION_SSH_PRIVATE_KEY` (dedicated deploy key). See `docs/ops/github-production-deploy.md`.
+- Production code deploy: GitHub Actions on Environment `production-deploy` (no reviewers; repository fail-closed gates) after **Owner Merge & Deploy**. Live Ops stays on Environment `production` with required reviewers. See `docs/ops/github-production-deploy.md` and `docs/ops/owner-merge-and-deploy.md`.
 - Elaan / What’s New remains part of production deploy gates.
 - Rollback: `deployment/ROLLBACK.md`.
 

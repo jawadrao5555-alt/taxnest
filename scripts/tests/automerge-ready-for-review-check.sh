@@ -1,7 +1,6 @@
 #!/bin/bash
-# Prove draft → ready_for_review re-enters auto-merge WITHOUT giving
-# enable-pr-auto-merge.yml a pull_request trigger (that would run the
-# write-token job from the PR branch).
+# Prove draft → ready_for_review still refreshes PR checks WITHOUT giving
+# write-token merge workflows a pull_request trigger.
 # Does NOT SSH, deploy, merge, or call GitHub.
 # Usage: bash scripts/tests/automerge-ready-for-review-check.sh
 
@@ -12,18 +11,17 @@ ok()  { echo "PASS: $*"; }
 bad() { echo "FAIL: $*" >&2; FAILS=$((FAILS+1)); }
 
 AM="$ROOT/.github/workflows/enable-pr-auto-merge.yml"
+OM="$ROOT/.github/workflows/owner-merge-and-deploy.yml"
 PC="$ROOT/.github/workflows/pr-checks.yml"
 DP="$ROOT/.github/workflows/deploy-production.yml"
 
-for f in "$AM" "$PC" "$DP"; do
+for f in "$AM" "$OM" "$PC" "$DP"; do
   [ -f "$f" ] || bad "missing $f"
 done
 
-# --------------------------------------------------------------------------- PR checks: default types + ready_for_review only
 python3 - "$PC" <<'PY' && ok "PR checks pull_request types include ready_for_review and keep opened/synchronize/reopened" || bad "PR checks types must be opened, synchronize, reopened, ready_for_review"
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
-# Isolate the on: block before permissions/jobs
 m = re.search(r"(?ms)^on:\n(.*?)(?=^permissions:|^jobs:)", text)
 if not m:
     print("no on: block", file=sys.stderr)
@@ -44,7 +42,6 @@ need = ["opened", "synchronize", "reopened", "ready_for_review"]
 if got != need:
     print("types mismatch:", got, "want", need, file=sys.stderr)
     sys.exit(1)
-# Must not subscribe to noisy/broad extra types
 banned = ["edited", "labeled", "unlabeled", "assigned", "review_requested", "closed", "converted_to_draft"]
 for b in banned:
     if b in got:
@@ -53,8 +50,7 @@ for b in banned:
 sys.exit(0)
 PY
 
-# --------------------------------------------------------------------------- Enable PR auto-merge stays workflow_run-only (default branch)
-python3 - "$AM" <<'PY' && ok "Enable PR auto-merge trigger is workflow_run of PR checks only (no pull_request)" || bad "auto-merge must not gain a pull_request trigger"
+python3 - "$AM" <<'PY' && ok "retired auto-merge trigger is workflow_run of PR checks only (no pull_request)" || bad "retired auto-merge must not gain a pull_request trigger"
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 m = re.search(r"(?ms)^on:\n(.*?)(?=^permissions:|^jobs:)", text)
@@ -66,7 +62,7 @@ if re.search(r"(?m)^\s*pull_request:", on) or re.search(r"(?m)^\s*pull_request_t
     print("enable-pr-auto-merge must not trigger on pull_request / pull_request_target", file=sys.stderr)
     sys.exit(1)
 if re.search(r"(?m)^\s*workflow_dispatch:", on):
-    print("enable-pr-auto-merge must not add workflow_dispatch (not the existing security model)", file=sys.stderr)
+    print("retired auto-merge must not add workflow_dispatch", file=sys.stderr)
     sys.exit(1)
 if "workflow_run:" not in on:
     print("missing workflow_run", file=sys.stderr)
@@ -74,79 +70,43 @@ if "workflow_run:" not in on:
 if 'workflows: ["PR checks"]' not in on and "workflows: ['PR checks']" not in on:
     print("must listen to PR checks", file=sys.stderr)
     sys.exit(1)
-if "types: [completed]" not in on:
-    print("must listen to completed", file=sys.stderr)
-    sys.exit(1)
 if "ready_for_review" in on:
-    print("do not put ready_for_review on enable-pr-auto-merge (duplicate + PR-branch execution)", file=sys.stderr)
+    print("do not put ready_for_review on enable-pr-auto-merge", file=sys.stderr)
     sys.exit(1)
 sys.exit(0)
 PY
 
-# Failed PR checks cannot enable auto-merge
-if grep -q "github.event.workflow_run.conclusion == 'success'" "$AM" \
-   && grep -q "github.event.workflow_run.event == 'pull_request'" "$AM"; then
-  ok "auto-merge job requires successful PR-checks pull_request workflow_run"
-else
-  bad "auto-merge must require workflow_run conclusion success and event pull_request"
-fi
-
-# Draft skipped; ready_for_review path documented
-if grep -q 'pr.draft' "$AM" && grep -q 'skip draft' "$AM"; then
-  ok "auto-merge skips draft PRs"
-else
-  bad "auto-merge must skip drafts and log it"
-fi
-
-# Same-repo + cursor/ remain
-grep -q 'head.repo.full_name' "$AM" && grep -q "skip fork" "$AM" \
-  && ok "fork PRs still skipped" \
-  || bad "fork skip missing"
-grep -q "startsWith('cursor/')" "$AM" \
-  && ok "cursor/ branch restriction remains" \
-  || bad "cursor/ restriction missing"
-
-# Squash + SHA pin + already-merged skip (no duplicate merge/handoff)
-grep -q 'mergeMethod: SQUASH' "$AM" && grep -q "merge_method: 'squash'" "$AM" \
-  && ok "squash-merge behavior remains" \
-  || bad "squash merge missing"
-grep -q 'run.head_sha' "$AM" \
-  && ok "merge still pinned to PR-checks head SHA" \
-  || bad "head SHA pin missing"
-grep -qi 'already merged — skipping deploy handoff on rerun\|skipping deploy handoff on rerun' "$AM" \
-  && ok "already-merged reruns still skip duplicate deploy handoff" \
-  || bad "duplicate-handoff guard missing"
-
-# Permissions unchanged (contents write / PR write / actions write; no extra)
-python3 - "$AM" <<'PY' && ok "auto-merge permissions unchanged (contents/pull-requests/actions write only)" || bad "auto-merge permissions broadened or reduced"
+python3 - "$OM" <<'PY' && ok "Owner Merge & Deploy has no pull_request trigger (write-token stays on main)" || bad "owner workflow must not run from the PR branch"
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
-m = re.search(r"(?ms)^permissions:\n(.*?)(?=^jobs:|^on:)", text)
-if not m:
+m = re.search(r"(?ms)^on:\n(.*?)(?=^permissions:|^concurrency:|^jobs:)", text)
+on = m.group(1) if m else ""
+if re.search(r"(?m)^\s*pull_request:", on) or re.search(r"(?m)^\s*pull_request_target:", on):
     sys.exit(1)
-blob = m.group(1)
-need = {"contents: write", "pull-requests: write", "actions: write"}
-got = {ln.strip() for ln in blob.splitlines() if ln.strip() and not ln.strip().startswith("#")}
-if got != need:
-    print("permissions:", got, file=sys.stderr)
+if "workflow_run:" in on:
+    sys.exit(1)
+if "workflow_dispatch:" not in on:
     sys.exit(1)
 sys.exit(0)
 PY
 
-# Must not checkout PR code; must not hold prod secrets
-if grep -vE '^\s*#' "$AM" | grep -qiE 'actions/checkout'; then
-  bad "auto-merge must not checkout PR code"
+if grep -qE 'enablePullRequestAutoMerge|pulls\.merge' "$AM"; then
+  bad "retired auto-merge must not still squash-merge"
 else
-  ok "auto-merge still does not checkout untrusted code"
-fi
-if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS'; then
-  bad "auto-merge must not hold production secrets"
-else
-  ok "auto-merge still production-secret-free"
+  ok "retired auto-merge no longer squash-merges"
 fi
 
-# Deploy Production trigger/security not changed by this file set:
-# this check only asserts AM/PC did not start deploying.
+if grep -vE '^\s*#' "$AM" | grep -qiE 'actions/checkout'; then
+  bad "retired auto-merge must not checkout PR code"
+else
+  ok "retired auto-merge still does not checkout untrusted code"
+fi
+if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS'; then
+  bad "retired auto-merge must not hold production secrets"
+else
+  ok "retired auto-merge still production-secret-free"
+fi
+
 if grep -vE '^\s*#' "$PC" | grep -qiE 'environment:\s*production|PRODUCTION_SSH_PRIVATE_KEY|ci-deploy-production.sh'; then
   bad "PR checks must not deploy or hold production secrets"
 else
@@ -158,17 +118,12 @@ else
   ok "Deploy Production still does not run on pull_request"
 fi
 
-# Handoff still only target_sha (no skip_elaan)
-python3 - "$AM" <<'PY' && ok "deploy handoff still sends only target_sha" || bad "handoff must not send skip_elaan/allow_settings"
+python3 - "$ROOT/scripts/owner-merge-and-deploy.sh" <<'PY' && ok "owner dispatch still sends only target_sha" || bad "owner handoff must not send skip_elaan/allow_settings"
 import sys
 text = open(sys.argv[1], encoding="utf-8").read()
-idx = text.find("createWorkflowDispatch")
-if idx < 0:
+if "skip_elaan" in text or "allow_settings" in text:
     sys.exit(1)
-window = text[idx:idx+800]
-if "skip_elaan" in window or "allow_settings" in window:
-    sys.exit(1)
-if "target_sha" not in window:
+if "inputs[target_sha]" not in text:
     sys.exit(1)
 sys.exit(0)
 PY

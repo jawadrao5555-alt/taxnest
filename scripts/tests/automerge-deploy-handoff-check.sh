@@ -1,5 +1,6 @@
 #!/bin/bash
-# Prove the auto-merge → Deploy Production handoff cannot silently disappear.
+# Prove Deploy Production handoff still exists, but only via owner-triggered
+# merge — not via automatic Cursor merge.
 # Does NOT deploy, SSH, or require secrets.
 # Usage: bash scripts/tests/automerge-deploy-handoff-check.sh
 
@@ -10,60 +11,48 @@ ok()  { echo "PASS: $*"; }
 bad() { echo "FAIL: $*" >&2; FAILS=$((FAILS+1)); }
 
 AM="$ROOT/.github/workflows/enable-pr-auto-merge.yml"
+OM="$ROOT/.github/workflows/owner-merge-and-deploy.yml"
 DP="$ROOT/.github/workflows/deploy-production.yml"
 DOC="$ROOT/docs/ops/cloud-agent-issue-to-live.md"
 GHP="$ROOT/docs/ops/github-production-deploy.md"
 
 [ -f "$AM" ] || bad "missing enable-pr-auto-merge.yml"
+[ -f "$OM" ] || bad "missing owner-merge-and-deploy.yml"
 [ -f "$DP" ] || bad "missing deploy-production.yml"
 
 if [ -f "$AM" ]; then
-  grep -q 'createWorkflowDispatch' "$AM" \
-    && ok "auto-merge calls createWorkflowDispatch" \
-    || bad "auto-merge must createWorkflowDispatch Deploy Production after squash"
-
-  grep -q "workflow_id: 'deploy-production.yml'" "$AM" || grep -q 'workflow_id: "deploy-production.yml"' "$AM" \
-    && ok "auto-merge dispatches deploy-production.yml" \
-    || bad "auto-merge must target workflow_id deploy-production.yml"
-
-  grep -q 'target_sha' "$AM" \
-    && ok "auto-merge passes target_sha input" \
-    || bad "auto-merge must pass inputs.target_sha"
-
-  grep -q 'result.sha\|merge_commit_sha' "$AM" \
-    && ok "auto-merge uses merge/squash commit SHA (not only PR head)" \
-    || bad "auto-merge must hand off the squash/merge commit SHA"
-
-  grep -q 'actions: write' "$AM" \
-    && ok "auto-merge has actions: write for workflow_dispatch" \
-    || bad "auto-merge permissions.actions must be write"
-
-  # Must document why (GITHUB_TOKEN push suppression)
-  grep -qi 'GITHUB_TOKEN\|workflow_dispatch IS\|suppress' "$AM" \
-    && ok "auto-merge comments explain GITHUB_TOKEN push suppression" \
-    || bad "auto-merge must document why workflow_dispatch handoff exists"
-
-  # Must NOT embed production secrets
-  if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS|environment:\s*production'; then
-    bad "auto-merge must not hold production Environment secrets"
+  if grep -q 'createWorkflowDispatch' "$AM"; then
+    bad "retired auto-merge must not createWorkflowDispatch Deploy Production"
   else
-    ok "auto-merge does not embed production secrets/Environment"
+    ok "retired auto-merge does not dispatch Deploy Production"
   fi
+  if grep -vE '^\s*#' "$AM" | grep -qiE 'PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS|environment:\s*production'; then
+    bad "retired auto-merge must not hold production Environment secrets"
+  else
+    ok "retired auto-merge does not embed production secrets/Environment"
+  fi
+fi
 
-  # Immediate squash path must dispatch
-  grep -q 'dispatchDeployProduction' "$AM" \
-    && ok "auto-merge defines dispatchDeployProduction helper" \
-    || bad "missing dispatchDeployProduction helper"
+if [ -f "$OM" ]; then
+  grep -q 'deploy-production.yml' "$OM" || grep -q 'owner-merge-and-deploy.sh' "$OM" \
+    && ok "owner workflow is the Deploy Production handoff" \
+    || bad "owner-merge-and-deploy.yml must invoke the merge/dispatch script"
+  grep -q 'actions: write' "$OM" \
+    && ok "owner workflow has actions: write for workflow_dispatch" \
+    || bad "owner-merge-and-deploy permissions.actions must be write"
+  grep -qi 'GITHUB_TOKEN' "$OM" || grep -qi 'GITHUB_TOKEN' "$ROOT/scripts/owner-merge-and-deploy.sh" \
+    && ok "owner path documents/uses GITHUB_TOKEN for dispatch after squash" \
+    || bad "must document GITHUB_TOKEN squash → workflow_dispatch"
+fi
 
-  # Native auto-merge path must eventually hand off
-  grep -q 'waitMergedThenDispatch' "$AM" \
-    && ok "auto-merge waits/polls native auto-merge then hands off" \
-    || bad "native enablePullRequestAutoMerge path must hand off after merge"
-
-  # Reruns of already-merged PRs must not blindly re-dispatch
-  grep -qi 'skipping deploy handoff on rerun\|already merged — skipping deploy' "$AM" \
-    && ok "already-merged reruns skip duplicate handoff" \
-    || bad "already-merged PRs must skip duplicate deploy handoff on rerun"
+SH="$ROOT/scripts/owner-merge-and-deploy.sh"
+if [ -f "$SH" ]; then
+  grep -q 'inputs\[target_sha\]' "$SH" \
+    && ok "owner handoff passes target_sha input" \
+    || bad "owner merge must pass inputs.target_sha"
+  grep -q 'merge_method=squash' "$SH" \
+    && ok "owner handoff uses squash merge SHA (not only PR head)" \
+    || bad "owner merge must squash and hand off the squash commit SHA"
 fi
 
 if [ -f "$DP" ]; then
@@ -75,7 +64,6 @@ if [ -f "$DP" ]; then
     && ok "Deploy Production resolves deploy SHA via outputs" \
     || bad "Deploy Production must resolve DEPLOY_SHA for checkout/apply/verify"
 
-  # Both apply and live-verify must use resolved SHA, not raw github.sha only
   if grep -A2 'TARGET_SHA:' "$DP" | grep -q 'steps.resolve.outputs.sha'; then
     ok "deploy step TARGET_SHA uses resolved SHA"
   else
@@ -111,22 +99,27 @@ if [ -f "$DP" ]; then
     && ok "Deploy Production still runs ci-live-verify" \
     || bad "must keep post-deploy live verify"
 
-  # Must still support push to main (human merges)
   grep -A3 '^on:' "$DP" | grep -q 'push:' \
     && ok "Deploy Production still triggers on push to main" \
     || bad "must keep push-to-main trigger for human merges"
 fi
 
 if [ -f "$DOC" ]; then
-  grep -qi 'workflow_dispatch\|GITHUB_TOKEN\|handoff' "$DOC" \
-    && ok "issue-to-live doc mentions handoff/GITHUB_TOKEN/workflow_dispatch" \
-    || bad "issue-to-live doc must describe auto-merge deploy handoff"
+  grep -qi 'Owner Merge & Deploy\|Approved — Merge & Deploy' "$DOC" \
+    && ok "issue-to-live doc describes owner-triggered merge" \
+    || bad "issue-to-live doc must describe Owner Merge & Deploy"
+  grep -qi 'workflow_dispatch\|GITHUB_TOKEN' "$DOC" \
+    && ok "issue-to-live doc mentions GITHUB_TOKEN/workflow_dispatch" \
+    || bad "issue-to-live doc must still mention workflow_dispatch"
 fi
 
 if [ -f "$GHP" ]; then
-  grep -qi 'target_sha\|workflow_dispatch\|GITHUB_TOKEN' "$GHP" \
+  grep -qi 'target_sha\|workflow_dispatch' "$GHP" \
     && ok "github-production-deploy doc mentions target_sha/handoff" \
     || bad "github-production-deploy.md must document target_sha handoff"
+  grep -qi 'Owner Merge & Deploy\|owner-merge-and-deploy' "$GHP" \
+    && ok "github-production-deploy doc names Owner Merge & Deploy" \
+    || bad "github-production-deploy.md must name the owner workflow"
 fi
 
 echo ""

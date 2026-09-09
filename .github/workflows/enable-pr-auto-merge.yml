@@ -1,30 +1,15 @@
-# Enable GitHub native auto-merge (squash) on Cursor Cloud Agent PRs,
-# then hand the exact squash commit to Deploy Production.
+# RETIRED automatic Cursor merge.
 #
-# Safety:
-#   - Does NOT SSH or hold PRODUCTION_SSH_PRIVATE_KEY / LIVE_QA_PASS
-#   - Does NOT checkout untrusted PR code (workflow_run on the default branch)
-#   - Fork PRs are ignored
-#   - Runs only after the "PR checks" workflow succeeds (workflow_run on
-#     the default branch — never a pull_request trigger on this file)
-#   - Draft PRs are skipped. ready_for_review re-runs "PR checks", which
-#     then re-fires this workflow; do not add ready_for_review here
-#     (would duplicate and would run this write-token job from the PR branch)
-#   - GitHub still enforces any additional required checks / reviews
+# Cursor PRs are no longer squash-merged or deployed by this workflow.
+# Owner initiation is `.github/workflows/owner-merge-and-deploy.yml`.
 #
-# HANDOFF (why workflow_dispatch):
-#   Merges performed with GITHUB_TOKEN do not start push-triggered workflows
-#   (GitHub event suppression). workflow_dispatch IS allowed from GITHUB_TOKEN.
-#   After a successful squash, this job dispatches Deploy Production with
-#   inputs.target_sha = the exact squash commit on main. Deploy Production
-#   still uses Environment "production-deploy" (secrets + main-only branch
-#   policy; no required reviewers) + exact-SHA apply + ci-live-verify.
-#   Concurrency group production-deploy serializes deploys. Live Ops stays
-#   on Environment "production" with required reviewers.
+# Kept as a workflow_run listener on the default branch so a pull_request
+# trigger is never added (that would run a write-token job from the PR
+# branch). The job only logs that Cursor merge-on-green is disabled.
 #
-# GitHub GraphQL enablePullRequestAutoMerge fails with
-# "Pull request is in clean status" when mergeable_state is CLEAN.
-# In that case squash-merge the PR-checks SHA, then dispatch deploy.
+# MUST NOT: native GitHub merge-on-green, REST squash of the pull request,
+# Actions dispatch of Deploy Production, checkout PR code, or hold
+# production secrets.
 
 name: Enable PR auto-merge
 
@@ -34,223 +19,21 @@ on:
     types: [completed]
 
 permissions:
-  contents: write
-  pull-requests: write
-  actions: write
+  contents: read
 
 jobs:
   enable-auto-merge:
-    name: Enable squash auto-merge
+    name: Auto-merge disabled (owner approval required)
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Request squash auto-merge and hand off Deploy Production
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const run = context.payload.workflow_run;
-            let candidates = run.pull_requests || [];
-            if (candidates.length === 0) {
-              const listed = await github.rest.pulls.list({
-                owner, repo, state: 'open', base: 'main', per_page: 50,
-              });
-              candidates = listed.data.filter((p) => p.head.sha === run.head_sha);
-            }
-            if (candidates.length === 0) {
-              core.info('No open PR found for this PR-checks run; nothing to enable.');
-              return;
-            }
-
-            function assertSha(sha, label) {
-              if (!sha || !/^[0-9a-f]{40}$/i.test(sha)) {
-                throw new Error(`${label}: refusing deploy handoff — invalid SHA '${sha}'`);
-              }
-              return sha.toLowerCase();
-            }
-
-            // GITHUB_TOKEN merges suppress push workflows; workflow_dispatch is exempt.
-            async function dispatchDeployProduction(mergeSha, prNumber) {
-              const sha = assertSha(mergeSha, `PR #${prNumber}`);
-              // Confirm the squash commit is on main before asking production to deploy it.
-              const { data: commits } = await github.rest.repos.listCommits({
-                owner, repo, sha: 'main', per_page: 20,
-              });
-              const onMain = commits.some((c) => c.sha.toLowerCase() === sha);
-              if (!onMain) {
-                // Fresh squash can race listCommits; fall back to fetching the commit + comparing ancestry via API.
-                try {
-                  await github.rest.repos.getCommit({ owner, repo, ref: sha });
-                } catch (e) {
-                  throw new Error(`PR #${prNumber}: merge SHA ${sha} is not readable on the repo`);
-                }
-                core.warning(
-                  `PR #${prNumber}: merge SHA ${sha} not yet in listCommits(main) tip window — dispatching anyway after getCommit OK`
-                );
-              }
-              await github.rest.actions.createWorkflowDispatch({
-                owner,
-                repo,
-                workflow_id: 'deploy-production.yml',
-                ref: 'main',
-                inputs: {
-                  target_sha: sha,
-                },
-              });
-              core.info(
-                `PR #${prNumber}: handed off Deploy Production via workflow_dispatch target_sha=${sha}`
-              );
-            }
-
-            async function squashMerge(pr) {
-              if (pr.head.sha !== run.head_sha) {
-                throw new Error(
-                  `head SHA ${pr.head.sha} does not match PR-checks SHA ${run.head_sha}`
-                );
-              }
-              if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
-                throw new Error(`not mergeable (state=${pr.mergeable_state})`);
-              }
-              const { data: result } = await github.rest.pulls.merge({
-                owner,
-                repo,
-                pull_number: pr.number,
-                merge_method: 'squash',
-                sha: run.head_sha,
-              });
-              if (!result.merged) {
-                throw new Error(`PR #${pr.number}: pulls.merge returned merged=false`);
-              }
-              const mergeSha = assertSha(result.sha, `PR #${pr.number} squash`);
-              core.info(`PR #${pr.number}: squash-merged as ${mergeSha}`);
-              await dispatchDeployProduction(mergeSha, pr.number);
-              return mergeSha;
-            }
-
-            // Native auto-merge merges later; poll for merge_commit_sha then hand off.
-            async function waitMergedThenDispatch(prNumber) {
-              const maxAttempts = 36; // ~6 minutes
-              for (let i = 1; i <= maxAttempts; i++) {
-                await new Promise((r) => setTimeout(r, 10000));
-                const { data: p } = await github.rest.pulls.get({
-                  owner, repo, pull_number: prNumber,
-                });
-                if (p.merged && p.merge_commit_sha) {
-                  const mergeSha = assertSha(p.merge_commit_sha, `PR #${prNumber} auto-merge`);
-                  core.info(`PR #${prNumber}: native auto-merge completed as ${mergeSha} (poll ${i})`);
-                  await dispatchDeployProduction(mergeSha, prNumber);
-                  return true;
-                }
-                if (p.state === 'closed' && !p.merged) {
-                  core.warning(`PR #${prNumber}: closed without merge — no deploy handoff`);
-                  return false;
-                }
-              }
-              core.warning(
-                `PR #${prNumber}: auto-merge enabled but merge not observed in time — ` +
-                'Deploy Production was NOT dispatched. After merge, run workflow_dispatch with target_sha.'
-              );
-              return false;
-            }
-
-            let enabled = 0;
-            for (const brief of candidates) {
-              const { data: pr } = await github.rest.pulls.get({
-                owner, repo, pull_number: brief.number,
-              });
-              if (pr.base.ref !== 'main') continue;
-              if (pr.draft) {
-                core.info(`PR #${pr.number}: skip draft (auto-merge runs again after ready_for_review re-runs PR checks)`);
-                continue;
-              }
-              if (!pr.head.repo || pr.head.repo.full_name !== `${owner}/${repo}`) {
-                core.info(`PR #${pr.number}: skip fork`);
-                continue;
-              }
-              if (!pr.head.ref.startsWith('cursor/')) {
-                core.info(`PR #${pr.number}: skip non-cursor/ branch ${pr.head.ref}`);
-                continue;
-              }
-              if (pr.merged) {
-                // Already merged before this job acted — do NOT auto-dispatch
-                // (avoids duplicate deploys on reruns). Human/ops can workflow_dispatch.
-                core.info(`PR #${pr.number}: already merged — skipping deploy handoff on rerun`);
-                enabled += 1;
-                continue;
-              }
-              if (pr.head.sha !== run.head_sha) {
-                core.info(`PR #${pr.number}: skip stale head (PR ${pr.head.sha} vs checks ${run.head_sha})`);
-                continue;
-              }
-              try {
-                if (pr.mergeable_state === 'clean') {
-                  await squashMerge(pr);
-                  enabled += 1;
-                  continue;
-                }
-                await github.graphql(
-                  `mutation($id: ID!) {
-                    enablePullRequestAutoMerge(input: {
-                      pullRequestId: $id,
-                      mergeMethod: SQUASH
-                    }) {
-                      pullRequest { number }
-                    }
-                  }`,
-                  { id: pr.node_id }
-                );
-                core.info(`PR #${pr.number}: squash auto-merge enabled — waiting for merge to hand off deploy`);
-                await waitMergedThenDispatch(pr.number);
-                enabled += 1;
-              } catch (err) {
-                const msg = String(err.message || err);
-                if (/already enabled/i.test(msg)) {
-                  const { data: enabledPr } = await github.rest.pulls.get({
-                    owner, repo, pull_number: pr.number,
-                  });
-                  if (enabledPr.merged) {
-                    core.info(`PR #${pr.number}: auto-merge already enabled and already merged — skipping duplicate handoff`);
-                    enabled += 1;
-                    continue;
-                  }
-                  core.info(`PR #${pr.number}: auto-merge already enabled — waiting for merge to hand off deploy`);
-                  await waitMergedThenDispatch(pr.number);
-                  enabled += 1;
-                  continue;
-                }
-                if (/clean status/i.test(msg) || /already merged/i.test(msg)) {
-                  try {
-                    const { data: latest } = await github.rest.pulls.get({
-                      owner, repo, pull_number: pr.number,
-                    });
-                    if (latest.merged && latest.merge_commit_sha) {
-                      // Clean-status race: GitHub may report already merged without
-                      // this job having called pulls.merge. Hand off once.
-                      core.info(`PR #${pr.number}: already merged during handoff window`);
-                      await dispatchDeployProduction(latest.merge_commit_sha, pr.number);
-                      enabled += 1;
-                      continue;
-                    }
-                    await squashMerge(latest);
-                    enabled += 1;
-                    continue;
-                  } catch (mergeErr) {
-                    core.setFailed(
-                      `PR #${pr.number}: CLEAN auto-merge fallback squash/handoff failed: ${mergeErr.message || mergeErr}`
-                    );
-                    return;
-                  }
-                }
-                core.setFailed(
-                  `PR #${pr.number}: could not enable auto-merge: ${msg}. ` +
-                  'Confirm Settings → General → Allow auto-merge and Allow squash merging.'
-                );
-                return;
-              }
-            }
-            if (enabled === 0) {
-              core.info('No matching cursor/ same-repo PRs to auto-merge.');
-            }
+      - name: Refuse automatic Cursor merge and deploy
+        run: |
+          set -euo pipefail
+          echo "Automatic Cursor PR merge is disabled."
+          echo "PR checks succeeded for SHA ${{ github.event.workflow_run.head_sha }}."
+          echo "Owner must run Actions workflow 'Owner Merge & Deploy' with:"
+          echo "  pull_number, expected_head_sha, confirm='Approved — Merge & Deploy'"
+          echo "This job does not merge, dispatch Deploy Production, or hold secrets."

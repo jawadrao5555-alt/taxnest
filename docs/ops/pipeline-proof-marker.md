@@ -2,7 +2,7 @@
 
 This file exists only to exercise the TaxNest Cloud Agent automation chain:
 
-cursor/* PR → PR checks → auto-merge → Deploy Production workflow_dispatch handoff.
+cursor/* PR → PR checks → STOP for owner → Owner Merge & Deploy → Deploy Production workflow_dispatch handoff.
 
 It does not change NestPOS business logic, tax math, auth, customer data,
 migrations, or production configuration.

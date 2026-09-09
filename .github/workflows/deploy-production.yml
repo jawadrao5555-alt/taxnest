@@ -3,7 +3,7 @@
 # Triggers:
 #   1) push to main — human merges / non-GITHUB_TOKEN pushes
 #   2) workflow_dispatch with inputs.target_sha — required handoff after
-#      Enable PR auto-merge squash (GITHUB_TOKEN merges suppress push workflows;
+#      Owner Merge & Deploy squash (GITHUB_TOKEN merges suppress push workflows;
 #      workflow_dispatch is exempt). target_sha MUST be the exact squash commit.
 #
 # Flow:
@@ -56,7 +56,7 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: "Exact current origin/main commit SHA to deploy (auto-merge handoff). Non-tip SHAs fail closed. Leave empty only for emergency tip-of-main dispatch (still fail-closed if main moved)."
+        description: "Exact current origin/main commit SHA to deploy (Owner Merge & Deploy handoff). Non-tip SHAs fail closed. Leave empty only for emergency tip-of-main dispatch (still fail-closed if main moved)."
         type: string
         required: false
         default: ""

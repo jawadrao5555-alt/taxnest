@@ -1,0 +1,71 @@
+# Owner Merge & Deploy — explicit owner initiation only.
+#
+# Cursor Cloud Agents prepare cursor/* PRs and STOP. They must not merge or
+# dispatch this workflow (and typically cannot: workflow_dispatch 403).
+#
+# Owner runs this workflow from the Actions tab after saying
+# "Approved — Merge & Deploy" (the confirmation input must match exactly).
+#
+# Flow:
+#   verify phrase + cursor/* + not draft + targets main + expected head SHA
+#   + PR checks / validate success + mergeable
+#   → squash merge pinned to that head SHA
+#   → resulting squash SHA MUST equal current origin/main tip
+#   → workflow_dispatch Deploy Production with inputs.target_sha only
+#     (GITHUB_TOKEN merges do not start push workflows)
+#
+# Does NOT:
+#   - read production SSH keys or live QA passwords
+#   - use a GitHub Environment (no secrets on this job)
+#   - pass emergency Elaan-skip or settings-column flags
+#   - checkout untrusted PR code (checks out the workflow ref = main)
+#   - merge non-cursor/, drafts, forks, failed checks, or moved SHAs
+#
+# Deploy Production stays unattended after this initiation (Environment
+# production-deploy, no reviewers). Live Ops stays on Environment production
+# with reviewers.
+
+name: Owner Merge & Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: "PR number to squash-merge into main"
+        required: true
+        type: string
+      expected_head_sha:
+        description: "Full 40-char PR head SHA that must still match (from the PR)"
+        required: true
+        type: string
+      confirm:
+        description: "Must be exactly: Approved — Merge & Deploy"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: owner-merge-and-deploy
+  cancel-in-progress: false
+
+jobs:
+  merge-and-deploy:
+    name: Squash merge approved PR and dispatch Deploy Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main (workflow ref; not the PR branch)
+        uses: actions/checkout@v4
+
+      - name: Owner-approved merge + exact-SHA deploy handoff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          bash scripts/owner-merge-and-deploy.sh \
+            --pull-number="${{ github.event.inputs.pull_number }}" \
+            --expected-head-sha="${{ github.event.inputs.expected_head_sha }}" \
+            --confirm="${{ github.event.inputs.confirm }}"

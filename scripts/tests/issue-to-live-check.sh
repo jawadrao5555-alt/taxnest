@@ -36,7 +36,9 @@ if [ -f "$DOC" ]; then
     'Cloud Agent' \
     'multi-agent' \
     'Exact-SHA' \
-    'concurrency'
+    'concurrency' \
+    'Owner Merge & Deploy' \
+    'Approved — Merge & Deploy'
   do
     grep -qi "$needle" "$DOC" && ok "issue-to-live doc mentions: $needle" || bad "issue-to-live doc missing: $needle"
   done

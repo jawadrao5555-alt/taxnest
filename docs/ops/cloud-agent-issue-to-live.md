@@ -9,12 +9,14 @@ Companion docs:
 |---|---|
 | Local reproduce → fix → PR | `docs/ops/cloud-agent-issue-resolution.md` |
 | Local Chrome | `docs/ops/cloud-agent-local-browser-qa.md` |
-| PR auto-merge | `CLOUD_AGENT_HANDOFF.md`, `.github/workflows/enable-pr-auto-merge.yml` |
+| Owner Merge & Deploy | `docs/ops/owner-merge-and-deploy.md`, `.github/workflows/owner-merge-and-deploy.yml` |
+| Retired merge-on-green | `.github/workflows/enable-pr-auto-merge.yml` (logs only; does not merge) |
 | Production deploy | `docs/ops/github-production-deploy.md` |
 | Rollback | `deployment/ROLLBACK.md` |
 
-This document adds the **post-PR** half: merge → hand to Deploy Production →
-live smoke → self-heal loops — while keeping Cloud Agents **production-secret-free**.
+This document adds the **post-PR** half: owner-approved squash merge → hand to
+Deploy Production → live smoke → self-heal via a **new** PR — while keeping
+Cloud Agents **production-secret-free**. Cursor does **not** merge or deploy.
 
 ---
 
@@ -26,8 +28,12 @@ Issue (owner)
   → root-cause fix + targeted tests + original-issue re-test
   → full php artisan test (+ npm build if assets)
   → one focused cursor/* PR with evidence
-  → PR checks → automatic squash-merge (cursor/*)
-  → Enable PR auto-merge dispatches Deploy Production with exact squash SHA
+  → PR checks (still run; ready_for_review retriggers checks)
+  → STOP — wait for explicit owner approval
+  → Owner runs Actions workflow "Owner Merge & Deploy" with
+    pull_number + expected_head_sha + confirm exactly "Approved — Merge & Deploy"
+  → squash merge pinned to that head SHA; squash SHA must equal origin/main tip
+  → Owner Merge & Deploy dispatches Deploy Production with exact squash SHA
     (workflow_dispatch; required because GITHUB_TOKEN merges suppress push workflows)
   → Deploy Production **gate**: SHA must be current origin/main tip;
     skip_elaan/allow_settings refused; stale waiting runs cancelled
@@ -37,13 +43,14 @@ Issue (owner)
   → Actions SSH (PRODUCTION_SSH_PRIVATE_KEY) applies exact target_sha
   → Actions runs scripts/ci-live-verify.sh (SHA + NestPOS markers; LIVE_QA_PASS)
   → PASS ⇒ may say LIVE VERIFIED (cite SHA + Actions URL)
-  → FAIL ⇒ autonomous diagnosis/fix/test/PR/merge/redeploy cycle (below)
+  → FAIL ⇒ diagnosis/fix/test/new PR, then STOP again for owner (below)
 ```
 
-Cloud Agent **hands** the main commit to the protected deploy workflow via
-auto-merge plus an explicit `workflow_dispatch` of Deploy Production with
-`inputs.target_sha` set to the squash commit. The agent does **not** hold SSH
-keys, approve Live Ops, or run authenticated live smoke itself.
+The owner **hands** the main commit to the protected deploy workflow via
+**Owner Merge & Deploy** plus an explicit `workflow_dispatch` of Deploy Production
+with `inputs.target_sha` set to the squash commit. The agent does **not** hold SSH
+keys, merge PRs, dispatch deploy, approve Live Ops, or run authenticated live
+smoke itself.
 
 Human merges / non-token pushes to `main` still start Deploy Production via
 the normal `push` trigger (same `production-deploy` Environment + exact SHA +
@@ -116,16 +123,24 @@ branches to `main`. Live Ops continues to use Environment `production`
 ## Cloud Agent behavior after opening the PR
 
 1. Subscribe to PR checks / CI (`cursor-subscriptions`) — do not busy-poll.
-2. After squash-merge to `main`, observe Deploy Production with
-   `bash scripts/cloud-issue-to-live-observe.sh --sha=<merged-sha>`.
-3. Normal Deploy Production on `production-deploy` does **not** wait for a
+2. When **PR checks / validate** is green, report the PR number, the full
+   40-character head SHA, and the owner steps in
+   `docs/ops/owner-merge-and-deploy.md`.
+3. **STOP.** Do **not** merge. Do **not** dispatch **Owner Merge & Deploy** or
+   **Deploy Production**. Chat phrase `Approved — Merge & Deploy` is **not**
+   permission for the agent to merge (Cloud Agent `gh` cannot
+   `workflow_dispatch` anyway).
+4. After the owner has merged and deployed, observe Deploy Production with
+   `bash scripts/cloud-issue-to-live-observe.sh --sha=<merged-sha>` if the owner
+   asks, or in a follow-up that starts after that merge.
+5. Normal Deploy Production on `production-deploy` does **not** wait for a
    human Environment reviewer. Do **not** approve Live Ops (`production`)
    unless the owner asked for a Live Ops mutation. Do **not** approve or
    cancel an already-waiting legacy `production` Deploy Production run unless
    the owner explicitly asks.
-4. If Actions **succeeds** (deploy + live-verify): report **LIVE VERIFIED** with
+6. If Actions **succeeds** (deploy + live-verify): report **LIVE VERIFIED** with
    SHA + workflow URL + what markers were covered.
-5. If Actions **fails**: enter the self-heal cycle below. Do **not** say DONE /
+7. If Actions **fails**: enter the self-heal cycle below. Do **not** say DONE /
    FIXED / SUCCESS / LIVE VERIFIED.
 
 ---
@@ -145,7 +160,7 @@ FAIL (Actions evidence)
   → targeted PHPUnit + original-issue re-test
   → full suite when feasible
   → new focused PR with iteration audit trail
-  → PR checks → auto-merge → Deploy Production → live-verify again
+  → PR checks → STOP for owner → Owner Merge & Deploy → Deploy Production → live-verify again
 ```
 
 Rules:

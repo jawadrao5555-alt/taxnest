@@ -5,8 +5,9 @@
 ```mermaid
 flowchart LR
   PR[PR to main] --> Checks[pr-checks.yml]
-  Checks --> Auto[enable-pr-auto-merge.yml]
-  Auto --> Merge[squash merge]
+  Checks --> Stop[STOP for owner]
+  Stop --> Owner[owner-merge-and-deploy.yml]
+  Owner --> Merge[squash merge]
   Merge --> Gate[deploy-production.yml gate job]
   Gate --> Env[GitHub Environment production-deploy secrets]
   Env --> SSH[deploy job SSH to VPS]
@@ -17,7 +18,7 @@ flowchart LR
 
 **FACT:** `gate` requires the requested SHA to equal the current `origin/main` **tip** (not merely an ancestor) before any Environment secrets. `skip_elaan` and `allow_settings` are refused on this workflow. Stale waiting runs are cancelled; in-flight SSH is never cancelled (`deploy` concurrency `production-deploy` + `cancel-in-progress: false`). Environment `production-deploy` holds deploy secrets and must **not** have required reviewers. Live Ops stays on Environment `production` **with** required reviewers (GitHub protection is per-Environment). Elaan remains fail-closed. CI publishes `{deploy/elaan.yml title} [deploy {TARGET_SHA}]` so a new SHA cannot no-op against an older AppUpdate with the same human title.
 
-Artifacts: `.github/workflows/deploy-production.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `scripts/lib/elaan-deploy-title.py`, `scripts/lib/live-dirty-worktree.sh`, `scripts/lib/live-dirty-worktree-classify.py`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`.
+Artifacts: `.github/workflows/deploy-production.yml`, `.github/workflows/owner-merge-and-deploy.yml`, `scripts/ci-deploy-production.sh`, `scripts/lib/deploy-main-tip-guard.sh`, `scripts/lib/elaan-deploy-title.py`, `scripts/lib/live-dirty-worktree.sh`, `scripts/lib/live-dirty-worktree-classify.py`, `deploy/elaan.yml`, `docs/ops/github-production-deploy.md`, `docs/ops/owner-merge-and-deploy.md`.
 Reports: `docs/architecture/34-production-deployment-concurrency-elaan-forensic-audit.txt`, `docs/architecture/35-production-deployment-stale-sha-fix-report.txt`, `docs/architecture/36-elaan-freshness-idempotency-fix-report.txt`, `docs/architecture/37-production-sw-dirty-worktree-fix-report.txt`, `docs/architecture/41-production-unattended-deploy-audit.txt`.
 
 ## PWA cache bust on the Actions path

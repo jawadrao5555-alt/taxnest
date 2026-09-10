@@ -1,0 +1,49 @@
+# Poll approved relay requests and hand them to the guarded owner workflow.
+# The relay authenticates this job with GitHub OIDC and returns only claims
+# bound to this repository, PR, and exact head SHA.
+name: Approval Relay Dispatch
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  id-token: write
+
+concurrency:
+  group: approval-relay-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Claim approved requests and dispatch owner handoff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER_APPROVAL_RELAY_URL: https://taxnest.pk
+        run: |
+          set -euo pipefail
+          TOKEN="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=owner-approval-relay" | jq -r .value)"
+          jq -n --arg repo "$GITHUB_REPOSITORY" '{repository:$repo}' > /tmp/dispatch-request.json
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+            --data-binary @/tmp/dispatch-request.json \
+            "${OWNER_APPROVAL_RELAY_URL%/}/api/deployment-approval/v1/dispatch-claims" > /tmp/claims.json
+          python3 - /tmp/claims.json > /tmp/claims.tsv <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1], encoding="utf-8"))
+          for c in data.get("claims", data if isinstance(data, list) else []):
+              print("\t".join(str(c[k]) for k in ("approval_request_id","pull_number","expected_head_sha")))
+          PY
+          while IFS=$'\t' read -r request pull sha; do
+            [ -n "$request" ] || continue
+            gh workflow run owner-merge-and-deploy.yml --repo "$GITHUB_REPOSITORY" \
+              -f "pull_number=$pull" -f "expected_head_sha=$sha" \
+              -f "approval_request_id=$request"
+          done < /tmp/claims.tsv

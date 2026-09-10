@@ -2910,6 +2910,22 @@ Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::
 
 require __DIR__.'/auth.php';
 
+// Owner Deployment Approval Relay. Browser routes are admin-session protected;
+// machine routes use a signed GitHub Actions OIDC JWT (never a shared secret).
+Route::prefix('admin/deployment-approval')->middleware(['admin.auth'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'index'])->name('saas.admin.deployment-approval');
+    Route::post('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'store'])->name('saas.admin.deployment-approval.store');
+    Route::post('/{requestId}/approve', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'approve'])->name('saas.admin.deployment-approval.approve');
+});
+Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->group(function () {
+    Route::post('/dispatch-claims', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'dispatchClaims']);
+    Route::post('/approval-claims', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'claim']);
+    Route::post('/merge-complete', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'mergeComplete']);
+    Route::post('/deploy-run', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'deployRun']);
+    Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
+    Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
+});
+
 
 
 

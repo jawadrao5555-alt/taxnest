@@ -148,11 +148,10 @@ if re.search(r"(?m)^\s+permissions:\s*$", deploy) and "actions: write" in deploy
 print("structure ok")
 PY
 
-# skip_elaan still emergency-only
-if grep -A5 'skip_elaan:' "$WF" | grep -q 'default: false'; then
-  ok "skip_elaan defaults to false"
+if grep -qE 'skip_elaan|allow_settings' "$WF"; then
+  bad "Deploy Production must not expose emergency inputs"
 else
-  bad "skip_elaan must default to false"
+  ok "Deploy Production has no emergency inputs"
 fi
 
 # Elaan path unchanged in CI script

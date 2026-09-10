@@ -72,11 +72,14 @@ if "workflow_dispatch:" not in on:
     sys.exit(1)
 if re.search(r"(?m)^\s*pull_request:", on) or "workflow_run:" in on or re.search(r"(?m)^\s*push:", on):
     print("must not auto-trigger on PR/push/workflow_run", file=sys.stderr); sys.exit(1)
-for needle in ("pull_number", "expected_head_sha", "confirm"):
+for needle in ("pull_number", "expected_head_sha", "approval_request_id"):
     if needle not in on:
         print("missing input", needle, file=sys.stderr); sys.exit(1)
-if "Approved — Merge & Deploy" not in text:
-    print("missing confirmation phrase", file=sys.stderr); sys.exit(1)
+if "id-token: write" not in text or "OWNER_APPROVAL_RELAY_URL" not in text:
+    print("missing OIDC relay configuration", file=sys.stderr); sys.exit(1)
+for block in re.findall(r"(?ms)^\s+run:\s*\|\n(.*?)(?=^\s+- name:|^\s*$)", text):
+    if "${{" in block:
+        print("owner run block contains raw GitHub expression", file=sys.stderr); sys.exit(1)
 if "group: owner-merge-and-deploy" not in text:
     print("missing owner concurrency group", file=sys.stderr); sys.exit(1)
 if "cancel-in-progress: false" not in text:
@@ -93,6 +96,11 @@ PY
 grep -q 'owner-merge-and-deploy.sh' "$OM" \
   && ok "owner workflow runs scripts/owner-merge-and-deploy.sh" \
   || bad "owner workflow must call the merge script"
+if grep -q 'confirm' "$OM"; then
+  bad "owner workflow must not authorize with a plaintext confirmation"
+else
+  ok "owner workflow has no plaintext approval bypass"
+fi
 grep -q "merge_method=squash\|merge_method:squash\|merge_method=squash" "$SH" \
   && ok "owner merge uses squash" \
   || bad "must squash merge"
@@ -104,6 +112,31 @@ if grep -q 'skip_elaan' "$SH" || grep -q 'allow_settings' "$SH"; then
 else
   ok "owner dispatch does not send skip_elaan/allow_settings"
 fi
+grep -q 'approval_request_id' "$SH" && grep -q 'ACTIONS_ID_TOKEN_REQUEST_URL' "$SH" \
+  && ok "owner script claims approval through GitHub OIDC relay" \
+  || bad "owner script must use OIDC relay approval claim"
+grep -q '/api/deployment-approval/v1/approval-claims' "$SH" \
+  && grep -q '/api/deployment-approval/v1/merge-complete' "$SH" \
+  && ok "owner script uses approval-claims and merge-complete endpoints" \
+  || bad "owner script relay endpoint contract/order missing"
+grep -q '::add-mask::' "$SH" && grep -q 'deployment_run_id' "$SH" \
+  && grep -q 'v1/deploy-run' "$SH" \
+  && ok "owner script masks receipt and registers exact deployment run" \
+  || bad "owner script must mask receipt and register deployment run"
+grep -q 'createdAt' "$SH" && grep -q 'displayTitle' "$SH" && grep -q 'headSha' "$SH" \
+  && grep -q 'displayTitle == \$title' "$SH" && grep -q 'min_by(.databaseId)' "$SH" \
+  && ok "owner binds exact-title newly-created run and chooses smallest database ID" \
+  || bad "owner run binding selector is incomplete"
+grep -q 'openssl rand -hex 16' "$SH" && grep -q 'inputs\[handoff_nonce\]' "$SH" \
+  && grep -q 'handoff_nonce' "$SH" \
+  && ok "owner generates and carries a 128-bit handoff nonce" \
+  || bad "handoff nonce correlation missing"
+python3 - "$SH" <<'PY' && ok "merge-complete precedes Deploy Production dispatch" || bad "merge-complete must precede dispatch"
+import sys
+t=open(sys.argv[1], encoding="utf-8").read()
+if t.index("api/deployment-approval/v1/merge-complete") > t.index("actions/workflows/deploy-production.yml/dispatches"):
+    sys.exit(1)
+PY
 grep -q 'sha=' "$SH" && grep -q 'expected-head-sha' "$SH" \
   && ok "squash merge is pinned to expected head SHA" \
   || bad "must pin pulls.merge sha to expected head"

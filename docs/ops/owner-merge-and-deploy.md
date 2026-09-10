@@ -1,79 +1,82 @@
 # Owner Merge & Deploy
 
-Cursor Cloud Agents implement, test, and open **one focused `cursor/*` PR**, then
-**STOP**. They must not merge and must not dispatch production deploy.
+Agents implement, test, and open **one focused `cursor/*` PR**, then **STOP**.
+They must not merge, approve, or dispatch production.
 
-The owner initiates merge+deploy with an auditable GitHub Actions
-`workflow_dispatch` (not a chat workaround). Cloud Agent `gh` typically cannot
-create `workflow_dispatch` events (HTTP 403).
+The owner authorizes an exact release from the authenticated TaxNest SaaS admin
+panel. Plain chat text is intent, not authentication.
 
-## Confirmation phrase
+## Mobile owner approval
 
-Exactly:
+1. Wait until the PR is Ready, targets `main`, comes from a same-repository
+   `cursor/*` branch, and its current **PR checks / validate** check is green.
+2. Copy the PR number and its full 40-character head SHA from the agent's PR
+   report.
+3. On a signed-in phone or browser, open SaaS Admin → **Deploy Approvals**.
+4. Create a request using that PR number and exact head SHA.
+5. Review the pinned repository, PR, SHA, expiry, and status. Enter the current
+   super-admin password and tap **Approve exact release**.
+6. GitHub's scheduled **Approval Relay Dispatch** job picks up the approval.
+   GitHub schedules normally run within about five minutes, but may be delayed.
+7. The page records the final deployment result and links to the GitHub run.
+   Live verification must pass before anyone reports the release as live.
 
-```
-Approved — Merge & Deploy
-```
+No GitHub PAT, owner credentials, VPS key, production secret, or shared relay
+secret is stored in the web application.
 
-(em dash `—`, not a hyphen.)
+## Security binding
 
-## Steps (after the implementation PR for this workflow is already on `main`)
+Every approval is bound to:
 
-1. Wait until the feature PR is **Ready** (not draft), targets **`main`**, branch
-   starts with **`cursor/`**, and **PR checks / validate** is green on the current
-   head SHA.
-2. Copy the PR **number** and the full 40-character **head SHA**.
-3. GitHub → **Actions** → **Owner Merge & Deploy** → **Run workflow**.
-4. Branch: **`main`** (this selects the workflow file on `main`).
-5. Inputs:
-   - `pull_number`: the PR number
-   - `expected_head_sha`: that 40-char head SHA
-   - `confirm`: `Approved — Merge & Deploy`
-6. Run. The job squash-merges **only if** the head SHA still matches, then
-   verifies the squash commit is the current `origin/main` tip, then
-   `workflow_dispatch`es **Deploy Production** with `inputs.target_sha` only.
-7. Watch **Deploy Production**. Environment `production-deploy` has **no
-   reviewer wait**. Live-verify must pass before anyone says LIVE VERIFIED.
+- repository `jawadrao5555-alt/taxnest`
+- PR number
+- exact 40-character PR head SHA
+- authenticated super-admin identity and approval time
+- unique request ID
+- short expiry
 
-Do **not** approve Environment `production` for this path. That Environment is
-Live Ops only.
+The dispatcher, owner merge workflow, and deploy workflow authenticate to the
+relay with short-lived GitHub Actions OIDC tokens. The relay requires the exact
+repository, `refs/heads/main`, audience, issuer, and workflow identity.
 
-## What the workflow rejects
+After approval:
 
-- Wrong confirmation phrase
-- Draft PRs
-- Non-`cursor/` branches
-- Forks
-- PRs not targeting `main`
-- Head SHA different from `expected_head_sha`
-- Failed or missing `validate` check
-- Merge conflicts / non-clean state
-- Already-merged PRs whose squash SHA is **not** the current `origin/main` tip
-  (never deploy an older SHA)
+1. The dispatcher leases the request once and starts **Owner Merge & Deploy**.
+2. Owner Merge & Deploy revalidates the PR and required check, then claims the
+   request once.
+3. The relay issues a random owner-workflow receipt once and stores only its
+   SHA-256 hash.
+4. The workflow squash-merges the pinned head SHA and records the exact squash
+   SHA against the approval.
+5. The owner workflow creates a random correlation nonce, dispatches Deploy
+   Production, selects the earliest exact nonce/SHA run, and consumes the
+   receipt while registering that GitHub run ID with the relay.
+6. **Deploy Production** is authorized only when its OIDC run ID, run attempt,
+   workflow SHA, nonce hash, and `target_sha` match the registered run and
+   recorded squash SHA.
+7. Deploy Production reports success or failure back to the approval record.
 
-Duplicate approval of a PR that is **already** the current main tip is
-idempotent: it dispatches Deploy Production again, or no-ops if that SHA already
-had a successful Deploy Production run.
+Direct `push` deployment is disabled. Deploy Production is
+`workflow_dispatch`-only and has no `skip_elaan` or `allow_settings` bypass
+inputs.
 
-## First landing of this workflow (chicken-and-egg)
+## What the relay or workflow rejects
 
-Until `owner-merge-and-deploy.yml` exists on `main`, this Actions workflow
-cannot run. The PR that introduces it must be squash-merged **once** by a human
-with permission to land on `main`.
+- non-super-admin or wrong current password
+- expired approval
+- wrong repository, PR, request ID, head SHA, workflow, audience, ref, or OIDC signature
+- draft, fork, non-`cursor/`, non-main, moved, conflicted, or stale PR
+- failed or missing `validate` check
+- duplicate claim or provenance receipt replay
+- merge SHA different from the current `origin/main` tip
+- deploy target different from the recorded squash SHA
 
-**Do not mark that implementation PR Ready while `enable-pr-auto-merge.yml` on
-`main` still squash-merges Ready `cursor/*` PRs** — the retired workflow on
-`main` would auto-land it. Keep it **draft**, then land it with a local
-`git merge --squash` (or equivalent admin merge) onto `main`, **or** mark Ready
-only when you accept that the *current* main auto-merge will be the one-time
-bootstrap that disables itself.
+## One-time bootstrap
 
-After that squash is on `main`, future PRs use the steps above. GitHub does not
-merge draft PRs from the UI, so later feature PRs should be marked Ready
-**after** this workflow is on `main` (auto-merge is then retired).
+The relay cannot authorize the PR that first introduces it because the relay
+code and scheduled workflow are not yet on `main`/production. That PR needs one
+final manual owner-controlled merge and existing deployment action. After its
+migration and workflows are live, all later releases use the mobile approval
+flow above.
 
-## Chat command
-
-If the owner types `Approved — Merge & Deploy` in Cursor chat, the agent must
-**not** invent a merge. Point the owner at this Actions workflow and the PR
-number + head SHA from the PR report.
+This bootstrap does not permit an agent to merge or deploy.

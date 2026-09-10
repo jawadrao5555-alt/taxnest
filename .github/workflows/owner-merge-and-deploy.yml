@@ -3,21 +3,21 @@
 # Cursor Cloud Agents prepare cursor/* PRs and STOP. They must not merge or
 # dispatch this workflow (and typically cannot: workflow_dispatch 403).
 #
-# Owner runs this workflow from the Actions tab after saying
-# "Approved — Merge & Deploy" (the confirmation input must match exactly).
+# Owner approval is issued by the production approval relay. Inputs alone are
+# never authorization.
 #
 # Flow:
-#   verify phrase + cursor/* + not draft + targets main + expected head SHA
+#   relay claim (OIDC + approval_request_id + exact repo/PR/HEAD)
+#   + cursor/* + not draft + targets main + expected head SHA
 #   + PR checks / validate success + mergeable
 #   → squash merge pinned to that head SHA
 #   → resulting squash SHA MUST equal current origin/main tip
-#   → workflow_dispatch Deploy Production with inputs.target_sha only
-#     (GITHUB_TOKEN merges do not start push workflows)
+#   → workflow_dispatch Deploy Production with target SHA and correlation nonce
 #
 # Does NOT:
 #   - read production SSH keys or live QA passwords
 #   - use a GitHub Environment (no secrets on this job)
-#   - pass emergency Elaan-skip or settings-column flags
+#   - expose emergency/manual deployment bypasses
 #   - checkout untrusted PR code (checks out the workflow ref = main)
 #   - merge non-cursor/, drafts, forks, failed checks, or moved SHAs
 #
@@ -26,6 +26,7 @@
 # with reviewers.
 
 name: Owner Merge & Deploy
+run-name: Owner Merge & Deploy — approval ${{ inputs.approval_request_id }}
 
 on:
   workflow_dispatch:
@@ -38,8 +39,8 @@ on:
         description: "Full 40-char PR head SHA that must still match (from the PR)"
         required: true
         type: string
-      confirm:
-        description: "Must be exactly: Approved — Merge & Deploy"
+      approval_request_id:
+        description: "Single-use approval request ID issued by the production approval relay"
         required: true
         type: string
 
@@ -47,6 +48,7 @@ permissions:
   contents: write
   pull-requests: write
   actions: write
+  id-token: write
 
 concurrency:
   group: owner-merge-and-deploy
@@ -64,8 +66,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          OWNER_APPROVAL_RELAY_URL: https://taxnest.pk
+          OWNER_PULL_NUMBER: ${{ inputs.pull_number }}
+          OWNER_EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          OWNER_APPROVAL_REQUEST_ID: ${{ inputs.approval_request_id }}
         run: |
           bash scripts/owner-merge-and-deploy.sh \
-            --pull-number="${{ github.event.inputs.pull_number }}" \
-            --expected-head-sha="${{ github.event.inputs.expected_head_sha }}" \
-            --confirm="${{ github.event.inputs.confirm }}"
+            --pull-number="$OWNER_PULL_NUMBER" \
+            --expected-head-sha="$OWNER_EXPECTED_HEAD_SHA" \
+            --approval-request-id="$OWNER_APPROVAL_REQUEST_ID"

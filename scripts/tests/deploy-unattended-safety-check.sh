@@ -105,8 +105,8 @@ if "secrets.PRODUCTION_SSH_PRIVATE_KEY" in am or "secrets.LIVE_QA_PASS" in am:
 print("no workaround")
 PY
 
-# --------------------------------------------------------------------------- Emergency flags fail-closed on unattended path
-python3 - "$WF" <<'PY' && ok "gate refuses skip_elaan/allow_settings; SSH job never passes them" || bad "emergency flags still reach unattended apply"
+# --------------------------------------------------------------------------- No emergency/manual bypass inputs
+python3 - "$WF" <<'PY' && ok "gate has no emergency inputs; SSH job receives none" || bad "emergency flags still reach unattended apply"
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 lines = text.splitlines()
@@ -128,11 +128,8 @@ for line in lines:
         jobs[cur].append(line)
 gate = "\n".join(jobs["gate"])
 deploy = "\n".join(jobs["deploy"])
-if "skip_elaan is refused" not in gate:
-    print("gate must refuse skip_elaan", file=sys.stderr)
-    sys.exit(1)
-if "allow_settings is refused" not in gate:
-    print("gate must refuse allow_settings", file=sys.stderr)
+if "skip_elaan" in text or "allow_settings" in text:
+    print("emergency inputs must be removed", file=sys.stderr)
     sys.exit(1)
 # SSH step must hardcode SKIP_ELAAN false / ALLOW_SETTINGS empty, not inputs
 ssh = deploy
@@ -142,9 +139,6 @@ if re.search(r"SKIP_ELAAN:\s*\$\{\{\s*github\.event\.inputs\.skip_elaan", ssh):
 if re.search(r"ALLOW_SETTINGS:\s*\$\{\{\s*github\.event\.inputs\.allow_settings", ssh):
     print("deploy must not pass allow_settings input through", file=sys.stderr)
     sys.exit(1)
-if 'SKIP_ELAAN: "false"' not in ssh and "SKIP_ELAAN: 'false'" not in ssh:
-    print("deploy must hardcode SKIP_ELAAN false", file=sys.stderr)
-    sys.exit(1)
 if "--no-elaan" in ssh:
     print("deploy job must not invoke --no-elaan", file=sys.stderr)
     sys.exit(1)
@@ -152,18 +146,11 @@ if "--allow-settings" in ssh:
     print("deploy job must not invoke --allow-settings", file=sys.stderr)
     sys.exit(1)
 # Refuse must happen in gate BEFORE cancel/SSH
-if gate.find("skip_elaan") > gate.find("cancel-stale-waiting-production-deploys.sh"):
-    print("skip_elaan refuse must run before cancelling other runs", file=sys.stderr)
-    sys.exit(1)
 print("flags ok")
 PY
 
-# skip_elaan still default false (input exists so a mistaken dispatch is visible and refused)
-if grep -A6 'skip_elaan:' "$WF" | grep -q 'default: false'; then
-  ok "skip_elaan input still defaults to false"
-else
-  bad "skip_elaan default must remain false"
-fi
+grep -q 'v1/provenance/verify' "$WF" && grep -q 'GITHUB_RUN_ID' "$WF" \
+  && ok "Deploy gate requires relay provenance" || bad "Deploy gate provenance missing"
 
 # --------------------------------------------------------------------------- Existing fail-closed apply/verify/concurrency still present
 python3 - "$WF" <<'PY' && ok "tip/concurrency/live-verify/SSH invariants remain" || bad "core deploy invariants missing"
@@ -240,9 +227,9 @@ else
   bad "must not drop OWNER_APPROVES_LIVE_OPS_FIX"
 fi
 
-# Owner merge (not retired auto-merge) dispatches only target_sha
+# Owner merge (not retired auto-merge) dispatches exact SHA and relay provenance
 SH="$ROOT/scripts/owner-merge-and-deploy.sh"
-python3 - "$AM" "$SH" <<'PY' && ok "owner handoff sends only target_sha; auto-merge does not dispatch" || bad "must not dispatch skip_elaan/allow_settings; auto-merge must stay retired"
+python3 - "$AM" "$SH" <<'PY' && ok "owner handoff sends exact SHA and relay provenance; auto-merge does not dispatch" || bad "owner provenance handoff or retired auto-merge regressed"
 import sys
 am, sh = (open(p, encoding="utf-8").read() for p in sys.argv[1:])
 if "createWorkflowDispatch" in am or "pulls.merge" in am or "enablePullRequestAutoMerge" in am:
@@ -250,6 +237,9 @@ if "createWorkflowDispatch" in am or "pulls.merge" in am or "enablePullRequestAu
     sys.exit(1)
 if "inputs[target_sha]" not in sh:
     print("owner script must dispatch target_sha", file=sys.stderr)
+    sys.exit(1)
+if "inputs[approval_request_id]" not in sh or "inputs[handoff_nonce]" not in sh or "v1/deploy-run" not in sh:
+    print("owner script must dispatch relay provenance", file=sys.stderr)
     sys.exit(1)
 if "skip_elaan" in sh or "allow_settings" in sh:
     print("owner dispatch must not send skip_elaan/allow_settings", file=sys.stderr)

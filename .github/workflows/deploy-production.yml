@@ -1,14 +1,13 @@
 # Deploy production (Nayatel VPS) via GitHub Actions
 #
-# Triggers:
-#   1) push to main — human merges / non-GITHUB_TOKEN pushes
-#   2) workflow_dispatch with inputs.target_sha — required handoff after
+# Trigger:
+#   workflow_dispatch from Owner Merge & Deploy only, with a relay-bound run nonce.
 #      Owner Merge & Deploy squash (GITHUB_TOKEN merges suppress push workflows;
 #      workflow_dispatch is exempt). target_sha MUST be the exact squash commit.
 #
 # Flow:
 #   → job "gate" (no Environment, no secrets): resolve SHA, require it equals
-#     current origin/main TIP, refuse skip_elaan/allow_settings, cancel other
+#     current origin/main TIP and cancel other
 #     runs WAITING for an Environment (legacy production reviewers or a
 #     re-added wait)
 #   → job "deploy": GitHub Environment "production-deploy" (secrets + main-only
@@ -29,11 +28,7 @@
 #   - Non-tip SHA fails closed BEFORE Environment secrets and BEFORE SSH
 #   - Stale SHA fails closed again immediately before SSH
 #   - Live QA password stays in Environment secret LIVE_QA_PASS
-#   - Deploy SHA is pinned (push: github.sha / dispatch: inputs.target_sha)
-#   - skip_elaan and allow_settings are refused on this workflow (fail-closed).
-#     Emergency Elaan skip / settings-column allow-list is the owner workstation
-#     path: scripts/deploy-live.sh. Do not re-enable those inputs on the
-#     unattended path.
+#   - Deploy SHA is pinned to the relay-authorized dispatch input
 #   - Environment "production" (required reviewers) is reserved for Live Ops.
 #     Do not point this workflow back at "production" — that reintroduces the
 #     human approval bottleneck and couples deploy to Live Ops reviewers.
@@ -48,29 +43,27 @@
 # Rollback: deployment/ROLLBACK.md
 
 name: Deploy Production
+run-name: Deploy Production — approval ${{ inputs.approval_request_id }} — nonce ${{ inputs.handoff_nonce }}
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       target_sha:
-        description: "Exact current origin/main commit SHA to deploy (Owner Merge & Deploy handoff). Non-tip SHAs fail closed. Leave empty only for emergency tip-of-main dispatch (still fail-closed if main moved)."
+        description: "Exact current origin/main commit SHA from the Owner Merge & Deploy handoff"
         type: string
-        required: false
-        default: ""
-      skip_elaan:
-        description: "REFUSED — emergency Elaan skip is not allowed on the unattended Deploy Production path. Use scripts/deploy-live.sh on an owner workstation."
-        type: boolean
-        default: false
-      allow_settings:
-        description: "REFUSED — settings-column allow-list is not allowed on the unattended Deploy Production path. Use scripts/deploy-live.sh on an owner workstation."
+        required: true
+      approval_request_id:
+        description: "Relay approval request bound to this deploy"
         type: string
-        default: ""
+        required: true
+      handoff_nonce:
+        description: "Lowercase 128-bit correlation nonce from Owner Merge & Deploy"
+        type: string
+        required: true
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   gate:
@@ -79,18 +72,52 @@ jobs:
     permissions:
       contents: read
       actions: write
+      id-token: write
     concurrency:
       group: production-deploy-gate
       cancel-in-progress: true
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
     steps:
+      - name: Verify relay provenance (OIDC-bound registered run)
+        env:
+          OWNER_APPROVAL_RELAY_URL: https://taxnest.pk
+          APPROVAL_REQUEST_ID: ${{ inputs.approval_request_id }}
+          HANDOFF_NONCE: ${{ inputs.handoff_nonce }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          TOKEN="$(curl --fail --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=owner-approval-relay" | jq -r .value)"
+          jq -n --arg id "$APPROVAL_REQUEST_ID" --arg repo "$GITHUB_REPOSITORY" \
+            --arg sha "$TARGET_SHA" --arg nonce "$HANDOFF_NONCE" --arg run "$RUN_ID" --arg attempt "$RUN_ATTEMPT" \
+            '{approval_request_id:$id,repository:$repo,target_sha:$sha,handoff_nonce:$nonce,run_id:($run|tonumber),run_attempt:($attempt|tonumber)}' > /tmp/relay-request.json
+          for attempt in $(seq 1 30); do
+            HTTP_CODE="$(curl --silent --show-error -o /tmp/relay-verification.json -w '%{http_code}' \
+              -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+              --data-binary @/tmp/relay-request.json \
+              "${OWNER_APPROVAL_RELAY_URL%/}/api/deployment-approval/v1/provenance/verify")"
+            if [ "$HTTP_CODE" = "200" ]; then break; fi
+            if [ "$HTTP_CODE" != "409" ]; then
+              echo "relay provenance failed HTTP ${HTTP_CODE}" >&2; cat /tmp/relay-verification.json >&2; exit 1
+            fi
+            sleep 2
+          done
+          [ "$HTTP_CODE" = "200" ] || { echo "relay provenance registration timeout" >&2; exit 1; }
+          grep -q '"valid"[[:space:]]*:[[:space:]]*true' /tmp/relay-verification.json \
+            || { echo "relay rejected deploy provenance" >&2; cat /tmp/relay-verification.json >&2; exit 1; }
+
       - name: Resolve exact deploy SHA
         id: resolve
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
         run: |
           set -euo pipefail
           EVENT="${GITHUB_EVENT_NAME}"
-          INPUT_SHA="${{ github.event.inputs.target_sha || '' }}"
+          INPUT_SHA="${TARGET_SHA}"
           if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$INPUT_SHA" ]; then
             case "$INPUT_SHA" in
               *[!0-9a-fA-F]*|"")
@@ -104,33 +131,10 @@ jobs:
             fi
             echo "Deploy SHA source=workflow_dispatch inputs.target_sha"
             echo "sha=${INPUT_SHA}" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT" = "push" ]; then
-            echo "Deploy SHA source=push github.sha"
-            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT" = "workflow_dispatch" ]; then
-            echo "Deploy SHA source=workflow_dispatch empty target_sha → github.sha (emergency; still must equal origin/main tip at run time)"
-            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           else
             echo "Unsupported event ${EVENT}" >&2
             exit 1
           fi
-
-      - name: Guard — refuse skip_elaan / allow_settings on the unattended path
-        run: |
-          set -euo pipefail
-          SKIP="${{ github.event.inputs.skip_elaan || 'false' }}"
-          ALLOW="${{ github.event.inputs.allow_settings || '' }}"
-          if [ "$SKIP" = "true" ] || [ "$SKIP" = "1" ]; then
-            echo "CI DEPLOY FAILED: skip_elaan is refused on unattended Deploy Production." >&2
-            echo "Elaan freshness stays fail-closed. Emergency skip is scripts/deploy-live.sh --no-elaan on an owner workstation (not this workflow, not a Cloud Agent)." >&2
-            exit 1
-          fi
-          if [ -n "$ALLOW" ]; then
-            echo "CI DEPLOY FAILED: allow_settings is refused on unattended Deploy Production." >&2
-            echo "A settings-column mutation must fail closed here. Emergency allow-list is scripts/deploy-live.sh --allow-settings=... on an owner workstation." >&2
-            exit 1
-          fi
-          echo "Unattended path OK — skip_elaan false, allow_settings empty."
 
       - name: Checkout exact deploy commit
         uses: actions/checkout@v4
@@ -139,9 +143,10 @@ jobs:
           fetch-depth: 0
 
       - name: Guard — refuse wrong SHA / non-main history / non-tip
+        env:
+          DEPLOY_SHA: ${{ steps.resolve.outputs.sha }}
         run: |
           set -euo pipefail
-          DEPLOY_SHA="${{ steps.resolve.outputs.sha }}"
           echo "github.event_name=${GITHUB_EVENT_NAME}"
           echo "github.ref=${GITHUB_REF}"
           echo "DEPLOY_SHA=${DEPLOY_SHA}"
@@ -166,12 +171,11 @@ jobs:
     steps:
       - name: Pin SHA from gate
         id: resolve
+        env:
+          DEPLOY_SHA: ${{ needs.gate.outputs.sha }}
+          INPUT_SHA: ${{ inputs.target_sha }}
         run: |
           set -euo pipefail
-          DEPLOY_SHA="${{ needs.gate.outputs.sha }}"
-          INPUT_SHA="${{ github.event.inputs.target_sha || '' }}"
-          SKIP="${{ github.event.inputs.skip_elaan || 'false' }}"
-          ALLOW="${{ github.event.inputs.allow_settings || '' }}"
           case "$DEPLOY_SHA" in
             *[!0-9a-fA-F]*|"")
               echo "Gate did not output a valid SHA" >&2
@@ -188,18 +192,6 @@ jobs:
               exit 1
             fi
           fi
-          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "$DEPLOY_SHA" != "$GITHUB_SHA" ]; then
-            echo "Refusing deploy: gate SHA $DEPLOY_SHA != github.sha $GITHUB_SHA" >&2
-            exit 1
-          fi
-          if [ "$SKIP" = "true" ] || [ "$SKIP" = "1" ]; then
-            echo "Refusing deploy: skip_elaan reached the SSH job (gate should have refused)" >&2
-            exit 1
-          fi
-          if [ -n "$ALLOW" ]; then
-            echo "Refusing deploy: allow_settings reached the SSH job (gate should have refused)" >&2
-            exit 1
-          fi
           echo "sha=${DEPLOY_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact deploy commit
@@ -209,9 +201,10 @@ jobs:
           fetch-depth: 0
 
       - name: Guard — refuse stale SHA after Environment start (before SSH)
+        env:
+          DEPLOY_SHA: ${{ steps.resolve.outputs.sha }}
         run: |
           set -euo pipefail
-          DEPLOY_SHA="${{ steps.resolve.outputs.sha }}"
           echo "github.event_name=${GITHUB_EVENT_NAME}"
           echo "github.ref=${GITHUB_REF}"
           echo "DEPLOY_SHA=${DEPLOY_SHA}"
@@ -224,20 +217,10 @@ jobs:
         env:
           TARGET_SHA: ${{ steps.resolve.outputs.sha }}
           PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
-          SKIP_ELAAN: "false"
-          ALLOW_SETTINGS: ""
         run: |
           set -euo pipefail
           if [ -z "${PRODUCTION_SSH_PRIVATE_KEY}" ]; then
             echo "PRODUCTION_SSH_PRIVATE_KEY is empty — configure it on the GitHub Environment 'production-deploy' (not a repository secret, not Environment 'production')." >&2
-            exit 1
-          fi
-          if [ "${SKIP_ELAAN}" != "false" ] && [ "${SKIP_ELAAN}" != "0" ]; then
-            echo "SKIP_ELAAN must stay false on unattended Deploy Production" >&2
-            exit 1
-          fi
-          if [ -n "${ALLOW_SETTINGS}" ]; then
-            echo "ALLOW_SETTINGS must stay empty on unattended Deploy Production" >&2
             exit 1
           fi
           bash scripts/ci-deploy-production.sh --target-sha="${TARGET_SHA}"
@@ -250,3 +233,33 @@ jobs:
           LIVE_URL: https://taxnest.pk
           LIVE_VERIFY_PROFILE: extended
         run: bash scripts/ci-live-verify.sh
+
+  provenance-status:
+    name: Report deployment outcome to approval relay
+    if: ${{ always() }}
+    needs: [gate, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: POST outcome callback
+        env:
+          OWNER_APPROVAL_RELAY_URL: https://taxnest.pk
+          APPROVAL_REQUEST_ID: ${{ inputs.approval_request_id }}
+          HANDOFF_NONCE: ${{ inputs.handoff_nonce }}
+          DEPLOYED_SHA: ${{ needs.gate.outputs.sha }}
+          OUTCOME: ${{ needs.deploy.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TOKEN="$(curl --fail --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=owner-approval-relay" | jq -r .value)"
+          jq -n --arg id "$APPROVAL_REQUEST_ID" --arg sha "$DEPLOYED_SHA" \
+            --arg outcome "$OUTCOME" --arg url "$RUN_URL" --arg nonce "$HANDOFF_NONCE" --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+            '{approval_request_id:$id,handoff_nonce:$nonce,deployed_sha:(if $sha == "" then null else $sha end),outcome:$outcome,run_url:$url,run_id:($run|tonumber),run_attempt:($attempt|tonumber)}' > /tmp/status.json
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+            --data-binary @/tmp/status.json \
+            "${OWNER_APPROVAL_RELAY_URL%/}/api/deployment-approval/v1/status"

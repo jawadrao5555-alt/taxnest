@@ -118,12 +118,16 @@ else
   ok "Deploy Production still does not run on pull_request"
 fi
 
-python3 - "$ROOT/scripts/owner-merge-and-deploy.sh" <<'PY' && ok "owner dispatch still sends only target_sha" || bad "owner handoff must not send skip_elaan/allow_settings"
+python3 - "$ROOT/scripts/owner-merge-and-deploy.sh" <<'PY' && ok "owner dispatch sends exact SHA and relay provenance" || bad "owner handoff provenance contract missing"
 import sys
 text = open(sys.argv[1], encoding="utf-8").read()
 if "skip_elaan" in text or "allow_settings" in text:
     sys.exit(1)
 if "inputs[target_sha]" not in text:
+    sys.exit(1)
+if "inputs[approval_request_id]" not in text or "inputs[handoff_nonce]" not in text or "v1/deploy-run" not in text:
+    sys.exit(1)
+if "inputs[provenance_receipt]" in text:
     sys.exit(1)
 sys.exit(0)
 PY

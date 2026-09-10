@@ -5,15 +5,15 @@ Permanent production deploy path after code is already on `main`:
 ```
 Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS-visible changes)
   → PR checks (no deploy) → STOP for owner
-  → Owner runs Actions workflow "Owner Merge & Deploy" with
-    pull_number + expected_head_sha + confirm exactly "Approved — Merge & Deploy"
+  → Owner approves the exact PR + head SHA from SaaS Admin → Deploy Approvals
+  → scheduled Approval Relay Dispatch authenticates with GitHub Actions OIDC
+  → Owner Merge & Deploy claims a one-time owner-workflow receipt
   → squash merge pinned to that head SHA → exact squash SHA must be origin/main tip
-  → workflow_dispatch Deploy Production with inputs.target_sha=<squash SHA>
-    (GITHUB_TOKEN merges do not start push workflows; workflow_dispatch does)
-  → OR a human push to main starts Deploy Production with github.sha
+  → workflow dispatches target_sha + approval ID + random correlation nonce
+  → relay consumes the receipt while binding the earliest exact-nonce GitHub run
   → GitHub Actions workflow ".github/workflows/deploy-production.yml"
-  → job "gate": requested SHA must equal current origin/main tip; skip_elaan
-    and allow_settings are refused; stale waiting runs are cancelled
+  → job "gate": OIDC run/attempt/workflow SHA + nonce must match; target must be current main tip;
+    stale waiting runs are cancelled
     (in_progress SSH is never cancelled)
   → GitHub Environment "production-deploy" (secrets + main-only branch policy;
     no required reviewers — protection is repository fail-closed gates)
@@ -37,16 +37,24 @@ GitHub suppresses new workflow runs for most events caused by `GITHUB_TOKEN`
 
 Supported handoff (no Cloud Agent secrets):
 
-1. Owner runs `.github/workflows/owner-merge-and-deploy.yml` (`workflow_dispatch`)
-   with `pull_number`, `expected_head_sha`, and confirm `Approved — Merge & Deploy`.
-   How-to: `docs/ops/owner-merge-and-deploy.md`.
-2. The job squash-merges **only** a Ready, same-repo `cursor/*` PR to `main`
+1. The owner creates and password-confirms an exact PR/SHA approval in SaaS
+   Admin → **Deploy Approvals**. How-to:
+   `docs/ops/owner-merge-and-deploy.md`.
+2. Scheduled `.github/workflows/approval-dispatch.yml` authenticates to the
+   relay with GitHub Actions OIDC, leases the approval, and dispatches
+   `.github/workflows/owner-merge-and-deploy.yml`.
+3. The owner workflow claims a one-time receipt, then squash-merges
+   **only** a Ready, same-repo `cursor/*` PR to `main`
    whose head SHA still matches and whose **PR checks / validate** succeeded.
-3. It reads the **exact squash/merge commit SHA** on `main` and refuses if that
+4. It reads the **exact squash/merge commit SHA** on `main` and refuses if that
    SHA is not the current `origin/main` **tip**.
-4. It calls `workflow_dispatch` on `deploy-production.yml` with
-   `inputs.target_sha=<that SHA>` only (never `skip_elaan` / `allow_settings`).
-5. Deploy Production **gate** checks out that SHA and refuses it unless it is
+5. It records that SHA, creates a random correlation nonce, and dispatches
+   `deploy-production.yml` with `target_sha`, `approval_request_id`, and
+   `handoff_nonce`. It then consumes the receipt while registering the earliest
+   exact nonce/SHA GitHub run ID with the relay.
+6. Deploy Production proves its registered run ID, run attempt, nonce, and
+   workflow SHA through OIDC, checks out that SHA, and
+   refuses it unless it is
    **exactly** the current `origin/main` tip (ancestor-only is not enough).
    `skip_elaan` / `allow_settings` fail closed here. The gate then cancels other
    Deploy Production runs that are still `waiting`. Job `deploy` uses
@@ -65,8 +73,9 @@ These are separate gates:
 | Gate | What happens | Who/what waits |
 |---|---|---|
 | PR checks | `.github/workflows/pr-checks.yml` on `cursor/*` PRs. Does not merge or deploy. | Agent + owner review the report. |
-| Owner Merge & Deploy | Explicit Actions `workflow_dispatch` with confirmation phrase. Squash-merges one approved PR and hands the exact squash SHA to Deploy Production. | **Owner** (this is the merge/deploy initiation). |
-| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on **push to `main`** (or `workflow_dispatch` with exact tip SHA) | Repository fail-closed gates: exact origin/main tip, merged-only SHA, refused `skip_elaan`/`allow_settings`, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
+| Owner approval relay | Authenticated super-admin approval bound to one repository, PR, head SHA, request ID, and expiry. GitHub OIDC dispatcher starts Owner Merge & Deploy. | **Owner** approves on mobile; scheduled GitHub dispatcher waits for that approval. |
+| Owner Merge & Deploy | Revalidates and squash-merges one relay-approved PR, then consumes its receipt while registering the exact nonce-correlated Deploy run. | Fail-closed relay claim; no phrase or manual workflow input is authority. |
+| Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on `workflow_dispatch` with exact tip SHA + approval ID + correlation nonce | Registered run ID/attempt + OIDC workflow SHA + nonce provenance, exact origin/main tip, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
 | Live Ops (`production`) | `live-ops-diagnose.yml` / `live-ops-remediate.yml` | Required reviewers on Environment `production` — **keep MANUAL**. Also `OWNER_APPROVES_LIVE_OPS_FIX` for mutations. |
 
 Do not give Cloud Agent production SSH keys or Environment secrets. Cloud Agents
@@ -106,8 +115,8 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 
 | Step | Behavior |
 |---|---|
-| Trigger | `push` to `main`, or `workflow_dispatch` on `main` (Owner Merge & Deploy handoff passes `target_sha`) |
-| Deploy SHA | `push` → `github.sha`; `workflow_dispatch` with `target_sha` → that exact 40-char SHA. **Must equal current `origin/main` tip** at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. |
+| Trigger | `workflow_dispatch` on `main` from Owner Merge & Deploy with `target_sha`, `approval_request_id`, and `handoff_nonce`. No push trigger. |
+| Deploy SHA | Exact 40-char `target_sha` recorded by the relay as the approved squash SHA. It must equal current `origin/main` tip at gate time and again immediately before SSH. Ancestor-of-main is not sufficient. Historical SHA → fail closed, no mutation. Rollback is `deployment/ROLLBACK.md`, not this workflow. |
 | Concurrency | **No workflow-level group.** `gate` uses `production-deploy-gate` with `cancel-in-progress: true` (newer tip supersedes older pre-apply). `deploy` uses `production-deploy` with `cancel-in-progress: false` — at most one SSH/apply; in-flight apply is never cancelled. After a SHA proves it is the tip, `gate` cancels other runs whose status is `waiting` (never `in_progress`). |
 | Gate | Job `deploy` uses `environment: production-deploy` (secrets + main-only branch policy; **no required reviewers**). Job `gate` does **not** use an Environment (no secrets, starts immediately, fail-closed on non-tip and on `skip_elaan`/`allow_settings`). |
 | Checkout | Exact deploy SHA (resolved), full history |
@@ -121,11 +130,11 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 | Live dirty tree | Unexpected tracked modifications fail closed (no auto-stash / reset / checkout / clean). Deploy Production #16 failed because the previous apply left the intentional `public/sw.js` stamp dirty, and the preflight treated every tracked `M` as unexpected. The preflight now classifies on the runner: `public/sw.js` is allowed **only** when `git diff HEAD -- public/sw.js` is solely the live-remote-apply stamp line. Any other file or any extra `sw.js` hunk still fails. The leftover stamp is **not** discarded in preflight; `remote_apply` still restores it immediately before the next checkout, then restamps. |
 | Not run | Replit-local preflights (MySQL staging, Chromium, `.local` QA), SW `CACHE_VERSION` auto-bump **commits** (replaced by the live stamp above), any `git push`, Cloud Agent processes |
 
-Manual `workflow_dispatch` inputs:
+Required `workflow_dispatch` inputs:
 
-- `target_sha` — exact 40-char **current origin/main tip** to deploy (used by Owner Merge & Deploy handoff). A historical SHA that is still on main history is **rejected** with a diagnostic; it will not SSH. Leave empty only for emergency dispatch of `github.sha`, which still must equal the tip at run time.
-- `skip_elaan` — **refused** on this workflow (fail-closed). Emergency skip is `scripts/deploy-live.sh --no-elaan` on an owner workstation, never Cloud Agent, never a token auto-approve.
-- `allow_settings` — **refused** on this workflow (fail-closed). Emergency allow-list is `scripts/deploy-live.sh --allow-settings=...` on an owner workstation.
+- `target_sha` — exact 40-char current `origin/main` tip and relay-recorded squash SHA.
+- `approval_request_id` — UUID of the authenticated owner approval.
+- `handoff_nonce` — random 128-bit correlation value. It is not bearer authority; the relay also requires the registered GitHub run ID/attempt and exact OIDC workflow SHA.
 
 ## Committed Elaan spec (`deploy/elaan.yml`)
 
@@ -160,7 +169,7 @@ After a `cursor/*` PR is **Ready** and green, the owner follows
 **`docs/ops/owner-merge-and-deploy.md`**, then
 **`docs/ops/cloud-agent-issue-to-live.md`**:
 
-- Owner Merge & Deploy squash + `workflow_dispatch` handoff starts Deploy Production with the exact squash SHA (GITHUB_TOKEN merges do not fire `push` workflows)
+- Owner mobile approval → OIDC relay → Owner Merge & Deploy squash starts and registers the exact nonce-correlated Deploy run for the approved SHA
 - Cursor does **not** auto-merge. Green PR checks are not permission to merge.
 - Normal deploys do **not** wait for Environment reviewers (`production-deploy` has none)
 - Actions runs post-deploy `ci-live-verify.sh` (SHA + NestPOS markers)

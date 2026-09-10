@@ -172,11 +172,11 @@ else
   ok "no unqualified-title fallback in freshness check"
 fi
 
-# skip_elaan not newly enabled
-if grep -q 'skip_elaan' "$WF" && grep -A5 'skip_elaan:' "$WF" | grep -q 'default: false'; then
-  ok "skip_elaan still defaults to false"
+# Deploy Production has no emergency/manual bypass inputs.
+if grep -qE 'skip_elaan|allow_settings' "$WF"; then
+  bad "Deploy Production exposes an emergency bypass input"
 else
-  bad "skip_elaan default changed"
+  ok "Deploy Production has no emergency bypass inputs"
 fi
 
 # PR #29 invariants still in the workflow

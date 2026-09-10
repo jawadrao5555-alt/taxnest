@@ -104,4 +104,23 @@ class LiveOpsAdminAndRunnerTest extends LiveOpsTestCase
             'X-Live-Ops-Token' => 'short',
         ])->assertStatus(503);
     }
+
+    public function test_safe_auto_deploy_requires_token_and_blocks_high_risk_paths(): void
+    {
+        Config::set('live_ops.runner_token', str_repeat('d', 40));
+        $this->postJson('/api/live-ops/v1/safe-auto-deploy', [
+            'pull_request_number' => 1,
+            'head_sha' => str_repeat('a', 40),
+            'paths' => ['public/js/pos-print-attempt.js'],
+        ])->assertStatus(401);
+
+        $this->postJson('/api/live-ops/v1/safe-auto-deploy', [
+            'pull_request_number' => 1,
+            'head_sha' => str_repeat('a', 40),
+            'paths' => ['database/migrations/x.php'],
+        ], [
+            'X-Live-Ops-Token' => str_repeat('d', 40),
+        ])->assertStatus(422)
+            ->assertJsonPath('ok', false);
+    }
 }

@@ -1,0 +1,56 @@
+# Ordinary-safe auto-deploy via the existing owner-approval relay.
+# Does NOT squash-merge in this job. Does NOT dispatch Deploy Production.
+# Does NOT skip Elaan. Does NOT reintroduce push-to-main.
+# After the runner auto-approves an AUTO_DEPLOY change-set, the existing
+# Approval Relay Dispatch workflow (OIDC) starts Owner Merge & Deploy.
+name: Live Ops Safe Auto Merge
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: "cursor/* PR number"
+        required: true
+        type: string
+      expected_head_sha:
+        description: "Full 40-char PR head SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: live-ops-safe-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  classify-and-relay:
+    name: Classify paths and approve via relay if AUTO_DEPLOY
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard inputs
+        run: |
+          set -euo pipefail
+          echo "${{ github.event.inputs.pull_number }}" | grep -Eq '^[0-9]+$'
+          echo "${{ github.event.inputs.expected_head_sha }}" | grep -Eq '^[0-9a-fA-F]{40}$'
+      - name: Classify and request relay auto-approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LIVE_OPS_RUNNER_TOKEN: ${{ secrets.LIVE_OPS_RUNNER_TOKEN }}
+          LIVE_OPS_BASE_URL: ${{ secrets.LIVE_OPS_BASE_URL }}
+        run: |
+          mkdir -p artifacts
+          bash scripts/live-ops-safe-auto-merge.sh \
+            --pull-number="${{ github.event.inputs.pull_number }}" \
+            --expected-head-sha="${{ github.event.inputs.expected_head_sha }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-ops-safe-auto-deploy
+          path: artifacts/live-ops-safe-auto-deploy.json
+          if-no-files-found: error
+          retention-days: 14

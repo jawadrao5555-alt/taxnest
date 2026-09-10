@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LiveOpsRemediationRequest;
+use App\Services\LiveOps\LiveOpsAutonomousEngine;
 use App\Services\LiveOps\LiveOpsDiagnosticsService;
 use App\Services\LiveOps\LiveOpsRemediationService;
+use App\Services\OwnerDeploymentApprovalService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -129,5 +131,58 @@ class LiveOpsRunnerController extends Controller
         }
 
         return response()->json(['ok' => true, 'remediation' => $row]);
+    }
+
+    public function ownerCommand(Request $request, LiveOpsAutonomousEngine $engine)
+    {
+        $this->authorizeRunner($request);
+        $validated = $request->validate([
+            'text' => 'required|string|max:500',
+            'requester' => 'nullable|string|max:120',
+            'source' => 'nullable|string|max:80',
+            'request_id' => 'nullable|string|max:64',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
+        ]);
+
+        try {
+            $result = $engine->handle($validated['text'], [
+                'requester' => $validated['requester'] ?? 'github-actions',
+                'source' => $validated['source'] ?? 'runner',
+                'request_id' => $validated['request_id'] ?? null,
+                'date_from' => $validated['date_from'] ?? null,
+                'date_to' => $validated['date_to'] ?? null,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true, 'result' => $result]);
+    }
+
+    public function safeAutoDeploy(Request $request, OwnerDeploymentApprovalService $approvals)
+    {
+        $this->authorizeRunner($request);
+        $validated = $request->validate([
+            'pull_request_number' => 'required|integer|min:1',
+            'head_sha' => 'required|string|size:40',
+            'paths' => 'required|array|min:1|max:200',
+            'paths.*' => 'string|max:255',
+            'requester' => 'nullable|string|max:120',
+        ]);
+
+        try {
+            $row = $approvals->approveOrdinarySafeFix($validated);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'approval_request_id' => $row->request_id,
+            'status' => $row->status,
+            'pull_request_number' => $row->pull_request_number,
+            'head_sha' => $row->head_sha,
+        ]);
     }
 }

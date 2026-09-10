@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\AdminUser;
 use App\Models\AdminAuditLog;
 use App\Models\OwnerDeploymentApprovalRequest;
+use App\Services\LiveOps\LiveOpsChangeRiskClassifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -167,6 +169,41 @@ class OwnerDeploymentApprovalService
             'repository' => $row->repository,
             'pull_request_number' => $row->pull_request_number,
             'head_sha' => $row->head_sha,
+        ]);
+
+        return $row;
+    }
+
+    /**
+     * Ordinary safe application fixes may be approved without the admin-panel password
+     * when the trusted Live Ops runner token is present AND the change-set is AUTO_DEPLOY.
+     * Still uses the existing relay + exact-SHA Owner Merge & Deploy path.
+     */
+    public function approveOrdinarySafeFix(array $input): OwnerDeploymentApprovalRequest
+    {
+        $paths = is_array($input['paths'] ?? null) ? $input['paths'] : [];
+        $classified = app(LiveOpsChangeRiskClassifier::class)->classifyPaths($paths);
+        if ($classified['class'] !== LiveOpsChangeRiskClassifier::AUTO_DEPLOY) {
+            throw new \InvalidArgumentException(
+                'Automatic deploy blocked: '.($classified['reason'] ?? 'high-risk change set')
+            );
+        }
+
+        $admin = AdminUser::query()->where('role', 'super_admin')->orderBy('id')->first();
+        if (!$admin) {
+            throw new \InvalidArgumentException('No super_admin is available to audit autonomous approval.');
+        }
+
+        $row = $this->create([
+            'pull_request_number' => (int) ($input['pull_request_number'] ?? 0),
+            'head_sha' => strtolower((string) ($input['head_sha'] ?? '')),
+        ], (int) $admin->id);
+
+        $row = $this->approve($row, (int) $admin->id);
+        AdminAuditLog::log((int) $admin->id, 'owner_deployment_safe_auto', self::class, null, [
+            'request_id' => $row->request_id,
+            'risk_class' => $classified['class'],
+            'path_count' => count($classified['allowed_paths']),
         ]);
 
         return $row;

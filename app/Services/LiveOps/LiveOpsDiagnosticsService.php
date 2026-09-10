@@ -24,6 +24,7 @@ class LiveOpsDiagnosticsService
         private LiveOpsRedactor $redactor,
         private LiveOpsAuditService $audit,
         private LiveOpsPlatformHealth $platform,
+        private LiveOpsCompanyResolver $resolver,
     ) {
     }
 
@@ -41,7 +42,8 @@ class LiveOpsDiagnosticsService
         $companyName = isset($input['company_name']) ? trim((string) $input['company_name']) : null;
 
         if ($companyName && !$companyId) {
-            $companyId = $this->resolveCompanyIdByName($companyName);
+            $resolved = $this->resolver->resolve($companyName);
+            $companyId = $resolved['company_id'];
         }
 
         $payload = match ($operation) {
@@ -144,29 +146,6 @@ class LiveOpsDiagnosticsService
         }
 
         return [$from, $to];
-    }
-
-    private function resolveCompanyIdByName(string $name): int
-    {
-        $q = $this->posCompaniesQuery()
-            ->where(function ($w) use ($name) {
-                $w->where('name', $name);
-                if (ctype_digit($name)) {
-                    $w->orWhere('id', (int) $name);
-                }
-                if (Schema::hasColumn('companies', 'account_code')) {
-                    $w->orWhere('account_code', $name);
-                }
-            });
-
-        $ids = $q->limit(5)->pluck('id');
-        if ($ids->count() === 1) {
-            return (int) $ids->first();
-        }
-        if ($ids->isEmpty()) {
-            throw new \InvalidArgumentException("Company not found: {$name}");
-        }
-        throw new \InvalidArgumentException("Ambiguous company name: {$name} (matches {$ids->count()} companies — use company_id)");
     }
 
     private function posCompaniesQuery()
@@ -512,6 +491,8 @@ class LiveOpsDiagnosticsService
                     'device_uid' => $j->device_uid,
                     'error' => $this->redactor->redactString((string) ($j->error ?? '')),
                     'attempts' => $j->attempts,
+                    'transaction_id' => $j->transaction_id,
+                    'content_fetched_at' => optional($j->content_fetched_at)?->toIso8601String(),
                     'created_at' => optional($j->created_at)?->toIso8601String(),
                     'updated_at' => optional($j->updated_at)?->toIso8601String(),
                 ])->all();
@@ -547,7 +528,56 @@ class LiveOpsDiagnosticsService
             'devices' => $devices,
             'recent_jobs' => $jobs,
             'failed_job_count' => collect($jobs)->where('status', 'failed')->count(),
+            'stuck_job_count' => $this->stuckPrintCount($jobs),
+            'job_counts' => $this->printJobCounts($companyId, $jobs),
         ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $jobs
+     */
+    private function stuckPrintCount(array $jobs): int
+    {
+        $minutes = (int) config('live_ops.autonomous.stuck_print_minutes', 5);
+        $cutoff = now()->subMinutes($minutes);
+
+        return collect($jobs)->filter(function (array $j) use ($cutoff) {
+            $status = (string) ($j['status'] ?? '');
+            if (!in_array($status, ['pending', 'printing', 'claimed', 'queued'], true)) {
+                return false;
+            }
+            $at = $j['updated_at'] ?? $j['created_at'] ?? null;
+            if (!$at) {
+                return false;
+            }
+            try {
+                return Carbon::parse($at)->lt($cutoff);
+            } catch (\Throwable $e) {
+                return false;
+            }
+        })->count();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $jobs
+     * @return array{total:int,pending:int,printing:int,done:int,failed:int}
+     */
+    private function printJobCounts(int $companyId, array $jobs): array
+    {
+        $counts = [
+            'total' => count($jobs),
+            'pending' => collect($jobs)->where('status', 'pending')->count(),
+            'printing' => collect($jobs)->where('status', 'printing')->count(),
+            'done' => collect($jobs)->whereIn('status', ['done', 'printed', 'completed'])->count(),
+            'failed' => collect($jobs)->where('status', 'failed')->count(),
+        ];
+        if (Schema::hasTable('pos_print_jobs')) {
+            $counts['total_today'] = PosPrintJob::where('company_id', $companyId)
+                ->where('created_at', '>=', now()->startOfDay())
+                ->count();
+        }
+
+        return $counts;
     }
 
     private function errorSummary(int $companyId, Carbon $from, Carbon $to): array
@@ -999,13 +1029,129 @@ class LiveOpsDiagnosticsService
         ];
 
         $overall = $this->composeOverallStatus($sections);
+        $cards = $this->ownerCompanyCards($from, $to, $billing, $activity, $pra);
 
         return $sections + [
             'overall' => $overall,
+            'owner_company_cards' => $cards,
             'unknown_observability_gaps' => $overall['unknown'],
             'recommended_owner_actions' => $overall['recommended_owner_actions'],
-            'remediation_note' => 'Diagnosis never executes fixes. Owner must explicitly approve a low/medium allow-listed remediation.',
+            'remediation_note' => 'Diagnosis is read-only. Ordinary low-risk operational fixes may proceed from the owner-command path; high-risk changes stay blocked.',
         ];
+    }
+
+    /**
+     * Owner-readable per-shop cards for DAILY_OPS (names, billing, print, agent, PRA).
+     *
+     * @param  array<string, mixed>  $billing
+     * @param  array<string, mixed>  $activity
+     * @param  array<string, mixed>  $pra
+     * @return list<array<string, mixed>>
+     */
+    private function ownerCompanyCards(Carbon $from, Carbon $to, array $billing, array $activity, array $pra): array
+    {
+        $printStats = $this->fleetPrintStats($from, $to);
+        $agents = [];
+        foreach ($activity['agents']['agents'] ?? [] as $row) {
+            $agents[(int) $row['company_id']] = $row;
+        }
+        $praFail = [];
+        foreach ($pra['companies_with_failures'] ?? [] as $row) {
+            $praFail[(int) $row['company_id']] = (int) ($row['fail_count'] ?? 0);
+        }
+        $companies = $this->posCompaniesQuery()
+            ->limit((int) config('live_ops.limits.max_companies_in_report', 200))
+            ->get(['id', 'name', 'agent_enabled', 'agent_last_seen', 'status', 'company_status']);
+
+        $byBilling = [];
+        foreach ($billing['companies'] ?? [] as $row) {
+            $byBilling[(int) $row['company_id']] = $row;
+        }
+
+        $cards = [];
+        foreach ($companies as $c) {
+            $id = (int) $c->id;
+            $b = $byBilling[$id] ?? [];
+            $a = $agents[$id] ?? [];
+            $print = $printStats[$id] ?? ['total' => 0, 'failed' => 0, 'stuck' => 0];
+            $praFailed = $praFail[$id] ?? (int) ($b['pra_failed'] ?? 0);
+            $online = array_key_exists('online', $a) ? (bool) $a['online'] : $c->agentOnline();
+            $issues = [];
+            if ((int) $print['failed'] > 0) {
+                $issues[] = ((int) $print['failed']).' failed print job(s)';
+            }
+            if ((int) $print['stuck'] > 0) {
+                $issues[] = ((int) $print['stuck']).' stuck print job(s)';
+            }
+            if ($praFailed > 0) {
+                $issues[] = $praFailed.' PRA error(s)';
+            }
+            if ($c->agent_enabled && !$online) {
+                $issues[] = 'Desktop Agent offline';
+            }
+            $printerLine = 'PASS';
+            if ((int) $print['failed'] > 0 || (int) $print['stuck'] > 0) {
+                $printerLine = 'FAIL';
+            }
+            $cards[] = [
+                'company_id' => $id,
+                'name' => $c->name,
+                'billing_amount' => round((float) ($b['gross_total'] ?? 0), 2),
+                'bill_count' => (int) ($b['invoice_count'] ?? 0),
+                'successful_bills' => (int) ($b['pra_submitted'] ?? 0),
+                'failed_abnormal' => $praFailed,
+                'print_jobs' => (int) $print['total'],
+                'failed_print_jobs' => (int) $print['failed'],
+                'stuck_print_jobs' => (int) $print['stuck'],
+                'agent' => $online ? 'ONLINE' : ($c->agent_enabled ? 'OFFLINE' : 'DISABLED'),
+                'printer' => $printerLine,
+                'pra' => $praFailed > 0 ? 'FAIL' : 'PASS',
+                'issues' => $issues,
+                'issues_line' => $issues ? implode('; ', $issues) : 'None',
+                'severity' => $issues ? 'attention' : 'none',
+                'root_cause' => $issues ? null : null,
+                'actions_taken' => [],
+                'unresolved' => $issues,
+            ];
+        }
+
+        usort($cards, fn ($x, $y) => ($y['billing_amount'] <=> $x['billing_amount']) ?: strcmp((string) $x['name'], (string) $y['name']));
+
+        return $cards;
+    }
+
+    /**
+     * @return array<int, array{total:int,failed:int,stuck:int}>
+     */
+    private function fleetPrintStats(Carbon $from, Carbon $to): array
+    {
+        if (!Schema::hasTable('pos_print_jobs')) {
+            return [];
+        }
+        $minutes = (int) config('live_ops.autonomous.stuck_print_minutes', 5);
+        $stuckCut = now()->subMinutes($minutes);
+        $rows = DB::table('pos_print_jobs')
+            ->where('created_at', '>=', $from->copy()->startOfDay())
+            ->where('created_at', '<=', $to->copy()->endOfDay())
+            ->select(
+                'company_id',
+                DB::raw('COUNT(*) as total'),
+                DB::raw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed"),
+                DB::raw("SUM(CASE WHEN status IN ('pending','printing','claimed','queued') AND updated_at < '".$stuckCut->toDateTimeString()."' THEN 1 ELSE 0 END) as stuck")
+            )
+            ->groupBy('company_id')
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int) $row->company_id] = [
+                'total' => (int) $row->total,
+                'failed' => (int) $row->failed,
+                'stuck' => (int) $row->stuck,
+            ];
+        }
+
+        return $out;
     }
 
     /**

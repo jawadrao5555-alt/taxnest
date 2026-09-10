@@ -1,6 +1,9 @@
 # Poll approved relay requests and hand them to the guarded owner workflow.
 # The relay authenticates this job with GitHub OIDC and returns only claims
 # bound to this repository, PR, and exact head SHA.
+#
+# Empty relay bodies are treated as zero claims (schedule poller success).
+# Non-JSON HTML still fails closed.
 name: Approval Relay Dispatch
 
 on:
@@ -21,6 +24,9 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Claim approved requests and dispatch owner handoff
         env:
           GH_TOKEN: ${{ github.token }}
@@ -31,16 +37,15 @@ jobs:
             -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=owner-approval-relay" | jq -r .value)"
           jq -n --arg repo "$GITHUB_REPOSITORY" '{repository:$repo}' > /tmp/dispatch-request.json
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+          HTTP=$(curl --fail --silent --show-error \
+            -o /tmp/claims.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
             --data-binary @/tmp/dispatch-request.json \
-            "${OWNER_APPROVAL_RELAY_URL%/}/api/deployment-approval/v1/dispatch-claims" > /tmp/claims.json
-          python3 - /tmp/claims.json > /tmp/claims.tsv <<'PY'
-          import json, sys
-          data=json.load(open(sys.argv[1], encoding="utf-8"))
-          for c in data.get("claims", data if isinstance(data, list) else []):
-              print("\t".join(str(c[k]) for k in ("approval_request_id","pull_number","expected_head_sha")))
-          PY
+            "${OWNER_APPROVAL_RELAY_URL%/}/api/deployment-approval/v1/dispatch-claims")
+          echo "relay HTTP $HTTP bytes=$(wc -c < /tmp/claims.json)"
+          python3 scripts/lib/approval_dispatch_claims.py /tmp/claims.json > /tmp/claims.tsv
           while IFS=$'\t' read -r request pull sha; do
             [ -n "$request" ] || continue
             gh workflow run owner-merge-and-deploy.yml --repo "$GITHUB_REPOSITORY" \

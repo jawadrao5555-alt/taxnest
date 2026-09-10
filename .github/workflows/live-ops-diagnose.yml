@@ -37,7 +37,7 @@ on:
         required: false
         default: ""
       company_name:
-        description: "Exact company name or account_code"
+        description: "Company name or account_code (owners never need a company ID)"
         type: string
         required: false
         default: ""

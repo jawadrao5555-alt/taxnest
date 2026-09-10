@@ -149,4 +149,82 @@ return [
     'product_types' => ['pos'], // NestPOS PRA focus
 
     'exclude_email_suffix' => '@scaletest.pk',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company name resolver
+    |--------------------------------------------------------------------------
+    */
+    'resolver' => [
+        'min_partial_chars' => 3,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Autonomous owner-command engine
+    |--------------------------------------------------------------------------
+    */
+    'autonomous' => [
+        'max_fix_iterations' => 3,
+        'low_operational_from_owner_command' => true,
+        'stuck_print_minutes' => 5,
+        'github_issue_prefix' => '[TAXNEST-OPS]',
+        'bridge_label' => 'live-ops-command',
+        'statuses' => [
+            'INVESTIGATING',
+            'DIAGNOSED',
+            'FIXING',
+            'TESTING',
+            'READY_TO_DEPLOY',
+            'DEPLOYING',
+            'VERIFYING',
+            'RESOLVED',
+            'BLOCKED',
+            'FAILED',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Change-set risk (ordinary safe auto-deploy vs fail-closed)
+    |--------------------------------------------------------------------------
+    | Deny wins. Unlisted application paths are treated as high-risk.
+    | Docs-only changes are ignored by the classifier.
+    */
+    'risk' => [
+        'auto_deploy_path_allow' => [
+            'resources/views/',
+            'resources/css/',
+            'public/js/',
+            'public/css/',
+            'pra-agent/src/',
+            'pra-agent/test/',
+            'agent-realtime-gateway/src/',
+            'app/Services/LiveOps/',
+            'app/Http/Controllers/Api/LiveOpsRunnerController.php',
+            'app/Console/Commands/LiveOps',
+            'config/live_ops.php',
+            'tests/Feature/LiveOps/',
+            'tests/Feature/PosPrint',
+            'scripts/cloud-live-ops',
+            'scripts/ci-live-ops',
+            'scripts/lib/live_ops_',
+            'scripts/tests/live-ops-',
+            'docs/ops/live-ops',
+        ],
+        'high_risk_path_deny' => [
+            'database/migrations/',
+            'app/Services/PosTaxMath.php',
+            'app/Services/Tax',
+            'app/Http/Middleware/AgentAuth.php',
+            'app/Http/Middleware/Authenticate.php',
+            'app/Http/Middleware/Company',
+            '.env',
+            '.github/workflows/deploy-production.yml',
+            '.github/workflows/owner-merge-and-deploy.yml',
+            'scripts/deploy-live.sh',
+            'scripts/owner-merge-and-deploy.sh',
+            'scripts/lib/owner-merge-and-deploy.py',
+        ],
+    ],
 ];

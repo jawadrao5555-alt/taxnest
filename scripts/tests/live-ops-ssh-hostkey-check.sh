@@ -18,10 +18,12 @@ KH="$ROOT/scripts/lib/live-known-hosts"
 HOST="$ROOT/scripts/lib/live-host.sh"
 DIAG="$ROOT/scripts/ci-live-ops-diagnose.sh"
 REM="$ROOT/scripts/ci-live-ops-remediate.sh"
+OWN="$ROOT/scripts/ci-live-ops-owner-command.sh"
 WF="$ROOT/.github/workflows/live-ops-diagnose.yml"
 REM_WF="$ROOT/.github/workflows/live-ops-remediate.yml"
+OWN_WF="$ROOT/.github/workflows/live-ops-owner-bridge.yml"
 
-for f in "$KH" "$HOST" "$DIAG" "$REM" "$WF" "$REM_WF"; do
+for f in "$KH" "$HOST" "$DIAG" "$REM" "$OWN" "$WF" "$REM_WF" "$OWN_WF"; do
   [ -f "$f" ] || bad "missing $f"
 done
 
@@ -103,7 +105,7 @@ if [ -f "$HOST" ]; then
 fi
 
 # --------------------------------------------------------------------------- diagnose / remediate CI helpers
-for f in "$DIAG" "$REM"; do
+for f in "$DIAG" "$REM" "$OWN"; do
   bn=$(basename "$f")
   bash -n "$f" && ok "$bn bash -n" || bad "$bn bash -n failed"
 
@@ -145,15 +147,23 @@ grep -q 'live-ops:remediate' "$REM" \
   && ok "remediate helper remains the separate remediate path" \
   || bad "remediate helper must still call live-ops:remediate"
 
-python3 - "$WF" "$REM_WF" <<'PY' && ok "Live Ops Diagnose stays on Environment production; Remediate stays separate" || bad "Live Ops Environment split broken"
+grep -q 'live-ops:owner-command' "$OWN" \
+  && ok "owner-command SSH path runs live-ops:owner-command" \
+  || bad "owner-command helper must call live-ops:owner-command"
+if grep -q 'live-ops:remediate' "$OWN"; then
+  bad "owner-command helper must not invoke live-ops:remediate"
+else
+  ok "owner-command helper does not invoke remediate"
+fi
+
+python3 - "$WF" "$REM_WF" "$OWN_WF" <<'PY' && ok "Live Ops Diagnose/Remediate/Owner Bridge stay on Environment production" || bad "Live Ops Environment split broken"
 import re, sys
-diag, rem = (open(p, encoding="utf-8").read() for p in sys.argv[1:])
-if not re.search(r"(?m)^\s+environment:\s+production\s*$", diag):
-    sys.exit(1)
-if not re.search(r"(?m)^\s+environment:\s+production\s*$", rem):
-    sys.exit(1)
-if re.search(r"(?m)^\s+environment:\s+production-deploy\s*$", diag + "\n" + rem):
-    sys.exit(1)
+texts = [open(p, encoding="utf-8").read() for p in sys.argv[1:]]
+for text in texts:
+    if not re.search(r"(?m)^\s+environment:\s+production\s*$", text):
+        sys.exit(1)
+    if re.search(r"(?m)^\s+environment:\s+production-deploy\s*$", text):
+        sys.exit(1)
 sys.exit(0)
 PY
 

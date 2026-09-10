@@ -1,0 +1,162 @@
+# Live Ops owner-command bridge — ChatGPT / GitHub remote control.
+#
+# ChatGPT GitHub connectors often cannot call workflow_dispatch (needs
+# actions: write). Creating an issue or comment DOES work with issues: write.
+# This workflow accepts:
+#   - workflow_dispatch (Actions write)
+#   - repository_dispatch type taxnest-live-ops (contents/actions write)
+#   - issues / issue_comment from the repository owner with [TAXNEST-OPS]
+#
+# It never accepts arbitrary workflows, shell, or SSH from the comment body.
+# Secrets stay in GitHub Environment production. Cloud Agents never receive them.
+# Parser runs locally first; production is contacted only for allow-listed intents.
+
+name: Live Ops Owner Bridge
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Owner phrase, e.g. Aaj ki report do"
+        required: true
+        type: string
+      requester:
+        description: "Audit requester label"
+        required: false
+        type: string
+        default: chatgpt
+  repository_dispatch:
+    types: [taxnest-live-ops]
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: live-ops-owner-bridge
+  cancel-in-progress: false
+
+jobs:
+  owner-command:
+    name: Parse and run allow-listed owner command
+    runs-on: ubuntu-latest
+    environment: production
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'repository_dispatch' ||
+      (
+        github.event_name == 'issues' &&
+        !github.event.issue.pull_request &&
+        github.event.sender.login == github.repository_owner &&
+        startsWith(github.event.issue.title, '[TAXNEST-OPS]')
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        !github.event.issue.pull_request &&
+        github.event.sender.login == github.repository_owner &&
+        (
+          startsWith(github.event.issue.title, '[TAXNEST-OPS]') ||
+          contains(github.event.comment.body, '[TAXNEST-OPS]')
+        ) &&
+        !contains(github.event.comment.body, 'taxnest-ops-result')
+      )
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve owner text
+        id: cmd
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WD_COMMAND: ${{ github.event.inputs.command }}
+          WD_REQUESTER: ${{ github.event.inputs.requester }}
+          RD_TEXT: ${{ github.event.client_payload.text }}
+          RD_REQUESTER: ${{ github.event.client_payload.requester }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > /tmp/owner-text.json
+          import json, os
+          event = os.environ.get("EVENT_NAME") or ""
+          text = ""
+          requester = os.environ.get("ACTOR") or "github"
+          if event == "workflow_dispatch":
+              text = os.environ.get("WD_COMMAND") or ""
+              requester = os.environ.get("WD_REQUESTER") or requester
+          elif event == "repository_dispatch":
+              text = os.environ.get("RD_TEXT") or ""
+              requester = os.environ.get("RD_REQUESTER") or requester
+          elif event == "issue_comment":
+              text = os.environ.get("COMMENT_BODY") or ""
+          else:
+              title = os.environ.get("ISSUE_TITLE") or ""
+              body = os.environ.get("ISSUE_BODY") or ""
+              text = title + "\n" + body
+          print(json.dumps({"text": text.strip(), "requester": requester[:120]}))
+          PY
+          TEXT=$(python3 -c 'import json; print(json.load(open("/tmp/owner-text.json"))["text"])')
+          REQUESTER=$(python3 -c 'import json; print(json.load(open("/tmp/owner-text.json"))["requester"])')
+          echo "requester=$REQUESTER" >> "$GITHUB_OUTPUT"
+          mkdir -p artifacts
+          python3 scripts/lib/live_ops_owner_command.py "$TEXT" | tee artifacts/live-ops-owner-parsed.json
+          python3 - <<'PY'
+          import json, sys
+          d=json.load(open("artifacts/live-ops-owner-parsed.json", encoding="utf-8"))
+          if not d.get("ok"):
+              print("Rejected:", d.get("error"), file=sys.stderr)
+              sys.exit(1)
+          print("intent", d.get("intent"), "operation", d.get("operation"), "company", d.get("company_name"))
+          PY
+          {
+            echo "text<<TN_EOF"
+            python3 -c 'import json; print(json.load(open("/tmp/owner-text.json"))["text"])'
+            echo "TN_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run owner-command on production (HTTPS runner or pinned SSH artisan)
+        env:
+          LIVE_OPS_RUNNER_TOKEN: ${{ secrets.LIVE_OPS_RUNNER_TOKEN }}
+          LIVE_OPS_BASE_URL: ${{ secrets.LIVE_OPS_BASE_URL }}
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          OWNER_TEXT: ${{ steps.cmd.outputs.text }}
+          REQUESTER: ${{ steps.cmd.outputs.requester }}
+          SOURCE: github-owner-bridge
+          REQUEST_ID: ${{ github.run_id }}
+        run: bash scripts/ci-live-ops-owner-command.sh
+
+      - name: Upload owner report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-ops-owner-command
+          path: |
+            artifacts/live-ops-owner-command.json
+            artifacts/live-ops-owner-parsed.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Post owner-readable report
+        if: github.event_name == 'issues' || github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > /tmp/owner-comment.md
+          import json
+          d=json.load(open("artifacts/live-ops-owner-command.json", encoding="utf-8"))
+          report=(d.get("owner_report") or {})
+          text=report.get("text") or d.get("error") or "No report text."
+          print("<!-- taxnest-ops-result -->")
+          print(text)
+          print("")
+          print(f"request_id: {d.get('request_id')}  status: {d.get('status')}")
+          PY
+          gh issue comment "$ISSUE" --body-file /tmp/owner-comment.md

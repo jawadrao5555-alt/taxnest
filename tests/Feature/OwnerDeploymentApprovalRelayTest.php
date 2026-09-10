@@ -616,4 +616,28 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $this->assertSame('succeeded', $row->fresh()->status);
         $this->postJson('/api/deployment-approval/v1/status', array_merge($status, ['handoff_nonce' => str_repeat('e', 32)]))->assertStatus(409);
     }
+
+    public function test_ordinary_safe_fix_can_auto_approve_through_the_relay(): void
+    {
+        $this->admin();
+        $this->github();
+        $row = app(OwnerDeploymentApprovalService::class)->approveOrdinarySafeFix([
+            'pull_request_number' => 17,
+            'head_sha' => self::SHA,
+            'paths' => ['public/js/pos-print-attempt.js', 'pra-agent/src/printer-poll-policy.js'],
+        ]);
+        $this->assertSame('approved', $row->status);
+        $this->assertSame(self::SHA, $row->head_sha);
+    }
+
+    public function test_high_risk_change_set_cannot_auto_approve(): void
+    {
+        $this->admin();
+        $this->expectException(\InvalidArgumentException::class);
+        app(OwnerDeploymentApprovalService::class)->approveOrdinarySafeFix([
+            'pull_request_number' => 17,
+            'head_sha' => self::SHA,
+            'paths' => ['database/migrations/2026_01_01_drop.php', 'app/Services/PosTaxMath.php'],
+        ]);
+    }
 }

@@ -12,6 +12,23 @@ Restores practical LIVE NestPOS PRA ops (investigate → explain → owner-direc
 | Super-admin `/admin/live-ops` | Same diagnostics + approve/execute in browser | Expose secrets to Cloud Agent env |
 | Desktop Agent | Execute allow-listed `pending_commands` from heartbeat | Arbitrary remote shell |
 
+## Owner phrases (no IDs, no GitHub UI)
+
+See `docs/ops/live-ops-owner-bridge.md`. ChatGPT / the owner can say:
+
+```
+Aaj ki report do.
+Pizza Master check karo
+ZFC ka printing issue solve karo
+Sab companies check karo aur jahan issue ho solve karo
+```
+
+```bash
+bash scripts/cloud-live-ops-request.sh --command='Aaj ki report do'
+```
+
+If `workflow_dispatch` is HTTP 403, open a GitHub issue titled `[TAXNEST-OPS] Aaj ki report do`. Minimum GitHub App permission for dispatch: `actions: write`. Do not paste a PAT.
+
 ## Cloud Agent commands
 
 ```bash

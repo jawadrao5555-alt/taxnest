@@ -2834,6 +2834,8 @@ Route::prefix('api/di/v1')->middleware(['di.api', 'throttle:120,1'])->withoutMid
 // Cloud Agents never hold LIVE_OPS_RUNNER_TOKEN.
 Route::prefix('api/live-ops/v1')->middleware(['throttle:30,1'])->withoutMiddleware($statelessMachine)->group(function () {
     Route::post('/diagnose', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'diagnose']);
+    Route::post('/owner-command', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'ownerCommand']);
+    Route::post('/safe-auto-deploy', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'safeAutoDeploy']);
     Route::post('/remediate/propose', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'propose']);
     Route::post('/remediate/{actionId}/approve', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'approve']);
     Route::post('/remediate/{actionId}/execute', [\App\Http\Controllers\Api\LiveOpsRunnerController::class, 'execute']);

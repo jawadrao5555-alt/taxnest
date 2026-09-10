@@ -4,12 +4,10 @@
 # title (Deploy Production #15). Same-SHA retries stay idempotent.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
-title: "Production update — NestPOS Stock-In Excel (single-shop receiving)"
-audience: pos
+title: "Production update — NestPOS receipt printing reliability"
+audience: all
 type: feature
 points:
-  - "POS aur FBR POS ka What's New popup aur bell pehle jaisa hai — 7 din live, seen tracking, aur admin master switch."
-  - "NestPOS Inventory mein Stock-In Excel (single-shop): /pos/inventory/stock-in se supplier maal receive. Unmatched rows clearance mein jati hain; Master Excel stock nahi badalti."
-  - "Har naya production SHA live par ek naya published AppUpdate banata hai (title ke sath deploy SHA). Purana announcement re-date nahi hota aur duplicate nahi banta."
-  - "Live PWA CACHE_VERSION stamp working-tree par rehta hai (commit nahi). Agle deploy us expected stamp ko allow karta hai; koi unexpected tracked file ab bhi fail-closed hai."
-  - "Cloud/Admin Live Ops se company diagnose allow-listed read-only reports se hota hai; Fix sirf OWNER_APPROVES_LIVE_OPS_FIX ke baad."
+  - "Receipt aur KOT printing ka retry flow ab ek hi print-attempt ko safely track karta hai."
+  - "Lost, malformed ya ambiguous response par automatic retry same attempt use karta hai, is liye duplicate receipt ka risk kam hota hai."
+  - "Manual reprint hamesha naya attempt banata hai, jabke offline fallback known offline state mein available rehta hai."

@@ -1144,12 +1144,16 @@ function tnCustLoc() {
 </script>
 @endif
 @if($deliveryReceiptId = session('delivery_receipt_to_print'))
+<script src="/js/pos-print-attempt.js?v=20260909"></script>
 <script>
 // Form submissions reload the board, so queue the requested receipt after the
 // redirect. Match the sale screen: Desktop Agent first, auto-print iframe only
 // when silent printing is unavailable.
 (function () {
     var txnId = {{ (int) $deliveryReceiptId }};
+    // One redirect-triggered print attempt owns one UUID. A network/5xx retry
+    // reuses this payload; a later intentional action gets a fresh page/script.
+    var payload = window.NestPosPrintAttempt.billPayload(txnId);
     var fallback = function () {
         var frame = document.createElement('iframe');
         frame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-9999px;top:-9999px';
@@ -1157,19 +1161,36 @@ function tnCustLoc() {
         document.body.appendChild(frame);
         window.setTimeout(function () { frame.remove(); }, 180000);
     };
-    fetch('{{ route('pos.api.print-jobs') }}', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': {{ Js::from(csrf_token()) }}
-        },
-        body: JSON.stringify({ type: 'bill', transaction_id: txnId })
-    }).then(function (response) {
-        return response.json().catch(function () { return null; }).then(function (data) {
-            if (!response.ok || !data || !data.success) fallback();
-        });
-    }).catch(fallback);
+    if (!window.NestPosPrintAttempt.canDispatch(navigator.onLine)) {
+        fallback();
+        return;
+    }
+    window.NestPosPrintAttempt.run({
+        payload: payload,
+        retryDelay: 1200,
+        send: function (samePayload) {
+            return fetch('{{ route('pos.api.print-jobs') }}', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': {{ Js::from(csrf_token()) }}
+                },
+                body: JSON.stringify(samePayload)
+            }).then(function (response) {
+                if (!response.ok) {
+                    return response.status >= 500
+                        ? {}
+                        : { definitiveFailure: true, retryable: false };
+                }
+                return response.json().catch(function () { return null; }).then(function (data) {
+                    return (data && data.success) ? { accepted: true, data: data } : {};
+                });
+            });
+        }
+    }).then(function (decision) {
+        if (decision.fallbackAllowed) fallback();
+    });
 })();
 </script>
 @endif

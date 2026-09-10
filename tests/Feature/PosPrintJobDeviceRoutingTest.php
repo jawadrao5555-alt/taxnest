@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\PosController;
 use App\Models\Company;
 use App\Models\PosAgentDevice;
+use App\Models\PosPrintJob;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
@@ -111,6 +113,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
             $t->string('type');
             $t->string('target_printer')->nullable();
             $t->unsignedBigInteger('transaction_id')->nullable();
+            $t->string('print_attempt_uuid', 64)->nullable();
             $t->unsignedBigInteger('restaurant_order_id')->nullable();
             $t->string('render_query')->nullable();
             $t->string('status')->default('pending');
@@ -121,6 +124,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
             $t->unsignedInteger('attempts')->default(0);
             $t->unsignedBigInteger('created_by')->nullable();
             $t->timestamps();
+            $t->unique(['company_id', 'print_attempt_uuid'], 'pos_print_jobs_company_attempt_unique');
         });
 
         Schema::create('pos_agent_devices', function (Blueprint $t) {
@@ -231,10 +235,53 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         ]);
     }
 
-    private function createBillJob(int $userId, int $txnId): \Illuminate\Testing\TestResponse
+    private function createBillJob(int $userId, int $txnId, ?string $attemptUuid = null): \Illuminate\Testing\TestResponse
     {
         return $this->actingAs(User::find($userId), 'pos')
-            ->postJson('/pos/api/print-jobs', ['type' => 'bill', 'transaction_id' => $txnId]);
+            ->postJson('/pos/api/print-jobs', array_filter([
+                'type' => 'bill',
+                'transaction_id' => $txnId,
+                'print_attempt_uuid' => $attemptUuid,
+            ], fn ($value) => $value !== null));
+    }
+
+    private function attemptUuid(int $suffix): string
+    {
+        return sprintf('00000000-0000-4000-8000-%012d', $suffix);
+    }
+
+    private function plantConcurrentPrintWinner(int $transactionId, int $userId, string $attemptUuid): void
+    {
+        $fired = false;
+        PosPrintJob::creating(function () use (&$fired, $transactionId, $userId, $attemptUuid) {
+            if ($fired) {
+                return;
+            }
+            $fired = true;
+
+            // Simulate the other request committing after this request's lookup
+            // but before its INSERT. The unique index rejects this loser; the
+            // endpoint must recover and return this winner.
+            $level = DB::transactionLevel();
+            if ($level > 0) {
+                DB::commit();
+            }
+            DB::table('pos_print_jobs')->insert([
+                'company_id' => $this->companyId,
+                'type' => 'bill',
+                'target_printer' => 'Manager-POS80',
+                'transaction_id' => $transactionId,
+                'print_attempt_uuid' => $attemptUuid,
+                'status' => 'pending',
+                'attempts' => 0,
+                'created_by' => $userId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            if ($level > 0) {
+                DB::beginTransaction();
+            }
+        });
     }
 
     // ── 1. Device registry ─────────────────────────────────────────────────
@@ -348,6 +395,251 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $job = DB::table('pos_print_jobs')->orderByDesc('id')->first();
         $this->assertNull($job->device_uid);
         $this->assertSame('Manager-POS80', $job->target_printer);
+    }
+
+    public function test_repeated_bill_enqueue_reuses_one_active_transaction_scoped_job(): void
+    {
+        $txn = $this->seedTransaction();
+
+        $first = $this->createBillJob($this->adminId, $txn)
+            ->assertOk()
+            ->assertJson(['success' => true]);
+        $second = $this->createBillJob($this->cashierId, $txn)
+            ->assertOk()
+            ->assertJson(['success' => true, 'deduped' => true]);
+
+        $this->assertSame($first->json('job_id'), $second->json('job_id'));
+        $this->assertSame(
+            1,
+            DB::table('pos_print_jobs')
+                ->where('company_id', $this->companyId)
+                ->where('transaction_id', $txn)
+                ->whereIn('status', ['pending', 'printing'])
+                ->count()
+        );
+
+        $controller = file_get_contents(app_path('Http/Controllers/PosController.php'));
+        $this->assertStringContainsString('->lockForUpdate()', $controller);
+    }
+
+    public function test_first_keyed_receipt_attempt_creates_exactly_one_bill_job(): void
+    {
+        $txn = $this->seedTransaction();
+        $uuid = $this->attemptUuid(1);
+
+        $response = $this->createBillJob($this->adminId, $txn, $uuid)
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertFalse((bool) $response->json('deduped'));
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->count());
+        $this->assertSame($uuid, DB::table('pos_print_jobs')->where('id', $response->json('job_id'))->value('print_attempt_uuid'));
+    }
+
+    public static function keyedReplayStatuses(): array
+    {
+        return [
+            'pending' => ['pending'],
+            'printing' => ['printing'],
+            'done' => ['done'],
+            'failed' => ['failed'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('keyedReplayStatuses')]
+    public function test_same_key_reuses_existing_job_regardless_of_status(string $status): void
+    {
+        $txn = $this->seedTransaction();
+        $uuid = $this->attemptUuid(2);
+        $first = $this->createBillJob($this->adminId, $txn, $uuid)->assertOk();
+        DB::table('pos_print_jobs')->where('id', $first->json('job_id'))->update(['status' => $status]);
+
+        $retry = $this->createBillJob($this->adminId, $txn, $uuid)
+            ->assertOk()
+            ->assertJson(['success' => true, 'deduped' => true]);
+
+        $this->assertSame($first->json('job_id'), $retry->json('job_id'));
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->count());
+    }
+
+    public function test_duplicate_key_race_recovers_the_single_committed_winner(): void
+    {
+        $txn = $this->seedTransaction();
+        $uuid = $this->attemptUuid(3);
+        $this->plantConcurrentPrintWinner($txn, $this->adminId, $uuid);
+
+        $response = $this->createBillJob($this->adminId, $txn, $uuid)
+            ->assertOk()
+            ->assertJson(['success' => true, 'deduped' => true]);
+
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->count());
+        $this->assertSame(
+            (int) DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->value('id'),
+            (int) $response->json('job_id')
+        );
+    }
+
+    public function test_different_keys_create_two_intentional_print_attempts(): void
+    {
+        $txn = $this->seedTransaction();
+        $first = $this->createBillJob($this->adminId, $txn, $this->attemptUuid(4))->assertOk();
+        $second = $this->createBillJob($this->adminId, $txn, $this->attemptUuid(5))->assertOk();
+
+        $this->assertNotSame($first->json('job_id'), $second->json('job_id'));
+        $this->assertSame(2, DB::table('pos_print_jobs')->where('transaction_id', $txn)->count());
+    }
+
+    public function test_lost_response_retry_after_done_reuses_the_original_job(): void
+    {
+        $txn = $this->seedTransaction();
+        $uuid = $this->attemptUuid(6);
+        $first = $this->createBillJob($this->adminId, $txn, $uuid)->assertOk();
+        DB::table('pos_print_jobs')->where('id', $first->json('job_id'))->update(['status' => 'done']);
+
+        // The first response is deliberately ignored: this is the browser retry.
+        $retry = $this->createBillJob($this->adminId, $txn, $uuid)
+            ->assertOk()
+            ->assertJson(['deduped' => true]);
+
+        $this->assertSame($first->json('job_id'), $retry->json('job_id'));
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->count());
+    }
+
+    public function test_existing_key_replays_before_mutable_agent_and_printer_gates(): void
+    {
+        $txn = $this->seedTransaction();
+        $uuid = $this->attemptUuid(11);
+        $first = $this->createBillJob($this->adminId, $txn, $uuid)->assertOk();
+        DB::table('pos_print_jobs')->where('id', $first->json('job_id'))->update(['status' => 'done']);
+
+        Company::where('id', $this->companyId)->update(['agent_last_seen' => now()->subMinutes(10)]);
+        $this->createBillJob($this->adminId, $txn, $uuid)
+            ->assertOk()
+            ->assertJson(['job_id' => $first->json('job_id'), 'deduped' => true]);
+
+        Company::where('id', $this->companyId)->update([
+            'agent_last_seen' => now(),
+            'pos_printer_settings' => json_encode([
+                'silent_print_enabled' => false,
+                'receipt_printer' => 'Manager-POS80',
+                'available_printers' => [],
+            ]),
+        ]);
+        $this->createBillJob($this->adminId, $txn, $uuid)
+            ->assertOk()
+            ->assertJson(['job_id' => $first->json('job_id'), 'deduped' => true]);
+
+        Company::where('id', $this->companyId)->update([
+            'pos_printer_settings' => json_encode([
+                'silent_print_enabled' => true,
+                'receipt_printer' => null,
+                'available_printers' => [],
+            ]),
+        ]);
+        $this->createBillJob($this->adminId, $txn, $uuid)
+            ->assertOk()
+            ->assertJson(['job_id' => $first->json('job_id'), 'deduped' => true]);
+
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->count());
+    }
+
+    public function test_same_key_is_company_scoped_and_cannot_expose_another_company_job(): void
+    {
+        $uuid = $this->attemptUuid(7);
+        $txnA = $this->seedTransaction();
+        $jobA = $this->createBillJob($this->adminId, $txnA, $uuid)->assertOk();
+
+        $companyB = DB::table('companies')->insertGetId([
+            'name' => 'Other Shop',
+            'product_type' => 'pos',
+            'status' => 'approved',
+            'company_status' => 'approved',
+            'agent_api_key' => 'other-agent-key',
+            'agent_enabled' => true,
+            'agent_core_enabled' => false,
+            'agent_last_seen' => now(),
+            'pos_cashier_own_sales_only' => false,
+            'pos_printer_settings' => json_encode([
+                'silent_print_enabled' => true,
+                'receipt_printer' => 'Other-POS80',
+                'available_printers' => [],
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $userB = DB::table('users')->insertGetId([
+            'name' => 'Other Owner',
+            'email' => 'other-owner@test.pk',
+            'password' => Hash::make('Secret@12345'),
+            'company_id' => $companyB,
+            'role' => 'company_admin',
+            'pos_role' => 'pos_admin',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $txnB = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $companyB,
+            'pra_status' => 'local',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $jobB = $this->createBillJob($userB, $txnB, $uuid)->assertOk();
+
+        $this->assertNotSame($jobA->json('job_id'), $jobB->json('job_id'));
+        $this->assertSame(2, DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->count());
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('company_id', $this->companyId)->where('print_attempt_uuid', $uuid)->count());
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('company_id', $companyB)->where('print_attempt_uuid', $uuid)->count());
+    }
+
+    public function test_same_company_key_cannot_be_reused_for_another_transaction(): void
+    {
+        $uuid = $this->attemptUuid(8);
+        $txnA = $this->seedTransaction();
+        $txnB = $this->seedTransaction();
+        $first = $this->createBillJob($this->adminId, $txnA, $uuid)->assertOk();
+
+        $this->createBillJob($this->adminId, $txnB, $uuid)
+            ->assertStatus(409)
+            ->assertJson(['success' => false, 'reason' => 'idempotency_conflict'])
+            ->assertJsonMissing(['job_id' => $first->json('job_id')]);
+
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('print_attempt_uuid', $uuid)->count());
+    }
+
+    public function test_intentional_reprint_after_done_uses_a_new_key_and_creates_a_new_job(): void
+    {
+        $txn = $this->seedTransaction();
+        $first = $this->createBillJob($this->adminId, $txn, $this->attemptUuid(9))->assertOk();
+        DB::table('pos_print_jobs')->where('id', $first->json('job_id'))->update(['status' => 'done']);
+
+        $reprint = $this->createBillJob($this->adminId, $txn, $this->attemptUuid(10))
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertNotSame($first->json('job_id'), $reprint->json('job_id'));
+        $this->assertSame(2, DB::table('pos_print_jobs')->where('transaction_id', $txn)->count());
+    }
+
+    public function test_print_attempt_collision_detector_matches_only_its_own_unique_index(): void
+    {
+        $exception = fn (string $message, string $code = '23000') => new \Illuminate\Database\QueryException(
+            'sqlite',
+            'insert into pos_print_jobs ...',
+            [],
+            new \PDOException($message, (int) $code)
+        );
+
+        $this->assertTrue(PosController::isPrintAttemptUuidCollision($exception(
+            "SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '1-key' for key 'pos_print_jobs_company_attempt_unique'"
+        )));
+        $this->assertTrue(PosController::isPrintAttemptUuidCollision($exception(
+            'SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: pos_print_jobs.company_id, pos_print_jobs.print_attempt_uuid'
+        )));
+        $this->assertFalse(PosController::isPrintAttemptUuidCollision($exception(
+            'SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: pos_print_jobs.company_id, pos_print_jobs.id'
+        )));
     }
 
     public function test_assigned_but_offline_counter_falls_back_to_company_default(): void

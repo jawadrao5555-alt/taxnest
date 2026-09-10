@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.3 (2026-09-09)
+**Receipt foran queue ho, aur missed realtime wake par bhi chand seconds mein uth jaye**
+
+- Pending PRA status ka background refresh chalta rehta hai, magar finalized receipt ab uske peeche 4.8 seconds tak nahi rukti. Pending slip ka wazeh PRA clarifier aur fiscal submission behavior unchanged hai.
+- Healthy WebSocket par koi wake miss ho jaye ya socket half-open ho to HTTP recovery sweep ab 30 seconds ke bajaye maximum 5 seconds ka gap rakhti hai.
+- Realtime wake ab bhi immediate hai; fallback single in-flight poll, server long-poll, duplicate guard aur company/device isolation ko unchanged rakhta hai.
+
 ## v1.13.2 (2026-09-05)
 **Purana domain har raste se khud theek — aur settings screen bhi foran new domain dikhaye**
 

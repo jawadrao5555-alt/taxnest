@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260907-043308-2476f770'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260909-185000-receipt-print'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -55,6 +55,7 @@ const STATIC_ASSETS = [
     '/icons/nest-pra/icon-512.png',
     '/icons/nest-fbr/icon-192.png',
     '/icons/nest-fbr/icon-512.png',
+    '/js/pos-print-attempt.js?v=20260909',
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Offline</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#059669,#047857);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;color:#fff}.box{text-align:center;background:rgba(255,255,255,.08);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:50px 40px;max-width:420px;box-shadow:0 25px 60px rgba(0,0,0,.3)}.ico{font-size:64px;margin-bottom:20px}h1{font-size:28px;margin-bottom:10px;font-weight:700}.sub{opacity:.85;font-size:15px;margin-bottom:30px;line-height:1.6}.status{background:rgba(0,0,0,.2);padding:16px;border-radius:12px;border-left:4px solid #fbbf24;text-align:left;font-size:14px}.btn{margin-top:24px;display:inline-block;background:#fff;color:#059669;padding:12px 28px;border-radius:10px;font-weight:600;text-decoration:none;border:none;cursor:pointer;font-size:15px}</style></head><body><div class="box"><div class="ico">📡</div><h1>You're Offline</h1><p class="sub">Internet connection nahi hai. Cached pages khol sakte hain — ya net wapas aane par auto-reload hoga.</p><div class="status"><strong>Tip:</strong> Net aate hi yeh page khud refresh ho jayega.</div><button class="btn" onclick="location.reload()">Try Again</button></div><script>window.addEventListener('online',()=>location.reload());setInterval(()=>{if(navigator.onLine)location.reload()},5000)</script></body></html>`;

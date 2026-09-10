@@ -20,8 +20,9 @@ use Tests\TestCase;
  * Agent-handled companies (Company::agentHandlesPra) save finals as
  * pra_status='pending'; the Desktop Agent submits within seconds. The sale
  * screen popup polls a tiny status endpoint to flip the badge to PRA VERIFIED,
- * show the fiscal number and reload the receipt iframe — and the first print
- * gets a bounded grace. Server pieces under lock here:
+ * show the fiscal number and reload the receipt iframe. Printing does not wait
+ * behind that bounded refresh because pending receipts are explicitly labelled.
+ * Server pieces under lock here:
  *
  *   1. GET /pos/transaction/{id}/pra-status (apiPraStatus): returns the live
  *      pra_status + pra_invoice_number; company-scoped (cross-company = 404).
@@ -202,6 +203,38 @@ class PosAgentPraStatusPollTest extends TestCase
         $res = $controller->apiPraStatus($ownId);
         $this->assertStringContainsString('no-store', (string) $res->headers->get('Cache-Control'),
             'a cached pending response would wedge the popup poll forever');
+    }
+
+    public function test_pending_pra_refresh_does_not_block_receipt_enqueue(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/universal.blade.php'));
+        $this->assertNotFalse($blade);
+
+        $start = strpos($blade, 'async _printReceiptInner(onAfterPrint, printAttemptUuid)');
+        $end = strpos($blade, 'printKitchenTicket(', $start);
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($end);
+        $receiptPath = substr($blade, $start, $end - $start);
+
+        $this->assertStringContainsString('this.praPrintGrace().catch(() => {});', $receiptPath);
+        $this->assertStringNotContainsString('await this.praPrintGrace()', $receiptPath);
+        $this->assertStringContainsString(
+            'print_attempt_uuid: printAttemptUuid',
+            $receiptPath,
+            'the exact finalized transaction print attempt must carry one stable retry key'
+        );
+    }
+
+    public function test_delivery_board_receipt_retry_reuses_one_print_attempt_uuid(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/deliveries.blade.php'));
+        $start = strpos($blade, "if(\$deliveryReceiptId = session('delivery_receipt_to_print'))");
+        $this->assertNotFalse($start);
+        $script = substr($blade, $start);
+
+        $this->assertStringContainsString('window.NestPosPrintAttempt.billPayload(txnId)', $script);
+        $this->assertStringContainsString('body: JSON.stringify(samePayload)', $script);
+        $this->assertStringContainsString('if (decision.fallbackAllowed) fallback();', $script);
     }
 
     // ── 2. FBR twin endpoint ──────────────────────────────────────────────

@@ -18,6 +18,7 @@ const os = require('os');
 const path = require('path');
 const WebSocket = require('ws');
 const { printerLaneKey, processPrintSchedule } = require('./printer-queue');
+const { nextPollDelay } = require('./printer-poll-policy');
 const { RealtimeWakeClient, realtimeUrl } = require('./realtime-wake');
 
 let printersInterval = null;
@@ -320,11 +321,11 @@ function startPollLoop() {
       delay = 3000; // pollPrintJobs never throws, but never let the loop die
     }
     if (stopped) return;
-    if (typeof delay !== 'number' || !isFinite(delay) || delay < 0) delay = 1500;
-    // WebSocket wakeups make continuous long-polls unnecessary while connected.
-    // Retain a slow recovery sweep in case a wake is lost or a gateway deploys.
-    if (realtimeHealthy && !wakePollPending) delay = Math.max(delay, 30000);
-    timer = setTimeout(tick, wakePollPending ? 0 : delay);
+    // WebSocket wakeups accelerate this loop, but are not treated as a guarantee:
+    // a half-open socket or missed gateway broadcast still gets a bounded HTTP
+    // recovery poll without creating concurrent requests or a busy loop.
+    delay = nextPollDelay(delay, realtimeHealthy, wakePollPending);
+    timer = setTimeout(tick, delay);
   };
   tick();
 }

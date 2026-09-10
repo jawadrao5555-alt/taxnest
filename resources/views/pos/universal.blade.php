@@ -4658,6 +4658,7 @@ $jsEnc = function ($value, $fallback = '[]') {
     return $json === false ? $fallback : $json;
 };
 @endphp
+<script src="/js/pos-print-attempt.js?v=20260909"></script>
 <script>
 // OFFLINE-FIRST BOOT (Jul 2026): server-side fingerprint of everything baked
 // into this page (user, company, screen file, catalog, settings). The SW may
@@ -6217,6 +6218,9 @@ function restaurantPos() {
         _newOfflineUuid() {
             try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
             return 'off-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+        },
+        _newPrintAttemptUuid() {
+            return window.NestPosPrintAttempt.newUuid();
         },
         // Task 994: fetch with a HARD timeout — a hung hold/pay request must
         // surface an error within seconds, not after the browser's multi-minute
@@ -11599,6 +11603,56 @@ function restaurantPos() {
             }
         },
         async _trySilentPrintInner(payload, _retry = true) {
+            if (payload && payload.type === 'bill' && payload.print_attempt_uuid && window.NestPosPrintAttempt) {
+                if (!window.NestPosPrintAttempt.canDispatch(navigator.onLine)) {
+                    const local = window.NestPosLocal && await window.NestPosLocal.printQueue.enqueue(
+                        String(payload.transaction_id),
+                        { document: payload }
+                    );
+                    return (local && local.success)
+                        ? { success: true, local: true, pending: true }
+                        : false;
+                }
+
+                const decision = await window.NestPosPrintAttempt.run({
+                    payload,
+                    retryDelay: 1200,
+                    send: async (samePayload) => {
+                        const res = await fetch('/pos/api/print-jobs', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: JSON.stringify(samePayload),
+                        });
+                        if (!res.ok) {
+                            // 5xx may be an upstream failure after the DB commit;
+                            // only a semantic 4xx proves this attempt was rejected.
+                            return res.status >= 500
+                                ? {}
+                                : { definitiveFailure: true, retryable: false };
+                        }
+                        const data = await res.json().catch(() => null);
+                        return (data && data.success)
+                            ? { accepted: true, data: data }
+                            : {};
+                    }
+                });
+                if (decision.state === 'accepted') return decision.data;
+                if (decision.state === 'accepted_unknown') {
+                    const local = window.NestPosLocal && await window.NestPosLocal.printQueue.enqueue(
+                        String(payload.transaction_id),
+                        { document: payload }
+                    );
+                    this.printBeacon('silent-print-accepted-unknown', {
+                        type: payload.type,
+                        transaction_id: payload.transaction_id,
+                    });
+                    return (local && local.success)
+                        ? { success: true, local: true, pending: true, accepted_unknown: true }
+                        : { success: true, accepted_unknown: true };
+                }
+                return false;
+            }
+
             try {
                 const res = await fetch('/pos/api/print-jobs', {
                     method: 'POST',
@@ -11657,23 +11711,26 @@ function restaurantPos() {
 
         async printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            // One invocation = one intentional print attempt. trySilentPrint's
+            // internal network/5xx retries reuse this exact payload and UUID.
+            const printAttemptUuid = this._newPrintAttemptUuid();
             // Task 779: poore printReceipt ko print-WORK ginti mein rakho — praPrintGrace
             // ke intezar ke doran na timers hote hain na handlers, aur tables-first
             // navigation us khali gap mein page badal kar print kaat sakti thi.
             this.printWorkInFlight++;
             try {
-                return await this._printReceiptInner(onAfterPrint);
+                return await this._printReceiptInner(onAfterPrint, printAttemptUuid);
             } finally {
                 this.printWorkInFlight--;
             }
         },
-        async _printReceiptInner(onAfterPrint) {
-            // Task 655: agent-mode fiscal grace — bill abhi 'pending' hai to chand
-            // seconds ka bounded intezar (submit aa jaye to PEHLI slip par hi PRA
-            // fiscal number chapta hai), warna jo bhi haalat hai usi par print.
-            // Kabhi block nahi hota; manual, auto-chain aur silent print teeno
-            // isi raste se guzarte hain.
-            await this.praPrintGrace();
+        async _printReceiptInner(onAfterPrint, printAttemptUuid) {
+            // Keep the PRA badge/receipt iframe refresh running, but never hold the
+            // physical receipt behind it. A pending receipt already carries the
+            // explicit "being reported to PRA" clarifier; fiscal submission remains
+            // unchanged and the exact finalized transaction is still what the
+            // server renders when the agent fetches this job.
+            this.praPrintGrace().catch(() => {});
             const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             const txnId = this.lastTransactionId;
@@ -11690,7 +11747,11 @@ function restaurantPos() {
                 // actually reached the queue (or fallen back). runAutoPrintChain's
                 // silent fast path awaits this before creating the KOT job —
                 // receipt-first → KOT-after holds even under network/agent latency.
-                const ok = await this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId });
+                const ok = await this.trySilentPrint({
+                    type: 'bill',
+                    transaction_id: txnId,
+                    print_attempt_uuid: printAttemptUuid,
+                });
                 if (ok) {
                     // deduped = this bill is ALREADY on its way to the printer
                     // (double-press guard) — tell the cashier to wait, no 2nd copy.
@@ -12335,7 +12396,8 @@ function restaurantPos() {
                 + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'bill', transaction_id: txnId }).then(ok => {
+                const printAttemptUuid = this._newPrintAttemptUuid();
+                this.trySilentPrint({ type: 'bill', transaction_id: txnId, print_attempt_uuid: printAttemptUuid }).then(ok => {
                     if (ok) {
                         this.showToast(ok.deduped ? window.TXT.bill_already_printing : window.TXT.receipt_sent_to_printer, ok.deduped ? 'info' : 'success');
                     } else {
@@ -12516,7 +12578,8 @@ function restaurantPos() {
             const done = () => { setTimeout(() => { this.reprintBusyId = null; }, 800); };
             const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', done);
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'bill', transaction_id: bill.id }).then(ok => {
+                const printAttemptUuid = this._newPrintAttemptUuid();
+                this.trySilentPrint({ type: 'bill', transaction_id: bill.id, print_attempt_uuid: printAttemptUuid }).then(ok => {
                     if (ok) {
                         if (ok.deduped) this.showToast(window.TXT.bill_already_printing, 'info');
                         else this.showToast(window.TXT.receipt_sent_prefix + (bill.pra_invoice_number || bill.invoice_number), 'success');
@@ -13262,10 +13325,10 @@ function restaurantPos() {
                 el.src = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '' : '/receipt') + '?_pra=' + Date.now();
             } catch (e) { /* best-effort — popup badge is already correct */ }
         },
-        // Bounded pehla-print grace (max ~4.8s): bill abhi 'pending' ho to print
-        // se pehle submit ka mauqa do. Status flip milte hi state update ho kar
-        // foran wapas; warna timeout par pending slip hi chal padti hai —
-        // counter ki raftar kabhi block nahi hoti. Errors silent.
+        // Bounded background fiscal refresh (max ~4.8s): bill abhi 'pending' ho
+        // to status/receipt popup ko fresh rakho, magar physical print-job enqueue
+        // ko kabhi is poll ke peeche mat roko. Pending receipt par localized
+        // "being reported to PRA" clarifier pehle se maujood hai. Errors silent.
         async praPrintGrace() {
             if (this.lastPraStatus !== 'pending' || !this.lastTransactionId || this.lastIsOffline) return;
             const txnId = this.lastTransactionId;

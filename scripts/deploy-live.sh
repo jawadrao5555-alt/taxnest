@@ -52,6 +52,7 @@ case "$ALLOW_SETTINGS" in
   *[!a-zA-Z0-9_,]*) echo "Invalid --allow-settings (letters, digits, _ and , only)" >&2; exit 1 ;;
 esac
 cd "$(dirname "$0")/.."
+ROOT=$(pwd)
 
 # The live origin — host, key, app path, PHP binary, URLs, state files.
 # shellcheck source=scripts/lib/live-host.sh

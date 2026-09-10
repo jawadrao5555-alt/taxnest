@@ -32,13 +32,12 @@ if [ -f "$DOC" ]; then
     'PRODUCTION_SSH_PRIVATE_KEY' \
     'LIVE_QA_PASS' \
     'ci-live-verify' \
-    'skip_elaan' \
     'Cloud Agent' \
     'multi-agent' \
     'Exact-SHA' \
     'concurrency' \
     'Owner Merge & Deploy' \
-    'Approved — Merge & Deploy'
+    'Owner Merge & Deploy'
   do
     grep -qi "$needle" "$DOC" && ok "issue-to-live doc mentions: $needle" || bad "issue-to-live doc missing: $needle"
   done
@@ -96,18 +95,16 @@ if [ -f "$DP" ]; then
     && ok "Deploy Production keeps concurrency protection" || bad "concurrency protection missing"
   grep -q 'deploy_guard_main_tip\|deploy_require_origin_main_tip' "$DP" \
     && ok "Deploy Production refuses non-tip SHA" || bad "Deploy Production missing origin/main tip guard"
-  grep -q 'github.sha' "$DP" && ok "Deploy Production still uses github.sha" || bad "exact SHA wiring missing"
+  grep -q 'approval_request_id' "$DP" && grep -q 'v1/provenance/verify' "$DP" \
+    && grep -q 'handoff_nonce' "$DP" && grep -q 'GITHUB_RUN_ID' "$DP" && grep -q 'GITHUB_RUN_ATTEMPT' "$DP" \
+    && ! grep -q 'provenance_receipt:' "$DP" \
+    && ok "Deploy Production requires run-bound relay provenance" || bad "relay provenance wiring missing"
   if grep -q 'pull_request' "$DP"; then
     bad "Deploy Production must not run on pull_request"
   else
     ok "Deploy Production does not run on pull_request"
   fi
-  # skip_elaan must remain emergency-only input, not default true
-  if grep -A5 'skip_elaan:' "$DP" | grep -q 'default: false'; then
-    ok "skip_elaan defaults to false"
-  else
-    bad "skip_elaan must default to false"
-  fi
+  if grep -qE 'skip_elaan|allow_settings|^  push:' "$DP"; then bad "Deploy Production exposes forbidden bypass/trigger"; else ok "Deploy Production has no bypass or push trigger"; fi
 fi
 
 for f in "$HAND" "$AGENTS" "$ISSUE" "$GHP"; do

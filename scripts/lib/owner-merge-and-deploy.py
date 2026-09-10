@@ -13,7 +13,6 @@ import json
 import re
 import sys
 
-CONFIRM_PHRASE = "Approved — Merge & Deploy"
 VALIDATE_CHECK_NAME = "validate"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
@@ -40,13 +39,14 @@ def decide(payload: dict) -> dict:
       dispatch_only     — already merged as current tip; dispatch deploy
       noop              — already merged and that tip already deployed successfully
     """
-    confirm = (payload.get("confirm") or "").strip()
-    if confirm != CONFIRM_PHRASE:
+    if not (payload.get("approval_request_id") or "").strip():
         return {
             "action": "reject",
-            "reason": "confirmation phrase mismatch — required exactly: Approved — Merge & Deploy",
+            "reason": "approval_request_id is required — authorization must come from the production relay",
             "dispatch_sha": None,
         }
+    if not (payload.get("provenance_receipt") or "").strip():
+        return {"action": "reject", "reason": "relay provenance receipt is required", "dispatch_sha": None}
 
     expected = _norm_sha(payload.get("expected_head_sha"))
     if not _is_sha(expected):
@@ -227,7 +227,8 @@ def _self_test() -> int:
         },
     }
     good = {
-        "confirm": CONFIRM_PHRASE,
+        "approval_request_id": "approval-123",
+        "provenance_receipt": "receipt-from-relay",
         "expected_head_sha": sha,
         "owner": "o",
         "repo": "r",
@@ -245,8 +246,8 @@ def _self_test() -> int:
     else:
         print("PASS: merge_head_sha pinned to expected head")
 
-    bad_phrase = dict(good, confirm="Approved - Merge & Deploy")
-    check("wrong phrase rejected", bad_phrase, "reject")
+    missing_approval = dict(good, approval_request_id="")
+    check("missing relay approval rejected", missing_approval, "reject")
 
     draft = dict(good, pr={**base_pr, "draft": True})
     check("draft rejected", draft, "reject")

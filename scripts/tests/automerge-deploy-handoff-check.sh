@@ -47,8 +47,9 @@ fi
 
 SH="$ROOT/scripts/owner-merge-and-deploy.sh"
 if [ -f "$SH" ]; then
-  grep -q 'inputs\[target_sha\]' "$SH" \
-    && ok "owner handoff passes target_sha input" \
+  grep -q 'inputs\[target_sha\]' "$SH" && grep -q 'inputs\[approval_request_id\]' "$SH" && grep -q 'inputs\[handoff_nonce\]' "$SH" && grep -q 'v1/deploy-run' "$SH" \
+    && ! grep -q 'inputs\[provenance_receipt\]' "$SH" \
+    && ok "owner handoff registers relay provenance without exposing receipt" \
     || bad "owner merge must pass inputs.target_sha"
   grep -q 'merge_method=squash' "$SH" \
     && ok "owner handoff uses squash merge SHA (not only PR head)" \
@@ -99,9 +100,11 @@ if [ -f "$DP" ]; then
     && ok "Deploy Production still runs ci-live-verify" \
     || bad "must keep post-deploy live verify"
 
-  grep -A3 '^on:' "$DP" | grep -q 'push:' \
-    && ok "Deploy Production still triggers on push to main" \
-    || bad "must keep push-to-main trigger for human merges"
+  if grep -qE '^  push:' "$DP"; then bad "Deploy Production must not trigger on push"; else ok "Deploy Production is dispatch-only"; fi
+  grep -q 'approval_request_id' "$DP" && grep -q 'handoff_nonce' "$DP" && grep -q 'v1/provenance/verify' "$DP" \
+    && grep -q 'GITHUB_RUN_ID' "$DP" && grep -q 'GITHUB_RUN_ATTEMPT' "$DP" \
+    && grep -q 'v1/status' "$DP" && grep -q 'run_attempt' "$DP" && ! grep -q 'provenance_receipt:' "$DP" \
+    && ok "Deploy Production requires relay provenance" || bad "relay provenance contract missing"
 fi
 
 if [ -f "$DOC" ]; then

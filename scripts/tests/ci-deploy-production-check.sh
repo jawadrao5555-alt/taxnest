@@ -61,17 +61,54 @@ if [ -f "$WF" ]; then
     && ok "workflow cancels stale Environment-waiting runs" \
     || bad "workflow must cancel status=waiting Deploy Production runs from the gate"
 
-  grep -q 'skip_elaan is refused' "$WF" \
-    && ok "workflow refuses skip_elaan on the unattended path" \
-    || bad "workflow must fail-closed when skip_elaan is set"
+  if grep -qE 'skip_elaan|allow_settings' "$WF"; then
+    bad "Deploy Production must not expose emergency/manual bypass inputs"
+  else
+    ok "workflow exposes no emergency/manual bypass inputs"
+  fi
 
-  grep -qE 'branches:[[:space:]]*$|[[:space:]]+- main' "$WF" \
-    && ok "workflow triggers on main" \
-    || bad "workflow should trigger on main"
+  if grep -qE '^  push:' "$WF"; then
+    bad "Deploy Production must not deploy from push to main"
+  else
+    ok "workflow has no push-to-main deployment trigger"
+  fi
 
   grep -q 'workflow_dispatch' "$WF" \
     && ok "workflow supports workflow_dispatch" \
     || bad "workflow missing workflow_dispatch"
+  python3 - "$WF" <<'PY' && ok "Deploy inputs are exactly target_sha, approval_request_id, handoff_nonce" || bad "Deploy input contract drifted"
+import re, sys
+t=open(sys.argv[1], encoding="utf-8").read()
+m=re.search(r"(?ms)^  workflow_dispatch:\n(.*?)(?=^permissions:)", t)
+block=m.group(1) if m else ""
+names=re.findall(r"(?m)^      ([A-Za-z_][A-Za-z0-9_]*):\s*$", block)
+if names != ["target_sha", "approval_request_id", "handoff_nonce"]:
+    print(names, file=sys.stderr); raise SystemExit(1)
+if "provenance_receipt" in block:
+    raise SystemExit(1)
+PY
+
+  grep -q 'approval_request_id' "$WF" && grep -q 'v1/provenance/verify' "$WF" && ! grep -q 'provenance_receipt:' "$WF" \
+    && ok "workflow requires relay provenance verified with OIDC" \
+    || bad "workflow must verify relay provenance before secrets"
+  grep -q 'v1/status' "$WF" && grep -q 'run_id' "$WF" && grep -q 'run_attempt' "$WF" \
+    && ok "provenance and status callbacks are run-bound" || bad "run binding missing"
+  grep -q 'HTTP_CODE' "$WF" && grep -q '"409"' "$WF" && grep -q 'sleep 2' "$WF" \
+    && ok "deploy provenance verification retries registration HTTP 409" \
+    || bad "deploy provenance must retry HTTP 409 registration race"
+  python3 - "$WF" <<'PY' && ok "Deploy run blocks use env values, not raw expressions" || bad "raw expression interpolation found in run block"
+import re, sys
+t=open(sys.argv[1], encoding="utf-8").read()
+for block in re.findall(r"(?ms)^\s+run:\s*\|\n(.*?)(?=^\s+- name:|^\s*$)", t):
+    if "${{" in block:
+        raise SystemExit(1)
+PY
+  grep -q 'v1/status' "$WF" && grep -q 'always()' "$WF" \
+    && ok "workflow always posts relay outcome status" \
+    || bad "workflow must post outcome status via always-run callback"
+  [ "$(grep -A25 'POST outcome callback' "$WF" | grep -c -- '--retry-all-errors')" -ge 2 ] \
+    && ok "relay outcome token acquisition and POST both retry transient failures" \
+    || bad "relay outcome token acquisition and POST must both retry transient failures"
 
   grep -q 'ref: \${{ steps.resolve.outputs.sha }}' "$WF" \
     && ok "checkout pins exact resolved deploy SHA" \

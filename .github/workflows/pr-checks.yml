@@ -43,3 +43,5 @@ jobs:
         run: bash scripts/tests/live-ops-daily-ops-check.sh
       - name: Live Ops autonomous owner-command checks
         run: bash scripts/tests/live-ops-autonomous-check.sh
+      - name: Approval Relay Dispatch empty-claims parser checks
+        run: bash scripts/tests/approval-dispatch-check.sh

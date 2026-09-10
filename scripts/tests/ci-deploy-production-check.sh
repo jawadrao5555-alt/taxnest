@@ -106,6 +106,9 @@ PY
   grep -q 'v1/status' "$WF" && grep -q 'always()' "$WF" \
     && ok "workflow always posts relay outcome status" \
     || bad "workflow must post outcome status via always-run callback"
+  [ "$(grep -A25 'POST outcome callback' "$WF" | grep -c -- '--retry-all-errors')" -ge 2 ] \
+    && ok "relay outcome token acquisition and POST both retry transient failures" \
+    || bad "relay outcome token acquisition and POST must both retry transient failures"
 
   grep -q 'ref: \${{ steps.resolve.outputs.sha }}' "$WF" \
     && ok "checkout pins exact resolved deploy SHA" \

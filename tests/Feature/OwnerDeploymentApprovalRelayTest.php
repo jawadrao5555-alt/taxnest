@@ -30,22 +30,35 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         ]);
     }
 
-    private function github(bool $shaMatches = true): void
+    private function github(bool $shaMatches = true, ?string $mergedSha = null): void
     {
         $head = $shaMatches ? self::SHA : str_repeat('c', 40);
-        Http::fake([
-            'https://api.github.com/repos/'.config('deployment_approval.repository').'/pulls/*' => Http::response([
-                'state' => 'open', 'draft' => false, 'base' => [
+        Http::fake(function ($request) use ($head, $mergedSha) {
+            $url = $request->url();
+            if (str_ends_with($url, '/commits/main')) {
+                return Http::response(['sha' => $mergedSha]);
+            }
+            if (str_contains($url, '/check-runs')) {
+                return Http::response([
+                    'check_runs' => [
+                        ['name' => 'lint', 'status' => 'completed', 'conclusion' => 'success'],
+                        ['name' => 'validate', 'status' => 'completed', 'conclusion' => 'success'],
+                    ],
+                ]);
+            }
+            if (str_contains($url, '/pulls/')) {
+                return Http::response([
+                'state' => $mergedSha ? 'closed' : 'open',
+                'merged' => (bool) $mergedSha,
+                'merge_commit_sha' => $mergedSha,
+                'draft' => false, 'base' => [
                     'ref' => 'main', 'repo' => ['full_name' => config('deployment_approval.repository')],
                 ], 'head' => ['sha' => $head, 'repo' => ['full_name' => config('deployment_approval.repository')]],
-            ]),
-            'https://api.github.com/repos/'.config('deployment_approval.repository').'/commits/*/check-runs*' => Http::response([
-                'check_runs' => [
-                    ['name' => 'lint', 'status' => 'completed', 'conclusion' => 'success'],
-                    ['name' => 'validate', 'status' => 'completed', 'conclusion' => 'success'],
-                ],
-            ]),
-        ]);
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
     }
 
     private function row(array $extra = []): OwnerDeploymentApprovalRequest
@@ -110,6 +123,21 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $this->assertSame($first->request_id, $second->request_id);
         $service->approve($first, $admin->id);
         $this->assertSame($first->request_id, $service->approve($first, $admin->id)->request_id);
+    }
+
+    public function test_expired_active_request_does_not_block_fresh_approval(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $this->github();
+        $admin = $this->admin();
+        $expired = $this->row(['status' => 'claimed', 'expires_at' => now()->subMinute()]);
+        $fresh = $service->create([
+            'pull_request_number' => 17,
+            'head_sha' => self::SHA,
+        ], $admin->id);
+
+        $this->assertNotSame($expired->request_id, $fresh->request_id);
+        $this->assertSame('pending', $fresh->status);
     }
 
     public function test_dispatch_lease_is_idempotent_until_expiry_and_retries_after_expiry(): void
@@ -228,6 +256,180 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         }
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         $service->recordDeploymentResult($row->request_id, ['run_id' => 998, 'run_attempt' => 1, 'handoff_nonce' => self::NONCE, 'outcome' => 'success', 'deployed_sha' => self::MERGE], ['run_id' => 998, 'run_attempt' => 1, 'workflow_sha' => self::MERGE]);
+    }
+
+    public function test_exact_owner_failure_releases_claim_and_invalidates_old_receipt(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $this->github();
+        $row = $this->row([
+            'status' => 'claimed',
+            'provenance_receipt_hash' => hash('sha256', 'old-receipt'),
+            'owner_workflow_sha' => self::OWNER_SHA,
+            'owner_workflow_run_id' => 700,
+            'owner_workflow_run_attempt' => 1,
+        ]);
+        $claims = ['workflow_sha' => self::OWNER_SHA, 'run_id' => 700, 'run_attempt' => 1];
+
+        try {
+            $service->recordOwnerWorkflowFailure($row->request_id, [
+                'outcome' => 'failure',
+            ], array_merge($claims, ['run_attempt' => 2]));
+            $this->fail('A different owner workflow attempt must not release the claim.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(409, $e->getStatusCode());
+        }
+
+        $released = $service->recordOwnerWorkflowFailure($row->request_id, [
+            'outcome' => 'failure',
+            'failure_summary' => 'Dispatch did not complete.',
+        ], $claims);
+
+        $this->assertSame('approved', $released->status);
+        $this->assertNull($released->provenance_receipt_hash);
+        $this->assertNull($released->owner_workflow_run_id);
+        $this->assertSame('Dispatch did not complete.', $released->failure_summary);
+        $this->assertCount(1, $service->leaseApprovedRequests());
+    }
+
+    public function test_merged_owner_failure_can_retry_only_at_same_main_tip(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $this->github(true, self::MERGE);
+        $row = $this->row([
+            'status' => 'merged',
+            'merge_sha' => self::MERGE,
+            'provenance_receipt_hash' => hash('sha256', 'old-receipt'),
+            'owner_workflow_sha' => self::OWNER_SHA,
+            'owner_workflow_run_id' => 700,
+            'owner_workflow_run_attempt' => 1,
+        ]);
+        $this->assertSame(self::MERGE, $row->fresh()->merge_sha);
+        $service->recordOwnerWorkflowFailure($row->request_id, ['outcome' => 'failure'], [
+            'workflow_sha' => self::OWNER_SHA,
+            'run_id' => 700,
+            'run_attempt' => 1,
+        ]);
+        $this->assertSame(self::MERGE, $row->fresh()->merge_sha);
+        $service->leaseApprovedRequests();
+        $this->assertSame(self::MERGE, $row->fresh()->merge_sha);
+
+        $claim = $service->claimForMerge([
+            'approval_request_id' => $row->request_id,
+            'repository' => $row->repository,
+            'pull_number' => 17,
+            'expected_head_sha' => self::SHA,
+        ], ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]);
+        $service->recordMerge(
+            $row->request_id,
+            $claim['provenance_receipt'],
+            self::MERGE,
+            ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]
+        );
+
+        $this->assertSame('merged', $row->fresh()->status);
+        $this->assertNotSame(hash('sha256', 'old-receipt'), $row->fresh()->provenance_receipt_hash);
+    }
+
+    public function test_owner_failure_after_github_merge_discovers_merge_sha_before_retry(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $this->github(true, self::MERGE);
+        $row = $this->row([
+            'status' => 'claimed',
+            'merge_sha' => null,
+            'provenance_receipt_hash' => hash('sha256', 'old-receipt'),
+            'owner_workflow_sha' => self::OWNER_SHA,
+            'owner_workflow_run_id' => 700,
+            'owner_workflow_run_attempt' => 1,
+        ]);
+
+        $released = $service->recordOwnerWorkflowFailure($row->request_id, [
+            'outcome' => 'failure',
+        ], ['workflow_sha' => self::OWNER_SHA, 'run_id' => 700, 'run_attempt' => 1]);
+
+        $this->assertSame('approved', $released->status);
+        $this->assertSame(self::MERGE, $released->merge_sha);
+        $this->assertNull($released->provenance_receipt_hash);
+        $this->assertCount(1, $service->leaseApprovedRequests());
+
+        $claim = $service->claimForMerge([
+            'approval_request_id' => $row->request_id,
+            'repository' => $row->repository,
+            'pull_number' => 17,
+            'expected_head_sha' => self::SHA,
+        ], ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]);
+        $this->assertSame(64, strlen($claim['provenance_receipt']));
+    }
+
+    public function test_registered_run_can_record_failure_before_provenance_gate_succeeds(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $row = $this->row([
+            'status' => 'deploy_registered',
+            'merge_sha' => self::MERGE,
+            'deployment_run_id' => 999,
+            'deployment_run_attempt' => 1,
+            'handoff_nonce_hash' => hash('sha256', self::NONCE),
+            'deployment_workflow_sha' => null,
+        ]);
+
+        try {
+            $service->recordDeploymentResult($row->request_id, [
+                'run_id' => 999,
+                'run_attempt' => 1,
+                'handoff_nonce' => self::NONCE,
+                'outcome' => 'failure',
+            ], ['run_id' => 999, 'run_attempt' => 1, 'workflow_sha' => str_repeat('d', 40)]);
+            $this->fail('An unrelated workflow SHA must not report a pre-provenance failure.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(409, $e->getStatusCode());
+        }
+
+        $result = $service->recordDeploymentResult($row->request_id, [
+            'run_id' => 999,
+            'run_attempt' => 1,
+            'handoff_nonce' => self::NONCE,
+            'outcome' => 'failure',
+            'failure_summary' => 'Provenance gate failed.',
+        ], ['run_id' => 999, 'run_attempt' => 1, 'workflow_sha' => self::MERGE]);
+
+        $this->assertSame('failed', $result->status);
+        $this->assertSame(self::MERGE, $result->deployment_workflow_sha);
+    }
+
+    public function test_failed_deployment_requires_fresh_owner_approval_and_same_main_tip(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $this->github(true, self::MERGE);
+        $admin = $this->admin();
+        $failed = $this->row([
+            'status' => 'failed',
+            'merge_sha' => self::MERGE,
+            'deploy_result' => 'failure',
+            'deployment_run_id' => 999,
+            'deployment_run_attempt' => 1,
+        ]);
+
+        $fresh = $service->create([
+            'pull_request_number' => 17,
+            'head_sha' => self::SHA,
+        ], $admin->id);
+
+        $this->assertNotSame($failed->request_id, $fresh->request_id);
+        $this->assertSame('pending', $fresh->status);
+        $this->assertSame(self::MERGE, $fresh->merge_sha);
+        $this->assertNull($fresh->approved_at);
+        $approved = $service->approve($fresh, $admin->id);
+        $this->assertSame('approved', $approved->status);
+        $this->assertCount(1, $service->leaseApprovedRequests());
+        $claim = $service->claimForMerge([
+            'approval_request_id' => $fresh->request_id,
+            'repository' => $fresh->repository,
+            'pull_number' => 17,
+            'expected_head_sha' => self::SHA,
+        ], ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]);
+        $this->assertSame(64, strlen($claim['provenance_receipt']));
     }
 
     public function test_index_renders_requester_approver_result_and_run_link(): void

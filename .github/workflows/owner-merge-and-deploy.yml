@@ -63,6 +63,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Owner-approved merge + exact-SHA deploy handoff
+        id: owner-handoff
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -75,3 +76,22 @@ jobs:
             --pull-number="$OWNER_PULL_NUMBER" \
             --expected-head-sha="$OWNER_EXPECTED_HEAD_SHA" \
             --approval-request-id="$OWNER_APPROVAL_REQUEST_ID"
+
+      - name: Release failed owner handoff for a safe retry
+        if: ${{ failure() && steps.owner-handoff.outcome == 'failure' }}
+        env:
+          OWNER_APPROVAL_RELAY_URL: https://taxnest.pk
+          APPROVAL_REQUEST_ID: ${{ inputs.approval_request_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TOKEN="$(curl --fail --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=owner-approval-relay" | jq -r .value)"
+          jq -n --arg id "$APPROVAL_REQUEST_ID" --arg url "$RUN_URL" \
+            '{approval_request_id:$id,outcome:"failure",failure_summary:("Owner Merge & Deploy failed: " + $url)}' \
+            > /tmp/owner-status.json
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+            --data-binary @/tmp/owner-status.json \
+            "${OWNER_APPROVAL_RELAY_URL%/}/api/deployment-approval/v1/owner-status"

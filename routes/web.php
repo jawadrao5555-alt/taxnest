@@ -2921,6 +2921,7 @@ Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withou
     Route::post('/dispatch-claims', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'dispatchClaims']);
     Route::post('/approval-claims', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'claim']);
     Route::post('/merge-complete', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'mergeComplete']);
+    Route::post('/owner-status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'ownerStatus']);
     Route::post('/deploy-run', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'deployRun']);
     Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
     Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);

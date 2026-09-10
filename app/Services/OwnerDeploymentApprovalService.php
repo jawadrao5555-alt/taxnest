@@ -12,7 +12,7 @@ class OwnerDeploymentApprovalService
 {
     public const REPOSITORY = 'jawadrao5555-alt/taxnest';
 
-    public function validatePullRequest(int $number, string $sha): array
+    public function validatePullRequest(int $number, string $sha, ?string $expectedMergeSha = null): array
     {
         if (!preg_match('/^[0-9a-f]{40}$/i', $sha)) {
             throw new \InvalidArgumentException('HEAD SHA must be exactly 40 hexadecimal characters.');
@@ -33,15 +33,31 @@ class OwnerDeploymentApprovalService
 
         $data = $pr->json();
 
-        if (
-            ($data['state'] ?? null) !== 'open'
-            || ($data['draft'] ?? true)
+        $commonBindingInvalid = ($data['draft'] ?? true)
             || ($data['base']['ref'] ?? null) !== 'main'
             || ($data['base']['repo']['full_name'] ?? null) !== self::REPOSITORY
             || ($data['head']['repo']['full_name'] ?? null) !== self::REPOSITORY
-            || !hash_equals(strtolower($sha), strtolower((string) ($data['head']['sha'] ?? '')))
-        ) {
+            || !hash_equals(strtolower($sha), strtolower((string) ($data['head']['sha'] ?? '')));
+        $stateInvalid = $expectedMergeSha
+            ? (($data['state'] ?? null) !== 'closed'
+                || !($data['merged'] ?? false)
+                || !hash_equals(strtolower($expectedMergeSha), strtolower((string) ($data['merge_commit_sha'] ?? ''))))
+            : (($data['state'] ?? null) !== 'open');
+
+        if ($commonBindingInvalid || $stateInvalid) {
             throw new \InvalidArgumentException('Pull request is not an eligible TaxNest deployment.');
+        }
+
+        if ($expectedMergeSha) {
+            $main = Http::withHeaders($headers)
+                ->timeout(10)
+                ->get('https://api.github.com/repos/'.self::REPOSITORY.'/commits/main');
+            if (
+                !$main->successful()
+                || !hash_equals(strtolower($expectedMergeSha), strtolower((string) $main->json('sha', '')))
+            ) {
+                throw new \InvalidArgumentException('Approved merge is no longer the current main tip.');
+            }
         }
 
         $checks = Http::withHeaders($headers)
@@ -66,15 +82,33 @@ class OwnerDeploymentApprovalService
     {
         $number = (int) $input['pull_request_number'];
         $sha = strtolower($input['head_sha']);
-        $this->validatePullRequest($number, $sha);
 
         $existing = OwnerDeploymentApprovalRequest::query()
             ->where('repository', self::REPOSITORY)
             ->where('pull_request_number', $number)
             ->where('head_sha', $sha)
-            ->whereIn('status', ['pending', 'approved', 'dispatching', 'claimed', 'merged', 'deploying'])
+            ->whereIn('status', ['pending', 'approved', 'dispatching', 'claimed', 'merged', 'deploy_registered', 'deploying'])
+            ->where('expires_at', '>', now())
             ->latest()
             ->first();
+
+        $recoverySource = $existing?->merge_sha ? $existing : OwnerDeploymentApprovalRequest::query()
+            ->where('repository', self::REPOSITORY)
+            ->where('pull_request_number', $number)
+            ->where('head_sha', $sha)
+            ->whereNotNull('merge_sha')
+            ->where(function ($query) {
+                $query->where('status', 'failed')
+                    ->orWhere(function ($expiredMerged) {
+                        $expiredMerged->where('status', 'merged')
+                            ->whereNull('deployment_run_id')
+                            ->where('expires_at', '<=', now());
+                    });
+            })
+            ->latest()
+            ->first();
+
+        $this->validatePullRequest($number, $sha, $recoverySource?->merge_sha);
 
         if ($existing) {
             return $existing;
@@ -87,6 +121,7 @@ class OwnerDeploymentApprovalService
             'status' => 'pending',
             'requested_admin_id' => $adminId,
             'expires_at' => now()->addMinutes((int) config('deployment_approval.approval_ttl_minutes', 30)),
+            'merge_sha' => $recoverySource?->merge_sha,
         ];
 
         $row = OwnerDeploymentApprovalRequest::create($attributes);
@@ -102,7 +137,7 @@ class OwnerDeploymentApprovalService
 
     public function approve(OwnerDeploymentApprovalRequest $row, int $adminId): OwnerDeploymentApprovalRequest
     {
-        $this->validatePullRequest($row->pull_request_number, $row->head_sha);
+        $this->validatePullRequest($row->pull_request_number, $row->head_sha, $row->merge_sha);
 
         $row = DB::transaction(function () use ($row, $adminId) {
             $locked = OwnerDeploymentApprovalRequest::lockForUpdate()->findOrFail($row->request_id);
@@ -185,7 +220,7 @@ class OwnerDeploymentApprovalService
             abort(409, 'Approval binding mismatch.');
         }
 
-        $this->validatePullRequest($row->pull_request_number, $row->head_sha);
+        $this->validatePullRequest($row->pull_request_number, $row->head_sha, $row->merge_sha);
         $receipt = bin2hex(random_bytes(32));
 
         DB::transaction(function () use ($row, $receipt, $claims): void {
@@ -232,9 +267,114 @@ class OwnerDeploymentApprovalService
                 return;
             }
 
-            abort_unless($row->status === 'claimed' && !$row->merge_sha, 409, 'Merge result cannot be recorded.');
+            abort_unless(
+                $row->status === 'claimed'
+                && (!$row->merge_sha || hash_equals((string) $row->merge_sha, $mergeSha)),
+                409,
+                'Merge result cannot be recorded.'
+            );
             $row->update(['status' => 'merged', 'merge_sha' => $mergeSha]);
         });
+    }
+
+    public function recordOwnerWorkflowFailure(
+        string $requestId,
+        array $input,
+        array $claims
+    ): OwnerDeploymentApprovalRequest {
+        $snapshot = OwnerDeploymentApprovalRequest::findOrFail($requestId);
+        if (!in_array($snapshot->status, ['claimed', 'merged'], true)) {
+            return $snapshot;
+        }
+        abort_unless($this->ownerWorkflowMatches($snapshot, $claims), 409, 'Owner workflow mismatch.');
+
+        $recovery = ['recoverable' => true, 'merge_sha' => $snapshot->merge_sha];
+        if ($snapshot->status === 'claimed' && !$snapshot->merge_sha) {
+            $recovery = $this->resolveOwnerFailureRecovery($snapshot);
+        }
+
+        return DB::transaction(function () use ($requestId, $input, $claims, $recovery) {
+            $row = OwnerDeploymentApprovalRequest::lockForUpdate()->findOrFail($requestId);
+
+            if (!in_array($row->status, ['claimed', 'merged'], true)) {
+                return $row;
+            }
+
+            abort_unless($this->ownerWorkflowMatches($row, $claims), 409, 'Owner workflow mismatch.');
+
+            $row->update([
+                'status' => $recovery['recoverable'] ? 'approved' : 'failed',
+                'expires_at' => now()->addMinutes((int) config('deployment_approval.approval_ttl_minutes', 30)),
+                'dispatch_lease_id' => null,
+                'dispatch_lease_expires_at' => null,
+                'claimed_at' => null,
+                'provenance_receipt_hash' => null,
+                'provenance_receipt_used_at' => null,
+                'owner_workflow_sha' => null,
+                'owner_workflow_run_id' => null,
+                'owner_workflow_run_attempt' => null,
+                'merge_sha' => $recovery['merge_sha'],
+                'failure_summary' => $recovery['recoverable']
+                    ? ($input['failure_summary'] ?? 'Owner Merge & Deploy failed before handoff completed.')
+                    : 'Owner Merge & Deploy failed after the PR became ineligible for a safe retry.',
+            ]);
+
+            return $row->fresh();
+        });
+    }
+
+    private function ownerWorkflowMatches(OwnerDeploymentApprovalRequest $row, array $claims): bool
+    {
+        return ($claims['workflow_sha'] ?? '') === $row->owner_workflow_sha
+            && (int) ($claims['run_id'] ?? 0) === (int) $row->owner_workflow_run_id
+            && (int) ($claims['run_attempt'] ?? 0) === (int) $row->owner_workflow_run_attempt;
+    }
+
+    private function resolveOwnerFailureRecovery(OwnerDeploymentApprovalRequest $row): array
+    {
+        $headers = [
+            'Accept' => 'application/vnd.github+json',
+            'User-Agent' => 'TaxNest-owner-approval-relay',
+            'X-GitHub-Api-Version' => '2022-11-28',
+        ];
+        $response = Http::withHeaders($headers)
+            ->timeout(10)
+            ->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls/'.$row->pull_request_number);
+
+        if (!$response->successful()) {
+            throw new \RuntimeException('GitHub pull request state could not be recovered.');
+        }
+
+        $pr = $response->json();
+        $bindingMatches = !($pr['draft'] ?? true)
+            && ($pr['base']['ref'] ?? null) === 'main'
+            && ($pr['base']['repo']['full_name'] ?? null) === self::REPOSITORY
+            && ($pr['head']['repo']['full_name'] ?? null) === self::REPOSITORY
+            && hash_equals(strtolower($row->head_sha), strtolower((string) ($pr['head']['sha'] ?? '')));
+
+        if (!$bindingMatches) {
+            return ['recoverable' => false, 'merge_sha' => null];
+        }
+        if (($pr['state'] ?? null) === 'open') {
+            return ['recoverable' => true, 'merge_sha' => null];
+        }
+
+        $mergeSha = strtolower((string) ($pr['merge_commit_sha'] ?? ''));
+        if (
+            ($pr['state'] ?? null) !== 'closed'
+            || !($pr['merged'] ?? false)
+            || preg_match('/^[0-9a-f]{40}$/', $mergeSha) !== 1
+        ) {
+            return ['recoverable' => false, 'merge_sha' => null];
+        }
+
+        try {
+            $this->validatePullRequest($row->pull_request_number, $row->head_sha, $mergeSha);
+        } catch (\InvalidArgumentException) {
+            return ['recoverable' => false, 'merge_sha' => $mergeSha];
+        }
+
+        return ['recoverable' => true, 'merge_sha' => $mergeSha];
     }
 
     public function registerDeployRun(array $input, array $claims): void
@@ -333,7 +473,13 @@ class OwnerDeploymentApprovalService
                 409,
                 'Deployment run mismatch.'
             );
-            abort_unless(($claims['workflow_sha'] ?? '') === $row->deployment_workflow_sha, 409, 'Deployment workflow mismatch.');
+            $workflowSha = strtolower((string) ($claims['workflow_sha'] ?? ''));
+            $expectedWorkflowSha = strtolower((string) ($row->deployment_workflow_sha ?: $row->merge_sha));
+            abort_unless(
+                $expectedWorkflowSha !== '' && hash_equals($expectedWorkflowSha, $workflowSha),
+                409,
+                'Deployment workflow mismatch.'
+            );
             abort_unless(
                 hash_equals((string) $row->handoff_nonce_hash, hash('sha256', $input['handoff_nonce'])),
                 409,
@@ -362,6 +508,7 @@ class OwnerDeploymentApprovalService
             $row->update([
                 'status' => $result === 'success' ? 'succeeded' : 'failed',
                 'deploy_result' => $result,
+                'deployment_workflow_sha' => $row->deployment_workflow_sha ?: $workflowSha,
                 'deployed_sha' => $deployedSha,
                 'workflow_run_url' => $input['run_url'] ?? null,
                 'failure_summary' => $result === 'failure' ? ($input['failure_summary'] ?? $input['outcome']) : null,

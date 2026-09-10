@@ -117,8 +117,9 @@ grep -q 'approval_request_id' "$SH" && grep -q 'ACTIONS_ID_TOKEN_REQUEST_URL' "$
   || bad "owner script must use OIDC relay approval claim"
 grep -q '/api/deployment-approval/v1/approval-claims' "$SH" \
   && grep -q '/api/deployment-approval/v1/merge-complete' "$SH" \
-  && ok "owner script uses approval-claims and merge-complete endpoints" \
-  || bad "owner script relay endpoint contract/order missing"
+  && grep -q '/api/deployment-approval/v1/owner-status' "$OM" \
+  && ok "owner workflow uses claim, merge-complete, and failure-release endpoints" \
+  || bad "owner workflow relay endpoint contract/order missing"
 grep -q '::add-mask::' "$SH" && grep -q 'deployment_run_id' "$SH" \
   && grep -q 'v1/deploy-run' "$SH" \
   && ok "owner script masks receipt and registers exact deployment run" \

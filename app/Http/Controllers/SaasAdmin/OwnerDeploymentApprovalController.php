@@ -112,6 +112,31 @@ class OwnerDeploymentApprovalController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function ownerStatus(
+        Request $request,
+        GitHubActionsOidcVerifier $oidc,
+        OwnerDeploymentApprovalService $service
+    ) {
+        $claims = $oidc->verify($request, 'owner-merge-and-deploy.yml');
+        $input = $request->validate([
+            'approval_request_id' => ['required', 'uuid'],
+            'outcome' => ['required', 'in:failure,cancelled'],
+            'failure_summary' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $approval = $service->recordOwnerWorkflowFailure(
+            $input['approval_request_id'],
+            $input,
+            $claims
+        );
+
+        return response()->json([
+            'ok' => true,
+            'status' => $approval->status,
+            'request_id' => $approval->request_id,
+        ]);
+    }
+
     public function provenance(
         Request $request,
         GitHubActionsOidcVerifier $oidc,

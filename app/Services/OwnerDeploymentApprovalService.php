@@ -289,7 +289,7 @@ class OwnerDeploymentApprovalService
         abort_unless($this->ownerWorkflowMatches($snapshot, $claims), 409, 'Owner workflow mismatch.');
 
         $recovery = ['recoverable' => true, 'merge_sha' => $snapshot->merge_sha];
-        if ($snapshot->status === 'claimed' && !$snapshot->merge_sha) {
+        if ($snapshot->isUnexpired() && $snapshot->status === 'claimed' && !$snapshot->merge_sha) {
             $recovery = $this->resolveOwnerFailureRecovery($snapshot);
         }
 
@@ -302,9 +302,10 @@ class OwnerDeploymentApprovalService
 
             abort_unless($this->ownerWorkflowMatches($row, $claims), 409, 'Owner workflow mismatch.');
 
+            $recoverable = $row->isUnexpired() && $recovery['recoverable'];
+
             $row->update([
-                'status' => $recovery['recoverable'] ? 'approved' : 'failed',
-                'expires_at' => now()->addMinutes((int) config('deployment_approval.approval_ttl_minutes', 30)),
+                'status' => $recoverable ? 'approved' : 'failed',
                 'dispatch_lease_id' => null,
                 'dispatch_lease_expires_at' => null,
                 'claimed_at' => null,
@@ -314,9 +315,11 @@ class OwnerDeploymentApprovalService
                 'owner_workflow_run_id' => null,
                 'owner_workflow_run_attempt' => null,
                 'merge_sha' => $recovery['merge_sha'],
-                'failure_summary' => $recovery['recoverable']
+                'failure_summary' => $recoverable
                     ? ($input['failure_summary'] ?? 'Owner Merge & Deploy failed before handoff completed.')
-                    : 'Owner Merge & Deploy failed after the PR became ineligible for a safe retry.',
+                    : ($row->isUnexpired()
+                        ? 'Owner Merge & Deploy failed after the PR became ineligible for a safe retry.'
+                        : 'Owner approval expired before Owner Merge & Deploy completed. Fresh approval is required.'),
             ]);
 
             return $row->fresh();

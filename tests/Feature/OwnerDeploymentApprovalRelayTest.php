@@ -262,8 +262,10 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
     {
         $service = app(OwnerDeploymentApprovalService::class);
         $this->github();
+        $originalExpiry = now()->addHour()->startOfSecond();
         $row = $this->row([
             'status' => 'claimed',
+            'expires_at' => $originalExpiry,
             'provenance_receipt_hash' => hash('sha256', 'old-receipt'),
             'owner_workflow_sha' => self::OWNER_SHA,
             'owner_workflow_run_id' => 700,
@@ -289,7 +291,102 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $this->assertNull($released->provenance_receipt_hash);
         $this->assertNull($released->owner_workflow_run_id);
         $this->assertSame('Dispatch did not complete.', $released->failure_summary);
+        $this->assertTrue($originalExpiry->equalTo($released->expires_at));
         $this->assertCount(1, $service->leaseApprovedRequests());
+    }
+
+    public function test_owner_failure_after_expiry_fails_closed_and_cannot_revive_approval(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $expiredAt = now()->subMinute()->startOfSecond();
+        $row = $this->row([
+            'status' => 'claimed',
+            'expires_at' => $expiredAt,
+            'provenance_receipt_hash' => hash('sha256', 'expired-receipt'),
+            'owner_workflow_sha' => self::OWNER_SHA,
+            'owner_workflow_run_id' => 700,
+            'owner_workflow_run_attempt' => 1,
+        ]);
+
+        $result = $service->recordOwnerWorkflowFailure(
+            $row->request_id,
+            ['outcome' => 'failure'],
+            ['workflow_sha' => self::OWNER_SHA, 'run_id' => 700, 'run_attempt' => 1]
+        );
+
+        $this->assertSame('failed', $result->status);
+        $this->assertTrue($expiredAt->equalTo($result->expires_at));
+        $this->assertNull($result->provenance_receipt_hash);
+        $this->assertNull($result->owner_workflow_run_id);
+        $this->assertStringContainsString('expired', $result->failure_summary);
+        $this->assertCount(0, $service->leaseApprovedRequests());
+    }
+
+    public function test_expired_old_workflow_cannot_supersede_fresh_pending_approval(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $this->github();
+        $admin = $this->admin();
+        $expired = $this->row([
+            'status' => 'claimed',
+            'expires_at' => now()->subMinute(),
+            'provenance_receipt_hash' => hash('sha256', 'expired-receipt'),
+            'owner_workflow_sha' => self::OWNER_SHA,
+            'owner_workflow_run_id' => 700,
+            'owner_workflow_run_attempt' => 1,
+        ]);
+        $fresh = $service->create([
+            'pull_request_number' => 17,
+            'head_sha' => self::SHA,
+        ], $admin->id);
+
+        $service->recordOwnerWorkflowFailure(
+            $expired->request_id,
+            ['outcome' => 'failure'],
+            ['workflow_sha' => self::OWNER_SHA, 'run_id' => 700, 'run_attempt' => 1]
+        );
+
+        $this->assertSame('failed', $expired->fresh()->status);
+        $this->assertSame('pending', $fresh->fresh()->status);
+        $this->assertCount(0, $service->leaseApprovedRequests());
+    }
+
+    public function test_repeated_owner_failure_recovery_never_extends_original_approval_ttl(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $this->github();
+        $originalExpiry = now()->addHour()->startOfSecond();
+        $row = $this->row([
+            'status' => 'claimed',
+            'expires_at' => $originalExpiry,
+            'provenance_receipt_hash' => hash('sha256', 'first-receipt'),
+            'owner_workflow_sha' => self::OWNER_SHA,
+            'owner_workflow_run_id' => 700,
+            'owner_workflow_run_attempt' => 1,
+        ]);
+
+        $service->recordOwnerWorkflowFailure(
+            $row->request_id,
+            ['outcome' => 'failure'],
+            ['workflow_sha' => self::OWNER_SHA, 'run_id' => 700, 'run_attempt' => 1]
+        );
+        $this->assertTrue($originalExpiry->equalTo($row->fresh()->expires_at));
+
+        $service->leaseApprovedRequests();
+        $service->claimForMerge([
+            'approval_request_id' => $row->request_id,
+            'repository' => $row->repository,
+            'pull_number' => 17,
+            'expected_head_sha' => self::SHA,
+        ], ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]);
+        $service->recordOwnerWorkflowFailure(
+            $row->request_id,
+            ['outcome' => 'failure'],
+            ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]
+        );
+
+        $this->assertSame('approved', $row->fresh()->status);
+        $this->assertTrue($originalExpiry->equalTo($row->fresh()->expires_at));
     }
 
     public function test_merged_owner_failure_can_retry_only_at_same_main_tip(): void

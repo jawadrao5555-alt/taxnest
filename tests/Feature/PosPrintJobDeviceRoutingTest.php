@@ -775,6 +775,53 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame([$other], collect($res2->json('jobs'))->pluck('id')->all());
     }
 
+    public function test_unstamped_shared_printer_job_is_claimed_only_by_a_device_that_reports_it(): void
+    {
+        $this->seedDevice('dev-counter-1', [
+            'printers' => [['name' => 'p1', 'displayName' => 'Kitchen', 'isDefault' => false]],
+            'printers_reported_at' => now(),
+        ]);
+        $this->seedDevice('dev-counter-2', [
+            'printers' => [['name' => 'p1', 'displayName' => 'Kitchen', 'isDefault' => false]],
+            'printers_reported_at' => now(),
+        ]);
+        $this->seedDevice('dev-office', [
+            'printers' => [['name' => 'Office-Laser', 'displayName' => 'Office', 'isDefault' => true]],
+            'printers_reported_at' => now(),
+        ]);
+        $kot = $this->seedJob([
+            'type' => 'kot',
+            'target_printer' => 'p1',
+            'device_uid' => null,
+        ]);
+
+        $wrong = $this->agentGet('/api/agent/print-jobs?device_uid=dev-office')->assertOk();
+        $this->assertSame([], collect($wrong->json('jobs'))->pluck('id')->all());
+        $this->assertSame('pending', DB::table('pos_print_jobs')->where('id', $kot)->value('status'));
+
+        $capable = $this->agentGet('/api/agent/print-jobs?device_uid=dev-counter-2')->assertOk();
+        $this->assertSame([$kot], collect($capable->json('jobs'))->pluck('id')->all());
+
+        // The other capable counter remains a failover contender, but the
+        // atomic pending -> printing claim prevents a duplicate KOT.
+        $second = $this->agentGet('/api/agent/print-jobs?device_uid=dev-counter-1')->assertOk();
+        $this->assertSame([], collect($second->json('jobs'))->pluck('id')->all());
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('id', $kot)->value('attempts'));
+    }
+
+    public function test_device_without_an_authoritative_printer_report_keeps_legacy_unstamped_scope(): void
+    {
+        $this->seedDevice('dev-old-agent', [
+            'printers' => null,
+            'printers_reported_at' => null,
+        ]);
+        $legacy = $this->seedJob(['target_printer' => 'Manager-POS80']);
+
+        $res = $this->agentGet('/api/agent/print-jobs?device_uid=dev-old-agent')->assertOk();
+
+        $this->assertSame([$legacy], collect($res->json('jobs'))->pluck('id')->all());
+    }
+
     public function test_legacy_agent_never_claims_stamped_jobs(): void
     {
         $stamped = $this->seedJob(['device_uid' => 'dev-c1']);

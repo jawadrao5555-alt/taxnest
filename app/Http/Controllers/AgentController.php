@@ -1207,13 +1207,51 @@ class AgentController extends Controller
             // the Printer Settings page and enqueue-time routing see it online.
             $this->syncAgentDevice($company, $request);
         }
-        $deviceScope = function ($q) use ($deviceAware, $deviceUid) {
+
+        // An unstamped job is company-wide, but it is not printer-agnostic.
+        // Once this device has reported an authoritative printer list, let it
+        // compete only for unstamped jobs whose target queue it actually has.
+        // This preserves shared-printer failover between capable counters while
+        // preventing an unrelated company Agent from winning the claim and then
+        // failing with "Invalid deviceName provided". Devices that have never
+        // reported printers retain the legacy scope until their first report.
+        $reportedPrinterNames = null;
+        if ($deviceAware && $deviceUid) {
+            try {
+                $device = \App\Models\PosAgentDevice::query()
+                    ->where('company_id', $company->id)
+                    ->where('device_uid', $deviceUid)
+                    ->first(['printers', 'printers_reported_at']);
+                if ($device?->printers_reported_at) {
+                    $reportedPrinterNames = collect($device->printers ?? [])
+                        ->pluck('name')
+                        ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+                        ->map(fn ($name) => trim($name))
+                        ->unique()
+                        ->values()
+                        ->all();
+                }
+            } catch (\Throwable $e) {
+                // Registry reads are best-effort. A schema/transient failure
+                // keeps the established claim behavior rather than stopping
+                // all company printing.
+                $reportedPrinterNames = null;
+            }
+        }
+
+        $deviceScope = function ($q) use ($deviceAware, $deviceUid, $reportedPrinterNames) {
             if (!$deviceAware) {
                 return; // column not migrated yet — legacy behavior
             }
             if ($deviceUid) {
-                $q->where(function ($w) use ($deviceUid) {
-                    $w->whereNull('device_uid')->orWhere('device_uid', $deviceUid);
+                $q->where(function ($w) use ($deviceUid, $reportedPrinterNames) {
+                    $w->where('device_uid', $deviceUid)
+                        ->orWhere(function ($unstamped) use ($reportedPrinterNames) {
+                            $unstamped->whereNull('device_uid');
+                            if (is_array($reportedPrinterNames)) {
+                                $unstamped->whereIn('target_printer', $reportedPrinterNames);
+                            }
+                        });
                 });
             } else {
                 $q->whereNull('device_uid');

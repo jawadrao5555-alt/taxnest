@@ -210,6 +210,31 @@ class IngredientController extends Controller
         ]);
 
         $ingredient = Ingredient::where('company_id', $companyId)->findOrFail($id);
+
+        // Unit metadata defines the meaning of every stored stock and recipe quantity.
+        // Never relabel live quantities in-place: that silently corrupts food cost,
+        // consumption and low-stock reporting. Empty, unused ingredients may still
+        // be corrected normally; used ingredients require an explicit audited
+        // conversion workflow.
+        $newUnit = (string) $request->input('unit');
+        $newBaseUnit = (string) ($request->input('base_unit') ?: $newUnit);
+        $newFactor = (float) ($request->input('conversion_factor') ?: 1);
+        $unitMeaningChanged = $newUnit !== (string) $ingredient->unit
+            || $newBaseUnit !== (string) ($ingredient->base_unit ?: $ingredient->unit)
+            || abs($newFactor - (float) ($ingredient->conversion_factor ?: 1)) > 0.000001;
+        if ($unitMeaningChanged) {
+            $hasStock = abs((float) $ingredient->current_stock) > 0.000001;
+            $hasRecipes = ProductRecipe::where('company_id', $companyId)
+                ->where('ingredient_id', $ingredient->id)
+                ->exists();
+            if ($hasStock || $hasRecipes) {
+                return back()->withInput()->with(
+                    'error',
+                    'Unit/base unit ab direct change nahi ho sakti kyun ke stock ya recipes mojood hain. Pehle audited unit conversion use karein; quantity ko sirf relabel nahi kiya gaya.'
+                );
+            }
+        }
+
         $code = trim((string) $request->input('code', ''));
         if ($code !== '' && Schema::hasColumn('ingredients', 'code')
             && Ingredient::where('company_id', $companyId)->where('id', '!=', $id)

@@ -2001,6 +2001,52 @@ class AgentController extends Controller
     }
 
     /**
+     * Only failures that prove the OS rejected the queue before spooling are
+     * safe to hand to another counter automatically. Everything else is
+     * ambiguous: paper may already have come out and retrying would duplicate
+     * a bill/KOT.
+     */
+    private function isDefinitelyBeforeSpoolFailure(string $error): bool
+    {
+        return (bool) preg_match(
+            '/Invalid deviceName(?: provided)?|printer (?:queue )?(?:not found|does not exist)|unknown printer|no such printer/i',
+            $error
+        );
+    }
+
+    /**
+     * Pick another ONLINE device that authoritatively reports the exact same
+     * queue. This is topology-agnostic: USB, Windows-shared and LAN printers all
+     * work, with any number of counters. Exact queue-name matching prevents a
+     * job being redirected to an unrelated receipt printer.
+     */
+    private function safePrintFailoverDevice($company, $job, ?string $failedDeviceUid): ?string
+    {
+        if (!self::deviceRoutingReady() || !$failedDeviceUid || (int) $job->attempts >= 3) {
+            return null;
+        }
+
+        try {
+            return \App\Models\PosAgentDevice::query()
+                ->where('company_id', $company->id)
+                ->where('device_uid', '!=', $failedDeviceUid)
+                ->where('last_seen_at', '>=', now()->subSeconds(120))
+                ->orderByDesc('last_seen_at')
+                ->get(['device_uid', 'printers'])
+                ->first(function ($device) use ($job) {
+                    return collect($device->printers ?? [])
+                        ->pluck('name')
+                        ->contains(fn ($name) => is_string($name)
+                            && trim($name) === trim((string) $job->target_printer));
+                })?->device_uid;
+        } catch (\Throwable $e) {
+            // Registry trouble must never turn an uncertain result into an
+            // automatic reprint. The ordinary failed state remains visible.
+            return null;
+        }
+    }
+
+    /**
      * Agent reports the outcome of a claimed print job.
      */
     public function printJobResult(Request $request, $id)
@@ -2021,9 +2067,45 @@ class AgentController extends Controller
             return response()->json(['error' => 'Job not found'], 404);
         }
 
+        $error = $validated['error'] ?? 'Print failed';
+        $failoverDevice = !$validated['success'] && $this->isDefinitelyBeforeSpoolFailure($error)
+            ? $this->safePrintFailoverDevice($company, $job, $this->requestDeviceUid($request))
+            : null;
+
+        if ($failoverDevice) {
+            $retry = [
+                'status' => 'pending',
+                'device_uid' => $failoverDevice,
+                'error' => 'safe_failover_scheduled: ' . $error,
+                'claim_token' => null,
+            ];
+            // The previous content fetch is safe to clear only because this
+            // classified failure proves the OS never accepted the print.
+            if (self::contentFetchTrackingReady()) {
+                $retry['content_fetched_at'] = null;
+            }
+            $job->update($retry);
+
+            Log::info('PRINT_ROUTING safe pre-spool failover scheduled', [
+                'company_id' => $company->id,
+                'job_id' => $job->id,
+                'type' => $job->type,
+                'target_printer' => $job->target_printer,
+                'failed_device_uid' => $this->requestDeviceUid($request),
+                'failover_device_uid' => $failoverDevice,
+                'attempts' => $job->attempts,
+            ]);
+
+            return response()->json([
+                'ok' => true,
+                'retry_scheduled' => true,
+                'device_uid' => $failoverDevice,
+            ]);
+        }
+
         $job->update([
             'status' => $validated['success'] ? 'done' : 'failed',
-            'error' => $validated['success'] ? null : ($validated['error'] ?? 'Print failed'),
+            'error' => $validated['success'] ? null : $error,
             'claim_token' => null,
         ]);
 

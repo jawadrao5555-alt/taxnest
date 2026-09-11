@@ -809,6 +809,109 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame(1, DB::table('pos_print_jobs')->where('id', $kot)->value('attempts'));
     }
 
+    public function test_definite_pre_spool_failure_moves_job_to_another_online_capable_counter(): void
+    {
+        foreach (['dev-bad', 'dev-good'] as $uid) {
+            $this->seedDevice($uid, [
+                'printers' => [['name' => 'Kitchen-LAN', 'displayName' => 'Kitchen', 'isDefault' => false]],
+                'printers_reported_at' => now(),
+            ]);
+        }
+        $jobId = $this->seedJob([
+            'type' => 'kot',
+            'target_printer' => 'Kitchen-LAN',
+            'status' => 'printing',
+            'attempts' => 1,
+            'claim_token' => 'claim-one',
+            'content_fetched_at' => now(),
+        ]);
+
+        $this->agentPost('/api/agent/print-jobs/' . $jobId . '/result', [
+            'success' => false,
+            'error' => 'Invalid deviceName provided',
+            'device_uid' => 'dev-bad',
+        ])->assertOk()->assertJson([
+            'retry_scheduled' => true,
+            'device_uid' => 'dev-good',
+        ]);
+
+        $job = DB::table('pos_print_jobs')->where('id', $jobId)->first();
+        $this->assertSame('pending', $job->status);
+        $this->assertSame('dev-good', $job->device_uid);
+        $this->assertNull($job->claim_token);
+        $this->assertNull($job->content_fetched_at);
+        $this->assertStringStartsWith('safe_failover_scheduled:', $job->error);
+
+        // Failed counter cannot win it again; the selected capable counter can.
+        $bad = $this->agentGet('/api/agent/print-jobs?device_uid=dev-bad')->assertOk();
+        $this->assertSame([], collect($bad->json('jobs'))->pluck('id')->all());
+        $good = $this->agentGet('/api/agent/print-jobs?device_uid=dev-good')->assertOk();
+        $this->assertSame([$jobId], collect($good->json('jobs'))->pluck('id')->all());
+    }
+
+    public function test_ambiguous_failure_is_never_auto_reprinted(): void
+    {
+        foreach (['dev-one', 'dev-two'] as $uid) {
+            $this->seedDevice($uid, [
+                'printers' => [['name' => 'Kitchen-LAN', 'displayName' => 'Kitchen', 'isDefault' => false]],
+                'printers_reported_at' => now(),
+            ]);
+        }
+        $fetchedAt = now()->subSecond();
+        $jobId = $this->seedJob([
+            'type' => 'kot',
+            'target_printer' => 'Kitchen-LAN',
+            'status' => 'printing',
+            'attempts' => 1,
+            'claim_token' => 'claim-ambiguous',
+            'content_fetched_at' => $fetchedAt,
+        ]);
+
+        $this->agentPost('/api/agent/print-jobs/' . $jobId . '/result', [
+            'success' => false,
+            'error' => 'Print callback timed out',
+            'device_uid' => 'dev-one',
+        ])->assertOk()->assertJsonMissing(['retry_scheduled' => true]);
+
+        $job = DB::table('pos_print_jobs')->where('id', $jobId)->first();
+        $this->assertSame('failed', $job->status);
+        $this->assertSame('Print callback timed out', $job->error);
+        $this->assertNotNull($job->content_fetched_at,
+            'ambiguous result must retain the duplicate-print evidence');
+    }
+
+    public function test_definite_failure_stays_failed_when_no_other_capable_counter_is_online(): void
+    {
+        $this->seedDevice('dev-bad', [
+            'printers' => [['name' => 'Kitchen-LAN', 'displayName' => 'Kitchen', 'isDefault' => false]],
+            'printers_reported_at' => now(),
+        ]);
+        $this->seedDevice('dev-offline', [
+            'last_seen_at' => now()->subMinutes(10),
+            'printers' => [['name' => 'Kitchen-LAN', 'displayName' => 'Kitchen', 'isDefault' => false]],
+            'printers_reported_at' => now()->subMinutes(10),
+        ]);
+        $jobId = $this->seedJob([
+            'type' => 'kot',
+            'target_printer' => 'Kitchen-LAN',
+            'status' => 'printing',
+            'attempts' => 1,
+            'claim_token' => 'claim-none',
+            'content_fetched_at' => now(),
+        ]);
+
+        $this->agentPost('/api/agent/print-jobs/' . $jobId . '/result', [
+            'success' => false,
+            'error' => 'Invalid deviceName provided',
+            'device_uid' => 'dev-bad',
+        ])->assertOk()->assertJsonMissing(['retry_scheduled' => true]);
+
+        $job = DB::table('pos_print_jobs')->where('id', $jobId)->first();
+        $this->assertSame('failed', $job->status);
+        $this->assertSame('Invalid deviceName provided', $job->error);
+        $this->assertNotNull($job->content_fetched_at);
+    }
+
     public function test_device_without_an_authoritative_printer_report_keeps_legacy_unstamped_scope(): void
     {
         $this->seedDevice('dev-old-agent', [

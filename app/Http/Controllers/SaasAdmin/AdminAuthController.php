@@ -11,7 +11,7 @@ class AdminAuthController extends Controller
     public function showLogin()
     {
         if (auth('admin')->check()) {
-            return redirect()->intended('/admin/dashboard');
+            return redirect('/admin/dashboard');
         }
         return view('admin.login');
     }
@@ -25,7 +25,7 @@ class AdminAuthController extends Controller
 
         if (Auth::guard('admin')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect('/admin/dashboard');
+            return redirect()->intended('/admin/dashboard');
         }
 
         return back()->withErrors(['email' => 'Invalid credentials.'])->onlyInput('email');

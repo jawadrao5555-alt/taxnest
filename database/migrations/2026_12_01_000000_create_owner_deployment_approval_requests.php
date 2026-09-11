@@ -35,7 +35,7 @@ return new class extends Migration {
             $table->char('deployed_sha', 40)->nullable();
             $table->text('failure_summary')->nullable();
             $table->timestamps();
-            $table->index(['repository', 'pull_request_number', 'head_sha']);
+            $table->index(['repository', 'pull_request_number', 'head_sha'], 'odpr_repo_pr_sha_idx');
         });
     }
 

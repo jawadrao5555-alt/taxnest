@@ -3,15 +3,20 @@
 namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\DeploymentApprovalReady;
+use App\Models\AdminUser;
 use App\Models\OwnerDeploymentApprovalRequest;
+use App\Services\EligibleDeploymentPullRequestService;
 use App\Services\GitHubActionsOidcVerifier;
 use App\Services\OwnerDeploymentApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class OwnerDeploymentApprovalController extends Controller
 {
-    public function index()
+    public function index(EligibleDeploymentPullRequestService $github)
     {
         $this->authorizeOwner();
 
@@ -21,24 +26,57 @@ class OwnerDeploymentApprovalController extends Controller
                 ->latest()
                 ->limit(25)
                 ->get(),
+            'eligiblePullRequests' => $github->eligible(),
         ]);
     }
 
-    public function store(Request $request, OwnerDeploymentApprovalService $service)
-    {
+    public function store(
+        Request $request,
+        OwnerDeploymentApprovalService $service,
+        EligibleDeploymentPullRequestService $github
+    ) {
         $this->authorizeOwner();
         $input = $request->validate([
             'pull_request_number' => ['required', 'integer', 'min:1'],
-            'head_sha' => ['required', 'regex:/^[0-9a-fA-F]{40}$/'],
         ]);
 
         try {
-            $approval = $service->create($input, auth('admin')->id());
+            $candidate = $github->resolve((int) $input['pull_request_number']);
+            $approval = $service->create([
+                'pull_request_number' => $candidate['number'],
+                'head_sha' => $candidate['head_sha'],
+            ], auth('admin')->id());
         } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['pull_request_number' => $exception->getMessage()])->withInput();
         }
 
-        return back()->with('success', "Deployment request {$approval->request_id} is ready for approval.");
+        AdminUser::query()->where('role', 'super_admin')->whereNotNull('email')->each(
+            function (AdminUser $admin) use ($approval): void {
+                try {
+                    Mail::to($admin->email)->send(new DeploymentApprovalReady($approval, $admin));
+                } catch (\Throwable $exception) {
+                    Log::warning('Deployment approval email could not be sent.', [
+                        'request_id' => $approval->request_id,
+                        'admin_id' => $admin->id,
+                        'exception' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        );
+
+        return back()->with('success', "Deployment request {$approval->request_id} is ready for approval. Eligible super admins were notified.");
+    }
+
+    public function review(Request $request, string $requestId)
+    {
+        $this->authorizeOwner();
+        abort_unless((int) $request->query('approver') === (int) auth('admin')->id(), 403);
+
+        $approval = OwnerDeploymentApprovalRequest::findOrFail($requestId);
+        abort_unless($approval->status === 'pending' && $approval->isUnexpired(), 410);
+
+        return redirect()->route('saas.admin.deployment-approval', ['review' => $approval->request_id])
+            ->with('success', 'Secure email link verified. Review the exact PR and enter your current password to approve.');
     }
 
     public function approve(

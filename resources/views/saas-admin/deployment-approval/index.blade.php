@@ -33,23 +33,26 @@
             <section class="mb-8 rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/20">
                 <div class="border-b border-slate-800 px-5 py-5 sm:px-6">
                     <p class="text-xs font-bold uppercase tracking-[0.16em] text-cyan-400">New release request</p>
-                    <h2 class="mt-1 text-xl font-semibold text-white">Register a build for owner review</h2>
-                    <p class="mt-1 text-sm text-slate-400">Use the pull request's full 40-character commit SHA. This cannot be edited after submission.</p>
+                    <h2 class="mt-1 text-xl font-semibold text-white">Choose a validated release</h2>
+                    <p class="mt-1 text-sm text-slate-400">TaxNest fetches the exact HEAD SHA from GitHub. Only open, non-draft cursor/* PRs targeting main with a green validate check appear here.</p>
                 </div>
-                <form method="post" action="{{ route('saas.admin.deployment-approval.store') }}" class="grid gap-5 px-5 py-5 sm:grid-cols-[0.35fr_0.65fr_auto] sm:items-end sm:px-6">
+                <form method="post" action="{{ route('saas.admin.deployment-approval.store') }}" class="grid gap-5 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-end sm:px-6">
                     @csrf
                     <label class="block">
-                        <span class="mb-2 block text-sm font-semibold text-slate-200">Pull request</span>
-                        <span class="relative block">
-                            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">#</span>
-                            <input name="pull_request_number" type="number" min="1" inputmode="numeric" required value="{{ old('pull_request_number') }}" placeholder="1428" class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 pl-8 text-base text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20">
-                        </span>
+                        <span class="mb-2 block text-sm font-semibold text-slate-200">Eligible pull request</span>
+                        <select name="pull_request_number" required class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-base text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20">
+                            <option value="">Select a green PR</option>
+                            @foreach($eligiblePullRequests as $pr)
+                                <option value="{{ $pr['number'] }}" @selected((string) old('pull_request_number') === (string) $pr['number'])>
+                                    #{{ $pr['number'] }} — {{ $pr['title'] }} — {{ substr($pr['head_sha'], 0, 12) }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if(empty($eligiblePullRequests))
+                            <span class="mt-2 block text-xs text-amber-300">No eligible green cursor/* PR is currently available.</span>
+                        @endif
                     </label>
-                    <label class="block">
-                        <span class="mb-2 block text-sm font-semibold text-slate-200">Full commit SHA</span>
-                        <input name="head_sha" type="text" pattern="[0-9a-fA-F]{40}" minlength="40" maxlength="40" required value="{{ old('head_sha') }}" placeholder="40-character HEAD SHA" spellcheck="false" autocapitalize="off" class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20">
-                    </label>
-                    <button type="submit" class="min-h-12 rounded-xl bg-cyan-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900">Create request</button>
+                    <button type="submit" @disabled(empty($eligiblePullRequests)) class="min-h-12 rounded-xl bg-cyan-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900">Create request &amp; email approvers</button>
                 </form>
             </section>
 
@@ -67,7 +70,7 @@
                     $isPending = $status === 'pending';
                     $statusClasses = $isPending ? 'border-amber-400/30 bg-amber-400/10 text-amber-300' : ($status === 'approved' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400');
                 @endphp
-                <article class="mb-4 overflow-hidden rounded-2xl border {{ $isPending ? 'border-amber-400/30' : 'border-slate-800' }} bg-slate-900">
+                <article id="request-{{ $row->request_id }}" class="mb-4 overflow-hidden rounded-2xl border {{ request('review') === $row->request_id ? 'ring-2 ring-cyan-400' : '' }} {{ $isPending ? 'border-amber-400/30' : 'border-slate-800' }} bg-slate-900">
                     <div class="border-b border-slate-800 px-5 py-4 sm:px-6">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>

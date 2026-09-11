@@ -2917,6 +2917,8 @@ require __DIR__.'/auth.php';
 Route::prefix('admin/deployment-approval')->middleware(['admin.auth'])->group(function () {
     Route::get('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'index'])->name('saas.admin.deployment-approval');
     Route::post('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'store'])->name('saas.admin.deployment-approval.store');
+    Route::get('/{requestId}/review', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'review'])
+        ->middleware(['signed', 'throttle:10,1'])->name('saas.admin.deployment-approval.review');
     Route::post('/{requestId}/approve', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'approve'])->name('saas.admin.deployment-approval.approve');
 });
 Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->group(function () {

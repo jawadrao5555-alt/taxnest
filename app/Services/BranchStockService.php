@@ -49,6 +49,12 @@ class BranchStockService
     /** "companyId:userId" => branches that user may touch, per request. */
     private static array $actorMemo = [];
 
+    /**
+     * Sentinel for an authenticated non-owner with no usable branch mapping.
+     * Must be non-null (null = "show every branch") and match no real row.
+     */
+    public const DENIED_BRANCH_ID = -1;
+
     /** True when the `branches` table actually exists. Mirrors BranchContextService::branchesReady(). */
     public static function ready(): bool
     {
@@ -132,10 +138,10 @@ class BranchStockService
             return collect();
         }
 
+        $userId = 0;
         try {
             $ctx = app(BranchContextService::class);
-            $userId = 0;
-            foreach (['pos', 'fbrpos', 'web'] as $guard) {
+            foreach (['fbrpos', 'pos', 'health', 'web'] as $guard) {
                 if ($id = \Illuminate\Support\Facades\Auth::guard($guard)->id()) {
                     $userId = (int) $id;
                     break;
@@ -147,11 +153,15 @@ class BranchStockService
             }
             $ids = $ctx->accessibleBranches()->pluck('id')->map(fn ($id) => (int) $id)->all();
         } catch (\Throwable $e) {
-            return self::branches($companyId);
+            // Console/queue/migration have no actor — keep company-wide access.
+            // An authenticated session must never fail open onto every shop.
+            return $userId > 0 ? collect() : self::branches($companyId);
         }
 
         if (empty($ids)) {
-            return self::$actorMemo[$key] = self::branches($companyId);
+            return self::$actorMemo[$key] = $userId > 0
+                ? collect()
+                : self::branches($companyId);
         }
 
         return self::$actorMemo[$key] = self::branches($companyId)
@@ -257,7 +267,7 @@ class BranchStockService
                 return (int) $active;
             }
             $first = self::actorBranches($companyId)->first();
-            return $first ? (int) $first->id : self::headOfficeBranchId($companyId);
+            return $first ? (int) $first->id : self::DENIED_BRANCH_ID;
         }
 
         return self::branchBelongs($companyId, $active) ? (int) $active : null;

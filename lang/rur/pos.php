@@ -2034,7 +2034,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kds_auto_print_disabled' => 'KDS auto-print disable ho gaya',
     'kds_auto_print_enabled' => 'KDS auto-print enable ho gaya',
     'kds_auto_print_kot' => 'Kitchen Display par auto-print KOT',
-    'kds_auto_print_kot_sub' => 'Naya order aate hi KDS screen wali device khud KOT ticket print kare (kitchen printer KDS device se attached ho)',
+    'kds_auto_print_kot_sub' => 'Naya order aate hi TaxNest KOT ko capable active device par route karta hai. Printer KDS, cashier PC ya LAN par shared ho sakta hai.',
     'kds_display' => 'KDS display',
     'kds_hint' => 'Hold hone par orders KDS screen par dikhayen',
     'kds_cancelled_header' => 'CANCEL',

@@ -34,6 +34,12 @@ PY
 
 grep -q 'approval_dispatch_claims.py' "$WF" && ok "workflow uses tested parser" || bad "workflow must call approval_dispatch_claims.py"
 grep -q 'actions/checkout@v4' "$WF" && ok "workflow checks out parser" || bad "workflow must checkout before python helper"
+grep -q '1-59/5 \* \* \* \*' "$WF" \
+  && grep -q '2-59/5 \* \* \* \*' "$WF" \
+  && grep -q '3-59/5 \* \* \* \*' "$WF" \
+  && grep -q '4-59/5 \* \* \* \*' "$WF" \
+  && ok "relay has staggered minute pickup schedules" \
+  || bad "relay must retain all staggered pickup schedules"
 if grep -q 'json.load(open(sys.argv' "$WF"; then
   bad "workflow must not inline json.load on the relay body"
 else

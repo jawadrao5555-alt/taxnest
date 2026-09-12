@@ -71,6 +71,7 @@ class PosBranchStockTest extends TestCase
             $table->unsignedBigInteger('company_id')->nullable();
             $table->string('role')->nullable();
             $table->string('pos_role')->nullable();
+            $table->string('health_role')->nullable();
             $table->unsignedBigInteger('default_branch_id')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
@@ -870,6 +871,72 @@ class PosBranchStockTest extends TestCase
 
         $this->assertFalse(BranchStockService::viewingAllBranches($this->companyId), 'all-branches is owner-only');
         $this->assertSame($this->cityBranchId, BranchStockService::viewBranchId($this->companyId));
+    }
+
+    public function test_unassigned_manager_gets_zero_branch_stock_not_head_office(): void
+    {
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_manager', null), $this->mainBranchId);
+
+        $this->assertTrue(BranchStockService::actorBranches($this->companyId)->isEmpty());
+        $this->assertSame(BranchStockService::DENIED_BRANCH_ID, BranchStockService::viewBranchId($this->companyId));
+        $this->assertFalse(BranchStockService::actorCanUse($this->companyId, $this->mainBranchId));
+        $this->assertFalse(BranchStockService::actorCanUse($this->companyId, $this->cityBranchId));
+        $this->assertFalse(BranchStockService::viewingAllBranches($this->companyId));
+
+        $ids = BranchStockService::applyViewFilter(
+            DB::table('inventory_stocks')->where('company_id', $this->companyId),
+            $this->companyId
+        )->pluck('id');
+        $this->assertTrue($ids->isEmpty(), 'unmapped manager must not see any branch stock');
+    }
+
+    public function test_health_guard_manager_without_mapping_is_fail_closed(): void
+    {
+        $user = $this->makeUser('pos_manager', null);
+        DB::table('users')->where('id', $user->id)->update(['health_role' => 'health_pharmacist', 'pos_role' => null]);
+        $user = User::find($user->id);
+        Auth::guard('health')->setUser($user);
+        BranchStockService::flushMemo();
+
+        $this->assertTrue(BranchStockService::actorBranches($this->companyId)->isEmpty());
+        $this->assertSame(BranchStockService::DENIED_BRANCH_ID, BranchStockService::viewBranchId($this->companyId));
+    }
+
+    public function test_fbrpos_and_web_unassigned_managers_are_fail_closed(): void
+    {
+        $user = $this->makeUser('pos_manager', null);
+        foreach (['fbrpos', 'web'] as $guard) {
+            Auth::guard('pos')->logout();
+            Auth::guard('fbrpos')->logout();
+            Auth::guard('health')->logout();
+            Auth::guard('web')->logout();
+            Auth::guard($guard)->setUser($user);
+            BranchStockService::flushMemo();
+            $this->assertTrue(BranchStockService::actorBranches($this->companyId)->isEmpty(), $guard);
+            $this->assertSame(BranchStockService::DENIED_BRANCH_ID, BranchStockService::viewBranchId($this->companyId), $guard);
+        }
+    }
+
+    public function test_console_without_auth_still_sees_company_branches(): void
+    {
+        Auth::guard('pos')->logout();
+        Auth::guard('fbrpos')->logout();
+        Auth::guard('health')->logout();
+        Auth::guard('web')->logout();
+        BranchStockService::flushMemo();
+
+        $this->assertSame(2, BranchStockService::actorBranches($this->companyId)->count());
+    }
+
+    public function test_stale_pivot_to_missing_branch_is_fail_closed(): void
+    {
+        $user = $this->makeManagerFor([999999]);
+        $this->actAs($user, $this->mainBranchId);
+
+        $this->assertTrue(BranchStockService::actorBranches($this->companyId)->isEmpty());
+        $this->assertSame(BranchStockService::DENIED_BRANCH_ID, BranchStockService::viewBranchId($this->companyId));
     }
 
     // ── 6. single-shop companies keep the old behaviour ──────────────────────

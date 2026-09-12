@@ -48,6 +48,9 @@ gh run list --repo "$REPO" --workflow 'Deploy Production' --status success --lim
   > "$TMP/success.json" 2>/dev/null || echo '[]' > "$TMP/success.json"
 
 OIDC_TOKEN=$(curl --fail --silent --show-error \
+  --retry 5 \
+  --retry-delay 2 \
+  --retry-all-errors \
   -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
   "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=owner-approval-relay" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')
 RELAY_URL="${OWNER_APPROVAL_RELAY_URL%/}"

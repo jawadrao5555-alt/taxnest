@@ -5282,6 +5282,7 @@ class PosController extends Controller
                 // Same display authority as both receipt widths: raw token 4 may
                 // deliberately render as L004 under the local daily style.
                 'bill_token'       => $hasBillToken ? \App\Support\PosBillNumberStyle::bigNumber($kotCompany, $b) : null,
+                'display_number'   => \App\Support\PosBillNumberStyle::displayNumber($kotCompany, $b),
                 'customer_name'    => $b->customer_name,
                 'customer_phone'   => $b->customer_phone,
                 'order_type'       => $b->order_type,
@@ -5340,6 +5341,7 @@ class PosController extends Controller
                 'is_final'         => true,
                 'invoice_number'   => $b->invoice_number,
                 'bill_token'       => $hasBillToken ? \App\Support\PosBillNumberStyle::bigNumber($kotCompany, $b) : null,
+                'display_number'   => \App\Support\PosBillNumberStyle::displayNumber($kotCompany, $b),
                 'customer_name'    => $b->customer_name,
                 'customer_phone'   => $b->customer_phone,
                 'order_type'       => $b->order_type,
@@ -5504,7 +5506,8 @@ class PosController extends Controller
             ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
             ->orderBy('id', 'desc')
             ->limit(300)
-            ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'customer_phone', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
+            ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'customer_phone', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at',
+                   ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') ? ['bill_token'] : [])]);
 
         // Task 1036: WhatsApp Bill from the Reprint list — per-bill routable
         // number (null when feature off / unroutable → client hides the action).
@@ -5530,7 +5533,7 @@ class PosController extends Controller
                 ->all();
         }
 
-        $data = $bills->map(function ($b) use ($tableByTx, $waBillOn) {
+        $data = $bills->map(function ($b) use ($tableByTx, $waBillOn, $company) {
             // Badge resolution mirrors the Transactions-page tab split: the
             // ACTUAL PRA outcome decides, not invoice_mode alone.
             if (!empty($b->pra_invoice_number)) {
@@ -5549,6 +5552,8 @@ class PosController extends Controller
             return [
                 'id'                 => $b->id,
                 'invoice_number'     => $b->invoice_number,
+                'display_number'     => \App\Support\PosBillNumberStyle::displayNumber($company, $b),
+                'bill_token'         => \App\Support\PosBillNumberStyle::bigNumber($company, $b),
                 'pra_invoice_number' => $b->pra_invoice_number,
                 'customer_name'      => $b->customer_name,
                 'total_amount'       => (float) $b->total_amount,

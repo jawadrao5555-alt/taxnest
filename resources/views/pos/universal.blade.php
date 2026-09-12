@@ -1394,8 +1394,8 @@ window.addEventListener('popstate', function() {
                     <template x-for="bill in reprintBills.slice(0, 8)" :key="'strip-' + bill.id">
                         <button type="button" @click="reprintBill(bill)" :disabled="reprintBusyId === bill.id"
                             class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 dark:hover:bg-purple-900/20 transition flex-shrink-0 disabled:opacity-50"
-                            :title="'Reprint ' + (bill.pra_invoice_number || bill.invoice_number)">
-                            <span x-text="bill.pra_invoice_number || bill.invoice_number"></span>
+                            :title="'Reprint ' + (billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number)">
+                            <span x-text="billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number"></span>
                             <span class="font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs.' + Number(bill.total_amount).toLocaleString()"></span>
                         </button>
                     </template>
@@ -2974,7 +2974,7 @@ window.addEventListener('popstate', function() {
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800">
                         <div class="flex items-center justify-between mb-1.5">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="billDisplayNumber(bill)"></span>
                                 <span class="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" x-text="window.TXT.delivery"></span>
                                 <template x-if="bill.rider_name">
                                     <span class="text-[9px] bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 px-2 py-0.5 rounded-full font-bold" x-text="'{{ __('pos.rider_word') }}: ' + bill.rider_name"></span>
@@ -3305,7 +3305,7 @@ window.addEventListener('popstate', function() {
                         <div class="flex items-center justify-between mb-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
-                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.pra_invoice_number || bill.invoice_number"></span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number"></span>
                                 {{-- ZFC (25 Aug 2026): PRA ka lamba physical number bill dhoondne
                                      mein madad nahi karta — shop apne hi POS number se pehchanti
                                      hai. Jab PRA number dikh raha ho to dukan ka apna number
@@ -3392,7 +3392,7 @@ window.addEventListener('popstate', function() {
         <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
             <div class="px-4 py-3 bg-teal-600 flex items-center justify-between flex-shrink-0">
                 <div class="min-w-0">
-                    <h3 class="text-white font-bold text-sm truncate" x-text="reprintPreviewBill ? (window.TXT.bill_preview_prefix + (reprintPreviewBill.pra_invoice_number || reprintPreviewBill.invoice_number)) : ''"></h3>
+                    <h3 class="text-white font-bold text-sm truncate" x-text="reprintPreviewBill ? (window.TXT.bill_preview_prefix + billDisplayNumber(reprintPreviewBill)) : ''"></h3>
                     <p class="text-teal-100 text-[11px]" x-text="reprintPreviewBill ? [orderTypeLabel(reprintPreviewBill), reprintPreviewBill.customer_name, 'Rs. ' + Number(reprintPreviewBill.total_amount).toLocaleString()].filter(Boolean).join(' • ') : ''"></p>
                 </div>
                 <button @click="reprintPreviewBill = null" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition flex-shrink-0" title="{{ __('pos.ti_close') }}">
@@ -3500,7 +3500,7 @@ window.addEventListener('popstate', function() {
                     {{ __('pos.make_final_choose_payment') }}
                 </h3>
                 <p class="text-[11px] text-gray-500 mt-1">
-                    <span class="font-bold text-gray-700 dark:text-gray-300" x-text="promoteTarget ? (promoteTarget.invoice_number || ('#' + promoteTarget.id)) : ''"></span>
+                    <span class="font-bold text-gray-700 dark:text-gray-300" x-text="promoteTarget ? (billDisplayNumber(promoteTarget) || promoteTarget.invoice_number || ('#' + promoteTarget.id)) : ''"></span>
                     <span x-show="promoteTarget"> • current Rs. <span x-text="promoteTarget ? Number(promoteTarget.total_amount).toLocaleString() : ''"></span></span>
                 </p>
                 <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-1" x-text="praEnabled ? window.TXT.pay_edit_hint_pra_on : window.TXT.pay_edit_hint_pra_off"></p>
@@ -12265,11 +12265,17 @@ function restaurantPos() {
         // Popup search (owner video, 25 Aug 2026) — same haystack as the
         // Deliveries board row filter: bill number, customer, phone, address,
         // rider. Filtering only; nothing is hidden from the badge counts.
+        // Customer-facing calling number (daily L003 / token / serial) — same
+        // authority as the printed receipt. invoice_number stays for audit search.
+        billDisplayNumber(b) {
+            if (!b) return '';
+            return b.display_number || b.bill_token || b.pra_invoice_number || b.invoice_number || ('#' + b.id);
+        },
         pdFiltered(list) {
             const q = (this.pdSearch || '').trim().toLowerCase();
             if (!q) return list;
             return list.filter(b => [
-                b.invoice_number, b.customer_name, b.customer_phone,
+                b.display_number, b.bill_token, b.invoice_number, b.customer_name, b.customer_phone,
                 b.delivery_address, b.rider_name, b.delivery_status,
             ].some(v => v && String(v).toLowerCase().includes(q)));
         },
@@ -12470,6 +12476,8 @@ function restaurantPos() {
             const q = (this.localSearch || '').toLowerCase().trim();
             if (!q) return this.localBills;
             return this.localBills.filter(b =>
+                (b.display_number || '').toLowerCase().includes(q) ||
+                (b.bill_token || '').toString().toLowerCase().includes(q) ||
                 (b.invoice_number || '').toLowerCase().includes(q) ||
                 (b.customer_name || '').toLowerCase().includes(q) ||
                 (b.customer_phone || '').toLowerCase().includes(q) ||
@@ -12542,7 +12550,9 @@ function restaurantPos() {
             const q = (this.reprintSearch || '').toLowerCase().trim();
             if (!q) return this.reprintBills;
             return this.reprintBills.filter(b =>
-                (b.invoice_number || '').toLowerCase().includes(q)
+                (b.display_number || '').toLowerCase().includes(q)
+                || (b.bill_token || '').toString().toLowerCase().includes(q)
+                || (b.invoice_number || '').toLowerCase().includes(q)
                 || (b.pra_invoice_number || '').toLowerCase().includes(q)
                 || (b.customer_name || '').toLowerCase().includes(q)
                 || String(b.total_amount || '').includes(q)

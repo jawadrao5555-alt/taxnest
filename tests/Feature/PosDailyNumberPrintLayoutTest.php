@@ -303,4 +303,31 @@ class PosDailyNumberPrintLayoutTest extends TestCase
         $this->assertStringContainsString(__('pos.order_match_token_label') . ' 4', $body);
         $this->assertStringContainsString(__('pos.bill_ref_label') . ': ' . self::INVOICE_NUMBER, $body);
     }
+
+    public function test_display_number_covers_daily_token_serial_and_missing_token(): void
+    {
+        $daily = $this->makeCompany(['local_number_style' => 'daily']);
+        $this->assertSame(self::DAILY_DISPLAY, PosBillNumberStyle::displayNumber($daily, $this->makeTxn($daily)));
+
+        $token = $this->makeCompany(['local_number_style' => 'token']);
+        $this->assertSame('3', PosBillNumberStyle::displayNumber($token, $this->makeTxn($token)));
+
+        $serial = $this->makeCompany(['local_number_style' => 'serial']);
+        $this->assertSame(self::INVOICE_NUMBER, PosBillNumberStyle::displayNumber($serial, $this->makeTxn($serial)));
+
+        $missing = $this->makeTxn($daily, ['bill_token' => null]);
+        $this->assertNull(PosBillNumberStyle::bigNumber($daily, $missing));
+        $this->assertSame(self::INVOICE_NUMBER, PosBillNumberStyle::displayNumber($daily, $missing));
+        $this->assertSame(self::INVOICE_NUMBER, $missing->invoice_number);
+    }
+
+    public function test_sale_screen_and_payload_keep_display_number_next_to_serial(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/universal.blade.php'));
+        $this->assertStringContainsString('billDisplayNumber(bill)', $blade);
+        $this->assertStringContainsString('b.display_number', $blade);
+        $controller = file_get_contents(app_path('Http/Controllers/PosController.php'));
+        $this->assertStringContainsString("'display_number'", $controller);
+        $this->assertGreaterThanOrEqual(3, substr_count($controller, 'PosBillNumberStyle::displayNumber'));
+    }
 }

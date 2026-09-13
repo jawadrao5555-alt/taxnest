@@ -72,6 +72,13 @@ class AppUpdateController extends Controller
             return redirect('/admin/app-updates')->with('error', 'At least one feature point is required.');
         }
 
+        if (AppUpdate::containsOperationalDetails((string) $request->title, $points)) {
+            return redirect('/admin/app-updates')->withInput()->with(
+                'error',
+                'Customer update mein SHA, deployment, Live Ops, server, database, workflow ya doosri internal technical details publish nahi ki ja sakti.'
+            );
+        }
+
         AppUpdate::create([
             'title' => $request->title,
             'points' => $points,
@@ -111,6 +118,13 @@ class AppUpdateController extends Controller
         $points = $this->parsePoints($request->points_text);
         if (empty($points)) {
             return redirect('/admin/app-updates')->with('error', 'At least one feature point is required.');
+        }
+
+        if (AppUpdate::containsOperationalDetails((string) $request->title, $points)) {
+            return redirect('/admin/app-updates')->withInput()->with(
+                'error',
+                'Customer update mein SHA, deployment, Live Ops, server, database, workflow ya doosri internal technical details publish nahi ki ja sakti.'
+            );
         }
 
         $data = [

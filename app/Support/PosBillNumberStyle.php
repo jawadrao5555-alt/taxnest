@@ -84,4 +84,19 @@ class PosBillNumberStyle
 
         return null;
     }
+
+    /**
+     * Customer-facing calling number: token/daily big number when allocated,
+     * otherwise the stored invoice serial. Search/audit keep invoice_number.
+     */
+    public static function displayNumber($company, $transaction): ?string
+    {
+        $big = self::bigNumber($company, $transaction);
+        if ($big !== null && $big !== '') {
+            return $big;
+        }
+        $serial = $transaction->invoice_number ?? null;
+
+        return $serial !== null && $serial !== '' ? (string) $serial : null;
+    }
 }

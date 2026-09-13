@@ -118,6 +118,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
             $t->string('render_query')->nullable();
             $t->string('status')->default('pending');
             $t->string('claim_token')->nullable();
+            $t->timestamp('content_fetched_at')->nullable();
             $t->string('device_uid')->nullable();
             $t->text('printed_item_ids')->nullable();
             $t->text('error')->nullable();
@@ -1039,6 +1040,15 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $job = DB::table('pos_print_jobs')->where('id', $fresh)->first();
         $this->assertSame('dev-c1', $job->device_uid, 'a fresh stamped job stays with its counter');
         $this->assertSame('pending', $job->status);
+    }
+
+    public function test_print_job_schema_tracks_content_fetched_at(): void
+    {
+        $this->assertTrue(Schema::hasColumn('pos_print_jobs', 'content_fetched_at'));
+        $id = $this->seedJob();
+        $this->assertNull(DB::table('pos_print_jobs')->where('id', $id)->value('content_fetched_at'));
+        DB::table('pos_print_jobs')->where('id', $id)->update(['content_fetched_at' => now()]);
+        $this->assertNotNull(DB::table('pos_print_jobs')->where('id', $id)->value('content_fetched_at'));
     }
 
     // ── 5. Setup-form printer save (Task 1187) ─────────────────────────────

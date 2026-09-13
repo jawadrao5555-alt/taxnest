@@ -8,9 +8,9 @@ const {
 } = require('../src/printer-poll-policy');
 
 test('healthy realtime keeps a bounded HTTP recovery sweep for missed wakes', () => {
-  assert.equal(REALTIME_RECOVERY_MS, 5000);
-  assert.equal(nextPollDelay(1500, true, false), 5000);
-  assert.equal(nextPollDelay(0, true, false), 5000);
+  assert.equal(REALTIME_RECOVERY_MS, 1000);
+  assert.equal(nextPollDelay(1500, true, false), 1500);
+  assert.equal(nextPollDelay(0, true, false), 1000);
 });
 
 test('a realtime wake triggers an immediate poll without waiting for recovery', () => {
@@ -22,5 +22,5 @@ test('disconnected polling preserves server suggestions and never busy-loops on 
   assert.equal(nextPollDelay(0, false, false), 0);
   assert.equal(nextPollDelay(1500, false, false), 1500);
   assert.equal(nextPollDelay(Number.NaN, false, false), 1500);
-  assert.equal(nextPollDelay(-1, true, false), 5000);
+  assert.equal(nextPollDelay(-1, true, false), 1500);
 });

@@ -174,6 +174,26 @@ class AppUpdate extends Model
         });
     }
 
+
+    /**
+     * Customer announcements describe benefits and usage only. Operational
+     * deployment provenance belongs in internal release/audit records.
+     */
+    public static function containsOperationalDetails(string $title, array $points = []): bool
+    {
+        $text = strtolower($title . "\n" . implode("\n", array_map('strval', $points)));
+
+        return (bool) preg_match(
+            '/(?:\\bdeploy(?:ment|ed|ing)?\\b|\\blive[ _-]?ops\\b|\\bworking[ _-]?tree\\b|\\bworkflow\\b|\\bcallback\\b|\\bdatabase\\b|\\bmigration\\b|\\bserver\\b|\\bcache[_ -]?version\\b|\\bsha\\b|\\bcommit\\b|\\b[0-9a-f]{40}\\b)/i',
+            $text
+        );
+    }
+
+    public function hasOperationalDetails(): bool
+    {
+        return self::containsOperationalDetails((string) $this->title, (array) $this->points);
+    }
+
     public function seens()
     {
         return $this->hasMany(AppUpdateSeen::class, 'app_update_id');

@@ -6,9 +6,18 @@
 # Non-JSON HTML still fails closed.
 name: Approval Relay Dispatch
 
+# GitHub limits each individual schedule to a five-minute cadence. Five
+# staggered, individually-valid schedules make approval pickup normally happen
+# within about one minute without adding a PAT, production GitHub credential,
+# or weakening the OIDC-bound claim. workflow_dispatch remains an emergency
+# wake-up only.
 on:
   schedule:
     - cron: "*/5 * * * *"
+    - cron: "1-59/5 * * * *"
+    - cron: "2-59/5 * * * *"
+    - cron: "3-59/5 * * * *"
+    - cron: "4-59/5 * * * *"
   workflow_dispatch:
 
 permissions:

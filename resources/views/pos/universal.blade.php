@@ -598,7 +598,7 @@ window.addEventListener('popstate', function() {
         <div class="flex items-center gap-1.5 mx-auto flex-shrink-0" x-data="{ switchesOpen: false, autoPrintLoading: false, autoKotLoading: false, swTop: 0, swRight: 0 }">
 
             {{-- + New Sale — replaces the static nav link on this page (action = clear & restart) --}}
-            <button @click="newSale()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition flex-shrink-0" title="{{ __('pos.ti_new_sale_clear') }}">
+            <button @click="newSale()" data-nav-new-sale="action" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition flex-shrink-0" title="{{ __('pos.ti_new_sale_clear') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.new_sale') }}</span>
             </button>
@@ -1061,7 +1061,7 @@ window.addEventListener('popstate', function() {
         </template>
 
         {{-- New Sale — MOBILE ONLY since Jul 2026 redesign (desktop copy teleported into the top-nav) --}}
-        <button @click="newSale()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
+        <button @click="newSale()" data-nav-new-sale="action" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             <span class="hidden sm:inline">{{ __('pos.new_word') }}</span>
         </button>

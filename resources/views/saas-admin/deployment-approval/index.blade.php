@@ -8,13 +8,39 @@
                         Production control
                     </div>
                     <h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Deployment approvals</h1>
-                    <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">Review the exact build before it reaches production. Approve only when the commit, requester, and result are expected.</p>
+                    <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">Review the exact build before it reaches production. Approve only when the commit, requester, and result are expected. One TaxNest Admin approval is the normal path.</p>
                 </div>
                 <div class="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-left sm:min-w-[190px]">
                     <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Owner decision</p>
                     <p class="mt-1 text-sm font-semibold text-slate-200">One approval. One release.</p>
                 </div>
             </div>
+
+            <section class="mb-6 rounded-2xl border {{ !empty($poller['recovery_needed']) ? 'border-amber-400/40 bg-amber-400/10' : 'border-slate-800 bg-slate-900' }} px-5 py-5 sm:px-6" data-approval-poller>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] {{ !empty($poller['recovery_needed']) ? 'text-amber-300' : 'text-cyan-400' }}">Relay pickup</p>
+                        <h2 class="mt-1 text-lg font-semibold text-white">{{ $poller['headline'] ?? 'Relay poller status' }}</h2>
+                        <p class="mt-2 max-w-3xl text-sm leading-6 {{ !empty($poller['recovery_needed']) ? 'text-amber-100' : 'text-slate-400' }}">{{ $poller['guidance'] ?? '' }}</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-left sm:min-w-[220px]">
+                        <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Last poller heartbeat</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-200" data-poller-heartbeat>
+                            {{ $poller['last_poller_at'] ? $poller['last_poller_at']->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') : 'No authenticated poll yet' }}
+                        </p>
+                        @if(!empty($poller['poller_run_url']))
+                            <a href="{{ $poller['poller_run_url'] }}" target="_blank" rel="noopener" class="mt-2 inline-flex min-h-8 items-center text-xs font-semibold text-cyan-300 underline decoration-cyan-400/40 underline-offset-4 hover:text-cyan-200">Open last GitHub poller run</a>
+                        @endif
+                    </div>
+                </div>
+                @if(!empty($poller['recovery_needed']))
+                    <ol class="mt-4 list-decimal space-y-1 pl-5 text-sm text-amber-50">
+                        <li>Do not approve this PR again.</li>
+                        <li>Open GitHub Actions → Approval Relay Dispatch → Run workflow.</li>
+                        <li>Keep exact-SHA, OIDC, repository, branch, and approval provenance gates unchanged.</li>
+                    </ol>
+                @endif
+            </section>
 
             @if(session('success'))
                 <div role="status" class="mb-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
@@ -72,7 +98,9 @@
                 @php
                     $status = strtolower((string) $row->status);
                     $isPending = $status === 'pending';
-                    $statusClasses = $isPending ? 'border-amber-400/30 bg-amber-400/10 text-amber-300' : ($status === 'approved' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400');
+                    $pickup = $requestStatuses[$row->request_id] ?? ['label' => $row->status, 'tone' => 'slate', 'message' => ''];
+                    $tone = $pickup['tone'] ?? 'slate';
+                    $statusClasses = $tone === 'amber' ? 'border-amber-400/30 bg-amber-400/10 text-amber-300' : ($tone === 'emerald' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : ($tone === 'rose' ? 'border-rose-400/30 bg-rose-400/10 text-rose-300' : ($tone === 'cyan' ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200' : 'border-slate-700 bg-slate-800 text-slate-400')));
                 @endphp
                 <article id="request-{{ $row->request_id }}" class="mb-4 overflow-hidden rounded-2xl border {{ request('review') === $row->request_id ? 'ring-2 ring-cyan-400' : '' }} {{ $isPending ? 'border-amber-400/30' : 'border-slate-800' }} bg-slate-900">
                     <div class="border-b border-slate-800 px-5 py-4 sm:px-6">
@@ -80,9 +108,13 @@
                             <div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="font-mono text-sm text-slate-500">#{{ $row->pull_request_number }}</span>
-                                    <span class="rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wider {{ $statusClasses }}">{{ $row->status }}</span>
+                                    <span class="rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wider {{ $statusClasses }}">{{ $pickup['label'] }}</span>
+                                    <span class="font-mono text-[11px] text-slate-500">{{ $row->status }}</span>
                                 </div>
                                 <p class="mt-2 break-all font-mono text-xs text-slate-400">{{ $row->request_id }}</p>
+                                @if(!empty($pickup['message']))
+                                    <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-400" data-approval-guidance>{{ $pickup['message'] }}</p>
+                                @endif
                             </div>
                             @if($isPending)<span class="inline-flex items-center gap-2 text-sm font-semibold text-amber-200"><span class="h-2 w-2 animate-pulse rounded-full bg-amber-300"></span>Action needed</span>@endif
                         </div>

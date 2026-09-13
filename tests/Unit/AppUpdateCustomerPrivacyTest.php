@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\AppUpdate;
+use App\Support\CustomerFacingUpdateTitle;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -34,5 +35,25 @@ class AppUpdateCustomerPrivacyTest extends TestCase
                 'Your existing printer settings remain unchanged.',
             ]
         ));
+    }
+
+    public function test_customer_title_strips_deploy_suffix_and_keeps_the_stored_title(): void
+    {
+        $sha = 'aac4820f29cfa0432ff39e0fb1b4e51f305edb36';
+        $stored = 'Kitchen printing is more reliable [deploy '.$sha.']';
+        $update = new AppUpdate(['title' => $stored]);
+
+        $this->assertTrue(CustomerFacingUpdateTitle::containsDeploySuffix($stored));
+        $this->assertSame('Kitchen printing is more reliable', $update->customerTitle());
+        $this->assertSame($stored, $update->title);
+        $this->assertSame(
+            'Kitchen printing is more reliable',
+            CustomerFacingUpdateTitle::display($stored)
+        );
+        $this->assertSame(
+            'Already customer safe',
+            CustomerFacingUpdateTitle::display('Already customer safe')
+        );
+        $this->assertSame('', CustomerFacingUpdateTitle::display(null));
     }
 }

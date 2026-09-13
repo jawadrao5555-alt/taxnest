@@ -43,3 +43,4 @@ pra-agent-*.zip
 backup.sql
 *.sql.gz
 /storage/backups/
+/storage/app/owner-approval/

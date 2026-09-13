@@ -45,7 +45,7 @@
                         class="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-xl cursor-pointer"
                         aria-label="Close">×</button>
                 <div class="text-3xl mb-2">🎉</div>
-                <h2 class="text-xl sm:text-2xl font-extrabold leading-snug pr-8">{{ $detailUpdate->title }}</h2>
+                <h2 class="text-xl sm:text-2xl font-extrabold leading-snug pr-8">{{ $detailUpdate->customerTitle() }}</h2>
                 <p class="text-[12px] text-white/80 mt-2">
                     <x-wn-type-badge :update="$detailUpdate" :light="true" />
                     · {{ $detailUpdate->created_at->format('d M Y') }}

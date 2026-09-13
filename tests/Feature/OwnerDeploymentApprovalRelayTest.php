@@ -48,12 +48,19 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
             }
             if (str_contains($url, '/pulls/')) {
                 return Http::response([
+                'number' => 17,
+                'title' => 'Relay approval test',
+                'html_url' => 'https://github.com/'.config('deployment_approval.repository').'/pull/17',
                 'state' => $mergedSha ? 'closed' : 'open',
                 'merged' => (bool) $mergedSha,
                 'merge_commit_sha' => $mergedSha,
                 'draft' => false, 'base' => [
                     'ref' => 'main', 'repo' => ['full_name' => config('deployment_approval.repository')],
-                ], 'head' => ['sha' => $head, 'repo' => ['full_name' => config('deployment_approval.repository')]],
+                ], 'head' => [
+                    'ref' => 'cursor/forensic-release-readiness',
+                    'sha' => $head,
+                    'repo' => ['full_name' => config('deployment_approval.repository')],
+                ],
                 ]);
             }
 

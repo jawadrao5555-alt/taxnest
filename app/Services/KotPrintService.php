@@ -250,14 +250,14 @@ class KotPrintService
                     ->where('device_uid', $deviceUid)
                     ->first();
                 if ($device) {
-                    return !$device->last_seen_at || $device->last_seen_at->lt($cutoff);
+                    return (bool) ($device->last_seen_at && $device->last_seen_at->lt($cutoff));
                 }
             }
         } catch (\Throwable $e) {
             // fall through to company heartbeat
         }
 
-        return !$company->agent_last_seen || $company->agent_last_seen->lt($cutoff);
+        return (bool) ($company->agent_last_seen && $company->agent_last_seen->lt($cutoff));
     }
 
     /**
@@ -355,6 +355,11 @@ class KotPrintService
                 ->orderBy('id')->limit(50)->get();
             foreach ($rows as $job) {
                 if (!self::owningAgentUnresponsive($company, $job->device_uid)) {
+                    continue;
+                }
+                // A claim that just succeeded is proof of life for this tick —
+                // do not requeue or fail-closed a job the agent is still holding.
+                if ($job->updated_at && $job->updated_at->gt(now()->subSeconds(self::HANDOFF_UNRESPONSIVE_SECONDS))) {
                     continue;
                 }
                 if ($fetchTracked && $job->content_fetched_at) {

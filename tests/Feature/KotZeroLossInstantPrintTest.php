@@ -394,8 +394,9 @@ class KotZeroLossInstantPrintTest extends TestCase
         $jobId = (int) $queued['job_ids'][0];
         $this->claim('dev-kitchen');
         PosPrintJob::whereKey($jobId)->update([
-            'content_fetched_at' => now(),
+            'content_fetched_at' => now()->subSeconds(KotPrintService::HANDOFF_UNRESPONSIVE_SECONDS + 5),
             'device_uid' => 'dev-kitchen',
+            'updated_at' => now()->subSeconds(KotPrintService::HANDOFF_UNRESPONSIVE_SECONDS + 5),
         ]);
         DB::table('pos_agent_devices')->where('device_uid', 'dev-kitchen')
             ->update(['last_seen_at' => now()->subSeconds(KotPrintService::HANDOFF_UNRESPONSIVE_SECONDS + 5)]);
@@ -421,7 +422,10 @@ class KotZeroLossInstantPrintTest extends TestCase
         $queued = KotPrintService::enqueueForOrder($this->companyA(), $order, $this->cashierA, true);
         $jobId = (int) $queued['job_ids'][0];
         $this->claim('dev-kitchen');
-        PosPrintJob::whereKey($jobId)->update(['device_uid' => 'dev-kitchen']);
+        PosPrintJob::whereKey($jobId)->update([
+            'device_uid' => 'dev-kitchen',
+            'updated_at' => now()->subSeconds(KotPrintService::HANDOFF_UNRESPONSIVE_SECONDS + 5),
+        ]);
         $this->assertNull(PosPrintJob::find($jobId)->content_fetched_at);
         $this->assertTrue(KotPrintService::reprintProvenSafe(PosPrintJob::find($jobId)));
         DB::table('pos_agent_devices')->where('device_uid', 'dev-kitchen')

@@ -869,7 +869,7 @@ function waiterApp() {
         },
         async loadKotAttention() {
             try {
-                const res = await fetch('{{ route('pos.api.kot-print-attention') }}', { headers: { 'Accept': 'application/json' } });
+                const res = await this._fetchWithTimeout('{{ route('pos.api.kot-print-attention') }}', { headers: { 'Accept': 'application/json' } });
                 if (!res.ok) return;
                 const data = await res.json();
                 this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
@@ -877,7 +877,7 @@ function waiterApp() {
         },
         async reportLocalCoreDown() {
             try {
-                const res = await fetch('{{ route('pos.api.kot-local-core-down') }}', {
+                const res = await this._fetchWithTimeout('{{ route('pos.api.kot-local-core-down') }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     body: '{}',

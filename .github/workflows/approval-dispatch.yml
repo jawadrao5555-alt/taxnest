@@ -4,13 +4,18 @@
 #
 # Empty relay bodies are treated as zero claims (schedule poller success).
 # Non-JSON HTML still fails closed.
+#
+# GitHub cron is NOT a guaranteed timer. Historical scheduled gaps on this
+# workflow have been 1-5 hours even with staggered crons (see run #38 →
+# manual #39). Immediate Admin→GitHub dispatch would need a GitHub App
+# installation token with actions:write. This workflow does not invent or
+# store that credential. workflow_dispatch remains the owner emergency wake-up.
 name: Approval Relay Dispatch
 
 # GitHub limits each individual schedule to a five-minute cadence. Five
 # staggered, individually-valid schedules make approval pickup normally happen
-# within about one minute without adding a PAT, production GitHub credential,
-# or weakening the OIDC-bound claim. workflow_dispatch remains an emergency
-# wake-up only.
+# within about one minute when GitHub actually fires the scheduler. They do
+# not add a PAT, production GitHub credential, or weaken the OIDC-bound claim.
 on:
   schedule:
     - cron: "*/5 * * * *"

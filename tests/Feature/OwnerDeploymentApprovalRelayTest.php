@@ -6,6 +6,8 @@ use App\Models\AdminUser;
 use App\Models\OwnerDeploymentApprovalRequest;
 use App\Services\GitHubActionsOidcVerifier;
 use App\Services\OwnerDeploymentApprovalService;
+use App\Support\OwnerApprovalPickupStatus;
+use App\Support\OwnerApprovalPollerHeartbeat;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -159,6 +161,121 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $retry = $service->leaseApprovedRequests();
         $this->assertCount(1, $retry);
         $this->assertNotSame($first[0]['approval_request_id'], ''); // returned binding remains stable
+        $this->assertSame($first[0]['approval_request_id'], $retry[0]['approval_request_id']);
+        $this->assertSame(17, $retry[0]['pull_number']);
+        $this->assertSame(self::SHA, $retry[0]['expected_head_sha']);
+    }
+
+    public function test_empty_dispatch_claims_are_success_and_record_poller_heartbeat(): void
+    {
+        OwnerApprovalPollerHeartbeat::forget();
+        $this->mock(GitHubActionsOidcVerifier::class, function ($mock) {
+            $mock->shouldReceive('verify')->once()->andReturn([
+                'run_id' => 38,
+                'run_attempt' => 1,
+                'workflow_sha' => self::SHA,
+            ]);
+        });
+
+        $response = $this->postJson('/api/deployment-approval/v1/dispatch-claims', [
+            'repository' => config('deployment_approval.repository'),
+        ])->assertOk()->assertJson([
+            'claims' => [],
+            'run_id' => 38,
+            'run_attempt' => 1,
+        ]);
+        $this->assertNotEmpty($response->json('polled_at'));
+
+        $this->assertNotNull(OwnerApprovalPollerHeartbeat::lastSuccessAt());
+        $this->assertSame(38, OwnerApprovalPollerHeartbeat::snapshot()['run_id']);
+    }
+
+    public function test_failed_oidc_does_not_record_a_poller_heartbeat(): void
+    {
+        OwnerApprovalPollerHeartbeat::forget();
+        $this->mock(GitHubActionsOidcVerifier::class, fn ($m) => $m->shouldReceive('verify')->once()->andThrow(
+            \Symfony\Component\HttpKernel\Exception\HttpException::class,
+            403
+        ));
+
+        $this->postJson('/api/deployment-approval/v1/dispatch-claims', [
+            'repository' => config('deployment_approval.repository'),
+        ])->assertForbidden();
+
+        $this->assertNull(OwnerApprovalPollerHeartbeat::lastSuccessAt());
+    }
+
+    public function test_concurrent_pollers_do_not_double_dispatch_the_same_approval(): void
+    {
+        $this->row();
+        $this->mock(GitHubActionsOidcVerifier::class, function ($mock) {
+            $mock->shouldReceive('verify')->twice()->andReturn([
+                'run_id' => 39,
+                'run_attempt' => 1,
+                'workflow_sha' => self::SHA,
+            ]);
+        });
+
+        $first = $this->postJson('/api/deployment-approval/v1/dispatch-claims', [
+            'repository' => config('deployment_approval.repository'),
+        ])->assertOk()->json('claims');
+        $second = $this->postJson('/api/deployment-approval/v1/dispatch-claims', [
+            'repository' => config('deployment_approval.repository'),
+        ])->assertOk()->json('claims');
+
+        $this->assertCount(1, $first);
+        $this->assertCount(0, $second);
+        $this->assertSame(self::SHA, $first[0]['expected_head_sha']);
+    }
+
+    public function test_stale_leased_request_is_reclaimed_without_a_second_admin_approval(): void
+    {
+        $row = $this->row([
+            'status' => 'dispatching',
+            'dispatch_lease_expires_at' => now()->subMinute(),
+        ]);
+        $retry = app(OwnerDeploymentApprovalService::class)->leaseApprovedRequests();
+
+        $this->assertCount(1, $retry);
+        $this->assertSame($row->request_id, $retry[0]['approval_request_id']);
+        $this->assertSame('dispatching', $row->fresh()->status);
+        $this->assertTrue($row->fresh()->dispatch_lease_expires_at->isFuture());
+    }
+
+    public function test_delayed_schedule_status_warns_only_when_heartbeat_is_stale_and_approval_is_waiting(): void
+    {
+        OwnerApprovalPollerHeartbeat::forget();
+        $waiting = $this->row(['status' => 'approved']);
+
+        $missing = OwnerApprovalPickupStatus::summarize([$waiting], ['recorded_at' => null, 'run_id' => 0]);
+        $this->assertTrue($missing['delayed_schedule']);
+        $this->assertTrue($missing['recovery_needed']);
+        $this->assertStringContainsString('Do not approve again', $missing['guidance']);
+
+        $recent = OwnerApprovalPickupStatus::summarize([$waiting], [
+            'recorded_at' => now()->subMinutes(3),
+            'run_id' => 38,
+        ]);
+        $this->assertFalse($recent['delayed_schedule']);
+        $this->assertFalse($recent['recovery_needed']);
+        $this->assertSame(1, $recent['waiting_count']);
+
+        $stale = OwnerApprovalPickupStatus::summarize([$waiting], [
+            'recorded_at' => now()->subMinutes(45),
+            'run_id' => 38,
+        ]);
+        $this->assertTrue($stale['recovery_needed']);
+        $this->assertSame(
+            'https://github.com/'.config('deployment_approval.repository').'/actions/runs/38',
+            $stale['poller_run_url']
+        );
+
+        $idle = OwnerApprovalPickupStatus::summarize([], [
+            'recorded_at' => now()->subMinutes(45),
+            'run_id' => 38,
+        ]);
+        $this->assertTrue($idle['delayed_schedule']);
+        $this->assertFalse($idle['recovery_needed']);
     }
 
     public function test_wrong_oidc_workflow_is_denied_at_each_machine_boundary(): void
@@ -543,7 +660,28 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $row = $this->row(['requested_admin_id' => $requester->id, 'approved_admin_id' => $approver->id, 'status' => 'succeeded', 'deploy_result' => 'success', 'workflow_run_url' => 'https://github.com/run/1']);
         $this->actingAs($requester, 'admin')->get('/admin/deployment-approval')
             ->assertOk()->assertSee($requester->name)->assertSee($approver->name)
-            ->assertSee('Success')->assertSee('https://github.com/run/1');
+            ->assertSee('Success')->assertSee('https://github.com/run/1')
+            ->assertSee('Relay pickup')
+            ->assertSee('Last poller heartbeat');
+    }
+
+    public function test_index_shows_delayed_pickup_recovery_without_asking_for_a_second_approval(): void
+    {
+        Http::fake();
+        OwnerApprovalPollerHeartbeat::forget();
+        $admin = $this->admin();
+        $this->row([
+            'requested_admin_id' => $admin->id,
+            'approved_admin_id' => $admin->id,
+            'status' => 'approved',
+        ]);
+
+        $this->actingAs($admin, 'admin')->get('/admin/deployment-approval')
+            ->assertOk()
+            ->assertSee('GitHub scheduled pickup is delayed')
+            ->assertSee('Do not approve this PR again.')
+            ->assertSee('Approval Relay Dispatch')
+            ->assertDontSee('Approve this release again');
     }
 
     public function test_expired_approval_cannot_register_deploy_run(): void

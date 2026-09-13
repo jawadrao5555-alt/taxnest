@@ -51,6 +51,14 @@ if grep -q 'json.load(open(sys.argv' "$WF"; then
 else
   ok "workflow no longer inlines json.load on the relay body"
 fi
+if grep -q 'secrets\.' "$WF"; then
+  bad "approval relay must stay PAT-free and OIDC-only"
+else
+  ok "approval relay remains PAT-free"
+fi
+grep -q 'GitHub cron is NOT a guaranteed timer' "$WF" \
+  && ok "workflow documents GitHub scheduler delay" \
+  || bad "workflow must document that GitHub cron is not a guaranteed timer"
 
 echo ""
 if [ "$FAILS" -eq 0 ]; then

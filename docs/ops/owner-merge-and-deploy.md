@@ -17,12 +17,34 @@ panel. Plain chat text is intent, not authentication.
 5. Review the pinned repository, PR, SHA, expiry, and status. Enter the current
    super-admin password and tap **Approve exact release**.
 6. GitHub's scheduled **Approval Relay Dispatch** job picks up the approval.
-   GitHub schedules normally run within about five minutes, but may be delayed.
-7. The page records the final deployment result and links to the GitHub run.
+   GitHub cron is **not** a guaranteed five-minute timer. Observed gaps after
+   a successful scheduled run have been hours long (Approval Relay #38 at
+   10:31Z, then no schedule until manual #39 at 13:06Z). Staggered crons and
+   OIDC curl retries reduce ordinary latency; they cannot force GitHub to fire.
+7. TaxNest Admin → Deploy Approvals shows the last authenticated poller
+   heartbeat (including empty claims). If an approval is waiting and that
+   heartbeat is stale, **do not approve again**. Use GitHub Actions →
+   Approval Relay Dispatch → Run workflow.
+8. The page records the final deployment result and links to the GitHub run.
    Live verification must pass before anyone reports the release as live.
 
 No GitHub PAT, owner credentials, VPS key, production secret, or shared relay
 secret is stored in the web application.
+
+## Immediate-dispatch boundary
+
+Guaranteed immediate Admin → GitHub dispatch fundamentally requires a GitHub
+App installation token (or another owner-held credential) with `actions:write`
+so TaxNest can start **Owner Merge & Deploy** at approval time. Cloud Agents
+must not invent, store, or configure that credential. Until the owner makes
+that security decision, the durable path is:
+
+- one TaxNest Admin password approval
+- OIDC-authenticated scheduled poller + stale-lease retry
+- poller heartbeat / delayed-schedule status in Admin
+- owner emergency `workflow_dispatch` of Approval Relay Dispatch
+
+Exact-SHA, OIDC, repository, branch, and approval provenance gates stay closed.
 
 ## Security binding
 

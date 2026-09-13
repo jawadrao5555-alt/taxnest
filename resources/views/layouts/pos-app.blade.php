@@ -543,8 +543,9 @@
                             {{-- Sale-screen redesign (Jul 2026): on the sale screen itself the static
                                  "New Sale" link is replaced by the teleported action button (newSale())
                                  that lands in #tn-nav-sale-tools below — see universal.blade.php. --}}
-                            @unless(request()->routeIs('pos.invoice.create') || $confinedRoleLayout)
+                            @unless(request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create') || $confinedRoleLayout)
                             <a href="{{ route('pos.invoice.create') }}"
+                               data-nav-new-sale="static"
                                class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                 {{ __('pos.new_sale') }}
@@ -720,7 +721,7 @@
                                                 @click="bellOpen = false; window.dispatchEvent(new CustomEvent('open-whats-new-detail', { detail: { id: {{ (int) $wnu->id }} } }))"
                                                 class="block w-full px-4 py-3 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition cursor-pointer">
                                             <div class="flex items-center justify-between gap-2">
-                                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $wnu->title }} <x-wn-type-badge :update="$wnu" /></p>
+                                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $wnu->customerTitle() }} <x-wn-type-badge :update="$wnu" /></p>
                                                 <span x-show="rowUnseen" x-cloak class="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">{{ __('pos.new_word') }}</span>
                                             </div>
                                             <p class="text-[10px] text-gray-400 mt-0.5">{{ $wnu->created_at->format('d M Y') }}</p>
@@ -1029,7 +1030,9 @@
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="lg:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
-                    <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.new_sale') }}</a>
+                    @unless(request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create') || $confinedRoleLayout)
+                    <a href="{{ route('pos.invoice.create') }}" data-nav-new-sale="static" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.new_sale') }}</a>
+                    @endunless
                     @if($posEffStyleLayout === 'saaf')
                     @if($posNavCan('dashboard'))
                     <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_home') }}</a>
@@ -1411,7 +1414,7 @@
                          style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #451a03; box-shadow: 0 6px 18px -6px rgba(245,158,11,0.7);">
                         🎉 {{ __('pos.wn_featured_badge') }}
                     </div>
-                    <h2 class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->title }}</h2>
+                    <h2 class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->customerTitle() }}</h2>
                     <p class="text-[12px] text-white/75 mt-1.5"><x-wn-type-badge :update="$whatsNewFeatured" :light="true" /> · {{ $whatsNewFeatured->created_at->format('d M Y') }}</p>
                 </div>
                 <div class="px-6 py-5 overflow-y-auto" style="max-height: 52vh;">
@@ -1436,7 +1439,7 @@
                             <p class="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">{{ __('pos.wn_featured_more') }}</p>
                             @foreach($whatsNewPopupList->reject(fn ($u) => $u->id === $whatsNewFeatured->id) as $wnp)
                                 <div class="{{ $loop->first ? '' : 'mt-4 pt-3 border-t border-gray-100 dark:border-gray-800' }}">
-                                    <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-1.5">{{ $wnp->title }} <x-wn-type-badge :update="$wnp" /> <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
+                                    <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-1.5">{{ $wnp->customerTitle() }} <x-wn-type-badge :update="$wnp" /> <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
                                     <ul class="space-y-1.5">
                                         @foreach(($wnp->points ?? []) as $wnpt)
                                             <li class="flex items-start gap-2 text-[13px] text-gray-600 dark:text-gray-300">
@@ -1483,7 +1486,7 @@
                     <div class="text-4xl mb-1">🎉</div>
                     <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
                     @if($whatsNewUnseenCount === 1)
-                        <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} <x-wn-type-badge :update="$whatsNewPopup" :light="true" /> · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
+                        <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->customerTitle() }} <x-wn-type-badge :update="$whatsNewPopup" :light="true" /> · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
                     @else
                         <p class="text-[12px] text-white/80 mt-1">{{ __('pos.whats_new_scroll_hint') }}</p>
                     @endif
@@ -1495,7 +1498,7 @@
                     @foreach($whatsNewPopupList as $wnp)
                     <div class="{{ $loop->first ? '' : 'mt-5 pt-4 border-t border-gray-200 dark:border-gray-700' }}">
                         @if($whatsNewUnseenCount > 1)
-                            <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-2">{{ $wnp->title }} <x-wn-type-badge :update="$wnp" /> <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-2">{{ $wnp->customerTitle() }} <x-wn-type-badge :update="$wnp" /> <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
                         @endif
                         @if($wnp->image_path ?? null)
                             <img src="{{ asset('storage/' . $wnp->image_path) }}" alt="{{ __('pos.update_image_alt') }}" loading="lazy"

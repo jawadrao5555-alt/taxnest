@@ -17,7 +17,7 @@ class SmartDeploymentApprovalTest extends TestCase
 
     private const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-    public function test_owner_selects_pr_number_and_server_binds_exact_github_head_sha(): void
+    public function test_owner_password_approval_binds_exact_github_head_sha_in_one_step(): void
     {
         Mail::fake();
         Http::fake([
@@ -37,13 +37,16 @@ class SmartDeploymentApprovalTest extends TestCase
         $response = $this->actingAs($owner, 'admin')->post('/admin/deployment-approval', [
             'pull_request_number' => 55,
             'head_sha' => str_repeat('b', 40),
+            'password' => 'secret-password',
         ]);
 
-        $response->assertRedirect();
+        $response->assertRedirect()->assertSessionHas('success');
         $approval = OwnerDeploymentApprovalRequest::query()->sole();
         $this->assertSame(self::SHA, $approval->head_sha);
-        $this->assertSame('pending', $approval->status);
-        Mail::assertSent(DeploymentApprovalReady::class, fn ($mail) => $mail->hasTo('owner@example.test'));
+        $this->assertSame('approved', $approval->status);
+        $this->assertSame($owner->id, $approval->approved_admin_id);
+        Mail::assertNothingSent();
+        Mail::assertNotSent(DeploymentApprovalReady::class);
     }
 
     public function test_signed_email_review_link_is_recipient_bound_and_does_not_approve(): void
@@ -99,7 +102,30 @@ class SmartDeploymentApprovalTest extends TestCase
 
         $this->actingAs($owner, 'admin')->post('/admin/deployment-approval', [
             'pull_request_number' => 55,
+            'password' => 'secret-password',
         ])->assertSessionHasErrors('pull_request_number');
+
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
+    }
+
+    public function test_password_is_required_and_wrong_password_does_not_create_a_request(): void
+    {
+        Http::fake();
+        $owner = AdminUser::query()->create([
+            'name' => 'Owner',
+            'email' => 'owner@example.test',
+            'password' => 'secret-password',
+            'role' => 'super_admin',
+        ]);
+
+        $this->actingAs($owner, 'admin')->post('/admin/deployment-approval', [
+            'pull_request_number' => 55,
+        ])->assertSessionHasErrors('password');
+
+        $this->actingAs($owner, 'admin')->post('/admin/deployment-approval', [
+            'pull_request_number' => 55,
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors('password');
 
         $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
     }

@@ -196,6 +196,15 @@ class AppUpdate extends Model
         return self::containsOperationalDetails((string) $this->title, (array) $this->points);
     }
 
+    /**
+     * Shop-facing title. Strips the CI `[deploy {sha}]` suffix so customers
+     * never see release provenance. The stored title is unchanged.
+     */
+    public function customerTitle(): string
+    {
+        return \App\Support\CustomerFacingUpdateTitle::display((string) $this->title);
+    }
+
     public function seens()
     {
         return $this->hasMany(AppUpdateSeen::class, 'app_update_id');

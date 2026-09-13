@@ -7,6 +7,8 @@ use App\Models\OwnerDeploymentApprovalRequest;
 use App\Services\EligibleDeploymentPullRequestService;
 use App\Services\GitHubActionsOidcVerifier;
 use App\Services\OwnerDeploymentApprovalService;
+use App\Support\OwnerApprovalPickupStatus;
+use App\Support\OwnerApprovalPollerHeartbeat;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -16,13 +18,20 @@ class OwnerDeploymentApprovalController extends Controller
     {
         $this->authorizeOwner();
 
+        $requests = OwnerDeploymentApprovalRequest::query()
+            ->with(['requestedBy:id,name', 'approvedBy:id,name'])
+            ->latest()
+            ->limit(25)
+            ->get();
+        $poller = OwnerApprovalPickupStatus::summarize($requests);
+
         return view('saas-admin.deployment-approval.index', [
-            'requests' => OwnerDeploymentApprovalRequest::query()
-                ->with(['requestedBy:id,name', 'approvedBy:id,name'])
-                ->latest()
-                ->limit(25)
-                ->get(),
+            'requests' => $requests,
             'eligiblePullRequests' => $github->eligible(),
+            'poller' => $poller,
+            'requestStatuses' => $requests->mapWithKeys(
+                fn ($row) => [$row->request_id => OwnerApprovalPickupStatus::forRequest($row, $poller)]
+            ),
         ]);
     }
 
@@ -52,7 +61,7 @@ class OwnerDeploymentApprovalController extends Controller
             return back()->withErrors(['pull_request_number' => $exception->getMessage()])->withInput();
         }
 
-        return back()->with('success', "PR #{$approval->pull_request_number} approved. Automatic merge and production deployment pickup is now queued; no GitHub workflow run is required.");
+        return back()->with('success', "PR #{$approval->pull_request_number} approved. One approval is enough. GitHub's scheduled Approval Relay will pick this up — do not approve again. If pickup is delayed, use GitHub Actions → Approval Relay Dispatch → Run workflow. Immediate auto-dispatch would need a GitHub App installation token, which this app does not store.");
     }
 
     public function review(Request $request, string $requestId)
@@ -86,7 +95,7 @@ class OwnerDeploymentApprovalController extends Controller
             return back()->withErrors(['password' => $exception->getMessage()]);
         }
 
-        return back()->with('success', 'Exact PR and HEAD SHA approved for deployment.');
+        return back()->with('success', 'Exact PR and HEAD SHA approved. Do not approve again. Wait for the scheduled Approval Relay, or use GitHub Actions → Approval Relay Dispatch → Run workflow if the poller heartbeat is stale.');
     }
 
     public function dispatchClaims(
@@ -97,7 +106,18 @@ class OwnerDeploymentApprovalController extends Controller
         $claims = $oidc->verify($request, 'approval-dispatch.yml');
         $request->validate(['repository' => ['required', 'in:'.config('deployment_approval.repository')]]);
 
-        return response()->json(['claims' => $service->leaseApprovedRequests(), 'run_id'=>(int)($claims['run_id']??0), 'run_attempt'=>(int)($claims['run_attempt']??0)]);
+        $polledAt = OwnerApprovalPollerHeartbeat::record(
+            now(),
+            (int) ($claims['run_id'] ?? 0),
+            (int) ($claims['run_attempt'] ?? 0)
+        );
+
+        return response()->json([
+            'claims' => $service->leaseApprovedRequests(),
+            'run_id' => (int) ($claims['run_id'] ?? 0),
+            'run_attempt' => (int) ($claims['run_attempt'] ?? 0),
+            'polled_at' => $polledAt->toIso8601String(),
+        ]);
     }
 
     public function claim(

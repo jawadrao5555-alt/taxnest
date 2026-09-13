@@ -262,22 +262,39 @@ class AgentManagementController extends Controller
     public static function latestReleaseInfo(): array
     {
         return \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
-            try {
-                $resp = \Illuminate\Support\Facades\Http::timeout(6)
-                    ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
-                    ->get('https://api.github.com/repos/' . self::releaseRepo() . '/releases/latest');
-                if ($resp->successful()) {
-                    return [
-                        'tag' => $resp->json('tag_name'),
+            $latest = ['tag' => null, 'assets' => []];
+
+            // Release assets historically lived in both the public
+            // releases-only repository and this repository. Query both and
+            // choose the newest valid Agent semver so an out-of-date mirror
+            // can never pin every shop to an older polling build.
+            foreach (array_unique([self::releaseRepo(), 'jawadrao5555-alt/taxnest']) as $repo) {
+                try {
+                    $resp = \Illuminate\Support\Facades\Http::timeout(6)
+                        ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
+                        ->get('https://api.github.com/repos/' . $repo . '/releases/latest');
+                    $tag = (string) $resp->json('tag_name', '');
+                    if (!$resp->successful() || !preg_match('/^v?(\d{1,2}\.\d+\.\d+)$/', $tag, $m)) {
+                        continue;
+                    }
+                    $current = ltrim((string) ($latest['tag'] ?? ''), 'vV');
+                    if ($current !== '' && version_compare($m[1], $current, '<=')) {
+                        continue;
+                    }
+                    $latest = [
+                        'tag' => $tag,
                         'assets' => collect($resp->json('assets', []))->map(fn($a) => [
                             'name' => $a['name'],
                             'url' => $a['browser_download_url'],
                             'size' => $a['size'] ?? 0,
                         ])->values()->all(),
                     ];
+                } catch (\Throwable $e) {
+                    // One release host failing must not hide a healthy mirror.
                 }
-            } catch (\Throwable $e) {}
-            return ['tag' => null, 'assets' => []];
+            }
+
+            return $latest;
         });
     }
 

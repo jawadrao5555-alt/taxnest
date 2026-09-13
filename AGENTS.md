@@ -17,6 +17,27 @@ one focused `cursor/*` PR with evidence.
 Do **not** claim DONE / FIXED / VERIFIED merely because code changed or
 PHPUnit passed.
 
+
+### Universal product fix + existing-configuration safety
+
+Every reported company is an **example of a platform problem**, not permission
+to hard-code that company, device, printer, user, or topology.
+
+- Solve the root cause for all compatible tenants and supported layouts
+  (including one or many counters/devices/printers).
+- Before editing, identify the existing tenant settings and working flows the
+  change could affect. Preserve them by default; never silently reset, replace,
+  or reinterpret saved configuration.
+- Add regression coverage for both the reported failure and at least one
+  previously-working configuration. Include multi-tenant isolation whenever
+  stored company configuration is involved.
+- Backward compatibility is required for existing companies and supported
+  older agents unless an explicit migration/upgrade plan is part of the task.
+- Safety must not become an excuse to leave the issue unresolved. If the first
+  automatic approach is unsafe (for example, it could duplicate a KOT), design
+  a safe recovery/failover/confirmation path and carry the issue to a practical
+  resolution.
+
 After the PR is green, **STOP** for the owner. The **issue → live** chain
 ([`docs/ops/cloud-agent-issue-to-live.md`](docs/ops/cloud-agent-issue-to-live.md))
 is: Owner Merge & Deploy (`docs/ops/owner-merge-and-deploy.md`) →

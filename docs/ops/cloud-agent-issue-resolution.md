@@ -110,12 +110,36 @@ Extend with a focused `scripts/cloud-local-*-smoke.mjs` that imports
 Fix the cause, not only the visible symptom. Trace data/path invariants
 (tenant `company_id`, tax snapshots, `pra_status`, series numbering, etc.).
 
-### 8. Implement the smallest correct fix
+### 8. Implement the smallest correct universal fix
 
-- Production-quality, minimal diff
+Treat the reporting company as a reproduction case, not the scope of the fix.
+
+- Production-quality, minimal diff that works across compatible tenants and
+  supported topologies; never hard-code a company, device, printer, user, or
+  one shop's current layout
+- Explicitly map which existing saved settings and working flows could be
+  affected; preserve their meaning and values by default
 - Preserve TaxNest fiscal, tenancy, security, numbering, tax, reporting, and
   deployment invariants
+- Keep backward compatibility for existing companies and supported older
+  agents, or provide an explicit safe migration/upgrade path
+- Safety is a design constraint, not a stopping point: when blind automation is
+  unsafe, implement a safe recovery, failover, or confirmation path that still
+  resolves the business issue
 - No drive-by refactors or unrelated file churn
+
+### 8A. Mandatory compatibility matrix
+
+Before implementation, write the smallest relevant matrix covering:
+
+1. the reported failing configuration;
+2. at least one previously-working configuration that must remain unchanged;
+3. one/many devices or printers when routing/concurrency is involved;
+4. a second tenant whenever stored company configuration is read or written;
+5. supported legacy-agent/no-new-field behavior when an agent contract changes.
+
+Turn the material rows into regression tests. A fix is incomplete if it solves
+the reporter while breaking an existing tenant configuration.
 
 ### 9. Test at the right levels
 

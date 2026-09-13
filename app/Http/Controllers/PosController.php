@@ -741,6 +741,14 @@ class PosController extends Controller
             ->orderByDesc('id')
             ->limit(10)
             ->get();
+        $recentPrintJobs = \App\Models\PosPrintJob::where('company_id', $companyId)
+            ->orderByDesc('id')
+            ->limit(15)
+            ->get();
+        $kotPrinterStale = \App\Support\PrinterIdentity::savedNameLooksStale(
+            $settings['kot_printer'] ?? null,
+            $settings['available_printers'] ?? []
+        );
 
         // Task 1166 — multi-counter registry (empty collections on legacy schema
         // or single-counter shops whose agent predates device identity).
@@ -768,7 +776,7 @@ class PosController extends Controller
         // counter-labeled). Single-counter/legacy shops get today's list back.
         $kotOptions = \App\Models\PosAgentDevice::kotPrinterOptions($company);
 
-        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'devices', 'assignableTeam', 'kotOptions'));
+        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'recentPrintJobs', 'kotPrinterStale', 'devices', 'assignableTeam', 'kotOptions'));
     }
 
     /**

@@ -776,6 +776,23 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame([$other], collect($res2->json('jobs'))->pluck('id')->all());
     }
 
+    public function test_unstamped_job_matches_reported_printer_after_case_and_space_fold(): void
+    {
+        $this->seedDevice('dev-counter-1', [
+            'printers' => [['name' => 'kitchen  printer', 'displayName' => 'Kitchen', 'isDefault' => false]],
+            'printers_reported_at' => now(),
+        ]);
+        $kot = $this->seedJob([
+            'type' => 'kot',
+            'target_printer' => 'Kitchen Printer',
+            'device_uid' => null,
+        ]);
+
+        $claimed = $this->agentGet('/api/agent/print-jobs?device_uid=dev-counter-1')->assertOk();
+        $this->assertSame([$kot], collect($claimed->json('jobs'))->pluck('id')->all());
+        $this->assertSame('Kitchen Printer', DB::table('pos_print_jobs')->where('id', $kot)->value('target_printer'));
+    }
+
     public function test_unstamped_shared_printer_job_is_claimed_only_by_a_device_that_reports_it(): void
     {
         $this->seedDevice('dev-counter-1', [

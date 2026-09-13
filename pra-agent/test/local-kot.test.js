@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { LocalCoreDomain } = require('../src/local-core/domain');
-const { renderKotHtml, planKotPrints, drainLocalKotQueue } = require('../src/local-kot');
+const { renderKotHtml, planKotPrints, drainLocalKotQueue, shouldHandBackToCloud } = require('../src/local-kot');
 
 const KEY = crypto.createHash('sha256').update('local-kot-tests').digest();
 const scope = { company_id: 'co-1', branch_id: 'br-1', device_id: 'dev-1', user_id: 'waiter-7' };
@@ -59,6 +59,10 @@ function hold(engine, orderId, orderType, withKot) {
     // Routing plan: no printer → nothing; counter copy only for dine-in when enabled.
     assert.deepStrictEqual(planKotPrints({ document: { order_type: 'dine_in' } }, {}), []);
     assert.deepStrictEqual(planKotPrints({ document: { order_type: 'dine_in' } }, { kot_printer: 'K1', silent_print_enabled: false }), []);
+    assert.strictEqual(shouldHandBackToCloud({ hold_synced_at_ms: 1 }, [], false), true, 'synced + no plan → instant cloud failover');
+    assert.strictEqual(shouldHandBackToCloud({ hold_synced_at_ms: 1 }, [{ printer: 'K1' }], true), true, 'synced + local print failed → instant cloud failover');
+    assert.strictEqual(shouldHandBackToCloud({}, [], false), false, 'unsynced + no plan stays local');
+    assert.strictEqual(shouldHandBackToCloud({ hold_synced_at_ms: 1 }, [{ printer: 'K1' }], false), false, 'synced + healthy plan stays local');
     assert.deepStrictEqual(planKotPrints({ document: { order_type: 'takeaway' } },
         { kot_printer: 'K1', counter_kot_enabled: true, counter_kot_printer: 'C1' }).map((p) => p.printer), ['K1']);
     assert.deepStrictEqual(planKotPrints({ document: { order_type: 'dine_in' } },
@@ -142,9 +146,8 @@ function hold(engine, orderId, orderType, withKot) {
     assert.deepStrictEqual([result.printed, result.acked, ackPrints, kotEvents(ackEng).length], [0, 0, 1, 1], 'completed slip: no reprint, no second ack');
     ackEng.close();
 
-    // 2) Hold already ACCEPTED by the cloud for longer than the handoff window
-    //    and still unprinted (printer dead) → hand back WITHOUT printing:
-    //    print.fail{terminal:true}, job failed for good, cloud prints it.
+    // 2) Hold already ACCEPTED by the cloud and local print fails → instant
+    //    hand-back (no 3–5 minute wait). Unsynced holds still retry locally.
     const backEng = engineWith(printSettings);
     hold(backEng, 'o-back', 'takeaway', true);
     let backPrints = 0;
@@ -153,16 +156,12 @@ function hold(engine, orderId, orderType, withKot) {
     assert.deepStrictEqual([result.failed, result.handed_back, backPrints], [1, 0, 1], 'unsynced hold: keeps trying the local printer');
     backEng.eventStore.now = () => clock; // outbox stamps use the same wall clock as the drain
     backEng.eventStore.markSent([heldEvent(backEng, 'o-back').id], {});
-    const syncedAt = clock;
-    clock += 2 * 60 * 1000;
+    clock += 6 * 1000; // past the first 5s retry backoff, still inside the 3 min window
     result = await drainLocalKotQueue(backEng, backDeps);
-    assert.deepStrictEqual([result.failed, result.handed_back, backPrints], [1, 0, 2], 'inside the window: still ours to print');
-    clock = syncedAt + 3 * 60 * 1000 + 10 * 60 * 1000; // window over (and past retry backoff)
-    result = await drainLocalKotQueue(backEng, backDeps);
-    assert.deepStrictEqual([result.failed, result.handed_back, backPrints], [0, 1, 2], 'window over: handed back, printer NOT tried again');
+    assert.deepStrictEqual([result.failed, result.handed_back, backPrints], [0, 1, 2], 'synced + local fail: instant cloud failover');
     const backJob = backEng.snapshot().print_queue['kot:o-back'];
     assert.strictEqual(backJob.status, 'failed');
-    assert.strictEqual(backJob.last_error, 'local_kot_handoff_timeout');
+    assert.strictEqual(backJob.last_error, 'Printer offline');
     acks = kotEvents(backEng);
     assert.strictEqual(acks.length, 1);
     assert.strictEqual(acks[0].payload.command_type, 'print.fail');
@@ -171,6 +170,21 @@ function hold(engine, orderId, orderType, withKot) {
     result = await drainLocalKotQueue(backEng, backDeps);
     assert.deepStrictEqual([result.failed, result.handed_back, backPrints, kotEvents(backEng).length], [0, 0, 2, 1], 'a handed-back slip is never retried locally');
     backEng.close();
+
+    // 2b) Silent print off / missing kot_printer after cloud accept: hand back
+    //     WITHOUT trying a local printer (nothing to print to).
+    const silentEng = engineWith({ print: { silent_print_enabled: false, kot_printer: 'Kitchen-80' } });
+    hold(silentEng, 'o-silent', 'takeaway', true);
+    silentEng.eventStore.now = () => clock;
+    silentEng.eventStore.markSent([heldEvent(silentEng, 'o-silent').id], {});
+    let silentPrints = 0;
+    result = await drainLocalKotQueue(silentEng, {
+        printHtml: async () => { silentPrints++; return { success: true }; },
+        deviceId: 'dev-1', now: () => clock, log: () => {}, scope,
+    });
+    assert.deepStrictEqual([result.handed_back, result.failed, silentPrints], [1, 0, 0]);
+    assert.strictEqual(silentEng.snapshot().print_queue['kot:o-silent'].last_error, 'local_kot_printer_unavailable');
+    silentEng.close();
 
     // 3) Internet still down (hold never accepted): no handoff clock runs —
     //    the shop PC is the only printer there is, so it keeps retrying.

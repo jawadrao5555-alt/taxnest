@@ -236,6 +236,44 @@ class KotPrintService
     }
 
     /**
+     * Watchdog sweep across every company that still has a fresh local
+     * handoff past the timeout. Independent of agent claim polling.
+     *
+     * @return array{expired:int, queued:int, companies:int}
+     */
+    public static function expireLocalHandoffsAll(): array
+    {
+        $out = ['expired' => 0, 'queued' => 0, 'companies' => 0];
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+                return $out;
+            }
+            $companyIds = PosPrintJob::query()
+                ->where('type', 'kot')
+                ->where('status', self::LOCAL_STATUS)
+                ->where('created_at', '<', now()->subSeconds(self::LOCAL_HANDOFF_TIMEOUT_SECONDS))
+                ->distinct()
+                ->orderBy('company_id')
+                ->limit(200)
+                ->pluck('company_id');
+            foreach ($companyIds as $companyId) {
+                $company = Company::find($companyId);
+                if (!$company) {
+                    continue;
+                }
+                $one = self::expireLocalHandoffs($company);
+                $out['companies']++;
+                $out['expired'] += (int) ($one['expired'] ?? 0);
+                $out['queued'] += (int) ($one['queued'] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService expireLocalHandoffsAll failed: '.$e->getMessage());
+        }
+
+        return $out;
+    }
+
+    /**
      * Task 1194 — enqueue-time owning-device stamp for KOT-family jobs
      * (kot / counter copy / station / kot_void). A pick made on the union
      * printer picker remembers which counter PC owns the printer; stamping

@@ -63,3 +63,18 @@ Server remediation / UI can enqueue test print jobs; agent `TEST_PRINT` Live Ops
 ## KOT
 
 Restaurant KOT jobs carry `printed_item_ids` SNAPSHOT; routing via Kot services + counter flags.
+
+**FACT (Sep 2026):** Offline Local Core owns a kitchen slip only while it can
+print it. After the cloud accepts `order.held`, an empty silent-print plan or
+an immediate local print failure hands the slip back (`print.fail{terminal}`)
+so the cloud agent prints without a 3–5 minute wait. Unsynced holds (internet
+down) stay queued locally.
+
+**FACT:** `print:expire-local-handoffs` is an independent overdue-handoff
+watchdog. Agent claim housekeeping still sweeps, but recovery must not depend
+on an agent poll.
+
+**FACT:** Unstamped claim eligibility matches `target_printer` to reported
+queue names after case/space fold (`PrinterIdentity`). The stored snapshot is
+not rewritten. Content-fetched unknown outcomes still fail closed (no blind
+reprint).

@@ -9,6 +9,8 @@ use App\Models\PosAgentDevice;
 use App\Models\PosPrintJob;
 use App\Models\PosTransaction;
 use App\Models\PraLog;
+use App\Support\KotPrintState;
+use App\Support\PrinterIdentity;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -479,23 +481,44 @@ class LiveOpsDiagnosticsService
         $settings = $c->printerSettings();
         $jobs = [];
         if (Schema::hasTable('pos_print_jobs')) {
+            $hasOrder = Schema::hasColumn('pos_print_jobs', 'restaurant_order_id');
+            $hasFetched = Schema::hasColumn('pos_print_jobs', 'content_fetched_at');
+            $hasLines = Schema::hasColumn('pos_print_jobs', 'printed_item_ids');
             $jobs = PosPrintJob::where('company_id', $companyId)
                 ->orderByDesc('id')
                 ->limit((int) config('live_ops.limits.max_print_jobs', 25))
                 ->get()
-                ->map(fn (PosPrintJob $j) => [
-                    'id' => $j->id,
-                    'type' => $j->type,
-                    'target_printer' => $j->target_printer,
-                    'status' => $j->status,
-                    'device_uid' => $j->device_uid,
-                    'error' => $this->redactor->redactString((string) ($j->error ?? '')),
-                    'attempts' => $j->attempts,
-                    'transaction_id' => $j->transaction_id,
-                    'content_fetched_at' => optional($j->content_fetched_at)?->toIso8601String(),
-                    'created_at' => optional($j->created_at)?->toIso8601String(),
-                    'updated_at' => optional($j->updated_at)?->toIso8601String(),
-                ])->all();
+                ->map(function (PosPrintJob $j) use ($hasOrder, $hasFetched, $hasLines, $settings) {
+                    $state = KotPrintState::forJob($j);
+                    $target = (string) ($j->target_printer ?? '');
+                    $lineCount = 0;
+                    if ($hasLines && is_array($j->printed_item_ids)) {
+                        $lineCount = count($j->printed_item_ids);
+                    }
+                    $token = (string) ($j->claim_token ?? '');
+                    $channel = str_starts_with($token, 'ac:kot:') ? 'local_handoff' : 'cloud';
+
+                    return [
+                        'id' => $j->id,
+                        'type' => $j->type,
+                        'target_printer' => $j->target_printer,
+                        'normalized_target_printer' => PrinterIdentity::normalize($target),
+                        'printer_identity_match' => PrinterIdentity::reportedHas($settings['available_printers'] ?? [], $target),
+                        'status' => $j->status,
+                        'display_state' => $state['key'],
+                        'device_uid' => $j->device_uid,
+                        'created_by_user_id' => $j->created_by,
+                        'channel' => $channel,
+                        'kitchen_line_count' => $lineCount,
+                        'error' => $this->redactor->redactString((string) ($j->error ?? '')),
+                        'attempts' => $j->attempts,
+                        'transaction_id' => $j->transaction_id,
+                        'restaurant_order_id' => $hasOrder ? $j->restaurant_order_id : null,
+                        'content_fetched_at' => $hasFetched ? optional($j->content_fetched_at)?->toIso8601String() : null,
+                        'created_at' => optional($j->created_at)?->toIso8601String(),
+                        'updated_at' => optional($j->updated_at)?->toIso8601String(),
+                    ];
+                })->all();
         }
 
         $devices = [];
@@ -517,8 +540,14 @@ class LiveOpsDiagnosticsService
         return [
             'silent_print_enabled' => $settings['silent_print_enabled'],
             'assigned_receipt_printer' => $settings['receipt_printer'],
+            'assigned_kot_printer' => $settings['kot_printer'] ?? null,
+            'kot_printer_stale' => PrinterIdentity::savedNameLooksStale(
+                $settings['kot_printer'] ?? null,
+                $settings['available_printers'] ?? []
+            ),
             'discovered_printers' => collect($settings['available_printers'] ?? [])->map(fn ($p) => [
                 'name' => $p['name'] ?? null,
+                'normalized_name' => PrinterIdentity::normalize($p['name'] ?? null),
                 'displayName' => $p['displayName'] ?? null,
                 'isDefault' => (bool) ($p['isDefault'] ?? false),
                 'isTextOnly' => (bool) ($p['isTextOnly'] ?? false),
@@ -530,6 +559,40 @@ class LiveOpsDiagnosticsService
             'failed_job_count' => collect($jobs)->where('status', 'failed')->count(),
             'stuck_job_count' => $this->stuckPrintCount($jobs),
             'job_counts' => $this->printJobCounts($companyId, $jobs),
+            'kot_chain' => $this->kotChain($companyId, $jobs),
+        ];
+    }
+
+    /**
+     * Least-privilege redacted KOT chain for owner-approved Live Ops.
+     * IDs, timestamps, printer identity, device/user refs, channel and
+     * burst counts only — never item names, receipts, or customer data.
+     *
+     * @param  list<array<string, mixed>>  $jobs
+     */
+    private function kotChain(int $companyId, array $jobs): array
+    {
+        $kot = collect($jobs)->whereIn('type', ['kot', 'kot_void', 'fbr_kot']);
+        $byMinute = [];
+        foreach ($kot as $job) {
+            $minute = substr((string) ($job['created_at'] ?? ''), 0, 16);
+            $byMinute[$minute] = ($byMinute[$minute] ?? 0) + 1;
+        }
+        $mismatches = $kot->filter(fn ($j) => ($j['target_printer'] ?? null)
+            && !($j['printer_identity_match'] ?? false))->count();
+
+        return [
+            'company_id' => $companyId,
+            'kot_jobs' => $kot->count(),
+            'local_handoffs' => $kot->where('channel', 'local_handoff')->count(),
+            'cloud_jobs' => $kot->where('channel', 'cloud')->count(),
+            'action_required' => $kot->where('display_state', KotPrintState::ACTION_REQUIRED)->count(),
+            'pending' => $kot->where('display_state', KotPrintState::PENDING)->count(),
+            'printing' => $kot->where('display_state', KotPrintState::PRINTING)->count(),
+            'printer_mismatches' => $mismatches,
+            'concurrent_burst_max' => $byMinute === [] ? 0 : max($byMinute),
+            'device_uids' => $kot->pluck('device_uid')->filter()->unique()->values()->all(),
+            'created_by_user_ids' => $kot->pluck('created_by_user_id')->filter()->unique()->values()->all(),
         ];
     }
 

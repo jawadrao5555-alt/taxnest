@@ -136,6 +136,9 @@ Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::job(new SyncFbrPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::command('pos:clean-zombie-tables')->everyFifteenMinutes();
+// Overdue local-KOT handoff watchdog: recover a shop-PC slip the agent never
+// acknowledged without waiting for the next claim poll.
+Schedule::command('print:expire-local-handoffs')->everyMinute()->withoutOverlapping();
 // DRAP medicine catalogue (Task 1579): weekly re-sync keeps notified MRPs and
 // effective dates current. The command only QUEUES the crawl (bulk queue, chunked
 // self-requeue, cursor in medicine_catalogue_syncs) — live needs both the

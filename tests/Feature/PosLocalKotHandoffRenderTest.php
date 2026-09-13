@@ -190,7 +190,8 @@ class PosLocalKotHandoffRenderTest extends TestCase
         DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:' . $aggregate)
             ->update(['created_at' => now()->subSeconds(KotPrintService::LOCAL_HANDOFF_TIMEOUT_SECONDS + 5)]);
         $swept = KotPrintService::expireLocalHandoffs($this->company());
-        $this->assertSame(['expired' => 1, 'queued' => 1], $swept, 'expiry = exactly one cloud recovery KOT');
+        $this->assertSame(1, $swept['expired']);
+        $this->assertSame(1, $swept['queued'], 'expiry = exactly one cloud recovery KOT');
     }
 
     private function recoveryJob(int $orderId): object

@@ -70,5 +70,7 @@ class LiveOpsPrinterTest extends LiveOpsTestCase
         $json = json_encode($report);
         $this->assertStringNotContainsString('SecretB', $json);
         $this->assertStringNotContainsString('should-not-leak', $json);
+        $this->assertArrayHasKey('kot_chain', $report['data']);
+        $this->assertSame(0, $report['data']['kot_chain']['kot_jobs']);
     }
 }

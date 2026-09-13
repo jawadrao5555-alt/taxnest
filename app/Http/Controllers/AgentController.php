@@ -10,6 +10,7 @@ use App\Models\PosTransaction;
 use App\Models\FbrPosTransaction;
 use App\Services\PraIntegrationService;
 use App\Services\FbrService;
+use App\Support\PrinterIdentity;
 
 class AgentController extends Controller
 {
@@ -1239,25 +1240,6 @@ class AgentController extends Controller
             }
         }
 
-        $deviceScope = function ($q) use ($deviceAware, $deviceUid, $reportedPrinterNames) {
-            if (!$deviceAware) {
-                return; // column not migrated yet — legacy behavior
-            }
-            if ($deviceUid) {
-                $q->where(function ($w) use ($deviceUid, $reportedPrinterNames) {
-                    $w->where('device_uid', $deviceUid)
-                        ->orWhere(function ($unstamped) use ($reportedPrinterNames) {
-                            $unstamped->whereNull('device_uid');
-                            if (is_array($reportedPrinterNames)) {
-                                $unstamped->whereIn('target_printer', $reportedPrinterNames);
-                            }
-                        });
-                });
-            } else {
-                $q->whereNull('device_uid');
-            }
-        };
-
         // Housekeeping (stale requeue + purge) is throttled to once per 30s per
         // company — with long-polling agents this endpoint runs far more often
         // and the maintenance queries must not run on every pass.
@@ -1281,11 +1263,13 @@ class AgentController extends Controller
             $wait = min($wait, 2);
         }
         $held = false;
-        $pendingExists = fn () => DB::table('pos_print_jobs')
-            ->where('company_id', $company->id)
-            ->where('status', 'pending')
-            ->where($deviceScope)
-            ->exists();
+        $pendingExists = fn () => $this->eligiblePendingPrintJobIds(
+            $company,
+            $deviceAware,
+            $deviceUid,
+            $reportedPrinterNames,
+            1
+        ) !== [];
         $hasPending = $pendingExists();
 
         // Activity gate (Aug 2026 — "server bohat slow" incident). A held poll
@@ -1349,12 +1333,20 @@ class AgentController extends Controller
         }
 
         $token = (string) \Illuminate\Support\Str::uuid();
+        $claimIds = $this->eligiblePendingPrintJobIds(
+            $company,
+            $deviceAware,
+            $deviceUid,
+            $reportedPrinterNames,
+            10
+        );
+        if ($claimIds === []) {
+            return response()->json(['ok' => true, 'jobs' => [], 'count' => 0, 'held' => $held]);
+        }
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
-            ->where($deviceScope)
-            ->orderBy('id')
-            ->limit(10)
+            ->whereIn('id', $claimIds)
             ->update([
                 'status' => 'printing',
                 'claim_token' => $token,
@@ -1447,6 +1439,54 @@ class AgentController extends Controller
     }
 
     /**
+     * Pending jobs this agent may claim. Stamped jobs stay owner-only.
+     * Unstamped jobs match reported printer names after case/space fold so
+     * a rename-spacing mismatch cannot hide a valid kitchen queue. The
+     * stored target_printer snapshot is not rewritten.
+     *
+     * @param  list<string>|null  $reportedPrinterNames
+     * @return list<int>
+     */
+    private function eligiblePendingPrintJobIds($company, bool $deviceAware, ?string $deviceUid, ?array $reportedPrinterNames, int $limit): array
+    {
+        $q = DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->orderBy('id');
+        $columns = ['id', 'target_printer'];
+        if ($deviceAware) {
+            $columns[] = 'device_uid';
+            if ($deviceUid) {
+                $q->where(function ($w) use ($deviceUid) {
+                    $w->where('device_uid', $deviceUid)->orWhereNull('device_uid');
+                });
+            } else {
+                $q->whereNull('device_uid');
+            }
+        }
+        $rows = $q->limit(max(40, $limit * 4))->get($columns);
+        $ids = [];
+        foreach ($rows as $row) {
+            if (!$deviceAware) {
+                $ids[] = (int) $row->id;
+            } else {
+                $own = $deviceUid && (string) ($row->device_uid ?? '') === (string) $deviceUid;
+                $unstamped = ($row->device_uid ?? null) === null || $row->device_uid === '';
+                if ($own) {
+                    $ids[] = (int) $row->id;
+                } elseif ($unstamped && (!is_array($reportedPrinterNames) || PrinterIdentity::reportedHas($reportedPrinterNames, $row->target_printer))) {
+                    $ids[] = (int) $row->id;
+                }
+            }
+            if (count($ids) >= $limit) {
+                break;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Print-job table maintenance — stale-claim requeue + old-row purge.
      * Called from claimPrintJobs, throttled to once per 30s per company.
      */
@@ -1511,7 +1551,7 @@ class AgentController extends Controller
                     if (in_array($row->type, ['kot', 'kot_void', 'fbr_kot'], true)) {
                         $carrier = $onlineDevices->first(function ($d) use ($row) {
                             return $d->device_uid !== $row->device_uid
-                                && collect($d->printers ?? [])->pluck('name')->contains($row->target_printer);
+                                && PrinterIdentity::reportedHas($d->printers ?? [], $row->target_printer);
                         });
                         if ($carrier) {
                             DB::table('pos_print_jobs')->where('id', $row->id)
@@ -2034,10 +2074,7 @@ class AgentController extends Controller
                 ->orderByDesc('last_seen_at')
                 ->get(['device_uid', 'printers'])
                 ->first(function ($device) use ($job) {
-                    return collect($device->printers ?? [])
-                        ->pluck('name')
-                        ->contains(fn ($name) => is_string($name)
-                            && trim($name) === trim((string) $job->target_printer));
+                    return PrinterIdentity::reportedHas($device->printers ?? [], $job->target_printer);
                 })?->device_uid;
         } catch (\Throwable $e) {
             // Registry trouble must never turn an uncertain result into an

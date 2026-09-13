@@ -44,6 +44,22 @@
             {{ __('pos.silent_print_needs_agent') }}
         </div>
         @endif
+        @if(!empty($kotPrinterStale))
+        <div class="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300" data-kot-printer-stale>
+            {{ __('pos.kot_printer_stale_warning') }}
+        </div>
+        @endif
+        @if(isset($kotActionRequired) && $kotActionRequired->count())
+        <div class="mt-3 p-3 rounded-xl border-2 border-rose-400 bg-rose-600 text-white" data-kot-action-required role="alert">
+            <p class="text-xs font-extrabold uppercase tracking-wide">{{ __('pos.kot_action_required_title') }}</p>
+            <p class="text-[12px] font-semibold mt-1">{{ __('pos.kot_action_required_body') }}</p>
+            <ul class="mt-2 space-y-1 text-[11px] font-semibold">
+                @foreach($kotActionRequired as $attn)
+                <li>KOT #{{ $attn['restaurant_order_id'] ?? $attn['id'] }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
     </div>
 
     <form method="POST" action="{{ route('pos.printer-settings') }}" class="space-y-5">
@@ -415,6 +431,30 @@
         });
     })();
     </script>
+    @endif
+
+    @if(isset($recentPrintJobs) && $recentPrintJobs->count())
+    <div class="mt-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5" data-print-activity>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.recent_print_activity') }}</h3>
+        <div class="space-y-2">
+            @foreach($recentPrintJobs as $job)
+            @php $state = \App\Support\KotPrintState::forJob($job); @endphp
+            <div class="flex items-start justify-between gap-3 p-2.5 rounded-lg border border-gray-100 dark:border-gray-800" data-print-state="{{ $state['key'] }}">
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        {{ $job->type === 'bill' ? __('pos.bill_word_short') : __('pos.kot_word') }}
+                        #{{ $job->type === 'bill' ? $job->transaction_id : $job->restaurant_order_id }}
+                        <span class="text-gray-400 font-normal">→ {{ $job->target_printer }}</span>
+                    </p>
+                    @if($job->error)
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">{{ $job->error }}</p>
+                    @endif
+                </div>
+                <span class="text-[11px] font-semibold whitespace-nowrap {{ $state['tone'] === 'rose' ? 'text-red-600' : ($state['tone'] === 'amber' ? 'text-amber-600' : 'text-emerald-600') }}">{{ $state['label'] }}</span>
+            </div>
+            @endforeach
+        </div>
+    </div>
     @endif
 
     {{-- Recent failed jobs --}}

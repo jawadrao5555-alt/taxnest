@@ -741,6 +741,15 @@ class PosController extends Controller
             ->orderByDesc('id')
             ->limit(10)
             ->get();
+        $kotActionRequired = collect(\App\Services\KotPrintService::actionRequiredJobs($company));
+        $recentPrintJobs = \App\Models\PosPrintJob::where('company_id', $companyId)
+            ->orderByDesc('id')
+            ->limit(15)
+            ->get();
+        $kotPrinterStale = \App\Support\PrinterIdentity::savedNameLooksStale(
+            $settings['kot_printer'] ?? null,
+            $settings['available_printers'] ?? []
+        );
 
         // Task 1166 — multi-counter registry (empty collections on legacy schema
         // or single-counter shops whose agent predates device identity).
@@ -768,7 +777,57 @@ class PosController extends Controller
         // counter-labeled). Single-counter/legacy shops get today's list back.
         $kotOptions = \App\Models\PosAgentDevice::kotPrinterOptions($company);
 
-        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'devices', 'assignableTeam', 'kotOptions'));
+        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'recentPrintJobs', 'kotActionRequired', 'kotPrinterStale', 'devices', 'assignableTeam', 'kotOptions'));
+    }
+
+    /**
+     * Sale / waiter poll: open KOT Action Required rows after a dead local
+     * agent or a content-fetched unknown outcome. Also runs the fast
+     * unresponsive recovery so staff are not left in a silent 5-minute wait.
+     */
+    public function apiKotPrintAttention(Request $request)
+    {
+        $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : (auth('pos')->user()->company_id ?? null);
+        $company = $companyId ? Company::find($companyId) : null;
+        if (!$company) {
+            return response()->json(['jobs' => [], 'failover_ms' => 0]);
+        }
+        $started = hrtime(true);
+        $jobs = \App\Services\KotPrintService::actionRequiredJobs($company);
+        $ms = (hrtime(true) - $started) / 1e6;
+
+        return response()->json([
+            'jobs' => $jobs,
+            'failover_ms' => round($ms, 3),
+        ]);
+    }
+
+    /**
+     * Sale / waiter reported Local Core unreachable. Instant Action Required
+     * for this device's open local handoffs — never a silent wait, never a
+     * blind reprint after a possible local print.
+     */
+    public function apiKotLocalCoreDown(Request $request)
+    {
+        $user = auth('pos')->user();
+        $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : ($user->company_id ?? null);
+        $company = $companyId ? Company::find($companyId) : null;
+        if (!$company) {
+            return response()->json(['ok' => false, 'jobs' => []]);
+        }
+        $uid = $request->header('X-NestPOS-Device-Uid')
+            ?: $request->input('device_uid')
+            ?: ($user->pos_device_uid ?? null);
+        $started = hrtime(true);
+        \App\Services\KotPrintService::reportLocalCoreDown($company, $uid ? (string) $uid : null);
+        $jobs = \App\Services\KotPrintService::actionRequiredJobs($company);
+        $ms = (hrtime(true) - $started) / 1e6;
+
+        return response()->json([
+            'ok' => true,
+            'jobs' => $jobs,
+            'failover_ms' => round($ms, 3),
+        ]);
     }
 
     /**

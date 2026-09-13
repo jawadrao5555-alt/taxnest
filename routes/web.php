@@ -1094,6 +1094,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // cause next time. sendBeacon-compatible (pos/* is CSRF-exempt).
     Route::post('/api/print-telemetry', [PosController::class, 'apiPrintTelemetry'])
         ->middleware('throttle:30,1')->name('pos.api.print-telemetry');
+    Route::get('/api/kot-print-attention', [PosController::class, 'apiKotPrintAttention'])
+        ->middleware('throttle:60,1')->name('pos.api.kot-print-attention');
+    Route::post('/api/kot-print-attention/local-core-down', [PosController::class, 'apiKotLocalCoreDown'])
+        ->middleware('throttle:30,1')->name('pos.api.kot-local-core-down');
     // One-click silent-print prompt (sale-screen banner) — controller enforces
     // a strict admin/manager gate (isPosCashier → 403), same pattern as bulk-sale.
     Route::post('/api/printer-prompt', [PosController::class, 'apiPrinterPrompt'])->name('pos.api.printer-prompt');

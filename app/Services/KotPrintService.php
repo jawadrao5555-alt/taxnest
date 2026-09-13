@@ -34,17 +34,33 @@ class KotPrintService
      * While the handoff is FRESH (younger than LOCAL_HANDOFF_TIMEOUT_SECONDS)
      * every cloud KOT enqueue path excludes the handed-off lines, so the
      * counter's auto/full/safety-net KOT cannot print them a second time.
-     * Once it is older than that with no acknowledgement (agent died, local
-     * state lost, printer never answered) the cloud takes the slip back:
-     * expireLocalHandoffs() marks it expired and enqueues the normal cloud KOT
-     * for whatever is still unprinted. The shop PC gives up strictly EARLIER
-     * (pra-agent LOCAL_KOT_HANDOFF_MS = 3 min, measured from the same
-     * accept instant) and says so with print.fail{terminal} — so there is
-     * never a moment where both sides believe they own the slip.
+     * Once it is older than that with no acknowledgement AND the shop PC
+     * still looks online, expireLocalHandoffs() marks it expired and enqueues
+     * the normal cloud KOT for whatever is still unprinted. A dead /
+     * unresponsive shop PC is parked as Action Required immediately instead
+     * of a silent 5-minute wait — automatic reprint is not proven safe after
+     * a local print that may already have come out. The shop PC gives up
+     * strictly EARLIER (pra-agent LOCAL_KOT_HANDOFF_MS = 3 min, measured from
+     * the same accept instant) and says so with print.fail{terminal} — so
+     * there is never a moment where both sides believe they own the slip.
      */
     public const LOCAL_STATUS = 'local';
     public const LOCAL_EXPIRED_STATUS = 'expired';
     public const LOCAL_HANDOFF_TIMEOUT_SECONDS = 300;
+
+    /**
+     * Fast dead-agent window for an OPEN kitchen handoff / in-flight claim.
+     * The desktop agent heartbeats about every 30s and is treated online for
+     * 2 minutes. Three missed beats (90s) is the fastest safe "this PC is
+     * gone" signal that does not false-trigger on a single network blip.
+     */
+    public const HANDOFF_UNRESPONSIVE_SECONDS = 90;
+
+    /**
+     * Shop PC died or stopped answering after it took the slip. Paper may
+     * already be in the tray — automatic reprint is NOT proven safe.
+     */
+    public const LOCAL_AGENT_UNRESPONSIVE_ERROR = 'local_agent_unresponsive: the shop PC stopped answering after it took this kitchen slip. Check the printer tray — reprint from the bill/order screen only if nothing came out.';
 
     /** claim_token the Local Core ack (print.* on aggregate kot:<order>) resolves to. */
     public static function localHandoffToken(string $orderAggregate): string
@@ -199,26 +215,262 @@ class KotPrintService
     }
 
     /**
-     * Cloud recovery for a shop PC that never acknowledged its slip. Runs
-     * opportunistically from the agent's print-job poll (that agent is, by
-     * definition, online again). Each expired handoff becomes ONE normal
-     * cloud KOT (delta = still-unprinted lines only); a late print.complete
-     * that arrives afterwards voids that job while it is still pending, and
-     * the render path drops shop-PC-printed lines from any job that was
-     * already claimed (204 = no paper), so there is still exactly one slip.
+     * True when reprinting this job cannot create a second physical slip:
+     * the agent never fetched print content, so paper cannot have come out.
+     * Local handoffs print from the shop PC's own document — they are never
+     * proven safe after the PC goes silent.
+     */
+    public static function reprintProvenSafe(?PosPrintJob $job): bool
+    {
+        if (!$job) {
+            return false;
+        }
+        $token = (string) ($job->claim_token ?? '');
+        if (str_starts_with($token, 'ac:kot:') || ($job->status ?? '') === self::LOCAL_STATUS) {
+            return false;
+        }
+        if (!\App\Http\Controllers\AgentController::contentFetchTrackingReady()) {
+            return false;
+        }
+        $fetched = $job->content_fetched_at ?? null;
+
+        return $fetched === null && in_array((string) $job->status, ['printing', 'pending'], true);
+    }
+
+    /**
+     * Fastest safe "this shop PC is gone" check for an open handoff / claim.
+     * Uses the job's owning device when stamped; otherwise the company heartbeat.
+     */
+    public static function owningAgentUnresponsive(Company $company, ?string $deviceUid, int $windowSeconds = self::HANDOFF_UNRESPONSIVE_SECONDS): bool
+    {
+        $cutoff = now()->subSeconds(max(1, $windowSeconds));
+        try {
+            if ($deviceUid && \App\Http\Controllers\AgentController::deviceRoutingReady()) {
+                $device = \App\Models\PosAgentDevice::where('company_id', $company->id)
+                    ->where('device_uid', $deviceUid)
+                    ->first();
+                if ($device) {
+                    return (bool) ($device->last_seen_at && $device->last_seen_at->lt($cutoff));
+                }
+            }
+        } catch (\Throwable $e) {
+            // fall through to company heartbeat
+        }
+
+        return (bool) ($company->agent_last_seen && $company->agent_last_seen->lt($cutoff));
+    }
+
+    /**
+     * Park a local handoff as Action Required. Never enqueues a cloud KOT —
+     * the shop PC may already have printed.
+     */
+    public static function markLocalHandoffActionRequired(PosPrintJob $job, string $error = self::LOCAL_AGENT_UNRESPONSIVE_ERROR): bool
+    {
+        return (bool) PosPrintJob::whereKey($job->id)->where('status', self::LOCAL_STATUS)
+            ->update(['status' => 'failed', 'error' => $error, 'updated_at' => now()]);
+    }
+
+    /**
+     * Dead / unresponsive shop PC with an open local handoff: surface Action
+     * Required immediately. Instant automatic reprint is not proven safe.
      *
-     * @return array{expired:int, queued:int}
+     * @return array{marked:int}
+     */
+    public static function recoverUnresponsiveHandoffs(Company $company): array
+    {
+        $out = ['marked' => 0];
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+                return $out;
+            }
+            $open = PosPrintJob::where('company_id', $company->id)->where('type', 'kot')
+                ->where('status', self::LOCAL_STATUS)->orderBy('id')->limit(50)->get();
+            foreach ($open as $job) {
+                if (!self::owningAgentUnresponsive($company, $job->device_uid)) {
+                    continue;
+                }
+                if (self::markLocalHandoffActionRequired($job)) {
+                    $out['marked']++;
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService recoverUnresponsiveHandoffs failed: '.$e->getMessage());
+        }
+
+        return $out;
+    }
+
+    /**
+     * POS / waiter reported Local Core as dead right now. Instant Action
+     * Required for this device's open handoffs (or unstamped / already-dead
+     * ones). Never touches another online counter's live handoff.
+     *
+     * @return array{marked:int}
+     */
+    public static function reportLocalCoreDown(Company $company, ?string $deviceUid): array
+    {
+        $out = ['marked' => 0];
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+                return $out;
+            }
+            $open = PosPrintJob::where('company_id', $company->id)->where('type', 'kot')
+                ->where('status', self::LOCAL_STATUS)->orderBy('id')->limit(50)->get();
+            foreach ($open as $job) {
+                $uid = $job->device_uid ? (string) $job->device_uid : null;
+                if ($deviceUid && $uid && $uid !== $deviceUid) {
+                    continue;
+                }
+                if (!$deviceUid && $uid && !self::owningAgentUnresponsive($company, $uid)) {
+                    continue;
+                }
+                if (self::markLocalHandoffActionRequired($job)) {
+                    $out['marked']++;
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService reportLocalCoreDown failed: '.$e->getMessage());
+        }
+
+        return $out;
+    }
+
+    /**
+     * Cloud claim whose owning agent is dead: requeue only when content was
+     * never fetched; otherwise fail closed (Action Required).
+     *
+     * @return array{failed:int, requeued:int}
+     */
+    public static function recoverUnresponsiveCloudClaims(Company $company): array
+    {
+        $out = ['failed' => 0, 'requeued' => 0];
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+                return $out;
+            }
+            $fetchTracked = \App\Http\Controllers\AgentController::contentFetchTrackingReady();
+            $rows = PosPrintJob::where('company_id', $company->id)
+                ->where('status', 'printing')
+                ->where(fn ($q) => $q->whereNull('claim_token')->orWhere('claim_token', 'not like', 'ac:kot:%'))
+                ->orderBy('id')->limit(50)->get();
+            foreach ($rows as $job) {
+                if (!self::owningAgentUnresponsive($company, $job->device_uid)) {
+                    continue;
+                }
+                // A claim that just succeeded is proof of life for this tick —
+                // do not requeue or fail-closed a job the agent is still holding.
+                if ($job->updated_at && $job->updated_at->gt(now()->subSeconds(self::HANDOFF_UNRESPONSIVE_SECONDS))) {
+                    continue;
+                }
+                if ($fetchTracked && $job->content_fetched_at) {
+                    $flipped = PosPrintJob::whereKey($job->id)->where('status', 'printing')
+                        ->whereNotNull('content_fetched_at')
+                        ->update([
+                            'status' => 'failed',
+                            'claim_token' => null,
+                            'error' => \App\Http\Controllers\AgentController::UNCONFIRMED_AFTER_FETCH_ERROR,
+                            'updated_at' => now(),
+                        ]);
+                    if ($flipped) {
+                        $out['failed']++;
+                    }
+                    continue;
+                }
+                $flipped = PosPrintJob::whereKey($job->id)->where('status', 'printing')
+                    ->when($fetchTracked, fn ($q) => $q->whereNull('content_fetched_at'))
+                    ->update(['status' => 'pending', 'claim_token' => null, 'updated_at' => now()]);
+                if ($flipped) {
+                    $out['requeued']++;
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService recoverUnresponsiveCloudClaims failed: '.$e->getMessage());
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{local_action_required:int, cloud_failed:int, cloud_requeued:int}
+     */
+    public static function recoverUnresponsivePrints(Company $company): array
+    {
+        $local = self::recoverUnresponsiveHandoffs($company);
+        $cloud = self::recoverUnresponsiveCloudClaims($company);
+
+        return [
+            'local_action_required' => (int) ($local['marked'] ?? 0),
+            'cloud_failed' => (int) ($cloud['failed'] ?? 0),
+            'cloud_requeued' => (int) ($cloud['requeued'] ?? 0),
+        ];
+    }
+
+    /**
+     * Operator-facing Action Required rows (failed-closed unknown outcomes).
+     *
+     * @return list<array{id:int, restaurant_order_id:?int, error:string, display_state:string}>
+     */
+    public static function actionRequiredJobs(Company $company, int $limit = 15): array
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+                return [];
+            }
+            self::recoverUnresponsivePrints($company);
+
+            return PosPrintJob::where('company_id', $company->id)
+                ->where('type', 'kot')
+                ->where('status', 'failed')
+                ->where(function ($q) {
+                    $q->where('error', 'like', 'local_agent_unresponsive%')
+                        ->orWhere('error', 'like', 'unconfirmed_after_print_content_fetched%');
+                })
+                ->where('created_at', '>=', now()->subHours(12))
+                ->orderByDesc('id')
+                ->limit($limit)
+                ->get()
+                ->map(fn (PosPrintJob $job) => [
+                    'id' => (int) $job->id,
+                    'restaurant_order_id' => $job->restaurant_order_id ? (int) $job->restaurant_order_id : null,
+                    'error' => (string) ($job->error ?? ''),
+                    'display_state' => \App\Support\KotPrintState::ACTION_REQUIRED,
+                    'created_at' => optional($job->created_at)?->toIso8601String(),
+                ])->values()->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Cloud recovery for a shop PC that never acknowledged its slip. First
+     * recovers dead/unresponsive agents (Action Required, no blind reprint).
+     * A still-online agent that simply never acked past LOCAL_HANDOFF_TIMEOUT
+     * is the last-resort expire → one cloud KOT (late print.complete still
+     * voids that job while pending).
+     *
+     * @return array{expired:int, queued:int, action_required:int, cloud_requeued:int}
      */
     public static function expireLocalHandoffs(Company $company): array
     {
-        $out = ['expired' => 0, 'queued' => 0];
+        $out = ['expired' => 0, 'queued' => 0, 'action_required' => 0, 'cloud_requeued' => 0];
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) return $out;
+            $dead = self::recoverUnresponsivePrints($company);
+            $out['action_required'] = (int) ($dead['local_action_required'] ?? 0) + (int) ($dead['cloud_failed'] ?? 0);
+            $out['cloud_requeued'] = (int) ($dead['cloud_requeued'] ?? 0);
             $stale = PosPrintJob::where('company_id', $company->id)->where('type', 'kot')
                 ->where('status', self::LOCAL_STATUS)
                 ->where('created_at', '<', now()->subSeconds(self::LOCAL_HANDOFF_TIMEOUT_SECONDS))
                 ->orderBy('id')->limit(50)->get();
             foreach ($stale as $job) {
+                // Still-online hung drain: last-resort cloud take-back.
+                // Dead agents were already parked as Action Required above.
+                if (self::owningAgentUnresponsive($company, $job->device_uid)) {
+                    if (self::markLocalHandoffActionRequired($job)) {
+                        $out['action_required']++;
+                    }
+                    continue;
+                }
                 // Conditional flip: whoever flips it owns the cloud enqueue.
                 $flipped = PosPrintJob::whereKey($job->id)->where('status', self::LOCAL_STATUS)
                     ->update(['status' => self::LOCAL_EXPIRED_STATUS, 'error' => 'Shop PC never confirmed the kitchen slip; cloud printed it.']);
@@ -232,6 +484,48 @@ class KotPrintService
         } catch (\Throwable $e) {
             \Log::warning('KotPrintService expireLocalHandoffs failed: ' . $e->getMessage());
         }
+        return $out;
+    }
+
+    /**
+     * Watchdog sweep: dead-agent Action Required first, then overdue
+     * still-online handoffs. Independent of agent claim polling.
+     *
+     * @return array{expired:int, queued:int, companies:int, action_required:int, cloud_requeued:int}
+     */
+    public static function expireLocalHandoffsAll(): array
+    {
+        $out = ['expired' => 0, 'queued' => 0, 'companies' => 0, 'action_required' => 0, 'cloud_requeued' => 0];
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+                return $out;
+            }
+            $companyIds = PosPrintJob::query()
+                ->where('type', 'kot')
+                ->where(function ($q) {
+                    $q->where('status', self::LOCAL_STATUS)
+                        ->orWhere('status', 'printing');
+                })
+                ->distinct()
+                ->orderBy('company_id')
+                ->limit(200)
+                ->pluck('company_id');
+            foreach ($companyIds as $companyId) {
+                $company = Company::find($companyId);
+                if (!$company) {
+                    continue;
+                }
+                $one = self::expireLocalHandoffs($company);
+                $out['companies']++;
+                $out['expired'] += (int) ($one['expired'] ?? 0);
+                $out['queued'] += (int) ($one['queued'] ?? 0);
+                $out['action_required'] += (int) ($one['action_required'] ?? 0);
+                $out['cloud_requeued'] += (int) ($one['cloud_requeued'] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService expireLocalHandoffsAll failed: '.$e->getMessage());
+        }
+
         return $out;
     }
 

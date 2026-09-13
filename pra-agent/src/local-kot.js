@@ -134,6 +134,22 @@ function planKotPrints(job, printSettings) {
   return plan;
 }
 
+/** Cloud has accepted the hold — a live failover path exists. */
+function holdAcceptedByCloud(job) {
+  const synced = Number(job && job.hold_synced_at_ms);
+  return Number.isFinite(synced) && synced > 0;
+}
+
+/**
+ * Instant cloud failover: local cannot print (no silent target, or this
+ * attempt failed) AND the internet already accepted the hold. Unsynced
+ * holds stay local — there is no cloud printer to hand to yet.
+ */
+function shouldHandBackToCloud(job, plan, printFailed) {
+  if (!holdAcceptedByCloud(job)) return false;
+  return !plan || plan.length === 0 || !!printFailed;
+}
+
 /**
  * Drain the domain's local-only KOT queue once.
  * @param {object} domain  LocalCoreDomain (needs localPrintJobs/claimLocalPrint/finishLocalPrint)
@@ -198,9 +214,18 @@ async function drainLocalKotQueue(domain, deps) {
       out.handed_back += 1;
       continue;
     }
+    if (shouldHandBackToCloud(job, plan, false)) {
+      let acked = false;
+      try { acked = ackLocalPrint(domain, job, false, 'local_kot_printer_unavailable', deps, now()); }
+      catch (e) { log(`[local-kot] ${job.id} instant hand-back failed: ${e && e.message}`); }
+      if (!acked) { try { domain.finishLocalPrint(job.id, claimed.claim_token, false, 'local_kot_printer_unavailable'); } catch (e) {} }
+      log(`[local-kot] ${job.id} handed back immediately (local printer unavailable/misconfigured, cloud accepted)`);
+      out.handed_back += 1;
+      continue;
+    }
     if (!plan.length) {
-      // No silent KOT printer known for this shop yet (settings arrive with the
-      // first cloud snapshot). Keep the slip queued with backoff — never drop it.
+      // No silent KOT printer and the cloud has not accepted the hold yet
+      // (internet down). Keep the slip queued with backoff — never drop it.
       try { domain.finishLocalPrint(job.id, claimed.claim_token, false, 'kot_printer_not_configured'); } catch (e) {}
       out.failed += 1;
       continue;
@@ -233,6 +258,13 @@ async function drainLocalKotQueue(domain, deps) {
       if (!acked) { try { domain.finishLocalPrint(job.id, claimed.claim_token, true, null); } catch (e) {} }
       else out.acked += 1;
       out.printed += 1;
+    } else if (shouldHandBackToCloud(job, plan, true)) {
+      let acked = false;
+      try { acked = ackLocalPrint(domain, job, false, lastError || 'local_printer_unavailable', deps, now()); }
+      catch (e) { log(`[local-kot] ${job.id} failover hand-back failed: ${e && e.message}`); }
+      if (!acked) { try { domain.finishLocalPrint(job.id, claimed.claim_token, false, lastError || 'local_printer_unavailable'); } catch (e) {} }
+      log(`[local-kot] ${job.id} handed back immediately (local print failed, cloud accepted)`);
+      out.handed_back += 1;
     } else {
       try { domain.finishLocalPrint(job.id, claimed.claim_token, false, lastError); } catch (e) {}
       out.failed += 1;
@@ -241,4 +273,7 @@ async function drainLocalKotQueue(domain, deps) {
   return out;
 }
 
-module.exports = { renderKotHtml, planKotPrints, drainLocalKotQueue, handoffExpired, LOCAL_KOT_HANDOFF_MS };
+module.exports = {
+  renderKotHtml, planKotPrints, drainLocalKotQueue, handoffExpired,
+  holdAcceptedByCloud, shouldHandBackToCloud, LOCAL_KOT_HANDOFF_MS,
+};

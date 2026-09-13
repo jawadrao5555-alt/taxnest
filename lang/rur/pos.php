@@ -2078,6 +2078,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_print_style' => 'KOT print style — paper ki bachat',
     'kot_print_style_hint' => 'Zaroorat ki cheezein chhupakar kitchen ticket chhota karein, aur print ki position adjust karein',
     'kot_printer_hint' => 'Kitchen tickets (KOT) seedha kitchen ke is printer par jayengi.',
+    'kot_printer_stale_warning' => 'Saved kitchen printer ka naam ab reported queue se match nahi karta (case ya spacing). Settings change nahi huin — missing print ho to live queue choose karein.',
+    'kot_action_required_title' => 'Action Required — kitchen slip confirm nahi hui',
+    'kot_action_required_body' => 'Shop PC kitchen ticket lene ke baad jawab nahi de raha. Printer tray check karein. Reprint tabhi karein jab kuch na nikla ho.',
+    'kot_action_required_reprint' => 'KOT reprint karein',
     'kot_reprint_banner' => '*** REPRINT #:n — PEHLA TICKET RADD KAREIN ***',
     // Task 778: delta slip par KOT #N ke saath "ADD-ON"; full-mode update ticket par banner; nayi rows par tag.
     'kot_addon_marker' => 'ADD-ON',
@@ -3543,6 +3547,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'recent_fbr_logs' => 'Haal hi ke FBR logs',
     'recent_movements' => 'Recent Movements',
     'recent_orders' => 'Recent Orders',
+    'recent_print_activity' => 'Recent print activity',
     'recent_pra_logs' => 'Haal hi ke PRA logs',
     'recent_settlements' => 'Recent Settlements',
     'recent_transactions' => 'Recent Transactions',

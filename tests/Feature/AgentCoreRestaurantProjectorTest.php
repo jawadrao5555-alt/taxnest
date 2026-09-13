@@ -479,7 +479,9 @@ class AgentCoreRestaurantProjectorTest extends TestCase
         $order = \App\Models\RestaurantOrder::findOrFail($orderId);
 
         // Fresh handoff: expiry sweep leaves it alone, cloud stays silent.
-        $this->assertSame(['expired' => 0, 'queued' => 0], KotPrintService::expireLocalHandoffs($this->company));
+        $fresh = KotPrintService::expireLocalHandoffs($this->company);
+        $this->assertSame(0, $fresh['expired']);
+        $this->assertSame(0, $fresh['queued']);
         $this->assertCount(0, $this->cloudKotJobs($orderId));
 
         // Agent died before printing (no ack ever): after the timeout the cloud
@@ -493,7 +495,9 @@ class AgentCoreRestaurantProjectorTest extends TestCase
         $jobs = $this->cloudKotJobs($orderId);
         $this->assertCount(1, $jobs);
         // Second sweep: nothing left to expire, nothing new queued.
-        $this->assertSame(['expired' => 0, 'queued' => 0], KotPrintService::expireLocalHandoffs($this->company));
+        $again = KotPrintService::expireLocalHandoffs($this->company);
+        $this->assertSame(0, $again['expired']);
+        $this->assertSame(0, $again['queued']);
         $this->assertCount(1, $this->cloudKotJobs($orderId));
 
         // Late ack from a resurrected agent: stamps the still-NULL lines, closes

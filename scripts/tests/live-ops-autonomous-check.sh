@@ -95,6 +95,14 @@ grep -q 'live_ops_owner_command.py' "$BRIDGE" && ok "owner bridge parses before 
   || bad "bridge must parse locally first"
 grep -q 'environment: production' "$BRIDGE" && ok "owner bridge uses Environment production" \
   || bad "bridge must use Environment production"
+grep -q 'github.event.issue.number || github.run_id' "$BRIDGE" \
+  && ok "one waiting incident cannot block every later Live Ops request" \
+  || bad "Live Ops concurrency must be scoped per issue/run"
+if grep -q 'title + "\\n" + body' "$BRIDGE"; then
+  bad "issue context must not be parsed as executable owner command"
+else
+  ok "issue command parser uses authenticated title only"
+fi
 if grep -q 'environment: production-deploy' "$BRIDGE"; then
   bad "owner bridge must not use production-deploy"
 else

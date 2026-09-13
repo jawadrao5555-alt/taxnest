@@ -1,7 +1,5 @@
-# Elaan for THIS production deploy only. CI publishes
-#   "{title} [deploy {TARGET_SHA}]"
-# so a new SHA cannot no-op against an older AppUpdate with the same human
-# title (Deploy Production #15). Same-SHA retries stay idempotent.
+# Elaan for THIS production deploy only. CI stores TARGET_SHA internally in
+# deployment_key; customer-visible title/points never contain provenance.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
 title: "Production update — NestPOS receipt printing reliability"

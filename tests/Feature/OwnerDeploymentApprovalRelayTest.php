@@ -89,10 +89,10 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $admin = $this->admin();
         $this->github();
         $this->actingAs($admin, 'admin')->post('/admin/deployment-approval', [
-            'pull_request_number' => 17, 'head_sha' => strtoupper(self::SHA),
+            'pull_request_number' => 17, 'password' => 'correct-password',
         ])->assertRedirect()->assertSessionHas('success');
         $this->assertDatabaseHas('owner_deployment_approval_requests', [
-            'pull_request_number' => 17, 'head_sha' => self::SHA, 'status' => 'pending',
+            'pull_request_number' => 17, 'head_sha' => self::SHA, 'status' => 'approved',
         ]);
 
         $this->expectException(\InvalidArgumentException::class);

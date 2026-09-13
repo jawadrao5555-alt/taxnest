@@ -940,14 +940,29 @@ class LiveOpsDiagnosticsService
 
     private function serverHealth(): array
     {
-        return [
-            'server' => $this->platform->server(),
-            'application' => $this->platform->application(),
-            'database' => $this->platform->database(),
-            'queue' => $this->platform->queue(),
-            'scheduler' => $this->platform->scheduler(),
-            'websocket' => $this->platform->websocket(),
+        $sections = [
+            'server_health' => $this->platform->server(),
+            'application_health' => $this->platform->application(),
+            'database_health' => $this->platform->database(),
+            'queue_worker_health' => $this->platform->queue(),
+            'scheduler_health' => $this->platform->scheduler(),
+            'websocket_agent_health' => ['websocket' => $this->platform->websocket(), 'agents' => []],
             'performance' => $this->platform->performance(),
+        ];
+        $overall = $this->composeOverallStatus($sections);
+
+        return [
+            // Backward-compatible keys used by the existing API and tests.
+            'server' => $sections['server_health'],
+            'application' => $sections['application_health'],
+            'database' => $sections['database_health'],
+            'queue' => $sections['queue_worker_health'],
+            'scheduler' => $sections['scheduler_health'],
+            'websocket' => $sections['websocket_agent_health']['websocket'],
+            'performance' => $sections['performance'],
+            'overall' => $overall,
+            'unknown_observability_gaps' => $overall['unknown'],
+            'recommended_owner_actions' => $overall['recommended_owner_actions'],
             'note' => 'Read-only host/process/DB signals. Missing values are UNKNOWN. No services were restarted.',
         ];
     }
@@ -1465,7 +1480,11 @@ class LiveOpsDiagnosticsService
                 (int) ($payload['counts']['failed'] ?? 0),
                 (int) ($payload['counts']['pending'] ?? 0)
             ),
-            'SERVER_HEALTH' => 'Server health snapshot (read-only).',
+            'SERVER_HEALTH' => sprintf(
+                'SERVER_HEALTH %s — %s',
+                $payload['overall']['status'] ?? 'UNKNOWN',
+                $payload['overall']['summary'] ?? 'No measured result was returned.'
+            ),
             'DAILY_OPS' => sprintf(
                 'DAILY_OPS %s — %s',
                 $payload['overall']['status'] ?? 'UNKNOWN',

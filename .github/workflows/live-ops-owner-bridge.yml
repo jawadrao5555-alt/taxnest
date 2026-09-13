@@ -38,7 +38,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: live-ops-owner-bridge
+  group: live-ops-owner-bridge-${{ github.event.issue.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -97,9 +97,9 @@ jobs:
           elif event == "issue_comment":
               text = os.environ.get("COMMENT_BODY") or ""
           else:
-              title = os.environ.get("ISSUE_TITLE") or ""
-              body = os.environ.get("ISSUE_BODY") or ""
-              text = title + "\n" + body
+              # The title is the authenticated allow-listed command. Issue body
+              # is incident context, not executable input.
+              text = os.environ.get("ISSUE_TITLE") or ""
           print(json.dumps({"text": text.strip(), "requester": requester[:120]}))
           PY
           TEXT=$(python3 -c 'import json; print(json.load(open("/tmp/owner-text.json"))["text"])')

@@ -121,8 +121,8 @@ If `production-deploy` secrets are missing, Deploy Production fail-closes (empty
 | Gate | Job `deploy` uses `environment: production-deploy` (secrets + main-only branch policy; **no required reviewers**). Job `gate` does **not** use an Environment (no secrets, starts immediately, fail-closed on non-tip and on `skip_elaan`/`allow_settings`). |
 | Checkout | Exact deploy SHA (resolved), full history |
 | SSH | Writes `PRODUCTION_SSH_PRIVATE_KEY` to a temp file (mode 600), uses `scripts/lib/live-known-hosts` + `StrictHostKeyChecking=yes` |
-| Elaan spec | If `deploy/elaan.yml` is in the commit, `scripts/elaan-insert.sh --from-file --deploy-sha=$TARGET_SHA` creates a published `AppUpdate` whose **title is `{spec title} [deploy {40-char SHA}]`**. A new SHA therefore cannot no-op against an older row with the same human title (Deploy Production #15 / AppUpdate #265). Idempotent on the **qualified** title: same-SHA retry is `ELAAN_EXISTS` (not duplicated or re-dated). The reserved Daily L001 title is rejected. Unattended Deploy Production **refuses** `skip_elaan`. |
-| Elaan gate | Freshness check: a published `pos`/`all` row must have `created_at` after the last deploy marker for a **new** SHA. A **same-SHA** rerun/refresh (live HEAD and marker commit both equal the TARGET_SHA) may pass only when that SHA-qualified published title still exists as a published `pos`/`all` AppUpdate — the same human title from an older SHA does not count, and existing titles are never re-dated or duplicated. Infra-only deploys omit `deploy/elaan.yml` only when a qualifying published row already exists; unattended Deploy Production **cannot** skip this gate. |
+| Elaan spec | `scripts/elaan-insert.sh --from-file --deploy-sha=$TARGET_SHA` creates a published `AppUpdate`. SHA is stored only in private `deployment_key`; customer title/points contain no deployment provenance. Same-SHA retry is idempotent. |
+| Elaan gate | A new SHA requires a time-fresh published `pos`/`all` row. A same-SHA rerun may pass only when private `deployment_key` matches TARGET_SHA. Rows are never re-dated or duplicated. |
 | Apply | `scripts/ci-deploy-production.sh` → shared `scripts/lib/live-remote-apply.sh` |
 | Live verify | Same job runs `scripts/ci-live-verify.sh`: live HEAD == deploy SHA, `/up` 200, NestPOS QA login + feature markers (not merely HTTP 200). Uses Environment secrets `PRODUCTION_SSH_PRIVATE_KEY` + `LIVE_QA_PASS`. Failure fails the workflow — Cloud Agents must start a new diagnosis cycle (`docs/ops/cloud-agent-issue-to-live.md`). |
 | Semantics | Same remote core as `deploy-live.sh`: flock lock, maintenance `artisan down` (200), exact-SHA checkout, composer if needed, migrate only when the gap includes migrations, config/route/view cache rebuild, ownership + SELinux repair, PHP-FPM reload with OPcache proof, `taxnest-queue` restart, `artisan up`, homepage 200, cache-fresh probe, deploy marker. Fail closed (site stays in maintenance on apply failure). |
@@ -143,8 +143,8 @@ POS/FBR What's New still lives in `app_updates` (admin `/admin/app-updates`, pop
 For a production-bound PR that should announce a change:
 
 1. Copy `deploy/elaan.example.yml` → `deploy/elaan.yml` (or edit the existing file).
-2. Prefer a **new human title**. Never reuse `Daily L001 ke liye roz Reset dabana zaroori nahi`. CI always appends ` [deploy {TARGET_SHA}]` before insert, so a new SHA cannot reuse an older AppUpdate even if the human title is unchanged. Same-SHA Actions reruns no-op that qualified title (no re-date, no duplicate).
-3. After the tip/Elaan gates pass, Actions inserts the SHA-qualified row on live, then the freshness gate must still pass. A new SHA needs a **time-fresh** row (the insert just created it). `ELAAN_EXISTS` on an old human title is **not** freshness.
+2. Prefer a **new human title**. Never reuse `Daily L001 ke liye roz Reset dabana zaroori nahi`. CI stores TARGET_SHA privately in `deployment_key`; same-SHA reruns no-op without changing customer text.
+3. After the tip/Elaan gates pass, Actions inserts the row on live, then the freshness gate must still pass. A new SHA needs a **time-fresh** row. `ELAAN_EXISTS` on an old human title is **not** freshness.
 
 The freshness gate counts `audience IN ('pos','all')` only. An `fbr_pos`-only spec will insert but will **not** satisfy the gate.
 

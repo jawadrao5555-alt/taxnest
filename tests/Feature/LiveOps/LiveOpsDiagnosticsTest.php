@@ -248,6 +248,8 @@ class LiveOpsDiagnosticsTest extends LiveOpsTestCase
         $this->assertArrayHasKey('database', $server['data']);
         $this->assertTrue($server['data']['database']['connection_ok']);
         $this->assertSame('unknown', $server['data']['performance']['availability']);
+        $this->assertContains($server['data']['overall']['status'], ['GREEN', 'ATTENTION', 'CRITICAL']);
+        $this->assertNotEmpty($server['data']['overall']['summary']);
 
         $daily = app(LiveOpsDiagnosticsService::class)->run('DAILY_OPS', [
             'date_from' => now()->toDateString(),

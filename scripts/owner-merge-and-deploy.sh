@@ -40,6 +40,11 @@ trap 'rm -rf "$TMP"' EXIT
 
 echo "==> Fetch PR #${PULL} and origin/main tip"
 gh api "repos/${REPO}/pulls/${PULL}" > "$TMP/pr.json"
+gh api --paginate "repos/${REPO}/pulls/${PULL}/files?per_page=100" --jq '.[].filename' > "$TMP/pr-files.txt"
+AGENT_RELEASE_NEEDED=false
+if grep -Eq '^pra-agent/|^\.github/workflows/build-agent\.yml$' "$TMP/pr-files.txt"; then
+  AGENT_RELEASE_NEEDED=true
+fi
 MAIN_SHA=$(gh api "repos/${REPO}/commits/main" --jq .sha)
 HEAD_SHA=$(python3 -c 'import json; print(json.load(open("'"$TMP"'/pr.json"))["head"]["sha"])')
 gh api "repos/${REPO}/commits/${HEAD_SHA}/check-runs?per_page=100" > "$TMP/checks.json"
@@ -164,6 +169,10 @@ PY
     -H "Content-Type: application/json" --data-binary @"$TMP/deploy-run.json" \
     "${RELAY_URL}/api/deployment-approval/v1/deploy-run"
   echo "OWNER MERGE & DEPLOY: dispatched Deploy Production for $sha (run $RUN_ID)"
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "merge_sha=$sha" >> "$GITHUB_OUTPUT"
+    echo "agent_release_needed=$AGENT_RELEASE_NEEDED" >> "$GITHUB_OUTPUT"
+  fi
 }
 
 if [ "$ACTION" = "noop" ]; then

@@ -349,6 +349,7 @@
         var tableId = order.table_id == null ? null : order.table_id;
         return {
             id: id, local: true, local_order_id: id, local_revision: Number(opts.revision || 0),
+            business_date: order.business_date || null,
             order_number: 'L-' + id.replace(/-/g, '').slice(-4).toUpperCase(),
             status: 'held', order_type: order.order_type || 'takeaway',
             table_id: tableId,

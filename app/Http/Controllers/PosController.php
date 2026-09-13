@@ -10163,6 +10163,7 @@ class PosController extends Controller
         // Existing-recipe quick-copy source: products in this company that already have a recipe.
         // Cashier can pick one to auto-populate ingredient rows (then tweak names/qty).
         $existingRecipes = [];
+        $recipeByProduct = [];
         if (class_exists(\App\Models\ProductRecipe::class)) {
             $recipeRows = \App\Models\ProductRecipe::where('company_id', $companyId)
                 ->with(['product:id,name', 'ingredient:id,name,unit,cost_per_unit'])
@@ -10182,6 +10183,7 @@ class PosController extends Controller
                     ];
                 }
                 if (!empty($items)) {
+                    $recipeByProduct[(int) $productId] = $items;
                     $existingRecipes[] = [
                         'product_id'   => (int) $productId,
                         'product_name' => $prodName,
@@ -10222,6 +10224,7 @@ class PosController extends Controller
 
         return view('pos.products', compact(
             'products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes',
+            'recipeByProduct',
             'company', 'productLimitStatus', 'stockBranchId', 'stockBranchName', 'stockAllBranches',
             'uomGroups'
         ));
@@ -10380,6 +10383,14 @@ class PosController extends Controller
             'box_type' => 'nullable|string|max:50',
         ]);
 
+        // Recipe rows are accounting input, not best-effort decoration. Parse
+        // and tenant-resolve them before creating the product or storing an
+        // image so malformed/foreign/duplicate rows fail without side effects.
+        $recipeRows = \App\Services\ProductRecipeEditor::rowsFrom($request);
+        $preparedRecipeRows = $recipeRows === null
+            ? null
+            : \App\Services\ProductRecipeEditor::prepare((int) $companyId, $recipeRows);
+
         $imageName = null;
         if ($request->hasFile('image')) {
             $imageName = $companyId . '_' . time() . '_' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
@@ -10430,8 +10441,7 @@ class PosController extends Controller
         // so a failed ingredient/recipe write rolls back the product too — no orphans.
         // Tracks counts so the cashier sees exactly what landed and what was skipped.
         $recipeAdded = 0;
-        $recipeSkipped = 0;
-        $product = \DB::transaction(function () use ($data, $request, $companyId, &$recipeAdded, &$recipeSkipped) {
+        $product = \DB::transaction(function () use ($data, $companyId, $preparedRecipeRows, &$recipeAdded) {
             $product = PosProduct::create($data);
 
             // Inventory mirror seed: when the inventory module is ON and the
@@ -10467,66 +10477,12 @@ class PosController extends Controller
                 }
             }
 
-            // Prefer JSON payload (robust to Alpine template-nesting); fall back to array form fields.
-            $ingredientRows = [];
-            if ($request->filled('ingredients_json')) {
-                $decoded = json_decode((string) $request->input('ingredients_json'), true);
-                if (is_array($decoded)) $ingredientRows = $decoded;
-            } elseif ($request->has('ingredients') && is_array($request->input('ingredients'))) {
-                $ingredientRows = $request->input('ingredients');
-            }
-
-            if (!empty($ingredientRows)) {
-                foreach ($ingredientRows as $row) {
-                    if (!is_array($row)) continue;
-                    $qty = $row['quantity_needed'] ?? null;
-                    if ($qty === null || $qty === '' || !is_numeric($qty) || (float)$qty <= 0) {
-                        // Only count as skipped if the row had any meaningful intent
-                        if (!empty($row['ingredient_id']) || !empty($row['new_name'])) $recipeSkipped++;
-                        continue;
-                    }
-
-                    $ingredient = null;
-                    if (!empty($row['ingredient_id'])) {
-                        $ingredient = \App\Models\Ingredient::where('company_id', $companyId)
-                            ->where('id', $row['ingredient_id'])->first();
-                    } elseif (!empty($row['new_name']) && !empty($row['new_unit'])) {
-                        $name = trim($row['new_name']);
-                        $unit = trim($row['new_unit']);
-                        // Reuse if same name+unit already exists (case-insensitive) to avoid dupes
-                        $ingredient = \App\Models\Ingredient::where('company_id', $companyId)
-                            ->whereRaw('LOWER(name) = ?', [strtolower($name)])
-                            ->where('unit', $unit)
-                            ->first();
-                        if (!$ingredient) {
-                            $ingredient = \App\Models\Ingredient::create([
-                                'company_id' => $companyId,
-                                'name' => $name,
-                                'unit' => $unit,
-                                'cost_per_unit' => isset($row['new_cost']) && is_numeric($row['new_cost']) ? (float)$row['new_cost'] : 0,
-                                'current_stock' => 0,
-                                'min_stock_level' => 0,
-                                'is_active' => true,
-                            ]);
-                        }
-                    }
-                    if (!$ingredient) { $recipeSkipped++; continue; }
-
-                    // Avoid duplicate (product, ingredient) pair
-                    $exists = \App\Models\ProductRecipe::where('company_id', $companyId)
-                        ->where('product_id', $product->id)
-                        ->where('ingredient_id', $ingredient->id)
-                        ->exists();
-                    if ($exists) { $recipeSkipped++; continue; }
-
-                    \App\Models\ProductRecipe::create([
-                        'company_id' => $companyId,
-                        'product_id' => $product->id,
-                        'ingredient_id' => $ingredient->id,
-                        'quantity_needed' => (float)$qty,
-                    ]);
-                    $recipeAdded++;
-                }
+            if ($preparedRecipeRows !== null) {
+                $recipeAdded = \App\Services\ProductRecipeEditor::sync(
+                    (int) $companyId,
+                    $product,
+                    $preparedRecipeRows
+                );
             }
             return $product;
         });
@@ -10547,9 +10503,6 @@ class PosController extends Controller
         $msg = __('pos.product_added_success');
         if ($recipeAdded > 0) {
             $msg .= __('pos.product_recipe_linked', ['count' => $recipeAdded]);
-        }
-        if ($recipeSkipped > 0) {
-            $msg .= __('pos.product_recipe_skipped', ['count' => $recipeSkipped]);
         }
         return back()->with('success', $msg);
     }
@@ -11038,6 +10991,11 @@ class PosController extends Controller
             'box_type' => 'nullable|string|max:50',
         ]);
 
+        $recipeRows = \App\Services\ProductRecipeEditor::rowsFrom($request);
+        $preparedRecipeRows = $recipeRows === null
+            ? null
+            : \App\Services\ProductRecipeEditor::prepare((int) $companyId, $recipeRows);
+
         $isExempt = $request->has('is_tax_exempt');
         $isThirdSchedule = $request->has('is_third_schedule');
         // Third Schedule → always tax-free (also marks exempt)
@@ -11157,7 +11115,16 @@ class PosController extends Controller
             });
         }
 
-        $product->update($data);
+        \DB::transaction(function () use ($product, $data, $companyId, $preparedRecipeRows) {
+            $product->update($data);
+            if ($preparedRecipeRows !== null) {
+                \App\Services\ProductRecipeEditor::sync(
+                    (int) $companyId,
+                    $product,
+                    $preparedRecipeRows
+                );
+            }
+        });
 
         // Auto-fetch image ONLY if cashier explicitly chose image_mode=auto on edit.
         // Other modes (keep / upload / remove) are already handled above.

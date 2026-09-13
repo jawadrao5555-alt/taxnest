@@ -119,6 +119,8 @@ const row = NestPosLocal.offlineHeld.rowFromProjection(projection, {
 });
 assert.strictEqual(row.local, true);
 assert.strictEqual(row.id, 'waiter-hold-1');
+assert.strictEqual(row.business_date, projection.business_date,
+    'counter carries the immutable held-order business date across midnight');
 assert.strictEqual(row.table.table_number, 'T4');
 assert.strictEqual(row.total_amount, 282, '2×100 @16% + 50 exempt = 282');
 assert.strictEqual(row.items.length, 2);
@@ -150,7 +152,7 @@ const asCard = NestPosLocal.offlineHeld.settlementFromRow(row, {});
 assert.strictEqual(asCard.tax_pricing.rate_basis_points, 1600);
 
 const sale = {
-    offline_uuid: 'pay-1', business_date: '2026-09-06', payment_method: 'cash',
+    offline_uuid: 'pay-1', business_date: row.business_date, payment_method: 'cash',
     incoming_order_id: null, recalled_order_id: null, table_id: 4, online_payment_confirmed: false,
     order_ref: { id: 'waiter-hold-1', order_number: row.order_number, order_type: 'dine_in', table_id: 4 },
     customer_ref: { id: null, name: null, phone: null }, customer_id: null, delivery_address: null,

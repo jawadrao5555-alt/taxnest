@@ -10487,7 +10487,12 @@ function restaurantPos() {
             const snapshot = {
                 order_id: orderId,
                 idempotency_key: idempotency,
-                business_date: this.bizToday || new Date().toISOString().slice(0, 10),
+                // A Local Core hold owns an immutable business date. Reusing the
+                // current screen date after midnight makes the atomic settlement
+                // fail closed and strands an otherwise valid offline order.
+                business_date: (heldOrd.local === true && heldOrd.business_date)
+                    ? heldOrd.business_date
+                    : (this.bizToday || new Date().toISOString().slice(0, 10)),
                 order_type: this.orderType || 'takeaway',
                 customer_ref: this.selectedCustomer ? {
                     id: this.selectedCustomer.id || null,

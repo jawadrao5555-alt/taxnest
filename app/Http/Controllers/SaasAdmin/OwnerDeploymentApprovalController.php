@@ -9,6 +9,7 @@ use App\Services\GitHubActionsOidcVerifier;
 use App\Services\OwnerDeploymentApprovalService;
 use App\Support\OwnerApprovalPickupStatus;
 use App\Support\OwnerApprovalPollerHeartbeat;
+use App\Support\OwnerApprovalImmediateDispatch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -17,6 +18,8 @@ class OwnerDeploymentApprovalController extends Controller
     public function index(EligibleDeploymentPullRequestService $github)
     {
         $this->authorizeOwner();
+
+        $eligiblePullRequests = $github->eligible();
 
         $requests = OwnerDeploymentApprovalRequest::query()
             ->with(['requestedBy:id,name', 'approvedBy:id,name'])
@@ -27,7 +30,9 @@ class OwnerDeploymentApprovalController extends Controller
 
         return view('saas-admin.deployment-approval.index', [
             'requests' => $requests,
-            'eligiblePullRequests' => $github->eligible(),
+            'eligiblePullRequests' => $eligiblePullRequests,
+            'eligibilityWarning' => $github->availabilityWarning(),
+            'immediateDispatch' => OwnerApprovalImmediateDispatch::status(),
             'poller' => $poller,
             'requestStatuses' => $requests->mapWithKeys(
                 fn ($row) => [$row->request_id => OwnerApprovalPickupStatus::forRequest($row, $poller)]
@@ -38,7 +43,8 @@ class OwnerDeploymentApprovalController extends Controller
     public function store(
         Request $request,
         OwnerDeploymentApprovalService $service,
-        EligibleDeploymentPullRequestService $github
+        EligibleDeploymentPullRequestService $github,
+        OwnerApprovalImmediateDispatch $immediateDispatch
     ) {
         $this->authorizeOwner();
         $input = $request->validate([
@@ -57,6 +63,7 @@ class OwnerDeploymentApprovalController extends Controller
                 'head_sha' => $candidate['head_sha'],
             ], auth('admin')->id());
             $approval = $service->approve($approval, auth('admin')->id());
+            $immediateDispatch->dispatch($approval);
         } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['pull_request_number' => $exception->getMessage()])->withInput();
         }
@@ -79,7 +86,8 @@ class OwnerDeploymentApprovalController extends Controller
     public function approve(
         Request $request,
         string $requestId,
-        OwnerDeploymentApprovalService $service
+        OwnerDeploymentApprovalService $service,
+        OwnerApprovalImmediateDispatch $immediateDispatch
     ) {
         $this->authorizeOwner();
         $request->validate(['password' => ['required', 'string']]);
@@ -90,7 +98,8 @@ class OwnerDeploymentApprovalController extends Controller
 
         try {
             $approval = OwnerDeploymentApprovalRequest::findOrFail($requestId);
-            $service->approve($approval, auth('admin')->id());
+            $approval = $service->approve($approval, auth('admin')->id());
+            $immediateDispatch->dispatch($approval);
         } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['password' => $exception->getMessage()]);
         }

@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main (workflow ref; not the PR branch)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Owner-approved merge + exact-SHA deploy handoff
         id: owner-handoff
@@ -76,6 +76,35 @@ jobs:
             --pull-number="$OWNER_PULL_NUMBER" \
             --expected-head-sha="$OWNER_EXPECTED_HEAD_SHA" \
             --approval-request-id="$OWNER_APPROVAL_REQUEST_ID"
+
+      - name: Dispatch exact-SHA Agent release when this PR changed the Agent
+        if: ${{ steps.owner-handoff.outputs.agent_release_needed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.owner-handoff.outputs.merge_sha }}
+          APPROVAL_REQUEST_ID: ${{ inputs.approval_request_id }}
+        run: |
+          set -euo pipefail
+          echo "$TARGET_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          # A transient GitHub API failure must not silently omit the desktop
+          # release after the approved merge. Repeated requests remain safe:
+          # Build Agent is serialized per SHA and skips an already-published
+          # exact-SHA version instead of replacing it.
+          for attempt in 1 2 3; do
+            if gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/build-agent.yml/dispatches" \
+              -f ref=main \
+              -f "inputs[target_sha]=$TARGET_SHA" \
+              -f "inputs[approval_request_id]=$APPROVAL_REQUEST_ID"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Build Agent dispatch failed after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 3))
+          done
+          echo "Dispatched Build PRA Agent for exact merge SHA $TARGET_SHA"
 
       - name: Release failed owner handoff for a safe retry
         if: ${{ failure() && steps.owner-handoff.outcome == 'failure' }}

@@ -49,6 +49,17 @@
             {{ __('pos.kot_printer_stale_warning') }}
         </div>
         @endif
+        @if(isset($kotActionRequired) && $kotActionRequired->count())
+        <div class="mt-3 p-3 rounded-xl border-2 border-rose-400 bg-rose-600 text-white" data-kot-action-required role="alert">
+            <p class="text-xs font-extrabold uppercase tracking-wide">{{ __('pos.kot_action_required_title') }}</p>
+            <p class="text-[12px] font-semibold mt-1">{{ __('pos.kot_action_required_body') }}</p>
+            <ul class="mt-2 space-y-1 text-[11px] font-semibold">
+                @foreach($kotActionRequired as $attn)
+                <li>KOT #{{ $attn['restaurant_order_id'] ?? $attn['id'] }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
     </div>
 
     <form method="POST" action="{{ route('pos.printer-settings') }}" class="space-y-5">

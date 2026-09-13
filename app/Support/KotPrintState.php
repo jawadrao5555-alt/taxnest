@@ -58,4 +58,10 @@ final class KotPrintState
             || str_contains($error, 'Shop PC confirmed')
             || str_contains($error, 'cloud printed');
     }
+
+    public static function isActionRequiredError(string $error): bool
+    {
+        return str_starts_with($error, 'local_agent_unresponsive')
+            || str_starts_with($error, 'unconfirmed_after_print_content_fetched');
+    }
 }

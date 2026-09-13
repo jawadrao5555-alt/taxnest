@@ -324,8 +324,117 @@ class KotZeroLossInstantPrintTest extends TestCase
         $this->assertSame('local_handoff', $cloud['reason']);
         $this->assertSame([], $cloud['job_ids']);
 
-        $this->assertSame(['expired' => 0, 'queued' => 0], KotPrintService::expireLocalHandoffs($this->companyA()));
-        $this->assertSame(['expired' => 0, 'queued' => 0, 'companies' => 0], KotPrintService::expireLocalHandoffsAll());
+        $fresh = KotPrintService::expireLocalHandoffs($this->companyA());
+        $this->assertSame(0, $fresh['expired']);
+        $this->assertSame(0, $fresh['queued']);
+        $this->assertSame(0, $fresh['action_required']);
+        $all = KotPrintService::expireLocalHandoffsAll();
+        $this->assertSame(0, $all['expired']);
+        $this->assertSame(0, $all['queued']);
+        $this->assertSame(0, $all['action_required']);
+        $this->assertSame(1, $all['companies']);
+    }
+
+    public function test_dead_local_agent_is_action_required_immediately_without_auto_reprint(): void
+    {
+        $this->seedDevice('dev-kitchen', [['name' => 'Kitchen Printer']]);
+        DB::table('pos_agent_devices')->where('device_uid', 'dev-kitchen')
+            ->update(['last_seen_at' => now()->subSeconds(KotPrintService::HANDOFF_UNRESPONSIVE_SECONDS + 5)]);
+        $order = $this->holdOrder($this->companyA, 'ZL-DEAD');
+        $lineIds = DB::table('restaurant_order_items')->where('order_id', $order->id)->pluck('id')->map(fn ($i) => (int) $i)->all();
+        $handoff = KotPrintService::openLocalHandoff($this->companyA(), $order, 'zl-dead', $lineIds, 'dev-kitchen', $this->waiterId, now());
+        $this->assertFalse(KotPrintService::reprintProvenSafe($handoff));
+
+        $started = hrtime(true);
+        $out = KotPrintService::expireLocalHandoffs($this->companyA());
+        $this->timings['dead_agent_failover_ms'] = (hrtime(true) - $started) / 1e6;
+
+        $this->assertSame(0, $out['expired']);
+        $this->assertSame(0, $out['queued']);
+        $this->assertSame(1, $out['action_required']);
+        $row = PosPrintJob::where('claim_token', 'ac:kot:zl-dead')->first();
+        $this->assertSame('failed', $row->status);
+        $this->assertStringStartsWith('local_agent_unresponsive', (string) $row->error);
+        $this->assertSame(KotPrintState::ACTION_REQUIRED, KotPrintState::forJob($row)['key']);
+        $this->assertSame([], KotPrintService::freshLocalHandoffLineIds($this->companyA(), $order->fresh()));
+        $this->assertSame(0, PosPrintJob::where('restaurant_order_id', $order->id)->where('status', 'pending')->count());
+        $this->assertTrue(KotPrintState::isActionRequiredError((string) $row->error));
+        $jobs = KotPrintService::actionRequiredJobs($this->companyA());
+        $this->assertSame([$row->id], collect($jobs)->pluck('id')->all());
+        fwrite(STDOUT, "\nKOT dead-agent failover (ms): ".json_encode($this->timings, JSON_PRETTY_PRINT)."\n");
+        $this->assertLessThan(2000, $this->timings['dead_agent_failover_ms']);
+    }
+
+    public function test_local_core_down_report_is_instant_action_required_even_if_heartbeat_is_fresh(): void
+    {
+        $this->seedDevice('dev-kitchen', [['name' => 'Kitchen Printer']]);
+        $this->seedDevice('dev-other', [['name' => 'Other']]);
+        $dead = $this->holdOrder($this->companyA, 'ZL-COREDOWN');
+        $alive = $this->holdOrder($this->companyA, 'ZL-OTHER');
+        $deadLines = DB::table('restaurant_order_items')->where('order_id', $dead->id)->pluck('id')->map(fn ($i) => (int) $i)->all();
+        $aliveLines = DB::table('restaurant_order_items')->where('order_id', $alive->id)->pluck('id')->map(fn ($i) => (int) $i)->all();
+        KotPrintService::openLocalHandoff($this->companyA(), $dead, 'zl-coredown', $deadLines, 'dev-kitchen', $this->waiterId, now());
+        KotPrintService::openLocalHandoff($this->companyA(), $alive, 'zl-other', $aliveLines, 'dev-other', $this->cashierB, now());
+
+        $started = hrtime(true);
+        $out = KotPrintService::reportLocalCoreDown($this->companyA(), 'dev-kitchen');
+        $this->timings['local_core_down_ms'] = (hrtime(true) - $started) / 1e6;
+
+        $this->assertSame(1, $out['marked']);
+        $this->assertSame('failed', DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:zl-coredown')->value('status'));
+        $this->assertSame(KotPrintService::LOCAL_STATUS, DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:zl-other')->value('status'));
+        $this->assertLessThan(2000, $this->timings['local_core_down_ms']);
+    }
+
+    public function test_dead_agent_after_content_fetch_fails_closed_without_reprint(): void
+    {
+        $this->seedDevice('dev-kitchen', [['name' => 'Kitchen Printer']]);
+        $order = $this->holdOrder($this->companyA, 'ZL-FETCHED');
+        $queued = KotPrintService::enqueueForOrder($this->companyA(), $order, $this->cashierA, true);
+        $jobId = (int) $queued['job_ids'][0];
+        $this->claim('dev-kitchen');
+        PosPrintJob::whereKey($jobId)->update([
+            'content_fetched_at' => now(),
+            'device_uid' => 'dev-kitchen',
+        ]);
+        DB::table('pos_agent_devices')->where('device_uid', 'dev-kitchen')
+            ->update(['last_seen_at' => now()->subSeconds(KotPrintService::HANDOFF_UNRESPONSIVE_SECONDS + 5)]);
+
+        $started = hrtime(true);
+        $out = KotPrintService::expireLocalHandoffs($this->companyA());
+        $this->timings['content_fetched_dead_ms'] = (hrtime(true) - $started) / 1e6;
+
+        $this->assertSame(1, $out['action_required']);
+        $this->assertSame(0, $out['cloud_requeued']);
+        $row = PosPrintJob::find($jobId);
+        $this->assertSame('failed', $row->status);
+        $this->assertStringStartsWith('unconfirmed_after_print_content_fetched', (string) $row->error);
+        $this->assertSame(KotPrintState::ACTION_REQUIRED, KotPrintState::forJob($row)['key']);
+        $this->assertSame([], $this->claim('dev-kitchen'));
+        $this->assertLessThan(2000, $this->timings['content_fetched_dead_ms']);
+    }
+
+    public function test_dead_agent_before_content_fetch_requeues_immediately(): void
+    {
+        $this->seedDevice('dev-kitchen', [['name' => 'Kitchen Printer']]);
+        $order = $this->holdOrder($this->companyA, 'ZL-SAFE');
+        $queued = KotPrintService::enqueueForOrder($this->companyA(), $order, $this->cashierA, true);
+        $jobId = (int) $queued['job_ids'][0];
+        $this->claim('dev-kitchen');
+        PosPrintJob::whereKey($jobId)->update(['device_uid' => 'dev-kitchen']);
+        $this->assertNull(PosPrintJob::find($jobId)->content_fetched_at);
+        $this->assertTrue(KotPrintService::reprintProvenSafe(PosPrintJob::find($jobId)));
+        DB::table('pos_agent_devices')->where('device_uid', 'dev-kitchen')
+            ->update(['last_seen_at' => now()->subSeconds(KotPrintService::HANDOFF_UNRESPONSIVE_SECONDS + 5)]);
+
+        $started = hrtime(true);
+        $out = KotPrintService::expireLocalHandoffs($this->companyA());
+        $this->timings['safe_requeue_ms'] = (hrtime(true) - $started) / 1e6;
+
+        $this->assertSame(1, $out['cloud_requeued']);
+        $this->assertSame('pending', PosPrintJob::find($jobId)->status);
+        $this->assertCount(1, $this->claim('dev-kitchen'));
+        $this->assertLessThan(2000, $this->timings['safe_requeue_ms']);
     }
 
     public function test_independent_watchdog_recovers_overdue_handoff_without_agent_poll(): void

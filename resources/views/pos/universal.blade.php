@@ -559,6 +559,7 @@ window.addEventListener('popstate', function() {
      terminals, big TVs). Auto mode picks the zoom from viewport size; manual % is
      per-device via localStorage 'tn_screen_fit'. Empty string = normal 100% layout. --}}
 <div data-tn-sale-document="pra" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-sale-root flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
+    @include('pos.partials.kot-action-required-banner')
 
     {{-- Task 127: Starter offline-locked notice — persistent (while offline), dismissible.
          Shows ONLY when the shop is offline AND the plan does not allow offline billing,
@@ -4990,6 +4991,7 @@ function restaurantPos() {
         kitchenNotes: '',
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
         heldOrders: {!! $jsEnc($heldOrdersJson) !!},
+        kotActionRequired: [],
         _heldEtag: null,     // Task 1097: ETag from last held-orders poll (If-None-Match fast-path)
         _incomingEtag: null, // Task 1097: ETag from last incoming-orders poll
         _tableEtag: null,    // Task 1109: ETag from last table-status poll (If-None-Match fast-path)
@@ -5782,6 +5784,8 @@ function restaurantPos() {
                 // on Tab B appears here within one cycle (full server list replaces local list).
                 // Runs independently of the table board so it works on retail POS too.
                 setInterval(() => { if (!document.hidden) this.loadHeldOrders(); }, 25000);
+                setTimeout(() => this.loadKotAttention(), 800);
+                setInterval(() => { if (!document.hidden) this.loadKotAttention(); }, 5000);
             }
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
@@ -8708,6 +8712,7 @@ function restaurantPos() {
                     this.heldOrders = fresh.concat(pendingLocal);
                 }
                 this._clampHeldCursor();
+                this.loadKotAttention();
             } catch (e) {
                 // Cloud unreachable → NestPOS Desktop merges the shop PC's own open
                 // orders (waiter tablets + this counter, held via Local Core) so the
@@ -8739,7 +8744,7 @@ function restaurantPos() {
                 orders = answer.data;
                 const rev = await window.NestPosLocal.query('revisions').catch(() => null);
                 revisions = rev && rev.success && rev.data && typeof rev.data === 'object' ? rev.data : {};
-            } catch (e) { return; }
+            } catch (e) { this.reportLocalCoreDown(); return; }
             const tableNumber = (id) => {
                 if (id == null) return null;
                 const t = this.tablePickerFlat().find(x => String(x.id) === String(id));
@@ -8761,6 +8766,31 @@ function restaurantPos() {
             const keptIds = new Set(kept.map(o => String(o.id)));
             this.heldOrders = kept.concat(rows.filter(r => !keptIds.has(r.id) && r.id !== recalled));
             this._clampHeldCursor();
+        },
+        async loadKotAttention() {
+            try {
+                const res = await fetch('{{ route('pos.api.kot-print-attention') }}', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                const data = await res.json();
+                this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
+            } catch (e) {}
+        },
+        async reportLocalCoreDown() {
+            try {
+                const res = await fetch('{{ route('pos.api.kot-local-core-down') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: '{}',
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
+            } catch (e) {}
+        },
+        reprintKotAttention(job) {
+            const id = job && job.restaurant_order_id;
+            if (!id) return;
+            this.printKitchenTicket(id, null, true);
         },
         async selectTable(table, opts) {
             // Table-se-Bill (Jul 2026) + ZFC (5 Aug 2026): occupied table WITH a
@@ -10498,6 +10528,7 @@ function restaurantPos() {
                 answer = await window.NestPosLocal.heldOrder.hold(orderId, snapshot, revision, kotDocument);
             }
             if (!answer || !answer.success) return answer;
+            this.loadKotAttention();
             return { success: true, local: true, pending: true, state: 'pending',
                 message: 'Order saved locally — sync pending',
                 kot_queued: !!kotDocument,

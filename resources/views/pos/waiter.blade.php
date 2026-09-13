@@ -56,6 +56,7 @@
          class="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">
         {{ __('pos.waiter_offline_banner') }}
     </div>
+    @include('pos.partials.kot-action-required-banner')
 
     {{-- ── Header ─────────────────────────────────────────────────────────── --}}
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -841,6 +842,7 @@ function waiterApp() {
         updateAvailable: false,
         // Occupied-timer tick (7 Aug 2026): elapsedSince() labels refresh live.
         nowTick: Date.now(),
+        kotActionRequired: [],
 
         init() {
             this.categories = [...new Set(this.products.map(p => p.category))].sort();
@@ -862,6 +864,32 @@ function waiterApp() {
                 this.reloadTablesQuiet();
                 setInterval(() => { if (!document.hidden) this.reloadTablesQuiet(); }, 30000);
             }
+            setTimeout(() => this.loadKotAttention(), 800);
+            setInterval(() => { if (!document.hidden) this.loadKotAttention(); }, 5000);
+        },
+        async loadKotAttention() {
+            try {
+                const res = await fetch('{{ route('pos.api.kot-print-attention') }}', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                const data = await res.json();
+                this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
+            } catch (e) {}
+        },
+        async reportLocalCoreDown() {
+            try {
+                const res = await fetch('{{ route('pos.api.kot-local-core-down') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: '{}',
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                this.kotActionRequired = Array.isArray(data.jobs) ? data.jobs : [];
+            } catch (e) {}
+        },
+        reprintKotAttention() {
+            // Waiter tablet has no silent reprint path — the banner tells staff
+            // to check the tray; the counter reprints deliberately.
         },
 
         // A weak/briefly interrupted shop connection used to leave the table

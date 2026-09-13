@@ -70,9 +70,18 @@ an immediate local print failure hands the slip back (`print.fail{terminal}`)
 so the cloud agent prints without a 3–5 minute wait. Unsynced holds (internet
 down) stay queued locally.
 
+**FACT:** A dead/unresponsive shop PC (three missed ~30s heartbeats = 90s, or
+an immediate Local Core-down report from the sale/waiter screen) must not sit
+in silent `Printing (local)` for the 5-minute handoff timeout. Instant
+automatic reprint is used only when it is proven safe (cloud claim whose
+content was never fetched). After content fetch, or for a local handoff the
+shop PC may already have printed, the job becomes Action Required immediately
+so staff check the tray and reprint deliberately.
+
 **FACT:** `print:expire-local-handoffs` is an independent overdue-handoff
-watchdog. Agent claim housekeeping still sweeps, but recovery must not depend
-on an agent poll.
+watchdog. It first parks dead-agent handoffs as Action Required, then expires
+still-online hung drains past `LOCAL_HANDOFF_TIMEOUT_SECONDS`. Agent claim
+housekeeping still sweeps, but recovery must not depend on an agent poll.
 
 **FACT:** Unstamped claim eligibility matches `target_printer` to reported
 queue names after case/space fold (`PrinterIdentity`). The stored snapshot is

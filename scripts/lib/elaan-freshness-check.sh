@@ -12,9 +12,8 @@
 # last deploy marker (unchanged).
 #
 # SAME SHA rerun (live HEAD == target SHA == marker commit): when the
-# time-based count is zero, PASS only if the SHA-qualified published title
-# (deploy/elaan.yml title + " [deploy <TARGET_SHA>]") still exists as a
-# published pos/all AppUpdate. Does not re-date or duplicate.
+# time-based count is zero, PASS only if the internal deployment_key matches
+# TARGET_SHA. The customer-visible title never contains release provenance.
 # Unrelated old announcements (including the same human title from an older
 # SHA) do not satisfy the gate. skip_elaan is not used.
 
@@ -35,22 +34,11 @@ elaan_committed_title() {
     || true
 }
 
-# Published title used on live for this TARGET_SHA (CI --deploy-sha).
-# Fail closed (return 1) if the SHA cannot be qualified — never fall back to
-# the unqualified human title (that is Deploy Production #15).
 elaan_published_title() {
-  local RAW SHA QUALIFIED
+  local RAW
   RAW=$(elaan_committed_title)
-  SHA="${1:-}"
   RAW="${RAW%"${RAW##*[![:space:]]}"}"
-  [ -n "$RAW" ] || return 0
-  if [ -z "$SHA" ]; then
-    printf '%s\n' "$RAW"
-    return 0
-  fi
-  QUALIFIED=$(python3 "$ROOT/scripts/lib/elaan-deploy-title.py" qualify --title "$RAW" --sha "$SHA") \
-    || return 1
-  printf '%s\n' "$QUALIFIED"
+  printf '%s\n' "$RAW"
 }
 
 elaan_freshness_check() {
@@ -136,7 +124,7 @@ EOFELAAN
       local TITLE_B64 TITLE_OUT TITLE_RC
       TITLE_B64=$(printf '%s' "$TITLE" | base64 -w0 2>/dev/null || printf '%s' "$TITLE" | base64)
       TITLE_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-        "LIVE_DIR='$LIVE_DIR' TITLE_B64='$TITLE_B64' bash -s" 2>&1 <<'EOFTITLE'
+        "LIVE_DIR='$LIVE_DIR' TITLE_B64='$TITLE_B64' TARGET_SHA='$TARGET_SHA' bash -s" 2>&1 <<'EOFTITLE'
 cd "$LIVE_DIR" || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
 DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
 [ -z "$DB_HOST" ] && DB_HOST=127.0.0.1
@@ -155,8 +143,16 @@ fi
 export TITLE
 # Escape for a MySQL single-quoted string literal (title only; never prints secrets).
 TITLE_SQL=$(python3 -c "import os; s=os.environ['TITLE']; print(\"'\" + s.replace('\\\\', '\\\\\\\\').replace(\"'\", \"''\") + \"'\")")
-COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND title = ${TITLE_SQL}" 2>&1)
+HAS_KEY=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
+  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='deployment_key'" 2>/dev/null || echo 0)
+if [ "$HAS_KEY" = "1" ]; then
+  COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
+    -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND deployment_key = '$TARGET_SHA'" 2>&1)
+else
+  # Transitional first deployment, before the new internal column exists.
+  COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
+    -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND title = ${TITLE_SQL}" 2>&1)
+fi
 MYSQL_RC=$?
 if [ $MYSQL_RC -ne 0 ] || ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
   echo "ELAAN_TITLE_DB_ERROR"

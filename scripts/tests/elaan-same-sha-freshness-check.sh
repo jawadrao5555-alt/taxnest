@@ -170,11 +170,11 @@ grep -q 'new_sha_missing_fresh' "$EVAL" \
   && ok "evaluator preserves new_sha_missing_fresh FAIL" \
   || bad "evaluator missing new_sha_missing_fresh"
 
-# Shared check queries exact title (not any old row) on same-SHA path
+# Shared check queries exact internal deployment key (not any old row).
 grep -q 'ELAAN_TITLE_COUNT' "$CHECK" \
-  && grep -q 'title =' "$CHECK" \
-  && ok "same-SHA path counts exact title match for pos/all published rows" \
-  || bad "same-SHA title match query missing"
+  && grep -q "deployment_key = '\$TARGET_SHA'" "$CHECK" \
+  && ok "same-SHA path counts exact deployment-key match" \
+  || bad "same-SHA deployment-key query missing"
 
 # skip_elaan remains emergency-only, not default for same-SHA
 if grep -q 'same_sha_original_title' "$CHECK" && ! grep -q 'skip_elaan.*same-SHA\|same-SHA.*skip_elaan set' "$CHECK"; then

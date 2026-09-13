@@ -34,9 +34,9 @@
                 <div class="border-b border-slate-800 px-5 py-5 sm:px-6">
                     <p class="text-xs font-bold uppercase tracking-[0.16em] text-cyan-400">New release request</p>
                     <h2 class="mt-1 text-xl font-semibold text-white">Choose a validated release</h2>
-                    <p class="mt-1 text-sm text-slate-400">TaxNest fetches the exact HEAD SHA from GitHub. Only open, non-draft cursor/* PRs targeting main with a green validate check appear here.</p>
+                    <p class="mt-1 text-sm text-slate-400">TaxNest fetches and binds the exact HEAD SHA. Select one green PR and approve once; automatic relay handles merge and production deployment.</p>
                 </div>
-                <form method="post" action="{{ route('saas.admin.deployment-approval.store') }}" class="grid gap-5 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-end sm:px-6">
+                <form method="post" action="{{ route('saas.admin.deployment-approval.store') }}" class="grid gap-5 px-5 py-5 sm:grid-cols-2 sm:items-end sm:px-6">
                     @csrf
                     <label class="block">
                         <span class="mb-2 block text-sm font-semibold text-slate-200">Eligible pull request</span>
@@ -52,7 +52,11 @@
                             <span class="mt-2 block text-xs text-amber-300">No eligible green cursor/* PR is currently available.</span>
                         @endif
                     </label>
-                    <button type="submit" @disabled(empty($eligiblePullRequests)) class="min-h-12 rounded-xl bg-cyan-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900">Create request &amp; email approvers</button>
+                    <label class="block">
+                        <span class="mb-2 block text-sm font-semibold text-slate-200">Current admin password</span>
+                        <input class="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 text-base text-white outline-none placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20" type="password" name="password" required autocomplete="current-password" placeholder="Confirm this production release">
+                    </label>
+                    <button type="submit" @disabled(empty($eligiblePullRequests)) class="min-h-12 rounded-xl bg-cyan-400 px-5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 sm:col-span-2">Approve &amp; release automatically</button>
                 </form>
             </section>
 

@@ -13,10 +13,12 @@
         Dashboard
     </a>
 
-    <a href="{{ route('pos.invoice.create') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.invoice.create') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
+    @unless(request()->routeIs('pos.invoice.create'))
+    <a href="{{ route('pos.invoice.create') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm text-gray-600 dark:text-gray-400">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/></svg>
         New Sale
     </a>
+    @endunless
 
     <a href="{{ route('pos.transactions') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.transactions') || request()->routeIs('pos.transaction.show') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>

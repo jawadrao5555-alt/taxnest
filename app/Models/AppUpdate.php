@@ -17,8 +17,10 @@ class AppUpdate extends Model
         'title', 'points', 'image_path', 'audience', 'target_categories', 'type', 'is_published', 'is_featured', 'created_by',
         // Task 1582: category family this update is for (all / food_service /
         // goods_retail / pharmacy / services). Legacy rows read as 'all'.
-        'audience_family',
+        'audience_family', 'deployment_key',
     ];
+
+    protected $hidden = ['deployment_key'];
 
     protected $casts = [
         'points' => 'array',

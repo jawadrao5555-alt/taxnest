@@ -19,13 +19,10 @@
 # Usage (committed spec — GitHub Actions after Environment approval + SSH):
 #   bash scripts/elaan-insert.sh --from-file deploy/elaan.yml --deploy-sha="$TARGET_SHA"
 #
-# --deploy-sha (required for CI): publish title becomes
-#   "{spec title} [deploy {40-char sha}]"
-# so a NEW SHA cannot no-op against an older AppUpdate with the same human
-# title (Deploy Production #15 / AppUpdate #265). Same-SHA retry uses the
-# same qualified title → ELAAN_EXISTS, no duplicate, not re-dated.
+# --deploy-sha (required for CI) is stored only in the internal deployment_key
+# column. It is never appended to customer-visible title or points.
 #
-# Idempotency: if a row with the SAME (possibly SHA-qualified) title already
+# Idempotency: CI uses the internal deployment key; local/manual use the title.
 # exists, treat that as a successful no-op (ELAAN_EXISTS, or the legacy
 # "title already exists ... will not duplicate or re-date" message even when
 # PHP exited 1). Do not insert a duplicate and do not re-date the existing
@@ -99,9 +96,8 @@ if [ -n "$FROM_FILE" ]; then
 fi
 
 [ -n "$TITLE" ] || fail "--title is required"
-if [ -n "$DEPLOY_SHA" ]; then
-  TITLE=$(python3 "$(dirname "$0")/lib/elaan-deploy-title.py" qualify --title "$TITLE" --sha "$DEPLOY_SHA") \
-    || fail "could not qualify Elaan title with deploy SHA"
+if [ -n "$DEPLOY_SHA" ] && ! printf '%s' "$DEPLOY_SHA" | grep -qE '^[0-9a-fA-F]{40}$'; then
+  fail "--deploy-sha must be exactly 40 hexadecimal characters"
 fi
 [ ${#POINTS[@]} -gt 0 ] || fail "at least one --point is required"
 case "$AUDIENCE" in pos|fbr_pos|all) ;; *) fail "--audience must be pos, fbr_pos, or all" ;; esac
@@ -147,6 +143,7 @@ PHP_CATS_ARRAY="${PHP_CATS_ARRAY})"
 TITLE_ESCAPED=$(printf '%s' "$TITLE" | sed "s/'/\\\\'/g")
 AUDIENCE_ESCAPED=$(printf '%s' "$AUDIENCE" | sed "s/'/\\\\'/g")
 TYPE_ESCAPED=$(printf '%s' "$ELAAN_TYPE" | sed "s/'/\\\\'/g")
+DEPLOY_SHA_ESCAPED=$(printf '%s' "$DEPLOY_SHA" | tr 'A-F' 'a-f')
 
 # ---------------------------------------------------------- PHP bootstrap script
 # Runs identically on live (hardcoded LIVE_DIR paths) or dev (relative paths from CWD).
@@ -206,7 +203,10 @@ if ('$TITLE_ESCAPED' === \$reserved) {
     exit(1);
 }
 
-\$existing = App\Models\AppUpdate::where('title', '$TITLE_ESCAPED')->orderByDesc('id')->get();
+\$hasDeploymentKey = Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'deployment_key');
+\$existing = (\$hasDeploymentKey && '$DEPLOY_SHA_ESCAPED' !== '')
+    ? App\Models\AppUpdate::where('deployment_key', '$DEPLOY_SHA_ESCAPED')->get()
+    : App\Models\AppUpdate::where('title', '$TITLE_ESCAPED')->orderByDesc('id')->get();
 if (\$existing->isNotEmpty()) {
     \$old = \$existing->first();
     echo "ELAAN_EXISTS id=" . \$old->id
@@ -222,7 +222,8 @@ if (\$existing->isNotEmpty()) {
     'audience'     => '$AUDIENCE_ESCAPED',
     'is_published' => true,
     'created_by'   => null,
-] + \$extra);
+] + \$extra + ((\$hasDeploymentKey && '$DEPLOY_SHA_ESCAPED' !== '')
+    ? ['deployment_key' => '$DEPLOY_SHA_ESCAPED'] : []));
 
 echo "ELAAN_INSERTED id=" . \$row->id . " title=" . json_encode(\$row->title) . "\n";
 exit(0);

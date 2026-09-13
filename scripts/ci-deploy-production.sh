@@ -178,7 +178,7 @@ insert_committed_elaan_spec() {
     fail "TARGET_SHA must be 40 hex chars to qualify the Elaan title"
   fi
   echo "Inserting $SPEC via scripts/elaan-insert.sh --deploy-sha=$TARGET_SHA"
-  echo "(published title is spec title + [deploy SHA]; existing exact published title is a no-op, never re-dated)."
+  echo "(customer title stays clean; exact SHA is bound by internal deployment_key; retry is a no-op)."
   bash "$ROOT/scripts/elaan-insert.sh" --from-file "$SPEC" --deploy-sha="$TARGET_SHA" \
     || fail "committed Elaan spec insert failed — fix deploy/elaan.yml or use skip_elaan for emergencies"
 }

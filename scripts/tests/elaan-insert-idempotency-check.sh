@@ -41,7 +41,7 @@ if [ -f "$INSERT" ]; then
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 # Streamed PHP inside the heredoc
-m = re.search(r"\$existing = App\\Models\\AppUpdate::where\('title'", text)
+m = re.search(r"\$existing = .*?App\\Models\\AppUpdate::where\(", text, re.S)
 if not m:
     sys.exit(1)
 rest = text[m.start():]

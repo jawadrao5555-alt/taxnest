@@ -1,7 +1,6 @@
 # Copy to deploy/elaan.yml in a production-bound PR. GitHub Actions publishes
-# this as "{title} [deploy {TARGET_SHA}]" so each new SHA gets its own
-# AppUpdate row. Same-SHA retries no-op that qualified title (no duplicate,
-# no re-date). Do not reuse Daily L001. skip_elaan is emergency-only.
+# TARGET_SHA is stored in the private deployment_key column. Customer-visible
+# title/points contain benefits only. Same-SHA retries do not duplicate/re-date.
 #
 # GitHub Actions (after Environment approval + SSH) inserts this as a
 # published AppUpdate via scripts/elaan-insert.sh, then runs the existing

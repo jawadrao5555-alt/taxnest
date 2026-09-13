@@ -3,16 +3,12 @@
 namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Mail\DeploymentApprovalReady;
-use App\Models\AdminUser;
 use App\Models\OwnerDeploymentApprovalRequest;
 use App\Services\EligibleDeploymentPullRequestService;
 use App\Services\GitHubActionsOidcVerifier;
 use App\Services\OwnerDeploymentApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class OwnerDeploymentApprovalController extends Controller
 {
@@ -38,7 +34,12 @@ class OwnerDeploymentApprovalController extends Controller
         $this->authorizeOwner();
         $input = $request->validate([
             'pull_request_number' => ['required', 'integer', 'min:1'],
+            'password' => ['required', 'string'],
         ]);
+
+        if (!Hash::check((string) $request->input('password'), auth('admin')->user()->password)) {
+            return back()->withErrors(['password' => 'Current admin password is incorrect.'])->withInput();
+        }
 
         try {
             $candidate = $github->resolve((int) $input['pull_request_number']);
@@ -46,25 +47,12 @@ class OwnerDeploymentApprovalController extends Controller
                 'pull_request_number' => $candidate['number'],
                 'head_sha' => $candidate['head_sha'],
             ], auth('admin')->id());
+            $approval = $service->approve($approval, auth('admin')->id());
         } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['pull_request_number' => $exception->getMessage()])->withInput();
         }
 
-        AdminUser::query()->where('role', 'super_admin')->whereNotNull('email')->each(
-            function (AdminUser $admin) use ($approval): void {
-                try {
-                    Mail::to($admin->email)->send(new DeploymentApprovalReady($approval, $admin));
-                } catch (\Throwable $exception) {
-                    Log::warning('Deployment approval email could not be sent.', [
-                        'request_id' => $approval->request_id,
-                        'admin_id' => $admin->id,
-                        'exception' => $exception->getMessage(),
-                    ]);
-                }
-            }
-        );
-
-        return back()->with('success', "Deployment request {$approval->request_id} is ready for approval. Eligible super admins were notified.");
+        return back()->with('success', "PR #{$approval->pull_request_number} approved. Automatic merge and production deployment pickup is now queued; no GitHub workflow run is required.");
     }
 
     public function review(Request $request, string $requestId)

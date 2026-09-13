@@ -34,6 +34,12 @@ PY
 
 grep -q 'approval_dispatch_claims.py' "$WF" && ok "workflow uses tested parser" || bad "workflow must call approval_dispatch_claims.py"
 grep -q 'actions/checkout@v4' "$WF" && ok "workflow checks out parser" || bad "workflow must checkout before python helper"
+grep -q -- '--retry-all-errors' "$WF" && grep -q 'for attempt in 1 2 3' "$WF" \
+  && ok "relay and GitHub dispatch retry transient failures" \
+  || bad "single approval flow must retry relay and dispatch failures"
+grep -q 'cancel-in-progress: true' "$WF" \
+  && ok "stale poller cannot block a fresh automatic pickup" \
+  || bad "relay concurrency must favor the newest poll"
 grep -q '1-59/5 \* \* \* \*' "$WF" \
   && grep -q '2-59/5 \* \* \* \*' "$WF" \
   && grep -q '3-59/5 \* \* \* \*' "$WF" \

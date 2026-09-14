@@ -24,7 +24,7 @@ jobs:
     name: validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Workflow and auto-merge safety checks
         run: bash scripts/tests/pr-auto-merge-check.sh
       - name: Issue-to-live workflow safety checks
@@ -37,6 +37,8 @@ jobs:
         run: bash scripts/tests/deploy-unattended-safety-check.sh
       - name: Owner Merge & Deploy safety checks
         run: bash scripts/tests/owner-merge-and-deploy-check.sh
+      - name: Exact-SHA Agent release chain checks
+        run: bash scripts/tests/agent-release-chain-check.sh
       - name: Live Ops SSH host-key pin checks
         run: bash scripts/tests/live-ops-ssh-hostkey-check.sh
       - name: Live Ops daily-ops allow-list checks

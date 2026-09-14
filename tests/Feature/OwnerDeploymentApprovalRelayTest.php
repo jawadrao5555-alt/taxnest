@@ -8,6 +8,7 @@ use App\Services\GitHubActionsOidcVerifier;
 use App\Services\OwnerDeploymentApprovalService;
 use App\Support\OwnerApprovalPickupStatus;
 use App\Support\OwnerApprovalPollerHeartbeat;
+use App\Support\OwnerApprovalImmediateDispatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -84,6 +85,21 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $this->get('/admin/deployment-approval')->assertRedirect();
         $this->actingAs($this->admin('admin'), 'admin')
             ->get('/admin/deployment-approval')->assertForbidden();
+    }
+
+    public function test_immediate_dispatch_seam_is_credential_free_and_fail_closed(): void
+    {
+        config(['deployment_approval.immediate_dispatch.driver' => 'github_app']);
+        $row = $this->row();
+
+        $status = OwnerApprovalImmediateDispatch::status();
+        $result = app(OwnerApprovalImmediateDispatch::class)->dispatch($row);
+
+        $this->assertFalse($status['enabled']);
+        $this->assertSame('github_app', $status['driver']);
+        $this->assertFalse($result['dispatched']);
+        $this->assertSame('scheduled_oidc', $result['mode']);
+        $this->assertSame($row->request_id, $result['approval_request_id']);
     }
 
     public function test_creation_validates_exact_pr_sha_and_named_validate_check(): void
@@ -655,6 +671,7 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
 
     public function test_index_renders_requester_approver_result_and_run_link(): void
     {
+        Http::fake();
         $requester = $this->admin();
         $approver = $this->admin();
         $row = $this->row(['requested_admin_id' => $requester->id, 'approved_admin_id' => $approver->id, 'status' => 'succeeded', 'deploy_result' => 'success', 'workflow_run_url' => 'https://github.com/run/1']);
@@ -662,7 +679,27 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
             ->assertOk()->assertSee($requester->name)->assertSee($approver->name)
             ->assertSee('Success')->assertSee('https://github.com/run/1')
             ->assertSee('Relay pickup')
-            ->assertSee('Last poller heartbeat');
+            ->assertSee('Last poller heartbeat')
+            ->assertSee('Scheduled OIDC relay active')
+            ->assertSee('Approval Relay Dispatch remains the emergency wake-up.');
+    }
+
+    public function test_index_keeps_history_visible_when_github_eligibility_is_unavailable(): void
+    {
+        Http::fake(fn () => Http::response([], 503));
+        $admin = $this->admin();
+        $row = $this->row([
+            'requested_admin_id' => $admin->id,
+            'approved_admin_id' => $admin->id,
+            'status' => 'succeeded',
+            'deploy_result' => 'success',
+        ]);
+
+        $this->actingAs($admin, 'admin')->get('/admin/deployment-approval')
+            ->assertOk()
+            ->assertSee('GitHub eligibility unavailable.')
+            ->assertSee('HTTP 503')
+            ->assertSee($row->head_sha);
     }
 
     public function test_index_shows_delayed_pickup_recovery_without_asking_for_a_second_approval(): void

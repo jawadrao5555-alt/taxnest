@@ -45,9 +45,18 @@ function equal(a, b) {
     const y = Buffer.from(String(b || ''));
     return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
-function addresses() {
+function addresses(networkInterfaces) {
     const out = [];
-    Object.values(os.networkInterfaces() || {}).forEach((list) => (list || []).forEach((i) => {
+    let interfaces;
+    try {
+        interfaces = (networkInterfaces || os.networkInterfaces)() || {};
+    } catch (error) {
+        // Some locked-down Windows/service environments can temporarily deny
+        // adapter enumeration. Pairing must fail safely without crashing Local
+        // Core; the next status/pairing attempt can recover when Windows does.
+        return out;
+    }
+    Object.values(interfaces).forEach((list) => (list || []).forEach((i) => {
         if (!i.internal && (i.family === 'IPv4' || i.family === 4) && isPrivateAddress(i.address)) out.push(i.address);
     }));
     return out;
@@ -103,7 +112,9 @@ function createLocalCoreLanTls(options) {
         res.end(JSON.stringify(payload));
     }
     function issueOffer() {
-        const ips = addresses();
+        const ips = typeof opts.addressProvider === 'function'
+            ? opts.addressProvider()
+            : addresses();
         if (!ips.length) throw new Error('No private LAN address is available');
         const now = Date.now();
         const waiterAuthority = typeof opts.pairingAuthorityProvider === 'function'

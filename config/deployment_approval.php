@@ -11,6 +11,13 @@ return [
     // GitHub cron is not a guaranteed timer. Warn the owner when the last
     // authenticated poller heartbeat is older than this.
     'schedule_delay_warn_minutes' => 20,
+    // Deliberately dormant. A future GitHub App driver must mint short-lived
+    // installation tokens outside stored application data and preserve every
+    // exact-SHA/OIDC/provenance gate. Merely changing this value cannot enable
+    // dispatch: no credential-bearing driver is shipped.
+    'immediate_dispatch' => [
+        'driver' => 'disabled',
+    ],
     'allowed_workflow_refs' => [
         'approval-dispatch.yml' => 'jawadrao5555-alt/taxnest/.github/workflows/approval-dispatch.yml@refs/heads/main',
         'owner-merge-and-deploy.yml' => 'jawadrao5555-alt/taxnest/.github/workflows/owner-merge-and-deploy.yml@refs/heads/main',

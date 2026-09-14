@@ -364,7 +364,7 @@
                     copySrc: '',
                     ings: @js(($ingredients ?? collect())->map(fn($i)=>['id'=>$i->id,'name'=>$i->name,'unit'=>$i->unit])->values()),
                     existingRecipes: @js($existingRecipes ?? []),
-                    add() { this.rows.push({ mode:'existing', ingredient_id:'', new_name:'', new_unit:'KGS', new_cost:'', quantity_needed:'' }); },
+                    add() { this.rows.push({ mode:'existing', ingredient_id:'', new_name:'', new_unit:'kg', new_cost:'', quantity_needed:'' }); },
                     toggle() { this.open = !this.open; if (this.open && this.rows.length === 0) this.add(); },
                     copyFromRecipe() {
                         const pid = parseInt(this.copySrc);
@@ -378,7 +378,7 @@
                                 mode: 'existing',
                                 ingredient_id: String(ing.ingredient_id),
                                 new_name: '',
-                                new_unit: 'KGS',
+                                new_unit: 'kg',
                                 new_cost: '',
                                 quantity_needed: ing.quantity_needed
                             });
@@ -459,13 +459,13 @@
                                 <div>
                                     <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.unit_label') }} *</label>
                                     <select x-model="row.new_unit" class="w-full text-xs rounded-md border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-900/10 text-gray-900 dark:text-white px-1.5 py-1.5">
-                                        <option value="KGS">KGS</option>
-                                        <option value="GMS">GMS</option>
-                                        <option value="LTR">LTR</option>
-                                        <option value="ML">ML</option>
-                                        <option value="PCS">PCS</option>
-                                        <option value="DOZ">DOZ</option>
-                                        <option value="PKT">PKT</option>
+                                        <option value="kg">kg</option>
+                                        <option value="g">g</option>
+                                        <option value="ltr">ltr</option>
+                                        <option value="ml">ml</option>
+                                        <option value="pcs">pcs</option>
+                                        <option value="dozen">dozen</option>
+                                        <option value="pack">pack</option>
                                     </select>
                                 </div>
                                 <div>
@@ -512,7 +512,8 @@
     @php
         $catFieldNames = array_values($categoryFields ?? []);
         $boolCatFields = ['prescription_required', 'weight_based', 'custom_order'];
-        $productsJson = $products->map(function ($p) use ($catFieldNames, $boolCatFields, $uomDefault) {
+        $recipeByProduct = $recipeByProduct ?? [];
+        $productsJson = $products->map(function ($p) use ($catFieldNames, $boolCatFields, $uomDefault, $recipeByProduct) {
             $row = [
                 'id' => $p->id,
                 'name' => $p->name,
@@ -532,6 +533,14 @@
                 'low_stock_threshold' => $p->low_stock_threshold ?? 10,
                 'image' => $p->image,
                 'image_url' => $p->image ? asset('storage/products/' . $p->image) : null,
+                'recipe_rows' => array_map(fn ($item) => [
+                    'mode' => 'existing',
+                    'ingredient_id' => (string) $item['ingredient_id'],
+                    'new_name' => '',
+                    'new_unit' => 'kg',
+                    'new_cost' => '',
+                    'quantity_needed' => $item['quantity_needed'],
+                ], $recipeByProduct[(int) $p->id] ?? []),
             ];
             foreach ($catFieldNames as $cf) {
                 $val = $p->$cf;
@@ -859,6 +868,53 @@
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.description_label') }}</label>
                                 <input type="text" name="description" x-model="editing.description" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                             </div>
+                            @if(\App\Services\PosFeatureService::moduleRelevant($company, 'recipes'))
+                            <div class="sm:col-span-2 lg:col-span-3 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-900/10 p-3">
+                                <input type="hidden" name="ingredients_json" :value="JSON.stringify(editing.recipe_rows || [])">
+                                <div class="flex items-center justify-between gap-2 mb-2">
+                                    <div>
+                                        <p class="text-xs font-bold text-purple-800 dark:text-purple-200">{{ __('pos.recipe_ingredients') }}</p>
+                                        <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ __('pos.recipe_edit_inline_hint') }}</p>
+                                    </div>
+                                    <button type="button" @click="addEditRecipe()" class="min-h-10 px-3 rounded-lg bg-purple-600 text-white text-xs font-bold hover:bg-purple-700">{{ __('pos.add_another_ingredient') }}</button>
+                                </div>
+                                <div class="space-y-2">
+                                    <template x-for="(row, idx) in editing.recipe_rows" :key="'edit-recipe-'+idx">
+                                        <div class="grid grid-cols-12 gap-2 items-end rounded-lg border border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 p-2">
+                                            <div class="col-span-12 sm:col-span-2">
+                                                <label class="block text-[10px] font-bold text-gray-500 mb-1">{{ __('pos.type_label') }}</label>
+                                                <select x-model="row.mode" class="w-full min-h-10 text-xs rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800">
+                                                    <option value="existing">{{ __('pos.existing_word') }}</option>
+                                                    <option value="new">{{ __('pos.plus_new') }}</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-span-12 sm:col-span-5" x-show="row.mode === 'existing'">
+                                                <label class="block text-[10px] font-bold text-gray-500 mb-1">{{ __('pos.pick_ingredient') }}</label>
+                                                <select x-model="row.ingredient_id" class="w-full min-h-10 text-xs rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800">
+                                                    <option value="">{{ __('pos.dash_select_dash') }}</option>
+                                                    @foreach(($ingredients ?? collect()) as $ingredient)
+                                                    <option value="{{ $ingredient->id }}">{{ $ingredient->name }} ({{ $ingredient->unit }})</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="col-span-12 sm:col-span-5 grid grid-cols-3 gap-1.5" x-show="row.mode === 'new'">
+                                                <input type="text" x-model="row.new_name" placeholder="{{ __('pos.new_name_label') }}" class="min-h-10 text-xs rounded-md border-emerald-300 dark:border-emerald-700 dark:bg-gray-800">
+                                                <select x-model="row.new_unit" class="min-h-10 text-xs rounded-md border-emerald-300 dark:border-emerald-700 dark:bg-gray-800">
+                                                    <option value="kg">kg</option><option value="g">g</option><option value="ltr">ltr</option><option value="ml">ml</option><option value="pcs">pcs</option><option value="dozen">dozen</option><option value="pack">pack</option>
+                                                </select>
+                                                <input type="number" x-model="row.new_cost" min="0" step="0.01" placeholder="{{ __('pos.cost_per_unit') }}" class="min-h-10 text-xs rounded-md border-emerald-300 dark:border-emerald-700 dark:bg-gray-800">
+                                            </div>
+                                            <div class="col-span-9 sm:col-span-4">
+                                                <label class="block text-[10px] font-bold text-gray-500 mb-1">{{ __('pos.qty_needed_per_product') }}</label>
+                                                <input type="number" x-model="row.quantity_needed" min="0.0001" step="0.0001" class="w-full min-h-10 text-xs rounded-md border-purple-300 dark:border-purple-700 dark:bg-gray-800">
+                                            </div>
+                                            <button type="button" @click="editing.recipe_rows.splice(idx, 1)" :aria-label="@js(__('pos.remove_row'))" class="col-span-3 sm:col-span-1 min-h-10 rounded-md border border-red-300 text-red-600 hover:bg-red-600 hover:text-white">✕</button>
+                                        </div>
+                                    </template>
+                                    <p x-show="editing.recipe_rows.length === 0" class="text-xs text-gray-500 dark:text-gray-400 py-2">{{ __('pos.recipe_empty_hint') }}</p>
+                                </div>
+                            </div>
+                            @endif
                             {{-- Image mode --}}
                             <div class="sm:col-span-2 lg:col-span-3" x-data="{ emode: 'keep' }">
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.image_label') }}</label>
@@ -991,7 +1047,15 @@
                     else { this.selected = this.selected.filter(id => !ids.includes(id)); }
                 },
                 clearSelect() { this.selected = []; },
-                openEdit(p) { this.editing = JSON.parse(JSON.stringify(p)); },
+                openEdit(p) {
+                    this.editing = JSON.parse(JSON.stringify(p));
+                    if (!Array.isArray(this.editing.recipe_rows)) this.editing.recipe_rows = [];
+                },
+                addEditRecipe() {
+                    if (!this.editing) return;
+                    if (!Array.isArray(this.editing.recipe_rows)) this.editing.recipe_rows = [];
+                    this.editing.recipe_rows.push({ mode:'existing', ingredient_id:'', new_name:'', new_unit:'kg', new_cost:'', quantity_needed:'' });
+                },
                 postForm(action, fields) {
                     const f = document.createElement('form');
                     f.method = 'POST'; f.action = action;

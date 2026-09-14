@@ -42,9 +42,20 @@
                 @endif
             </section>
 
+            <section class="mb-6 rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4 sm:px-6" data-immediate-dispatch-status>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Approval transport</p>
+                <p class="mt-1 text-sm font-semibold text-slate-200">{{ $immediateDispatch['label'] ?? 'Scheduled OIDC relay active' }}</p>
+                <p class="mt-1 text-sm leading-6 text-slate-400">{{ $immediateDispatch['guidance'] ?? '' }}</p>
+            </section>
+
             @if(session('success'))
                 <div role="status" class="mb-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
                     {{ session('success') }}
+                </div>
+            @endif
+            @if($eligibilityWarning ?? null)
+                <div role="alert" class="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                    <strong>GitHub eligibility unavailable.</strong> {{ $eligibilityWarning }}
                 </div>
             @endif
             @if($errors->any())

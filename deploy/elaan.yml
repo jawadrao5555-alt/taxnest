@@ -2,10 +2,10 @@
 # deployment_key; customer-visible title/points never contain provenance.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
-title: "Production update — NestPOS receipt printing reliability"
+title: "Production update — product aur recipe aik hi jagah"
 audience: all
 type: feature
 points:
-  - "Receipt aur KOT printing ka retry flow ab ek hi print-attempt ko safely track karta hai."
-  - "Lost, malformed ya ambiguous response par automatic retry same attempt use karta hai, is liye duplicate receipt ka risk kam hota hai."
-  - "Manual reprint hamesha naya attempt banata hai, jabke offline fallback known offline state mein available rehta hai."
+  - "Product add ya edit karte waqt us ki ingredient recipe bhi usi form mein manage ki ja sakti hai."
+  - "Ghalat, duplicate ya doosri company ki ingredient row par product aur recipe dono save nahi honge; saaf row-level error milega."
+  - "Purane KGS/GMS/DOZ/PKT unit labels standard recipe units mein safely normalize hote hain."

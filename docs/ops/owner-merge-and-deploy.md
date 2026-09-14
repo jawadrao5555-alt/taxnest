@@ -73,10 +73,20 @@ After approval:
 5. The owner workflow creates a random correlation nonce, dispatches Deploy
    Production, selects the earliest exact nonce/SHA run, and consumes the
    receipt while registering that GitHub run ID with the relay.
-6. **Deploy Production** is authorized only when its OIDC run ID, run attempt,
+6. If the approved PR changed `pra-agent/**` or the Agent build workflow, the
+   owner workflow also dispatches **Build PRA Agent** with the exact recorded
+   squash SHA. This explicit dispatch is required because a merge performed
+   with `GITHUB_TOKEN` does not create a second workflow from the resulting
+   ordinary `push` event. The Agent workflow checks out and validates that
+   full SHA before packaging, so a later `main` commit cannot enter the build.
+   Dispatch uses three bounded attempts for transient GitHub API failures.
+   Repeated requests remain idempotent: builds serialize by target SHA, and an
+   existing version tag on that exact SHA is reported without replacing its
+   release assets.
+7. **Deploy Production** is authorized only when its OIDC run ID, run attempt,
    workflow SHA, nonce hash, and `target_sha` match the registered run and
    recorded squash SHA.
-7. Deploy Production reports success or failure back to the approval record.
+8. Deploy Production reports success or failure back to the approval record.
 
 Direct `push` deployment is disabled. Deploy Production is
 `workflow_dispatch`-only and has no `skip_elaan` or `allow_settings` bypass

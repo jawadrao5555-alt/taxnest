@@ -33,7 +33,7 @@ print("vectors ok")
 PY
 
 grep -q 'approval_dispatch_claims.py' "$WF" && ok "workflow uses tested parser" || bad "workflow must call approval_dispatch_claims.py"
-grep -q 'actions/checkout@v4' "$WF" && ok "workflow checks out parser" || bad "workflow must checkout before python helper"
+grep -q 'actions/checkout@v7' "$WF" && ok "workflow uses the supported checkout action" || bad "workflow must use actions/checkout@v7 before the python helper"
 grep -q -- '--retry-all-errors' "$WF" && grep -q 'for attempt in 1 2 3' "$WF" \
   && ok "relay and GitHub dispatch retry transient failures" \
   || bad "single approval flow must retry relay and dispatch failures"

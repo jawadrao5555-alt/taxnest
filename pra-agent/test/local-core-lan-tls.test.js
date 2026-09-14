@@ -74,6 +74,10 @@ assert.strictEqual(authorityMatchesDevice(Object.assign({}, waiter, { branch_id:
     });
     const server = createLocalCoreLanTls({
         dataDir: serverDir, port: 0, identity,
+        // Keep the transport test deterministic in CI/sandboxes where adapter
+        // enumeration is intentionally blocked. Production still enumerates
+        // and validates the real private LAN address.
+        addressProvider: () => ['192.168.50.10'],
         pairingAuthorityProvider: () => authority,
         waiterAuthorityProvider: (token) => token === authority.token ? authority : null,
         actorRegistrar: (scope) => {

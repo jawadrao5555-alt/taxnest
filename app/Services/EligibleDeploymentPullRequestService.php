@@ -2,22 +2,33 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class EligibleDeploymentPullRequestService
 {
     private const REPOSITORY = OwnerDeploymentApprovalService::REPOSITORY;
 
+    private ?string $availabilityWarning = null;
+
     /** @return list<array{number:int,title:string,head_sha:string,head_ref:string,url:string}> */
     public function eligible(): array
     {
-        $response = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls', [
-            'state' => 'open',
-            'base' => 'main',
-            'per_page' => 50,
-        ]);
+        try {
+            $response = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls', [
+                'state' => 'open',
+                'base' => 'main',
+                'per_page' => 50,
+            ]);
+        } catch (ConnectionException) {
+            $this->availabilityWarning = 'GitHub is temporarily unreachable. Existing approval history is still available, but no new release can be approved until eligibility is verified.';
+
+            return [];
+        }
 
         if (! $response->successful()) {
+            $this->availabilityWarning = 'GitHub eligibility returned HTTP '.$response->status().'. Existing approval history is still available; retry after GitHub recovers.';
+
             return [];
         }
 
@@ -35,19 +46,32 @@ class EligibleDeploymentPullRequestService
             ->all();
     }
 
+    public function availabilityWarning(): ?string
+    {
+        return $this->availabilityWarning;
+    }
+
     /** @return array{number:int,title:string,head_sha:string,head_ref:string,url:string} */
     public function resolve(int $number): array
     {
-        $response = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls/'.$number);
+        try {
+            $response = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls/'.$number);
+        } catch (ConnectionException) {
+            throw new \InvalidArgumentException('GitHub eligibility check is temporarily unavailable. No approval was created.');
+        }
         if (! $response->successful() || ! $this->basicEligibility($response->json())) {
             throw new \InvalidArgumentException('Pull request is not an eligible open cursor/* release.');
         }
 
         $pr = $response->json();
         $sha = strtolower((string) data_get($pr, 'head.sha'));
-        $checks = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/commits/'.$sha.'/check-runs', [
-            'per_page' => 100,
-        ]);
+        try {
+            $checks = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/commits/'.$sha.'/check-runs', [
+                'per_page' => 100,
+            ]);
+        } catch (ConnectionException) {
+            throw new \InvalidArgumentException('GitHub check status is temporarily unavailable. No approval was created.');
+        }
         $validate = collect($checks->json('check_runs', []))->firstWhere('name', 'validate');
         if (! $checks->successful()
             || ! $validate
@@ -82,6 +106,6 @@ class EligibleDeploymentPullRequestService
             'Accept' => 'application/vnd.github+json',
             'User-Agent' => 'TaxNest-owner-approval-relay',
             'X-GitHub-Api-Version' => '2022-11-28',
-        ])->timeout(10);
+        ])->connectTimeout(2)->timeout(5);
     }
 }

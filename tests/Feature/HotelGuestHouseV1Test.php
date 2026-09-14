@@ -470,9 +470,12 @@ class HotelGuestHouseV1Test extends TestCase
         $owner = $this->owner($company);
         $label = __('pos.hotel_stat_in_house');
 
+        $this->assertNull($stays->occupancyForViewer($denied, $company));
+        $this->assertNotNull($stays->occupancyForViewer($owner, $company));
+
+        // Restaurant dashboard is owner/manager-only; cashiers never see it.
         $this->actingAs($denied, 'pos')->get('/pos/restaurant/dashboard')
-            ->assertOk()
-            ->assertDontSee($label, false);
+            ->assertRedirect('/pos/invoice/create');
         $this->actingAs($owner, 'pos')->get('/pos/restaurant/dashboard')
             ->assertOk()
             ->assertSee($label, false);

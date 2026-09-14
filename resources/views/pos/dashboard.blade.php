@@ -67,6 +67,12 @@
         </div>
         @endif
 
+        @if(!empty($hotelOccupancy))
+        <div class="mb-4">
+            @include('pos.hotel._occupancy-strip', ['occupancy' => $hotelOccupancy, 'hotelDeskUrl' => route('pos.hotel.dashboard')])
+        </div>
+        @endif
+
         {{-- ━━━ PRA POS Universal v2 — Customize CTA (dismissible; hidden on the Saaf clean dashboard) ━━━ --}}
         @if(!$isCashier && ($dashboardStyle ?? 'default') !== 'saaf')
         <div x-data="{ show: localStorage.getItem('hide_universal_cta_v1') !== '1' }" x-show="show" x-cloak class="mb-4 rounded-2xl bg-purple-600 p-4 sm:p-5 text-white shadow-xl relative overflow-hidden">

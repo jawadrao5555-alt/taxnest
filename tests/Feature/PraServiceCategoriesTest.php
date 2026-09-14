@@ -433,8 +433,10 @@ class PraServiceCategoriesTest extends TestCase
             'A salon is not a restaurant.');
 
         $hotel = PosFeatureService::registrationAttributes('hotel');
-        $this->assertTrue($hotel['restaurant_mode'],
-            'A hotel runs a kitchen, so it gets the restaurant module — not just restaurants do.');
+        $this->assertFalse($hotel['restaurant_mode'],
+            'A new hotel is accommodation-first: kitchen stays off until the shop turns it on.');
+        $this->assertTrue((bool) ($hotel['feature_flags']['rooms'] ?? false),
+            'A new hotel must open with Rooms already on.');
 
         $pharmacy = PosFeatureService::registrationAttributes('pharmacy');
         $this->assertTrue((bool) $pharmacy['feature_flags']['prescription'],
@@ -907,7 +909,7 @@ class PraServiceCategoriesTest extends TestCase
      * restaurant default at sign-up.
      */
     private const FOOD_TYPES = [
-        'restaurant', 'cafe', 'quick_service', 'hotel', 'marquee', 'catering',
+        'restaurant', 'cafe', 'quick_service', 'marquee', 'catering',
     ];
 
     /** Every offered PRA type is a real, complete, nameable business type. */

@@ -41,7 +41,8 @@ class ProductImageService
     private static function categoryKeywords(string $category): string
     {
         return match ($category) {
-            'restaurant', 'cafe', 'food', 'hotel' => 'food,dish,meal,cuisine',
+            'restaurant', 'cafe', 'food'          => 'food,dish,meal,cuisine',
+            'hotel'                               => 'hotel,room,bedroom,lobby',
             'bakery'                              => 'bakery,bread,pastry,cake',
             'grocery', 'supermarket'              => 'grocery,food,market',
             'pharmacy', 'medical'                 => 'medicine,pharmacy,health',

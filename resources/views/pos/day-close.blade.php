@@ -687,6 +687,16 @@
         <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.dc_checklist_title') }}</h3>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.dc_checklist_hint') }}</p>
         <ul class="space-y-2">
+            {{-- Hotel stays are occupancy, not restaurant open orders. Info only. --}}
+            @if(!empty($hotelOccupancy))
+            <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg bg-teal-50/70 dark:bg-teal-900/10">
+                <span class="font-bold text-teal-700">i</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_hotel_stays') }}</span>
+                <span class="text-xs text-gray-600 dark:text-gray-400">{{ __('pos.dc_hotel_stays_hint', ['in_house' => $hotelOccupancy['in_house'] ?? 0, 'reserved' => $hotelOccupancy['reserved'] ?? 0]) }}</span>
+                <span class="ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200">{{ __('pos.dc_check_warn_only') }}</span>
+                <a href="{{ route('pos.hotel.dashboard') }}" class="text-xs underline font-semibold text-teal-800">{{ __('pos.nav_hotel') }}</a>
+            </li>
+            @endif
             {{-- 1. Open restaurant orders — BLOCKER (restaurant-mode shops only) --}}
             @if($dcRestaurantRelevant)
             <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ ($openOrders ?? 0) > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">

@@ -2187,6 +2187,11 @@ class PosController extends Controller
         // chip ki jagah pakki honi chahiye — is liye poora summary bhi jata hai.
         $riderChip = \App\Services\PosRiderKhataAlert::summary((int) $companyId, $company);
 
+        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForCompany(
+            $company,
+            app(\App\Services\BranchContextService::class)->getActiveBranchId()
+        );
+
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
@@ -2197,7 +2202,8 @@ class PosController extends Controller
             'pendingProvisional', 'openOrdersCount', 'counterOrdersCount', 'heldNoTableCount',
             'unclosedPriorDays', 'canDayClose', 'todayKhata',
             'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
-            'inactiveRegulars', 'dashTeamMembers', 'dashCashierId', 'riderPending', 'riderChip'
+            'inactiveRegulars', 'dashTeamMembers', 'dashCashierId', 'riderPending', 'riderChip',
+            'hotelOccupancy'
         ));
     }
 
@@ -10676,7 +10682,6 @@ class PosController extends Controller
         $barcodeIdx = $this->findColumn($header, ['barcode', 'bar code', 'ean']);
         $taxIdx = $this->findColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax', 'tax %']);
         $uomIdx = $this->findColumn($header, ['unit (uom)', 'unit', 'uom']);
-        $importUomDefault = \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId));
         // Tax Exempt column (owner request Jul 2026): Yes/No round-trip so bulk
         // exempting via Excel works. Older files without the column keep the
         // existing flag untouched.
@@ -10833,7 +10838,7 @@ class PosController extends Controller
                     'sku' => $sku,
                     'barcode' => $barcode,
                     'tax_rate' => ($exempt === true) ? 0 : ($tax !== null ? $tax : 0),
-                    'uom' => $uom !== '' ? $uom : $importUomDefault,
+                    'uom' => $uom !== '' ? $uom : \App\Services\PosUnitCatalog::importDefaultFor(Company::find($companyId), $name, $cat),
                     'is_tax_exempt' => $exempt === true,
                     'is_active' => true,
                 ];
@@ -13493,6 +13498,11 @@ class PosController extends Controller
         // rows included, closed = a PosDayCloseReport row exists for that date.
         $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date, false, $dcBranchId);
 
+        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForCompany(
+            $company,
+            $dcBranchId
+        );
+
         // Pending checklist (Task 661, ZFC): undispatched delivery bills HARD-BLOCK
         // the close (ZFC closed a day while delivery orders never left the shop);
         // rider unsettled cash is a WARNING only (khata legitimately carries).
@@ -13541,7 +13551,7 @@ class PosController extends Controller
              return view('pos.day-close-summary', compact('company', 'date', 'stats', 'existingReport', 'streamSplit', 'showLocalStream', 'dcIso', 'dcBranchName', 'dcAllBranches', 'counterCashTotals', 'summary'));
          }
 
-         return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcBlockersAllClearable', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
+         return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcBlockersAllClearable', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive', 'hotelOccupancy'));
     }
 
      /**

@@ -9,7 +9,7 @@ class PosFeatureService
     public const ALL_FLAGS = [
         'kot', 'tables', 'kitchen', 'kitchen_notes', 'recipes',
         'inventory', 'delivery', 'barcode', 'prescription',
-        'service_jobs', 'customer_profile', 'bulk_pricing',
+        'service_jobs', 'rooms', 'customer_profile', 'bulk_pricing',
         'multi_branch', 'customer_loyalty',
         // Pharmacy Mode (Task 1558) — 'pharmacy' is the master child flag that
         // companies.pharmacy_mode mirrors; the other two are its own children.
@@ -167,6 +167,12 @@ class PosFeatureService
             'icon' => '💇',
             'category' => 'specialty',
         ],
+        'rooms' => [
+            'label' => 'Rooms & Guest Stays',
+            'description' => 'Room board, reservations, check-in/out, guest folio. Switch off to keep billing-only POS when another PMS runs the front desk.',
+            'icon' => '🏨',
+            'category' => 'accommodation',
+        ],
     ];
 
     public const CATEGORY_META = [
@@ -199,6 +205,12 @@ class PosFeatureService
             'description' => 'Pharmacy compliance, salon bookings, service jobs',
             'icon' => '🎯',
             'color' => 'pink',
+        ],
+        'accommodation' => [
+            'label' => 'Hotel & Guest House',
+            'description' => 'Rooms, stays, housekeeping and guest folio',
+            'icon' => '🏨',
+            'color' => 'teal',
         ],
     ];
 
@@ -239,7 +251,7 @@ class PosFeatureService
             'customer_profile' => true, 'customer_loyalty' => true,
         ],
         'hotel' => [
-            'tables' => true, 'kot' => true, 'kitchen' => true,
+            'rooms' => true,
             'service_jobs' => true, 'multi_branch' => true,
             'customer_profile' => true, 'customer_loyalty' => true,
         ],
@@ -489,10 +501,10 @@ class PosFeatureService
         ],
         'hotel' => [
             'label' => 'Hotel / Guest House',
-            'description' => 'Rooms, in-house dining, multi-branch, guest loyalty',
+            'description' => 'Rooms, stays and guest folio — kitchen, tables and delivery optional',
             'icon' => '🏨',
             'badge' => 'New',
-            'color' => 'cyan',
+            'color' => 'teal',
         ],
         // Clubs used to hide inside this preset with no mention of their own —
         // a club owner had no way to tell that this was their card.
@@ -923,7 +935,7 @@ class PosFeatureService
         return PosCategoryProfiles::profile(self::profileCategory($company), self::panelFor($company));
     }
 
-    /** Vocabulary family: food_service / goods_retail / pharmacy / services / general. */
+    /** Vocabulary family: food_service / goods_retail / pharmacy / services / accommodation / general. */
     public static function familyFor(?Company $company): string
     {
         return PosCategoryProfiles::family(self::profileCategory($company));
@@ -1571,7 +1583,8 @@ class PosFeatureService
      * The keys are heading slugs — 'pos.auth_btg_<key>' carries the wording.
      */
     public const CATEGORY_GROUPS = [
-        'food'         => ['restaurant', 'cafe', 'quick_service', 'catering', 'hotel', 'marquee'],
+        'food'         => ['restaurant', 'cafe', 'quick_service', 'catering', 'marquee'],
+        'stay'         => ['hotel'],
         'personal'     => ['salon', 'gym', 'laundry', 'tailoring'],
         'health_edu'   => ['clinic', 'education'],
         'professional' => ['consultant', 'architect', 'it_services', 'advertising', 'financial_services', 'property_dealer'],
@@ -1587,7 +1600,7 @@ class PosFeatureService
      * this map only has to carry what the label itself does not say.
      */
     public const CATEGORY_SEARCH_TERMS = [
-        'restaurant'         => 'restaurant hotel khana dine food dhaba',
+        'restaurant'         => 'restaurant khana dine food dhaba',
         'cafe'               => 'cafe coffee chai tea bakery counter',
         'quick_service'      => 'fast food burger pizza dhaba takeaway tikka',
         'salon'              => 'salon spa parlour beauty clinic hair massage pedicure facial',

@@ -3312,6 +3312,11 @@ class RestaurantPosController extends Controller
         // Chip ke liye poora summary (bina-rider delivery cash bhi isi mein).
         $riderChip = \App\Services\PosRiderKhataAlert::summary((int) $companyId, $company);
 
+        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForCompany(
+            $company,
+            app(\App\Services\BranchContextService::class)->getActiveBranchId()
+        );
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
@@ -3324,7 +3329,7 @@ class RestaurantPosController extends Controller
             'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
             'counterOrdersCount', 'heldNoTableCount', 'todayKhata',
             'todayTotalSale', 'yesterdayTotalSale', 'newCustomersToday', 'newCustomersMonth',
-            'inactiveRegulars', 'riderPending', 'riderChip'
+            'inactiveRegulars', 'riderPending', 'riderChip', 'hotelOccupancy'
         ));
     }
 

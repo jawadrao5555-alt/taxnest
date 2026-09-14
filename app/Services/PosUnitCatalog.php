@@ -189,6 +189,47 @@ final class PosUnitCatalog
         return $code !== null && (self::UNITS[$code][1] ?? false);
     }
 
+    /**
+     * Count units (NGT, NOS, PCS, …) must stay whole numbers. Measure units
+     * (KG, HR, …) may be fractional. A missing/unknown unit is treated as a
+     * count so a blank sale line cannot sneak a decimal past the rule.
+     */
+    public static function quantityAllowed(?string $code, float $quantity): bool
+    {
+        if ($quantity <= 0) {
+            return false;
+        }
+        if (self::isMeasure($code)) {
+            return true;
+        }
+
+        return abs($quantity - round($quantity)) < 0.0005;
+    }
+
+    /**
+     * Excel import fallback for a blank/unknown unit cell on a NEW row.
+     *
+     * Hotel shops default new products to NGT on the product form (rooms),
+     * but a blank import cell on breakfast or laundry must not become Nights.
+     * Accommodation-looking names keep NGT; everything else uses NOS.
+     */
+    public static function importDefaultFor(?Company $company, string $name = '', string $rowCategory = ''): string
+    {
+        $shopDefault = self::defaultFor($company);
+        $category = $company
+            ? (string) (PosFeatureService::resolveCategory($company))
+            : '';
+        if ($category !== 'hotel' && $shopDefault !== 'NGT') {
+            return $shopDefault;
+        }
+        $hay = strtolower($name . ' ' . $rowCategory);
+        if (preg_match('/\b(room|night|nights|stay|suite|deluxe|standard room|guest house|rihaish)\b/', $hay)) {
+            return 'NGT';
+        }
+
+        return 'NOS';
+    }
+
     public static function isValid(?string $code): bool
     {
         $code = self::normalize($code);

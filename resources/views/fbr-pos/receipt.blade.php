@@ -532,6 +532,7 @@
          Branch map:
            'submitted' + fbr_invoice_number → fiscalised: QR + FBR number + verify line
            'offline'                         → created offline: .local-badge + sync note
+           'verification_pending'             → reconciliation hold; never retry
            'failed'                          → FBR rejected: dashed retry badge
            'pending' / (other non-null)      → awaiting submission: dashed retry badge
            null / 'local' ($fbrRcptTopBadge) → handled in top section; QR-only here --}}
@@ -558,6 +559,15 @@
         {{ __('pos.receipt_offline_invoice') }}<br>
         {{ __('pos.receipt_offline_sync_fbr') }}<br>
         {{ $transaction->invoice_number }}
+    </div>
+    @elseif($transaction->fbr_status === 'verification_pending')
+    {{-- VERIFICATION HOLD: the local IMS may already have allocated a fiscal
+         number but the callback did not prove explicit Code 100. Never claim
+         FBR verification and never tell the cashier that this will retry. --}}
+    <div class="fbr-badge" style="border-style: dashed; border-color:#7c3aed;">
+        <div class="fbr-title" style="color:#7c3aed;">⚠ {{ __('pos.fbr_verification_pending') }}</div>
+        <div>POS: {{ $transaction->invoice_number }}</div>
+        <div style="font-size:10px; margin-top:3px;">{{ __('pos.fbr_verification_pending_no_retry') }}</div>
     </div>
     @elseif($transaction->fbr_status === 'failed')
     {{-- FAILED: FBR rejected the submission (e.g. duplicate, validation error).

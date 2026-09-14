@@ -102,6 +102,8 @@
                         <td class="px-4 py-3 text-center">
                             @if($txn->fbr_status === 'submitted')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">{{ __('pos.submitted_word') }}</span>
+                            @elseif($txn->fbr_status === 'verification_pending')
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">{{ __('pos.fbr_verification_pending') }}</span>
                             @elseif($txn->fbr_status === 'failed')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">{{ __('pos.failed_word') }}</span>
                             @elseif($txn->fbr_status === null)

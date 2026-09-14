@@ -53,7 +53,7 @@
             </div>
 
             @if($company->fbr_pos_id)
-            <div class="fbc-metric"><p class="text-[9px] text-emerald-200/60 font-bold">{{ __('pos.fbr_pos_hash_caps') }}</p><p class="text-sm font-bold text-white">{{ $company->fbr_pos_id }}</p><p class="text-[8px] text-emerald-200/40">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</p></div>
+            <div class="fbc-metric"><p class="text-[9px] text-emerald-200/60 font-bold">{{ __('pos.fbr_pos_hash_caps') }}</p><p class="text-sm font-bold text-white">{{ $company->fbr_pos_id }}</p><p class="text-[8px] text-emerald-200/40">{{ \App\Services\FbrPosSubmissionEvidenceService::requestedEnvironmentLabel($company) }}</p></div>
             @endif
         </div>
 

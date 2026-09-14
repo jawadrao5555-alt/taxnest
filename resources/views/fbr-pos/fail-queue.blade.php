@@ -33,7 +33,7 @@
     @endif
 
     {{-- Stats Cards --}}
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-5">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900/40 p-4 shadow-sm">
             <div class="text-[11px] uppercase tracking-wider text-red-600 font-bold">{{ __('pos.failed_word') }}</div>
             <div class="text-3xl font-black text-red-700 dark:text-red-400 mt-1">{{ (int)($stats->failed_count ?? 0) }}</div>
@@ -45,6 +45,10 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-orange-200 dark:border-orange-900/40 p-4 shadow-sm">
             <div class="text-[11px] uppercase tracking-wider text-orange-600 font-bold">Settings Error</div>
             <div class="text-3xl font-black text-orange-700 dark:text-orange-400 mt-1">{{ (int)($stats->config_error_count ?? 0) }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-violet-200 dark:border-violet-900/40 p-4 shadow-sm">
+            <div class="text-[11px] uppercase tracking-wider text-violet-600 font-bold">{{ __('pos.fbr_verification_pending') }}</div>
+            <div class="text-3xl font-black text-violet-700 dark:text-violet-400 mt-1">{{ (int)($stats->verification_pending_count ?? 0) }}</div>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-emerald-200 dark:border-emerald-900/40 p-4 shadow-sm">
             <div class="text-[11px] uppercase tracking-wider text-emerald-600 font-bold">{{ __('pos.submitted_word') }}</div>
@@ -136,11 +140,15 @@
                                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-xs font-bold"><span class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span> {{ __('pos.pending_word') }}</span>
                             @elseif($tx->fbr_status === 'config_error')
                                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-bold"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Settings Error</span>
+                            @elseif($tx->fbr_status === 'verification_pending')
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 text-xs font-bold"><span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span> {{ __('pos.fbr_verification_pending') }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 max-w-xs">
                             @if($tx->fbr_status === 'config_error')
                                 <span class="text-orange-600 dark:text-orange-400 font-medium">{{ __('pos.fq_set_then_retry') }}</span>
+                            @elseif($tx->fbr_status === 'verification_pending')
+                                <span class="text-violet-600 dark:text-violet-400 font-medium">{{ $tx->fbr_error_message ?: __('pos.fbr_verification_pending_no_retry') }}</span>
                             @else
                                 @php $lastLog = $tx->fbrLogs->first(); @endphp
                                 @if($lastLog && $lastLog->error_message)
@@ -153,14 +161,14 @@
                         <td class="px-4 py-3 text-xs text-gray-500">{{ $tx->created_at->format('d M H:i') }}</td>
                         <td class="px-4 py-3 text-right">
                             <div class="flex items-center justify-end gap-2">
-                                @if($tx->fbr_status !== 'config_error')
+                                @if(!in_array($tx->fbr_status, ['config_error', 'verification_pending'], true))
                                 <a href="{{ route('fbrpos.editFailed', $tx->id) }}"
                                    class="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-1"
                                    title="{{ __('pos.ti_edit_line_items_retry') }}">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     {{ __('pos.edit') }}
                                 </a>
-                                @else
+                                @elseif($tx->fbr_status === 'config_error')
                                 <a href="{{ route('fbrpos.settings') }}"
                                    class="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-sm flex items-center gap-1"
                                    title="{{ __('pos.fq_set_then_retry') }}">
@@ -168,6 +176,7 @@
                                     Fix Settings
                                 </a>
                                 @endif
+                                @if($tx->fbr_status !== 'verification_pending')
                                 <form method="POST" action="{{ route('fbrpos.failQueue.retryOne', $tx->id) }}" class="inline">
                                     @csrf
                                     <button type="submit"
@@ -179,6 +188,7 @@
                                         {{ __('pos.retry_word') }}
                                     </button>
                                 </form>
+                                @endif
                                 <a href="{{ route('fbrpos.show', $tx->id) }}" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200">{{ __('pos.view_word') }}</a>
                             </div>
                         </td>

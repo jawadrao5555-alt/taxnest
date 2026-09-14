@@ -14,6 +14,9 @@
                 {{-- Optional FBR integration (Sep 2026): a plain bill (reporting OFF /
                      converted). No FBR chip, no Submit/Retry — nothing to send. --}}
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" data-bill-kind="sale">{{ __('pos.bill_no_fbr_word') }}</span>
+            @elseif($transaction->fbr_status === 'verification_pending')
+                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">{{ __('pos.fbr_verification_pending') }}</span>
+                <span class="text-xs text-violet-700 dark:text-violet-300">{{ __('pos.fbr_verification_pending_no_retry') }}</span>
             @elseif($transaction->fbr_status === 'failed')
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">{{ __('pos.fbr_failed') }}</span>
                 {{-- ✏️ Edit & Retry only available for terminal-failed bills (not pending/in-flight) --}}

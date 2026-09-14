@@ -204,6 +204,7 @@ async function flushCallbackQueueInner() {
           response: item.response,
           error: item.error,
           offline: item.offline || false,
+          agent_version: item.agent_version || currentConfig.appVersion || '1.0.0',
         },
         { headers: { Authorization: `Bearer ${currentConfig.apiKey}` }, timeout: 10000 }
       );
@@ -420,6 +421,12 @@ async function syncOnceInner() {
   try {
     const res = await axios.get(`${currentConfig.serverUrl}/pending-invoices`, {
       headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
+      params: {
+        // Additive evidence only. Older servers ignore these query values and
+        // older agents remain supported when they omit them.
+        version: currentConfig.appVersion || '1.0.0',
+        device_uid: currentConfig.deviceUid || null,
+      },
       timeout: 15000,
     });
 
@@ -526,6 +533,7 @@ async function reportResult(txnId, success, praInvoiceNumber, response, error, o
     response,
     error,
     offline,
+    agent_version: currentConfig?.appVersion || '1.0.0',
   };
   try {
     await axios.post(

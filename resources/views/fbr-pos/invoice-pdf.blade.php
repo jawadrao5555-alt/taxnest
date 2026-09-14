@@ -319,6 +319,12 @@
             <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
             @endif
         </div>
+        @elseif($transaction->fbr_status === 'verification_pending')
+        <div class="local-box" style="border-color:#7c3aed; color:#7c3aed;">
+            {{ __('pos.fbr_verification_pending') }}<br>
+            {{ $transaction->invoice_number }}<br>
+            <span style="font-size:9px;">{{ __('pos.fbr_verification_pending_no_retry') }}</span>
+        </div>
         @elseif($transaction->fbr_status === null || $transaction->fbr_status === 'local')
         @php
             // Mirrors thermal receipt (22 Jul 2026): PROVISIONAL only for deliberate

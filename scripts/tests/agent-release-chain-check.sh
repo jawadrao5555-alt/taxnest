@@ -77,6 +77,70 @@ for path in sys.argv[1:]:
         yaml.safe_load(handle)
 PY
 
+python3 - "$BUILD" <<'PY' && ok "missing Agent tag is a successful new-release path; unexpected git errors still fail" || bad "Agent tag lookup LASTEXITCODE handling is unsafe"
+import re, sys, yaml
+
+text = open(sys.argv[1], encoding="utf-8").read()
+workflow = yaml.safe_load(text)
+steps = workflow["jobs"]["build-windows"]["steps"]
+agent = next(step for step in steps if step.get("id") == "agent-version")
+script = agent["run"]
+
+show_ref = re.search(
+    r'git show-ref --verify --quiet "refs/tags/\$tag"\n\s*\$(\w+)\s*=\s*\$LASTEXITCODE\b',
+    script,
+)
+if not show_ref:
+    print("git show-ref result is not captured immediately", file=sys.stderr)
+    sys.exit(1)
+lookup = show_ref.group(1)
+if f"if (${lookup} -eq 0)" not in script:
+    print("exit 0 must mean the version tag already exists", file=sys.stderr)
+    sys.exit(1)
+if f"elseif (${lookup} -eq 1)" not in script or '"already_released=false"' not in script:
+    print("exit 1 must be the new-release path", file=sys.stderr)
+    sys.exit(1)
+if f"git show-ref failed with exit code ${lookup}" not in script:
+    print("unexpected git show-ref codes must fail the step", file=sys.stderr)
+    sys.exit(1)
+if "Release $tag already belongs to $tagTarget; bump package version" not in script:
+    print("tag-collision protection missing from agent-version step", file=sys.stderr)
+    sys.exit(1)
+if not script.rstrip().endswith("$global:LASTEXITCODE = 0"):
+    print("successful process exit state must be restored at end of agent-version", file=sys.stderr)
+    sys.exit(1)
+
+# Static model of the captured lookup: missing tag is not a step failure.
+def classify(tag_lookup: int) -> str:
+    if tag_lookup == 0:
+        return "already_released"
+    if tag_lookup == 1:
+        return "new_release"
+    raise RuntimeError(f"git show-ref failed with exit code {tag_lookup}")
+
+assert classify(0) == "already_released"
+assert classify(1) == "new_release"
+for code in (-1, 2, 128):
+    try:
+        classify(code)
+    except RuntimeError:
+        continue
+    print(f"unexpected exit {code} must fail", file=sys.stderr)
+    sys.exit(1)
+
+source = next(step for step in steps if step.get("id") == "release-source")
+src = source["run"]
+for needle in (
+    "target_sha must be a full 40-character SHA",
+    "Checked out $actual, expected $env:REQUESTED_SHA",
+    "merge-base --is-ancestor $actual origin/main",
+):
+    if needle not in src:
+        print("exact target-SHA validation drifted", file=sys.stderr)
+        sys.exit(1)
+sys.exit(0)
+PY
+
 if [ "$FAILS" -eq 0 ]; then
   echo "agent-release-chain-check: ALL PASS"
   exit 0

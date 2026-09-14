@@ -57,15 +57,19 @@ jobs:
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid agent semver: $version" }
           $tag = "v$version"
           git show-ref --verify --quiet "refs/tags/$tag"
-          if ($LASTEXITCODE -eq 0) {
+          $tagLookup = $LASTEXITCODE
+          if ($tagLookup -eq 0) {
             $tagTarget = (git rev-list -n 1 $tag).Trim().ToLowerInvariant()
             $actual = (git rev-parse HEAD).Trim().ToLowerInvariant()
             if ($tagTarget -ne $actual) { throw "Release $tag already belongs to $tagTarget; bump package version" }
             "already_released=true" >> $env:GITHUB_OUTPUT
-          } else {
+          } elseif ($tagLookup -eq 1) {
             "already_released=false" >> $env:GITHUB_OUTPUT
+          } else {
+            throw "git show-ref failed with exit code $tagLookup while looking up $tag"
           }
           "version=$version" >> $env:GITHUB_OUTPUT
+          $global:LASTEXITCODE = 0
       - if: ${{ steps.agent-version.outputs.already_released != 'true' }}
         run: npm install
       - if: ${{ steps.agent-version.outputs.already_released != 'true' }}

@@ -6,11 +6,13 @@ use App\Models\Ingredient;
 use App\Models\IngredientMovement;
 use App\Models\IngredientStock;
 use App\Models\InventoryMovement;
+use App\Models\Company;
 use App\Models\PosProduct;
 use App\Models\StockCheck;
 use App\Models\StockCheckLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Physical Stock Check — the whole expected-vs-counted lifecycle in one place.
@@ -157,6 +159,14 @@ class StockCheckService
             : StockCheck::SCOPE_PRODUCTS;
 
         return DB::transaction(function () use ($companyId, $branchId, $scope, $userId, $options) {
+            // Lock a row that always exists before checking for an open sheet.
+            // Locking an empty stock_checks result does not prevent two
+            // concurrent transactions from both observing "none" and then
+            // inserting rival snapshots. The company row serializes opens for
+            // this tenant; the branch-specific check below keeps the business
+            // rule at one open sheet per branch.
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+
             // One open sheet per branch, enforced HERE and not just in the UI:
             // two managers opening sheets a second apart would each freeze their
             // own snapshot, and posting both would apply the same shortage twice.
@@ -311,49 +321,92 @@ class StockCheckService
     {
         if (!$check->isOpen()) return 0;
 
-        $lines = StockCheckLine::where('stock_check_id', $check->id)
-            ->whereIn('id', array_map('intval', array_keys($input)))
-            ->get()
-            ->keyBy('id');
-
-        $changed = 0;
+        // Validate the complete payload before the first write. Casting an
+        // arbitrary string to float turns it into zero in PHP; clamping a
+        // negative number to zero is equally dangerous for physical stock.
+        // Both could silently create a full-stock shortage. A bad row rejects
+        // the save/import atomically and leaves every previous count intact.
+        $normalized = [];
+        $errors = [];
         foreach ($input as $lineId => $payload) {
-            $line = $lines->get((int) $lineId);
-            if (!$line) continue;
+            if (!is_array($payload)) {
+                $errors["lines.{$lineId}.counted"] = __('pos.stock_check_count_invalid');
+                continue;
+            }
 
             $raw = $payload['counted'] ?? null;
-            // An empty box means "not counted yet" — that is different from a
-            // counted zero, and the sheet must be able to say both.
-            $counted = ($raw === null || $raw === '') ? null : round((float) $raw, 4);
-            if ($counted !== null && $counted < 0) $counted = 0.0;
+            if ($raw === null || (is_string($raw) && trim($raw) === '')) {
+                $counted = null;
+            } elseif (!is_scalar($raw) || !is_numeric(trim((string) $raw))) {
+                $errors["lines.{$lineId}.counted"] = __('pos.stock_check_count_invalid');
+                continue;
+            } else {
+                $counted = (float) trim((string) $raw);
+                if (!is_finite($counted) || $counted < 0) {
+                    $errors["lines.{$lineId}.counted"] = __('pos.stock_check_count_invalid');
+                    continue;
+                }
+                $counted = round($counted, 4);
+            }
 
-            $reason = isset($payload['reason']) && in_array($payload['reason'], StockCheckLine::REASONS, true)
-                ? $payload['reason'] : null;
-            $notes = isset($payload['notes']) && $payload['notes'] !== ''
-                ? mb_substr((string) $payload['notes'], 0, 255) : null;
-
-            $variance = $counted === null ? 0.0 : round($counted - (float) $line->expected_quantity, 4);
-            $varianceValue = round($variance * (float) $line->unit_cost, 2);
-
-            $isSame = ($line->counted_quantity === null && $counted === null)
-                || ($line->counted_quantity !== null && $counted !== null
-                    && abs((float) $line->counted_quantity - $counted) < 0.00005);
-            if ($isSame && $line->reason === $reason && $line->notes === $notes) continue;
-
-            $line->update([
-                'counted_quantity' => $counted,
-                'variance' => $variance,
-                'variance_value' => $varianceValue,
-                'reason' => $reason,
-                'notes' => $notes,
-                'counted_by' => $counted === null ? null : $userId,
-                'counted_at' => $counted === null ? null : now(),
-            ]);
-            $changed++;
+            $normalized[$lineId] = $payload + ['counted' => $counted];
+            $normalized[$lineId]['counted'] = $counted;
         }
 
-        if ($changed > 0) self::recalculate($check);
-        return $changed;
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return DB::transaction(function () use ($check, $normalized, $userId): int {
+            // Serialize Save with Post/Cancel. Without the header lock a late
+            // browser or spreadsheet request can update count lines while a
+            // manager is posting the old values, leaving the completed audit
+            // inconsistent with the stock movements it produced.
+            $fresh = StockCheck::whereKey($check->id)->lockForUpdate()->first();
+            if (!$fresh || !$fresh->isOpen()) return 0;
+
+            $lines = StockCheckLine::where('stock_check_id', $fresh->id)
+                ->whereIn('id', array_map('intval', array_keys($normalized)))
+                ->get()
+                ->keyBy('id');
+
+            $changed = 0;
+            foreach ($normalized as $lineId => $payload) {
+                $line = $lines->get((int) $lineId);
+                if (!$line) continue;
+
+                // An empty box means "not counted yet" — that is different from a
+                // counted zero, and the sheet must be able to say both.
+                $counted = $payload['counted'];
+
+                $reason = isset($payload['reason']) && in_array($payload['reason'], StockCheckLine::REASONS, true)
+                    ? $payload['reason'] : null;
+                $notes = isset($payload['notes']) && $payload['notes'] !== ''
+                    ? mb_substr((string) $payload['notes'], 0, 255) : null;
+
+                $variance = $counted === null ? 0.0 : round($counted - (float) $line->expected_quantity, 4);
+                $varianceValue = round($variance * (float) $line->unit_cost, 2);
+
+                $isSame = ($line->counted_quantity === null && $counted === null)
+                    || ($line->counted_quantity !== null && $counted !== null
+                        && abs((float) $line->counted_quantity - $counted) < 0.00005);
+                if ($isSame && $line->reason === $reason && $line->notes === $notes) continue;
+
+                $line->update([
+                    'counted_quantity' => $counted,
+                    'variance' => $variance,
+                    'variance_value' => $varianceValue,
+                    'reason' => $reason,
+                    'notes' => $notes,
+                    'counted_by' => $counted === null ? null : $userId,
+                    'counted_at' => $counted === null ? null : now(),
+                ]);
+                $changed++;
+            }
+
+            if ($changed > 0) self::recalculate($fresh);
+            return $changed;
+        });
     }
 
     /** Roll the line totals up onto the header. */

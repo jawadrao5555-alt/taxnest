@@ -48,6 +48,8 @@ class PosAccessService
         'orders',
         'products',
         'customers',
+        'hotel',
+        'hotel_housekeeping',
         'tables',
         'kitchen',
         'deliveries',
@@ -91,6 +93,9 @@ class PosAccessService
         '#^pos/local-bills#' => 'orders',
         '#^pos/products#' => 'products',
         '#^pos/customers#' => 'customers',
+        '#^pos/hotel/rooms/\d+/housekeeping$#' => 'hotel_housekeeping',
+        '#^pos/hotel/rooms$#' => 'hotel_housekeeping',
+        '#^pos/hotel#' => 'hotel',
         '#^pos/restaurant/tables#' => 'tables',
         '#^pos/restaurant/table-management#' => 'tables',
         '#^pos/restaurant/floors#' => 'tables',
@@ -184,14 +189,12 @@ class PosAccessService
             return null;
         }
         $allowed = in_array($feature, $set, true);
-        // Owner rule (3 Aug 2026): jab company mein koi alag Delivery Manager
-        // account (pos_role='pos_delivery') maujood hi nahi, to cashier/manager
-        // Deliveries board (rider assign/settle) chala sakte hain — chahe unka
-        // custom set 'deliveries' unticked ho. Delivery account bante hi yeh
-        // fallback khud band ho jata hai (asal gating wapas lag jati hai).
-        // Nav ($posNavCan) + route gate (PosAuth) + posCashierBlocked() sab isi
-        // ek verdict se chalte hain — single source of truth barqarar.
         if (!$allowed && $feature === 'deliveries' && self::deliveriesFallbackOpen($user)) {
+            return true;
+        }
+        // Front desk ('hotel') includes housekeeping. A housekeeping-only
+        // saved set still maps the rooms board without opening the folio.
+        if (!$allowed && $feature === 'hotel_housekeeping' && in_array('hotel', $set, true)) {
             return true;
         }
 

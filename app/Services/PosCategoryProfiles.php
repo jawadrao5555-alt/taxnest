@@ -31,10 +31,10 @@ use App\Models\Company;
  */
 class PosCategoryProfiles
 {
-    public const FAMILIES = ['food_service', 'goods_retail', 'pharmacy', 'services', 'general'];
+    public const FAMILIES = ['food_service', 'goods_retail', 'pharmacy', 'services', 'accommodation', 'general'];
 
     /** Audience families an admin can target (general = unclassified, gets all). */
-    public const AUDIENCE_FAMILIES = ['all', 'food_service', 'goods_retail', 'pharmacy', 'services'];
+    public const AUDIENCE_FAMILIES = ['all', 'food_service', 'goods_retail', 'pharmacy', 'services', 'accommodation'];
 
     /**
      * Modules EVERY shop gets, whatever it sells: billing, customers,
@@ -73,6 +73,13 @@ class PosCategoryProfiles
         'services' => [
             'service_jobs',
         ],
+        'accommodation' => [
+            'rooms', 'service_jobs', 'customer_loyalty',
+            'kot', 'tables', 'kitchen', 'kitchen_notes', 'recipes', 'inventory',
+            'delivery',
+            'deals_enabled', 'riders_enabled', 'rider_tracking_enabled',
+            'qr_menu_enabled', 'loyalty_enabled', 'kot_enabled',
+        ],
         // Unclassified: nothing is hidden. Resolved at runtime to every module.
         'general' => [],
     ];
@@ -107,8 +114,8 @@ class PosCategoryProfiles
             'examples' => ['Cappuccino', 'Chocolate Brownie', 'Club Sandwich', 'Iced Latte']],
         'quick_service' => ['family' => 'food_service', 'order' => 'takeaway',
             'examples' => ['Zinger Burger', 'Chicken Roll', 'Fries (Large)', 'Cold Drink 500ml']],
-        'hotel'         => ['family' => 'food_service', 'modules' => ['service_jobs'], 'order' => 'dine_in',
-            'examples' => ['Room Service Breakfast', 'Chicken Karahi (Full)', 'Mineral Water 1.5L', 'Laundry Service']],
+        'hotel'         => ['family' => 'accommodation', 'audiences' => ['food_service'], 'order' => 'walk_in',
+            'examples' => ['Deluxe Room (Per Night)', 'Twin Room (Per Night)', 'Laundry Service', 'Airport Pickup']],
         'marquee'       => ['family' => 'food_service', 'modules' => ['service_jobs'], 'order' => 'dine_in',
             'examples' => ['Per Head Dinner', 'Hall Booking', 'Stage Decoration', 'Cold Drink 500ml']],
         'catering'      => ['family' => 'food_service', 'modules' => ['service_jobs'], 'order' => 'delivery',
@@ -243,6 +250,15 @@ class PosCategoryProfiles
             'checklist' => ['products', 'receipt', 'team', 'first_sale'],
             'tiles' => ['sales', 'items', 'customers', 'khata'],
         ],
+        'accommodation' => [
+            'examples' => ['Deluxe Room (Per Night)', 'Twin Room (Per Night)', 'Laundry Service', 'Airport Pickup'],
+            'unit' => 'NGT', 'units' => ['NGT', 'DAY', 'HR', 'HEAD', 'NOS', 'PCS'],
+            'fbr_unit' => 'U', 'fbr_units' => ['U', 'PCS'],
+            'order' => 'walk_in', 'grid' => 'rooms', 'sample_category' => 'Rooms',
+            'prices' => [8000, 6500, 400, 2500],
+            'checklist' => ['rooms', 'products', 'receipt', 'team', 'first_sale'],
+            'tiles' => ['occupancy', 'sales', 'items', 'customers'],
+        ],
         'general' => [
             'examples' => ['Item A', 'Item B', 'Item C', 'Item D'],
             'unit' => 'NOS', 'units' => ['NOS', 'PCS', 'KGS', 'LTR', 'MTR', 'PKT', 'BOX'],
@@ -329,13 +345,13 @@ class PosCategoryProfiles
             'modules' => self::modules($category, $panel),
             'examples' => $examples,
             'unit' => $own['unit'] ?? ($isFbr ? $fam['fbr_unit'] : $fam['unit']),
-            'units' => $isFbr ? $fam['fbr_units'] : $fam['units'],
+            'units' => $own['units'] ?? ($isFbr ? $fam['fbr_units'] : $fam['units']),
             'order' => $own['order'] ?? $fam['order'],
-            'grid' => $fam['grid'],
-            'sample_category' => $fam['sample_category'],
+            'grid' => $own['grid'] ?? $fam['grid'],
+            'sample_category' => $own['sample_category'] ?? $fam['sample_category'],
             'prices' => $prices,
-            'checklist' => $fam['checklist'],
-            'tiles' => $fam['tiles'],
+            'checklist' => $own['checklist'] ?? $fam['checklist'],
+            'tiles' => $own['tiles'] ?? $fam['tiles'],
         ];
     }
 }

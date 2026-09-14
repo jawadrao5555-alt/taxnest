@@ -24,6 +24,11 @@
     <div class="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
         @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')
+        @if(!empty($hotelOccupancy))
+        <div class="mb-4">
+            @include('pos.hotel._occupancy-strip', ['occupancy' => $hotelOccupancy, 'hotelDeskUrl' => route('pos.hotel.dashboard')])
+        </div>
+        @endif
         {{-- Owner (25 Aug 2026, voice note): "rider settlement ko bhi idhar
              pending wali jagah le aayein — banda din bhar dashboard hi khol kar
              baitha hota hai, day-close ki report mein har waqt to nahi jayega."

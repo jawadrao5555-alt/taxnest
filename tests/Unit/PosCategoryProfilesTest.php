@@ -171,6 +171,17 @@ class PosCategoryProfilesTest extends TestCase
         $this->assertFalse(PosFeatureService::moduleRelevant($praGrocery, 'kot_enabled'));
         $this->assertFalse(PosFeatureService::moduleRelevant($praGrocery, 'kitchen_notes'));
 
+        $hotel = $this->shop('hotel', 'pos');
+        $this->assertSame('accommodation', PosFeatureService::familyFor($hotel));
+        foreach (['rooms', 'service_jobs', 'kitchen', 'tables', 'kot', 'customer_loyalty'] as $k) {
+            $this->assertTrue(PosFeatureService::moduleRelevant($hotel, $k), "hotel must still be able to turn on {$k}");
+        }
+        foreach (['barcode', 'pharmacy', 'prescription', 'batch_expiry', 'pharmacy_enabled'] as $k) {
+            $this->assertFalse(PosFeatureService::moduleRelevant($hotel, $k), "hotel must not see {$k}");
+        }
+        $this->assertTrue((bool) PosFeatureService::forCompany($hotel)->rooms, 'new hotel preset turns rooms on');
+        $this->assertFalse((bool) PosFeatureService::forCompany($hotel)->kitchen, 'new hotel preset does not force a kitchen');
+
         // Unclassified: nothing hidden.
         $general = $this->shop('general', 'pos');
         foreach (PosCategoryProfiles::knownModules() as $k) {
@@ -235,7 +246,7 @@ class PosCategoryProfilesTest extends TestCase
         $this->assertTrue(PosFeatureService::audienceMatches($this->shop('bakery', 'fbrpos'), 'food_service'), 'bakery listens to both worlds');
         $this->assertTrue(PosFeatureService::audienceMatches($this->shop('bakery', 'fbrpos'), 'goods_retail'));
         $this->assertFalse(PosFeatureService::audienceMatches($this->shop('salon'), 'goods_retail'));
-        foreach (['food_service', 'goods_retail', 'pharmacy', 'services'] as $fam) {
+        foreach (['food_service', 'goods_retail', 'pharmacy', 'services', 'accommodation'] as $fam) {
             $this->assertTrue(PosFeatureService::audienceMatches($this->shop('general'), $fam), 'unclassified shops hear everything');
         }
     }
@@ -268,7 +279,7 @@ class PosCategoryProfilesTest extends TestCase
                 $lower = mb_strtolower($text);
 
                 $forbidden = [];
-                if ($family === 'pharmacy' || $family === 'services') {
+                if ($family === 'pharmacy' || $family === 'services' || $family === 'accommodation') {
                     $forbidden = array_merge($forbidden, self::FOOD_WORDS);
                 }
                 if ($family === 'food_service' || $family === 'goods_retail' || $family === 'services') {

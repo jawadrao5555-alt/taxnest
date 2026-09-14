@@ -57,6 +57,7 @@ use App\Http\Controllers\PosInventoryController;
 use App\Http\Controllers\PosInventoryMasterController;
 use App\Http\Controllers\PosStockCheckController;
 use App\Http\Controllers\PosStockInController;
+use App\Http\Controllers\HotelController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
@@ -1116,6 +1117,28 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/products/search-mode', [PosController::class, 'productSearchMode'])->name('pos.products.search-mode');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
     Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
+
+    Route::middleware(['feature:rooms'])->prefix('hotel')->group(function () {
+        Route::get('/', [HotelController::class, 'dashboard'])->name('pos.hotel.dashboard');
+        Route::get('/rooms', [HotelController::class, 'rooms'])->name('pos.hotel.rooms');
+        Route::post('/rooms/{id}/housekeeping', [HotelController::class, 'housekeeping'])->whereNumber('id')->name('pos.hotel.rooms.housekeeping');
+        Route::post('/rooms/{id}/service', [HotelController::class, 'serviceState'])->whereNumber('id')->name('pos.hotel.rooms.service');
+        Route::get('/stays', [HotelController::class, 'staysIndex'])->name('pos.hotel.stays.index');
+        Route::get('/stays/create', [HotelController::class, 'createStay'])->name('pos.hotel.stays.create');
+        Route::post('/stays', [HotelController::class, 'storeStay'])->name('pos.hotel.stays.store');
+        Route::get('/stays/{id}', [HotelController::class, 'showStay'])->whereNumber('id')->name('pos.hotel.stays.show');
+        Route::post('/stays/{id}/check-in', [HotelController::class, 'checkIn'])->whereNumber('id')->name('pos.hotel.stays.check-in');
+        Route::post('/stays/{id}/check-out', [HotelController::class, 'checkOut'])->whereNumber('id')->name('pos.hotel.stays.check-out');
+        Route::post('/stays/{id}/extend', [HotelController::class, 'extend'])->whereNumber('id')->name('pos.hotel.stays.extend');
+        Route::post('/stays/{id}/move', [HotelController::class, 'move'])->whereNumber('id')->name('pos.hotel.stays.move');
+        Route::post('/stays/{id}/cancel', [HotelController::class, 'cancel'])->whereNumber('id')->name('pos.hotel.stays.cancel');
+        Route::post('/stays/{id}/no-show', [HotelController::class, 'noShow'])->whereNumber('id')->name('pos.hotel.stays.no-show');
+        Route::post('/stays/{id}/folio/charge', [HotelController::class, 'folioCharge'])->whereNumber('id')->name('pos.hotel.folio.charge');
+        Route::post('/stays/{id}/folio/payment', [HotelController::class, 'folioPayment'])->whereNumber('id')->name('pos.hotel.folio.payment');
+        Route::post('/stays/{id}/folio/refund', [HotelController::class, 'folioRefund'])->whereNumber('id')->name('pos.hotel.folio.refund');
+        Route::post('/stays/{id}/folio/reverse', [HotelController::class, 'folioReverse'])->whereNumber('id')->name('pos.hotel.folio.reverse');
+        Route::post('/stays/{id}/folio/settle', [HotelController::class, 'folioSettle'])->whereNumber('id')->name('pos.hotel.folio.settle');
+    });
     // Dashboard "gone quiet" card: mark one customer as handled. Same pattern
     // as bulk-sale above — OUTSIDE PosAdminOnly (that middleware redirects),
     // controller enforces the admin/manager allowlist with a true 403 so the
@@ -1156,6 +1179,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
         Route::post('/rider-bill-preview/settings', [\App\Http\Controllers\RiderBillPreviewController::class, 'update'])->name('rider.preview.settings');
         Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
+        Route::post('/hotel/rooms', [HotelController::class, 'storeRoom'])->name('pos.hotel.rooms.store')->middleware('feature:rooms');
+        Route::put('/hotel/rooms/{id}', [HotelController::class, 'updateRoom'])->whereNumber('id')->name('pos.hotel.rooms.update')->middleware('feature:rooms');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         // NO plan.limit middleware here on purpose: at-cap shops must still be

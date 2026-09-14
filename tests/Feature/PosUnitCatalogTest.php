@@ -425,6 +425,17 @@ class PosUnitCatalogTest extends TestCase
         $this->assertSame('NOS', PosUnitCatalog::defaultFor(null), 'no company row → PRA services, same as panelFor(null)');
     }
 
+    public function test_hotel_import_default_uses_nights_only_for_room_like_names(): void
+    {
+        $hotel = $this->makeCompany('pos', 'hotel', 'Serena');
+        $this->assertTrue(PosUnitCatalog::quantityAllowed('NGT', 2));
+        $this->assertFalse(PosUnitCatalog::quantityAllowed('NGT', 1.5));
+        $this->assertTrue(PosUnitCatalog::quantityAllowed('KGS', 1.5));
+        $this->assertSame('NGT', PosUnitCatalog::importDefaultFor($hotel, 'Deluxe Room', 'Rooms'));
+        $this->assertSame('NOS', PosUnitCatalog::importDefaultFor($hotel, 'Breakfast', 'Food'));
+        $this->assertSame('NOS', PosUnitCatalog::importDefaultFor($hotel, 'Spa', ''));
+    }
+
     public function test_changing_business_category_changes_the_group_on_next_load(): void
     {
         $shop = $this->makeCompany('fbrpos', 'retail', 'Changing Shop');
@@ -538,8 +549,8 @@ class PosUnitCatalogTest extends TestCase
         $uom = fn (string $name) => DB::table('pos_products')->where('company_id', $hotel->id)->where('name', $name)->value('uom');
         $this->assertSame('NGT', $uom('Deluxe Room'), 'new service unit must import');
         $this->assertSame('TRIP', $uom('Airport Pickup'), 'lower-case cell must normalize');
-        $this->assertSame('NGT', $uom('Breakfast'), 'blank cell on a NEW row → hotel default');
-        $this->assertSame('NGT', $uom('Spa'), 'unknown text is treated as blank, never stored');
+        $this->assertSame('NOS', $uom('Breakfast'), 'blank cell on a NEW food row must not become Nights');
+        $this->assertSame('NOS', $uom('Spa'), 'unknown text is treated as blank, never stored as Nights');
         $this->assertSame('NOS', $uom('Old Buffet'), 'blank cell on an EXISTING row keeps its legacy unit');
     }
 }

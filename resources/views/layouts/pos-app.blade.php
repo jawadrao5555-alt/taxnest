@@ -822,6 +822,12 @@
                                         {{ __('pos.nav_customers') }}
                                     </a>
                                     @endif
+                                    @if(!empty($posFeaturesLayout->rooms) && ($posNavCan('hotel') || $posNavCan('hotel_housekeeping')))
+                                    <a href="{{ $posNavCan('hotel') ? route('pos.hotel.dashboard') : route('pos.hotel.rooms') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 21V8l9-5 9 5v13M9 21v-6h6v6"/></svg>
+                                        {{ $posNavCan('hotel') ? __('pos.nav_hotel') : __('pos.nav_hotel_rooms') }}
+                                    </a>
+                                    @endif
                                     @if($posFeaturesLayout->tables && $posNavCan('tables', !$isCashierLayout))
                                     <a href="{{ route('pos.restaurant.tables') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -1172,6 +1178,7 @@
                     $posNavCan('products') ? ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''] : null,
                     $dealsNavVisible ? ['label' => __('pos.deals_title'), 'url' => route('pos.deals'), 'icon' => '◇', 'kbd' => ''] : null,
                     $posNavCan('customers') ? ['label' => __('pos.nav_customers'), 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''] : null,
+                    (!empty($posFeaturesLayout->rooms) && ($posNavCan('hotel') || $posNavCan('hotel_housekeeping'))) ? ['label' => $posNavCan('hotel') ? __('pos.nav_hotel') : __('pos.nav_hotel_rooms'), 'url' => $posNavCan('hotel') ? route('pos.hotel.dashboard') : route('pos.hotel.rooms'), 'icon' => '⌂', 'kbd' => ''] : null,
                     $posNavCan('reports') ? ['label' => __('pos.reports'), 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''] : null,
                     $posNavCan('day_close', $dayCloseNavDefault) ? ['label' => __('pos.nav_day_close'), 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''] : null,
                     $posNavCan('customize') ? ['label' => __('pos.nav_billing_plan'), 'url' => route('pos.billing'), 'icon' => '₨', 'kbd' => ''] : null,

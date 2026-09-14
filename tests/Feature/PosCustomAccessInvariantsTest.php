@@ -74,6 +74,8 @@ class PosCustomAccessInvariantsTest extends TestCase
         $this->assertSame('day_close', PosAccessService::featureForPath('pos/day-close'));
         $this->assertSame('customize', PosAccessService::featureForPath('pos/settings/local-billing'));
         $this->assertSame('team', PosAccessService::featureForPath('pos/team'));
+        $this->assertSame('hotel', PosAccessService::featureForPath('pos/hotel'));
+        $this->assertSame('hotel', PosAccessService::featureForPath('pos/hotel/stays/12'));
     }
 
     // ════════════════════════════════════════════════════════════════════

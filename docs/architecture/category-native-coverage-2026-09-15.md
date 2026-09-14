@@ -109,3 +109,18 @@ Lab 2 is BLOCKED by this container; Lab 3 is BLOCKED before page load because
 Cloud Browser cannot reach executor loopback. Therefore none of the 12 new
 operational cores is promoted to COMPLETE in this ledger. Passing source-level
 tests alone is not called live verification.
+
+## WSL promotion command
+
+On a clean WSL checkout of this PR branch, all remaining local promotion gates
+are orchestrated by one fail-closed command:
+
+```bash
+bash scripts/category-native-wsl-verify.sh
+```
+
+The runner requires PHP 8.4.1+, PDO SQLite/MySQL, Composer, Node/npm, local
+MariaDB and Chromium. It refuses non-loopback database hosts, creates and
+destroys only `taxnest_category_lab`, runs Lab 1, SQLite Lab 2, MariaDB parity,
+fictional desktop/mobile browser journeys and finally the repository's full
+test command. It does not approve, merge, deploy or contact a fiscal endpoint.

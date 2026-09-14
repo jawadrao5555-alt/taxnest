@@ -23,7 +23,7 @@ $host = (string) config('database.connections.'.config('database.default').'.hos
 $safeSqlite = $driver === 'sqlite' && str_contains($database, '.local/category-lab.sqlite');
 $safeMysql = in_array($driver, ['mysql', 'mariadb'], true)
     && in_array($host, ['127.0.0.1', 'localhost'], true)
-    && in_array($database, ['taxnest_dev', 'taxnest_staging', 'taxnest_lab'], true);
+    && in_array($database, ['taxnest_dev', 'taxnest_staging', 'taxnest_lab', 'taxnest_category_lab'], true);
 if (! $safeSqlite && ! $safeMysql) {
     fwrite(STDERR, "CATEGORY QA SEED REFUSED: database is not the disposable local lab.\n");
     exit(2);

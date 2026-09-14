@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Company;
+use App\Models\Ingredient;
 use App\Models\StockCheck;
 use App\Models\StockCheckLine;
+use App\Services\PosFeatureService;
 use App\Services\StockCheckAlreadyOpenException;
 use App\Services\StockCheckService;
 use Illuminate\Database\Schema\Blueprint;
@@ -22,7 +25,18 @@ class StockCheckIntegrityTest extends TestCase
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->boolean('is_internal_account')->default(false);
+            $table->text('feature_flags')->nullable();
+            $table->boolean('inventory_enabled')->default(true);
             $table->softDeletes();
+            $table->timestamps();
+        });
+        Schema::create('ingredients', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->string('unit')->default('kg');
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
         Schema::create('pos_products', function (Blueprint $table) {
@@ -90,6 +104,60 @@ class StockCheckIntegrityTest extends TestCase
         });
 
         DB::table('companies')->insert(['id' => 1, 'name' => 'Fictional Stock Lab']);
+        PosFeatureService::flushGateCaches();
+        PosFeatureService::assumeExtrasColumn(false);
+    }
+
+    public function test_ingredient_counting_stays_hidden_when_recipe_feature_is_off(): void
+    {
+        $company = Company::findOrFail(1);
+        $company->update([
+            'is_internal_account' => true,
+            'feature_flags' => ['inventory' => true, 'recipes' => false],
+        ]);
+        Ingredient::create([
+            'company_id' => $company->id,
+            'name' => 'Legacy Flour',
+            'unit' => 'kg',
+        ]);
+
+        PosFeatureService::flushGateCaches();
+
+        $this->assertFalse(StockCheckService::ingredientCountingAvailable($company->fresh()));
+        $this->assertSame(
+            StockCheck::SCOPE_PRODUCTS,
+            StockCheckService::allowedScope($company->fresh(), StockCheck::SCOPE_INGREDIENTS)
+        );
+        $this->assertSame(
+            StockCheck::SCOPE_PRODUCTS,
+            StockCheckService::allowedScope($company->fresh(), StockCheck::SCOPE_BOTH)
+        );
+    }
+
+    public function test_ingredient_counting_is_available_when_catalogue_and_recipe_feature_are_on(): void
+    {
+        $company = Company::findOrFail(1);
+        $company->update([
+            'is_internal_account' => true,
+            'feature_flags' => ['inventory' => true, 'recipes' => true],
+        ]);
+        Ingredient::create([
+            'company_id' => $company->id,
+            'name' => 'Active Flour',
+            'unit' => 'kg',
+        ]);
+
+        PosFeatureService::flushGateCaches();
+
+        $this->assertTrue(StockCheckService::ingredientCountingAvailable($company->fresh()));
+        $this->assertSame(
+            StockCheck::SCOPE_INGREDIENTS,
+            StockCheckService::allowedScope($company->fresh(), StockCheck::SCOPE_INGREDIENTS)
+        );
+        $this->assertSame(
+            StockCheck::SCOPE_BOTH,
+            StockCheckService::allowedScope($company->fresh(), StockCheck::SCOPE_BOTH)
+        );
     }
 
     public function test_invalid_count_rejects_the_complete_save_before_any_row_changes(): void

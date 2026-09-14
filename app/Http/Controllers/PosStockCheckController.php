@@ -145,7 +145,7 @@ class PosStockCheckController extends Controller
             ->orderBy('category')
             ->pluck('category');
 
-        $hasIngredients = StockCheckService::ingredientsAvailable($companyId);
+        $canCountIngredients = StockCheckService::ingredientCountingAvailable($company);
 
         $openCheck = StockCheck::where('company_id', $companyId)
             ->where('status', StockCheck::STATUS_COUNTING)
@@ -153,7 +153,7 @@ class PosStockCheckController extends Controller
             ->first();
 
         return view('pos.inventory.stock-check.create', array_merge($branchView, compact(
-            'company', 'categories', 'hasIngredients', 'openCheck'
+            'company', 'categories', 'canCountIngredients', 'openCheck'
         )));
     }
 
@@ -178,12 +178,9 @@ class PosStockCheckController extends Controller
         // all-branches view still resolves to a concrete branch to count.
         $branchId = BranchStockService::writeBranchId($companyId, $picked);
 
-        $scope = $request->scope;
-        if ($scope !== StockCheck::SCOPE_PRODUCTS && !StockCheckService::ingredientsAvailable($companyId)) {
-            // Asking for raw materials in a shop that has none would produce an
-            // empty sheet; fall back rather than hand back a blank page.
-            $scope = StockCheck::SCOPE_PRODUCTS;
-        }
+        // A stale tab or crafted request must not reopen a plan-gated
+        // Recipes/ingredient surface. Fall back to the visible scope.
+        $scope = StockCheckService::allowedScope($company, (string) $request->scope);
 
         try {
             $check = StockCheckService::open($companyId, $branchId, $scope, (int) auth('pos')->id(), [

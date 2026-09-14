@@ -2,10 +2,8 @@
 # deployment_key; customer-visible title/points never contain provenance.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
-title: "Production update — physical stock count zyada mehfooz"
+title: "Production update — stock-count options ab feature ke mutabiq"
 audience: all
 type: improvement
 points:
-  - "Physical count mein ghalat text ya negative quantity ab zero ban kar stock ko kharab nahi karegi; poori save safely ruk kar saaf error degi."
-  - "Ek branch par do managers aik waqt mein rival stock-check sheets nahi khol sakte."
-  - "Save, Post aur Cancel aik dosray se race nahi karte; completed audit aur stock movements aik jaisay rehte hain."
+  - "Recipes band hon to Physical Stock Check ab Products ko khud select karta hai aur chhupa hua ingredient option submit nahi hota."

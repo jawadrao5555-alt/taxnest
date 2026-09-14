@@ -92,6 +92,25 @@ class StockCheckService
         }
     }
 
+    /** Keep the visible option and the accepted write scope on one gate. */
+    public static function ingredientCountingAvailable(Company $company): bool
+    {
+        return self::ingredientsAvailable((int) $company->id)
+            && PosFeatureService::moduleAvailable($company, 'recipes');
+    }
+
+    /** Normalize a requested sheet scope against the currently visible modules. */
+    public static function allowedScope(Company $company, string $scope): string
+    {
+        if (!in_array($scope, [StockCheck::SCOPE_PRODUCTS, StockCheck::SCOPE_INGREDIENTS, StockCheck::SCOPE_BOTH], true)) {
+            return StockCheck::SCOPE_PRODUCTS;
+        }
+
+        return $scope !== StockCheck::SCOPE_PRODUCTS && !self::ingredientCountingAvailable($company)
+            ? StockCheck::SCOPE_PRODUCTS
+            : $scope;
+    }
+
     /* ------------------------------------------------------------------ */
     /* Creating a sheet                                                    */
     /* ------------------------------------------------------------------ */

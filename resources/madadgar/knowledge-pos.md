@@ -432,3 +432,7 @@ Sale screen ki mazeed cheezein:
 - Unlimited: Pro ke sab features + unlimited team accounts, 5 branches, unlimited billing aur Priority Support.
 - Sirf teen optional paid add-ons hain: WhatsApp Bill, Rider Live Tracking aur Caller ID. Delivery Riders, QR Menu aur Staff Hazri add-ons nahi rahe.
 - Trial ke dauran SAB features milte hain. Agar koi feature package mein na ho to us ka page Billing par le jata hai — upgrade kar ke khul jata hai.
+
+### Physical Stock Check mein scope select na ho
+
+Agar Recipes feature band hai lekin purane ingredients record mein mojood hain, Physical Stock Check ab sirf Products dikhata aur usay khud select karta hai. Purani tab ya manually badli request se hidden ingredient count start nahi hota.

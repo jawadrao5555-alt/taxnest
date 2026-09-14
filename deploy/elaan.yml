@@ -4,6 +4,6 @@
 
 title: "Production update — stock-count options ab feature ke mutabiq"
 audience: all
-type: fix
+type: improvement
 points:
   - "Recipes band hon to Physical Stock Check ab Products ko khud select karta hai aur chhupa hua ingredient option submit nahi hota."

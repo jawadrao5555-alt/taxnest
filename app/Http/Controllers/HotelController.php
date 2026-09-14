@@ -193,6 +193,7 @@ class HotelController extends Controller
         ]);
         $data['walk_in'] = $request->boolean('walk_in');
         try {
+            $this->room((int) $data['room_id']);
             $stay = $this->stays->book((int) app('currentCompanyId'), (int) auth('pos')->id(), $data);
         } catch (HotelStayException $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -209,7 +210,9 @@ class HotelController extends Controller
         $stay->load(['room', 'occupants', 'folioEntries', 'assignments.room']);
         $totals = $this->folio->totals($stay);
         $companyId = (int) app('currentCompanyId');
+        $branchId = $this->branches->getActiveBranchId();
         $rooms = HotelRoom::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->where('is_active', true)
             ->orderBy('room_number')
             ->get();

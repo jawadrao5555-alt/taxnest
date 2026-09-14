@@ -47,6 +47,15 @@ class HotelAccessService
         return PosAccessService::customAllows($user, 'hotel_housekeeping') === true;
     }
 
+    /**
+     * Occupancy on retail/restaurant dashboards and day-close is Hotel data.
+     * Show it only to Hotel front-desk or Hotel Housekeeping staff.
+     */
+    public static function canSeeOccupancy(?User $user): bool
+    {
+        return self::canHousekeeping($user);
+    }
+
     public static function canManageRooms(?User $user): bool
     {
         return self::isManager($user);

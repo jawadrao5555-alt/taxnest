@@ -20,7 +20,7 @@ class HotelFolioService
      * @return array{
      *   charges:float, payments:float, deposits:float, deposit_refunds:float,
      *   refunds:float, invoiced:float, outstanding:float, charge_outstanding:float,
-     *   deposit_held:float, uninvoiced_charges:float
+     *   deposit_held:float, uninvoiced_charges:float, advance_credit:float
      * }
      */
     public function totals(HotelStay $stay): array
@@ -87,6 +87,7 @@ class HotelFolioService
             'charge_outstanding' => max(0, $chargeOutstanding),
             'deposit_held' => round($deposits - $depositRefunds, 2),
             'uninvoiced_charges' => $uninvoiced,
+            'advance_credit' => max(0, round($collectedTowardCharges - $charges, 2)),
         ];
     }
 

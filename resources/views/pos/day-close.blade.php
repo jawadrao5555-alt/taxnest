@@ -28,6 +28,12 @@
     </div>
     @endif
 
+    @if(!empty($hotelOccupancy))
+    <div class="mb-6">
+        @include('pos.hotel._occupancy-strip', ['occupancy' => $hotelOccupancy, 'hotelDeskUrl' => route('pos.hotel.dashboard')])
+    </div>
+    @endif
+
     {{-- Stranded-day banner (Task 455): prior business day(s) never closed —
          auto-close skipped (open orders) or nobody closed manually. Surface
          them loudly before more bills pile onto today. --}}

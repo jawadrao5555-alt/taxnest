@@ -263,6 +263,9 @@ async function runJourney(browser, label, viewport, creds) {
                     clickSubmit(payForm),
                 ]);
                 ok('advance payment posted');
+                const folioText = await page.locator('body').innerText();
+                if (/Advance Credit|پیشگی کریڈٹ/i.test(folioText)) ok('Advance Credit tile visible after overpay');
+                else bad('Advance Credit tile missing after payment above charges');
             } else {
                 bad('payment form missing on stay show');
             }
@@ -323,6 +326,13 @@ async function runJourney(browser, label, viewport, creds) {
         say('Permissions: cashier without hotel grant');
         await logout(page);
         await loginAs(page, creds.deniedLogin, creds.password);
+        await page.goto(`${BASE_URL}/pos/dashboard`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        const deniedDash = await page.locator('body').innerText();
+        if (/\bIn house\b/.test(deniedDash) || /hotel_stat_in_house/.test(deniedDash)) {
+            bad('denied cashier saw hotel occupancy on dashboard');
+        } else {
+            ok('denied cashier dashboard has no hotel occupancy strip');
+        }
         await page.goto(`${BASE_URL}/pos/hotel`, { waitUntil: 'domcontentloaded', timeout: 30000 });
         if (!page.url().match(/\/pos\/hotel\/?$/)) ok(`denied cashier blocked → ${page.url()}`);
         else bad('denied cashier reached front desk');

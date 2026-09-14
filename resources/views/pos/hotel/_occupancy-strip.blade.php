@@ -1,5 +1,5 @@
 <div class="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50/40 dark:bg-teal-900/10 p-3">
-    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
         @foreach([
             ['hotel_stat_rooms', $occupancy['rooms'] ?? 0],
             ['hotel_stat_in_house', $occupancy['in_house'] ?? 0],
@@ -18,6 +18,12 @@
         @endforeach
     </div>
     @isset($hotelDeskUrl)
-    <p class="mt-2"><a href="{{ $hotelDeskUrl }}" class="text-xs font-semibold text-teal-800 hover:underline">{{ __('pos.hotel_front_desk') }}</a></p>
+    @php
+        $occupancyUser = auth('pos')->user();
+        $occupancyCanDesk = \App\Services\HotelAccessService::canFrontDesk($occupancyUser);
+        $occupancyLink = $occupancyCanDesk ? $hotelDeskUrl : route('pos.hotel.rooms');
+        $occupancyLinkLabel = $occupancyCanDesk ? __('pos.hotel_front_desk') : __('pos.hotel_rooms');
+    @endphp
+    <p class="mt-2"><a href="{{ $occupancyLink }}" class="text-xs font-semibold text-teal-800 hover:underline">{{ $occupancyLinkLabel }}</a></p>
     @endisset
 </div>

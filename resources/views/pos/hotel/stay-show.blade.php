@@ -30,11 +30,12 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
         @foreach([
             ['hotel_folio_charges', $totals['charges']],
             ['hotel_folio_paid', $totals['payments'] - $totals['refunds']],
             ['hotel_folio_due', $totals['outstanding']],
+            ['hotel_folio_advance_credit', $totals['advance_credit'] ?? 0],
             ['hotel_folio_deposit', $totals['deposit_held']],
         ] as $tile)
         <div class="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3">

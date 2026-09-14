@@ -130,6 +130,9 @@ class HotelGuestHouseV1ContractTest extends TestCase
         $denied->pos_custom_access = json_encode(['dashboard', 'orders']);
         $this->assertFalse(HotelAccessService::canFrontDesk($denied));
         $this->assertFalse(HotelAccessService::canHousekeeping($denied));
+        $this->assertFalse(HotelAccessService::canSeeOccupancy($denied));
+        $this->assertTrue(HotelAccessService::canSeeOccupancy($hkOnly));
+        $this->assertTrue(HotelAccessService::canSeeOccupancy($owner));
 
         // Hotel must not lean on Healthcare IPD roles.
         $ipd = new User();
@@ -148,5 +151,33 @@ class HotelGuestHouseV1ContractTest extends TestCase
         $user->pos_custom_access = json_encode(['dashboard', 'hotel']);
         $this->assertTrue(PosAccessService::customAllows($user, 'hotel'));
         $this->assertTrue(PosAccessService::customAllows($user, 'hotel_housekeeping'));
+    }
+
+    public function test_advance_credit_and_other_branch_keys_exist_in_all_languages(): void
+    {
+        $en = require base_path('lang/en/pos.php');
+        $rur = require base_path('lang/rur/pos.php');
+        $ur = require base_path('lang/ur/pos.php');
+        foreach (['hotel_folio_advance_credit', 'hotel_room_other_branch'] as $key) {
+            $this->assertArrayHasKey($key, $en);
+            $this->assertArrayHasKey($key, $rur);
+            $this->assertArrayHasKey($key, $ur);
+            $this->assertSame(array_search($key, array_keys($en), true), array_search($key, array_keys($rur), true));
+            $this->assertSame(array_search($key, array_keys($en), true), array_search($key, array_keys($ur), true));
+        }
+        $this->assertSame('Advance Credit', $en['hotel_folio_advance_credit']);
+        $this->assertSame('Advance Credit', $rur['hotel_folio_advance_credit']);
+        $this->assertMatchesRegularExpression('/[\x{0600}-\x{06FF}]/u', $ur['hotel_folio_advance_credit']);
+        $this->assertMatchesRegularExpression('/[\x{0600}-\x{06FF}]/u', $ur['hotel_room_other_branch']);
+    }
+
+    public function test_overlap_queries_take_locking_reads(): void
+    {
+        $src = file_get_contents(app_path('Services/HotelStayService.php'));
+        $this->assertNotFalse($src);
+        $this->assertMatchesRegularExpression(
+            '/function assertRoomFree[\s\S]*lockForUpdate\(\)->pluck\([\'"]id[\'"]\)[\s\S]*lockForUpdate\(\)->pluck\([\'"]id[\'"]\)/',
+            $src
+        );
     }
 }

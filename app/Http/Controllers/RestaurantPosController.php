@@ -3312,7 +3312,8 @@ class RestaurantPosController extends Controller
         // Chip ke liye poora summary (bina-rider delivery cash bhi isi mein).
         $riderChip = \App\Services\PosRiderKhataAlert::summary((int) $companyId, $company);
 
-        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForCompany(
+        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForViewer(
+            auth('pos')->user(),
             $company,
             app(\App\Services\BranchContextService::class)->getActiveBranchId()
         );

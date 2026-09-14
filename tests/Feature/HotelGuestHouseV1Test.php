@@ -225,6 +225,7 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertEquals(8000.0, $totals['payments']);
         $this->assertEquals(2000.0, $totals['deposits']);
         $this->assertEquals(0.0, $totals['outstanding']);
+        $this->assertEquals(0.0, $totals['advance_credit']);
         $this->assertEquals(2000.0, $totals['deposit_held']);
         $this->assertEquals(8000.0, $totals['uninvoiced_charges']);
 
@@ -421,5 +422,231 @@ class HotelGuestHouseV1Test extends TestCase
             ->withSession(['active_branch_id' => $branchA->id])
             ->get('/pos/hotel/stays/' . $stay->id)
             ->assertOk();
+    }
+
+    public function test_occupancy_is_hidden_without_hotel_or_housekeeping_access(): void
+    {
+        $company = $this->company('hotel');
+        $stays = app(HotelStayService::class);
+        $this->room($stays, $company, '101');
+        $denied = $this->staff($company, 'pos_cashier', ['dashboard', 'orders', 'day_close']);
+        $hk = $this->staff($company, 'pos_cashier', ['dashboard', 'hotel_housekeeping', 'day_close']);
+        $owner = $this->owner($company);
+        $label = __('pos.hotel_stat_in_house');
+
+        $this->assertNull($stays->occupancyForViewer($denied, $company));
+        $this->assertNotNull($stays->occupancyForViewer($hk, $company));
+        $this->assertNotNull($stays->occupancyForViewer($owner, $company));
+
+        $this->actingAs($denied, 'pos')->get('/pos/dashboard')
+            ->assertOk()
+            ->assertDontSee($label, false);
+        $this->actingAs($hk, 'pos')->get('/pos/dashboard')
+            ->assertOk()
+            ->assertSee($label, false);
+        $this->actingAs($owner, 'pos')->get('/pos/dashboard')
+            ->assertOk()
+            ->assertSee($label, false);
+
+        $this->actingAs($denied, 'pos')->get('/pos/day-close')
+            ->assertOk()
+            ->assertDontSee($label, false);
+        $this->actingAs($hk, 'pos')->get('/pos/day-close')
+            ->assertOk()
+            ->assertSee($label, false);
+        $this->actingAs($owner, 'pos')->get('/pos/day-close')
+            ->assertOk()
+            ->assertSee($label, false);
+    }
+
+    public function test_restaurant_dashboard_hides_occupancy_without_hotel_access(): void
+    {
+        $flags = PosFeatureService::defaultsForCategory('restaurant');
+        $flags['rooms'] = true;
+        $company = $this->company('restaurant', ['feature_flags' => $flags]);
+        $stays = app(HotelStayService::class);
+        $this->room($stays, $company, '101');
+        $denied = $this->staff($company, 'pos_cashier', ['dashboard', 'orders', 'day_close']);
+        $owner = $this->owner($company);
+        $label = __('pos.hotel_stat_in_house');
+
+        $this->actingAs($denied, 'pos')->get('/pos/restaurant/dashboard')
+            ->assertOk()
+            ->assertDontSee($label, false);
+        $this->actingAs($owner, 'pos')->get('/pos/restaurant/dashboard')
+            ->assertOk()
+            ->assertSee($label, false);
+    }
+
+    public function test_stay_cannot_move_to_another_branch_room(): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('branches')) {
+            $this->markTestSkipped('branches table required');
+        }
+        $company = $this->company('hotel');
+        $stays = app(HotelStayService::class);
+        $user = $this->owner($company);
+        $branchA = \App\Models\Branch::create([
+            'company_id' => $company->id,
+            'name' => 'Tower A',
+            'code' => 'TA',
+            'is_active' => true,
+        ]);
+        $branchB = \App\Models\Branch::create([
+            'company_id' => $company->id,
+            'name' => 'Tower B',
+            'code' => 'TB',
+            'is_active' => true,
+        ]);
+        $roomA = $stays->createRoom((int) $company->id, [
+            'room_number' => '101',
+            'room_type' => 'Deluxe',
+            'capacity' => 2,
+            'rate_amount' => 4000,
+            'rate_unit' => 'NGT',
+            'branch_id' => $branchA->id,
+        ]);
+        $roomB = $stays->createRoom((int) $company->id, [
+            'room_number' => '202',
+            'room_type' => 'Deluxe',
+            'capacity' => 2,
+            'rate_amount' => 4000,
+            'rate_unit' => 'NGT',
+            'branch_id' => $branchB->id,
+        ]);
+        $stay = $stays->book((int) $company->id, (int) $user->id, [
+            'room_id' => $roomA->id,
+            'check_in_date' => '2026-09-20',
+            'check_out_date' => '2026-09-22',
+            'guest_name' => 'Cross Branch',
+        ]);
+        $this->expectException(HotelStayException::class);
+        $this->expectExceptionMessage(__('pos.hotel_room_other_branch'));
+        $stays->moveRoom($stay, (int) $roomB->id, (int) $user->id);
+    }
+
+    public function test_checked_in_room_move_marks_previous_room_dirty(): void
+    {
+        $company = $this->company('hotel');
+        $stays = app(HotelStayService::class);
+        $user = $this->owner($company);
+        $from = $this->room($stays, $company, '101', 4000);
+        $to = $this->room($stays, $company, '102', 4000);
+        $stay = $stays->book((int) $company->id, (int) $user->id, [
+            'room_id' => $from->id,
+            'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDays(2)->toDateString(),
+            'guest_name' => 'Mover',
+            'walk_in' => true,
+        ]);
+        $this->assertSame('clean', $from->fresh()->housekeeping);
+        $stays->moveRoom($stay, (int) $to->id, (int) $user->id);
+        $this->assertSame('dirty', $from->fresh()->housekeeping);
+        $this->assertSame((int) $to->id, (int) $stay->fresh()->room_id);
+
+        $reservedFrom = $this->room($stays, $company, '201', 4000);
+        $reservedTo = $this->room($stays, $company, '202', 4000);
+        $reserved = $stays->book((int) $company->id, (int) $user->id, [
+            'room_id' => $reservedFrom->id,
+            'check_in_date' => '2026-10-01',
+            'check_out_date' => '2026-10-03',
+            'guest_name' => 'Not Yet In',
+        ]);
+        $stays->moveRoom($reserved, (int) $reservedTo->id, (int) $user->id);
+        $this->assertSame('clean', $reservedFrom->fresh()->housekeeping);
+    }
+
+    public function test_overpayment_shows_advance_credit_separate_from_deposit(): void
+    {
+        $company = $this->company('hotel', [
+            'pos_tax_rate_cash' => 0,
+            'pos_tax_rate_card' => 0,
+        ]);
+        $stays = app(HotelStayService::class);
+        $folio = app(HotelFolioService::class);
+        $room = $this->room($stays, $company, '301', 4000);
+        $user = $this->owner($company);
+        $stay = $stays->book((int) $company->id, (int) $user->id, [
+            'room_id' => $room->id,
+            'check_in_date' => '2026-09-20',
+            'check_out_date' => '2026-09-22',
+            'guest_name' => 'Credit Guest',
+            'walk_in' => true,
+        ]);
+        $folio->postPayment($stay, [
+            'amount' => 12000,
+            'payment_method' => 'cash',
+            'idempotency_key' => 'adv-pay',
+        ], (int) $user->id);
+        $folio->postDeposit($stay, [
+            'amount' => 2000,
+            'payment_method' => 'cash',
+            'idempotency_key' => 'adv-dep',
+        ], (int) $user->id);
+        $totals = $folio->totals($stay->fresh());
+        $this->assertEquals(8000.0, $totals['charges']);
+        $this->assertEquals(0.0, $totals['outstanding']);
+        $this->assertEquals(4000.0, $totals['advance_credit']);
+        $this->assertEquals(2000.0, $totals['deposit_held']);
+        $this->assertNotEquals($totals['advance_credit'], $totals['deposit_held']);
+
+        $html = $this->actingAs($user, 'pos')
+            ->get('/pos/hotel/stays/' . $stay->id)
+            ->assertOk()
+            ->assertSee(__('pos.hotel_folio_advance_credit'), false)
+            ->assertSee('Rs 4,000', false)
+            ->getContent();
+        $this->assertStringContainsString(__('pos.hotel_folio_advance_credit'), $html);
+        $this->assertStringContainsString(__('pos.hotel_folio_deposit'), $html);
+    }
+
+    public function test_stay_detail_room_list_is_scoped_to_active_branch(): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('branches')) {
+            $this->markTestSkipped('branches table required');
+        }
+        $company = $this->company('hotel');
+        $stays = app(HotelStayService::class);
+        $user = $this->owner($company);
+        $branchA = \App\Models\Branch::create([
+            'company_id' => $company->id,
+            'name' => 'Tower A',
+            'code' => 'SA',
+            'is_active' => true,
+        ]);
+        $branchB = \App\Models\Branch::create([
+            'company_id' => $company->id,
+            'name' => 'Tower B',
+            'code' => 'SB',
+            'is_active' => true,
+        ]);
+        $roomA = $stays->createRoom((int) $company->id, [
+            'room_number' => 'ROOM-A-11',
+            'room_type' => 'Deluxe',
+            'capacity' => 2,
+            'rate_amount' => 4000,
+            'rate_unit' => 'NGT',
+            'branch_id' => $branchA->id,
+        ]);
+        $stays->createRoom((int) $company->id, [
+            'room_number' => 'ROOM-B-99',
+            'room_type' => 'Deluxe',
+            'capacity' => 2,
+            'rate_amount' => 4000,
+            'rate_unit' => 'NGT',
+            'branch_id' => $branchB->id,
+        ]);
+        $stay = $stays->book((int) $company->id, (int) $user->id, [
+            'room_id' => $roomA->id,
+            'check_in_date' => '2026-09-20',
+            'check_out_date' => '2026-09-22',
+            'guest_name' => 'List Guest',
+        ]);
+        $this->actingAs($user, 'pos')
+            ->withSession(['active_branch_id' => $branchA->id])
+            ->get('/pos/hotel/stays/' . $stay->id)
+            ->assertOk()
+            ->assertSee('ROOM-A-11', false)
+            ->assertDontSee('ROOM-B-99', false);
     }
 }

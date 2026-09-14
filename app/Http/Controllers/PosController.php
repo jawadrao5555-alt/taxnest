@@ -2187,7 +2187,8 @@ class PosController extends Controller
         // chip ki jagah pakki honi chahiye — is liye poora summary bhi jata hai.
         $riderChip = \App\Services\PosRiderKhataAlert::summary((int) $companyId, $company);
 
-        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForCompany(
+        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForViewer(
+            auth('pos')->user(),
             $company,
             app(\App\Services\BranchContextService::class)->getActiveBranchId()
         );
@@ -13498,7 +13499,8 @@ class PosController extends Controller
         // rows included, closed = a PosDayCloseReport row exists for that date.
         $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date, false, $dcBranchId);
 
-        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForCompany(
+        $hotelOccupancy = app(\App\Services\HotelStayService::class)->occupancyForViewer(
+            $dayCloseUser,
             $company,
             $dcBranchId
         );

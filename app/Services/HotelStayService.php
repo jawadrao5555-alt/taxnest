@@ -398,21 +398,35 @@ class HotelStayService
             if ($stay->status === HotelStay::STATUS_CHECKED_IN) {
                 $from = now()->toDateString();
             }
-            $room = HotelRoom::where('company_id', $stay->company_id)
-                ->where('id', $newRoomId)
-                ->lockForUpdate()
-                ->first();
+            $oldRoomId = (int) $stay->room_id;
+            $lockIds = array_values(array_unique(array_filter([$oldRoomId, $newRoomId], fn ($id) => (int) $id > 0)));
+            sort($lockIds);
+            $lockedRooms = [];
+            foreach ($lockIds as $rid) {
+                $lockedRooms[(int) $rid] = HotelRoom::where('company_id', $stay->company_id)
+                    ->where('id', $rid)
+                    ->lockForUpdate()
+                    ->first();
+            }
+            $room = $lockedRooms[$newRoomId] ?? null;
             if (!$room) {
                 throw new HotelStayException(__('pos.hotel_room_not_found'));
             }
             if ($room->isOutOfService()) {
                 throw new HotelStayException(__('pos.hotel_room_out_of_service'));
             }
+            if (!$this->sameBranchId($stay->branch_id, $room->branch_id)) {
+                throw new HotelStayException(__('pos.hotel_room_other_branch'));
+            }
             if (($stay->adult_count + $stay->child_count) > (int) $room->capacity) {
                 throw new HotelStayException(__('pos.hotel_capacity_exceeded'));
             }
             $this->assertRoomFree((int) $stay->company_id, (int) $room->id, $from, $to, (int) $stay->id);
-            $oldRoomId = (int) $stay->room_id;
+            if ($stay->status === HotelStay::STATUS_CHECKED_IN && $oldRoomId > 0 && $oldRoomId !== (int) $room->id) {
+                HotelRoom::where('company_id', $stay->company_id)
+                    ->where('id', $oldRoomId)
+                    ->update(['housekeeping' => HotelRoom::HK_DIRTY]);
+            }
             $assignment = HotelStayAssignment::where('company_id', $stay->company_id)
                 ->where('stay_id', $stay->id)
                 ->where('room_id', $oldRoomId)
@@ -462,6 +476,18 @@ class HotelStayService
      * plan gates (subscriptions) and break intentional minimal-schema
      * dashboard tests. Hotel routes still sit behind feature:rooms middleware.
      *
+     * @return array<string,int|float>|null null when Rooms is off / unmigrated / viewer has no Hotel access
+     */
+    public function occupancyForViewer(?\App\Models\User $user, ?\App\Models\Company $company, ?int $branchId = null, ?string $onDate = null): ?array
+    {
+        if (!HotelAccessService::canSeeOccupancy($user)) {
+            return null;
+        }
+
+        return $this->occupancyForCompany($company, $branchId, $onDate);
+    }
+
+    /**
      * @return array<string,int|float>|null null when Rooms is off / unmigrated
      */
     public function occupancyForCompany(?\App\Models\Company $company, ?int $branchId = null, ?string $onDate = null): ?array
@@ -574,6 +600,10 @@ class HotelStayService
 
     public function assertRoomFree(int $companyId, int $roomId, string $from, string $to, ?int $ignoreStayId = null): void
     {
+        // lockForUpdate: InnoDB REPEATABLE READ snapshots miss a stay committed
+        // by another worker while this request waited on the room row. Locking
+        // reads see the latest committed rows; pluck() (not exists()) actually
+        // fetches those rows so the lock is taken.
         $stayOverlap = HotelStay::where('company_id', $companyId)
             ->where('room_id', $roomId)
             ->whereIn('status', HotelStay::OPEN_STATUSES)
@@ -582,7 +612,7 @@ class HotelStayService
         if ($ignoreStayId) {
             $stayOverlap->where('id', '!=', $ignoreStayId);
         }
-        if ($stayOverlap->exists()) {
+        if ($stayOverlap->lockForUpdate()->pluck('id')->isNotEmpty()) {
             throw new HotelStayException(__('pos.hotel_room_overlap'));
         }
 
@@ -597,7 +627,7 @@ class HotelStayService
                     $q->where('id', '!=', $ignoreStayId);
                 }
             });
-        if ($assignmentOverlap->exists()) {
+        if ($assignmentOverlap->lockForUpdate()->pluck('id')->isNotEmpty()) {
             throw new HotelStayException(__('pos.hotel_room_overlap'));
         }
     }
@@ -638,6 +668,11 @@ class HotelStayService
             'unit_amount' => (float) $stay->rate_amount,
             'idempotency_key' => $idempotencyKey,
         ], $userId);
+    }
+
+    private function sameBranchId(mixed $left, mixed $right): bool
+    {
+        return (int) ($left ?: 0) === (int) ($right ?: 0);
     }
 
     private function assertRoomNumberFree(int $companyId, ?int $branchId, string $number, ?int $ignoreId = null): void

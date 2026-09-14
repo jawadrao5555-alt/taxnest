@@ -436,3 +436,7 @@ Sale screen ki mazeed cheezein:
 ### Physical Stock Check mein scope select na ho
 
 Agar Recipes feature band hai lekin purane ingredients record mein mojood hain, Physical Stock Check ab sirf Products dikhata aur usay khud select karta hai. Purani tab ya manually badli request se hidden ingredient count start nahi hota.
+
+### Inventory Master Excel mein duplicate row
+
+Agar aik workbook mein wohi Product Code/naam, Ingredient Code/naam-unit, ya wohi Product + Ingredient recipe dobara ho to system pehli row rakhta hai aur doosri row ka number issue list mein dikhata hai. Duplicate ko chup-chaap overwrite nahi kiya jata. Dono rows ki sahi information aik row mein mila kar file dobara upload karein. Baad mein wohi saaf file dobara upload karna safe aur idempotent rehta hai.

@@ -34,3 +34,11 @@ Gates
 
 Tests
   tests/Feature/PosInventoryMasterExcelTest.php
+
+Duplicate safety (2026-09-14)
+  A single workbook must not silently resolve repeated logical rows by
+  last-write-wins. PRODUCT is de-duplicated by normalized code or name;
+  INGREDIENT by normalized code or name+unit; RECIPE by normalized
+  product+ingredient+unit identity. The first row is prepared, later duplicates
+  are skipped with their source-row reference. A later clean re-upload remains
+  idempotent. This guard never writes stock or ledger movements.

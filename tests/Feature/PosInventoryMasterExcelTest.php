@@ -563,7 +563,7 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertEquals(0.25, (float) ProductRecipe::first()->quantity_needed);
     }
 
-    public function test_in_file_duplicate_product_rows_last_write_wins(): void
+    public function test_in_file_duplicate_product_rows_are_reported_and_first_row_is_kept(): void
     {
         $result = $this->importRows(self::HEADER, [
             ['PRODUCT', 'Coke 500ml', 'DK-500', 80, 'Drinks', 'first', '', '', '', '', '', '', '', '', '', '', ''],
@@ -573,15 +573,17 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertTrue($result['ok'], $result['message']);
         $this->assertSame(1, PosProduct::where('company_id', $this->companyId)->count());
         $p = PosProduct::first();
-        $this->assertEquals(95.0, (float) $p->price);
-        $this->assertSame('Soda', $p->category);
-        $this->assertSame('second', $p->description);
+        $this->assertEquals(80.0, (float) $p->price);
+        $this->assertSame('Drinks', $p->category);
+        $this->assertSame('first', $p->description);
+        $this->assertSame(1, $result['counts']['rows_skipped']);
+        $this->assertStringContainsString('row 2', strtolower(implode(' ', $result['errors'])));
         $this->assertNull($p->stock_quantity);
         $this->assertSame(0, InventoryMovement::count());
         $this->assertSame(0, IngredientMovement::count());
     }
 
-    public function test_in_file_duplicate_ingredient_rows_last_write_wins(): void
+    public function test_in_file_duplicate_ingredient_rows_are_reported_and_first_row_is_kept(): void
     {
         $result = $this->importRows(self::HEADER, [
             ['INGREDIENT', '', '', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', 300, 50, '', ''],
@@ -591,8 +593,10 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertTrue($result['ok'], $result['message']);
         $this->assertSame(1, Ingredient::where('company_id', $this->companyId)->count());
         $ing = Ingredient::first();
-        $this->assertEquals(310.0, (float) $ing->cost_per_unit);
-        $this->assertEquals(60.0, (float) $ing->min_stock_level);
+        $this->assertEquals(300.0, (float) $ing->cost_per_unit);
+        $this->assertEquals(50.0, (float) $ing->min_stock_level);
+        $this->assertSame(1, $result['counts']['rows_skipped']);
+        $this->assertStringContainsString('row 2', strtolower(implode(' ', $result['errors'])));
         $this->assertEquals(0.0, (float) $ing->current_stock);
         $this->assertSame(0, InventoryMovement::count());
         $this->assertSame(0, IngredientMovement::count());
@@ -610,8 +614,9 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertTrue($result['ok'], $result['message']);
         $this->assertSame(1, PosProduct::where('company_id', $this->companyId)->count());
         $p = PosProduct::first();
-        $this->assertEquals(450.0, (float) $p->price);
-        $this->assertSame('second', $p->description);
+        $this->assertEquals(400.0, (float) $p->price);
+        $this->assertSame('first', $p->description);
+        $this->assertSame(1, $result['counts']['rows_skipped']);
         $this->assertGreaterThan(0, (int) $p->id);
         $this->assertSame(1, ProductRecipe::where('company_id', $this->companyId)->count());
         $recipe = ProductRecipe::first();
@@ -635,7 +640,8 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertTrue($result['ok'], $result['message']);
         $this->assertSame(1, Ingredient::where('company_id', $this->companyId)->count());
         $ing = Ingredient::first();
-        $this->assertEquals(310.0, (float) $ing->cost_per_unit);
+        $this->assertEquals(300.0, (float) $ing->cost_per_unit);
+        $this->assertSame(1, $result['counts']['rows_skipped']);
         $this->assertGreaterThan(0, (int) $ing->id);
         $this->assertSame(1, ProductRecipe::where('company_id', $this->companyId)->count());
         $recipe = ProductRecipe::first();
@@ -645,5 +651,21 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertNull(PosProduct::first()->stock_quantity);
         $this->assertSame(0, InventoryMovement::count());
         $this->assertSame(0, IngredientMovement::count());
+    }
+
+    public function test_in_file_duplicate_recipe_rows_are_reported_and_first_quantity_is_kept(): void
+    {
+        $result = $this->importRows(self::HEADER, [
+            ['PRODUCT', 'Chicken Biryani', 'BRY-001', 450, 'Rice', '', '', '', '', '', '', '', '', '', '', '', ''],
+            ['INGREDIENT', '', '', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', 300, 50, '', ''],
+            ['RECIPE', 'Chicken Biryani', 'BRY-001', '', '', '', '', '', '', '', 'Basmati Rice', 'RICE-25', 'kg', '', '', 0.25, ''],
+            ['RECIPE', ' chicken   biryani ', 'bry-001', '', '', '', '', '', '', '', ' BASMATI RICE ', 'rice-25', 'KG', '', '', 0.50, ''],
+        ]);
+
+        $this->assertTrue($result['ok'], $result['message']);
+        $this->assertSame(1, ProductRecipe::where('company_id', $this->companyId)->count());
+        $this->assertEquals(0.25, (float) ProductRecipe::first()->quantity_needed);
+        $this->assertSame(1, $result['counts']['rows_skipped']);
+        $this->assertStringContainsString('row 4', strtolower(implode(' ', $result['errors'])));
     }
 }

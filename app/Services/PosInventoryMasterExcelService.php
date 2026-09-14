@@ -211,6 +211,11 @@ class PosInventoryMasterExcelService
         $recipeOps = [];
 
         $workRows = [];
+        $seenRows = [
+            'product' => [],
+            'ingredient' => [],
+            'recipe' => [],
+        ];
         for ($i = $headerIdx + 1; $i < count($rows); $i++) {
             $data = $rows[$i];
             $rowNo = $i + 1;
@@ -220,6 +225,18 @@ class PosInventoryMasterExcelService
             $parsedRow = $this->extractRow($data, $map);
             if ($this->isSampleRow($parsedRow)) {
                 $samplesSkipped++;
+                continue;
+            }
+
+            $duplicateOf = $this->duplicateRowOf($parsedRow, $rowNo, $seenRows);
+            if ($duplicateOf !== null) {
+                $skipped++;
+                $errors[] = $this->rowError(
+                    $rowNo,
+                    strtoupper((string) ($parsedRow['row_type'] ?? 'UNKNOWN')),
+                    $parsedRow['product_name'] ?: ($parsedRow['ingredient_name'] ?: ($parsedRow['product_code'] ?: $parsedRow['ingredient_code'])),
+                    __('Duplicate of row :row. The first row was kept; combine the values into one row and upload again.', ['row' => $duplicateOf])
+                );
                 continue;
             }
             $workRows[] = ['row' => $rowNo, 'parsed' => $parsedRow];
@@ -522,6 +539,65 @@ class PosInventoryMasterExcelService
             return $t;
         }
         return null;
+    }
+
+    /**
+     * Reject duplicate logical rows inside one workbook instead of silently
+     * applying the last price/cost/recipe quantity. A later clean re-upload is
+     * still idempotent; this guard only concerns ambiguity within one file.
+     *
+     * @param array<string,array<string,int>> $seen
+     */
+    private function duplicateRowOf(array $row, int $rowNo, array &$seen): ?int
+    {
+        $type = $row['row_type'] ?? null;
+        if (!isset($seen[$type])) {
+            return null;
+        }
+
+        $keys = match ($type) {
+            'product' => array_filter([
+                $this->identityKey('code', $row['product_code']),
+                $this->identityKey('name', $row['product_name']),
+            ]),
+            'ingredient' => array_filter([
+                $this->identityKey('code', $row['ingredient_code']),
+                $this->identityKey('name-unit', $row['ingredient_name'], $row['ingredient_unit']),
+            ]),
+            'recipe' => array_filter([
+                $this->identityKey(
+                    'recipe-code',
+                    $row['product_code'] ?: $row['product_name'],
+                    $row['ingredient_code'] ?: $row['ingredient_name'],
+                    $row['ingredient_unit']
+                ),
+            ]),
+            default => [],
+        };
+
+        foreach ($keys as $key) {
+            if (isset($seen[$type][$key])) {
+                return $seen[$type][$key];
+            }
+        }
+        foreach ($keys as $key) {
+            $seen[$type][$key] = $rowNo;
+        }
+
+        return null;
+    }
+
+    private function identityKey(string $prefix, mixed ...$parts): ?string
+    {
+        $normalized = array_map(
+            fn ($part) => strtolower(preg_replace('/\s+/u', ' ', trim((string) $part))),
+            $parts
+        );
+        if (implode('', $normalized) === '') {
+            return null;
+        }
+
+        return $prefix . ':' . implode('|', $normalized);
     }
 
     // ── Prepare / apply INGREDIENT ───────────────────────────────────────

@@ -2,8 +2,9 @@
 # deployment_key; customer-visible title/points never contain provenance.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
-title: "Production update — stock-count options ab feature ke mutabiq"
+title: "Inventory Master Excel ab duplicate rows ko wazeh rokta hai"
 audience: all
 type: improvement
 points:
-  - "Recipes band hon to Physical Stock Check ab Products ko khud select karta hai aur chhupa hua ingredient option submit nahi hota."
+  - "Aik hi file mein repeat product, ingredient ya recipe row ab chup-chaap rate, cost ya quantity overwrite nahi karti."
+  - "System pehli row rakhta aur duplicate row number saaf batata hai taa-ke file durust karke dobara upload ki ja sake."

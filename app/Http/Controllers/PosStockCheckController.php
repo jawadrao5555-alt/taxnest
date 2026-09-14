@@ -538,7 +538,18 @@ class PosStockCheckController extends Controller
             return back()->with('error', __('pos.stock_check_closed'));
         }
 
-        $check->update(['status' => StockCheck::STATUS_CANCELLED]);
+        $cancelled = DB::transaction(function () use ($check): bool {
+            // Serialize Cancel with Save/Post so a late cancel cannot overwrite
+            // a completed audit, and posting cannot apply a cancelled sheet.
+            $fresh = StockCheck::whereKey($check->id)->lockForUpdate()->first();
+            if (!$fresh || !$fresh->isOpen()) return false;
+            $fresh->update(['status' => StockCheck::STATUS_CANCELLED]);
+            return true;
+        });
+
+        if (!$cancelled) {
+            return back()->with('error', __('pos.stock_check_closed'));
+        }
 
         AuditLogService::log(
             'pos_stock_check_cancelled', 'StockCheck', $check->id, null,

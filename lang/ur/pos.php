@@ -6112,6 +6112,7 @@ return [
     'stock_check_import_empty' => 'بھیجی گئی فہرست میں کوئی سطر نہیں۔',
     'stock_check_import_too_big' => 'فہرست بہت بڑی ہے۔ زیادہ سے زیادہ :cap سطریں۔',
     'stock_check_import_bad_header' => 'خانوں کے نام سمجھ نہیں آئے۔ اسی صفحے سے اتاری گئی فہرست استعمال کریں۔',
+    'stock_check_count_invalid' => 'جسمانی گنتی صفر یا مثبت عدد ہونی چاہیے۔ کچھ محفوظ نہیں ہوا۔',
     'stock_check_import_nothing' => 'بھیجی گئی فہرست میں کوئی جسمانی گنتی نہیں ملی۔',
     'stock_check_imported' => 'فہرست سے :count گنتی لے لی گئی۔',
     'stock_check_import_skipped' => ':count سطریں چھوڑ دی گئیں کیونکہ شے یا عدد پڑھا نہیں جا سکا۔',

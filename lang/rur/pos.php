@@ -6116,6 +6116,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_check_import_empty' => 'Upload ki hui sheet mein koi row nahin hai.',
     'stock_check_import_too_big' => 'Sheet bohat bari hai. Zyada se zyada :cap rows.',
     'stock_check_import_bad_header' => 'Column ke naam samajh nahin aaye. Isi page se download ki hui sheet istemal karein.',
+    'stock_check_count_invalid' => 'Physical count zero ya positive number hona chahiye. Kuch save nahin hua.',
     'stock_check_import_nothing' => 'Upload ki hui sheet mein koi physical ginti nahin mili.',
     'stock_check_imported' => 'Sheet se :count ginti le li gayi.',
     'stock_check_import_skipped' => ':count rows chhor di gayin kyunke item ya number parha nahin ja saka.',

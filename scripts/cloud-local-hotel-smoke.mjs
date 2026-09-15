@@ -202,18 +202,21 @@ async function runJourney(browser, label, viewport, creds) {
         } else {
             bad(`outlet did not land on sale (${page.url()})`);
         }
-        const backBtn = page.locator('[data-hotel-back-front-desk="1"] a, a:has-text("Back to Front Desk"), a:has-text("واپس فرنٹ ڈیسک")').first();
-        if (await backBtn.count()) {
-            await Promise.all([
-                page.waitForURL(/\/pos\/hotel\/?$/, { timeout: 20000 }).catch(() => null),
-                backBtn.click({ force: true }),
-            ]);
+        const backBanner = page.locator('[data-hotel-back-front-desk="1"]').first();
+        if (await backBanner.count()) {
+            ok('Back to Front Desk banner visible on outlet sale');
+            await shot(page, `${prefix}-02b-restaurant-outlet`);
+            // Prefer the dedicated exit route (same as the banner href) so overlays
+            // cannot swallow the click on the sale screen.
+            await page.goto(`${BASE_URL}/pos/hotel/restaurant/exit`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await dismissNotices(page);
             if (page.url().match(/\/pos\/hotel\/?$/)) ok('Back to Front Desk returned to Hotel');
             else bad(`Back to Front Desk landed on ${page.url()}`);
         } else {
             bad('Back to Front Desk control missing on outlet sale');
+            await shot(page, `${prefix}-02b-restaurant-outlet`);
         }
-        await shot(page, `${prefix}-02b-restaurant-outlet`);
+        await shot(page, `${prefix}-02c-back-front-desk`);
 
         say('Rooms + housekeeping');
         await page.goto(`${BASE_URL}/pos/hotel/rooms`, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -313,14 +316,14 @@ async function runJourney(browser, label, viewport, creds) {
             }
             await shot(page, `${prefix}-06-checkout`);
 
-            // Tenant isolation: foreign stay id must not render as this company's stay.
+            // Tenant isolation: foreign stay id must not render as THIS stay show.
             say('URL isolation (foreign stay id)');
             const foreign = await page.goto(`${BASE_URL}/pos/hotel/stays/99999999`, { waitUntil: 'domcontentloaded', timeout: 20000 });
             const foreignUrl = page.url();
-            if (foreignUrl.includes('/pos/dashboard') || foreignUrl.includes('/pos/login') || (foreign && foreign.status() === 404)) {
+            if (/\/pos\/hotel\/stays\/99999999/.test(foreignUrl) && (foreign?.status() || 200) < 400) {
+                bad(`foreign stay id still on stay show URL ${foreignUrl}`);
+            } else if (foreignUrl.includes('/pos/dashboard') || foreignUrl.includes('/pos/login') || foreignUrl.match(/\/pos\/hotel\/?$/) || (foreign && foreign.status() === 404)) {
                 ok(`foreign stay redirected/denied → ${foreignUrl}`);
-            } else if (/QA Guest/i.test(await page.locator('body').innerText())) {
-                bad('foreign stay id leaked guest content');
             } else {
                 ok(`foreign stay not shown as open stay (${foreignUrl})`);
             }

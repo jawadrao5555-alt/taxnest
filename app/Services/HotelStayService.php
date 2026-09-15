@@ -532,7 +532,8 @@ class HotelStayService
 
         $stays = HotelStay::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId));
-        $inHouse = (clone $stays)->where('status', HotelStay::STATUS_CHECKED_IN)->count();
+        $inHouseIds = (clone $stays)->where('status', HotelStay::STATUS_CHECKED_IN)->pluck('id')->all();
+        $inHouse = count($inHouseIds);
         $reserved = (clone $stays)->where('status', HotelStay::STATUS_RESERVED)
             ->whereDate('check_in_date', '<=', $onDate)
             ->whereDate('check_out_date', '>', $onDate)
@@ -543,6 +544,15 @@ class HotelStayService
         $departures = (clone $stays)->where('status', HotelStay::STATUS_CHECKED_IN)
             ->whereDate('check_out_date', $onDate)
             ->count();
+        $dues = $this->folio->chargeDuesForStayIds($companyId, $inHouseIds);
+        $pendingDueCount = 0;
+        $pendingDueAmount = 0.0;
+        foreach ($dues as $amount) {
+            if ((float) $amount > 0.009) {
+                $pendingDueCount++;
+                $pendingDueAmount += (float) $amount;
+            }
+        }
 
         return [
             'rooms' => $roomCount,
@@ -553,8 +563,8 @@ class HotelStayService
             'dirty' => $dirty,
             'reserved' => $reserved,
             'available' => max(0, $roomCount - $oos - $inHouse - $reserved),
-            'pending_due_count' => 0,
-            'pending_due_amount' => 0.0,
+            'pending_due_count' => $pendingDueCount,
+            'pending_due_amount' => round($pendingDueAmount, 2),
         ];
     }
 
@@ -601,8 +611,8 @@ class HotelStayService
         )->values();
         $dues = $this->folio->chargeDuesForStayIds($companyId, $inHouse->pluck('id')->all());
         $pending = $inHouse->filter(fn ($stay) => ($dues[$stay->id] ?? 0) > 0.009)->values();
-        $occupancy['pending_due_count'] = $pending->count();
-        $occupancy['pending_due_amount'] = round((float) array_sum($pending->map(fn ($s) => $dues[$s->id] ?? 0)->all()), 2);
+        // Occupancy strip totals come from occupancy() over all in-house stays.
+        // Keep this pending list truncated for the desk board; do not overwrite counts.
         $occupancy['available'] = $available->count();
 
         return compact('occupancy', 'available', 'dirty', 'inHouse', 'arrivals', 'departures', 'pending', 'dues');

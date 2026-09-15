@@ -1,8 +1,8 @@
 <x-pos-layout>
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <a href="{{ route('pos.hotel.dashboard') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-teal-700 mb-3">{{ __('pos.hotel_back_desk') }}</a>
+    @include('pos.hotel._nav')
     <div class="flex items-center justify-between mb-5">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.hotel_rooms') }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ !empty($housekeepingView) ? __('pos.nav_hotel_housekeeping') : __('pos.hotel_rooms') }}</h1>
     </div>
     @if(session('success'))
     <div class="mb-4 p-3 rounded-lg bg-emerald-50 text-emerald-700 text-sm">{{ session('success') }}</div>
@@ -11,7 +11,9 @@
     <div class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{{ session('error') }}</div>
     @endif
 
-    @unless(auth('pos')->user()?->posCashierBlocked())
+    @include('pos.hotel._room-board')
+
+    @if(empty($housekeepingView) && !auth('pos')->user()?->posCashierBlocked())
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
         <h3 class="text-sm font-semibold mb-4">{{ __('pos.hotel_add_room') }}</h3>
         <form method="POST" action="{{ route('pos.hotel.rooms.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
@@ -31,7 +33,7 @@
         </form>
         <p class="text-xs text-gray-500 mt-2">{{ __('pos.hotel_charging_rule_note') }}</p>
     </div>
-    @endunless
+    @endif
 
     @if(!empty($canManageRooms))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
@@ -48,6 +50,7 @@
     </div>
     @endif
 
+    @if(empty($housekeepingView))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
         <table class="min-w-[48rem] w-full text-sm">
             <thead>
@@ -89,7 +92,7 @@
                         </form>
                         @else
                         {{ $room->service_state === 'out_of_service' ? __('pos.hotel_oos') : __('pos.hotel_in_service') }}
-                        @endunless
+                        @endif
                     </td>
                     <td class="px-4 py-3">
                         <form method="POST" action="{{ route('pos.hotel.rooms.housekeeping', $room->id) }}" class="flex gap-1">
@@ -108,5 +111,6 @@
             </tbody>
         </table>
     </div>
+    @endif
 </div>
 </x-pos-layout>

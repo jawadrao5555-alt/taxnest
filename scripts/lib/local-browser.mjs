@@ -94,6 +94,26 @@ export function resolveChromiumPath() {
             .sort();
         if (hits.length) return hits[hits.length - 1];
     } catch { /* ignore */ }
+    // Cursor/WSL agent sandboxes often cache Playwright Chromium under /tmp.
+    try {
+        const cacheRoot = '/tmp/cursor-sandbox-cache';
+        if (existsSync(cacheRoot)) {
+            const found = [];
+            for (const hash of readdirSync(cacheRoot)) {
+                const base = path.join(cacheRoot, hash, 'playwright');
+                if (!existsSync(base)) continue;
+                for (const dir of readdirSync(base)) {
+                    if (!dir.startsWith('chromium-')) continue;
+                    const bin = path.join(base, dir, 'chrome-linux64', 'chrome');
+                    if (existsSync(bin)) found.push(bin);
+                }
+            }
+            if (found.length) {
+                found.sort();
+                return found[found.length - 1];
+            }
+        }
+    } catch { /* ignore */ }
     return null;
 }
 

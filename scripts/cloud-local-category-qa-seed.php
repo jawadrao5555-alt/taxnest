@@ -7,10 +7,12 @@
 
 use App\Models\Company;
 use App\Models\PosService;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\PosFeatureService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 $app = require dirname(__DIR__).'/bootstrap/app.php';
@@ -59,10 +61,56 @@ $user = User::updateOrCreate(
     ]
 );
 
+// Lab smoke must create work orders. Without an active paid/trial-open
+// subscription the POS locks into view-only and Create Appointment never lands.
+if (Schema::hasTable('subscriptions') && Schema::hasTable('pricing_plans')) {
+    $planId = (int) (DB::table('pricing_plans')
+        ->where('product_type', 'pos')
+        ->where('name', 'Unlimited')
+        ->value('id')
+        ?: DB::table('pricing_plans')->where('product_type', 'pos')->where('is_trial', false)->value('id'));
+    if ($planId > 0) {
+        Subscription::withoutGlobalScopes()->updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'pricing_plan_id' => $planId,
+                'billing_cycle' => 'yearly',
+                'discount_percent' => 0,
+                'final_price' => 0,
+                'start_date' => now()->toDateString(),
+                'end_date' => now()->addYear()->toDateString(),
+                'trial_ends_at' => null,
+                'active' => true,
+                'override_type' => 'none',
+                'override_until' => null,
+            ]
+        );
+    }
+}
+
 foreach ([['Haircut', 1200], ['Facial', 2500], ['Manicure', 1800]] as [$name, $price]) {
     PosService::updateOrCreate(['company_id' => $company->id, 'name' => $name], [
         'price' => $price, 'tax_rate' => 16, 'is_active' => true, 'is_tax_exempt' => false,
     ]);
+}
+
+// Pre-mark What's New so interactive smoke is not blocked by elaan overlays.
+if (Schema::hasTable('app_updates') && Schema::hasTable('app_update_seens')) {
+    $updateIds = DB::table('app_updates')->where('is_published', 1)->pluck('id');
+    foreach ($updateIds as $uid) {
+        $exists = DB::table('app_update_seens')
+            ->where('user_id', $user->id)
+            ->where('app_update_id', $uid)
+            ->exists();
+        if (! $exists) {
+            DB::table('app_update_seens')->insert([
+                'app_update_id' => $uid,
+                'user_id' => $user->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
 }
 
 $dir = dirname(__DIR__).'/.local';

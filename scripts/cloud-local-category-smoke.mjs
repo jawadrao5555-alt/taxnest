@@ -38,9 +38,38 @@ async function dismissNotices(page) {
     for (const pattern of [/Samajh Gaya|Got it/i, /Baad Mein|Later/i]) {
         const button = page.getByRole('button', { name: pattern }).first();
         if (await button.isVisible().catch(() => false)) {
-            await button.click({ timeout: 3000 }).catch(() => null);
+            await button.click({ timeout: 5000 }).catch(() => null);
+            await page.waitForTimeout(300);
         }
     }
+    await page.evaluate(() => {
+        document.getElementById('tn-domain-move-notice')?.remove();
+        document.querySelectorAll('[data-wn-featured], [x-data*="wnOpen"]').forEach((el) => el.remove());
+        document.querySelectorAll('.fixed.inset-0').forEach((el) => {
+            const t = el.innerText || '';
+            if (/Naye Updates|AAP KI RAYE|Caller ID|Free Trial|Subscription expired|Payment Proof|Samajh Gaya|Baad Mein|whats.?new|Mashwara/i.test(t)) {
+                el.remove();
+            }
+        });
+    }).catch(() => {});
+}
+
+async function markWhatsNewSeen(page) {
+    await page.evaluate(async () => {
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (!token) return;
+        try {
+            await fetch('/pos/whats-new/seen', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': token,
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),
+            });
+        } catch { /* ignore */ }
+    }).catch(() => {});
 }
 
 async function signIn(page) {
@@ -51,6 +80,8 @@ async function signIn(page) {
         page.waitForURL((url) => !url.pathname.endsWith('/pos/login'), { timeout: 30000 }),
         page.getByRole('button', { name: /sign in|login|لاگ اِن/i }).first().click(),
     ]);
+    await dismissNotices(page);
+    await markWhatsNewSeen(page);
     await dismissNotices(page);
 }
 
@@ -90,11 +121,15 @@ async function journey(browser, label, viewport) {
         await page.locator('input[name="details[station]"]').fill('Chair A');
         await page.locator('input[name="quantity"]').fill('1');
         await page.locator('input[name="unit_price"]').fill('1200');
+        await dismissNotices(page);
+        const createBtn = page.getByRole('button', { name: /Create Appointment/i }).first();
         await Promise.all([
-            page.waitForURL(/\/pos\/work-orders\/\d+$/, { timeout: 30000 }),
-            page.getByRole('button', { name: /Create Appointment/i }).click(),
+            page.waitForURL(/\/pos\/work-orders\/\d+$/, { timeout: 30000 }).catch(() => null),
+            createBtn.click({ force: true }),
         ]);
-
+        if (!/\/pos\/work-orders\/\d+/.test(page.url())) {
+            throw new Error(`create did not land on work-order show (${page.url()})`);
+        }
         const marker = page.locator('[data-service-order]');
         jobNumber = await marker.getAttribute('data-service-order');
         if (/^SAL-\d{6}$/.test(jobNumber || '')) ok(`${label}: ${jobNumber} created`);
@@ -103,10 +138,12 @@ async function journey(browser, label, viewport) {
         else bad(`${label}: initial stage missing`);
         await saveEvidenceScreenshot(page, `category-${label}-02-created`);
 
+        await dismissNotices(page);
         await Promise.all([
             page.waitForLoadState('domcontentloaded'),
-            page.getByRole('button', { name: /Move to Checked In/i }).click(),
+            page.getByRole('button', { name: /Move to Checked In/i }).click({ force: true }),
         ]);
+        await dismissNotices(page);
         if (/Checked In/i.test(await page.locator('body').innerText())) ok(`${label}: transition and timeline shown`);
         else bad(`${label}: transition not visible`);
         await saveEvidenceScreenshot(page, `category-${label}-03-transition`);

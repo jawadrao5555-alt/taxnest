@@ -1154,6 +1154,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/report.csv', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'report'])->name('pos.service-work-orders.report');
         Route::get('/{id}', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'show'])->whereNumber('id')->name('pos.service-work-orders.show');
         Route::post('/{id}/transition', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'transition'])->whereNumber('id')->name('pos.service-work-orders.transition');
+        Route::post('/{id}/invoice', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'invoice'])->whereNumber('id')->name('pos.service-work-orders.invoice');
     });
 
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {

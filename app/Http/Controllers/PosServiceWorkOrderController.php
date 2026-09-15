@@ -7,8 +7,10 @@ use App\Models\PosService;
 use App\Models\PosServiceWorkOrder;
 use App\Services\BranchContextService;
 use App\Services\PosServiceWorkflowProfiles;
+use App\Services\PosServiceWorkOrderInvoiceService;
 use App\Services\PosServiceWorkOrderService;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 
 class PosServiceWorkOrderController extends Controller
 {
@@ -57,10 +59,44 @@ class PosServiceWorkOrderController extends Controller
         [$company, $profile] = $this->context();
         $query = PosServiceWorkOrder::where('company_id', $company->id)->where('category', $profile['category']);
         $branches->applyToQuery($query);
-        $order = $query->with(['events', 'service'])->findOrFail($id);
+        $order = $query->with(['events', 'service', 'posTransaction'])->findOrFail($id);
         $nextStatuses = PosServiceWorkflowProfiles::nextStatuses($profile, $order->status);
+        $canInvoice = ! $order->pos_transaction_id
+            && $order->status !== 'cancelled'
+            && in_array($order->status, $profile['terminal'] ?? [], true)
+            && (float) $order->total_amount > 0;
 
-        return view('pos.service-work-orders.show', compact('company', 'profile', 'order', 'nextStatuses'));
+        return view('pos.service-work-orders.show', compact('company', 'profile', 'order', 'nextStatuses', 'canInvoice'));
+    }
+
+    public function invoice(Request $request, int $id, PosServiceWorkOrderInvoiceService $billing, BranchContextService $branches)
+    {
+        [$company, $profile] = $this->context();
+        $data = $request->validate([
+            'payment_method' => 'required|string|in:cash,card,debit_card,credit_card,qr_payment',
+            'idempotency_key' => 'nullable|string|max:64',
+        ]);
+        $scoped = PosServiceWorkOrder::where('company_id', $company->id)->where('category', $profile['category']);
+        $branches->applyToQuery($scoped);
+        abort_unless($scoped->whereKey($id)->exists(), 404);
+        try {
+            $txn = $billing->issue(
+                $company,
+                $id,
+                $data['payment_method'],
+                (int) auth('pos')->id(),
+                $branches->stampBranchId(),
+                $data['idempotency_key'] ?? null
+            );
+        } catch (InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $order = PosServiceWorkOrder::where('company_id', $company->id)->find($id);
+
+        return redirect()
+            ->route('pos.transaction.show', $txn->id)
+            ->with('success', $profile['noun'].' billed as '.$txn->invoice_number.'. Operational reference '.$order?->job_number.' was preserved.');
     }
 
     public function transition(Request $request, int $id, PosServiceWorkOrderService $jobs, BranchContextService $branches)

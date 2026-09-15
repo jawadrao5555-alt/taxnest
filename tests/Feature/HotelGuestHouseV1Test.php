@@ -441,12 +441,17 @@ class HotelGuestHouseV1Test extends TestCase
         $this->actingAs($denied, 'pos')->get('/pos/dashboard')
             ->assertOk()
             ->assertDontSee($label, false);
+        // Hotel native shell: Manage/login home is Front Desk / Housekeeping,
+        // not the generic POS dashboard — occupancy lives on Hotel screens.
         $this->actingAs($hk, 'pos')->get('/pos/dashboard')
-            ->assertOk()
-            ->assertSee($label, false);
+            ->assertRedirect('/pos/hotel/housekeeping');
+        $this->actingAs($hk, 'pos')->get('/pos/hotel/housekeeping')
+            ->assertOk();
         $this->actingAs($owner, 'pos')->get('/pos/dashboard')
+            ->assertRedirect('/pos/hotel');
+        $this->actingAs($owner, 'pos')->get('/pos/hotel')
             ->assertOk()
-            ->assertSee($label, false);
+            ->assertSee(__('pos.hotel_in_house'), false);
 
         $this->actingAs($denied, 'pos')->get('/pos/day-close')
             ->assertOk()

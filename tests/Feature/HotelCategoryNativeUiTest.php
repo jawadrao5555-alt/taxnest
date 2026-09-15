@@ -110,19 +110,75 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringNotContainsString('>checked_in<', $html);
     }
 
-    public function test_kitchen_hotel_keeps_new_sale_and_retail_is_untouched(): void
+    public function test_restaurant_mode_hotel_keeps_shell_and_separates_outlet(): void
     {
         $flags = PosFeatureService::defaultsForCategory('hotel');
         $flags['kot'] = true;
         $flags['kitchen'] = true;
+        $flags['tables'] = true;
+        $savedMode = true;
         $hotelKitchen = $this->company('hotel', [
             'feature_flags' => $flags,
-            'restaurant_mode' => true,
+            'restaurant_mode' => $savedMode,
+            'hotel_checkout_outstanding' => 'allow',
         ]);
-        $this->assertFalse(HotelShell::hideGenericSale($hotelKitchen));
+        $before = $hotelKitchen->fresh()->only([
+            'restaurant_mode', 'business_category', 'hotel_checkout_outstanding', 'feature_flags',
+        ]);
+        $owner = $this->owner($hotelKitchen);
+
+        // Stronger than PR #80: New Sale stays hidden; outlet is the kitchen door.
+        $this->assertTrue(HotelShell::hideGenericSale($hotelKitchen));
+        $this->assertTrue(HotelShell::restaurantOutletOn($hotelKitchen));
+        $this->assertSame('/pos/hotel', HotelShell::postLoginPath($owner));
+        $this->actingAs($owner, 'pos')->get('/pos/dashboard')->assertRedirect('/pos/hotel');
+
+        $desk = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
+        $this->assertStringContainsString('data-hotel-native-nav="1"', $desk);
+        $this->assertStringContainsString('data-hotel-restaurant-outlet="1"', $desk);
+        $this->assertStringContainsString(__('pos.nav_hotel_restaurant_outlet'), $desk);
+        $this->assertStringNotContainsString('data-nav-new-sale="static"', $desk);
+        $this->assertStringContainsString('data-hotel-primary-actions="1"', $desk);
+
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/restaurant')
+            ->assertRedirect('/pos/invoice/create');
+        $sale = $this->actingAs($owner, 'pos')
+            ->withSession([HotelShell::OUTLET_SESSION_KEY => true])
+            ->get('/pos/invoice/create')
+            ->assertOk()
+            ->getContent();
+        $this->assertStringContainsString('data-hotel-back-front-desk="1"', $sale);
+        $this->assertStringContainsString(__('pos.hotel_back_front_desk'), $sale);
+        $this->actingAs($owner, 'pos')
+            ->withSession([HotelShell::OUTLET_SESSION_KEY => true])
+            ->get('/pos/hotel/restaurant/exit')
+            ->assertRedirect('/pos/hotel');
+
+        // Saved settings untouched by chrome.
+        $after = $hotelKitchen->fresh()->only([
+            'restaurant_mode', 'business_category', 'hotel_checkout_outstanding', 'feature_flags',
+        ]);
+        $this->assertSame($before, $after);
+        $this->assertTrue((bool) $after['restaurant_mode']);
+
         $retail = $this->company('retail');
         $this->assertFalse(HotelShell::hideGenericSale($retail));
         $this->assertSame('/pos/invoice/create', HotelShell::postLoginPath($this->owner($retail)));
+    }
+
+    public function test_restaurant_outlet_off_denies_sale_and_hides_entry(): void
+    {
+        $company = $this->company('hotel', ['restaurant_mode' => false]);
+        $owner = $this->owner($company);
+        $this->assertFalse(HotelShell::restaurantOutletOn($company));
+        $html = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
+        $this->assertStringNotContainsString('data-hotel-restaurant-outlet="1"', $html);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/restaurant')
+            ->assertRedirect('/pos/hotel');
+        $this->actingAs($owner, 'pos')->get('/pos/invoice/create')
+            ->assertRedirect('/pos/hotel');
+        $this->actingAs($owner, 'pos')->get('/pos/v2/invoice/create')
+            ->assertRedirect('/pos/hotel');
     }
 
     public function test_rooms_off_does_not_rewrite_saved_flags_or_open_hotel(): void
@@ -169,6 +225,68 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertSame('/pos/hotel/housekeeping', HotelShell::postLoginPath($hk));
     }
 
+    public function test_housekeeping_denied_from_restaurant_outlet(): void
+    {
+        $flags = PosFeatureService::defaultsForCategory('hotel');
+        $flags['kitchen'] = true;
+        $flags['kot'] = true;
+        $company = $this->company('hotel', [
+            'feature_flags' => $flags,
+            'restaurant_mode' => true,
+        ]);
+        $hk = $this->staff($company, 'pos_cashier', ['dashboard', 'hotel_housekeeping']);
+        $this->actingAs($hk, 'pos')->get('/pos/hotel/restaurant')->assertForbidden();
+        $this->actingAs($hk, 'pos')->get('/pos/invoice/create')->assertRedirect('/pos/hotel/housekeeping');
+    }
+
+    public function test_user_denied_both_modules_cannot_open_outlet_or_hotel(): void
+    {
+        $flags = PosFeatureService::defaultsForCategory('hotel');
+        $flags['kitchen'] = true;
+        $flags['kot'] = true;
+        $company = $this->company('hotel', [
+            'feature_flags' => $flags,
+            'restaurant_mode' => true,
+        ]);
+        $denied = $this->staff($company, 'pos_cashier', ['dashboard']);
+        $this->assertFalse(HotelShell::canOpenRestaurantOutlet($denied, $company));
+        $this->assertSame('/pos/dashboard', HotelShell::postLoginPath($denied));
+        $this->actingAs($denied, 'pos')->get('/pos/hotel')->assertRedirect();
+        $this->actingAs($denied, 'pos')->get('/pos/hotel/restaurant')->assertForbidden();
+        $this->actingAs($denied, 'pos')->get('/pos/invoice/create')->assertRedirect('/pos/dashboard');
+    }
+
+    public function test_restaurant_cashier_lands_on_outlet_not_front_desk(): void
+    {
+        $flags = PosFeatureService::defaultsForCategory('hotel');
+        $flags['kitchen'] = true;
+        $flags['kot'] = true;
+        $company = $this->company('hotel', [
+            'feature_flags' => $flags,
+            'restaurant_mode' => true,
+        ]);
+        $cashier = $this->staff($company, 'pos_cashier', ['dashboard', 'orders']);
+        $this->assertSame('/pos/hotel/restaurant', HotelShell::postLoginPath($cashier));
+        $this->assertTrue(HotelShell::canOpenRestaurantOutlet($cashier, $company));
+        $this->actingAs($cashier, 'pos')->get('/pos/hotel/restaurant')
+            ->assertRedirect('/pos/invoice/create');
+    }
+
+    public function test_manage_as_company_path_uses_hotel_shell(): void
+    {
+        $company = $this->company();
+        $owner = $this->owner($company);
+        $this->assertSame('/pos/hotel', HotelShell::postLoginPath($owner));
+
+        $flags = PosFeatureService::defaultsForCategory('hotel');
+        $flags['kitchen'] = true;
+        $kitchen = $this->company('hotel', [
+            'feature_flags' => $flags,
+            'restaurant_mode' => true,
+        ]);
+        $this->assertSame('/pos/hotel', HotelShell::postLoginPath($this->owner($kitchen)));
+    }
+
     public function test_second_branch_and_occupancy_due_still_count(): void
     {
         $company = $this->company();
@@ -210,13 +328,21 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertSame(HotelStay::STATUS_CHECKED_IN, $stayA->fresh()->status);
     }
 
-    public function test_stay_show_uses_readable_status_and_timeline(): void
+    public function test_stay_show_uses_readable_status_timeline_and_stay_extra_labels(): void
     {
         $company = $this->company();
         $stays = app(HotelStayService::class);
         $user = $this->owner($company);
         $room = $stays->createRoom((int) $company->id, [
             'room_number' => '401', 'rate_amount' => 2500, 'capacity' => 2,
+        ]);
+        $product = \App\Models\PosProduct::create([
+            'company_id' => $company->id,
+            'name' => 'Minibar Cola',
+            'price' => 150,
+            'uom' => 'NOS',
+            'is_active' => true,
+            'show_on_sale' => true,
         ]);
         $stay = $stays->book((int) $company->id, (int) $user->id, [
             'room_id' => $room->id,
@@ -231,5 +357,9 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString(__('pos.hotel_timeline'), $html);
         $this->assertStringContainsString('id="hotel-charge"', $html);
         $this->assertStringContainsString('overflow-x-auto', $html);
+        $this->assertStringContainsString('data-hotel-stay-extras="1"', $html);
+        $this->assertStringContainsString(__('pos.hotel_from_product'), $html);
+        $this->assertStringContainsString('Minibar Cola', $html);
+        $this->assertSame('Minibar Cola', $product->fresh()->name);
     }
 }

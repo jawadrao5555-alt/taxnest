@@ -1,7 +1,12 @@
 @php
+    // Returning to any Hotel chrome page leaves the Restaurant Outlet context.
+    \App\Services\HotelShell::leaveRestaurantOutlet();
     $hotelUser = auth('pos')->user();
     $hotelDesk = \App\Services\HotelAccessService::canFrontDesk($hotelUser);
     $hotelHk = \App\Services\HotelAccessService::canHousekeeping($hotelUser);
+    $hotelCompany = \App\Models\Company::find(app('currentCompanyId'));
+    $hotelOutletOn = \App\Services\HotelShell::restaurantOutletOn($hotelCompany);
+    $hotelCanOutlet = \App\Services\HotelShell::canOpenRestaurantOutlet($hotelUser, $hotelCompany);
 @endphp
 <nav class="flex flex-wrap gap-1.5 mb-5" data-hotel-native-nav="1">
     @if($hotelDesk)
@@ -16,6 +21,11 @@
     <a href="{{ route('pos.hotel.guests') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.guests') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_guests') }}</a>
     <a href="{{ route('pos.hotel.folios') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.folios') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_folios') }}</a>
     <a href="{{ route('pos.hotel.reports') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.reports') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_reports') }}</a>
+    @endif
+    @if($hotelOutletOn && $hotelCanOutlet)
+    <a href="{{ route('pos.hotel.restaurant-outlet') }}"
+       data-hotel-restaurant-outlet="1"
+       class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create', 'pos.hotel.restaurant-outlet') || \App\Services\HotelShell::inRestaurantOutlet() ? 'bg-amber-700 text-white' : 'bg-white dark:bg-gray-900 border border-amber-300 text-amber-900 dark:text-amber-200' }}">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
     @endif
 </nav>
 @if($hotelDesk && !empty($showHotelPrimaryActions))

@@ -186,7 +186,37 @@ async function runJourney(browser, label, viewport, creds) {
         const hasNewStay = await page.locator('a[href*="/pos/hotel/stays/create"]').count();
         if (hasRoomsLink && hasNewStay) ok('dashboard shows rooms + new stay actions');
         else bad('dashboard missing rooms/new-stay links');
+        const hasNewSale = await page.locator('[data-nav-new-sale="static"]').count();
+        if (hasNewSale === 0) ok('Hotel shell has no intermixed New Sale');
+        else bad('generic New Sale still in Hotel primary nav');
+        const hasOutlet = await page.locator('[data-hotel-restaurant-outlet="1"]').count();
+        if (hasOutlet > 0) ok('Restaurant Outlet entry visible with restaurant_mode ON');
+        else bad('Restaurant Outlet entry missing');
         await shot(page, `${prefix}-02-dashboard`);
+
+        say('Restaurant Outlet → sale → Back to Front Desk');
+        await page.goto(`${BASE_URL}/pos/hotel/restaurant`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await dismissNotices(page);
+        if (page.url().includes('/pos/invoice/create') || page.url().includes('/pos/v2/invoice/create')) {
+            ok(`outlet opened sale → ${page.url()}`);
+        } else {
+            bad(`outlet did not land on sale (${page.url()})`);
+        }
+        const backBanner = page.locator('[data-hotel-back-front-desk="1"]').first();
+        if (await backBanner.count()) {
+            ok('Back to Front Desk banner visible on outlet sale');
+            await shot(page, `${prefix}-02b-restaurant-outlet`);
+            // Prefer the dedicated exit route (same as the banner href) so overlays
+            // cannot swallow the click on the sale screen.
+            await page.goto(`${BASE_URL}/pos/hotel/restaurant/exit`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await dismissNotices(page);
+            if (page.url().match(/\/pos\/hotel\/?$/)) ok('Back to Front Desk returned to Hotel');
+            else bad(`Back to Front Desk landed on ${page.url()}`);
+        } else {
+            bad('Back to Front Desk control missing on outlet sale');
+            await shot(page, `${prefix}-02b-restaurant-outlet`);
+        }
+        await shot(page, `${prefix}-02c-back-front-desk`);
 
         say('Rooms + housekeeping');
         await page.goto(`${BASE_URL}/pos/hotel/rooms`, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -286,14 +316,14 @@ async function runJourney(browser, label, viewport, creds) {
             }
             await shot(page, `${prefix}-06-checkout`);
 
-            // Tenant isolation: foreign stay id must not render as this company's stay.
+            // Tenant isolation: foreign stay id must not render as THIS stay show.
             say('URL isolation (foreign stay id)');
             const foreign = await page.goto(`${BASE_URL}/pos/hotel/stays/99999999`, { waitUntil: 'domcontentloaded', timeout: 20000 });
             const foreignUrl = page.url();
-            if (foreignUrl.includes('/pos/dashboard') || foreignUrl.includes('/pos/login') || (foreign && foreign.status() === 404)) {
+            if (/\/pos\/hotel\/stays\/99999999/.test(foreignUrl) && (foreign?.status() || 200) < 400) {
+                bad(`foreign stay id still on stay show URL ${foreignUrl}`);
+            } else if (foreignUrl.includes('/pos/dashboard') || foreignUrl.includes('/pos/login') || foreignUrl.match(/\/pos\/hotel\/?$/) || (foreign && foreign.status() === 404)) {
                 ok(`foreign stay redirected/denied → ${foreignUrl}`);
-            } else if (/QA Guest/i.test(await page.locator('body').innerText())) {
-                bad('foreign stay id leaked guest content');
             } else {
                 ok(`foreign stay not shown as open stay (${foreignUrl})`);
             }
@@ -327,19 +357,34 @@ async function runJourney(browser, label, viewport, creds) {
         await logout(page);
         await loginAs(page, creds.deniedLogin, creds.password);
         await page.goto(`${BASE_URL}/pos/dashboard`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        const deniedDash = await page.locator('body').innerText();
-        if (/\bIn house\b/.test(deniedDash) || /hotel_stat_in_house/.test(deniedDash)) {
-            bad('denied cashier saw hotel occupancy on dashboard');
+        const deniedDashUrl = page.url();
+        // Denied-both lands on generic home (not Front Desk, not Outlet).
+        if (deniedDashUrl.includes('/pos/hotel') && !deniedDashUrl.includes('restaurant')) {
+            bad(`denied user reached Hotel shell → ${deniedDashUrl}`);
         } else {
-            ok('denied cashier dashboard has no hotel occupancy strip');
+            ok(`denied user stayed off Front Desk → ${deniedDashUrl}`);
         }
         await page.goto(`${BASE_URL}/pos/hotel`, { waitUntil: 'domcontentloaded', timeout: 30000 });
         if (!page.url().match(/\/pos\/hotel\/?$/)) ok(`denied cashier blocked → ${page.url()}`);
         else bad('denied cashier reached front desk');
+        await page.goto(`${BASE_URL}/pos/hotel/restaurant`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        const outletDeniedUrl = page.url();
+        const outletDeniedStatus = await page.locator('body').innerText().catch(() => '');
+        if (outletDeniedUrl.includes('/pos/invoice/create')) bad('denied user opened Restaurant Outlet sale');
+        else ok(`denied user blocked from outlet → ${outletDeniedUrl}`);
         await page.goto(`${BASE_URL}/pos/hotel/rooms`, { waitUntil: 'domcontentloaded', timeout: 30000 });
         if (!page.url().includes('/pos/hotel/rooms')) ok(`denied cashier blocked from rooms → ${page.url()}`);
         else bad('denied cashier reached rooms');
         await shot(page, `${prefix}-08-denied-permissions`);
+
+        say('Feature OFF: temporarily clear restaurant_mode via HTTP is out of scope; direct sale denial covered in PHPUnit');
+        // Soft check: HK cannot open outlet either.
+        await logout(page);
+        await loginAs(page, creds.hkLogin, creds.password);
+        await page.goto(`${BASE_URL}/pos/hotel/restaurant`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        if (page.url().includes('/pos/invoice/create')) bad('HK opened Restaurant Outlet');
+        else ok(`HK denied Restaurant Outlet → ${page.url()}`);
+        await shot(page, `${prefix}-09-hk-outlet-denied`);
 
         await writeDiag(`${prefix}-diagnostics`, diag, { stayUrl, finalUrl: page.url() });
         if (diag.pageErrors.length) bad(`pageerrors: ${diag.pageErrors.slice(0, 3).join(' | ')}`);

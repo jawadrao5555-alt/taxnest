@@ -273,12 +273,12 @@ class HotelFolioService
             $amount = array_key_exists('amount', $data)
                 ? round((float) $data['amount'], 2)
                 : round($qty * $unit, 2);
-            if ($amount == 0.0 && ($data['entry_type'] ?? '') === HotelFolioEntry::TYPE_CHARGE) {
-                throw new HotelStayException(__('pos.hotel_amount_required'));
-            }
 
             $productId = isset($data['product_id']) ? (int) $data['product_id'] : null;
-            if ($productId && Schema::hasTable('pos_products')) {
+            if ($productId) {
+                if (!HotelFolioCatalog::productAllowed((int) $stay->company_id, $stay->branch_id ? (int) $stay->branch_id : null, $productId)) {
+                    throw new HotelStayException(__('pos.hotel_item_other_branch'));
+                }
                 $product = PosProduct::where('company_id', $stay->company_id)->where('id', $productId)->first();
                 $productId = $product?->id;
                 if ($product && empty($data['description'])) {
@@ -287,6 +287,34 @@ class HotelFolioService
                 if ($product && empty($data['uom']) && $product->uom) {
                     $uom = $product->uom;
                 }
+                if ($product && $unit == 0.0 && isset($product->price)) {
+                    $unit = round((float) $product->price, 2);
+                    if (!array_key_exists('amount', $data)) {
+                        $amount = round($qty * $unit, 2);
+                    }
+                }
+            }
+            $serviceId = isset($data['service_id']) ? (int) $data['service_id'] : null;
+            if ($serviceId) {
+                if (!HotelFolioCatalog::serviceAllowed((int) $stay->company_id, $stay->branch_id ? (int) $stay->branch_id : null, $serviceId)) {
+                    throw new HotelStayException(__('pos.hotel_item_other_branch'));
+                }
+                if (Schema::hasTable('pos_services')) {
+                    $service = \App\Models\PosService::where('company_id', $stay->company_id)->where('id', $serviceId)->first();
+                    if ($service && empty($data['description'])) {
+                        $data['description'] = $service->name;
+                    }
+                    if ($service && $unit == 0.0) {
+                        $unit = round((float) $service->price, 2);
+                        if (!array_key_exists('amount', $data)) {
+                            $amount = round($qty * $unit, 2);
+                        }
+                    }
+                }
+            }
+
+            if ($amount == 0.0 && ($data['entry_type'] ?? '') === HotelFolioEntry::TYPE_CHARGE) {
+                throw new HotelStayException(__('pos.hotel_amount_required'));
             }
 
             try {

@@ -33,8 +33,23 @@
     </div>
     @endunless
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <table class="w-full text-sm">
+    @if(!empty($canManageRooms))
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+        <h3 class="text-sm font-semibold mb-2">{{ __('pos.hotel_checkout_policy') }}</h3>
+        <p class="text-xs text-gray-500 mb-3">{{ __('pos.hotel_checkout_policy_hint') }}</p>
+        <form method="POST" action="{{ route('pos.hotel.checkout-policy') }}" class="flex flex-col sm:flex-row gap-3 sm:items-end">
+            @csrf
+            <select name="hotel_checkout_outstanding" class="rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
+                <option value="allow" @selected(($checkoutPolicy ?? 'allow') === 'allow')>{{ __('pos.hotel_checkout_policy_allow') }}</option>
+                <option value="block" @selected(($checkoutPolicy ?? 'allow') === 'block')>{{ __('pos.hotel_checkout_policy_block') }}</option>
+            </select>
+            <button class="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-sm rounded-lg font-semibold">{{ __('pos.hotel_checkout_policy_save') }}</button>
+        </form>
+    </div>
+    @endif
+
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+        <table class="min-w-[48rem] w-full text-sm">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 uppercase">
                     <th class="px-4 py-3">{{ __('pos.hotel_room') }}</th>

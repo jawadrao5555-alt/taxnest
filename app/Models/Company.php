@@ -211,6 +211,7 @@ class Company extends Model
         'pos_tax_inclusive',
         'pos_tax_pricing_mode',
         'pos_product_search_mode',
+        'hotel_checkout_outstanding',
         'pos_setup_completed',
         'pos_use_legacy_restaurant',
         'fbr_universal_enabled',

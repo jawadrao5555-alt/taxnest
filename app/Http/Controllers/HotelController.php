@@ -6,9 +6,10 @@ use App\Exceptions\HotelStayException;
 use App\Models\HotelRoom;
 use App\Models\HotelStay;
 use App\Models\PosCustomer;
-use App\Models\PosProduct;
 use App\Services\BranchContextService;
 use App\Services\HotelAccessService;
+use App\Services\HotelCheckoutPolicy;
+use App\Services\HotelFolioCatalog;
 use App\Services\HotelFolioService;
 use App\Services\HotelStayService;
 use App\Services\PosFeatureService;
@@ -52,8 +53,9 @@ class HotelController extends Controller
         $uomGroups = PosUnitCatalog::groupsFor(\App\Models\Company::find($companyId));
         $canManageRooms = HotelAccessService::canManageRooms(auth('pos')->user());
         $canFrontDesk = HotelAccessService::canFrontDesk(auth('pos')->user());
+        $checkoutPolicy = HotelCheckoutPolicy::forCompany(\App\Models\Company::find($companyId));
 
-        return view('pos.hotel.rooms', compact('rooms', 'openStayByRoom', 'uomGroups', 'canManageRooms', 'canFrontDesk'));
+        return view('pos.hotel.rooms', compact('rooms', 'openStayByRoom', 'uomGroups', 'canManageRooms', 'canFrontDesk', 'checkoutPolicy'));
     }
 
     public function storeRoom(Request $request)
@@ -216,17 +218,13 @@ class HotelController extends Controller
             ->where('is_active', true)
             ->orderBy('room_number')
             ->get();
-        $products = collect();
-        if (Schema::hasTable('pos_products')) {
-            $products = PosProduct::where('company_id', $companyId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->limit(200)
-                ->get(['id', 'name', 'price', 'uom']);
-        }
+        $catalogBranchId = $stay->branch_id ? (int) $stay->branch_id : $branchId;
+        $products = HotelFolioCatalog::products($companyId, $catalogBranchId);
+        $services = HotelFolioCatalog::services($companyId, $catalogBranchId);
         $uomGroups = PosUnitCatalog::groupsFor(\App\Models\Company::find($companyId));
+        $checkoutPolicy = HotelCheckoutPolicy::forCompany(\App\Models\Company::find($companyId));
 
-        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'uomGroups'));
+        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy'));
     }
 
     public function checkIn(Request $request, int $id)
@@ -311,6 +309,7 @@ class HotelController extends Controller
             'uom' => 'nullable|string|max:8',
             'unit_amount' => 'required|numeric|min:0|max:10000000',
             'product_id' => 'nullable|integer',
+            'service_id' => 'nullable|integer',
             'idempotency_key' => 'nullable|string|max:64',
         ]);
         try {
@@ -415,6 +414,25 @@ class HotelController extends Controller
         return back()->with('success', __('pos.hotel_invoiced', [
             'number' => $result['transaction']->invoice_number,
         ]));
+    }
+
+    public function updateCheckoutPolicy(Request $request)
+    {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        $data = $request->validate([
+            'hotel_checkout_outstanding' => 'required|in:allow,block',
+        ]);
+        $company = \App\Models\Company::find((int) app('currentCompanyId'));
+        if (!$company) {
+            return back()->with('error', __('pos.hotel_company_missing'));
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'hotel_checkout_outstanding')) {
+            $company->forceFill([
+                'hotel_checkout_outstanding' => $data['hotel_checkout_outstanding'],
+            ])->save();
+        }
+
+        return back()->with('success', __('pos.hotel_checkout_policy_saved'));
     }
 
     private function stay(int $id): HotelStay

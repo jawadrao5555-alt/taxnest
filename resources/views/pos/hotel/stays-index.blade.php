@@ -13,8 +13,8 @@
             @endforeach
         </select>
     </form>
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <table class="w-full text-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+        <table class="min-w-[40rem] w-full text-sm">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 uppercase">
                     <th class="px-4 py-3">{{ __('pos.hotel_stay_no') }}</th>

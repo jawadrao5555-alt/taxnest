@@ -195,9 +195,15 @@ class HealthIpdOperationsTest extends TestCase
 
     private function makePatient(array $overrides = []): HealthPatient
     {
+        // Sequential MRNs in MR88**** — never overlaps hardcoded fixtures
+        // (MR009002/9003/9010/9011). random_int(1000,9999) could collide with
+        // those within one test and flake the full suite on SQLite UNIQUE(company_id, mrn).
+        static $seq = 0;
+        $seq++;
+
         return HealthPatient::create(array_merge([
             'company_id' => $this->company->id,
-            'mrn' => 'MR00' . random_int(1000, 9999),
+            'mrn' => 'MR88'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT),
             'name' => 'Nadia Bibi',
             'gender' => 'female',
             'age_years' => 41,

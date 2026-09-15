@@ -110,60 +110,25 @@ if [ "$DO_COMPOSER" = 1 ]; then
   composer install --no-interaction --prefer-dist --no-dev 2>&1 || exit 92
 fi
 
-# ---------------------------------------------------------------------------
-# Settings baselines (immutable / per-deploy)
-#
-# LIVE_SETTINGS_BASE (.taxnest-settings-before.json) is the RETAINED forensic
-# file from a failed settings-regression deploy. It must NEVER be overwritten
-# by a later capture — that would erase the only pre-mutation evidence.
-#
-# Each deploy writes to a unique file under LIVE_SETTINGS_BASELINES_DIR.
-# Concurrent deploys are serialized by flock; unique names still prevent
-# accidental path collisions.
-# ---------------------------------------------------------------------------
-RETAINED_BASE="${LIVE_SETTINGS_BASE}"
-BASELINES_DIR="${LIVE_SETTINGS_BASELINES_DIR:-$(dirname "$RETAINED_BASE")/.taxnest-settings-baselines}"
-RETAINED_DIR="${LIVE_SETTINGS_RETAINED_DIR:-$(dirname "$RETAINED_BASE")/.taxnest-settings-retained}"
-mkdir -p "$BASELINES_DIR" "$RETAINED_DIR" || exit 88
-DEPLOY_ID="${TARGET_SHA:-refresh}-$$-$(date -u +%Y%m%d%H%M%S)"
-SETTINGS_BASE="${BASELINES_DIR}/before-${DEPLOY_ID}.json"
-SETTINGS_BASE_OK=0
-
-# If a retained forensic baseline exists, restore from it BEFORE capturing a
-# fresh baseline for this deploy. Fail closed without overwriting it when the
-# plan is ambiguous or restoration cannot be verified.
-if [ -f "$RETAINED_BASE" ]; then
-  echo "REMOTE_STEP: retained settings baseline present — validating before any new capture"
-  if ! $PHP artisan pos:settings-restore --from="$RETAINED_BASE" >/dev/null 2>&1; then
-    echo "REMOTE_SETTINGS_RETAINED_AMBIGUOUS"
-    echo "REMOTE_STEP: refusing to overwrite retained baseline $RETAINED_BASE"
-    exit 89
-  fi
-  echo "REMOTE_STEP: retained baseline dry-run plan accepted — applying hash-checked restore"
-  RESTORE_OUT=$($PHP artisan pos:settings-restore --from="$RETAINED_BASE" --write 2>&1) || true
-  echo "$RESTORE_OUT" | sed 's/\[[^][]*\]/(redacted)/g'
-  if ! echo "$RESTORE_OUT" | grep -qE 'Verified: service_jobs-only rows match the baseline again|Already clean against baseline'; then
-    echo "REMOTE_SETTINGS_RETAINED_RESTORE_FAILED"
-    echo "REMOTE_STEP: retained baseline left untouched at $RETAINED_BASE"
-    exit 89
-  fi
-  FORENSIC_COPY="${RETAINED_DIR}/archived-after-restore-${DEPLOY_ID}.json"
-  cp -a "$RETAINED_BASE" "$FORENSIC_COPY" || exit 89
-  # Only after restore + verify + forensic copy: clear the active retain slot so
-  # the next capture can proceed. Never write a new snapshot onto RETAINED_BASE.
-  rm -f "$RETAINED_BASE" || exit 89
-  echo "REMOTE_SETTINGS_RETAINED_RESTORED"
-  echo "REMOTE_STEP: forensic copy kept at $FORENSIC_COPY"
-fi
-
-# Capture THIS deploy's baseline to a unique path (no-clobber; never RETAINED_BASE).
-if $PHP artisan pos:settings-snapshot --out="$SETTINGS_BASE" >/dev/null 2>&1; then
-  SETTINGS_BASE_OK=1
-  echo "REMOTE_STEP: settings baseline captured at $SETTINGS_BASE"
-else
-  echo "REMOTE_SETTINGS_BASELINE_FAILED"
-  echo "REMOTE_STEP: WARNING could not capture the settings baseline — regression guard is DISARMED for this deploy"
-fi
+# Settings baselines — shared helpers from the checked-out tree.
+# LIVE_SETTINGS_BASE is the RETAINED forensic file and must never be used as
+# a capture --out target.
+LIVE_SETTINGS_BASELINES_DIR="${LIVE_SETTINGS_BASELINES_DIR:-$(dirname "$LIVE_SETTINGS_BASE")/.taxnest-settings-baselines}"
+LIVE_SETTINGS_RETAINED_DIR="${LIVE_SETTINGS_RETAINED_DIR:-$(dirname "$LIVE_SETTINGS_BASE")/.taxnest-settings-retained}"
+# shellcheck disable=SC1091
+. "$LIVE_DIR/scripts/lib/settings-baseline.sh" || exit 88
+SETTINGS_ARTISAN="$PHP artisan"
+settings_baseline_init_dirs || exit 88
+DEPLOY_ID="$(settings_baseline_deploy_id "${TARGET_SHA:-refresh}")"
+HR=0
+settings_baseline_handle_retained "$DEPLOY_ID" || HR=$?
+[ "$HR" -eq 0 ] || exit "$HR"
+CR=0
+settings_baseline_capture "$DEPLOY_ID" || CR=$?
+case "$CR" in
+  0) ;;
+  *) exit "$CR" ;;
+esac
 
 if [ "$DO_MIGRATE" = 1 ]; then
   echo "REMOTE_STEP: migrate --force"
@@ -229,51 +194,10 @@ fi
 echo "REMOTE_STEP: artisan up"
 $PHP artisan up 2>&1 || exit 97
 
-# Settings-regression check, AFTER the site is back up. Deliberately not a
-# remote exit code: the release already shipped, and dropping the shops back
-# into maintenance would punish them for our bug. Instead it prints a marker
-# the local script turns into a loud DEPLOY FAILED, so a human must look.
-#
-# On regression: attempt hash-checked restore from THIS deploy's baseline, keep
-# a forensic copy, install/retain the canonical RETAINED_BASE only if absent
-# (never overwrite an older retained forensic file), and still FAIL CLOSED.
-# On clean: delete only THIS deploy's temporary baseline.
-if [ "$SETTINGS_BASE_OK" = 1 ]; then
-  echo "REMOTE_STEP: settings regression check against $SETTINGS_BASE"
-  if [ -n "$ALLOW_SETTINGS" ]; then
-    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" --allow="$ALLOW_SETTINGS" 2>&1)
-  else
-    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" 2>&1)
-  fi
-  SET_RC=$?
-  echo "$SET_OUT"
-  if [ "$SET_RC" != 0 ]; then
-    echo "REMOTE_SETTINGS_REGRESSION"
-    echo "REMOTE_STEP: attempting automatic protected-settings restore from this deploy baseline"
-    RESTORE_OUT=$($PHP artisan pos:settings-restore --from="$SETTINGS_BASE" --write 2>&1) || true
-    echo "$RESTORE_OUT" | sed 's/\[[^][]*\]/(redacted)/g'
-    if echo "$RESTORE_OUT" | grep -q 'Verified: service_jobs-only rows match the baseline again'; then
-      echo "REMOTE_SETTINGS_RESTORED"
-    else
-      echo "REMOTE_SETTINGS_RESTORE_FAILED"
-    fi
-    FORENSIC_COPY="${RETAINED_DIR}/retained-after-regression-${DEPLOY_ID}.json"
-    cp -a "$SETTINGS_BASE" "$FORENSIC_COPY" 2>/dev/null || true
-    echo "REMOTE_STEP: forensic copy of this deploy baseline at $FORENSIC_COPY"
-    # Install canonical retain slot only when empty — never clobber older evidence.
-    if [ ! -f "$RETAINED_BASE" ]; then
-      cp -a "$SETTINGS_BASE" "$RETAINED_BASE" 2>/dev/null || true
-      echo "REMOTE_STEP: canonical retained baseline installed at $RETAINED_BASE"
-    else
-      echo "REMOTE_STEP: canonical retained baseline already present — left untouched"
-    fi
-    # Keep this deploy's baseline file too (do not rm).
-    echo "REMOTE_STEP: deploy baseline retained at $SETTINGS_BASE"
-  else
-    rm -f "$SETTINGS_BASE"
-    echo "REMOTE_STEP: temporary deploy baseline removed (clean)"
-  fi
-fi
+# Settings-regression check after the site is up. Markers drive fail-closed
+# locally; the remote process still exits 0 so shops are not left in maintenance
+# for a settings bug after code already shipped.
+settings_baseline_post_check "$DEPLOY_ID" "${ALLOW_SETTINGS:-}"
 
 echo "REMOTE_DONE"
 exit 0

@@ -196,20 +196,34 @@ class PosCustomAccessDeployGuardTest extends TestCase
 
     public function test_deploy_guard_script_never_captures_onto_retained_path(): void
     {
-        $src = file_get_contents(base_path('scripts/lib/live-remote-apply.sh'));
-        $this->assertStringContainsString('before-${DEPLOY_ID}.json', $src);
-        $this->assertStringContainsString('RETAINED_BASE="${LIVE_SETTINGS_BASE}"', $src);
-        $this->assertStringContainsString('REMOTE_SETTINGS_RETAINED_AMBIGUOUS', $src);
-        $this->assertStringContainsString('exit 89', $src);
-        $this->assertStringContainsString('canonical retained baseline already present — left untouched', $src);
-        $this->assertStringContainsString('temporary deploy baseline removed (clean)', $src);
+        $apply = file_get_contents(base_path('scripts/lib/live-remote-apply.sh'));
+        $lib = file_get_contents(base_path('scripts/lib/settings-baseline.sh'));
+
+        // Apply script sources shared helpers and fail-closes on retained restore 89.
+        $this->assertStringContainsString('scripts/lib/settings-baseline.sh', $apply);
+        $this->assertStringContainsString('settings_baseline_handle_retained', $apply);
+        $this->assertStringContainsString('settings_baseline_capture', $apply);
+        $this->assertStringContainsString('settings_baseline_post_check', $apply);
+        $this->assertStringContainsString('[ "$HR" -eq 0 ] || exit "$HR"', $apply);
+        $this->assertStringContainsString('exit "$CR"', $apply);
+        $this->assertMatchesRegularExpression('/\b89\)/', $apply);
+
+        // Library owns unique per-deploy paths + retain/restore markers.
+        $this->assertStringContainsString('before-%s.json', $lib);
+        $this->assertStringContainsString('local retained="${LIVE_SETTINGS_BASE}"', $lib);
+        $this->assertStringContainsString('REMOTE_SETTINGS_RETAINED_AMBIGUOUS', $lib);
+        $this->assertStringContainsString('return 89', $lib);
+        $this->assertStringContainsString('canonical retained baseline already present — left untouched', $lib);
+        $this->assertStringContainsString('temporary deploy baseline removed (clean)', $lib);
+
+        // Never capture onto the retained forensic path from either file.
         $this->assertStringNotContainsString(
             'pos:settings-snapshot --out="$LIVE_SETTINGS_BASE"',
-            $src
+            $apply.$lib
         );
         $this->assertStringNotContainsString(
             'pos:settings-snapshot --out="$RETAINED_BASE"',
-            $src
+            $apply.$lib
         );
     }
 

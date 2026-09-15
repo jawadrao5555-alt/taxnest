@@ -382,14 +382,12 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         $viewer = $stays->occupancyForViewer($user, $company, null);
         $this->assertSame(1, $viewer['pending_due_count'] ?? 0);
 
-        $dueLabel = preg_quote(__('pos.hotel_stat_due'), '/');
         $html = $this->actingAs($user, 'pos')
             ->get('/pos/hotel')
             ->assertOk()
-            ->assertSee(__('pos.hotel_stat_due'), false)
             ->getContent();
         $this->assertMatchesRegularExpression(
-            '/'.$dueLabel.'[\s\S]{0,400}?\b1\b/u',
+            '/>(?:Pending due|Baqaya|باقی رقم)<\/p>\s*<p class="text-xl[^"]*">1<\/p>/u',
             $html
         );
 

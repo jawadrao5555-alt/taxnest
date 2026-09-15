@@ -3550,6 +3550,14 @@ class FbrPosController extends Controller
             return redirect()->route('fbrpos.show', $id)->with('error', __('pos.already_submitted_fbr'));
         }
 
+        // A verification hold may already represent a number allocated by the
+        // shop-PC IMS. Retrying it could create a duplicate fiscal invoice, so
+        // only reconciliation may release this state.
+        if ($transaction->fbr_status === 'verification_pending') {
+            return redirect()->route('fbrpos.show', $id)
+                ->with('error', __('pos.fbr_verification_pending_no_retry'));
+        }
+
         if ($transaction->invoice_mode === 'local') {
             return redirect()->route('fbrpos.show', $id)->with('error', __('pos.local_cannot_submit_fbr'));
         }
@@ -3842,7 +3850,7 @@ class FbrPosController extends Controller
             $transactions = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20, 1, [
                 'path' => $request->url(), 'query' => $request->query(),
             ]);
-            $stats = (object) ['failed_count' => 0, 'pending_count' => 0, 'submitted_count' => 0, 'failed_amount' => 0, 'config_error_count' => 0];
+            $stats = (object) ['failed_count' => 0, 'pending_count' => 0, 'verification_pending_count' => 0, 'submitted_count' => 0, 'failed_amount' => 0, 'config_error_count' => 0];
             return view('fbr-pos.fail-queue', compact('transactions', 'stats', 'fbrReportingOff'));
         }
 
@@ -3850,7 +3858,7 @@ class FbrPosController extends Controller
         // auto-retry pool on the sale screen). They get a distinct visual treatment
         // and a "Fix Settings" note so the admin knows what to do.
         $query = FbrPosTransaction::where('company_id', $companyId)
-            ->whereIn('fbr_status', ['failed', 'pending', 'config_error'])
+            ->whereIn('fbr_status', ['failed', 'pending', 'config_error', 'verification_pending'])
             ->where(function ($q) {
                 $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
             })
@@ -3875,6 +3883,7 @@ class FbrPosController extends Controller
             ->selectRaw("
                 SUM(CASE WHEN fbr_status = 'failed' THEN 1 ELSE 0 END) as failed_count,
                 SUM(CASE WHEN fbr_status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN fbr_status = 'verification_pending' THEN 1 ELSE 0 END) as verification_pending_count,
                 SUM(CASE WHEN fbr_status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
                 SUM(CASE WHEN fbr_status IN ('failed','config_error') THEN total_amount ELSE 0 END) as failed_amount,
                 SUM(CASE WHEN fbr_status = 'config_error' THEN 1 ELSE 0 END) as config_error_count
@@ -3926,6 +3935,9 @@ class FbrPosController extends Controller
 
         if ($tx->fbr_status === 'submitted') {
             return back()->with('error', __('pos.already_submitted_fbr_short'));
+        }
+        if ($tx->fbr_status === 'verification_pending') {
+            return back()->with('error', __('pos.fbr_verification_pending_no_retry'));
         }
 
         $fbrCompany = Company::find($companyId);
@@ -4135,6 +4147,8 @@ class FbrPosController extends Controller
         $fbrIntegrationMissing = $company->fbrIntegrationMissing();
         $fbrIntegrationDecision = $company->fbrIntegrationDecision();
         $fbrIntegrationConfigured = empty($fbrIntegrationMissing);
+        $fbrSubmissionDiagnostics = app(\App\Services\FbrPosSubmissionEvidenceService::class)
+            ->diagnostics($company);
 
         // Peti (Wholesale) Rate (Task 1414): the "reh gaye" list — products that
         // ALREADY sell in bulk (a past sale line hit a big quantity) but can't
@@ -4159,6 +4173,7 @@ class FbrPosController extends Controller
             'fbrIntegrationMissing',
             'fbrIntegrationDecision',
             'fbrIntegrationConfigured',
+            'fbrSubmissionDiagnostics',
             'petiGaps'
         ));
     }

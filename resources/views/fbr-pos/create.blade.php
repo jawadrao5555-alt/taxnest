@@ -571,7 +571,7 @@ kbd {
             </span>
             @endif
             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {{ $company->fbr_pos_environment === 'production' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' }}">
-                {{ strtoupper($company->fbr_pos_environment ?? 'sandbox') }}
+                {{ \App\Services\FbrPosSubmissionEvidenceService::requestedEnvironmentLabel($company) }}
             </span>
         </div>
     </div>

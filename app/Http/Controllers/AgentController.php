@@ -10,6 +10,7 @@ use App\Models\PosTransaction;
 use App\Models\FbrPosTransaction;
 use App\Services\PraIntegrationService;
 use App\Services\FbrService;
+use App\Services\FbrPosSubmissionEvidenceService;
 use App\Support\PrinterIdentity;
 
 class AgentController extends Controller
@@ -539,13 +540,36 @@ class AgentController extends Controller
     /** FBR POS equivalent of the PRA self-heal sweep, operating on fbr_pos_transactions. */
     private function fbrHeartbeat(Company $company, Request $request)
     {
-        // Self-heal: rows with a fiscal invoice # but a stale status.
-        $healed = DB::table('fbr_pos_transactions')
+        // Self-heal only a historically explicit Code 100 acceptance. A fiscal
+        // number by itself is not proof: a malformed/missing-code callback is
+        // deliberately held at verification_pending so heartbeat can never
+        // turn that ambiguous state into "submitted".
+        $healQuery = DB::table('fbr_pos_transactions')
             ->where('company_id', $company->id)
             ->whereNotNull('fbr_invoice_number')
-            ->where('fbr_invoice_number', '!=', '')
-            ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
-            ->update([
+            ->whereRaw("TRIM(fbr_invoice_number) <> ''")
+            ->where('fbr_response_code', '100')
+            ->whereIn('fbr_status', ['offline', 'pending', 'failed']);
+
+        // New callbacks carry a safe evidence row. Historical Code-100 rows
+        // predate the table, so "no evidence row" remains backward compatible;
+        // an existing non-accepted evidence row always blocks self-heal.
+        if (app(FbrPosSubmissionEvidenceService::class)->available()) {
+            $healQuery->where(function ($query) {
+                $query->whereExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from(FbrPosSubmissionEvidenceService::TABLE . ' as fse')
+                        ->whereColumn('fse.transaction_id', 'fbr_pos_transactions.id')
+                        ->where('fse.result_state', 'local_accepted');
+                })->orWhereNotExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from(FbrPosSubmissionEvidenceService::TABLE . ' as fse_any')
+                        ->whereColumn('fse_any.transaction_id', 'fbr_pos_transactions.id');
+                });
+            });
+        }
+
+        $healed = $healQuery->update([
                 'fbr_status' => 'submitted',
                 'updated_at' => now(),
             ]);
@@ -612,7 +636,7 @@ class AgentController extends Controller
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {
-            return $this->fbrPendingInvoices($company);
+            return $this->fbrPendingInvoices($company, $request);
         }
 
         // ===== PRA POS company (default) =====
@@ -717,7 +741,7 @@ class AgentController extends Controller
      * path so the agent needs zero changes: it POSTs each `payload` to `pra_endpoint`
      * (the local FBR IMS component on localhost:8524) and reports back via /submit-result.
      */
-    private function fbrPendingInvoices(Company $company)
+    private function fbrPendingInvoices(Company $company, Request $request)
     {
         $pending = FbrPosTransaction::where('company_id', $company->id)
             ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
@@ -737,6 +761,11 @@ class AgentController extends Controller
             try {
                 $txn->loadMissing(['items', 'company']);
                 $payload = $fbrService->buildFbrPosPayload($txn);
+                app(FbrPosSubmissionEvidenceService::class)->recordDispatch(
+                    $company,
+                    $txn,
+                    $request->input('version')
+                );
                 $invoices[] = [
                     'transaction_id' => $txn->id,
                     'invoice_number' => $txn->invoice_number,
@@ -761,6 +790,11 @@ class AgentController extends Controller
             'pra_mode' => 'fiscal_device',
             'pra_token' => '',
             'pra_pos_id' => $company->fbr_pos_id,
+            // Requested by TaxNest; never presented as proof of the installed
+            // shop-PC IMS environment or central FBR receipt.
+            'requested_environment' => $company->fbr_pos_environment ?? 'sandbox',
+            'local_ims_environment_proof' => 'unknown',
+            'central_verification' => 'unknown',
         ]);
     }
 
@@ -772,11 +806,16 @@ class AgentController extends Controller
             'transaction_id' => 'required|integer',
             'success' => 'required|boolean',
             'pra_invoice_number' => 'nullable|string',
-            'response' => 'nullable|array',
+            // FBR must be able to receive and quarantine malformed legacy-agent
+            // callbacks instead of Laravel rejecting them before evidence is
+            // recorded. Both result writers already treat non-arrays as unsafe.
+            'response' => 'nullable',
             'error' => 'nullable|string',
             // Agent >= Jul 2026: true when the failure was transport-level (IMS service
             // down / no internet / timeout) — the bill stays QUEUED, never 'failed'.
             'offline' => 'nullable|boolean',
+            // Additive Agent telemetry. Older agents omit it and remain valid.
+            'agent_version' => 'nullable|string|max:40',
         ]);
 
         // ===== FBR POS Fiscal Device company =====
@@ -925,20 +964,68 @@ class AgentController extends Controller
             return response()->json(['error' => 'Transaction not found'], 404);
         }
 
-        $fbrInvoiceNumber = $request->input('pra_invoice_number');
-        $treatAsSuccess = $request->boolean('success') && !empty($fbrInvoiceNumber);
+        $fbrInvoiceNumber = trim((string) $request->input('pra_invoice_number', ''));
+        $response = $request->input('response');
+        $code = null;
+        if (is_array($response)) {
+            foreach (['Code', 'response_code', 'code'] as $key) {
+                if (array_key_exists($key, $response) && $response[$key] !== null) {
+                    $candidate = trim((string) $response[$key]);
+                    if ($candidate !== '') {
+                        $code = $candidate;
+                        break;
+                    }
+                }
+            }
+        }
+        $explicitCode100 = $code === '100';
+        $treatAsSuccess = $request->boolean('success')
+            && $explicitCode100
+            && $fbrInvoiceNumber !== '';
+        $evidence = app(FbrPosSubmissionEvidenceService::class);
+
+        // Idempotent callback: once an explicit Code-100 result stamped this
+        // row, a late/stale callback must not replace its fiscal number or
+        // demote it. The agent receives an ack and drops the queued callback.
+        $storedNumber = trim((string) ($txn->fbr_invoice_number ?? ''));
+        if ($storedNumber !== '') {
+            $storedWasAccepted = (string) $txn->fbr_response_code === '100';
+            $evidence->recordResult(
+                $company,
+                $txn,
+                $storedWasAccepted ? ($txn->fbr_response ?? $response) : $response,
+                $storedWasAccepted ? '100' : $code,
+                $storedNumber,
+                $storedWasAccepted ? 'local_accepted' : 'verification_pending',
+                $request->input('agent_version')
+            );
+            $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+
+            return response()->json([
+                'ok' => true,
+                'already_submitted' => true,
+                'pra_invoice_number' => $storedNumber,
+            ]);
+        }
 
         if ($treatAsSuccess) {
-            $response = $request->input('response');
-            $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
-
             $txn->update(array_merge([
                 'fbr_status' => 'submitted',
                 'fbr_invoice_number' => $fbrInvoiceNumber,
-                'fbr_response_code' => substr((string) $code, 0, 250),
-                'fbr_response' => is_array($response) ? $response : null,
+                'fbr_response_code' => '100',
+                'fbr_response' => $response,
                 'fbr_submission_hash' => null,
             ], \App\Services\FbrService::fbrErrorPatch(null)));
+
+            $evidence->recordResult(
+                $company,
+                $txn,
+                $response,
+                '100',
+                $fbrInvoiceNumber,
+                'local_accepted',
+                $request->input('agent_version')
+            );
 
             Log::info('Agent: FBR submission success', [
                 'company_id' => $company->id,
@@ -947,6 +1034,39 @@ class AgentController extends Controller
             ]);
         } else {
             $errMsg = (string) $request->input('error', 'FBR submission failed');
+
+            // A success claim with a number but no explicit Code 100 is not a
+            // rejection and is not safe to retry automatically: local IMS may
+            // have allocated a number. Hold it for reconciliation without
+            // stamping the transaction's fiscal-number field.
+            $ambiguousSuccess = $request->boolean('success')
+                && $fbrInvoiceNumber !== ''
+                && (!$explicitCode100 || !is_array($response));
+
+            if ($ambiguousSuccess) {
+                $reason = !is_array($response)
+                    ? 'Agent success callback had a malformed response; explicit FBR IMS Code 100 was not proven.'
+                    : ($code === null
+                        ? 'Agent success callback omitted the FBR IMS response code; explicit Code 100 was not proven.'
+                        : 'Agent success callback carried FBR IMS code ' . mb_substr($code, 0, 40) . ', not Code 100.');
+                $txn->update(array_merge([
+                    'fbr_status' => 'verification_pending',
+                    'fbr_response_code' => $code === null ? null : mb_substr($code, 0, 250),
+                    'fbr_submission_hash' => null,
+                ], \App\Services\FbrService::fbrErrorPatch($reason)));
+                $evidence->recordResult(
+                    $company,
+                    $txn,
+                    $response,
+                    $code,
+                    $fbrInvoiceNumber,
+                    'verification_pending',
+                    $request->input('agent_version')
+                );
+                $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+
+                return response()->json(['ok' => true, 'verification_pending' => true]);
+            }
 
             // Same IMS-contact-optional rule as PRA: transport failures stay QUEUED
             // ('offline') and auto-retry; only real FBR rejections become 'failed'.
@@ -963,6 +1083,16 @@ class AgentController extends Controller
             ], \App\Services\FbrService::fbrErrorPatch(
                 $transportError ? \App\Services\FbrService::shortFbrTransportError($errMsg) : $errMsg
             )));
+
+            $evidence->recordResult(
+                $company,
+                $txn,
+                $response,
+                $code,
+                $fbrInvoiceNumber ?: null,
+                $transportError ? 'transport_deferred' : 'rejected',
+                $request->input('agent_version')
+            );
 
             Log::log($transportError ? 'info' : 'warning', 'Agent: FBR submission ' . ($transportError ? 'deferred (offline/IMS unreachable — queued)' : 'failed'), [
                 'company_id' => $company->id,

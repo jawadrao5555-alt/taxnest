@@ -169,8 +169,8 @@
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.environment_label') }}</label>
                         <select name="fbr_pos_environment" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
-                            <option value="sandbox" {{ ($company->fbr_pos_environment ?? 'sandbox') === 'sandbox' ? 'selected' : '' }}>{{ __('pos.sandbox_testing') }}</option>
-                            <option value="production" {{ ($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'selected' : '' }}>{{ __('pos.production_live') }}</option>
+                            <option value="sandbox" {{ ($company->fbr_pos_environment ?? 'sandbox') === 'sandbox' ? 'selected' : '' }}>{{ $isAgentMode ? __('pos.sandbox_requested_unverified') : __('pos.sandbox_testing') }}</option>
+                            <option value="production" {{ ($company->fbr_pos_environment ?? 'sandbox') === 'production' ? 'selected' : '' }}>{{ $isAgentMode ? __('pos.production_requested_unverified') : __('pos.production_live') }}</option>
                         </select>
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2.5">
@@ -199,6 +199,7 @@
                         <p class="text-xs text-gray-400 mt-1">{{ __('pos.fbr_pos_token_hint') }}</p>
                         @endif
                     </div>
+                    @if(!$isAgentMode)
                     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                         <p class="text-xs text-blue-700 dark:text-blue-400">
                             <strong>{{ __('pos.fbr_ims_pos_endpoints') }}</strong><br>
@@ -206,6 +207,11 @@
                             Production: https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData
                         </p>
                     </div>
+                    @else
+                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                        <p class="text-xs text-amber-800 dark:text-amber-300"><strong>{{ __('pos.fbr_local_ims_endpoint_class') }}</strong><br>{{ __('pos.fbr_local_ims_endpoint_hint') }}</p>
+                    </div>
+                    @endif
                     <div class="flex items-center gap-3">
                         <button type="submit" class="px-6 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">{{ __('pos.save_settings') }}</button>
                         <button type="button" onclick="testFbrConnection()" id="testBtn" class="px-6 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition">
@@ -441,7 +447,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">{{ __('pos.environment_label') }}</span>
-                        <span class="text-gray-900 dark:text-white">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span>
+                        <span class="text-gray-900 dark:text-white">{{ \App\Services\FbrPosSubmissionEvidenceService::requestedEnvironmentLabel($company) }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">{{ __('pos.pos_id') }}</span>
@@ -459,6 +465,35 @@
                     </div>
                 </div>
             </div>
+
+            @if($isAgentMode)
+            @php
+                $fbrDiag = $fbrSubmissionDiagnostics ?? [
+                    'requested_environment' => $company->fbr_pos_environment ?? 'sandbox',
+                    'local_environment_proof' => 'unknown',
+                    'pos_id_state' => 'unknown',
+                    'pos_id_mask' => null,
+                    'local_acceptance_state' => 'unknown',
+                    'central_verification_state' => 'unknown',
+                    'last_evidence_at' => null,
+                ];
+            @endphp
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-amber-200 dark:border-amber-800 shadow-md p-5"
+                 data-fbr-environment-proof="{{ $fbrDiag['local_environment_proof'] }}"
+                 data-fbr-posid-state="{{ $fbrDiag['pos_id_state'] }}"
+                 data-fbr-central-state="{{ $fbrDiag['central_verification_state'] }}">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.fbr_submission_evidence_title') }}</h3>
+                <p class="text-xs text-amber-700 dark:text-amber-300 mb-4">{{ __('pos.fbr_submission_evidence_hint') }}</p>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between gap-4"><span class="text-gray-500">{{ __('pos.fbr_requested_environment') }}</span><span class="text-right text-gray-900 dark:text-white">{{ \App\Services\FbrPosSubmissionEvidenceService::requestedEnvironmentLabel($company) }}</span></div>
+                    <div class="flex justify-between gap-4"><span class="text-gray-500">{{ __('pos.fbr_local_environment_proof') }}</span><span class="text-right font-semibold text-amber-600">{{ __('pos.fbr_evidence_' . $fbrDiag['local_environment_proof']) }}</span></div>
+                    <div class="flex justify-between gap-4"><span class="text-gray-500">{{ __('pos.fbr_posid_evidence') }}</span><span class="text-right {{ $fbrDiag['pos_id_state'] === 'drift' ? 'text-red-600 font-semibold' : 'text-gray-900 dark:text-white' }}">{{ __('pos.fbr_posid_' . $fbrDiag['pos_id_state']) }}{{ $fbrDiag['pos_id_mask'] ? ' · ' . $fbrDiag['pos_id_mask'] : '' }}</span></div>
+                    <div class="flex justify-between gap-4"><span class="text-gray-500">{{ __('pos.fbr_local_acceptance') }}</span><span class="text-right text-gray-900 dark:text-white">{{ __('pos.fbr_evidence_' . $fbrDiag['local_acceptance_state']) }}</span></div>
+                    <div class="flex justify-between gap-4"><span class="text-gray-500">{{ __('pos.fbr_central_verification') }}</span><span class="text-right font-semibold text-amber-600">{{ __('pos.fbr_evidence_' . $fbrDiag['central_verification_state']) }}</span></div>
+                </div>
+                <p class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_local_vs_central_hint') }}</p>
+            </div>
+            @endif
 
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.recent_fbr_logs') }}</h3>

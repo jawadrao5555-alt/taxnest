@@ -1145,6 +1145,17 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // card can roll the row back instead of silently "succeeding".
     Route::post('/customers/alert-dismiss', [PosController::class, 'dismissInactiveRegular'])->name('pos.customers.alert-dismiss');
 
+    // Category-native service operations. Hotel is deliberately excluded by
+    // PosServiceWorkflowProfiles; its stays/folio workflow remains canonical.
+    Route::middleware(['feature:service_jobs,relevant'])->prefix('work-orders')->group(function () {
+        Route::get('/', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'index'])->name('pos.service-work-orders.index');
+        Route::get('/create', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'create'])->name('pos.service-work-orders.create');
+        Route::post('/', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'store'])->name('pos.service-work-orders.store');
+        Route::get('/report.csv', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'report'])->name('pos.service-work-orders.report');
+        Route::get('/{id}', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'show'])->whereNumber('id')->name('pos.service-work-orders.show');
+        Route::post('/{id}/transition', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'transition'])->whereNumber('id')->name('pos.service-work-orders.transition');
+    });
+
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
         // Category profile (Task 1582): Services belong to the services family
         // (or an admin extra / grandfathered shop) — hidden = unreachable by URL.
@@ -2959,8 +2970,5 @@ Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withou
     Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
     Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
 });
-
-
-
 
 

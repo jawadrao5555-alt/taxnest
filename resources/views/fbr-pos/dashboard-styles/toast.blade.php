@@ -20,7 +20,7 @@
     @if($company->fbr_pos_id)
     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-2.5 flex items-center gap-3 fbt-a fbt-1">
         <div class="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0"><svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div>
-        <p class="text-[10px] font-bold text-blue-800 dark:text-blue-300">{{ __('pos.fbr_integrated_pos_line', ['id' => $company->fbr_pos_id, 'env' => ucfirst($company->fbr_pos_environment ?? 'sandbox')]) }}</p>
+        <p class="text-[10px] font-bold text-blue-800 dark:text-blue-300">{{ __('pos.fbr_integrated_pos_line', ['id' => $company->fbr_pos_id, 'env' => \App\Services\FbrPosSubmissionEvidenceService::requestedEnvironmentLabel($company)]) }}</p>
     </div>
     @endif
 

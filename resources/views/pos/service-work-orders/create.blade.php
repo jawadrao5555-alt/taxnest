@@ -1,0 +1,21 @@
+<x-pos-layout>
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6" data-service-create="{{ $profile['category'] }}">
+    <a href="{{ route('pos.service-work-orders.index') }}" class="text-sm text-purple-600">← {{ $profile['noun'] }} Board</a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-3 mb-1">New {{ $profile['noun'] }}</h1>
+    <p class="text-sm text-gray-500 mb-6">Starts at “{{ ucwords(str_replace('_', ' ', $profile['stages'][0])) }}” and moves through the {{ ucfirst(str_replace('_', ' ', $profile['category'])) }} workflow.</p>
+    @if($errors->any())<div class="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
+    <form method="POST" action="{{ route('pos.service-work-orders.store') }}" class="bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-xl shadow-sm p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">@csrf
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Customer *</label><input required name="customer_name" value="{{ old('customer_name') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Phone</label><input name="customer_phone" value="{{ old('customer_phone') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Service</label><select name="service_id" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"><option value="">Custom work</option>@foreach($services as $service)<option value="{{ $service->id }}" @selected(old('service_id') == $service->id)>{{ $service->name }} · Rs {{ number_format((float)$service->price, 2) }}</option>@endforeach</select></div>
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Work title</label><input name="title" value="{{ old('title') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Scheduled {{ $profile['schedule'] ? '*' : '' }}</label><input type="datetime-local" name="scheduled_at" value="{{ old('scheduled_at') }}" {{ $profile['schedule'] ? 'required' : '' }} class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Due / promised</label><input type="datetime-local" name="due_at" value="{{ old('due_at') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
+        @foreach($profile['fields'] as $key => $label)<div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">{{ $label }}</label><input name="details[{{ $key }}]" value="{{ old('details.'.$key) }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>@endforeach
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Quantity *</label><input required type="number" min="0.001" step="0.001" name="quantity" value="{{ old('quantity', 1) }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
+        <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Unit price *</label><input required type="number" min="0" step="0.01" name="unit_price" value="{{ old('unit_price', 0) }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
+        <div class="sm:col-span-2"><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Notes</label><textarea name="notes" rows="3" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white">{{ old('notes') }}</textarea></div>
+        <div class="sm:col-span-2 flex justify-end"><button class="px-5 py-2 rounded-lg bg-purple-600 text-white font-bold">Create {{ $profile['noun'] }}</button></div>
+    </form>
+</div>
+</x-pos-layout>

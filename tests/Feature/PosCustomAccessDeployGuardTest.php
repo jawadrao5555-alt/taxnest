@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * Guards for the PR #72 pos_custom_access deploy regression and recovery.
+ * Guards for the PR #72 pos_custom_access deploy regression and recovery,
+ * including immutable retained-baseline handling.
  */
 class PosCustomAccessDeployGuardTest extends TestCase
 {
@@ -18,18 +19,28 @@ class PosCustomAccessDeployGuardTest extends TestCase
 
     private string $baselinePath;
 
+    private string $retainedPath;
+
+    private string $baselinesDir;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->schema();
         $this->snap = new PosSettingsSnapshot();
-        $this->baselinePath = storage_path('app/testing-settings-before.json');
-        @unlink($this->baselinePath);
+        $dir = storage_path('app/settings-guard-'.uniqid());
+        mkdir($dir, 0775, true);
+        $this->baselinesDir = $dir;
+        $this->baselinePath = $dir.'/before-deploy-a.json';
+        $this->retainedPath = $dir.'/.taxnest-settings-before.json';
     }
 
     protected function tearDown(): void
     {
-        @unlink($this->baselinePath);
+        foreach (glob($this->baselinesDir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($this->baselinesDir);
         parent::tearDown();
     }
 
@@ -53,25 +64,30 @@ class PosCustomAccessDeployGuardTest extends TestCase
         $this->assertSame($payload, DB::table('users')->where('id', 10)->value('pos_custom_access'));
     }
 
-    public function test_service_jobs_only_addition_is_detected_and_legitimate_existing_grant_is_left_alone(): void
+    public function test_retained_baseline_is_never_overwritten_by_snapshot_out(): void
     {
-        $before = '["orders","dashboard"]';
-        $after = '["orders","dashboard","service_jobs"]';
-        $this->assertTrue($this->snap->isServiceJobsOnlyAddition(
-            $this->snap->normalizePublic($before),
-            $this->snap->normalizePublic($after)
-        ));
-        $this->assertFalse($this->snap->isServiceJobsOnlyAddition(
-            $this->snap->normalizePublic('["orders","service_jobs"]'),
-            $this->snap->normalizePublic('["orders","service_jobs"]')
-        ));
-        $this->assertFalse($this->snap->isServiceJobsOnlyAddition(
-            $this->snap->normalizePublic('["orders"]'),
-            $this->snap->normalizePublic('["orders","reports"]')
-        ));
+        DB::table('companies')->insert(['id' => 1, 'name' => 'A', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('users')->insert([
+            'id' => 1, 'company_id' => 1, 'role' => 'user', 'pos_role' => 'pos_cashier',
+            'pos_custom_access' => '["orders"]', 'is_active' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $original = $this->snap->capture();
+        $original['generated_at'] = '2026-09-15T00:00:00+00:00';
+        file_put_contents($this->retainedPath, json_encode($original));
+        $beforeBytes = file_get_contents($this->retainedPath);
+
+        DB::table('users')->where('id', 1)->update(['pos_custom_access' => '["orders","service_jobs"]']);
+        $this->assertSame(1, Artisan::call('pos:settings-snapshot', ['--out' => $this->retainedPath]));
+        $this->assertSame($beforeBytes, file_get_contents($this->retainedPath));
+
+        // Unique per-deploy path still works.
+        $this->assertSame(0, Artisan::call('pos:settings-snapshot', ['--out' => $this->baselinePath]));
+        $this->assertFileExists($this->baselinePath);
+        $this->assertNotSame($beforeBytes, file_get_contents($this->baselinePath));
     }
 
-    public function test_restore_dry_run_exact_write_idempotency_and_ambiguity_refusal(): void
+    public function test_exact_two_service_jobs_only_additions_restore_and_legitimate_grant_remains(): void
     {
         DB::table('companies')->insert([
             ['id' => 1, 'name' => 'A', 'created_at' => now(), 'updated_at' => now()],
@@ -96,42 +112,105 @@ class PosCustomAccessDeployGuardTest extends TestCase
         ]);
 
         $before = $this->snap->capture();
-        file_put_contents($this->baselinePath, json_encode($before));
+        file_put_contents($this->retainedPath, json_encode($before));
 
-        // Simulate the bad migration outcome for users 1 and 3 only.
         DB::table('users')->where('id', 1)->update(['pos_custom_access' => '["orders","service_jobs"]']);
         DB::table('users')->where('id', 3)->update(['pos_custom_access' => '["reports","service_jobs"]']);
-        // User 2 already had service_jobs — unchanged.
 
-        $after = $this->snap->capture();
-        $plan = $this->snap->planProtectedRestore($before, $after);
-        $this->assertTrue($plan['ok']);
-        $this->assertCount(2, $plan['restore']);
-        $this->assertSame([], $plan['refused']);
-
-        $dry = Artisan::call('pos:settings-restore', ['--from' => $this->baselinePath]);
-        $this->assertSame(0, $dry);
-        $this->assertSame('["orders","service_jobs"]', DB::table('users')->where('id', 1)->value('pos_custom_access'));
-
-        $write = Artisan::call('pos:settings-restore', ['--from' => $this->baselinePath, '--write' => true]);
-        $this->assertSame(0, $write);
+        $this->assertSame(0, Artisan::call('pos:settings-restore', ['--from' => $this->retainedPath]));
+        $this->assertSame(0, Artisan::call('pos:settings-restore', [
+            '--from' => $this->retainedPath,
+            '--write' => true,
+        ]));
         $this->assertSame('["orders"]', DB::table('users')->where('id', 1)->value('pos_custom_access'));
         $this->assertSame('["orders","service_jobs"]', DB::table('users')->where('id', 2)->value('pos_custom_access'));
         $this->assertSame('["reports"]', DB::table('users')->where('id', 3)->value('pos_custom_access'));
 
-        // Idempotent second write.
-        $again = Artisan::call('pos:settings-restore', ['--from' => $this->baselinePath, '--write' => true]);
-        $this->assertSame(0, $again);
+        // Idempotent.
+        $this->assertSame(0, Artisan::call('pos:settings-restore', [
+            '--from' => $this->retainedPath,
+            '--write' => true,
+        ]));
+    }
 
-        // Ambiguity: also change role → refuse.
+    public function test_malformed_old_or_ambiguous_baseline_refuses(): void
+    {
+        DB::table('companies')->insert(['id' => 1, 'name' => 'A', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('users')->insert([
+            'id' => 1, 'company_id' => 1, 'role' => 'user', 'pos_role' => 'pos_cashier',
+            'pos_custom_access' => '["orders"]', 'is_active' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        file_put_contents($this->retainedPath, '{"nope":true}');
+        $this->assertSame(1, Artisan::call('pos:settings-restore', ['--from' => $this->retainedPath]));
+        $this->assertFalse($this->snap->isValidSnapshot(json_decode('{"nope":true}', true)));
+
+        $before = $this->snap->capture();
+        file_put_contents($this->retainedPath, json_encode($before));
         DB::table('users')->where('id', 1)->update([
             'pos_custom_access' => '["orders","service_jobs"]',
             'pos_role' => 'pos_manager',
         ]);
-        $poisoned = $this->snap->capture();
-        $badPlan = $this->snap->planProtectedRestore($before, $poisoned);
-        $this->assertFalse($badPlan['ok']);
-        $this->assertSame('ambiguous_or_unsupported_changes', $badPlan['reason']);
+        $this->assertSame(1, Artisan::call('pos:settings-restore', ['--from' => $this->retainedPath]));
+        $this->assertSame('["orders","service_jobs"]', DB::table('users')->where('id', 1)->value('pos_custom_access'));
+    }
+
+    public function test_live_value_changed_after_planning_refuses_write(): void
+    {
+        DB::table('companies')->insert(['id' => 1, 'name' => 'A', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('users')->insert([
+            'id' => 1, 'company_id' => 1, 'role' => 'user', 'pos_role' => 'pos_cashier',
+            'pos_custom_access' => '["orders"]', 'is_active' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $before = $this->snap->capture();
+        file_put_contents($this->retainedPath, json_encode($before));
+        DB::table('users')->where('id', 1)->update(['pos_custom_access' => '["orders","service_jobs"]']);
+        $after = $this->snap->capture();
+        $plan = $this->snap->planProtectedRestore($before, $after);
+        $this->assertTrue($plan['ok']);
+
+        // Race: live moved again after planning.
+        DB::table('users')->where('id', 1)->update(['pos_custom_access' => '["orders","service_jobs","reports"]']);
+        $result = $this->snap->applyProtectedRestore($plan['restore'], dryRun: false);
+        $this->assertSame(0, $result['written']);
+        $this->assertNotEmpty($result['refused']);
+        $this->assertSame('live_value_mismatch', $result['refused'][0]['reason']);
+    }
+
+    public function test_concurrent_per_sha_baselines_do_not_collide_and_clean_removes_only_own(): void
+    {
+        DB::table('companies')->insert(['id' => 1, 'name' => 'A', 'created_at' => now(), 'updated_at' => now()]);
+        $a = $this->baselinesDir.'/before-shaA-111.json';
+        $b = $this->baselinesDir.'/before-shaB-222.json';
+        $this->assertSame(0, Artisan::call('pos:settings-snapshot', ['--out' => $a]));
+        $this->assertSame(0, Artisan::call('pos:settings-snapshot', ['--out' => $b]));
+        $this->assertFileExists($a);
+        $this->assertFileExists($b);
+        $this->assertNotSame(file_get_contents($a), ''); // both exist independently
+        unlink($a); // clean deploy removes only its own
+        $this->assertFileDoesNotExist($a);
+        $this->assertFileExists($b);
+    }
+
+    public function test_deploy_guard_script_never_captures_onto_retained_path(): void
+    {
+        $src = file_get_contents(base_path('scripts/lib/live-remote-apply.sh'));
+        $this->assertStringContainsString('before-${DEPLOY_ID}.json', $src);
+        $this->assertStringContainsString('RETAINED_BASE="${LIVE_SETTINGS_BASE}"', $src);
+        $this->assertStringContainsString('REMOTE_SETTINGS_RETAINED_AMBIGUOUS', $src);
+        $this->assertStringContainsString('exit 89', $src);
+        $this->assertStringContainsString('canonical retained baseline already present — left untouched', $src);
+        $this->assertStringContainsString('temporary deploy baseline removed (clean)', $src);
+        $this->assertStringNotContainsString(
+            'pos:settings-snapshot --out="$LIVE_SETTINGS_BASE"',
+            $src
+        );
+        $this->assertStringNotContainsString(
+            'pos:settings-snapshot --out="$RETAINED_BASE"',
+            $src
+        );
     }
 
     public function test_tenant_company_branch_role_isolation_in_snapshot_diff(): void
@@ -160,19 +239,6 @@ class PosCustomAccessDeployGuardTest extends TestCase
         $this->assertSame('1', $diff['changed'][0]['row']);
         $this->assertSame('1', $diff['changed'][0]['company_id']);
         $this->assertSame('["orders"]', DB::table('users')->where('id', 2)->value('pos_custom_access'));
-    }
-
-    public function test_deploy_guard_script_auto_restores_then_keeps_fail_closed_marker(): void
-    {
-        $src = file_get_contents(base_path('scripts/lib/live-remote-apply.sh'));
-        $this->assertStringContainsString('pos:settings-restore --from="$SETTINGS_BASE" --write', $src);
-        $this->assertStringContainsString('REMOTE_SETTINGS_RESTORED', $src);
-        $this->assertStringContainsString('REMOTE_SETTINGS_REGRESSION', $src);
-        $this->assertStringContainsString('settings baseline retained', $src);
-        $this->assertDoesNotMatchRegularExpression(
-            '/REMOTE_SETTINGS_REGRESSION[\s\S]{0,80}rm -f "\$SETTINGS_BASE"/',
-            $src
-        );
     }
 
     private function schema(): void

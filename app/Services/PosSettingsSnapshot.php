@@ -314,6 +314,37 @@ class PosSettingsSnapshot
     }
 
     /**
+     * True when $payload looks like a PosSettingsSnapshot capture (never logs values).
+     */
+    public function isValidSnapshot(mixed $payload): bool
+    {
+        if (! is_array($payload)) {
+            return false;
+        }
+        if (! isset($payload['tables']) || ! is_array($payload['tables'])) {
+            return false;
+        }
+        if (! isset($payload['generated_at']) || ! is_string($payload['generated_at']) || $payload['generated_at'] === '') {
+            return false;
+        }
+        foreach ($payload['tables'] as $table => $rows) {
+            if (! is_string($table) || $table === '' || ! is_array($rows)) {
+                return false;
+            }
+            foreach ($rows as $key => $row) {
+                if (! is_string($key) && ! is_int($key)) {
+                    return false;
+                }
+                if (! is_array($row)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * SHA-256 of a normalized setting value (never log the raw customer value).
      */
     public function valueHash(?string $normalized): string

@@ -40,8 +40,8 @@ class PosSettingsRestoreCommand extends Command
         }
 
         $before = json_decode((string) file_get_contents($from), true);
-        if (! is_array($before) || ! isset($before['tables'])) {
-            $this->error('Not a settings snapshot baseline.');
+        if (! $snapshots->isValidSnapshot($before)) {
+            $this->error('Not a genuine settings snapshot baseline — refusing.');
 
             return self::FAILURE;
         }

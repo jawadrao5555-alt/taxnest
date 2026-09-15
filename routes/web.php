@@ -1125,6 +1125,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/guests', [HotelController::class, 'guests'])->name('pos.hotel.guests');
         Route::get('/folios', [HotelController::class, 'folios'])->name('pos.hotel.folios');
         Route::get('/reports', [HotelController::class, 'reports'])->name('pos.hotel.reports');
+        // Separated Restaurant Outlet (saved restaurant_mode ON only).
+        Route::get('/restaurant', [HotelController::class, 'restaurantOutlet'])->name('pos.hotel.restaurant-outlet');
+        Route::get('/restaurant/exit', [HotelController::class, 'leaveRestaurantOutlet'])->name('pos.hotel.restaurant-outlet.exit');
         Route::get('/rooms', [HotelController::class, 'rooms'])->name('pos.hotel.rooms');
         Route::post('/rooms/{id}/housekeeping', [HotelController::class, 'housekeeping'])->whereNumber('id')->name('pos.hotel.rooms.housekeeping');
         Route::post('/rooms/{id}/service', [HotelController::class, 'serviceState'])->whereNumber('id')->name('pos.hotel.rooms.service');

@@ -3007,6 +3007,21 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
 
         $user = auth('pos')->user();
+
+        // Hotel / Guest House: restaurant dashboard must not replace Front Desk.
+        // Outlet staff without Hotel tick go to the sale engine instead.
+        if (\App\Services\HotelShell::isNativeCategory($company)) {
+            if (\App\Services\HotelAccessService::canFrontDesk($user)) {
+                return redirect()->route('pos.hotel.dashboard');
+            }
+            if (\App\Services\HotelShell::canOpenRestaurantOutlet($user, $company)) {
+                return redirect()->route('pos.hotel.restaurant-outlet');
+            }
+            if (\App\Services\HotelAccessService::canHousekeeping($user)) {
+                return redirect()->route('pos.hotel.housekeeping');
+            }
+        }
+
         // Admin/manager/owner ONLY — cashiers (and every other role) are
         // redirected to the sale screen, so the company-wide figures below are
         // never exposed to an isolated cashier (Task 1197): no per-cashier

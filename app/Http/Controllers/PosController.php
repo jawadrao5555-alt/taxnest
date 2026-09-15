@@ -1669,6 +1669,21 @@ class PosController extends Controller
             return redirect()->route('pos.features', ['welcome' => 1]);
         }
 
+        // Hotel / Guest House native shell: never land on generic/restaurant POS
+        // home — even when restaurant_mode is already saved ON.
+        $dashUser = auth('pos')->user();
+        if (\App\Services\HotelShell::isNativeCategory($company)) {
+            if (\App\Services\HotelAccessService::canFrontDesk($dashUser)) {
+                return redirect()->route('pos.hotel.dashboard');
+            }
+            if (\App\Services\HotelAccessService::canHousekeeping($dashUser)) {
+                return redirect()->route('pos.hotel.housekeeping');
+            }
+            if (\App\Services\HotelShell::canOpenRestaurantOutlet($dashUser, $company)) {
+                return redirect()->route('pos.hotel.restaurant-outlet');
+            }
+        }
+
         // Business day (owner rule 26 Jul 2026): dashboard "today" = the OPEN
         // trading day — after midnight (before 6 AM) with yesterday un-closed,
         // "aaj" is still yesterday's business day. All day-bucket KPIs read
@@ -2512,6 +2527,24 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        // Hotel shell: generic New Sale is not the Hotel home. When restaurant
+        // outlet is OFF, refuse the sale URL. When ON, mark outlet context so
+        // the sale screen shows Back to Front Desk.
+        if (\App\Services\HotelShell::isNativeCategory($company)) {
+            $user = auth('pos')->user();
+            if (!\App\Services\HotelShell::restaurantOutletOn($company)
+                || !\App\Services\HotelShell::canOpenRestaurantOutlet($user, $company)) {
+                $home = \App\Services\HotelAccessService::canFrontDesk($user)
+                    ? route('pos.hotel.dashboard')
+                    : (\App\Services\HotelAccessService::canHousekeeping($user)
+                        ? route('pos.hotel.housekeeping')
+                        : route('pos.dashboard'));
+
+                return redirect($home)->with('error', __('pos.hotel_restaurant_outlet_off'));
+            }
+            \App\Services\HotelShell::enterRestaurantOutlet();
+        }
+
         \Log::info('POS MODE ACTIVE', [
             'company_id' => $company?->id,
             'mode' => 'UNIVERSAL',
@@ -2571,6 +2604,22 @@ class PosController extends Controller
         // First-time POS admins are guided through the setup wizard before billing.
         if ($this->needsPosSetup($company)) {
             return redirect()->route('pos.features', ['welcome' => 1]);
+        }
+
+        // Same Hotel outlet gate as createInvoice (covers /pos/v2/invoice/create).
+        if (\App\Services\HotelShell::isNativeCategory($company)) {
+            $user = auth('pos')->user();
+            if (!\App\Services\HotelShell::restaurantOutletOn($company)
+                || !\App\Services\HotelShell::canOpenRestaurantOutlet($user, $company)) {
+                $home = \App\Services\HotelAccessService::canFrontDesk($user)
+                    ? route('pos.hotel.dashboard')
+                    : (\App\Services\HotelAccessService::canHousekeeping($user)
+                        ? route('pos.hotel.housekeeping')
+                        : route('pos.dashboard'));
+
+                return redirect($home)->with('error', __('pos.hotel_restaurant_outlet_off'));
+            }
+            \App\Services\HotelShell::enterRestaurantOutlet();
         }
 
         $features = PosFeatureService::forCompany($company);

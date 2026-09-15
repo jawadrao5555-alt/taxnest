@@ -29,7 +29,16 @@
     $posFeaturesLayout = \App\Services\PosFeatureService::forCompany($companyLayout);
     $hideHotelGenericSale = \App\Services\HotelShell::hideGenericSale($companyLayout);
     $hotelNativeLayout = \App\Services\HotelShell::isNativeCategory($companyLayout);
+    $hotelRestaurantOutletOn = \App\Services\HotelShell::restaurantOutletOn($companyLayout);
+    $hotelCanRestaurantOutlet = \App\Services\HotelShell::canOpenRestaurantOutlet($posUserLayout, $companyLayout);
+    $hotelInRestaurantOutlet = $hotelRestaurantOutletOn && (
+        \App\Services\HotelShell::inRestaurantOutlet()
+        || request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create', 'pos.hotel.restaurant-outlet')
+    );
     $hotelHomeUrl = \App\Services\HotelShell::panelHomeUrl($posUserLayout, $companyLayout, $isRestaurantLayout);
+    // Generic Products catalog stays out of Hotel primary chrome; managers still
+    // reach inventory via Settings / authorized inventory screens.
+    $hideHotelGenericProducts = $hotelNativeLayout && !$hotelInRestaurantOutlet;
     // POS Team Custom Access (Task #111): optional per-member feature grants.
     // $posNavCan('feature', $roleDefault) — no custom set → role default
     // (existing behavior, zero change for existing shops); custom set →
@@ -566,11 +575,16 @@
                             <a href="{{ route('pos.transactions') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') ? 'active text-white' : 'text-white' }}">{{ __('pos.nav_bills') }}</a>
                             @endif
-                            @if($posNavCan('products'))
+                            @if($posNavCan('products') && !$hideHotelGenericProducts)
                             <a href="{{ route('pos.products') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.products') ? 'active text-white' : 'text-white' }}">{{ __('pos.products_word') }}</a>
                             @endif
-                            @if($dealsNavVisible)
+                            @if($hotelNativeLayout && $hotelRestaurantOutletOn && $hotelCanRestaurantOutlet)
+                            <a href="{{ route('pos.hotel.restaurant-outlet') }}"
+                               data-hotel-restaurant-outlet="1"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white {{ $hotelInRestaurantOutlet ? 'active' : '' }}">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
+                            @endif
+                            @if($dealsNavVisible && !$hotelNativeLayout)
                             <a href="{{ route('pos.deals') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.deals*') ? 'active text-white' : 'text-white' }}">{{ __('pos.deals_title') }}</a>
                             @endif
@@ -809,13 +823,13 @@
                                         {{ __('pos.nav_orders') }}
                                     </a>
                                     @endif
-                                    @if($posNavCan('products'))
+                                    @if($posNavCan('products') && !$hideHotelGenericProducts)
                                     <a href="{{ route('pos.products') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                         {{ __('pos.products_word') }}
                                     </a>
                                     @endif
-                                    @if($dealsNavVisible)
+                                    @if($dealsNavVisible && !$hotelNativeLayout)
                                     <a href="{{ route('pos.deals') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7m16 0H4m16 0a2 2 0 100-4h-5.5M4 12a2 2 0 110-4h5.5M12 8v13m0-13H9.5A2.5 2.5 0 1112 5.5V8zm0 0h2.5A2.5 2.5 0 1012 5.5V8z"/></svg>
                                         {{ __('pos.deals_title') }}
@@ -843,6 +857,9 @@
                                     <a href="{{ route('pos.hotel.folios') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_folios') }}</a>
                                     <a href="{{ route('pos.hotel.reports') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_reports') }}</a>
                                     @endif
+                                    @if($hotelRestaurantOutletOn && $hotelCanRestaurantOutlet)
+                                    <a href="{{ route('pos.hotel.restaurant-outlet') }}" data-hotel-restaurant-outlet="1" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-amber-800 dark:text-amber-300">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
+                                    @endif
                                     @else
                                     <a href="{{ $posNavCan('hotel') ? route('pos.hotel.dashboard') : route('pos.hotel.rooms') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 21V8l9-5 9 5v13M9 21v-6h6v6"/></svg>
@@ -850,6 +867,7 @@
                                     </a>
                                     @endif
                                     @endif
+                                    @if(!$hotelNativeLayout || $hotelInRestaurantOutlet)
                                     @if($posFeaturesLayout->tables && $posNavCan('tables', !$isCashierLayout))
                                     <a href="{{ route('pos.restaurant.tables') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -862,14 +880,15 @@
                                         {{ __('pos.nav_kitchen_display') }}
                                     </a>
                                     @endif
+                                    @endif
                                     {{-- Delivery Riders (Jul 2026): board visible to cashiers too (they receive rider cash); Riders CRUD admin-only. Plan gate: Pro+ (Aug 2026 matrix). --}}
-                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('deliveries'))
+                                    @if((!$hotelNativeLayout || $hotelInRestaurantOutlet) && !empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('deliveries'))
                                     <a href="{{ route('pos.deliveries') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
                                         {{ __('pos.nav_deliveries') }}
                                     </a>
                                     @endif
-                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('riders', !$isCashierLayout))
+                                    @if((!$hotelNativeLayout || $hotelInRestaurantOutlet) && !empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('riders', !$isCashierLayout))
                                     <a href="{{ route('pos.riders') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                         {{ __('pos.nav_riders') }}
@@ -877,7 +896,7 @@
                                     @endif
                                     {{-- Rider LIVE Tracking (Aug 2026): shown to admins whenever riders area exists;
                                          plan-locked companies land on the Unlimited upgrade card (deliberate upsell). --}}
-                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('riders', !$isCashierLayout))
+                                    @if((!$hotelNativeLayout || $hotelInRestaurantOutlet) && !empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('riders', !$isCashierLayout))
                                     <a href="{{ route('pos.riders.tracking') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         {{ __('pos.nav_rider_tracking') }}
@@ -1070,10 +1089,13 @@
                     @if($posNavCan('orders'))
                     <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_bills') }}</a>
                     @endif
-                    @if($posNavCan('products'))
+                    @if($posNavCan('products') && !$hideHotelGenericProducts)
                     <a href="{{ route('pos.products') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.products_word') }}</a>
                     @endif
-                    @if($dealsNavVisible)
+                    @if($hotelNativeLayout && $hotelRestaurantOutletOn && $hotelCanRestaurantOutlet)
+                    <a href="{{ route('pos.hotel.restaurant-outlet') }}" data-hotel-restaurant-outlet="1" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
+                    @endif
+                    @if($dealsNavVisible && !$hotelNativeLayout)
                     <a href="{{ route('pos.deals') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.deals_title') }}</a>
                     @endif
                     @if($posNavCan('reports'))
@@ -1158,6 +1180,13 @@
                  on phones. Full-height screens (sale, KDS, waiter) opt out — they
                  never scroll to an end and padding would eat working area. --}}
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade @unless(request()->is('*invoice/create') || request()->is('*kds*') || request()->is('*waiter*') || request()->is('*riders/tracking*')) tn-fab-pad @endunless" style="min-width: 0;">
+                @if($hotelInRestaurantOutlet && \App\Services\HotelAccessService::canFrontDesk($posUserLayout))
+                <div class="flex-shrink-0 bg-teal-800 text-white px-3 sm:px-5 py-2 flex items-center justify-between gap-3" data-hotel-back-front-desk="1">
+                    <span class="text-[12px] sm:text-[13px] font-semibold truncate">{{ __('pos.hotel_restaurant_outlet_banner') }}</span>
+                    <a href="{{ route('pos.hotel.restaurant-outlet.exit') }}"
+                       class="flex-shrink-0 px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-[12px] font-extrabold whitespace-nowrap">{{ __('pos.hotel_back_front_desk') }}</a>
+                </div>
+                @endif
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts" />
@@ -1197,10 +1226,11 @@
                 idx: 0,
                 items: @js(array_values(array_filter([
                     $hideHotelGenericSale ? null : ['label' => __('pos.new_sale'), 'url' => route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
+                    ($hotelNativeLayout && $hotelRestaurantOutletOn && $hotelCanRestaurantOutlet) ? ['label' => __('pos.nav_hotel_restaurant_outlet'), 'url' => route('pos.hotel.restaurant-outlet'), 'icon' => '◎', 'kbd' => ''] : null,
                     $posNavCan('dashboard') ? ['label' => __('pos.dashboard'), 'url' => $hotelHomeUrl, 'icon' => '◧', 'kbd' => ''] : null,
                     $posNavCan('orders') ? ['label' => __('pos.nav_orders_transactions'), 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''] : null,
-                    $posNavCan('products') ? ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''] : null,
-                    $dealsNavVisible ? ['label' => __('pos.deals_title'), 'url' => route('pos.deals'), 'icon' => '◇', 'kbd' => ''] : null,
+                    ($posNavCan('products') && !$hideHotelGenericProducts) ? ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''] : null,
+                    ($dealsNavVisible && !$hotelNativeLayout) ? ['label' => __('pos.deals_title'), 'url' => route('pos.deals'), 'icon' => '◇', 'kbd' => ''] : null,
                     $posNavCan('customers') ? ['label' => __('pos.nav_customers'), 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''] : null,
                     (!empty($posFeaturesLayout->rooms) && ($posNavCan('hotel') || $posNavCan('hotel_housekeeping'))) ? ['label' => $posNavCan('hotel') ? __('pos.nav_hotel') : __('pos.nav_hotel_rooms'), 'url' => $posNavCan('hotel') ? route('pos.hotel.dashboard') : route('pos.hotel.rooms'), 'icon' => '⌂', 'kbd' => ''] : null,
                     $posNavCan('reports') ? ['label' => __('pos.reports'), 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''] : null,

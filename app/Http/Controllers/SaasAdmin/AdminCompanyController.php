@@ -626,8 +626,11 @@ class AdminCompanyController extends Controller
             ]
         );
 
+        // NestPOS Hotel / Guest House: Manage/View as Company must open the
+        // Front Desk shell (or housekeeping board), never generic POS home —
+        // even when the company already saved restaurant_mode ON.
         $dashboard = match (true) {
-            $guard === 'pos' => '/pos/dashboard',
+            $guard === 'pos' => \App\Services\HotelShell::postLoginPath($user),
             $guard === 'fbrpos' => '/fbr-pos/dashboard',
             $erpsVertical !== null => \App\Support\NestErps::dashboardPath($erpsVertical),
             default => '/dashboard',

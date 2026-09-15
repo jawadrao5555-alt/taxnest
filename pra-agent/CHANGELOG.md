@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.5 (2026-09-15)
+**Release-chain safety update — existing tag kabhi overwrite nahi hoga**
+
+- Protected Agent build inputs badalne ke baad naya immutable release version use hota hai; purana `v1.13.4` tag move, overwrite ya recreate nahi hota.
+- Agent runtime, PRA/FBR submission, printing, offline mode, company/device isolation aur saved settings ka behavior unchanged hai.
+- Yeh release PR #75 ke hardened build workflow ko package karta hai; koi customer configuration migration nahi hai.
+
 ## v1.13.3 (2026-09-09)
 **Receipt foran queue ho, aur missed realtime wake par bhi chand seconds mein uth jaye**
 

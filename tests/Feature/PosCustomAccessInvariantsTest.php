@@ -419,6 +419,11 @@ class PosCustomAccessInvariantsTest extends TestCase
         'inventory',
         'customize',
         'team',
+        // service_jobs is category-native work orders: existing Custom Access
+        // sets stay exactly as the shop saved them. Grant only via role-default
+        // (NULL set) relevance, new-company defaults, or explicit Team edits —
+        // never a global migration rewrite (PR #72 deploy regression).
+        'service_jobs',
     ];
 
     public function test_every_new_feature_key_ships_with_a_working_backfill_migration(): void

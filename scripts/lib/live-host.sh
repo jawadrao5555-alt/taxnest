@@ -46,7 +46,13 @@ LIVE_URL="${LIVE_URL:-https://taxnest.pk}"
 LIVE_STATE_DIR="${LIVE_STATE_DIR:-/home/${LIVE_SSH_USER}}"
 LIVE_DEPLOY_LOCK="${LIVE_DEPLOY_LOCK:-${LIVE_STATE_DIR}/.taxnest-deploy.lock}"
 LIVE_DEPLOY_MARKER="${LIVE_DEPLOY_MARKER:-${LIVE_STATE_DIR}/.taxnest-last-deploy-marker}"
+# Canonical retained forensic baseline from a FAILED settings-regression deploy.
+# NEVER overwritten by a later normal capture (see live-remote-apply.sh).
 LIVE_SETTINGS_BASE="${LIVE_SETTINGS_BASE:-${LIVE_STATE_DIR}/.taxnest-settings-before.json}"
+# Per-deploy immutable baselines (unique names; safe concurrent deploys under flock).
+LIVE_SETTINGS_BASELINES_DIR="${LIVE_SETTINGS_BASELINES_DIR:-${LIVE_STATE_DIR}/.taxnest-settings-baselines}"
+# Archived forensic copies kept after restore verification (or new regressions).
+LIVE_SETTINGS_RETAINED_DIR="${LIVE_SETTINGS_RETAINED_DIR:-${LIVE_STATE_DIR}/.taxnest-settings-retained}"
 
 # --------------------------------------------------------------------- ssh
 LIVE_SSH_OPTS=(-i "$LIVE_SSH_KEY" -p "$LIVE_SSH_PORT" -o BatchMode=yes

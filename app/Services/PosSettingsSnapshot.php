@@ -314,6 +314,261 @@ class PosSettingsSnapshot
     }
 
     /**
+     * True when $payload looks like a PosSettingsSnapshot capture (never logs values).
+     */
+    public function isValidSnapshot(mixed $payload): bool
+    {
+        if (! is_array($payload)) {
+            return false;
+        }
+        if (! isset($payload['tables']) || ! is_array($payload['tables'])) {
+            return false;
+        }
+        if (! isset($payload['generated_at']) || ! is_string($payload['generated_at']) || $payload['generated_at'] === '') {
+            return false;
+        }
+        foreach ($payload['tables'] as $table => $rows) {
+            if (! is_string($table) || $table === '' || ! is_array($rows)) {
+                return false;
+            }
+            foreach ($rows as $key => $row) {
+                if (! is_string($key) && ! is_int($key)) {
+                    return false;
+                }
+                if (! is_array($row)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * SHA-256 of a normalized setting value (never log the raw customer value).
+     */
+    public function valueHash(?string $normalized): string
+    {
+        return hash('sha256', $normalized === null ? "\0" : $normalized);
+    }
+
+    /**
+     * True when AFTER is exactly BEFORE plus the single grant `service_jobs`
+     * (order-insensitive JSON arrays). Legitimate pre-existing service_jobs
+     * rows return false so they are never stripped.
+     */
+    public function isServiceJobsOnlyAddition(?string $before, ?string $after): bool
+    {
+        $b = $this->decodeFeatureList($before);
+        $a = $this->decodeFeatureList($after);
+        if ($b === null || $a === null) {
+            return false;
+        }
+        if (in_array('service_jobs', $b, true)) {
+            return false;
+        }
+        if (! in_array('service_jobs', $a, true)) {
+            return false;
+        }
+        $without = array_values(array_filter($a, fn ($k) => $k !== 'service_jobs'));
+        sort($b);
+        sort($without);
+
+        return $b === $without;
+    }
+
+    /**
+     * Plan a safe restore from a pre-deploy baseline.
+     *
+     * Only restores users.pos_custom_access rows where:
+     *  - the baseline→current delta is exactly a service_jobs append, and
+     *  - the live value still matches the post-deploy (after) hash.
+     *
+     * Any other changed column/row is refused as ambiguous.
+     *
+     * @return array{
+     *   ok:bool,
+     *   reason:?string,
+     *   restore:list<array{table:string,row:string,column:string,before_hash:string,after_hash:string}>,
+     *   refused:list<array{table:string,row:string,column:string,reason:string}>
+     * }
+     */
+    public function planProtectedRestore(array $before, array $after): array
+    {
+        $diff = $this->diff($before, $after);
+        $restore = [];
+        $refused = [];
+
+        foreach ($diff['changed'] as $finding) {
+            $table = (string) $finding['table'];
+            $column = (string) $finding['column'];
+            $row = (string) $finding['row'];
+            $beforeVal = $finding['before'] ?? null;
+            $afterVal = $finding['after'] ?? null;
+
+            if ($table !== 'users' || $column !== 'pos_custom_access') {
+                $refused[] = [
+                    'table' => $table,
+                    'row' => $row,
+                    'column' => $column,
+                    'reason' => 'unsupported_column',
+                ];
+                continue;
+            }
+            if (! $this->isServiceJobsOnlyAddition(
+                is_string($beforeVal) || $beforeVal === null ? $beforeVal : null,
+                is_string($afterVal) || $afterVal === null ? $afterVal : null
+            )) {
+                $refused[] = [
+                    'table' => $table,
+                    'row' => $row,
+                    'column' => $column,
+                    'reason' => 'not_service_jobs_only_addition',
+                ];
+                continue;
+            }
+            $restore[] = [
+                'table' => $table,
+                'row' => $row,
+                'column' => $column,
+                'before_hash' => $this->valueHash(is_string($beforeVal) ? $beforeVal : null),
+                'after_hash' => $this->valueHash(is_string($afterVal) ? $afterVal : null),
+                'before' => $beforeVal,
+            ];
+        }
+
+        if ($diff['dropped_tables'] !== [] || $diff['dropped_columns'] !== []) {
+            return [
+                'ok' => false,
+                'reason' => 'destructive_schema_change',
+                'restore' => [],
+                'refused' => $refused,
+            ];
+        }
+
+        if ($refused !== []) {
+            return [
+                'ok' => false,
+                'reason' => 'ambiguous_or_unsupported_changes',
+                'restore' => $restore,
+                'refused' => $refused,
+            ];
+        }
+
+        if ($restore === []) {
+            return [
+                'ok' => true,
+                'reason' => 'already_clean',
+                'restore' => [],
+                'refused' => [],
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'reason' => null,
+            'restore' => $restore,
+            'refused' => [],
+        ];
+    }
+
+    /**
+     * Apply a previously planned restore. Verifies the live cell still matches
+     * the expected after-hash before writing the baseline value.
+     *
+     * @param  list<array{table:string,row:string,column:string,before_hash:string,after_hash:string,before:mixed}>  $items
+     * @return array{written:int,skipped:int,refused:list<array{row:string,reason:string}>}
+     */
+    public function applyProtectedRestore(array $items, bool $dryRun = true): array
+    {
+        $written = 0;
+        $skipped = 0;
+        $refused = [];
+
+        foreach ($items as $item) {
+            if (($item['table'] ?? '') !== 'users' || ($item['column'] ?? '') !== 'pos_custom_access') {
+                $refused[] = ['row' => (string) ($item['row'] ?? ''), 'reason' => 'unsupported_column'];
+                continue;
+            }
+            if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'pos_custom_access')) {
+                $refused[] = ['row' => (string) $item['row'], 'reason' => 'schema_missing'];
+                continue;
+            }
+
+            $row = DB::table('users')->where('id', $item['row'])->select('id', 'pos_custom_access')->first();
+            if (! $row) {
+                $refused[] = ['row' => (string) $item['row'], 'reason' => 'row_missing'];
+                continue;
+            }
+
+            $liveNorm = $this->normalizePublic($row->pos_custom_access);
+            $liveHash = $this->valueHash($liveNorm);
+            $beforeNorm = is_string($item['before'] ?? null) || ($item['before'] ?? null) === null
+                ? $this->normalizePublic($item['before'] ?? null)
+                : null;
+
+            if ($liveHash === ($item['before_hash'] ?? '')) {
+                $skipped++;
+                continue; // already restored / never changed
+            }
+            if ($liveHash !== ($item['after_hash'] ?? '')) {
+                $refused[] = ['row' => (string) $item['row'], 'reason' => 'live_value_mismatch'];
+                continue;
+            }
+            if ($this->valueHash($beforeNorm) !== ($item['before_hash'] ?? '')) {
+                $refused[] = ['row' => (string) $item['row'], 'reason' => 'baseline_hash_mismatch'];
+                continue;
+            }
+            if (! $this->isServiceJobsOnlyAddition($beforeNorm, $liveNorm)) {
+                $refused[] = ['row' => (string) $item['row'], 'reason' => 'not_service_jobs_only_addition'];
+                continue;
+            }
+
+            if (! $dryRun) {
+                // Persist the exact baseline bytes when they were a JSON string;
+                // otherwise encode the decoded list stably.
+                $write = $item['before'];
+                if (is_array($write)) {
+                    $write = json_encode(array_values($write));
+                }
+                DB::table('users')->where('id', $item['row'])->update([
+                    'pos_custom_access' => $write,
+                ]);
+            }
+            $written++;
+        }
+
+        return compact('written', 'skipped', 'refused');
+    }
+
+    /** @return list<string>|null */
+    private function decodeFeatureList(?string $normalized): ?array
+    {
+        if ($normalized === null) {
+            return null;
+        }
+        $decoded = json_decode($normalized, true);
+        if (! is_array($decoded)) {
+            return null;
+        }
+        $out = [];
+        foreach ($decoded as $key) {
+            if (! is_string($key)) {
+                return null;
+            }
+            $out[] = $key;
+        }
+
+        return $out;
+    }
+
+    /** Expose normalize for restore hash checks without duplicating JSON rules. */
+    public function normalizePublic(mixed $value): ?string
+    {
+        return $this->normalize($value);
+    }
+
+    /**
      * Values are compared as strings so a driver difference can never be
      * mistaken for a settings change. Live PDO hands back non-cast integer
      * columns as strings while dev hands back ints — comparing raw would report

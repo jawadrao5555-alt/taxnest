@@ -40,7 +40,10 @@ remote_apply() {
   timeout 900 ssh "${SSH_OPTS[@]}" "$HOST" \
     "LIVE_DIR='$LIVE_DIR' LIVE_PHP='$LIVE_PHP' LIVE_WEB_GROUP='$LIVE_WEB_GROUP' \
      LIVE_FPM_SERVICE='$LIVE_FPM_SERVICE' LIVE_QUEUE_SERVICE='$LIVE_QUEUE_SERVICE' \
-     LIVE_SETTINGS_BASE='$LIVE_SETTINGS_BASE' LIVE_SSH_USER='$LIVE_SSH_USER' \
+     LIVE_SETTINGS_BASE='$LIVE_SETTINGS_BASE' \
+     LIVE_SETTINGS_BASELINES_DIR='$LIVE_SETTINGS_BASELINES_DIR' \
+     LIVE_SETTINGS_RETAINED_DIR='$LIVE_SETTINGS_RETAINED_DIR' \
+     LIVE_SSH_USER='$LIVE_SSH_USER' \
      flock -w 300 $DEPLOY_LOCK bash -s -- $DO_PULL $DO_COMPOSER $DO_MIGRATE '${ALLOW_SETTINGS:-}' '${TARGET_SHA}'" <<'REMOTE'
 set -u
 DO_PULL=$1; DO_COMPOSER=$2; DO_MIGRATE=$3; ALLOW_SETTINGS=${4:-}; TARGET_SHA=${5:-}
@@ -106,21 +109,26 @@ if [ "$DO_COMPOSER" = 1 ]; then
   echo "REMOTE_STEP: composer install"
   composer install --no-interaction --prefer-dist --no-dev 2>&1 || exit 92
 fi
-# Settings baseline BEFORE any migration touches a column. Taken on the code
-# that is already live, so it reflects what the shops actually had. Never fatal:
-# a host that cannot snapshot must still be able to deploy a hotfix.
-SETTINGS_BASE="$LIVE_SETTINGS_BASE"
-SETTINGS_BASE_OK=0
-if $PHP artisan pos:settings-snapshot --out="$SETTINGS_BASE" >/dev/null 2>&1; then
-  SETTINGS_BASE_OK=1
-  echo "REMOTE_STEP: settings baseline captured"
-else
-  # Not a remote exit code (the site is mid-maintenance and the release itself
-  # is fine), but the deploy is NOT clean: nothing is watching the settings this
-  # time. The local script turns this marker into a loud failure.
-  echo "REMOTE_SETTINGS_BASELINE_FAILED"
-  echo "REMOTE_STEP: WARNING could not capture the settings baseline — regression guard is DISARMED for this deploy"
-fi
+
+# Settings baselines — shared helpers from the checked-out tree.
+# LIVE_SETTINGS_BASE is the RETAINED forensic file and must never be used as
+# a capture --out target.
+LIVE_SETTINGS_BASELINES_DIR="${LIVE_SETTINGS_BASELINES_DIR:-$(dirname "$LIVE_SETTINGS_BASE")/.taxnest-settings-baselines}"
+LIVE_SETTINGS_RETAINED_DIR="${LIVE_SETTINGS_RETAINED_DIR:-$(dirname "$LIVE_SETTINGS_BASE")/.taxnest-settings-retained}"
+# shellcheck disable=SC1091
+. "$LIVE_DIR/scripts/lib/settings-baseline.sh" || exit 88
+SETTINGS_ARTISAN="$PHP artisan"
+settings_baseline_init_dirs || exit 88
+DEPLOY_ID="$(settings_baseline_deploy_id "${TARGET_SHA:-refresh}")"
+HR=0
+settings_baseline_handle_retained "$DEPLOY_ID" || HR=$?
+[ "$HR" -eq 0 ] || exit "$HR"
+CR=0
+settings_baseline_capture "$DEPLOY_ID" || CR=$?
+case "$CR" in
+  0) ;;
+  *) exit "$CR" ;;
+esac
 
 if [ "$DO_MIGRATE" = 1 ]; then
   echo "REMOTE_STEP: migrate --force"
@@ -186,22 +194,10 @@ fi
 echo "REMOTE_STEP: artisan up"
 $PHP artisan up 2>&1 || exit 97
 
-# Settings-regression check, AFTER the site is back up. Deliberately not a
-# remote exit code: the release already shipped, and dropping the shops back
-# into maintenance would punish them for our bug. Instead it prints a marker
-# the local script turns into a loud DEPLOY FAILED, so a human must look.
-if [ "$SETTINGS_BASE_OK" = 1 ]; then
-  echo "REMOTE_STEP: settings regression check"
-  if [ -n "$ALLOW_SETTINGS" ]; then
-    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" --allow="$ALLOW_SETTINGS" 2>&1)
-  else
-    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" 2>&1)
-  fi
-  SET_RC=$?
-  echo "$SET_OUT"
-  [ "$SET_RC" = 0 ] || echo "REMOTE_SETTINGS_REGRESSION"
-  rm -f "$SETTINGS_BASE"
-fi
+# Settings-regression check after the site is up. Markers drive fail-closed
+# locally; the remote process still exits 0 so shops are not left in maintenance
+# for a settings bug after code already shipped.
+settings_baseline_post_check "$DEPLOY_ID" "${ALLOW_SETTINGS:-}"
 
 echo "REMOTE_DONE"
 exit 0
@@ -210,6 +206,8 @@ REMOTE
 
 apply_fail_reason() {
   case "$1" in
+    88) echo "could not create settings baseline directories on live — SITE LEFT IN MAINTENANCE" ;;
+    89) echo "retained settings baseline could not be safely restored (ambiguous/unsupported) — SITE LEFT IN MAINTENANCE; retained file was NOT overwritten" ;;
     90) echo "cd to live dir failed" ;;
     91) echo "git fetch/checkout of target SHA failed on live — SITE LEFT IN MAINTENANCE (fix, then 'php artisan up' on live)" ;;
     92) echo "composer install failed on live — SITE LEFT IN MAINTENANCE" ;;

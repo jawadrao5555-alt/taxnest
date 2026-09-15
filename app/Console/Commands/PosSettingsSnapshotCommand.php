@@ -12,13 +12,12 @@ use Illuminate\Console\Command;
  *
  * Usage around a deploy:
  *
- *   php artisan pos:settings-snapshot --out=storage/app/settings-before.json
+ *   php artisan pos:settings-snapshot --out=/path/to/unique-before.json
  *   ... deploy + migrate ...
- *   php artisan pos:settings-snapshot --compare=storage/app/settings-before.json
+ *   php artisan pos:settings-snapshot --compare=/path/to/unique-before.json
  *
- * Exit code 1 means at least one EXISTING row's EXISTING setting changed.
- * Intentional changes are declared with --allow=column1,column2 so the deploy
- * still passes while every undeclared change stays fatal.
+ * --out refuses to overwrite an existing file unless --force is passed. Deploy
+ * tooling must never --force onto the retained forensic baseline path.
  */
 class PosSettingsSnapshotCommand extends Command
 {
@@ -27,7 +26,8 @@ class PosSettingsSnapshotCommand extends Command
         {--compare= : Compare the CURRENT state against this saved snapshot}
         {--company= : Limit to a single company id}
         {--allow= : Comma-separated column names whose change is expected}
-        {--limit=40 : Max individual findings to print}';
+        {--limit=40 : Max individual findings to print}
+        {--force : Allow overwriting an existing --out file (deploy tooling must not use this on retained baselines)}';
 
     protected $description = 'Capture or verify a snapshot of every company setting, branch value, staff permission and saved preference, so a deploy cannot silently reset one.';
 
@@ -41,7 +41,7 @@ class PosSettingsSnapshotCommand extends Command
 
         $comparePath = $this->option('compare');
         if ($comparePath === null) {
-            return $this->write($current, $rowCount, $tableList);
+            return $this->write($snapshots, $current, $rowCount, $tableList);
         }
 
         if (! is_file($comparePath)) {
@@ -51,7 +51,7 @@ class PosSettingsSnapshotCommand extends Command
         }
 
         $before = json_decode((string) file_get_contents($comparePath), true);
-        if (! is_array($before) || ! isset($before['tables'])) {
+        if (! $snapshots->isValidSnapshot($before)) {
             $this->error("Not a settings snapshot: {$comparePath}");
 
             return self::FAILURE;
@@ -77,9 +77,6 @@ class PosSettingsSnapshotCommand extends Command
             $this->line('  ~ ' . count($diff['allowed']) . ' declared change(s) via --allow');
         }
 
-        // A dropped settings column or table destroys every shop's value in it.
-        // That is data loss, not a diff — it is fatal on its own, and --allow
-        // cannot wave it through.
         $destructive = false;
         foreach ($diff['dropped_tables'] as $table) {
             $this->error("  ✗ settings table DROPPED: {$table} — every value it held is gone");
@@ -112,8 +109,8 @@ class PosSettingsSnapshotCommand extends Command
                 $c['table'],
                 $c['company_id'] ?? '-',
                 $c['column'],
-                $this->short($c['before']),
-                $this->short($c['after']),
+                'hash:'.substr($snapshots->valueHash(is_string($c['before'] ?? null) ? $c['before'] : null), 0, 12),
+                'hash:'.substr($snapshots->valueHash(is_string($c['after'] ?? null) ? $c['after'] : null), 0, 12),
             ];
         }
         $this->table(['table', 'company', 'column', 'before', 'after'], $rows);
@@ -126,8 +123,14 @@ class PosSettingsSnapshotCommand extends Command
         return self::FAILURE;
     }
 
-    private function write(array $snapshot, int $rowCount, string $tableList): int
+    private function write(PosSettingsSnapshot $snapshots, array $snapshot, int $rowCount, string $tableList): int
     {
+        if (! $snapshots->isValidSnapshot($snapshot)) {
+            $this->error('Refusing to write an invalid settings snapshot.');
+
+            return self::FAILURE;
+        }
+
         $json = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             $this->error('Could not encode the snapshot.');
@@ -148,6 +151,13 @@ class PosSettingsSnapshotCommand extends Command
 
             return self::FAILURE;
         }
+
+        if (is_file($out) && ! $this->option('force')) {
+            $this->error("Refusing to overwrite existing snapshot: {$out} (pass --force only for deliberate replacement; never on a retained forensic baseline)");
+
+            return self::FAILURE;
+        }
+
         if (@file_put_contents($out, $json) === false) {
             $this->error("Cannot write: {$out}");
 
@@ -158,17 +168,5 @@ class PosSettingsSnapshotCommand extends Command
         $this->line("  {$rowCount} rows across {$tableList}");
 
         return self::SUCCESS;
-    }
-
-    private function short(?string $v): string
-    {
-        if ($v === null) {
-            return '(null)';
-        }
-        if ($v === '') {
-            return "''";
-        }
-
-        return mb_strlen($v) > 48 ? mb_substr($v, 0, 45) . '...' : $v;
     }
 }

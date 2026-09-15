@@ -10,7 +10,7 @@ class PosServiceWorkOrder extends Model
         'company_id', 'branch_id', 'category', 'job_number', 'service_id',
         'customer_name', 'customer_phone', 'title', 'scheduled_at', 'due_at',
         'status', 'quantity', 'unit_price', 'total_amount', 'details', 'notes',
-        'created_by', 'completed_at',
+        'created_by', 'completed_at', 'pos_transaction_id',
     ];
 
     protected $casts = [
@@ -27,5 +27,10 @@ class PosServiceWorkOrder extends Model
     public function service()
     {
         return $this->belongsTo(PosService::class, 'service_id');
+    }
+
+    public function posTransaction()
+    {
+        return $this->belongsTo(PosTransaction::class, 'pos_transaction_id');
     }
 }

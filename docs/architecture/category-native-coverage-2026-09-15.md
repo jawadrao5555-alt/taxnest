@@ -27,11 +27,12 @@ the accepted reference architecture and is not rebuilt by this change.
 These are more than renamed profiles: each has a distinct noun, number prefix,
 native data fields, ordered lifecycle, tenant/branch-stamped board, append-only
 timeline, custom-access gate and CSV report. Lab 1 and isolated SQLite Lab 2
-pass. They remain **PARTIAL**, not COMPLETE, because MariaDB parity/concurrency
-and the real desktop/mobile Chromium journey could not run in this cloud lab.
-The browser service cannot reach the executor's loopback application and the
-container denies MariaDB socket creation. A generated work order also remains
-operationally adjacent to billing; it does not yet create or link a fiscal sale.
+pass. They remain **PARTIAL**, not COMPLETE, until every required promotion lab
+is green on the target branch. A terminal work order can now mint **one** NestPOS
+fiscal sale via `PosServiceWorkOrderInvoiceService` (`pos_transaction_id`), while
+keeping operational `PREFIX-######` job numbers separate from `P`/`L` invoice
+series. Cancelled jobs and non-terminal stages refuse billing; re-issue is
+idempotent.
 
 | Category | Implemented native operational core |
 |---|---|

@@ -13,6 +13,27 @@
             @foreach($nextStatuses as $next)<button name="to_status" value="{{ $next }}" class="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold">Move to {{ ucwords(str_replace('_', ' ', $next)) }}</button>@endforeach
             @if(\App\Services\PosServiceWorkflowProfiles::canTransition($profile, $order->status, 'cancelled'))<button name="to_status" value="cancelled" class="px-4 py-2 border border-red-300 text-red-700 rounded-lg">Cancel</button>@endif
         </form>@endif
+        @if($order->pos_transaction_id)
+        <div class="mt-5 p-4 rounded-lg bg-emerald-50 text-emerald-900 text-sm">
+            Fiscal sale {{ $order->posTransaction?->invoice_number ?? ('#'.$order->pos_transaction_id) }}
+            is linked. Operational reference remains <strong>{{ $order->job_number }}</strong>.
+            <a class="underline font-semibold ml-2" href="{{ route('pos.transaction.show', $order->pos_transaction_id) }}">Open bill</a>
+        </div>
+        @elseif(!empty($canInvoice))
+        <form method="POST" action="{{ route('pos.service-work-orders.invoice', $order) }}" class="mt-5 flex flex-wrap items-end gap-3 border-t pt-5">@csrf
+            <div><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Payment</label>
+                <select name="payment_method" class="rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white">
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="debit_card">Debit card</option>
+                    <option value="credit_card">Credit card</option>
+                    <option value="qr_payment">QR payment</option>
+                </select>
+            </div>
+            <button class="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold">Create NestPOS bill</button>
+            <p class="w-full text-xs text-gray-500">Creates a fiscal sale with a P/L invoice number. Keeps {{ $order->job_number }} as the operational job reference.</p>
+        </form>
+        @endif
     </div>
     <div class="mt-5 bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-xl p-5"><h2 class="font-bold dark:text-white mb-3">Timeline</h2><div class="space-y-3">@foreach($order->events as $event)<div class="border-l-2 border-purple-300 pl-3"><div class="text-sm font-semibold dark:text-white">{{ ucwords(str_replace('_', ' ', $event->to_status)) }}</div><div class="text-xs text-gray-500">{{ $event->occurred_at?->format('d M Y H:i') }}{{ $event->note ? ' · '.$event->note : '' }}</div></div>@endforeach</div></div>
 </div>

@@ -235,6 +235,13 @@ class PosAccessService
     public static function featureForPath(string $path): ?string
     {
         $path = ltrim($path, '/');
+        // Hotel Restaurant Outlet entry/exit mirrors the sale screen at the
+        // Custom Access layer (always reachable). HotelShell still fail-closes
+        // when restaurant_mode is OFF or the caller is housekeeping-only /
+        // denied both modules — do not treat this as a Hotel front-desk grant.
+        if (preg_match('#^pos/hotel/restaurant(/exit)?$#', $path)) {
+            return null;
+        }
         foreach (self::PATH_MAP as $pattern => $feature) {
             if (preg_match($pattern, $path)) {
                 return $feature;

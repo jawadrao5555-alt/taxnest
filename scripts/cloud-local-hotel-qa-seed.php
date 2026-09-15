@@ -48,6 +48,11 @@ $deniedLogin = 'hotelqa-denied@nestpos.pk';
 
 $company = Company::where('email', $login)->first();
 $flags = PosFeatureService::defaultsForCategory('hotel');
+// Disposable QA hotel keeps restaurant_mode ON so Outlet separation can be smoked
+// without rewriting any real customer company. Seed is fail-closed + fictional only.
+$flags['kitchen'] = true;
+$flags['kot'] = true;
+$flags['tables'] = true;
 if (!$company) {
     $company = Company::create([
         'name' => 'Hotel QA Guest House',
@@ -60,7 +65,7 @@ if (!$company) {
         'pos_integration_mode' => 'pra',
         'business_category' => 'hotel',
         'feature_flags' => $flags,
-        'restaurant_mode' => false,
+        'restaurant_mode' => true,
         'is_internal_account' => true,
         'pos_setup_completed' => true,
         'onboarding_completed' => true,
@@ -72,7 +77,7 @@ if (!$company) {
     $company->forceFill([
         'business_category' => 'hotel',
         'feature_flags' => $flags,
-        'restaurant_mode' => false,
+        'restaurant_mode' => true,
         'is_internal_account' => true,
         'pos_setup_completed' => true,
         'pos_tax_rate_cash' => 0,
@@ -113,12 +118,14 @@ $mkUser = function (string $email, string $role, string $posRole, ?array $custom
 
 $owner = $mkUser($login, 'company_admin', 'pos_admin', null);
 $hk = $mkUser($hkLogin, 'staff', 'pos_cashier', ['dashboard', 'hotel_housekeeping']);
-$denied = $mkUser($deniedLogin, 'staff', 'pos_cashier', ['dashboard', 'orders']);
+$denied = $mkUser($deniedLogin, 'staff', 'pos_cashier', ['dashboard']);
+$restoLogin = 'hotelqa-resto@nestpos.pk';
+$resto = $mkUser($restoLogin, 'staff', 'pos_cashier', ['dashboard', 'orders']);
 
 // Pre-mark What's New so interactive smoke is not blocked by elaan overlays.
 if (Schema::hasTable('app_updates') && Schema::hasTable('app_update_seens')) {
     $updateIds = DB::table('app_updates')->where('is_published', 1)->pluck('id');
-    foreach ([$owner, $hk, $denied] as $u) {
+    foreach ([$owner, $hk, $denied, $resto] as $u) {
         foreach ($updateIds as $uid) {
             $exists = DB::table('app_update_seens')
                 ->where('user_id', $u->id)
@@ -159,6 +166,18 @@ if ($existing < 3) {
     }
 }
 
+if (Schema::hasTable('pos_products')
+    && !\App\Models\PosProduct::where('company_id', $company->id)->where('name', 'QA Minibar Water')->exists()) {
+    \App\Models\PosProduct::create([
+        'company_id' => $company->id,
+        'name' => 'QA Minibar Water',
+        'price' => 120,
+        'uom' => 'NOS',
+        'is_active' => true,
+        'show_on_sale' => true,
+    ]);
+}
+
 $dir = __DIR__ . '/../.local';
 if (!is_dir($dir)) {
     mkdir($dir, 0700, true);
@@ -170,12 +189,13 @@ HOTEL_QA_LOGIN={$login}
 HOTEL_QA_PASS={$pass}
 HOTEL_QA_HK_LOGIN={$hkLogin}
 HOTEL_QA_DENIED_LOGIN={$deniedLogin}
+HOTEL_QA_RESTO_LOGIN={$restoLogin}
 CLOUD_LOCAL_QA_LOGIN={$login}
 CLOUD_LOCAL_QA_PASSWORD={$pass}
 VIDEO_DEMO_LOGIN={$login}
 VIDEO_DEMO_PASS={$pass}
 EOF);
 
-echo "OK hotel QA company_id={$company->id} owner={$login} hk={$hkLogin} denied={$deniedLogin}\n";
+echo "OK hotel QA company_id={$company->id} owner={$login} hk={$hkLogin} denied={$deniedLogin} resto={$restoLogin} restaurant_mode=1\n";
 echo "Creds: {$creds}\n";
 exit(0);

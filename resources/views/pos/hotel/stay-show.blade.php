@@ -25,7 +25,14 @@
             <form method="POST" action="{{ route('pos.hotel.stays.no-show', $stay->id) }}">@csrf<button class="px-3 py-2 bg-gray-600 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_no_show_btn') }}</button></form>
             @endif
             @if($stay->status === 'checked_in')
-            <form method="POST" action="{{ route('pos.hotel.stays.check-out', $stay->id) }}">@csrf<button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold" @if(($totals['outstanding'] ?? 0) > 0) onclick="return confirm(@json(__('pos.hotel_checkout_due_confirm', ['amount' => number_format($totals['outstanding'], 2)])))"@endif>{{ __('pos.hotel_check_out_btn') }}</button></form>
+            @php $due = (float) ($totals['outstanding'] ?? 0); $blockDue = ($checkoutPolicy ?? 'allow') === 'block' && $due > 0; @endphp
+            <form method="POST" action="{{ route('pos.hotel.stays.check-out', $stay->id) }}">
+                @csrf
+                <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold disabled:opacity-50" @if($blockDue) type="button" disabled title="{{ __('pos.hotel_checkout_due_blocked', ['amount' => number_format($due, 2)]) }}" @elseif($due > 0) onclick="return confirm(@json(__('pos.hotel_checkout_due_confirm', ['amount' => number_format($due, 2)])))"@endif>{{ __('pos.hotel_check_out_btn') }}</button>
+            </form>
+            @if($blockDue)
+            <p class="text-[11px] text-amber-700 max-w-[14rem]">{{ __('pos.hotel_checkout_due_blocked', ['amount' => number_format($due, 2)]) }}</p>
+            @endif
             @endif
         </div>
     </div>
@@ -79,10 +86,18 @@
                 @endforeach
             </select>
             @endif
+            @if(isset($services) && $services->isNotEmpty())
+            <select name="service_id" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+                <option value="">{{ __('pos.hotel_from_service') }}</option>
+                @foreach($services as $service)
+                <option value="{{ $service->id }}">{{ $service->name }} · Rs {{ number_format((float) $service->price, 2) }}</option>
+                @endforeach
+            </select>
+            @endif
             <div class="grid grid-cols-3 gap-2">
                 <select name="category" class="rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                     @foreach(['room','food','laundry','extra','other'] as $cat)
-                    <option value="{{ $cat }}">{{ $cat }}</option>
+                    <option value="{{ $cat }}">{{ __('pos.hotel_cat_'.$cat) }}</option>
                     @endforeach
                 </select>
                 <input type="number" step="0.001" name="quantity" value="1" required class="rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
@@ -99,11 +114,7 @@
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_take_money') }}</h3>
                 <input type="number" step="0.01" name="amount" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                 <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                    <option value="debit_card">Debit card</option>
-                    <option value="credit_card">Credit card</option>
-                    <option value="qr_payment">QR</option>
+                    @include('pos.hotel._payment-methods')
                 </select>
                 <select name="kind" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                     <option value="payment">{{ __('pos.hotel_advance_payment') }}</option>
@@ -116,9 +127,7 @@
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_refund') }}</h3>
                 <input type="number" step="0.01" name="amount" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                 <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                    <option value="qr_payment">QR</option>
+                    @include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])
                 </select>
                 <select name="kind" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                     <option value="payment">{{ __('pos.hotel_advance_payment') }}</option>
@@ -131,17 +140,15 @@
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_issue_bill') }}</h3>
                 <p class="text-xs text-gray-500">{{ __('pos.hotel_issue_bill_hint') }}</p>
                 <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                    <option value="qr_payment">QR</option>
+                    @include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])
                 </select>
                 <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_issue_bill') }}</button>
             </form>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border overflow-hidden">
-        <table class="w-full text-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-xl border overflow-x-auto">
+        <table class="min-w-[40rem] w-full text-sm">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 uppercase">
                     <th class="px-4 py-3">{{ __('pos.hotel_folio') }}</th>
@@ -154,7 +161,7 @@
                 @foreach($stay->folioEntries as $entry)
                 <tr class="border-b border-gray-100 dark:border-gray-800">
                     <td class="px-4 py-3">
-                        <span class="text-[10px] uppercase font-bold text-gray-500">{{ $entry->entry_type }}</span>
+                        <span class="text-[10px] uppercase font-bold text-gray-500">{{ __('pos.hotel_entry_'.$entry->entry_type) }} · {{ __('pos.hotel_cat_'.($entry->category ?: 'other')) }}</span>
                         <p>{{ $entry->description }}</p>
                         @if($entry->pos_transaction_id)
                         <a class="text-xs text-teal-800" href="{{ url('/pos/transaction/'.$entry->pos_transaction_id) }}">{{ __('pos.hotel_fiscal_bill') }}</a>

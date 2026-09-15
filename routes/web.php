@@ -1192,6 +1192,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/rider-bill-preview/settings', [\App\Http\Controllers\RiderBillPreviewController::class, 'update'])->name('rider.preview.settings');
         Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
         Route::post('/hotel/rooms', [HotelController::class, 'storeRoom'])->name('pos.hotel.rooms.store')->middleware('feature:rooms');
+        Route::post('/hotel/checkout-policy', [HotelController::class, 'updateCheckoutPolicy'])->name('pos.hotel.checkout-policy')->middleware('feature:rooms');
         Route::put('/hotel/rooms/{id}', [HotelController::class, 'updateRoom'])->whereNumber('id')->name('pos.hotel.rooms.update')->middleware('feature:rooms');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');

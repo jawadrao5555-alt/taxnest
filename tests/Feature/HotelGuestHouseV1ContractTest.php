@@ -67,7 +67,7 @@ class HotelGuestHouseV1ContractTest extends TestCase
     {
         $names = [
             'pos.hotel.dashboard', 'pos.hotel.rooms', 'pos.hotel.stays.index',
-            'pos.hotel.stays.store', 'pos.hotel.folio.settle',
+            'pos.hotel.stays.store', 'pos.hotel.folio.settle', 'pos.hotel.checkout-policy',
             'pos.hotel.rooms.store', 'pos.hotel.rooms.housekeeping',
         ];
         foreach ($names as $name) {
@@ -158,7 +158,7 @@ class HotelGuestHouseV1ContractTest extends TestCase
         $en = require base_path('lang/en/pos.php');
         $rur = require base_path('lang/rur/pos.php');
         $ur = require base_path('lang/ur/pos.php');
-        foreach (['hotel_folio_advance_credit', 'hotel_room_other_branch'] as $key) {
+        foreach (['hotel_folio_advance_credit', 'hotel_room_other_branch', 'hotel_checkout_due_blocked', 'hotel_cat_food', 'hotel_from_service'] as $key) {
             $this->assertArrayHasKey($key, $en);
             $this->assertArrayHasKey($key, $rur);
             $this->assertArrayHasKey($key, $ur);

@@ -2,9 +2,9 @@
 # deployment_key; customer-visible title/points never contain provenance.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
-title: "Inventory Master Excel ab duplicate rows ko wazeh rokta hai"
-audience: all
+title: "Hotel check-out rule aur folio extras ab branch-safe hain"
+audience: pos
 type: improvement
 points:
-  - "Aik hi file mein repeat product, ingredient ya recipe row ab chup-chaap rate, cost ya quantity overwrite nahi karti."
-  - "System pehli row rakhta aur duplicate row number saaf batata hai taa-ke file durust karke dobara upload ki ja sake."
+  - "Baqaya folio par check-out ab confirm-allow rehta hai jab tak aap Rooms se block na chunein — purani setting khud nahi badalti."
+  - "Stay extras sirf usi branch ke product/service dikhate hain, payment aur charge labels en/rur/ur mein hain, aur folio table mobile par sideways scroll hoti hai."

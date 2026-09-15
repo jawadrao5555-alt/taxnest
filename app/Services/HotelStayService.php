@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\HotelStayException;
+use App\Models\Company;
 use App\Models\HotelRoom;
 use App\Models\HotelStay;
 use App\Models\HotelStayAssignment;
@@ -322,6 +323,15 @@ class HotelStayService
             }
             if ($stay->status !== HotelStay::STATUS_CHECKED_IN) {
                 throw new HotelStayException(__('pos.hotel_transition_blocked'));
+            }
+            $totals = $this->folio->totals($stay);
+            if (($totals['outstanding'] ?? 0) > 0.009) {
+                $company = Company::find($stay->company_id);
+                if (!HotelCheckoutPolicy::allowsOutstandingCheckout($company)) {
+                    throw new HotelStayException(__('pos.hotel_checkout_due_blocked', [
+                        'amount' => number_format((float) $totals['outstanding'], 2),
+                    ]));
+                }
             }
             $stay->status = HotelStay::STATUS_CHECKED_OUT;
             $stay->actual_check_out_at = now();

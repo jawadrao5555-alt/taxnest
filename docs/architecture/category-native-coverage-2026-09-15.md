@@ -20,7 +20,7 @@ the accepted reference architecture and is not rebuilt by this change.
 | restaurant | tables, KOT/KDS, recipes, kitchen, delivery | existing focused suites |
 | cafe | counter/KOT, recipes, kitchen, loyalty | existing focused suites |
 | quick_service | counter/KOT, kitchen, delivery | existing focused suites |
-| hotel | rooms, stays, housekeeping, folio, day-close | PR #71; preserved unchanged |
+| hotel | rooms, stays, housekeeping, folio, day-close; category-native Front Desk chrome | PR #71 + occupancy-due #79; UI v2 does not rebuild the stay engine |
 
 ## Implemented operational cores — PARTIAL promotion
 

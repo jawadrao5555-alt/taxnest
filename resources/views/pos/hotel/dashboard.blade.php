@@ -1,10 +1,11 @@
 <x-pos-layout>
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('pos.partials.back-link')
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+    @include('pos.hotel._nav', ['showHotelPrimaryActions' => true])
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.hotel_front_desk') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.hotel_front_desk_hint') }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.hotel_front_desk_hint_v2') }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('pos.hotel.rooms') }}" class="px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold">{{ __('pos.hotel_rooms') }}</a>
@@ -22,6 +23,24 @@
 
     @include('pos.hotel._occupancy-strip', ['occupancy' => $occupancy])
 
+    @php $money = $money ?? ['collections' => 0, 'charges' => 0, 'invoiced' => 0]; @endphp
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 mb-5">
+        <div class="rounded-xl bg-white dark:bg-gray-900 border border-teal-100 p-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">{{ __('pos.hotel_stat_collections') }}</p>
+            <p class="text-xl font-extrabold mt-1">Rs {{ number_format($money['collections'] ?? 0) }}</p>
+        </div>
+        <div class="rounded-xl bg-white dark:bg-gray-900 border border-teal-100 p-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">{{ __('pos.hotel_stat_charges_today') }}</p>
+            <p class="text-xl font-extrabold mt-1">Rs {{ number_format($money['charges'] ?? 0) }}</p>
+        </div>
+        <div class="rounded-xl bg-white dark:bg-gray-900 border border-teal-100 p-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">{{ __('pos.hotel_stat_invoiced_today') }}</p>
+            <p class="text-xl font-extrabold mt-1">Rs {{ number_format($money['invoiced'] ?? 0) }}</p>
+        </div>
+    </div>
+
+    @include('pos.hotel._room-board', ['roomCards' => $roomCards ?? [], 'filter' => '', 'filterBase' => route('pos.hotel.rooms')])
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
             <h2 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mb-3">{{ __('pos.hotel_arrivals_today') }}</h2>
@@ -31,7 +50,7 @@
                     <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ $stay->guest_name }}</p>
                     <p class="text-xs text-gray-500">{{ $stay->stay_number }} · {{ __('pos.hotel_room') }} {{ $stay->room?->room_number }}</p>
                 </div>
-                <span class="text-xs font-medium text-teal-800 dark:text-teal-300">{{ $stay->status }}</span>
+                <span class="text-xs font-medium text-teal-800 dark:text-teal-300">{{ \App\Services\HotelShell::statusLabel($stay->status) }}</span>
             </a>
             @empty
             <p class="text-sm text-gray-500">{{ __('pos.hotel_no_arrivals') }}</p>

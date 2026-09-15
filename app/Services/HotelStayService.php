@@ -713,6 +713,121 @@ class HotelStayService
         }
     }
 
+    /**
+     * Today's folio collections and posted room/extra charges (not deposits).
+     *
+     * @return array{collections:float,charges:float,invoiced:float}
+     */
+    public function todayMoney(int $companyId, ?int $branchId = null): array
+    {
+        $today = now()->toDateString();
+        $stayIds = null;
+        if ($branchId) {
+            $stayIds = HotelStay::where('company_id', $companyId)
+                ->where('branch_id', $branchId)
+                ->pluck('id')
+                ->all();
+        }
+        $base = \App\Models\HotelFolioEntry::where('company_id', $companyId)
+            ->whereDate('created_at', $today)
+            ->when(is_array($stayIds), fn ($q) => $q->whereIn('stay_id', $stayIds ?: [0]));
+        $collections = (float) (clone $base)->where('entry_type', \App\Models\HotelFolioEntry::TYPE_PAYMENT)->sum('amount');
+        $charges = (float) (clone $base)->where('entry_type', \App\Models\HotelFolioEntry::TYPE_CHARGE)->sum('amount');
+        $invoiced = (float) (clone $base)->where('entry_type', \App\Models\HotelFolioEntry::TYPE_CHARGE)
+            ->whereNotNull('pos_transaction_id')
+            ->sum('amount');
+
+        return [
+            'collections' => round($collections, 2),
+            'charges' => round($charges, 2),
+            'invoiced' => round($invoiced, 2),
+        ];
+    }
+
+    /**
+     * Visual room board cards for the active branch.
+     *
+     * @return list<array{room:\App\Models\HotelRoom,stay:?HotelStay,tone:string,state:string}>
+     */
+    public function roomCards(int $companyId, ?int $branchId = null): array
+    {
+        $rooms = HotelRoom::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->where('is_active', true)
+            ->orderBy('room_number')
+            ->get();
+        $open = HotelStay::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereIn('status', HotelStay::OPEN_STATUSES)
+            ->get()
+            ->keyBy('room_id');
+        $cards = [];
+        foreach ($rooms as $room) {
+            $stay = $open->get($room->id);
+            if ($room->isOutOfService()) {
+                $state = 'oos';
+                $tone = 'slate';
+            } elseif ($stay && $stay->status === HotelStay::STATUS_CHECKED_IN) {
+                $state = 'occupied';
+                $tone = 'rose';
+            } elseif ($stay && $stay->status === HotelStay::STATUS_RESERVED) {
+                $state = 'reserved';
+                $tone = 'indigo';
+            } elseif ($room->housekeeping === HotelRoom::HK_DIRTY) {
+                $state = 'dirty';
+                $tone = 'amber';
+            } else {
+                $state = 'vacant';
+                $tone = 'emerald';
+            }
+            $cards[] = compact('room', 'stay', 'tone', 'state');
+        }
+
+        return $cards;
+    }
+
+    /**
+     * Readable stay timeline (assignments + folio), oldest first.
+     *
+     * @return list<array{at:string,label:string}>
+     */
+    public function stayTimeline(HotelStay $stay): array
+    {
+        $rows = [];
+        $rows[] = [
+            'at' => optional($stay->created_at)?->toDateTimeString() ?: '',
+            'label' => __('pos.hotel_timeline_created', ['number' => $stay->stay_number]),
+        ];
+        if ($stay->actual_check_in_at) {
+            $rows[] = [
+                'at' => $stay->actual_check_in_at->toDateTimeString(),
+                'label' => __('pos.hotel_timeline_checkin'),
+            ];
+        }
+        foreach ($stay->assignments as $assignment) {
+            $rows[] = [
+                'at' => optional($assignment->created_at)?->toDateTimeString() ?: '',
+                'label' => __('pos.hotel_timeline_room', ['room' => $assignment->room?->room_number ?? $assignment->room_id]),
+            ];
+        }
+        foreach ($stay->folioEntries as $entry) {
+            $kind = __('pos.hotel_entry_'.$entry->entry_type);
+            $rows[] = [
+                'at' => optional($entry->created_at)?->toDateTimeString() ?: '',
+                'label' => $kind.' · '.$entry->description.' · Rs '.number_format((float) $entry->amount, 2),
+            ];
+        }
+        if ($stay->actual_check_out_at) {
+            $rows[] = [
+                'at' => $stay->actual_check_out_at->toDateTimeString(),
+                'label' => __('pos.hotel_timeline_checkout'),
+            ];
+        }
+        usort($rows, fn ($a, $b) => strcmp($a['at'], $b['at']));
+
+        return $rows;
+    }
+
     private function normalizeHousekeeping(string $state): string
     {
         return in_array($state, [HotelRoom::HK_CLEAN, HotelRoom::HK_DIRTY, HotelRoom::HK_INSPECTED], true)

@@ -1120,6 +1120,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
 
     Route::middleware(['feature:rooms'])->prefix('hotel')->group(function () {
         Route::get('/', [HotelController::class, 'dashboard'])->name('pos.hotel.dashboard');
+        Route::get('/reservations', [HotelController::class, 'reservations'])->name('pos.hotel.reservations');
+        Route::get('/housekeeping', [HotelController::class, 'housekeepingBoard'])->name('pos.hotel.housekeeping');
+        Route::get('/guests', [HotelController::class, 'guests'])->name('pos.hotel.guests');
+        Route::get('/folios', [HotelController::class, 'folios'])->name('pos.hotel.folios');
+        Route::get('/reports', [HotelController::class, 'reports'])->name('pos.hotel.reports');
         Route::get('/rooms', [HotelController::class, 'rooms'])->name('pos.hotel.rooms');
         Route::post('/rooms/{id}/housekeeping', [HotelController::class, 'housekeeping'])->whereNumber('id')->name('pos.hotel.rooms.housekeeping');
         Route::post('/rooms/{id}/service', [HotelController::class, 'serviceState'])->whereNumber('id')->name('pos.hotel.rooms.service');

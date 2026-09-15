@@ -86,6 +86,7 @@ class HotelGuestHouseV1ContractTest extends TestCase
         $this->assertSame('hotel', PosAccessService::featureForPath('pos/hotel'));
         $this->assertSame('hotel', PosAccessService::featureForPath('pos/hotel/stays/9/folio/settle'));
         $this->assertSame('hotel_housekeeping', PosAccessService::featureForPath('/pos/hotel/rooms'));
+        $this->assertSame('hotel_housekeeping', PosAccessService::featureForPath('pos/hotel/housekeeping'));
         $this->assertSame('hotel_housekeeping', PosAccessService::featureForPath('pos/hotel/rooms/3/housekeeping'));
         $this->assertContains('hotel', PosAccessService::FEATURES);
         $this->assertContains('hotel_housekeeping', PosAccessService::FEATURES);
@@ -158,7 +159,7 @@ class HotelGuestHouseV1ContractTest extends TestCase
         $en = require base_path('lang/en/pos.php');
         $rur = require base_path('lang/rur/pos.php');
         $ur = require base_path('lang/ur/pos.php');
-        foreach (['hotel_folio_advance_credit', 'hotel_room_other_branch', 'hotel_checkout_due_blocked', 'hotel_cat_food', 'hotel_from_service'] as $key) {
+        foreach (['hotel_folio_advance_credit', 'hotel_room_other_branch', 'hotel_checkout_due_blocked', 'hotel_cat_food', 'hotel_from_service', 'hotel_status_checked_in', 'nav_hotel_front_desk'] as $key) {
             $this->assertArrayHasKey($key, $en);
             $this->assertArrayHasKey($key, $rur);
             $this->assertArrayHasKey($key, $ur);

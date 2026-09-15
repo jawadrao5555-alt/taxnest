@@ -27,6 +27,9 @@
     // matches what the restaurant.only middleware actually allows, regardless of
     // the restaurant_mode toggle. Dashboard routing above stays on restaurant_mode.
     $posFeaturesLayout = \App\Services\PosFeatureService::forCompany($companyLayout);
+    $hideHotelGenericSale = \App\Services\HotelShell::hideGenericSale($companyLayout);
+    $hotelNativeLayout = \App\Services\HotelShell::isNativeCategory($companyLayout);
+    $hotelHomeUrl = \App\Services\HotelShell::panelHomeUrl($posUserLayout, $companyLayout, $isRestaurantLayout);
     // POS Team Custom Access (Task #111): optional per-member feature grants.
     // $posNavCan('feature', $roleDefault) — no custom set → role default
     // (existing behavior, zero change for existing shops); custom set →
@@ -523,7 +526,7 @@
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
 
                     <div class="flex items-center gap-3 flex-shrink-0">
-                        <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="flex items-center gap-2 group">
+                        <a href="{{ $hotelHomeUrl }}" class="flex items-center gap-2 group">
                             <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition">
                                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
@@ -544,6 +547,7 @@
                                  "New Sale" link is replaced by the teleported action button (newSale())
                                  that lands in #tn-nav-sale-tools below — see universal.blade.php. --}}
                             @unless(request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create') || $confinedRoleLayout)
+                            @unless($hideHotelGenericSale)
                             <a href="{{ route('pos.invoice.create') }}"
                                data-nav-new-sale="static"
                                class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white">
@@ -551,11 +555,12 @@
                                 {{ __('pos.new_sale') }}
                             </a>
                             @endunless
+                            @endunless
                             @if($posEffStyleLayout === 'saaf')
                             {{-- Saaf dashboard (Jul 2026): simplified always-visible nav — 5 core links; everything else stays in the profile menu. --}}
                             @if($posNavCan('dashboard'))
-                            <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}"
-                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-white' }}">{{ __('pos.nav_home') }}</a>
+                            <a href="{{ $hotelHomeUrl }}"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') || request()->routeIs('pos.hotel.dashboard') ? 'active text-white' : 'text-white' }}">{{ __('pos.nav_home') }}</a>
                             @endif
                             @if($posNavCan('orders'))
                             <a href="{{ route('pos.transactions') }}"
@@ -793,7 +798,7 @@
                                     </a>
                                     @endif
                                     @if($posNavCan('dashboard'))
-                                    <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                    <a href="{{ $hotelHomeUrl }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                                         {{ __('pos.dashboard') }}
                                     </a>
@@ -823,10 +828,27 @@
                                     </a>
                                     @endif
                                     @if(!empty($posFeaturesLayout->rooms) && ($posNavCan('hotel') || $posNavCan('hotel_housekeeping')))
+                                    @if($hotelNativeLayout)
+                                    <div class="px-3 pt-3 pb-1">
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_hotel') }}</p>
+                                    </div>
+                                    @if($posNavCan('hotel'))
+                                    <a href="{{ route('pos.hotel.dashboard') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_front_desk') }}</a>
+                                    <a href="{{ route('pos.hotel.reservations') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_reservations') }}</a>
+                                    @endif
+                                    <a href="{{ $posNavCan('hotel') ? route('pos.hotel.rooms') : route('pos.hotel.housekeeping') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_rooms') }}</a>
+                                    <a href="{{ route('pos.hotel.housekeeping') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_housekeeping') }}</a>
+                                    @if($posNavCan('hotel'))
+                                    <a href="{{ route('pos.hotel.guests') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_guests') }}</a>
+                                    <a href="{{ route('pos.hotel.folios') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_folios') }}</a>
+                                    <a href="{{ route('pos.hotel.reports') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.nav_hotel_reports') }}</a>
+                                    @endif
+                                    @else
                                     <a href="{{ $posNavCan('hotel') ? route('pos.hotel.dashboard') : route('pos.hotel.rooms') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 21V8l9-5 9 5v13M9 21v-6h6v6"/></svg>
                                         {{ $posNavCan('hotel') ? __('pos.nav_hotel') : __('pos.nav_hotel_rooms') }}
                                     </a>
+                                    @endif
                                     @endif
                                     @if($posFeaturesLayout->tables && $posNavCan('tables', !$isCashierLayout))
                                     <a href="{{ route('pos.restaurant.tables') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
@@ -1037,11 +1059,13 @@
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="lg:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
                     @unless(request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create') || $confinedRoleLayout)
+                    @unless($hideHotelGenericSale)
                     <a href="{{ route('pos.invoice.create') }}" data-nav-new-sale="static" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.new_sale') }}</a>
+                    @endunless
                     @endunless
                     @if($posEffStyleLayout === 'saaf')
                     @if($posNavCan('dashboard'))
-                    <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_home') }}</a>
+                    <a href="{{ $hotelHomeUrl }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_home') }}</a>
                     @endif
                     @if($posNavCan('orders'))
                     <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_bills') }}</a>
@@ -1172,8 +1196,8 @@
                 q: '',
                 idx: 0,
                 items: @js(array_values(array_filter([
-                    ['label' => __('pos.new_sale'), 'url' => route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
-                    $posNavCan('dashboard') ? ['label' => __('pos.dashboard'), 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''] : null,
+                    $hideHotelGenericSale ? null : ['label' => __('pos.new_sale'), 'url' => route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
+                    $posNavCan('dashboard') ? ['label' => __('pos.dashboard'), 'url' => $hotelHomeUrl, 'icon' => '◧', 'kbd' => ''] : null,
                     $posNavCan('orders') ? ['label' => __('pos.nav_orders_transactions'), 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''] : null,
                     $posNavCan('products') ? ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''] : null,
                     $dealsNavVisible ? ['label' => __('pos.deals_title'), 'url' => route('pos.deals'), 'icon' => '◇', 'kbd' => ''] : null,

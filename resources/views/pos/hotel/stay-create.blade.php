@@ -1,7 +1,7 @@
 <x-pos-layout>
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <a href="{{ route('pos.hotel.stays.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-teal-700 mb-3">{{ __('pos.hotel_back_stays') }}</a>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ __('pos.hotel_new_stay') }}</h1>
+    @include('pos.hotel._nav')
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ !empty($walkIn) ? __('pos.hotel_action_walkin') : __('pos.hotel_action_booking') }}</h1>
     <p class="text-sm text-gray-500 mb-5">{{ __('pos.hotel_charging_rule_note') }}</p>
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{{ session('error') }}</div>
@@ -67,7 +67,7 @@
         </div>
         <div class="sm:col-span-2">
             <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="walk_in" value="1" class="rounded border-gray-300">
+                <input type="checkbox" name="walk_in" value="1" class="rounded border-gray-300" @checked(old('walk_in', !empty($walkIn)))>
                 {{ __('pos.hotel_walk_in') }}
             </label>
         </div>

@@ -22,6 +22,7 @@
              mid-suite with repeated "Allowed memory size exhausted" errors. -->
         <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_KEY" value="base64:2fl+KTVYFIEjblwNh83EzNpx7dLTs7jK7dbRbUYx21E=" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

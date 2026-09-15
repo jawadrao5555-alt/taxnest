@@ -6,7 +6,6 @@ use App\Exceptions\HotelStayException;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\HotelStay;
-use App\Models\InventoryStock;
 use App\Models\PosProduct;
 use App\Models\PosService;
 use App\Models\User;
@@ -16,7 +15,9 @@ use App\Services\HotelFolioService;
 use App\Services\HotelStayService;
 use App\Services\PosFeatureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -126,6 +127,39 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         ]);
     }
 
+    private function stock(Company $company, PosProduct $product, Branch $branch, float $qty): void
+    {
+        // sqlite keeps the original inventory_stocks.product_id → products FK
+        // (the drop migration is MySQL-only). Mirror the POS row into products
+        // so the stay-catalog fixture can stamp the same id live uses.
+        if (Schema::hasTable('products') && !DB::table('products')->where('id', $product->id)->exists()) {
+            $row = [
+                'id' => $product->id,
+                'company_id' => $company->id,
+                'name' => $product->name,
+                'default_price' => $product->price,
+                'is_active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            if (Schema::hasColumn('products', 'hs_code')) {
+                $row['hs_code'] = '0000.0000.00';
+            }
+            DB::table('products')->insert($row);
+        }
+        DB::table('inventory_stocks')->insert([
+            'company_id' => $company->id,
+            'product_id' => $product->id,
+            'branch_id' => $branch->id,
+            'quantity' => $qty,
+            'min_stock_level' => 0,
+            'avg_purchase_price' => 0,
+            'last_purchase_price' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     public function test_missing_checkout_setting_allows_outstanding_checkout(): void
     {
         $company = $this->company();
@@ -228,8 +262,8 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         $there = PosProduct::create(['company_id' => $company->id, 'name' => 'Minibar-B', 'price' => 300, 'is_active' => true]);
         $shared = PosProduct::create(['company_id' => $company->id, 'name' => 'Shared Extra', 'price' => 100, 'is_active' => true]);
         $foreign = PosProduct::create(['company_id' => $other->id, 'name' => 'Foreign Extra', 'price' => 9, 'is_active' => true]);
-        InventoryStock::create(['company_id' => $company->id, 'product_id' => $here->id, 'branch_id' => $branchA->id, 'quantity' => 5]);
-        InventoryStock::create(['company_id' => $company->id, 'product_id' => $there->id, 'branch_id' => $branchB->id, 'quantity' => 5]);
+        $this->stock($company, $here, $branchA, 5);
+        $this->stock($company, $there, $branchB, 5);
 
         $svcHere = PosService::create(['company_id' => $company->id, 'name' => 'Laundry Press', 'price' => 400, 'is_active' => true]);
         PosService::create(['company_id' => $other->id, 'name' => 'Foreign Spa', 'price' => 900, 'is_active' => true]);
@@ -261,8 +295,8 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         ]);
         $local = PosProduct::create(['company_id' => $company->id, 'name' => 'LOCAL-MINIBAR', 'price' => 120, 'is_active' => true]);
         $remote = PosProduct::create(['company_id' => $company->id, 'name' => 'REMOTE-SPA-KIT', 'price' => 880, 'is_active' => true]);
-        InventoryStock::create(['company_id' => $company->id, 'product_id' => $local->id, 'branch_id' => $branchA->id, 'quantity' => 3]);
-        InventoryStock::create(['company_id' => $company->id, 'product_id' => $remote->id, 'branch_id' => $branchB->id, 'quantity' => 3]);
+        $this->stock($company, $local, $branchA, 3);
+        $this->stock($company, $remote, $branchB, 3);
         $service = PosService::create(['company_id' => $company->id, 'name' => 'PRESS-SERVICE', 'price' => 150, 'is_active' => true]);
 
         $html = $this->actingAs($user, 'pos')

@@ -61,8 +61,29 @@ jobs:
           if ($tagLookup -eq 0) {
             $tagTarget = (git rev-list -n 1 $tag).Trim().ToLowerInvariant()
             $actual = (git rev-parse HEAD).Trim().ToLowerInvariant()
-            if ($tagTarget -ne $actual) { throw "Release $tag already belongs to $tagTarget; bump package version" }
-            "already_released=true" >> $env:GITHUB_OUTPUT
+            if ($tagTarget -eq $actual) {
+              "already_released=true" >> $env:GITHUB_OUTPUT
+            } else {
+              # Tag belongs to an older commit. If versioned Agent source/build
+              # inputs are unchanged vs that tag commit, succeed as an
+              # idempotent no-build. Never move/overwrite/recreate the tag.
+              # defaults.working-directory is pra-agent — compare from repo root.
+              Push-Location $env:GITHUB_WORKSPACE
+              try {
+                git diff --quiet $tagTarget $actual -- pra-agent .github/workflows/build-agent.yml
+                $agentDiff = $LASTEXITCODE
+              } finally {
+                Pop-Location
+              }
+              if ($agentDiff -eq 0) {
+                Write-Host "Tag $tag belongs to $tagTarget; Agent source/build inputs unchanged on $actual — idempotent no-build."
+                "already_released=true" >> $env:GITHUB_OUTPUT
+              } elseif ($agentDiff -eq 1) {
+                throw "Release $tag already belongs to $tagTarget and Agent source/build inputs changed on $actual; bump package version"
+              } else {
+                throw "git diff failed with exit code $agentDiff while comparing Agent inputs for $tag"
+              }
+            }
           } elseif ($tagLookup -eq 1) {
             "already_released=false" >> $env:GITHUB_OUTPUT
           } else {

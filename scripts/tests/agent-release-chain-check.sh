@@ -28,9 +28,11 @@ grep -q "target_sha must be a full 40-character SHA" "$BUILD" \
   && ok "Agent build validates source and binds release target to it" \
   || bad "Agent release source verification is incomplete"
 
-grep -q "Release \$tag already belongs to \$tagTarget; bump package version" "$BUILD" \
-  && ok "existing version tag cannot be silently moved to another commit" \
-  || bad "Agent release tag collision guard missing"
+grep -q "Agent source/build inputs changed on \$actual; bump package version" "$BUILD" \
+  && grep -q "idempotent no-build" "$BUILD" \
+  && grep -q 'git diff --quiet \$tagTarget \$actual -- pra-agent' "$BUILD" \
+  && ok "existing version tag on older commit is no-build when Agent inputs unchanged; bump required when changed" \
+  || bad "Agent release tag collision / unchanged-input no-build guard missing"
 
 grep -q "actions/checkout@v7" "$BUILD" \
   && ok "Agent build uses current supported checkout" \
@@ -103,12 +105,48 @@ if f"elseif (${lookup} -eq 1)" not in script or '"already_released=false"' not i
 if f"git show-ref failed with exit code ${lookup}" not in script:
     print("unexpected git show-ref codes must fail the step", file=sys.stderr)
     sys.exit(1)
-if "Release $tag already belongs to $tagTarget; bump package version" not in script:
+if "Release $tag already belongs to $tagTarget and Agent source/build inputs changed on $actual; bump package version" not in script:
     print("tag-collision protection missing from agent-version step", file=sys.stderr)
+    sys.exit(1)
+if "idempotent no-build" not in script:
+    print("unchanged-Agent no-build path missing", file=sys.stderr)
+    sys.exit(1)
+if "git diff --quiet $tagTarget $actual -- pra-agent" not in script:
+    print("Agent input tree compare missing", file=sys.stderr)
     sys.exit(1)
 if not script.rstrip().endswith("$global:LASTEXITCODE = 0"):
     print("successful process exit state must be restored at end of agent-version", file=sys.stderr)
     sys.exit(1)
+
+# Decision matrix: tag lookup + agent tree diff → outcome.
+def decide(tag_lookup: int, same_commit: bool, agent_diff: int | None) -> str:
+    if tag_lookup == 0:
+        if same_commit:
+            return "already_released"
+        if agent_diff == 0:
+            return "already_released_unchanged_inputs"
+        if agent_diff == 1:
+            raise RuntimeError("bump package version")
+        raise RuntimeError(f"git diff failed with exit code {agent_diff}")
+    if tag_lookup == 1:
+        return "new_release"
+    raise RuntimeError(f"git show-ref failed with exit code {tag_lookup}")
+
+assert decide(0, True, None) == "already_released"
+assert decide(0, False, 0) == "already_released_unchanged_inputs"
+assert decide(1, False, None) == "new_release"
+for bad in (
+    lambda: decide(0, False, 1),
+    lambda: decide(0, False, 2),
+    lambda: decide(128, False, None),
+):
+    try:
+        bad()
+    except RuntimeError:
+        pass
+    else:
+        print("expected failure path did not raise", file=sys.stderr)
+        sys.exit(1)
 
 # Static model of the captured lookup: missing tag is not a step failure.
 def classify(tag_lookup: int) -> str:

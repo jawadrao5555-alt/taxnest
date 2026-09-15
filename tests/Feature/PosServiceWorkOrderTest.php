@@ -187,16 +187,24 @@ class PosServiceWorkOrderTest extends TestCase
         );
     }
 
-    public function test_custom_access_backfill_is_additive_and_reversible(): void
+    public function test_service_jobs_migration_does_not_rewrite_saved_custom_access(): void
     {
-        DB::table('users')->insert(['id' => 1, 'pos_custom_access' => json_encode(['orders']), 'created_at' => now(), 'updated_at' => now()]);
-        $migration = require database_path('migrations/2026_09_15_011000_backfill_service_jobs_custom_access.php');
-        $migration->up();
-        $this->assertSame(['orders', 'service_jobs'], json_decode(DB::table('users')->value('pos_custom_access'), true));
-        $migration->up();
-        $this->assertSame(['orders', 'service_jobs'], json_decode(DB::table('users')->value('pos_custom_access'), true));
-        $migration->down();
-        $this->assertSame(['orders'], json_decode(DB::table('users')->value('pos_custom_access'), true));
+        DB::table('users')->insert([
+            ['id' => 1, 'pos_custom_access' => json_encode(['orders']), 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'pos_custom_access' => json_encode(['orders', 'service_jobs']), 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'pos_custom_access' => null, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $legacy = require database_path('migrations/2026_09_15_011000_backfill_service_jobs_custom_access.php');
+        $policy = require database_path('migrations/2026_09_15_013000_service_jobs_custom_access_no_silent_rewrite.php');
+        $legacy->up();
+        $policy->up();
+        $this->assertSame(['orders'], json_decode(DB::table('users')->where('id', 1)->value('pos_custom_access'), true));
+        $this->assertSame(['orders', 'service_jobs'], json_decode(DB::table('users')->where('id', 2)->value('pos_custom_access'), true));
+        $this->assertNull(DB::table('users')->where('id', 3)->value('pos_custom_access'));
+        $legacy->down();
+        $policy->down();
+        $this->assertSame(['orders'], json_decode(DB::table('users')->where('id', 1)->value('pos_custom_access'), true));
+        $this->assertSame(['orders', 'service_jobs'], json_decode(DB::table('users')->where('id', 2)->value('pos_custom_access'), true));
     }
 
     private function company(string $category, string $name): Company

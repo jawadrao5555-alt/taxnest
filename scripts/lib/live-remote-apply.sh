@@ -190,6 +190,10 @@ $PHP artisan up 2>&1 || exit 97
 # remote exit code: the release already shipped, and dropping the shops back
 # into maintenance would punish them for our bug. Instead it prints a marker
 # the local script turns into a loud DEPLOY FAILED, so a human must look.
+#
+# When protected settings moved unexpectedly, attempt an automatic restore from
+# the same pre-deploy baseline (service_jobs-only appends today), then still
+# FAIL CLOSED. The baseline file is kept on regression for forensic recovery.
 if [ "$SETTINGS_BASE_OK" = 1 ]; then
   echo "REMOTE_STEP: settings regression check"
   if [ -n "$ALLOW_SETTINGS" ]; then
@@ -199,8 +203,21 @@ if [ "$SETTINGS_BASE_OK" = 1 ]; then
   fi
   SET_RC=$?
   echo "$SET_OUT"
-  [ "$SET_RC" = 0 ] || echo "REMOTE_SETTINGS_REGRESSION"
-  rm -f "$SETTINGS_BASE"
+  if [ "$SET_RC" != 0 ]; then
+    echo "REMOTE_SETTINGS_REGRESSION"
+    echo "REMOTE_STEP: attempting automatic protected-settings restore from baseline"
+    RESTORE_OUT=$($PHP artisan pos:settings-restore --from="$SETTINGS_BASE" --write 2>&1) || true
+    echo "$RESTORE_OUT"
+    if echo "$RESTORE_OUT" | grep -q 'Verified: service_jobs-only rows match the baseline again'; then
+      echo "REMOTE_SETTINGS_RESTORED"
+    else
+      echo "REMOTE_SETTINGS_RESTORE_FAILED"
+    fi
+    # Keep the baseline for owner forensics / manual recovery — do not delete.
+    echo "REMOTE_STEP: settings baseline retained at $SETTINGS_BASE"
+  else
+    rm -f "$SETTINGS_BASE"
+  fi
 fi
 
 echo "REMOTE_DONE"

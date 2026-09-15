@@ -95,6 +95,7 @@ class PosAccessService
         '#^pos/products#' => 'products',
         '#^pos/customers#' => 'customers',
         '#^pos/hotel/rooms/\d+/housekeeping$#' => 'hotel_housekeeping',
+        '#^pos/hotel/housekeeping$#' => 'hotel_housekeeping',
         '#^pos/hotel/rooms$#' => 'hotel_housekeeping',
         '#^pos/hotel#' => 'hotel',
         '#^pos/work-orders#' => 'service_jobs',

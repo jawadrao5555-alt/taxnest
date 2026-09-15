@@ -32,8 +32,10 @@ class HotelController extends Controller
         $companyId = (int) app('currentCompanyId');
         $branchId = $this->branches->getActiveBranchId();
         $board = $this->stays->board($companyId, $branchId);
+        $money = $this->stays->todayMoney($companyId, $branchId);
+        $roomCards = $this->stays->roomCards($companyId, $branchId);
 
-        return view('pos.hotel.dashboard', $board);
+        return view('pos.hotel.dashboard', $board + compact('money', 'roomCards'));
     }
 
     public function rooms()
@@ -54,8 +56,14 @@ class HotelController extends Controller
         $canManageRooms = HotelAccessService::canManageRooms(auth('pos')->user());
         $canFrontDesk = HotelAccessService::canFrontDesk(auth('pos')->user());
         $checkoutPolicy = HotelCheckoutPolicy::forCompany(\App\Models\Company::find($companyId));
+        $roomCards = $this->stays->roomCards($companyId, $branchId);
+        $filter = (string) request()->query('filter', '');
+        $housekeepingView = false;
 
-        return view('pos.hotel.rooms', compact('rooms', 'openStayByRoom', 'uomGroups', 'canManageRooms', 'canFrontDesk', 'checkoutPolicy'));
+        return view('pos.hotel.rooms', compact(
+            'rooms', 'openStayByRoom', 'uomGroups', 'canManageRooms', 'canFrontDesk',
+            'checkoutPolicy', 'roomCards', 'filter', 'housekeepingView'
+        ));
     }
 
     public function storeRoom(Request $request)
@@ -133,7 +141,7 @@ class HotelController extends Controller
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $companyId = (int) app('currentCompanyId');
         $branchId = $this->branches->getActiveBranchId();
-        $status = (string) $request->query('status', '');
+        $status = (string) $request->input('status', '');
         $statusFilter = [
             HotelStay::STATUS_RESERVED,
             HotelStay::STATUS_CHECKED_IN,
@@ -149,7 +157,16 @@ class HotelController extends Controller
             ->paginate(40)
             ->withQueryString();
 
-        return view('pos.hotel.stays-index', compact('stays', 'status'));
+        $heading = $status === HotelStay::STATUS_RESERVED
+            ? __('pos.nav_hotel_reservations')
+            : __('pos.hotel_stays');
+
+        return view('pos.hotel.stays-index', compact('stays', 'status', 'heading'));
+    }
+
+    public function reservations(Request $request)
+    {
+        return $this->staysIndex($request->merge(['status' => HotelStay::STATUS_RESERVED]));
     }
 
     public function createStay()
@@ -172,7 +189,9 @@ class HotelController extends Controller
                 ->get(['id', 'name', 'phone']);
         }
 
-        return view('pos.hotel.stay-create', compact('rooms', 'customers'));
+        $walkIn = request()->boolean('walk_in');
+
+        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn'));
     }
 
     public function storeStay(Request $request)
@@ -223,8 +242,9 @@ class HotelController extends Controller
         $services = HotelFolioCatalog::services($companyId, $catalogBranchId);
         $uomGroups = PosUnitCatalog::groupsFor(\App\Models\Company::find($companyId));
         $checkoutPolicy = HotelCheckoutPolicy::forCompany(\App\Models\Company::find($companyId));
+        $timeline = $this->stays->stayTimeline($stay);
 
-        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy'));
+        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline'));
     }
 
     public function checkIn(Request $request, int $id)
@@ -433,6 +453,75 @@ class HotelController extends Controller
         }
 
         return back()->with('success', __('pos.hotel_checkout_policy_saved'));
+    }
+
+    public function housekeepingBoard()
+    {
+        HotelAccessService::abortUnlessHousekeeping(auth('pos')->user());
+        $companyId = (int) app('currentCompanyId');
+        $branchId = $this->branches->getActiveBranchId();
+        $roomCards = $this->stays->roomCards($companyId, $branchId);
+        $filter = (string) request()->query('filter', 'dirty');
+        $canManageRooms = false;
+        $canFrontDesk = HotelAccessService::canFrontDesk(auth('pos')->user());
+        $checkoutPolicy = null;
+        $rooms = collect();
+        $openStayByRoom = collect();
+        $uomGroups = [];
+        $housekeepingView = true;
+
+        return view('pos.hotel.rooms', compact(
+            'roomCards', 'filter', 'canManageRooms', 'canFrontDesk', 'checkoutPolicy',
+            'rooms', 'openStayByRoom', 'uomGroups', 'housekeepingView'
+        ));
+    }
+
+    public function guests()
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $companyId = (int) app('currentCompanyId');
+        $branchId = $this->branches->getActiveBranchId();
+        $guests = HotelStay::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->orderByDesc('id')
+            ->get(['id', 'guest_name', 'guest_phone', 'stay_number', 'status', 'check_in_date', 'check_out_date', 'room_id'])
+            ->unique(fn ($stay) => mb_strtolower(trim((string) $stay->guest_name).'|'.(string) $stay->guest_phone))
+            ->values();
+
+        return view('pos.hotel.guests', compact('guests'));
+    }
+
+    public function folios()
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $companyId = (int) app('currentCompanyId');
+        $branchId = $this->branches->getActiveBranchId();
+        $stays = HotelStay::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereIn('status', HotelStay::OPEN_STATUSES)
+            ->with('room')
+            ->orderByDesc('id')
+            ->get();
+        $dues = $this->folio->chargeDuesForStayIds($companyId, $stays->pluck('id')->all());
+
+        return view('pos.hotel.folios', compact('stays', 'dues'));
+    }
+
+    public function reports()
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $companyId = (int) app('currentCompanyId');
+        $branchId = $this->branches->getActiveBranchId();
+        $occupancy = $this->stays->occupancy($companyId, $branchId);
+        $money = $this->stays->todayMoney($companyId, $branchId);
+        $board = $this->stays->board($companyId, $branchId);
+
+        return view('pos.hotel.reports', [
+            'occupancy' => $occupancy,
+            'money' => $money,
+            'pending' => $board['pending'],
+            'dues' => $board['dues'],
+        ]);
     }
 
     private function stay(int $id): HotelStay

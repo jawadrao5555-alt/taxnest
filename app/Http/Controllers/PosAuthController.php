@@ -381,8 +381,8 @@ class PosAuthController extends Controller
             'pos_waiter'     => '/pos/waiter',
             // POS UNIFICATION: every other POS user (restaurant or retail) bills
             // on the single universal sale screen; restaurant behavior is driven
-            // by features.
-            default          => '/pos/invoice/create',
+            // by features. Hotel / Guest House with rooms ON lands on the desk.
+            default          => \App\Services\HotelShell::postLoginPath($user),
         };
     }
 

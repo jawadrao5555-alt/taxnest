@@ -180,7 +180,9 @@ class PosAuth
                 }
                 // Dashboard blocked too → land on the sale screen (unmapped path,
                 // always allowed) so the redirect can never loop.
-                $home = in_array('dashboard', $customAccess, true) ? '/pos/dashboard' : '/pos/invoice/create';
+                $home = in_array('dashboard', $customAccess, true)
+                    ? '/pos/dashboard'
+                    : \App\Services\HotelShell::postLoginPath($user);
                 return $this->toPortal($home)->with('error', __('pos.custom_access_denied'));
             }
         }

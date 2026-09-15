@@ -358,6 +358,75 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         $this->assertSame($invoiceId, \App\Models\HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'charge')->whereNotNull('pos_transaction_id')->value('pos_transaction_id'));
     }
 
+    public function test_occupancy_counts_all_in_house_dues_for_dashboard_strip(): void
+    {
+        $company = $this->company('hotel', [
+            'pos_tax_rate_cash' => 0,
+            'pos_tax_rate_card' => 0,
+        ]);
+        $stays = app(HotelStayService::class);
+        $folio = app(HotelFolioService::class);
+        $user = $this->owner($company);
+        $dueStay = $this->walkIn($stays, $company, $user, $this->room($stays, $company, '701', 5000), 'Due Guest');
+        $paidStay = $this->walkIn($stays, $company, $user, $this->room($stays, $company, '702', 5000), 'Paid Guest');
+        $folio->postPayment($paidStay, [
+            'amount' => 10000,
+            'payment_method' => 'cash',
+            'idempotency_key' => 'occ-pay-cleared',
+        ], (int) $user->id);
+
+        $occupancy = $stays->occupancy((int) $company->id, null);
+        $this->assertSame(2, $occupancy['in_house']);
+        $this->assertSame(1, $occupancy['pending_due_count']);
+        $this->assertGreaterThan(0.009, $occupancy['pending_due_amount']);
+        $viewer = $stays->occupancyForViewer($user, $company, null);
+        $this->assertSame(1, $viewer['pending_due_count'] ?? 0);
+
+        $dueLabel = preg_quote(__('pos.hotel_stat_due'), '/');
+        $html = $this->actingAs($user, 'pos')
+            ->get('/pos/hotel')
+            ->assertOk()
+            ->assertSee(__('pos.hotel_stat_due'), false)
+            ->getContent();
+        $this->assertMatchesRegularExpression(
+            '/'.$dueLabel.'[\s\S]{0,400}?\b1\b/u',
+            $html
+        );
+
+        $folio->postPayment($dueStay, [
+            'amount' => 10000,
+            'payment_method' => 'cash',
+            'idempotency_key' => 'occ-pay-due',
+        ], (int) $user->id);
+        $cleared = $stays->occupancy((int) $company->id, null);
+        $this->assertSame(0, $cleared['pending_due_count']);
+        $this->assertEquals(0.0, $cleared['pending_due_amount']);
+    }
+
+    public function test_board_pending_list_truncation_does_not_shrink_occupancy_due_count(): void
+    {
+        $company = $this->company('hotel', [
+            'pos_tax_rate_cash' => 0,
+            'pos_tax_rate_card' => 0,
+        ]);
+        $stays = app(HotelStayService::class);
+        $user = $this->owner($company);
+        for ($i = 1; $i <= 21; $i++) {
+            $this->walkIn(
+                $stays,
+                $company,
+                $user,
+                $this->room($stays, $company, sprintf('8%02d', $i), 1000),
+                'Due Guest '.$i
+            );
+        }
+        $board = $stays->board((int) $company->id, null);
+        $this->assertSame(21, $board['occupancy']['in_house']);
+        $this->assertSame(21, $board['occupancy']['pending_due_count']);
+        $this->assertCount(20, $board['pending']);
+        $this->assertGreaterThan(0.009, $board['occupancy']['pending_due_amount']);
+    }
+
     public function test_tenant_cannot_open_foreign_stay_or_policy_page_side_effect(): void
     {
         $a = $this->company();

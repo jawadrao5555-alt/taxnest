@@ -11,6 +11,7 @@ use App\Services\IntegrityHashService;
 use App\Services\ComplianceScoreService;
 use App\Services\HsIntelligenceService;
 use App\Services\HsUsagePatternService;
+use App\Services\DiFiscalSubmissionState;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,8 @@ class SendInvoiceToFbrJob implements ShouldQueue
 
     public $tries = 3;
     public $backoff = [30, 90, 180];
+    /** Queue retry_after is contractually >= 360 seconds (config/queue.php). */
+    public $timeout = 300;
 
     public function __construct(public int $invoiceId, public ?string $fbrEnvironment = null)
     {
@@ -86,7 +89,20 @@ class SendInvoiceToFbrJob implements ShouldQueue
 
         $environment = $invoice->company->fbr_environment ?? 'sandbox';
         $fbrService = new FbrService();
-        $response = $fbrService->submitInvoice($invoice, $this->attempts() - 1);
+        try {
+            $response = $fbrService->submitInvoice($invoice, $this->attempts() - 1);
+        } catch (\Throwable $e) {
+            // A legacy queued payload can die after crossing the send boundary.
+            // Preserve it for reconciliation; queue retry must not blind-post it.
+            DiFiscalSubmissionState::verificationRequired($invoice, $environment, 'legacy_job_callback_loss');
+            $invoice->save();
+            $this->releaseLock();
+            Log::error('SendInvoiceToFbrJob: fiscal outcome unknown', [
+                'invoice_id' => $invoice->id,
+                'exception_class' => get_class($e),
+            ]);
+            return;
+        }
 
         $executionMs = round((microtime(true) - $startTime) * 1000);
         Log::info("SendInvoiceToFbrJob: Invoice #{$invoice->id} completed in {$executionMs}ms, result: {$response['status']}");
@@ -95,15 +111,22 @@ class SendInvoiceToFbrJob implements ShouldQueue
 
         $this->updateFbrLog($invoice, $response, $executionMs, $environment, $failureCategory);
 
+        if ($response['status'] === 'simulated') {
+            DiFiscalSubmissionState::simulated($invoice);
+            $invoice->save();
+            $this->releaseLock();
+            return;
+        }
+
         if ($response['status'] === 'success') {
-            $invoice->status = 'locked';
-            $invoice->is_fbr_processing = false;
             $fbrNum = $response['fbr_invoice_number'] ?? null;
-            if ($fbrNum) {
-                $invoice->fbr_invoice_number = $fbrNum;
-                $invoice->fbr_submission_date = now();
+            if (!DiFiscalSubmissionState::isAuthoritativeAcknowledgement($fbrNum, $environment)) {
+                DiFiscalSubmissionState::verificationRequired($invoice, $environment, 'legacy_job_missing_acknowledgement');
+                $invoice->save();
+                $this->releaseLock();
+                return;
             }
-            $invoice->fbr_status = 'success';
+            DiFiscalSubmissionState::accepted($invoice, $fbrNum, $environment, 'fbr_authoritative_acknowledgement');
             $invoice->integrity_hash = IntegrityHashService::generate($invoice);
 
             $qrData = json_encode([
@@ -152,9 +175,11 @@ class SendInvoiceToFbrJob implements ShouldQueue
         }
 
         if ($response['status'] === 'pending_verification') {
-            $invoice->status = 'pending_verification';
-            $invoice->fbr_status = 'pending_verification';
-            $invoice->is_fbr_processing = false;
+            DiFiscalSubmissionState::verificationRequired(
+                $invoice,
+                $environment,
+                (string) ($response['failure_type'] ?? 'ambiguous_regulator_response')
+            );
             $invoice->save();
 
             InvoiceActivityService::log(
@@ -179,9 +204,7 @@ class SendInvoiceToFbrJob implements ShouldQueue
         $this->captureHsRejections($invoice, $response);
 
         if ($this->attempts() >= $this->tries) {
-            $invoice->status = 'failed';
-            $invoice->fbr_status = 'failed';
-            $invoice->is_fbr_processing = false;
+            DiFiscalSubmissionState::rejected($invoice);
             $invoice->save();
 
             InvoiceActivityService::log(
@@ -209,28 +232,27 @@ class SendInvoiceToFbrJob implements ShouldQueue
     {
         $invoice = Invoice::with(['company', 'items'])->find($this->invoiceId);
         if ($invoice) {
-            $invoice->status = 'failed';
-            $invoice->fbr_status = 'failed';
-            $invoice->is_fbr_processing = false;
+            // The queue framework reports this after an exception, not an
+            // authoritative regulator rejection. Keep it non-replayable.
+            $environment = $invoice->company?->fbr_environment ?? 'sandbox';
+            DiFiscalSubmissionState::verificationRequired($invoice, $environment, 'legacy_job_failed_callback');
             $invoice->save();
-
-            $this->captureHsRejections($invoice, [
-                'failure_type' => 'exception',
-                'errors' => [$exception->getMessage()],
-            ]);
 
             InvoiceActivityService::log(
                 $invoice->id,
                 $invoice->company_id,
-                'fbr_failed',
-                ['error' => $exception->getMessage()]
+                'pending_verification',
+                ['failure_type' => 'legacy_job_failed_callback']
             );
 
             ComplianceScoreService::recalculate($invoice->company_id);
         }
 
         $this->releaseLock();
-        Log::error("FBR submission permanently failed for invoice #{$this->invoiceId}: " . $exception->getMessage());
+        Log::error('FBR legacy job ended without an authoritative outcome', [
+            'invoice_id' => $this->invoiceId,
+            'exception_class' => get_class($exception),
+        ]);
     }
 
     private function releaseLock(): void

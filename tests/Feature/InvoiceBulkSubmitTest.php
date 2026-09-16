@@ -102,6 +102,11 @@ class InvoiceBulkSubmitTest extends TestCase
             $table->text('qr_data')->nullable();
             $table->string('integrity_hash')->nullable();
             $table->string('share_uuid')->nullable();
+            $table->string('fiscal_submission_state')->nullable();
+            $table->string('fiscal_submission_environment')->nullable();
+            $table->string('fiscal_submission_provenance')->nullable();
+            $table->unsignedBigInteger('fiscal_submission_batch_id')->nullable();
+            $table->timestamp('fiscal_lease_expires_at')->nullable();
             $table->timestamps();
         });
 
@@ -193,6 +198,15 @@ class InvoiceBulkSubmitTest extends TestCase
             $table->timestamp('completed_at')->nullable();
             $table->timestamp('acknowledged_at')->nullable();
             $table->timestamps();
+        });
+        Schema::create('invoice_bulk_submission_results', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('batch_id');
+            $table->unsignedBigInteger('invoice_id');
+            $table->string('outcome', 20);
+            $table->string('message', 300)->nullable();
+            $table->timestamps();
+            $table->unique(['batch_id', 'invoice_id'], 'invoice_bulk_result_once');
         });
         $this->company = Company::create([
             'name' => 'Bulk Test Co',
@@ -556,6 +570,121 @@ class InvoiceBulkSubmitTest extends TestCase
         $batch->refresh();
         $this->assertSame('completed', $batch->state);
         $this->assertEquals($completedAt, $batch->completed_at);
+    }
+
+    public function test_redelivered_job_records_the_invoice_outcome_once(): void
+    {
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'running',
+            'total' => 1,
+            'dispatched' => 1,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
+
+        BulkSubmitInvoiceJob::recordResult($batch->id, 701, 'failed', 'Explicit FBR rejection');
+        BulkSubmitInvoiceJob::recordResult($batch->id, 701, 'failed', 'Redelivered queue message');
+
+        $batch->refresh();
+        $this->assertSame(1, (int) $batch->done);
+        $this->assertSame(1, (int) $batch->failed);
+        $this->assertSame('completed', $batch->state);
+        $this->assertSame(1, \DB::table('invoice_bulk_submission_results')
+            ->where('batch_id', $batch->id)->where('invoice_id', 701)->count());
+    }
+
+    public function test_redelivered_final_result_settles_a_run_after_crash_between_counter_and_settlement(): void
+    {
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'running',
+            'total' => 1,
+            'dispatched' => 1,
+            'done' => 1,
+            'success' => 1,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
+        \DB::table('invoice_bulk_submission_results')->insert([
+            'batch_id' => $batch->id, 'invoice_id' => 702, 'outcome' => 'success',
+            'message' => 'completed before worker crash', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        BulkSubmitInvoiceJob::recordResult($batch->id, 702, 'success', 'redelivery after crash');
+
+        $this->assertSame('completed', $batch->fresh()->state);
+    }
+
+    public function test_seed_crash_after_cursor_commit_leaves_recoverable_outbox_rows(): void
+    {
+        Schema::create('invoice_bulk_submission_outbox', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('batch_id');
+            $table->unsignedBigInteger('invoice_id');
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->timestamp('dispatched_at')->nullable();
+            $table->timestamps();
+            $table->unique(['batch_id', 'invoice_id']);
+        });
+        $one = $this->makeDraft();
+        $two = $this->makeDraft();
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id, 'user_id' => $this->user->id,
+            'state' => 'queued', 'target_status' => 'draft', 'max_invoice_id' => $two->id,
+        ]);
+        $job = new SeedBulkSubmitBatchJob($batch->id);
+        $claim = new \ReflectionMethod($job, 'claimNextChunk');
+        $claim->setAccessible(true);
+        $claim->invoke($job); // simulated process crash: no dispatch happens
+
+        $this->assertSame(2, \DB::table('invoice_bulk_submission_outbox')->where('batch_id', $batch->id)->count());
+        $this->assertSame($two->id, (int) $batch->fresh()->cursor_id);
+
+        Queue::fake();
+        $flush = new \ReflectionMethod($job, 'dispatchOutbox');
+        $flush->setAccessible(true);
+        $flush->invoke($job); // replacement worker recovery
+        Queue::assertPushed(BulkSubmitInvoiceJob::class, 2);
+        $this->assertSame(2, \DB::table('invoice_bulk_submission_outbox')->whereNotNull('dispatched_at')->count());
+    }
+
+    public function test_duplicate_inflight_delivery_never_records_a_skipped_terminal_outcome(): void
+    {
+        $invoice = $this->makeDraft(['is_fbr_processing' => true, 'fbr_submission_hash' => 'owner-claim']);
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id, 'state' => 'running',
+            'total' => 1, 'dispatched' => 1, 'started_at' => now(), 'last_progress_at' => now(),
+        ]);
+
+        (new BulkSubmitInvoiceJob($invoice->id, $batch->id, $this->user->id))->handle();
+
+        $this->assertSame(0, (int) $batch->fresh()->done);
+        $this->assertSame(0, \DB::table('invoice_bulk_submission_results')->where('batch_id', $batch->id)->count());
+    }
+
+    public function test_post_acceptance_redelivery_recovers_same_batch_success_not_skip(): void
+    {
+        $invoice = $this->makeDraft([
+            'status' => 'locked',
+            'is_fbr_processing' => false,
+            'fiscal_submission_state' => 'accepted',
+        ]);
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id, 'state' => 'running',
+            'total' => 1, 'dispatched' => 1, 'started_at' => now(), 'last_progress_at' => now(),
+        ]);
+        $invoice->update(['fiscal_submission_batch_id' => $batch->id]);
+
+        // Simulates owner crash in the narrow interval after acceptance commit
+        // and before recordResult(success); this delivery is the recovery.
+        (new BulkSubmitInvoiceJob($invoice->id, $batch->id, $this->user->id))->handle();
+
+        $fresh = $batch->fresh();
+        $this->assertSame(1, (int) $fresh->done);
+        $this->assertSame(1, (int) $fresh->success);
+        $this->assertSame(0, (int) $fresh->skipped);
+        $this->assertSame('completed', $fresh->state);
     }
 
     /** While still dispatching, done == total must NOT end the run. */

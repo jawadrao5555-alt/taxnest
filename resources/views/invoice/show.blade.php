@@ -542,20 +542,29 @@
                 <div class="flex items-start gap-3">
                     <svg class="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div class="flex-1">
-                        <p class="text-sm font-bold text-emerald-800">FBR Production - Invoice Locked</p>
+                        <p class="text-sm font-bold text-emerald-800">
+                            FBR {{ $invoice->fiscal_submission_environment === 'sandbox' ? 'Sandbox acknowledgement' : 'Accepted' }} — Invoice Locked
+                        </p>
                         <div class="mt-1">
                             <template x-if="!editingFbr">
                                 <div class="flex items-center gap-2">
                                     <p class="text-sm text-emerald-700">FBR Invoice Number: <strong>{{ $invoice->fbr_invoice_number ?? 'Not set' }}</strong></p>
-                                    @if(in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                                    <button @click="editingFbr = true" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline">{{ $invoice->fbr_invoice_number ? 'Edit' : 'Add FBR #' }}</button>
+                                    @if(auth()->user()->role === 'super_admin')
+                                    <button @click="editingFbr = true" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline">Privileged correction</button>
                                     @endif
                                 </div>
                             </template>
                             <template x-if="editingFbr">
-                                <form method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-2 mt-1">
+                                <form method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex flex-wrap items-end gap-2 mt-1">
                                     @csrf
-                                    <input type="text" name="fbr_invoice_number" x-model="fbrNum" placeholder="Enter FBR Invoice Number" class="px-3 py-1.5 text-sm border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-72">
+                                    <div>
+                                        <label class="block text-xs font-medium text-emerald-800 mb-1">Regulator reference</label>
+                                        <input required minlength="5" type="text" name="fbr_invoice_number" x-model="fbrNum" placeholder="FBR invoice number" class="px-3 py-1.5 text-sm border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-72">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-emerald-800 mb-1">Correction reason</label>
+                                        <input required minlength="10" type="text" name="override_reason" placeholder="Reason (min. 10 characters)" class="px-3 py-1.5 text-sm border border-emerald-300 rounded-lg w-72">
+                                    </div>
                                     <button type="submit" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Save</button>
                                     <button type="button" @click="editingFbr = false" class="px-3 py-1.5 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-300 transition">Cancel</button>
                                 </form>
@@ -563,6 +572,9 @@
                         </div>
                         @if($invoice->fbr_submission_date)
                         <p class="text-xs text-emerald-600 mt-1">Submitted: {{ \Carbon\Carbon::parse($invoice->fbr_submission_date)->format('d-M-Y h:i A') }}</p>
+                        @endif
+                        @if($invoice->fiscal_submission_provenance)
+                        <p class="text-xs text-emerald-700 mt-1">Evidence: {{ str_replace('_', ' ', $invoice->fiscal_submission_provenance) }}</p>
                         @endif
                     </div>
                 </div>
@@ -574,29 +586,31 @@
                     <svg class="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
                     <div class="flex-1">
                         <p class="text-sm font-bold text-amber-800">Pending FBR Verification</p>
-                        <p class="mt-1 text-sm text-amber-700">FBR returned an ambiguous response. The invoice may have been accepted. Please check the FBR portal to confirm and then update this invoice's status.</p>
+                        <p class="mt-1 text-sm text-amber-700">The regulator outcome is unknown. This invoice is deliberately protected from retry, editing, deletion, and fiscal re-posting until a portal check is recorded.</p>
                         @if(in_array(auth()->user()->role, ['company_admin', 'super_admin']))
                         <div class="mt-3 space-y-3">
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex flex-wrap items-end gap-2">
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-wrap items-end gap-2">
                                 @csrf
+                                <input type="hidden" name="action" value="confirm">
                                 <div>
                                     <label class="block text-xs font-medium text-amber-800 mb-1">FBR Invoice Number (from portal)</label>
-                                    <input type="text" name="fbr_invoice_number" placeholder="e.g. 3620291786117DIA..." class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-64">
+                                    <input required minlength="5" type="text" name="fbr_invoice_number" placeholder="e.g. 3620291786117DIA..." class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-64">
                                 </div>
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Confirm & Save FBR #</button>
+                                <div>
+                                    <label class="block text-xs font-medium text-amber-800 mb-1">Portal verification note</label>
+                                    <input required minlength="10" type="text" name="verification_reason" placeholder="What was verified? (min. 10 characters)" class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg w-72">
+                                </div>
+                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Portal confirms acceptance</button>
                             </form>
-                            <div class="flex gap-2">
-                                <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
-                                    @csrf
-                                    <input type="hidden" name="action" value="confirm">
-                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition">Confirm Without Number</button>
-                                </form>
-                                <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="inline">
-                                    @csrf
-                                    <input type="hidden" name="action" value="reject">
-                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition">Not on FBR Portal (Reset to Draft)</button>
-                                </form>
-                            </div>
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-wrap items-end gap-2">
+                                @csrf
+                                <input type="hidden" name="action" value="reject">
+                                <div>
+                                    <label class="block text-xs font-medium text-amber-800 mb-1">Portal verification note</label>
+                                    <input required minlength="10" type="text" name="verification_reason" placeholder="Explain the portal search (min. 10 characters)" class="px-3 py-1.5 text-xs border border-red-300 rounded-lg w-72">
+                                </div>
+                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition">Portal shows no acceptance — return to draft</button>
+                            </form>
                         </div>
                         @endif
                     </div>
@@ -661,6 +675,17 @@
                             @endif
                         </div>
                         <div class="text-right" id="statusBadgeBlock">
+                            @php
+                                $fiscalState = $invoice->fiscal_submission_state;
+                                $fiscalLabel = match($fiscalState) {
+                                    'accepted' => ($invoice->fiscal_submission_environment === 'sandbox' ? 'Sandbox acknowledged' : 'FBR acknowledged'),
+                                    'verification_required' => 'Verification required',
+                                    'simulated' => 'Demo only — not submitted',
+                                    'rejected' => 'Regulator rejected',
+                                    'submitting' => 'Submission in progress',
+                                    default => null,
+                                };
+                            @endphp
                             <span id="invoiceStatusBadge" class="inline-flex px-3 py-1 rounded-full text-sm font-bold transition-all duration-200
                                 @if($invoice->status === 'draft') bg-gray-200 text-gray-700 dark:text-gray-300
                                 @elseif($invoice->status === 'failed') bg-red-100 text-red-800
@@ -670,13 +695,13 @@
                                 {{ $invoice->status === 'pending_verification' ? 'Pending Verification' : ucfirst($invoice->status) }}
                             </span>
                             <span id="fbrStatusBadge" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 transition-all duration-200
-                                @if(!$invoice->fbr_status) hidden @endif
+                                @if(!$invoice->fbr_status && !$fiscalLabel) hidden @endif
                                 @if($invoice->fbr_status === 'production') bg-emerald-100 text-emerald-800
                                 @elseif($invoice->fbr_status === 'validated') bg-emerald-100 text-emerald-800
                                 @elseif($invoice->fbr_status === 'failed' || $invoice->fbr_status === 'validation_failed') bg-red-100 text-red-800
                                 @elseif($invoice->fbr_status === 'sandbox') bg-amber-100 text-amber-800
                                 @else bg-gray-100 text-gray-800 dark:text-gray-100 @endif">
-                                FBR: {{ $invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Validation Failed' : ucfirst($invoice->fbr_status ?? '')) }}
+                                FBR: {{ $fiscalLabel ?? ($invoice->fbr_status === 'production' ? 'Production' : ($invoice->fbr_status === 'validation_failed' ? 'Validation Failed' : ucfirst($invoice->fbr_status ?? ''))) }}
                             </span>
                             @if($invoice->status === 'locked' && $invoice->integrity_hash)
                             <p class="text-xs text-green-600 mt-1">SHA256 Protected</p>
@@ -709,19 +734,8 @@
                             <p class="text-sm text-gray-600 dark:text-gray-400">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->display_invoice_number }}</span></p>
 @if($invoice->fbr_invoice_number)
 <p class="text-sm text-gray-600 dark:text-gray-400">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
-@elseif(in_array($invoice->status, ['locked', 'pending_verification']) && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-<div x-data="{ showFbrInput: false, fbrVal: '' }" class="mt-1">
-    <template x-if="!showFbrInput">
-        <button @click="showFbrInput = true" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline">+ Add FBR Invoice Number</button>
-    </template>
-    <template x-if="showFbrInput">
-        <form method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1">
-            @csrf
-            <input type="text" name="fbr_invoice_number" x-model="fbrVal" placeholder="FBR Invoice #" class="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-emerald-500 w-48">
-            <button type="submit" class="px-2 py-1 bg-emerald-600 text-white rounded text-xs font-semibold">Save</button>
-        </form>
-    </template>
-</div>
+@elseif($invoice->status === 'pending_verification')
+<p class="text-xs text-amber-700 mt-1">Portal verification is required; use the recorded confirmation controls above.</p>
 @endif
 @if($invoice->fbr_submission_date)
 <p class="text-sm text-gray-600 dark:text-gray-400">FBR Date: <span class="font-semibold text-gray-900">{{ $invoice->fbr_submission_date->format('d M Y H:i') }}</span></p>
@@ -1510,6 +1524,9 @@ function handleFbrResponse(data) {
     if (data.status === 'success') {
         openFbrSuccessModal(data);
         if (window.tnNotify) window.tnNotify('FBR Submission Successful', 'Invoice ' + (data.fbr_invoice_number || '') + ' submitted to FBR.', { tag: 'fbr-success', icon: '/icons/tax-di/icon-192.png' });
+    } else if (data.status === 'simulated') {
+        showFbrPending(data.message || 'Demo response recorded. No regulator acceptance was requested or recorded.');
+        if (window.tnNotify) window.tnNotify('Demo response only', data.message || 'No regulator acceptance was requested.', { tag: 'fbr-simulated', icon: '/icons/tax-di/icon-192.png' });
     } else if (data.status === 'pending_verification') {
         showFbrPending(data.message);
         if (window.tnNotify) window.tnNotify('FBR Pending Verification', data.message || 'Awaiting FBR confirmation.', { tag: 'fbr-pending', icon: '/icons/tax-di/icon-192.png' });
@@ -1686,7 +1703,7 @@ async function smartRefreshInvoiceStatus() {
         });
         if (!res.ok) throw new Error('Status fetch failed');
         const data = await res.json();
-        patchStatusBadge(data.status, data.fbr_status);
+        patchStatusBadge(data.status, data.fbr_status, data.fiscal_submission_state, data.fiscal_submission_environment);
         patchActionButtons(data.status, data.fbr_status, data.fbr_invoice_number, data.share_uuid, data.display_invoice_number, data.wht_rate, data.wht_locked);
         showSuccessToast(data.fbr_invoice_number);
     } catch (e) {
@@ -1694,7 +1711,7 @@ async function smartRefreshInvoiceStatus() {
     }
 }
 
-function patchStatusBadge(status, fbrStatus) {
+function patchStatusBadge(status, fbrStatus, fiscalState, fiscalEnvironment) {
     const badge = document.getElementById('invoiceStatusBadge');
     const fbrBadge = document.getElementById('fbrStatusBadge');
     if (badge) {
@@ -1706,12 +1723,22 @@ function patchStatusBadge(status, fbrStatus) {
         requestAnimationFrame(() => { badge.style.transition = 'opacity 200ms ease'; badge.style.opacity = '1'; });
     }
     if (fbrBadge) {
-        if (fbrStatus) {
+        if (fbrStatus || fiscalState) {
             fbrBadge.classList.remove('hidden');
             fbrBadge.className = 'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 transition-all duration-200';
             const fbrMap = { production: 'bg-emerald-100 text-emerald-800', validated: 'bg-emerald-100 text-emerald-800', failed: 'bg-red-100 text-red-800', validation_failed: 'bg-red-100 text-red-800', sandbox: 'bg-amber-100 text-amber-800' };
             fbrBadge.classList.add(...(fbrMap[fbrStatus] || 'bg-gray-100 text-gray-800 dark:text-gray-100').split(' '));
-            const fbrLabel = fbrStatus === 'production' ? 'Production' : fbrStatus === 'validation_failed' ? 'Validation Failed' : fbrStatus.charAt(0).toUpperCase() + fbrStatus.slice(1);
+            const canonicalLabels = {
+                accepted: fiscalEnvironment === 'sandbox' ? 'Sandbox acknowledged' : 'FBR acknowledged',
+                verification_required: 'Verification required',
+                simulated: 'Demo only — not submitted',
+                rejected: 'Regulator rejected',
+                submitting: 'Submission in progress'
+            };
+            const fbrLabel = canonicalLabels[fiscalState]
+                || (fbrStatus === 'production' ? 'Production'
+                    : fbrStatus === 'validation_failed' ? 'Validation Failed'
+                    : (fbrStatus ? fbrStatus.charAt(0).toUpperCase() + fbrStatus.slice(1) : 'Draft'));
             fbrBadge.textContent = 'FBR: ' + fbrLabel;
             fbrBadge.style.opacity = '0';
             requestAnimationFrame(() => { fbrBadge.style.transition = 'opacity 200ms ease'; fbrBadge.style.opacity = '1'; });

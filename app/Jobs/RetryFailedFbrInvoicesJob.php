@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\Invoice;
-use App\Services\FbrService;
+use App\Models\FbrLog;
+use App\Http\Controllers\InvoiceController;
+use App\Services\DiFiscalSubmissionState;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -65,13 +67,13 @@ class RetryFailedFbrInvoicesJob implements ShouldQueue
 
     private function retrySingle(int $invoiceId): void
     {
-        $invoice = Invoice::with('items', 'company')->find($invoiceId);
+        $invoice = Invoice::withoutGlobalScopes()->with('items', 'company')->find($invoiceId);
         if (!$invoice) {
             Log::warning("RetryFailedFbrInvoicesJob: invoice #{$invoiceId} not found");
             return;
         }
 
-        if ($invoice->fbr_invoice_number || $invoice->status === 'locked') {
+        if ($invoice->fbr_invoice_number || in_array($invoice->status, ['locked', 'pending_verification'], true)) {
             Log::info("RetryFailedFbrInvoicesJob: invoice #{$invoiceId} already locked, skip");
             return;
         }
@@ -81,34 +83,63 @@ class RetryFailedFbrInvoicesJob implements ShouldQueue
             return;
         }
 
-        $invoice->fbr_submission_hash = null;
-        $invoice->status = 'draft';
-        $invoice->fbr_status = null;
-        $invoice->is_fbr_processing = false;
-        $invoice->retry_count = ($invoice->retry_count ?? 0) + 1;
-        $invoice->last_retry_at = now();
-        $invoice->save();
+        // Automatic replay is safe only after an explicit regulator rejection.
+        // Any timeout, malformed acknowledgement or callback loss is retained
+        // as pending_verification and deliberately never reaches this worker.
+        $lastOutcome = FbrLog::where('invoice_id', $invoiceId)->latest('id')->first();
+        if (!$lastOutcome || $lastOutcome->status !== 'failed'
+            || !in_array($lastOutcome->failure_type, ['validation_error', 'payload_error', 'pre_validation', 'schema_error'], true)) {
+            Log::warning('RetryFailedFbrInvoicesJob: automatic replay refused without explicit rejection', [
+                'invoice_id' => $invoiceId,
+                'log_status' => $lastOutcome->status ?? null,
+                'failure_type' => $lastOutcome->failure_type ?? null,
+            ]);
+            return;
+        }
+
+        $claimed = DiFiscalSubmissionState::reserve(
+            $invoiceId,
+            'automatic_retry',
+            $invoice->company?->fbr_environment ?? 'sandbox'
+        );
+        if (!$claimed) {
+            Log::info("RetryFailedFbrInvoicesJob: invoice #{$invoiceId} was claimed by another submission");
+            return;
+        }
+        $claimed->retry_count = ($claimed->retry_count ?? 0) + 1;
+        $claimed->last_retry_at = now();
+        $claimed->save();
 
         try {
-            $fbr = new FbrService();
-            $result = $fbr->submitInvoice($invoice, 0);
+            $result = app(InvoiceController::class)->submitToFbrSync($claimed);
 
             if (($result['status'] ?? null) === 'success') {
-                Log::info("RetryFailedFbrInvoicesJob: invoice #{$invoiceId} SUCCESS on retry {$invoice->retry_count}");
+                Log::info("RetryFailedFbrInvoicesJob: invoice #{$invoiceId} SUCCESS on retry {$claimed->retry_count}");
                 return;
             }
 
-            $invoice->fbr_status = 'failed';
-            $invoice->save();
-
-            $errors = is_array($result['errors'] ?? null)
-                ? implode('; ', array_slice($result['errors'], 0, 3))
-                : ($result['failure_type'] ?? 'unknown');
-            Log::warning("RetryFailedFbrInvoicesJob: invoice #{$invoiceId} retry {$invoice->retry_count} failed: {$errors}");
+            Log::warning('RetryFailedFbrInvoicesJob: regulator did not accept automatic retry', [
+                'invoice_id' => $invoiceId,
+                'retry_count' => $claimed->retry_count,
+                'result_status' => $result['status'] ?? 'unknown',
+                'failure_type' => $result['failure_type'] ?? null,
+            ]);
         } catch (\Throwable $e) {
-            $invoice->fbr_status = 'failed';
-            $invoice->save();
-            Log::error("RetryFailedFbrInvoicesJob: invoice #{$invoiceId} exception: " . $e->getMessage());
+            // The send boundary may have been crossed. Do not clear the claim
+            // or turn this into a replayable failed invoice.
+            $current = Invoice::withoutGlobalScopes()->find($invoiceId);
+            if ($current && $current->is_fbr_processing) {
+                DiFiscalSubmissionState::verificationRequired(
+                    $current,
+                    $current->company?->fbr_environment ?? 'sandbox',
+                    'retry_worker_callback_loss'
+                );
+                $current->save();
+            }
+            Log::error('RetryFailedFbrInvoicesJob: retry outcome unknown', [
+                'invoice_id' => $invoiceId,
+                'exception_class' => get_class($e),
+            ]);
         }
     }
 }

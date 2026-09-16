@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceBulkSubmission;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -43,41 +44,37 @@ class SeedBulkSubmitBatchJob implements ShouldQueue
 
     public function handle(): void
     {
-        $batch = InvoiceBulkSubmission::find($this->batchId);
-        if (!$batch || !$batch->isActive()) {
+        // Recover rows committed by a predecessor that died after advancing
+        // the cursor but before it could enqueue the child jobs.
+        if (\Illuminate\Support\Facades\Schema::hasTable('invoice_bulk_submission_outbox')) {
+            $this->dispatchOutbox();
+        }
+        $claim = $this->claimNextChunk();
+        if ($claim === null) {
             return;
         }
 
-        if ($batch->cancel_requested) {
-            $this->finishDispatching($batch);
-            return;
+        [$batch, $ids, $finishedDispatching] = $claim;
+
+        // The rows were written with the cursor transaction. Dispatching can
+        // be repeated after a crash; the outbox unique key plus the bulk
+        // invoice claim make it harmless and prevent a lost invoice.
+        if (\Illuminate\Support\Facades\Schema::hasTable('invoice_bulk_submission_outbox')) {
+            $this->dispatchOutbox();
+        } else {
+            // Pre-migration compatibility only; RC production requires the
+            // transactional outbox migration before bulk dispatch is enabled.
+            foreach ($ids as $id) {
+                BulkSubmitInvoiceJob::dispatch((int) $id, $batch->id, $batch->user_id);
+            }
         }
 
-        if ($batch->state === 'queued') {
-            $batch->state = 'dispatching';
-            $batch->started_at = $batch->started_at ?? now();
-        }
-
-        $ids = $this->nextIds($batch);
-
-        foreach ($ids as $id) {
-            BulkSubmitInvoiceJob::dispatch((int) $id, $batch->id, $batch->user_id);
-        }
-
-        if (!empty($ids)) {
-            $batch->cursor_id = (int) end($ids);
-            $batch->dispatched = $batch->dispatched + count($ids);
-        }
-        $batch->last_progress_at = now();
-        $batch->save();
-
-        // More to go — hand the next chunk to a fresh job so this one stays short.
-        if (count($ids) === self::CHUNK) {
+        if (!$finishedDispatching) {
             self::dispatch($batch->id);
             return;
         }
 
-        $this->finishDispatching($batch);
+        BulkSubmitInvoiceJob::settleIfComplete($batch->id);
     }
 
     public function failed(?\Throwable $e = null): void
@@ -98,18 +95,82 @@ class SeedBulkSubmitBatchJob implements ShouldQueue
     }
 
     /**
-     * Everything is queued: the dispatched count is now the authoritative total
-     * (invoices submitted by hand between the click and here simply are not in
-     * the run), and completion becomes possible.
+     * Claim the next cursor range and advance it in one short transaction.
+     * Network submission happens later and is never performed while this lock
+     * is held.
+     *
+     * @return array{0: InvoiceBulkSubmission, 1: array<int>, 2: bool}|null
      */
-    protected function finishDispatching(InvoiceBulkSubmission $batch): void
+    protected function claimNextChunk(): ?array
     {
-        $batch->total = $batch->dispatched;
-        $batch->state = 'running';
-        $batch->last_progress_at = now();
-        $batch->save();
+        return DB::transaction(function () {
+            $batch = InvoiceBulkSubmission::withoutGlobalScopes()->whereKey($this->batchId)->lockForUpdate()->first();
+            if (!$batch || !$batch->isActive()) {
+                return null;
+            }
+            if ($batch->cancel_requested) {
+                $batch->state = 'cancelled';
+                $batch->completed_at = now();
+                $batch->last_progress_at = now();
+                $batch->save();
+                return null;
+            }
+            if ($batch->state === 'queued') {
+                $batch->state = 'dispatching';
+                $batch->started_at = $batch->started_at ?? now();
+            }
 
-        BulkSubmitInvoiceJob::settleIfComplete($batch->id);
+            $ids = $this->nextIds($batch);
+            if (!empty($ids)) {
+                $batch->cursor_id = (int) end($ids);
+                $batch->dispatched += count($ids);
+                if (\Illuminate\Support\Facades\Schema::hasTable('invoice_bulk_submission_outbox')) {
+                    DB::table('invoice_bulk_submission_outbox')->insertOrIgnore(array_map(
+                        fn (int $id) => [
+                            'batch_id' => $batch->id,
+                            'invoice_id' => $id,
+                            'user_id' => $batch->user_id,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ],
+                        $ids
+                    ));
+                }
+            }
+            $finished = count($ids) < self::CHUNK;
+            if ($finished) {
+                // Preserve the original requested total if a dispatch failure
+                // occurs; this normal terminal transition only occurs after all
+                // eligible rows in the frozen range were claimed.
+                $batch->total = $batch->dispatched;
+                $batch->state = 'running';
+            }
+            $batch->last_progress_at = now();
+            $batch->save();
+
+            return [$batch, $ids, $finished];
+        });
+    }
+
+    /** Deliver committed outbox rows; marking is deliberately after dispatch. */
+    protected function dispatchOutbox(): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('invoice_bulk_submission_outbox')) {
+            return;
+        }
+        DB::table('invoice_bulk_submission_outbox')
+            ->where('batch_id', $this->batchId)
+            ->whereNull('dispatched_at')
+            ->orderBy('id')
+            ->chunkById(self::CHUNK, function ($rows) {
+                foreach ($rows as $row) {
+                    BulkSubmitInvoiceJob::dispatch((int) $row->invoice_id, (int) $row->batch_id, $row->user_id ? (int) $row->user_id : null);
+                    DB::table('invoice_bulk_submission_outbox')
+                        ->where('id', $row->id)
+                        ->whereNull('dispatched_at')
+                        ->update(['dispatched_at' => now(), 'updated_at' => now()]);
+                }
+            });
     }
 
     /** The next page of still-eligible invoice ids for this run. */

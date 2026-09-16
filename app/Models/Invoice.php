@@ -47,6 +47,13 @@ class Invoice extends Model
         'source',
         'client_reference',
         'import_batch_id',
+        'fiscal_submission_state',
+        'fiscal_submission_environment',
+        'fiscal_submission_provenance',
+        'fiscal_submission_batch_id',
+        'fiscal_payload_hash',
+        'fiscal_lease_expires_at',
+        'fiscal_acknowledged_at',
     ];
 
     protected $casts = [
@@ -58,6 +65,9 @@ class Invoice extends Model
         'wht_rate' => 'float',
         'wht_amount' => 'float',
         'net_receivable' => 'float',
+        'fiscal_lease_expires_at' => 'datetime',
+        'fiscal_acknowledged_at' => 'datetime',
+        'fiscal_submission_batch_id' => 'integer',
     ];
 
     /**

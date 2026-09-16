@@ -17,10 +17,6 @@ fail() { printf 'rc-mariadb-lab: %s\n' "$*" >&2; exit 1; }
 [[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT >= 1024 && PORT <= 65535 && PORT != 9000 )) || fail "unsafe port"
 [[ "$PORT" != 33117 || "$ROOT" == /tmp/taxnest-rc-mariadb-browser-* ]] || fail "33117 is reserved for the exact browser fixture"
 [[ -x "$SERVER" && -x "$CLIENT" && -x "$ADMIN" && -x "$INSTALL_DB" ]] || fail "genuine MariaDB 10.6 server/client/install-db binaries unavailable"
-SERVER_VERSION="$("$SERVER" --version 2>&1)"
-CLIENT_VERSION="$("$CLIENT" --version 2>&1)"
-[[ "$SERVER_VERSION" =~ MariaDB ]] && [[ "$SERVER_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 server: $SERVER_VERSION"
-[[ "$CLIENT_VERSION" =~ MariaDB ]] && [[ "$CLIENT_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 client: $CLIENT_VERSION"
 if [[ "${RC_MARIADB_REQUIRE_EGRESS_GUARD:-0}" == 1 ]]; then
     [[ -r "${RC_MARIADB_LD_PRELOAD:-}" ]] || fail 'required loopback-only egress guard is unavailable'
 fi
@@ -33,6 +29,10 @@ guarded() {
         "$@"
     fi
 }
+SERVER_VERSION="$(guarded "$SERVER" --version 2>&1)"
+CLIENT_VERSION="$(guarded "$CLIENT" --version 2>&1)"
+[[ "$SERVER_VERSION" =~ MariaDB ]] && [[ "$SERVER_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 server: $SERVER_VERSION"
+[[ "$CLIENT_VERSION" =~ MariaDB ]] && [[ "$CLIENT_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 client: $CLIENT_VERSION"
 
 write_config() {
     mkdir -p "$ROOT" "$RUN" "$LOG"

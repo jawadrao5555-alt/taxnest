@@ -356,21 +356,35 @@ assertDi(
     && $bulkJobCount() === $liveBefore,
     'live outbox lease is not stolen by immediate retry'
 );
+// The immediate retry cannot take a live lease, but it must leave durable
+// delayed Seed work behind rather than relying on a test-only boolean hook.
+$delayedSeed = DB::table('jobs')
+    ->where('queue', BulkSubmitInvoiceJob::QUEUE)
+    ->where('payload', 'like', '%SeedBulkSubmitBatchJob%')
+    ->where('available_at', '>', time())
+    ->orderBy('id')
+    ->first();
+assertDi(
+    $delayedSeed !== null && (int) $delayedSeed->available_at > time(),
+    'live lease persisted a delayed Seed recovery queue row'
+);
 DB::table('invoice_bulk_submission_outbox')->where('id', $crashRow->id)->update([
     'dispatch_claimed_at' => now()->subSeconds(SeedBulkSubmitBatchJob::OUTBOX_CLAIM_SECONDS + 1),
 ]);
 $jobsBeforeRecovery = $bulkJobCount();
-[$recoveryWorkers] = runWorkers(
-    __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
-    [$crashBatch->id, 'dispatch'],
-    2,
-    true
-);
+// Model the queue reaching available_at, then execute its serialized delayed
+// job. This validates the real queue payload and recovery path without a
+// daemon or any external endpoint.
+DB::table('jobs')->where('id', $delayedSeed->id)->update(['available_at' => time() - 1]);
+$delayedPayload = json_decode((string) $delayedSeed->payload, true, 512, JSON_THROW_ON_ERROR);
+$delayedJob = unserialize($delayedPayload['data']['command'], ['allowed_classes' => true]);
+config(['queue.default' => 'database']);
+assertDi($delayedJob instanceof SeedBulkSubmitBatchJob, 'delayed queue payload contains a SeedBulkSubmitBatchJob');
+$delayedJob->handle();
 assertDi(
-    $recoveryWorkers === 2
-    && DB::table('invoice_bulk_submission_outbox')->where('id', $crashRow->id)->whereNotNull('dispatched_at')->exists()
+    DB::table('invoice_bulk_submission_outbox')->where('id', $crashRow->id)->whereNotNull('dispatched_at')->exists()
     && $bulkJobCount() === $jobsBeforeRecovery + 1,
-    'expired outbox claim replays one at-least-once hand-off'
+    'eligible delayed Seed job replays one expired at-least-once hand-off'
 );
 [$downstreamWorkers] = runWorkers(
     __DIR__.'/../../tests/native/rc_di_bulk_result_worker.php',
@@ -387,5 +401,5 @@ assertDi(
 );
 
 printf(
-    "PASS: DI native proof claims=10 duplicate_workers=10 terminal_workers=2 terminal_results=2 outbox_workers=4 endpoint_calls=0\n"
+    "PASS: DI native proof claims=10 duplicate_workers=10 terminal_workers=2 terminal_results=2 outbox_workers=3 delayed_seed_recovery=1 endpoint_calls=0\n"
 );

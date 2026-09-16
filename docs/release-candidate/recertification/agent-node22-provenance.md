@@ -44,11 +44,11 @@ path; this report does not claim it is active remotely.
 | `node v22.15.1 --test --test-concurrency=1` on 23 platform-independent PRA Agent test files | PASS — 43 tests; 0 failed, cancelled, skipped, or todo |
 | `node v22.15.1 --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js` | PASS — 8 tests; 0 failed, cancelled, skipped, or todo |
 | `vendor/bin/phpunit tests/Unit/AgentReleaseManifestTest.php` | PASS — 3 tests, 8 assertions |
+| `node v22.15.1 pra-agent/test/local-core-internet-cut.test.js` | PASS — real Electron Local Core release-gate harness, including offline KOT, held-order replay, counter recall/settlement, encrypted local persistence, and idempotent retry |
 
-`pra-agent/test/local-core-internet-cut.test.js` was deliberately excluded:
-it launches Electron and therefore requires a native/Linux GUI binary. No
-native or Windows release build was attempted. The platform-independent
-internet-cut harness is included in the 43 passing PRA Agent tests.
+The Electron testcase was not part of the earlier 43 platform-independent
+tests. Its separately recorded bounded Linux execution below uses the locked
+existing Electron runtime; no native or Windows release build was attempted.
 
 `pkgs.nspr` is already available without changing the environment:
 `/nix/store/gpb87pb8s826aggy1s3f352alp40dkj8-nspr-4.36/lib/libnspr4.so`.
@@ -60,19 +60,28 @@ At 12:10:09, a fresh workflow-authorization lookup observed HTTP 404. This
 records only that authorization observation; it did not dispatch, alter, or
 publish a workflow.
 
-The Linux Electron release-gate testcase was then actually invoked with the
-existing isolated Node `v22.15.1`, a fresh `env -i` home, the loopback-only
-`LD_PRELOAD` network guard, and
-`LD_LIBRARY_PATH=/nix/store/gpb87pb8s826aggy1s3f352alp40dkj8-nspr-4.36/lib`.
-`xvfb-run` was not installed (although `Xvfb` itself was present), so the
-testcase selected its documented headless fallback. It exited `1` before any
-application assertion because the installed Electron package contains no
-Linux runtime at
-`pra-agent/node_modules/electron/dist/electron` (`spawn ... ENOENT`).
+The first guarded invocation established that the `--ignore-scripts`
+dependency installation had left the locked Electron package without its
+reconstructable `dist/electron` runtime (`spawn ... ENOENT`). A second,
+explicit dependency-installation step used `npm rebuild electron
+--foreground-scripts --no-audit --no-fund` for the existing lockfile-selected
+Electron `41.10.7`, under a fresh isolated `env -i` home/cache. It completed
+successfully and exposed `pra-agent/node_modules/electron/dist/electron`
+(`v41.10.7`). No registry configuration, mirror, or credential workaround
+was used.
 
-This is a concrete missing-Electron-runtime dependency failure, not a pass or
-a GUI skip. No Electron download, native application build, Windows build,
-release build, publication, or workflow change was attempted.
+The testcase was then run once with isolated Node `v22.15.1`, the fresh
+`env -i` home and loopback-only `LD_PRELOAD` network guard. `xvfb-run` was
+not installed, so the available `Xvfb` binary was started directly on an
+ephemeral local display with TCP listening disabled. The execution passed
+with the known NSPR library and the Nix development-shell library closure in
+`LD_LIBRARY_PATH`; it printed `PASS Electron Local Core release-gate harness
+(incl. offline KOT: local print job + single cloud order.held + single
+order.settled)`.
+
+This is an actual passing Linux Electron verification, not a GUI skip. No
+native application build, Windows build, release build, publication, or
+workflow change was attempted.
 
 ## Raw evidence
 

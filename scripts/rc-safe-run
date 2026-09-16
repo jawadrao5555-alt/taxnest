@@ -147,6 +147,7 @@ if ((browser)); then
         "RC_BROWSER_PORT=${RC_BROWSER_PORT:-5911}"
         "RC_BROWSER_SESSION_DRIVER=file"
         "SESSION_DRIVER=file"
+        "RC_BROWSER_ONLY=${RC_BROWSER_ONLY:-}"
         "RC_BROWSER_STATE_ROOT=$browser_state"
         "RC_MARIADB_ROOT=$mariadb_root"
         "RC_MARIADB_PORT=${RC_MARIADB_PORT:-33117}"

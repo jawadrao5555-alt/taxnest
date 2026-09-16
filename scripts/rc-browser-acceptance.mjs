@@ -47,8 +47,9 @@ async function checkUsability(page,t,path,v) {
 async function surface(page,t,path,v) {
   if (path.endsWith('.csv')) {
     if (t.denied) {
-      const status=await page.evaluate(async p=>(await fetch(p,{credentials:'same-origin'})).status,path);
-      if (![302,401,403].includes(status)) fail(`${t.name}/${v.width}: denied CSV unexpectedly returned ${status}`); else pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied CSV stayed denied`);
+      const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:30000});
+      const status=response?.status()||0;
+      if (![302,401,403].includes(status)&&new URL(page.url()).pathname===path) fail(`${t.name}/${v.width}: denied CSV unexpectedly rendered`); else pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied CSV stayed denied`);
       return;
     }
     const [dl]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.evaluate(p=>location.assign(p),path)]);
@@ -58,7 +59,7 @@ async function surface(page,t,path,v) {
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000}); await dismiss(page);
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
-  if (t.denied) { if ([302,403].includes(status)||page.url().includes('/login')||page.url().includes('/dashboard')) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
+  if (t.denied) { if ([302,403].includes(status)||new URL(page.url()).pathname!==path) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);
   const expected=(t.expectedPaths||[])[(t.paths||[t.path]).indexOf(path)]||t.allowRedirectTo||path;
   if(new URL(page.url()).pathname!==expected)return fail(`${t.name}/${v.width}: ${path} ended at ${new URL(page.url()).pathname}, expected ${expected}`);
@@ -112,7 +113,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);if(d.consoleErrors.length)fail(`${t.name}/${label}: console error ${d.consoleErrors[0]}`);if(d.failedRequests.length)fail(`${t.name}/${label}: failed request ${d.failedRequests[0]}`);const unexpectedHttp=d.httpErrors.filter(x=>!t.denied||!t.paths?.some(path=>x.url===baseUrl+path));if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

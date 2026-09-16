@@ -52,7 +52,7 @@ $now = now();
 $company = static function (string $name, string $email, string $ntn, string $product, array $attributes = []): Company {
     return Company::withoutGlobalScopes()->create(array_merge([
         'name' => $name, 'email' => $email, 'ntn' => $ntn, 'phone' => '00000000000',
-        'status' => 'approved', 'company_status' => 'active', 'product_type' => $product,
+        'status' => 'approved', 'company_status' => 'active', 'product_type' => $product, 'default_language' => 'en',
         'is_internal_account' => true,
     ], $attributes));
 };
@@ -61,7 +61,7 @@ $user = static function (Company $company, string $name, string $email, string $
         'name' => $name, 'email' => $email, 'password' => Hash::make($password),
         'company_id' => $company->id, 'product_type' => $company->product_type,
         'role' => $role, 'pos_role' => $posRole ?: null, 'health_role' => $healthRole,
-        'is_active' => true,
+        'is_active' => true, 'language' => 'en',
     ];
     if ($customAccess !== null) {
         $attributes['pos_custom_access'] = json_encode($customAccess, JSON_THROW_ON_ERROR);
@@ -91,7 +91,7 @@ $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.inv
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
 $hotelHousekeeping = $user($hotel, 'Synthetic Hotel Housekeeping', 'hotel-housekeeping@rc-browser.invalid', 'staff', 'pos_cashier', ['dashboard', 'hotel_housekeeping']);
 $hotelOutlet = $user($hotel, 'Synthetic Restaurant Outlet Cashier', 'hotel-outlet@rc-browser.invalid', 'staff', 'pos_cashier', ['dashboard', 'orders']);
-$hotelDenied = $user($hotel, 'Synthetic Hotel Denied Cashier', 'hotel-denied@rc-browser.invalid', 'staff', 'pos_cashier', ['dashboard']);
+$hotelDenied = $user($hotel, 'Synthetic Hotel Denied Waiter', 'hotel-denied@rc-browser.invalid', 'staff', 'pos_waiter');
 
 $service = $company('Synthetic RC Event Services', 'service-company@rc-browser.invalid', 'RCBROWSER002', 'pos', [
     'business_category' => 'event_management', 'pos_type' => 'event_management',
@@ -101,7 +101,7 @@ $service = $company('Synthetic RC Event Services', 'service-company@rc-browser.i
 ]);
 $serviceWorker = $user($service, 'Synthetic Event Workflow Admin', 'service-work-orders@rc-browser.invalid', 'company_admin', 'pos_admin');
 $serviceManager = $user($service, 'Synthetic Event Workflow Manager', 'service-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'service_jobs']);
-$serviceDenied = $user($service, 'Synthetic Event Workflow Denied', 'service-denied@rc-browser.invalid', 'staff', 'pos_cashier', ['dashboard']);
+$serviceDenied = $user($service, 'Synthetic Event Workflow Denied Waiter', 'service-denied@rc-browser.invalid', 'staff', 'pos_waiter');
 
 $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid', 'RCBROWSER003', 'fbrpos', [
     'business_category' => 'retail', 'pos_type' => 'retail', 'fbr_pos_enabled' => true,
@@ -161,7 +161,7 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
         $companyCategory = $company("Synthetic {$panel} {$category}", "category-{$panel}-{$category}@rc-browser.invalid", 'RCB'.str_pad((string) (600 + count($categoryJourneys)), 8, '0', STR_PAD_LEFT), $product, [
             'business_category' => $category, 'pos_type' => $category,
             'feature_flags' => PosFeatureService::defaultsForCategory($category),
-            'fbr_pos_enabled' => $panel === 'fbr', 'pos_module_extras' => [], 'pos_setup_completed' => true,
+            'fbr_pos_enabled' => $panel === 'fbr', 'pos_module_extras' => [], 'pharmacy_mode' => $category === 'pharmacy', 'pos_setup_completed' => true,
             'pos_integration_mode' => $panel === 'fbr' ? 'fbr' : 'pra',
         ]);
         $categoryUser = $user($companyCategory, "Synthetic {$category} owner", "category-user-{$panel}-{$category}@rc-browser.invalid", 'company_admin', 'pos_admin');
@@ -170,8 +170,8 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
             'loginPath' => $panel === 'fbr' ? '/fbr-pos/login' : '/pos/login', 'paths' => [$path],
             'expectedPaths' => [$path], 'markers' => [$nativeMarker], 'mainMarkers' => [$nativeMarker],
             'categoryCoverage' => ['panel' => $panel, 'category' => $category, 'landing' => $landing,
-                'mismatchPath' => $panel === 'fbr' ? '/fbr-pos/services' : ($landing === 'service_work_orders' ? '/pos/hotel' : '/pos/work-orders'),
-                'sameProductPositivePath' => $panel === 'fbr' ? ($category === 'pharmacy' ? '/fbr-pos/pharmacy/batches' : '/fbr-pos/stock') : null],
+                'mismatchPath' => $panel === 'fbr' ? ($category === 'salon' ? '/fbr-pos/stock' : ($category === 'general' ? null : '/fbr-pos/services')) : ($landing === 'service_work_orders' ? '/pos/hotel' : '/pos/work-orders'),
+                'sameProductPositivePath' => $panel === 'fbr' ? ($category === 'pharmacy' ? '/fbr-pos/pharmacy/batches' : ($category === 'salon' ? '/fbr-pos/services' : '/fbr-pos/stock')) : null],
         ];
     }
 }
@@ -190,7 +190,7 @@ $fixture = [
         ['name' => 'hotel-admin-manage-as', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$hotel->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="full"])', 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk']],
         ['name' => 'service-work-orders-manager', 'login' => $serviceManager->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'markers' => ['Event Plan Board', 'Event Plan Number']],
         ['name' => 'health', 'login' => $healthUser->email, 'password' => $password, 'loginPath' => '/health/login', 'paths' => ['/health/dashboard'], 'markers' => ['Synthetic Browser Health Clinic']],
-        ['name' => 'fiscal', 'login' => $fiscalUser->email, 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/create'], 'markers' => ['FBR']],
+        ['name' => 'fiscal', 'login' => $fiscalUser->email, 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/create'], 'markers' => ['FBR POS Fee'], 'mainMarkers' => ['FBR POS Fee']],
         ['name' => 'hotel-denied', 'login' => $hotelDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel', '/pos/hotel/restaurant'], 'denied' => true],
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),

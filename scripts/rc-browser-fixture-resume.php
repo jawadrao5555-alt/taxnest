@@ -21,7 +21,7 @@ foreach(['pra'=>'pos','fbr'=>'fbrpos'] as $panel=>$product) {
         $profileCompany=new Company(['business_category'=>$category,'pos_type'=>$category,'product_type'=>$product]);$landing=PosFeatureService::profile($profileCompany)['landing'];
         $path=$panel==='fbr'?'/fbr-pos/billing':($landing==='hotel_front_desk'?'/pos/hotel':($landing==='service_work_orders'?'/pos/work-orders':'/pos/invoice/create'));
         $marker=$panel==='fbr'?'FBR POS Plans':($landing==='hotel_front_desk'?'Front Desk':($landing==='service_work_orders'?PosServiceWorkflowProfiles::forCompany($profileCompany)['noun'].' Board':'Current Order'));
-        $categoryJourneys[]=['name'=>"category-$panel-$category",'login'=>$u("category-user-$panel-$category@rc-browser.invalid"),'password'=>$password,'loginPath'=>$panel==='fbr'?'/fbr-pos/login':'/pos/login','paths'=>[$path],'expectedPaths'=>[$path],'markers'=>[$marker],'mainMarkers'=>[$marker],'categoryCoverage'=>['panel'=>$panel,'category'=>$category,'landing'=>$landing,'mismatchPath'=>$panel==='fbr'?'/fbr-pos/services':($landing==='service_work_orders'?'/pos/hotel':'/pos/work-orders'),'sameProductPositivePath'=>$panel==='fbr'?($category==='pharmacy'?'/fbr-pos/pharmacy/batches':'/fbr-pos/stock'):null]];
+        $categoryJourneys[]=['name'=>"category-$panel-$category",'login'=>$u("category-user-$panel-$category@rc-browser.invalid"),'password'=>$password,'loginPath'=>$panel==='fbr'?'/fbr-pos/login':'/pos/login','paths'=>[$path],'expectedPaths'=>[$path],'markers'=>[$marker],'mainMarkers'=>[$marker],'categoryCoverage'=>['panel'=>$panel,'category'=>$category,'landing'=>$landing,'mismatchPath'=>$panel==='fbr'?($category==='salon'?'/fbr-pos/stock':($category==='general'?null:'/fbr-pos/services')):($landing==='service_work_orders'?'/pos/hotel':'/pos/work-orders'),'sameProductPositivePath'=>$panel==='fbr'?($category==='pharmacy'?'/fbr-pos/pharmacy/batches':($category==='salon'?'/fbr-pos/services':'/fbr-pos/stock')):null]];
     }
 }
 $baseJourneys = [
@@ -32,7 +32,7 @@ $baseJourneys = [
 ['name'=>'hotel-admin-manage-as','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','submitPath'=>"/admin/companies/$hotel",'submitSelector'=>'form[action$="/impersonate"]:has(input[name="mode"][value="full"])','paths'=>['/pos/hotel'],'markers'=>['Front Desk']],
 ['name'=>'service-work-orders-manager','login'=>$u('service-manager@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/work-orders','/pos/work-orders/report.csv'],'markers'=>['Event Plan Board','Event Plan Number']],
 ['name'=>'health','login'=>$u('health@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/health/login','paths'=>['/health/dashboard'],'markers'=>['Synthetic Browser Health Clinic']],
-['name'=>'fiscal','login'=>$u('fiscal@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/create'],'markers'=>['FBR']],
+['name'=>'fiscal','login'=>$u('fiscal@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/create'],'markers'=>['FBR POS Fee'],'mainMarkers'=>['FBR POS Fee']],
 ['name'=>'hotel-denied','login'=>$u('hotel-denied@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/hotel','/pos/hotel/restaurant'],'denied'=>true],
 ['name'=>'service-work-orders-denied','login'=>$u('service-denied@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/work-orders','/pos/work-orders/report.csv'],'denied'=>true],
 ];

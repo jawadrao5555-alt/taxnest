@@ -6,6 +6,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Services\PosFeatureService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -599,5 +600,30 @@ class FbrPosDayCloseUndispatchedDeliveryTest extends TestCase
         $res->assertStatus(409)->assertJsonPath('ok', false)->assertJsonPath('undispatched', 1);
         $this->assertSame(0, DB::table('fbr_day_close_reports')->count(),
             'Single-date rush recovery must refuse while deliveries are undispatched.');
+    }
+
+    public function test_api_auto_close_hides_exception_details_and_logs_only_safe_metadata(): void
+    {
+        $cid = $this->makeCompany();
+        // Force the real day-close path to throw a database exception. Its native
+        // text contains implementation details and must never cross the API boundary.
+        Schema::drop('fbr_day_close_reports');
+        Log::spy();
+
+        $res = $this->actingAs($this->makeUser($cid), 'fbrpos')
+            ->postJson('/fbr-pos/api/auto-close-day', ['date' => now()->subDay()->toDateString()]);
+
+        $res->assertStatus(500)->assertExactJson([
+            'ok' => false,
+            'error' => 'Unable to auto-close the requested day. Please try again.',
+        ]);
+        $this->assertStringNotContainsString('fbr_day_close_reports', $res->getContent());
+
+        Log::shouldHaveReceived('error')->once()->withArgs(function ($message, $context = []) {
+            return $message === 'fbrpos apiAutoCloseDay failed'
+                && ($context['operation'] ?? null) === 'single'
+                && ($context['exception'] ?? null) === 'QueryException'
+                && !array_key_exists('error', $context);
+        });
     }
 }

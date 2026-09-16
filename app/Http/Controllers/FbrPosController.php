@@ -1342,8 +1342,18 @@ class FbrPosController extends Controller
 
             return response()->json(['ok' => true, 'closed' => $closed, 'count' => count($closed), 'skipped' => $skipped]);
         } catch (\Throwable $e) {
-            \Log::error('apiAutoCloseDay failed: ' . $e->getMessage());
-            return response()->json(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()], 500);
+            // A day-close failure can include SQL, filesystem, or upstream details. This
+            // authenticated API is consumed directly by the counter UI, so never return
+            // or concatenate that untrusted diagnostic text into a response or log line.
+            \Log::error('fbrpos apiAutoCloseDay failed', [
+                'operation' => $request->boolean('all') ? 'bulk' : 'single',
+                'exception' => class_basename($e),
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'error' => 'Unable to auto-close the requested day. Please try again.',
+            ], 500);
         }
     }
 

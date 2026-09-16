@@ -514,6 +514,33 @@
                self-stretch — that utility isn't in the current Vite build.) */
             #tn-nav-sale-tools { scrollbar-width: none; -ms-overflow-style: none; align-self: stretch; }
             #tn-nav-sale-tools::-webkit-scrollbar { display: none; }
+
+            /*
+             * Manage-as adds the non-removable Exit chip to the primary header.
+             * Let only that header's desktop navigation shrink/scroll inside its
+             * own flex item; do not hide document overflow. On phones, give the
+             * chip its own row so Exit remains reachable beside a full header.
+             */
+            .tn-impersonated-header .tn-impersonation-header-left { flex: 1 1 auto; min-width: 0; }
+            .tn-impersonated-header .tn-impersonation-header-nav {
+                min-width: 0;
+                overflow-x: auto;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .tn-impersonated-header .tn-impersonation-header-nav::-webkit-scrollbar { display: none; }
+            @media (max-width: 639px) {
+                .tn-impersonated-header .tn-impersonation-header-row {
+                    height: auto;
+                    min-height: 3rem;
+                    flex-wrap: wrap;
+                    row-gap: .25rem;
+                    padding-top: .25rem;
+                    padding-bottom: .25rem;
+                }
+                .tn-impersonated-header .tn-impersonation-header-left { flex-basis: 100%; }
+                .tn-impersonated-header .tn-impersonation-header-actions { margin-left: auto; }
+            }
         </style>
         {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur';
              MUST come after the * Inter rule above (same 0 specificity, later wins). --}}
@@ -531,10 +558,10 @@
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
-            <header class="topnav-bar flex-shrink-0 relative z-50">
-                <div class="flex items-center justify-between px-3 sm:px-5 h-12">
+            <header class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}">
+                <div class="tn-impersonation-header-row flex items-center justify-between px-3 sm:px-5 h-12">
 
-                    <div class="flex items-center gap-3 flex-shrink-0">
+                    <div class="tn-impersonation-header-left flex items-center gap-3 flex-shrink-0">
                         <a href="{{ $hotelHomeUrl }}" class="flex items-center gap-2 group">
                             <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition">
                                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -551,7 +578,7 @@
 
                         <div class="h-5 w-px bg-white/10 hidden lg:block"></div>
 
-                        <nav class="hidden lg:flex items-center gap-1">
+                        <nav class="tn-impersonation-header-nav hidden lg:flex items-center gap-1">
                             {{-- Sale-screen redesign (Jul 2026): on the sale screen itself the static
                                  "New Sale" link is replaced by the teleported action button (newSale())
                                  that lands in #tn-nav-sale-tools below — see universal.blade.php. --}}
@@ -617,7 +644,7 @@
                          NEVER spill over the right-side user group (ZFC overlap bug, 26 Jul 2026). --}}
                     <div id="tn-nav-sale-tools" class="hidden lg:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
 
-                    <div class="flex items-center gap-2 flex-shrink-0" x-data="{ isFs: false }"
+                    <div class="tn-impersonation-header-actions flex items-center gap-2 flex-shrink-0" x-data="{ isFs: false }"
                          x-init="
                             document.addEventListener('fullscreenchange', () => isFs = !!document.fullscreenElement);
                             isFs = !!document.fullscreenElement;

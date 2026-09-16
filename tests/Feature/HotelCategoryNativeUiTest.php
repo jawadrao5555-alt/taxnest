@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\HotelStay;
+use App\Models\AdminUser;
 use App\Models\User;
 use App\Services\HotelShell;
 use App\Services\HotelStayService;
@@ -108,6 +109,35 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString(__('pos.hotel_stat_collections'), $html);
         $this->assertStringNotContainsString('data-nav-new-sale="static"', $html);
         $this->assertStringNotContainsString('>checked_in<', $html);
+    }
+
+    public function test_manage_as_hotel_header_keeps_exit_in_a_responsive_scoped_layout(): void
+    {
+        $company = $this->company();
+        $owner = $this->owner($company);
+        $admin = AdminUser::create([
+            'name' => 'Synthetic Admin',
+            'email' => 'synthetic-admin-'.uniqid().'@test.pk',
+            'password' => Hash::make('Secret@12345'),
+            'role' => 'super_admin',
+        ]);
+
+        $html = $this->withSession([
+            'impersonation' => [
+                'admin_id' => $admin->id,
+                'company_id' => $company->id,
+                'company_name' => 'Synthetic Manage As Hotel',
+                'guard' => 'pos',
+                'mode' => 'full',
+                'readonly' => false,
+            ],
+        ])->actingAs($admin, 'admin')->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
+
+        $this->assertStringContainsString('tn-impersonated-header', $html);
+        $this->assertStringContainsString('tn-impersonation-header-row', $html);
+        $this->assertStringContainsString('tn-impersonation-header-nav', $html);
+        $this->assertStringContainsString('tn-impersonation-chip', $html);
+        $this->assertStringContainsString('Exit impersonation', $html);
     }
 
     public function test_restaurant_mode_hotel_keeps_shell_and_separates_outlet(): void

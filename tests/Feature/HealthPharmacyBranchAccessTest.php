@@ -321,6 +321,60 @@ class HealthPharmacyBranchAccessTest extends TestCase
         $this->assertSame(HealthMedicineBatch::STATUS_ACTIVE, $fresh->status);
     }
 
+    /**
+     * Branch checks are not a substitute for the hospital boundary. A genuine
+     * batch id from a different company must not be adjusted by this pharmacy.
+     */
+    public function test_a_pharmacist_cannot_adjust_another_hospitals_batch(): void
+    {
+        $otherCompany = Company::create([
+            'name' => 'Other Pharmacy Hospital',
+            'ntn' => 'PH-OTHER-1',
+            'product_type' => HealthPanel::PRODUCT_TYPE,
+            'status' => 'approved',
+            'company_status' => 'active',
+            'health_org_type' => 'hospital',
+            'health_modules' => json_encode(['opd', 'pharmacy']),
+        ]);
+        $foreignBranch = Branch::create([
+            'company_id' => $otherCompany->id,
+            'name' => 'Other Main Pharmacy',
+            'is_head_office' => true,
+            'is_active' => true,
+        ]);
+        $foreignMedicine = HealthMedicine::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id,
+            'name' => 'Foreign Medicine',
+            'form' => 'tablet',
+            'unit_uom' => 'each',
+            'sale_price' => 100,
+            'purchase_price' => 70,
+            'tax_rate' => 0,
+            'is_active' => true,
+        ]);
+        $foreignBatch = HealthMedicineBatch::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id,
+            'branch_id' => $foreignBranch->id,
+            'medicine_id' => $foreignMedicine->id,
+            'batch_no' => 'FOREIGN-BATCH',
+            'expiry_date' => now()->addYear()->toDateString(),
+            'quantity' => 50,
+            'received_quantity' => 50,
+            'cost_price' => 70,
+            'sale_price' => 100,
+            'status' => HealthMedicineBatch::STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($this->pharmacistA, HealthPanel::GUARD)
+            ->post('/health/pharmacy/stock/' . $foreignBatch->id . '/adjust', [
+                'quantity' => 5,
+                'reason' => 'attempted foreign adjustment',
+            ])
+            ->assertRedirect('/health/dashboard');
+
+        $this->assertEquals(50, (float) $foreignBatch->fresh()->quantity);
+    }
+
     /* ─────────────── The prescribed line belongs to its own slip ─────────────── */
 
     public function test_a_prescribed_line_cannot_be_spent_against_a_different_prescription(): void

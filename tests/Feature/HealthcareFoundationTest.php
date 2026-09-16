@@ -649,6 +649,31 @@ class HealthcareFoundationTest extends TestCase
         $this->assertFalse(HealthScopeService::canAccessBranch($doctor, $main));
     }
 
+    /**
+     * This is the deliberate legacy default, not an unrestricted fallback:
+     * an unassigned non-administrative staff record works at the active head
+     * office until the hospital records a specific branch posting.
+     */
+    public function test_an_unassigned_member_keeps_the_legacy_head_office_branch_default(): void
+    {
+        $main = DB::table('branches')->insertGetId([
+            'company_id' => $this->healthCompanyId, 'name' => 'Main',
+            'is_head_office' => true, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $second = DB::table('branches')->insertGetId([
+            'company_id' => $this->healthCompanyId, 'name' => 'Second',
+            'is_head_office' => false, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $accountant = $this->makeStaff('health_accountant');
+        $this->forgetHealthCaches();
+
+        $this->assertSame([$main], HealthScopeService::branchIdsFor($accountant));
+        $this->assertTrue(HealthScopeService::canAccessBranch($accountant, $main));
+        $this->assertFalse(HealthScopeService::canAccessBranch($accountant, $second));
+    }
+
     public function test_departments_stay_inside_their_company(): void
     {
         DB::table('health_departments')->insert([

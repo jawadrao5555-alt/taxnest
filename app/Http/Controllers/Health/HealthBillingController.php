@@ -659,6 +659,24 @@ class HealthBillingController extends HealthPanelController
         $date = $request->query('date', now()->toDateString());
         $branchId = $request->filled('branch_id') ? (int) $request->query('branch_id') : null;
 
+        /*
+         * A missing picker value used to mean "every company branch", even for
+         * a member whose branch boundary was narrow. That is not equivalent to
+         * the legacy head-office fallback in HealthScopeService: the fallback
+         * resolves to one legitimate branch, while an omitted report filter
+         * skips every branch predicate. Keep the established one-branch default
+         * for a member with one reachable branch, but require a deliberate
+         * branch choice where their assignment spans more than one.
+         */
+        if ($branchId === null) {
+            $reachable = $this->branchBoundary();
+            if ($reachable !== null) {
+                abort_unless(count($reachable) === 1, 403, __('health.denied_no_permission'));
+                $branchId = (int) $reachable[0];
+            }
+        }
+        $this->requireBranch($branchId);
+
         $from = $request->query('from', $date);
         $to = $request->query('to', $date);
 

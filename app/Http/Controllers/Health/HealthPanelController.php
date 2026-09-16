@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Health;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Company;
 use App\Models\HealthAccount;
 use App\Models\HealthBankAccount;
+use App\Models\HealthDepartment;
 use App\Models\HealthDoctor;
 use App\Models\User;
 use App\Services\HealthAccessService;
@@ -79,7 +81,18 @@ abstract class HealthPanelController extends Controller
      */
     protected function requireBranch($branchId): void
     {
-        if (!HealthScopeService::canAccessBranch($this->user(), $branchId)) {
+        if (!$branchId) {
+            return;
+        }
+
+        $companyId = (int) $this->company()?->id;
+        $belongsToCompany = $companyId > 0
+            && Branch::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->whereKey((int) $branchId)
+                ->exists();
+
+        if (!$belongsToCompany || !HealthScopeService::canAccessBranch($this->user(), $branchId)) {
             abort(403, __('health.denied_no_permission'));
         }
     }
@@ -109,7 +122,18 @@ abstract class HealthPanelController extends Controller
      */
     protected function requireDepartment($departmentId): void
     {
-        if (!HealthScopeService::canAccessDepartment($this->user(), $departmentId)) {
+        if (!$departmentId) {
+            return;
+        }
+
+        $companyId = (int) $this->company()?->id;
+        $belongsToCompany = $companyId > 0
+            && HealthDepartment::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->whereKey((int) $departmentId)
+                ->exists();
+
+        if (!$belongsToCompany || !HealthScopeService::canAccessDepartment($this->user(), $departmentId)) {
             abort(403, __('health.denied_no_permission'));
         }
     }

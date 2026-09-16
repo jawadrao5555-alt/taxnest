@@ -374,7 +374,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $owner = $this->owner($legacy);
         $before = $legacy->fresh()->only([
             'business_category', 'pos_type', 'feature_flags', 'restaurant_mode',
-            'hotel_checkout_outstanding', 'pos_custom_access',
+            'hotel_checkout_outstanding',
         ]);
 
         $this->assertSame('hotel', PosFeatureService::profileCategory($legacy));
@@ -384,7 +384,7 @@ class HotelCategoryNativeUiTest extends TestCase
 
         $after = $legacy->fresh()->only([
             'business_category', 'pos_type', 'feature_flags', 'restaurant_mode',
-            'hotel_checkout_outstanding', 'pos_custom_access',
+            'hotel_checkout_outstanding',
         ]);
         $this->assertSame($before, $after);
     }

@@ -58,6 +58,18 @@ grep -q 'group: build-pra-agent-\${{ inputs.target_sha || github.sha }}' "$BUILD
   && ok "duplicate exact-SHA Agent dispatches are serialized and idempotent" \
   || bad "Agent build duplicate-dispatch guard missing"
 
+grep -q "node-version: '22'" "$BUILD" \
+  && ok "Agent build pins the reviewed Node 22 runtime" \
+  || bad "Agent build must pin reviewed Node 22 runtime"
+
+grep -q "Create canonical release manifest" "$BUILD" \
+  && grep -q 'release-manifest.json' "$BUILD" \
+  && grep -q 'Get-FileHash -Algorithm SHA256' "$BUILD" \
+  && grep -q 'source_sha = \$env:SOURCE_SHA' "$BUILD" \
+  && grep -q 'min_agent_version = "1.3.0"' "$BUILD" \
+  && ok "Agent build publishes a hash-bound canonical release manifest" \
+  || bad "Agent canonical release manifest metadata is incomplete"
+
 if grep -qiE 'GH_PAT|PERSONAL_ACCESS_TOKEN|PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS' "$BUILD" "$OWNER" "$HANDOFF"; then
   bad "Agent release chain must not introduce PAT or production credentials"
 else

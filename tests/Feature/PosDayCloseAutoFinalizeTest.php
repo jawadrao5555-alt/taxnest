@@ -401,11 +401,17 @@ class PosDayCloseAutoFinalizeTest extends TestCase
 
     public function test_pra_connection_failure_finalizes_bill_as_offline_never_lost(): void
     {
-        // Reporting ON, cloud mode, relay pointed at a dead local port →
-        // instant connection refused, no external network in tests.
+        // Reporting ON, cloud mode. The relay hostname is explicitly trusted
+        // and cURL-pinned by test-only operations config to a dead loopback
+        // socket: connection refusal proves the normal offline transport path
+        // without treating a tenant-provided LAN URL as legitimate.
+        config([
+            'services.pra.relay_trusted_hosts' => ['relay.invalid'],
+            'services.pra.relay_resolve' => ['relay.invalid:443:127.0.0.1'],
+        ]);
         $companyId = $this->makeCompany([
             'pra_reporting_enabled' => true,
-            'pra_proxy_url' => 'http://127.0.0.1:9',
+            'pra_proxy_url' => 'https://relay.invalid',
         ]);
 
         $bill = $this->makeProvisional($companyId, 'L0001', ['subtotal' => 200.00, 'total_amount' => 200.00]);

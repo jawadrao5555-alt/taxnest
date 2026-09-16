@@ -10,10 +10,13 @@ app.disableHardwareAcceleration();
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent, setSafeRestartHandler } = require('./src/agent');
+const { validateUpdateInfo } = require('./src/release-manifest');
+const { heartbeatDiagnostics } = require('./src/heartbeat-diagnostics');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { createLanServer } = require('./src/lan-server');
 const { createLocalCoreLanTls } = require('./src/local-core/lan-tls');
@@ -97,6 +100,12 @@ async function handleAgentUpdate(info) {
       console.log(`[self-update] REJECTED zip_url outside trusted release host: ${info.zip_url}`);
       return;
     }
+    const manifestCheck = validateUpdateInfo(info, app.getVersion());
+    if (!manifestCheck.ok) {
+      console.log(`[self-update] REJECTED ${manifestCheck.code}; no bytes downloaded`);
+      lastUpdateAttempt = { target: info.version || null, stage: 'manifest', error: manifestCheck.code, at: new Date().toISOString() };
+      return;
+    }
     if (process.platform !== 'win32' || !app.isPackaged) return;
     if (updateInProgress) return;
     if (!isNewerVersion(info.version, app.getVersion())) return;
@@ -165,8 +174,9 @@ async function handleAgentUpdate(info) {
 
     // Download with stall protection (mirrors the FBR IMS downloader below).
     const res = await axios.get(info.zip_url, { responseType: 'stream', timeout: 60000, maxRedirects: 10 });
-    const total = parseInt(res.headers['content-length'] || '0', 10) || info.zip_size || 0;
+    const total = parseInt(res.headers['content-length'] || '0', 10) || info.zip_size;
     let done = 0;
+    const hasher = crypto.createHash('sha256');
     await new Promise((resolve, reject) => {
       const out = fs.createWriteStream(zipPath);
       let idleTimer = null;
@@ -179,6 +189,7 @@ async function handleAgentUpdate(info) {
       resetIdle();
       res.data.on('data', (chunk) => {
         done += chunk.length;
+        hasher.update(chunk);
         resetIdle();
         if (total) {
           const pct = Math.round((done / total) * 100);
@@ -199,6 +210,10 @@ async function handleAgentUpdate(info) {
     const gotSize = fs.statSync(zipPath).size;
     if (info.zip_size && gotSize !== info.zip_size) {
       throw new Error(`Downloaded size ${gotSize} != expected ${info.zip_size}`);
+    }
+    const gotHash = hasher.digest('hex');
+    if (gotHash.toLowerCase() !== String(info.zip_sha256).toLowerCase()) {
+      throw new Error('Downloaded SHA-256 does not match the canonical release manifest');
     }
 
     // Extract with PowerShell — zero extra npm dependencies.
@@ -1144,6 +1159,7 @@ if (!gotInstanceLock) {
         out.update_error = lastUpdateAttempt.error || null;
         out.update_attempted_at = lastUpdateAttempt.at || null;
       }
+      out.agent_diagnostics = heartbeatDiagnostics(getStatus());
       if (getPosSettings().offlineMode) {
         if (coreStartupError) {
           out.local_core_error_code = coreStartupError.code;

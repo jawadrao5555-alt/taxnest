@@ -1,0 +1,41 @@
+{
+  "schema": "taxnest-release-artifact-inventory/v1",
+  "generated_utc": "2026-09-16T00:00:00Z",
+  "baseline_sha": "0677abbc3fec912b3011dd6449be6a17263db84d",
+  "artifacts": [
+    {
+      "path": "caller-app/TaxNest-PRA-Agent-Windows.zip",
+      "kind": "file",
+      "sha256": "660362fc32eae8b60ae8178d8ccdadf6c11fb58b9c7e38c165c96face429a376",
+      "repository_introduction_sha": "f93de12eaab6a01fa147ae08dc26d1cd8bc127fb",
+      "provenance_status": "repository-introduction-only"
+    },
+    {
+      "path": "rider-app/dist/TaxNest-Rider-1.7.2.apk",
+      "kind": "file",
+      "sha256": "e2c3a2353e7115ffbc8bbfe036e89bfafb642269b3bef356774c5f29bd5f37a1",
+      "repository_introduction_sha": "083a5f03d5fee3df4620bcda0c1fd2929dc932ae",
+      "provenance_status": "repository-introduction-only"
+    },
+    {
+      "path": "rider-app/dist/TaxNest-Rider-1.7.2-beta.apk",
+      "kind": "file",
+      "sha256": "b2c5c23f6b6308e10c9a9eef80fab3d34ec9cb7146af4d7ddadabf5c0219179e",
+      "repository_introduction_sha": "39be7afb1d20ee369660e7980fa223e59fe0176e",
+      "provenance_status": "repository-introduction-only"
+    },
+    {
+      "path": "public/downloads/TaxNest-PRA-Agent-Windows.zip",
+      "kind": "symlink",
+      "target": "../../pra-agent/dist/TaxNest-PRA-Agent-Windows.zip",
+      "provenance_status": "build-attested"
+    },
+    {
+      "path": "routes-update.zip",
+      "kind": "file",
+      "sha256": "2d858dcd622369d0b1f83f63ea7acfa912b5dfca7a3944fb227c9239c5608fc8",
+      "repository_introduction_sha": "425ecafb2478faa6311955b7636c794220ec3ccf",
+      "provenance_status": "repository-introduction-only"
+    }
+  ]
+}

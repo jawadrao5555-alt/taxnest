@@ -53,6 +53,81 @@ class PraIntegrationService
         return self::SANDBOX_TOKEN;
     }
 
+    /**
+     * A cloud relay receives the PRA bearer token in its request body, so its
+     * destination is security configuration, not tenant editable routing.
+     * Fiscal-device/LAN submission is handled by the desktop agent and never
+     * reaches this server transport.
+     */
+    public static function trustedRelayUrl(?string $url): ?string
+    {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return null;
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts)
+            || ($parts['scheme'] ?? null) !== 'https'
+            || empty($parts['host'])
+            || isset($parts['user']) || isset($parts['pass'])
+            || isset($parts['port']) && (int) $parts['port'] !== 443) {
+            return null;
+        }
+        $host = strtolower(rtrim((string) $parts['host'], '.'));
+        // An IP literal (including localhost) cannot be an approved cloud
+        // relay. This blocks metadata/LAN SSRF even if a tenant saved it.
+        if ($host === 'localhost' || str_ends_with($host, '.localhost')
+            || filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return null;
+        }
+        $approved = config('services.pra.relay_trusted_hosts', []);
+        $approved = is_array($approved) ? array_map(
+            fn ($entry) => strtolower(rtrim(trim((string) $entry), '.')),
+            $approved
+        ) : [];
+        if (!in_array($host, $approved, true)) {
+            return null;
+        }
+        return $url;
+    }
+
+    /**
+     * cURL resolver pins are restricted to an already-approved relay hostname
+     * and its TLS port. They are deployment configuration, never a company
+     * setting, so a tenant cannot turn this into an SSRF primitive.
+     *
+     * @return array<int, string>
+     */
+    private static function trustedRelayResolve(string $relayUrl): array
+    {
+        $host = strtolower(rtrim((string) (parse_url($relayUrl, PHP_URL_HOST) ?? ''), '.'));
+        $pins = config('services.pra.relay_resolve', []);
+        if (!is_array($pins) || $host === '') {
+            return [];
+        }
+        foreach ($pins as $pin) {
+            $pin = trim((string) $pin);
+            if (preg_match('/^([^:]+):443:([0-9.]+)$/', $pin, $matches) !== 1) {
+                continue;
+            }
+            if (strtolower(rtrim($matches[1], '.')) === $host
+                && filter_var($matches[2], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return [$host . ':443:' . $matches[2]];
+            }
+        }
+        return [];
+    }
+
+    public static function trustedCloudApiUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        return is_array($parts)
+            && ($parts['scheme'] ?? null) === 'https'
+            && strtolower(rtrim((string) ($parts['host'] ?? ''), '.')) === 'ims.pral.com.pk'
+            && !isset($parts['user']) && !isset($parts['pass'])
+            && (!isset($parts['port']) || (int) $parts['port'] === 443);
+    }
+
     private function sanitizeBuyerName(?string $name): string
     {
         if (empty($name)) {
@@ -346,19 +421,21 @@ class PraIntegrationService
         // itself; no state is written on a contended call, so a legitimate
         // retry a moment later works exactly as before.
         $lock = null;
-        $acquired = true;
+        $acquired = false;
         try {
             $lock = Cache::lock(self::submitLockKey($transaction), 90);
             $acquired = (bool) $lock->get();
         } catch (\Throwable $e) {
-            // A cache store without lock support must degrade to today's
-            // behaviour (submission goes ahead), never block every bill.
-            Log::warning('PRA: submit lock unavailable — proceeding without lock', [
+            // Fiscal submission is not an availability-over-integrity path.
+            // If this process cannot prove exclusive ownership, it must not
+            // POST: a cache outage used to silently bypass the only duplicate
+            // guard and could create two regulator invoice numbers.
+            Log::warning('PRA: submit lock unavailable — fiscal submission deferred', [
                 'transaction_id' => $transaction->id,
-                'error' => $e->getMessage(),
+                'company_id' => $this->company->id,
+                'error_class' => get_class($e),
             ]);
-            $lock = null;
-            $acquired = true;
+            return $this->deferForLockFailure($transaction);
         }
 
         if (!$acquired) {
@@ -410,6 +487,42 @@ class PraIntegrationService
     }
 
     /**
+     * Keep an unsafe-to-send bill in the ordinary retry lane without touching
+     * a fiscalised winner. The conditional update protects a concurrent
+     * callback that may have written the regulator number while lock storage
+     * was unhealthy. Missing error column is tolerated during deploy windows.
+     */
+    private function deferForLockFailure(PosTransaction $transaction): array
+    {
+        $update = [
+            'pra_status' => 'pending',
+            'updated_at' => now(),
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'pra_error_message')) {
+            $update['pra_error_message'] = 'PRA submission temporarily deferred because duplicate protection is unavailable. The bill was not sent; retry will resume automatically.';
+        }
+
+        $written = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('id', $transaction->id)
+            ->where('company_id', $this->company->id)
+            ->where(function ($query) {
+                $query->whereNull('pra_invoice_number')->orWhereRaw("TRIM(pra_invoice_number) = ''");
+            })
+            ->update($update);
+
+        if ($written > 0) {
+            $transaction->forceFill($update)->syncOriginalAttributes(array_keys($update));
+        }
+
+        return [
+            'success' => false,
+            'response_code' => 'LOCK_UNAVAILABLE',
+            'retryable' => true,
+            'message' => 'PRA submission is temporarily deferred because duplicate protection is unavailable. The bill was not sent and will retry safely.',
+        ];
+    }
+
+    /**
      * The resubmission refusals sendInvoice() applies before contacting PRA,
      * re-runnable against a freshly loaded row: already fiscalised, a
      * provisional ('local') bill, or a hash twin that already carries a
@@ -446,6 +559,27 @@ class PraIntegrationService
     private function transmitToPra(PosTransaction $transaction): array
     {
         $payload = $this->generatePayload($transaction);
+        $apiUrl = $this->getApiUrl();
+        $token = $this->getToken();
+        $rawProxy = $this->company->pra_proxy_url;
+        $relayUrl = self::trustedRelayUrl($rawProxy);
+
+        // Validate destinations before creating a log or materialising a
+        // request containing a credential. This is a configuration failure,
+        // not an offline fiscal attempt, and no cURL call is permitted.
+        if (!self::trustedCloudApiUrl($apiUrl) || (!empty($rawProxy) && $relayUrl === null)) {
+            Log::warning('PRA cloud transport blocked by destination policy', [
+                'company_id' => $this->company->id,
+                'transaction_id' => $transaction->id,
+                'has_relay' => !empty($rawProxy),
+            ]);
+            return [
+                'success' => false,
+                'response_code' => 'UNTRUSTED_TRANSPORT',
+                'retryable' => false,
+                'message' => 'PRA cloud transport is not configured with an approved secure endpoint. The bill was not sent.',
+            ];
+        }
 
         $praLog = PraLog::create([
             'company_id' => $this->company->id,
@@ -455,19 +589,6 @@ class PraIntegrationService
         ]);
 
         try {
-            $apiUrl = $this->getApiUrl();
-            $token = $this->getToken();
-            $rawProxy = $this->company->pra_proxy_url;
-            $relayUrl = !empty($rawProxy) ? rtrim($rawProxy, '/') : null;
-
-            Log::info('PRA DEBUG: relay check', [
-                'company_id' => $this->company->id,
-                'raw_proxy' => $rawProxy,
-                'relay_url' => $relayUrl,
-                'relay_active' => $relayUrl ? 'YES' : 'NO',
-                'company_class' => get_class($this->company),
-            ]);
-
             Log::info('PRA: Submitting invoice to PRAL IMS', [
                 'transaction_id' => $transaction->id,
                 'url' => $apiUrl,
@@ -501,10 +622,10 @@ class PraIntegrationService
                         'ngrok-skip-browser-warning: true',
                         'Connection: keep-alive',
                     ],
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => 0,
-                    CURLOPT_FOLLOWLOCATION => true,
-                    CURLOPT_MAXREDIRS => 3,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_SSL_VERIFYHOST => 2,
+                    CURLOPT_FOLLOWLOCATION => false,
+                    CURLOPT_RESOLVE => self::trustedRelayResolve($relayUrl),
                     CURLOPT_ENCODING => 'gzip',          // auto-decompress
                     CURLOPT_TCP_NODELAY => 1,            // no Nagle delay
                     CURLOPT_TCP_KEEPALIVE => 1,
@@ -531,8 +652,9 @@ class PraIntegrationService
                         'Authorization: Bearer ' . $token,
                         'Connection: keep-alive',
                     ],
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_SSL_VERIFYHOST => 2,
+                    CURLOPT_FOLLOWLOCATION => false,
                     CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
                     CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
                     CURLOPT_ENCODING => 'gzip',

@@ -36,6 +36,10 @@
 #   bash scripts/apk-release-check.sh --strict <apk>          # exceptions FAIL too
 #   bash scripts/apk-release-check.sh --no-source-check <apk> # e.g. an old APK
 #                                                             # pulled back for a rollback
+#   bash scripts/android-release-provenance-check.sh --manifest release.json \
+#       --source-sha "$(git rev-parse HEAD)" --build-inputs-sha "$APP_INPUTS_SHA" <apk>
+#       # required provenance guard for hosted release bytes; the input hash
+#       # binds approved out-of-band Firebase/signing/build configuration.
 #
 # Needs only python3 (the manifest and the signing block are parsed directly —
 # no Android SDK required). keytool (JDK) is used for the certificate subject

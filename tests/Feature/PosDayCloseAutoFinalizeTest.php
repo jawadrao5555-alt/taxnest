@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\Company;
+use App\Models\User;
+use App\Http\Controllers\PosController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -65,6 +68,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $table->text('pra_production_token')->nullable();
             $table->string('pra_proxy_url')->nullable();
             $table->string('pra_pos_id')->nullable();
+            $table->string('receipt_printer_size')->nullable();
             $table->decimal('pos_tax_rate_cash', 8, 2)->nullable();
             $table->decimal('pos_tax_rate_card', 8, 2)->nullable();
             $table->softDeletes();
@@ -275,6 +279,57 @@ class PosDayCloseAutoFinalizeTest extends TestCase
     private function tx(int $id): object
     {
         return DB::table('pos_transactions')->where('id', $id)->first();
+    }
+
+    private function savePraSettings(int $companyId, array $data): mixed
+    {
+        $admin = User::create([
+            'name' => 'PRA settings admin',
+            'email' => 'pra-settings-' . $companyId . '-' . uniqid() . '@example.test',
+            'password' => 'not-used-in-this-direct-controller-test',
+            'company_id' => $companyId,
+            'role' => 'company_admin',
+            'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'pos');
+        app()->instance('currentCompanyId', $companyId);
+
+        $request = Request::create('/pos/pra-settings', 'POST', $data);
+        $request->setLaravelSession(app('session.store'));
+
+        return app(PosController::class)->praSettings($request);
+    }
+
+    public function test_fiscal_device_settings_preserve_inactive_legacy_relay_but_cloud_activation_rejects_it(): void
+    {
+        $companyId = $this->makeCompany([
+            'pra_connection_mode' => 'fiscal_device',
+            'pra_proxy_url' => 'http://127.0.0.1:8524/legacy-relay',
+            'receipt_printer_size' => '80mm',
+        ]);
+
+        $this->savePraSettings($companyId, [
+            'pra_environment' => 'sandbox',
+            'pra_proxy_url' => 'http://127.0.0.1:8524/legacy-relay',
+            'receipt_printer_size' => '58mm',
+        ]);
+
+        $saved = Company::findOrFail($companyId);
+        $this->assertSame('fiscal_device', $saved->pra_connection_mode);
+        $this->assertSame('http://127.0.0.1:8524/legacy-relay', $saved->pra_proxy_url);
+        $this->assertSame('58mm', $saved->receipt_printer_size);
+
+        $this->savePraSettings($companyId, [
+            'pra_environment' => 'sandbox',
+            'pra_connection_mode' => 'cloud',
+            'pra_proxy_url' => 'http://127.0.0.1:8524/legacy-relay',
+            'receipt_printer_size' => '80mm',
+        ]);
+
+        $rejected = Company::findOrFail($companyId);
+        $this->assertSame('fiscal_device', $rejected->pra_connection_mode);
+        $this->assertSame('http://127.0.0.1:8524/legacy-relay', $rejected->pra_proxy_url);
+        $this->assertSame('58mm', $rejected->receipt_printer_size);
     }
 
     // ── 1. reporting-OFF finalize ───────────────────────────────────────────

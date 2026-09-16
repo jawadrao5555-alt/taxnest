@@ -2,6 +2,11 @@
 
 UTC: 2026-09-16T10:42:34Z
 
+Recovery note (2026-09-16T11:04Z–11:06Z): the temporary worktree and raw
+logs were lost; this ledger was reconstructed from retained context on
+`93de2ccf`. Historical verification counts below are observed evidence, not
+recertification by this reconstructed worktree.
+
 ## Implemented
 
 - `PraIntegrationService` now fails closed when the cache lock backend throws:
@@ -91,6 +96,7 @@ UTC: 2026-09-16T10:42:34Z
 
 | `env -i HOME="$HOME" PATH="/nix/store/bf45nflf0wylnscwwa2xgliib91x226l-nodejs-22.22.0/bin:/usr/bin:/bin" NODE_ENV=test LD_LIBRARY_PATH="<Chromium-mapped libX11:nss:glib directories>" node --test test/local-core-internet-cut.test.js` from `pra-agent` | one bounded Electron retry; GLib was supplied from existing Chromium process `/proc/40593/maps`, then Electron stopped on the next missing GUI runtime dependency: `libnspr4.so`. No further library search/install was attempted. |
 | `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=':memory:' php artisan test tests/Feature/PosDayCloseAutoFinalizeTest.php tests/Feature/PraSubmitIdempotencyTest.php tests/Feature/AgentReleaseAvailabilityTest.php tests/Unit/AgentReleaseManifestTest.php` | exit 0; 41 tests / 255 assertions. This is the targeted closure after the recorded full-suite failure: the trusted/pinned dead relay takes the real cloud connection-failure branch, records its attempt, and leaves the day-close bill `offline`; security/manifest PRA regressions also pass. |
+| `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=':memory:' php artisan test tests/Feature/PosDayCloseAutoFinalizeTest.php` | historical observed result: exit 0; 22 tests / 168 assertions. The restored focused regression keeps an inactive legacy relay and the chosen printer preference on fiscal-device settings save, while rejecting that same untrusted relay when cloud activation is requested. This result was not rerun after worktree reconstruction. |
 
 ## Blockers
 

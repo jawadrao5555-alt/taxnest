@@ -91,7 +91,9 @@ return new class extends Migration
         $table->foreignId('requested_admin_id')->constrained('admin_users')->restrictOnDelete();
         $table->foreignId('approved_admin_id')->nullable()->constrained('admin_users')->nullOnDelete();
         $table->timestamp('approved_at')->nullable();
-        $table->timestamp('expires_at')->index();
+        // MariaDB 10.6 strict NO_ZERO_DATE rejects Laravel's implicit default
+        // for a required TIMESTAMP. The application supplies this deadline.
+        $table->dateTime('expires_at')->index();
         $table->uuid('dispatch_lease_id')->nullable()->unique();
         $table->timestamp('dispatch_lease_expires_at')->nullable();
         $table->timestamp('claimed_at')->nullable();
@@ -176,7 +178,7 @@ return new class extends Migration
                 $table->timestamp('approved_at')->nullable();
             }
             if (! Schema::hasColumn(self::TABLE, 'expires_at')) {
-                $table->timestamp('expires_at');
+                $table->dateTime('expires_at');
             }
             if (! Schema::hasColumn(self::TABLE, 'dispatch_lease_id')) {
                 $table->uuid('dispatch_lease_id')->nullable();

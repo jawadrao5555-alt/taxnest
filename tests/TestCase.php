@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Http;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -15,6 +16,7 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Http::preventStrayRequests();
 
         // Some app code arms a PHP execution timer for long web work
         // (@set_time_limit(300) in the ZIP/audit-pack builders). Under PHPUnit

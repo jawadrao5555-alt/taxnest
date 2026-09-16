@@ -4,14 +4,16 @@ set -Eeuo pipefail
 
 ROOT="$(realpath -m "${RC_MARIADB_ROOT:-/tmp/taxnest-rc-mariadb-${UID}}")"
 PORT="${RC_MARIADB_PORT:-33116}"
-SERVER="${RC_MARIADB_SERVER:-/nix/store/y6mixsnc4fcrdrfvfdlyr8j2s7qh3ff9-mariadb-server-10.6.22/bin/mariadbd}"
+SERVER="${RC_MARIADBD:-${RC_MARIADB_SERVER:-}}"
+if [[ -z "$SERVER" ]]; then SERVER="$(command -v mariadbd 2>/dev/null || command -v mysqld 2>/dev/null || true)"; fi
 CLIENT="$(dirname "$SERVER")/mariadb"
 ADMIN="$(dirname "$SERVER")/mariadb-admin"
 DATA="$ROOT/data"; RUN="$ROOT/run"; LOG="$ROOT/log"; SOCKET="$RUN/mariadb.sock"; PID="$RUN/mariadb.pid"; CNF="$ROOT/my.cnf"
 
 fail() { printf 'rc-mariadb-lab: %s\n' "$*" >&2; exit 1; }
 [[ "$ROOT" == /tmp/taxnest-rc-mariadb-* ]] || fail "refusing root outside /tmp/taxnest-rc-mariadb-*"
-[[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT >= 1024 && PORT <= 65535 && PORT != 9000 && PORT != 33117 )) || fail "unsafe port"
+[[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT >= 1024 && PORT <= 65535 && PORT != 9000 )) || fail "unsafe port"
+[[ "$PORT" != 33117 || "$ROOT" == /tmp/taxnest-rc-mariadb-browser-* ]] || fail "33117 is reserved for the exact browser fixture"
 [[ -x "$SERVER" && -x "$CLIENT" && -x "$ADMIN" ]] || fail "MariaDB 10.6 binaries unavailable"
 
 write_config() {

@@ -1,0 +1,45 @@
+# PROPOSED ONLY — NOT the active .github/workflows/pr-checks.yml.
+# Recovery artifact: every unrecertified/lost harness is an explicit red gate,
+# never a skipped/green placeholder.
+name: Proposed RC PR checks
+on: { pull_request: { branches: [main] } }
+permissions: { contents: read }
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "php -l tests/TestCase.php && node --check scripts/rc-browser-acceptance.mjs" }]
+  fullphpunit:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: recovered RC harness is not recertified after worktree loss'; exit 2" }]
+  native-mariadb:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: native MariaDB bulk evidence/raw logs lost and not rerun'; exit 2" }]
+  isolation-fiscal:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: isolation/fiscal recovery harness is not recertified'; exit 2" }]
+  jsagentrealtime:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: recovered realtime harness is not recertified'; exit 2" }]
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: dependency audit must be rerun in a fresh authorized job'; exit 2" }]
+  browserdesktopmobile:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: fresh browser setup unavailable until lost synthetic fixture seeder is recovered'; exit 2" }]
+  manifestbuild:
+    runs-on: ubuntu-latest
+    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: manifest/build evidence must be regenerated'; exit 2" }]
+  validate:
+    if: always()
+    needs: [syntax, fullphpunit, native-mariadb, isolation-fiscal, jsagentrealtime, dependency-audit, browserdesktopmobile, manifestbuild]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          test "${{ needs.syntax.result }}" = success &&
+          test "${{ needs.fullphpunit.result }}" = success &&
+          test "${{ needs.native-mariadb.result }}" = success &&
+          test "${{ needs.isolation-fiscal.result }}" = success &&
+          test "${{ needs.jsagentrealtime.result }}" = success &&
+          test "${{ needs.dependency-audit.result }}" = success &&
+          test "${{ needs.browserdesktopmobile.result }}" = success &&
+          test "${{ needs.manifestbuild.result }}" = success

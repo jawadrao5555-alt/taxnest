@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Fail-closed disposable application runner. Browser mode retains its guarded
+# state until the fixture's explicit stop command so its loopback daemon does
+# not outlive a deleted HOME/LD_PRELOAD path.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; browser=0
+[[ "${1:-}" == --browser ]] && { browser=1; shift; }; [[ "${1:-}" == -- ]] || { echo 'usage: rc-safe-run [--browser] -- command' >&2; exit 2; }; shift
+[[ $# -gt 0 && ! -e "$ROOT/.env" ]] || { echo 'rc-safe-run: BLOCKED repository .env or empty command' >&2; exit 2; }
+for x in bootstrap/cache/config.php bootstrap/cache/routes-v7.php bootstrap/cache/events.php; do [[ ! -e "$ROOT/$x" ]] || { echo "rc-safe-run: BLOCKED cached state: $x" >&2; exit 2; }; done
+if ((browser)); then home="/tmp/taxnest-rc-browser-${UID}/runtime"; else home="$(mktemp -d /tmp/taxnest-rc-home.XXXXXX)"; fi
+mkdir -p "$home"/{tmp,cache,composer,guard}; chmod 700 "$home"
+guard="$(RC_NETWORK_GUARD_BUILD_DIR="$home/guard" bash "$ROOT/scripts/rc-network-build.sh")" || exit $?
+[[ -r "$guard" ]] || { echo 'rc-safe-run: BLOCKED egress guard unavailable' >&2; exit 2; }
+envs=("HOME=$home" "TMPDIR=$home/tmp" "XDG_CACHE_HOME=$home/cache" "COMPOSER_HOME=$home/composer" "PATH=$PATH" APP_ENV=testing APP_KEY=base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE= APP_URL=http://127.0.0.1 "APP_CONFIG_CACHE=$home/cache/config.php" "APP_ROUTES_CACHE=$home/cache/routes.php" CACHE_STORE=array DB_CONNECTION=sqlite DB_DATABASE=:memory: SESSION_DRIVER=array QUEUE_CONNECTION=sync MAIL_MAILER=array BROADCAST_CONNECTION=null NO_PROXY=127.0.0.1,localhost,::1 no_proxy=127.0.0.1,localhost,::1 "LD_PRELOAD=$guard")
+if ((browser)); then envs+=(RC_BROWSER_DB=taxnest_rc_browser RC_BROWSER_PORT=5911 RC_BROWSER_SESSION_DRIVER=file "RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${UID}" "RC_MARIADB_ROOT=/tmp/taxnest-rc-mariadb-browser-${UID}" RC_MARIADB_PORT=33117); fi
+env -i "${envs[@]}" "$@"; status=$?
+((browser)) || rm -rf "$home"; exit "$status"

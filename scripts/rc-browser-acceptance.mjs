@@ -1,0 +1,70 @@
+import { readFileSync } from 'node:fs';
+import { assertLocalOnlyBaseUrl, attachDiagnostics, launchLocalBrowser, saveEvidenceScreenshot } from './lib/local-browser.mjs';
+
+const baseUrl = assertLocalOnlyBaseUrl(process.env.BASE_URL);
+const fixturePath = process.env.RC_BROWSER_FIXTURE;
+if (!fixturePath?.startsWith('/tmp/taxnest-rc-browser-')) throw new Error('RC_BROWSER_FIXTURE must be generated under isolated /tmp state');
+const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+if (!fixture.synthetic || !Array.isArray(fixture.readOnlyJourneys) || !Array.isArray(fixture.transactionalJourneys)) throw new Error('synthetic separated fixture required');
+const requested = String(process.env.RC_BROWSER_ONLY || '').split(',').map(x => x.trim()).filter(Boolean);
+const regular = [...fixture.readOnlyJourneys, ...fixture.transactionalJourneys];
+const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
+const cases = requested.length ? regular.filter(x => requested.includes(x.name)) : regular;
+const unknown = requested.filter(name => ![...regular, ...di].some(x => x.name === name));
+if (unknown.length) throw new Error(`unknown requested journey: ${unknown.join(', ')}`);
+let failures = 0; const fail = m => { failures++; console.error(`FAIL: ${m}`); }; const pass = m => console.log(`PASS: ${m}`);
+const views = [['desktop', { width: 1366, height: 900 }], ['mobile', { width: 390, height: 844 }]];
+const loopback = host => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host);
+function valid(t) { if (!String(t.login).endsWith('.invalid') || !t.password || !t.loginPath?.startsWith('/')) throw new Error(`${t.name}: reserved synthetic credentials and relative login required`); }
+async function dismiss(page) {
+  for (let i=0;i<4;i++) {
+    const pra=page.locator('[data-pra-elaan-popup]:visible');
+    if (await pra.count()) { await pra.locator('button').last().click(); await page.waitForTimeout(250); continue; }
+    const b=page.locator('[x-ref="wnBtn"]:visible,button:has-text("Got it"):visible,button:has-text("Samajh gaya"):visible,[data-pos-survey] button:has-text("Baad Mein"):visible').first();
+    if (!await b.count()) break; await b.click(); await page.waitForTimeout(250);
+  }
+}
+async function login(page,t) {
+  await page.goto(baseUrl+t.loginPath,{waitUntil:'domcontentloaded',timeout:30000});
+  await page.locator('input[name="login"],input[name="email"],input#login').first().fill(t.login);
+  const p=page.locator('input[name="password"]').first(); await p.fill(t.password);
+  await Promise.all([page.waitForURL(u=>!u.pathname.endsWith(t.loginPath),{timeout:30000}).catch(()=>null),p.press('Enter')]);
+  if (page.url().endsWith(t.loginPath)) throw new Error(`${t.name}: authentication remained on login page`);
+}
+async function surface(page,t,path,v) {
+  if (path.endsWith('.csv')) {
+    if (t.denied) {
+      const status=await page.evaluate(async p=>(await fetch(p,{credentials:'same-origin'})).status,path);
+      if (![302,401,403].includes(status)) fail(`${t.name}/${v.width}: denied CSV unexpectedly returned ${status}`); else pass(`${t.name}/${v.width}: denied CSV stayed denied`);
+      return;
+    }
+    const [dl]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.evaluate(p=>location.assign(p),path)]);
+    const p=await dl.path(); const csv=p&&readFileSync(p,'utf8');
+    if (!csv || !/Number"?[,]+Customer,Status,Scheduled,Due,Amount/.test(csv)) fail(`${t.name}/${v.width}: CSV schema missing`); else pass(`${t.name}/${v.width}: authorized CSV downloaded`);
+    return;
+  }
+  const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000}); await dismiss(page);
+  const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
+  if (t.denied) { if ([302,403].includes(status)||page.url().includes('/login')||page.url().includes('/dashboard')) pass(`${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
+  if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);
+  if (!(t.markers||[]).some(x=>body.includes(x))) fail(`${t.name}/${v.width}: ${path} omitted every declared marker`); else pass(`${t.name}/${v.width}: ${path} rendered`);
+  const width=await page.evaluate(()=>Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)); if(width>v.width+2) fail(`${t.name}/${v.width}: horizontal overflow (${width}px)`);
+}
+async function workflow(page,t,v) {
+  const f=t.serviceWorkflow; if(!f)return;
+  await page.goto(baseUrl+f.createPath,{waitUntil:'domcontentloaded',timeout:30000}); await dismiss(page);
+  for(const [n,val] of Object.entries({customer_name:f.customerName,title:f.title,quantity:f.quantity,unit_price:f.unitPrice,scheduled_at:f.scheduledAt,...Object.fromEntries(Object.entries(f.details).map(([k,x])=>[`details[${k}]`,x]))})) { const el=page.locator(`[name="${n}"]`).first(); if(!await el.count())throw new Error(`${t.name}: form omitted ${n}`);await el.fill(String(val)); }
+  const create=page.locator('form[action$="/pos/work-orders"] button[type="submit"],form[action$="/pos/work-orders"] button').first();
+  await Promise.all([page.waitForURL(/\/pos\/work-orders\/\d+$/,{timeout:30000,waitUntil:'domcontentloaded'}),create.click()]); const order=new URL(page.url()).pathname;
+  for(const s of f.transitions){const b=page.locator(`button[name="to_status"][value="${s}"]`).first();if(!await b.count())throw new Error(`${t.name}: transition ${s} unavailable`);await b.click();await page.waitForLoadState('domcontentloaded');}
+  const invoice=page.locator('form[action$="/invoice"] button[type="submit"],form[action$="/invoice"] button').first(); await Promise.all([page.waitForURL(/\/pos\/transaction\/\d+$/,{timeout:30000}),invoice.click()]);
+  await page.goto(baseUrl+order,{waitUntil:'domcontentloaded',timeout:30000}); if(!(await page.locator('body').innerText()).includes(f.invoiceMarker))throw new Error(`${t.name}: invoice linkage marker missing`); pass(`${t.name}/${v.width}: actual service create, transitions, and invoice linked`);
+}
+async function one(browser,label,v,t) {
+  valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
+  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);for(const text of t.absenceMarkers||[])if((await p.locator('body').innerText()).includes(text))fail(`${t.name}/${label}: forbidden control rendered: ${text}`); for(const path of t.blockedMutationPaths||[])if(await p.locator(`[href="${path}"],form[action="${path}"]`).count())fail(`${t.name}/${label}: mutation route rendered`); if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`); }
+  catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
+}
+const {browser}=await launchLocalBrowser();
+try { for(const [label,v]of views)for(const t of cases)await one(browser,label,v,t); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');

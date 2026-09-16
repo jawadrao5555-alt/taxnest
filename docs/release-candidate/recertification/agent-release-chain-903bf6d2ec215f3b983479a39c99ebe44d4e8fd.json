@@ -1,0 +1,64 @@
+{
+  "baseline": {
+    "exit": 1,
+    "fail_count": 4,
+    "fail_names": [
+      "Agent build must pin reviewed Node 22 runtime",
+      "Agent build must use npm ci rather than a mutable install",
+      "Agent canonical release manifest metadata is incomplete",
+      "Agent tag lookup LASTEXITCODE handling is unsafe"
+    ],
+    "log_path": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/agent-release-chain-baseline.log",
+    "log_sha256": "9f0dacf5da706720a4923f2bcdecd894965f73d4fbdb4d3b2b4e97bbdde49e48",
+    "pass_count": 10,
+    "pass_names": [
+      "Agent build accepts and checks out an exact target SHA",
+      "Agent build validates source and binds release target to it",
+      "existing version tag on older commit is no-build when Agent inputs unchanged; bump required when changed",
+      "Agent build uses current supported checkout",
+      "owner handoff detects Agent/build-workflow changes and exports decision",
+      "single owner approval dispatches Agent build for exact merge SHA with bounded recovery",
+      "duplicate exact-SHA Agent dispatches are serialized and idempotent",
+      "Agent release chain remains PAT- and production-credential-free",
+      "Agent dispatch runs only after owner handoff",
+      "workflow YAML parses"
+    ],
+    "workflow_hashes": {
+      ".github/workflows/build-agent.yml": "7726ae3c64cb05576718a620e2625b4ee272be841ba41375a281b6cb1a3b1703",
+      ".github/workflows/owner-merge-and-deploy.yml": "050de335d796e599e1e494595ac3e82fd7537942c1e72b9eb705516f239f968d",
+      "scripts/owner-merge-and-deploy.sh": "386aac9923d38a649aa7c69ffc14caf736cf1a5e98507305f1bd9e458c52faba"
+    }
+  },
+  "baseline_source_mode": "independent-local-clone",
+  "baseline_source_status": "clean committed baseline workflow files",
+  "command": "bash scripts/rc-safe-run -- bash scripts/tests/agent-release-chain-check.sh",
+  "generated_utc": "2026-09-16T12:58:10.964682Z",
+  "network_scope": "loopback-only guard; static local checker; no GitHub calls, dispatch, merge, build, or release",
+  "proposal": {
+    "exit": 0,
+    "fail_count": 0,
+    "fail_names": [],
+    "log_path": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/agent-release-chain-proposal.log",
+    "log_sha256": "3a691f884d578af08cd8cdc52209ec5a83191d18752891a166af9c9df6521fac",
+    "pass_count": 14,
+    "pass_names": [
+      "Agent build accepts and checks out an exact target SHA",
+      "Agent build validates source and binds release target to it",
+      "existing version tag on older commit is no-build when Agent inputs unchanged; bump required when changed",
+      "Agent build uses current supported checkout",
+      "owner handoff detects Agent/build-workflow changes and exports decision",
+      "single owner approval dispatches Agent build for exact merge SHA with bounded recovery",
+      "duplicate exact-SHA Agent dispatches are serialized and idempotent",
+      "Agent build pins the reviewed Node 22 runtime",
+      "Agent build installs the reviewed lockfile exactly",
+      "Agent build publishes a hash-bound exact-source canonical release manifest",
+      "Agent release chain remains PAT- and production-credential-free",
+      "Agent dispatch runs only after owner handoff",
+      "workflow YAML parses",
+      "missing Agent tag is a successful new-release path; unexpected git errors still fail"
+    ],
+    "source_mode": "held local proposal worktree"
+  },
+  "schema_version": 1,
+  "source_sha": "903bf6d2ec215f3b983479a39c99ebe44d4e8fd4"
+}

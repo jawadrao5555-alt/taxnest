@@ -30,9 +30,9 @@ $baseJourneys = [
 ['name'=>'hotel-housekeeping','login'=>$u('hotel-housekeeping@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/hotel/housekeeping'],'markers'=>['Housekeeping']],
 ['name'=>'hotel-outlet','login'=>$u('hotel-outlet@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/hotel/restaurant'],'markers'=>['Current Order'],'allowRedirectTo'=>'/pos/invoice/create'],
 ['name'=>'hotel-admin-manage-as','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','submitPath'=>"/admin/companies/$hotel",'submitSelector'=>'form[action$="/impersonate"]:has(input[name="mode"][value="full"])','paths'=>['/pos/hotel'],'markers'=>['Front Desk']],
-['name'=>'service-work-orders-manager','login'=>$u('service-manager@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/work-orders','/pos/work-orders/report.csv'],'markers'=>['Event Plan Board','Event Plan Number']],
+['name'=>'service-work-orders-manager','login'=>$u('service-manager@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/work-orders','/pos/work-orders/report.csv'],'markers'=>['Event Plan Board'],'usableSelectors'=>['a[href$="/pos/work-orders/create"]']],
 ['name'=>'health','login'=>$u('health@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/health/login','paths'=>['/health/dashboard'],'markers'=>['Synthetic Browser Health Clinic']],
-['name'=>'fiscal','login'=>$u('fiscal@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/create'],'markers'=>['FBR POS Fee'],'mainMarkers'=>['FBR POS Fee']],
+['name'=>'fiscal','login'=>$u('fiscal@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/create'],'markers'=>['New FBR POS Sale'],'mainMarkers'=>['New FBR POS Sale'],'usableSelectors'=>['[x-ref="barcodeInput"]']],
 ['name'=>'hotel-denied','login'=>$u('hotel-denied@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/hotel','/pos/hotel/restaurant'],'denied'=>true],
 ['name'=>'service-work-orders-denied','login'=>$u('service-denied@rc-browser.invalid'),'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/work-orders','/pos/work-orders/report.csv'],'denied'=>true],
 ];

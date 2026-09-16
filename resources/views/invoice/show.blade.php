@@ -1,23 +1,23 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-                <nav class="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
+            <div class="min-w-0">
+                <nav class="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1.5 min-w-0">
                     <a href="{{ route('dashboard') }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Dashboard</a>
                     <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <a href="/invoices?tab={{ in_array($invoice->status, ['draft', 'failed']) ? ($invoice->status === 'failed' ? 'failed' : 'draft') : 'completed' }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Invoices</a>
                     <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <span class="text-gray-800 dark:text-gray-200 font-semibold">{{ $invoice->display_invoice_number }}</span>
                 </nav>
-                <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-3 min-w-0">
                     <a href="/invoices?tab={{ in_array($invoice->status, ['draft', 'failed']) ? ($invoice->status === 'failed' ? 'failed' : 'draft') : 'completed' }}" class="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition text-sm font-medium">
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         Back to Invoices
                     </a>
-                    <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">Invoice {{ $invoice->display_invoice_number }}</h2>
+                    <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight min-w-0 break-words">Invoice {{ $invoice->display_invoice_number }}</h2>
                 </div>
             </div>
-            <div class="flex items-center flex-wrap gap-2" id="actionButtonsBlock">
+            <div class="flex items-center flex-wrap gap-2 min-w-0" id="actionButtonsBlock">
                 @if($invoice->status === 'draft')
                 {{-- DRAFT: Edit, Verify Integrity, Submit to FBR, Duplicate, Delete, WHT --}}
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Edit</a>

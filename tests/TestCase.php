@@ -35,6 +35,11 @@ abstract class TestCase extends BaseTestCase
         \App\Services\CompanyGroupService::flushSchemaCache();
         \App\Http\Controllers\Auth\PasswordResetLinkController::flushSchemaCache();
         \App\Support\AgentApiKey::flushSchemaCache();
+        // PosFeatureService caches plan/category answers by company id, while
+        // feature tests routinely drop and rebuild minimal schemas (and SQLite
+        // reuses company id 1). Never let an earlier test's entitlement answer
+        // leak into the next isolated fixture.
+        \App\Services\PosFeatureService::flushGateCaches();
 
         $this->assertTestEnvironmentIsIsolated();
     }

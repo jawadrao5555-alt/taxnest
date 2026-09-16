@@ -1,12 +1,11 @@
-# Native MariaDB and DI recertification checkpoint
+# Native MariaDB and DI final immutable-source proof
 
-This is a **bounded native checkpoint**, not final GitHub certification. The
-review-correction native runs began from committed source
-`5f887ddd671e3cad69a5b667ee429a9a9053f900` with the correction patch
-uncommitted; that exact patch is now captured by
-`903bf6d2ec215f3b983479a39c99ebe44d4e8fd4`. Re-run at the final immutable
-SHA with the remaining release gates before certification; this checkpoint
-does not certify either SHA.
+The final native proof passed from an independent, shallow, non-shared clone
+at immutable source SHA `23bb5252291f6f5afd5a7f83a70a0b002ae34fc1`.
+The clone top-level and detached HEAD were checked before its clone-local,
+locked Composer vendor dry run. This report certifies only the disposable
+native database/DI lane; it does not replace any owner authorization or
+separate release gates.
 
 ## Runtime and safety boundary
 
@@ -44,7 +43,7 @@ non-`/tmp/taxnest-rc-mariadb-*` roots, rejects ports `9000` and `33117`, and
 records raw non-secret output below the ignored `.local/recertification/`
 directory.
 
-## Review-correction result
+## Historical review-correction result
 
 The equivalent `full`, data-bearing `upgrade`, and `di` modes were run as
 three separate fresh guarded MariaDB roots (rather than retaining one server
@@ -84,7 +83,75 @@ the token, timestamp, and recovery index. This closes the previously
 unproven concurrent-dispatch/crash window while retaining redelivery after a
 dispatcher crash.
 
+## Final immutable-source result
+
+The final command was run once, from the independent clone, with a fresh
+`/tmp/taxnest-rc-mariadb-native_final_23bb5252_all` root and port `33116`:
+
+```bash
+env -i PATH="$PATH" HOME="$E/run-home" LANG=C LC_ALL=C TZ=UTC CI=1 \
+  NO_PROXY='*' no_proxy='*' \
+  RC_MARIADB_SERVER="$MARIADB_BIN/mariadbd" \
+  RC_MARIADB_CLIENT="$MARIADB_BIN/mariadb" \
+  RC_MARIADB_ADMIN="$MARIADB_BIN/mariadb-admin" \
+  RC_MARIADB_INSTALL_DB="$MARIADB_BIN/mariadb-install-db" \
+  RC_MARIADB_RUN_ID=native_final_23bb5252_all \
+  RC_RECERTIFICATION_DIR="$E/lab-all" \
+  bash scripts/rc-mariadb-migration-lab.sh --all
+```
+
+Exit: `0`. MariaDB was native `10.6.22-MariaDB`; server/client identification,
+initialization, startup, health checks, clients, clean PHP processes, and
+independent PHP workers all used the loopback-only guard. The harness rejects
+ambient MySQL, non-disposable roots, ports `9000`/`33117`, and absent guard
+paths. Fiscal/PRA endpoint/token values were empty; DI recorded `endpoint_calls=0`.
+
+| Final probe | Actual result |
+|---|---|
+| Migration/order/re-entry | PASS — 542 files, 53 timestamp ties, 291 tables, 542 ledger rows, no pending second migration |
+| Schema integrity | PASS — 111 manifest tables, 7 integrity indexes, 119 FK orphan checks |
+| Data-bearing upgrade | PASS — 2 each of fictional tenants, settings, fiscal references/environments, branches, stocks, serials, numbering settings, and ledgers; `Business→Kaarobar` expected backfill; 2 uninferred historic metadata records |
+| InnoDB concurrency | PASS — stock lock `10→8`; canonical fiscal identity outcomes `claimed,duplicate` |
+| DI state/result races | PASS — 10 claim workers/one winner, 10 duplicate result workers/one durable result, two distinct terminal results settle `total=2` once, and result-before-settlement recovery |
+| Outbox crash/recovery | PASS — two committed rows dispatched; post-enqueue/pre-mark loss retained one live lease; immediate retry did not steal it; a real delayed `SeedBulkSubmitBatchJob` database-queue row had future `available_at`; after eligibility it was deserialized and handled once, replaying one handoff; duplicate downstream delivery persisted one fiscal result |
+
+### F01–F11 native closure mapping
+
+| Finding | Final native evidence |
+|---|---|
+| F01 | DI has no configured fiscal endpoint; synthetic acceptance remains source-tested |
+| F02 | Native DI acceptance/state path passed without endpoint calls |
+| F03 | Upgrade retained 2 explicit fiscal environments |
+| F04 | Ambiguous recovery and sealed non-replay path passed |
+| F05 | No regulator endpoint was invoked (`endpoint_calls=0`) |
+| F06 | Clean `env -i` plus loopback guard applied to native PHP children |
+| F07 | Not a native database finding; privileged browser/owner controls remain separately gated |
+| F08 | Ten synchronized canonical claim workers produced exactly one winner |
+| F09 | Native DI immutable fiscal reference/line state path passed |
+| F10 | Duplicate-result, terminal-settlement, outbox crash, durable delayed recovery, and downstream single-result proofs passed |
+| F11 | Guarded native queue/lease proof passed; focused timeout contract remains separately recorded |
+
+The unchanged-source supplemental native PHPUnit evidence is retained from the
+independent clone preparation lane: owner deployment MariaDB schema `6 tests /
+23 assertions`, and exact FBR KOT timestamp probe `1 / 4`.
+
 ## Raw non-secret evidence
+
+Final immutable-source evidence is
+`.local/recertification/native-final-23bb5252/`:
+
+- source fetch/checkout and locked vendor check:
+  `ae12636a297fda3fe442c797c9472b953c9766a16b421146278c37ef72d0d198`,
+  `c9fce63367a08a0b64ab14b7b4b561882e0ecc56cb07c6f44695300407a3d163`,
+  `80f405fab00170b59483e441922ddc9f7ebbd7838cb1e6e639aef9f6d021da5d`
+- final `native-all.log` / `lab-all/mariadb-all.log`:
+  `e473ca7aaa4f9e33517dd5a989b9270a22ae79c6d9d7b66d58cf72ce4ff48998`
+- final migration list / timestamp ties:
+  `86ca6097a5141f02d085c263982e3e72934ee78ed19bbba28301e81148cef2ca`,
+  `fa324b92cff3aa3f1dfe946a20178507aeb576798c84a265aae80d1cea2c3a6d`
+- final upgrade before / after:
+  `676dc7257c3a4fbd3816b830944e9c853d8e46abac6dba329ff2237fb5471059`,
+  `0e33f5801e59c6e2e910397148117959e25ad3f861efd6cbf33bd3c3c8d5b771`
 
 Historical pre-review `--all` evidence remains in
 `.local/recertification/native_mariadb106_301873a3_final/`; it must not be

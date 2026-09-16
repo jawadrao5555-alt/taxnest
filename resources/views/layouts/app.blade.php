@@ -208,10 +208,10 @@
                 @include('layouts.navigation')
             </nav>
 
-            <div class="flex flex-col h-full w-full lg:ml-64">
+            <div class="flex flex-col h-full w-full min-w-0 lg:ml-64">
                 <header class="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                     <div class="flex items-center justify-between h-14 px-4 sm:px-6">
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
                             <button onclick="toggleSidebar()" class="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                             </button>
@@ -222,7 +222,7 @@
                                 </a>
                             @endif
                             @isset($header)
-                                <div class="text-sm">{{ $header }}</div>
+                                <div class="text-sm flex-1 min-w-0">{{ $header }}</div>
                             @endisset
                         </div>
                         <div class="flex items-center gap-3">
@@ -346,7 +346,7 @@
                 <script>if(localStorage.getItem('di-apk-nudge-dismissed')==='1'){var n=document.getElementById('di-apk-nudge');if(n)n.remove();}</script>
                 @endif
 
-                <main class="flex-1 overflow-y-auto p-4 sm:p-6 main-scroll bg-gray-50 dark:bg-gray-950 page-fade">
+                <main class="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 main-scroll bg-gray-50 dark:bg-gray-950 page-fade">
                     @if(session('success'))
                         <div class="max-w-7xl mx-auto mb-4">
                             <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">

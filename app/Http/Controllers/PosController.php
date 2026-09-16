@@ -2113,8 +2113,14 @@ class PosController extends Controller
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         // The PRA dashboard is also used by restaurant-shaped companies. Use
         // the canonical plan/override gate (not restaurant_mode) so its pending
-        // tile can warn about the same held orders that block day close.
-        $isRestaurant = \App\Services\PosFeatureService::restaurantAllowed($company);
+        // tile can warn about the same held orders that block day close. A
+        // pre-migration/minimal test schema has no subscriptions table yet;
+        // querying the plan there would turn a dashboard drift guard into a
+        // SQL error, so retain the legacy restaurant-mode signal until the
+        // entitlement table exists.
+        $isRestaurant = \Illuminate\Support\Facades\Schema::hasTable('subscriptions')
+            ? \App\Services\PosFeatureService::restaurantAllowed($company)
+            : (bool) ($company->restaurant_mode ?? false);
         [$openOrdersCount, $counterOrdersCount, $heldNoTableCount] = $this->pendingRestaurantOrderCounts(
             $companyId,
             $isRestaurant

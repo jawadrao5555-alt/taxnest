@@ -162,17 +162,22 @@ export function loadLocalQaCreds() {
 
 /**
  * Attach console + pageerror + failed request collectors to a Playwright page.
+ * Also records HTTP ≥400 responses with URL/resourceType so bare Chrome
+ * "Failed to load resource: 403" console lines can be correlated to sources.
  * @param {import('playwright-core').Page} page
- * @returns {{ consoleErrors: string[], pageErrors: string[], failedRequests: string[], summary: () => string }}
+ * @returns {{ consoleErrors: string[], pageErrors: string[], failedRequests: string[], httpErrors: object[], summary: () => string }}
  */
 export function attachDiagnostics(page) {
     const consoleErrors = [];
     const pageErrors = [];
     const failedRequests = [];
+    const httpErrors = [];
 
     page.on('console', (msg) => {
         if (msg.type() === 'error') {
-            consoleErrors.push(msg.text());
+            const loc = msg.location();
+            const locStr = loc?.url ? `${loc.url}${loc.lineNumber != null ? ':' + loc.lineNumber : ''}` : '';
+            consoleErrors.push(locStr ? `${msg.text()} @ ${locStr}` : msg.text());
         }
     });
     page.on('pageerror', (err) => {
@@ -185,16 +190,32 @@ export function attachDiagnostics(page) {
         if (/NS_BINDING_ABORTED|net::ERR_ABORTED/i.test(errText)) return;
         failedRequests.push(`${req.method()} ${req.url()} — ${errText}`);
     });
+    page.on('response', (res) => {
+        const status = res.status();
+        if (status < 400) return;
+        const url = res.url();
+        if (/\/favicon\.ico($|\?)/i.test(url)) return;
+        const req = res.request();
+        httpErrors.push({
+            status,
+            method: req.method(),
+            url,
+            resourceType: req.resourceType(),
+            fromPage: page.url(),
+        });
+    });
 
     return {
         consoleErrors,
         pageErrors,
         failedRequests,
+        httpErrors,
         summary() {
             const parts = [];
             if (pageErrors.length) parts.push(`pageerrors=${pageErrors.length}`);
             if (consoleErrors.length) parts.push(`console_errors=${consoleErrors.length}`);
             if (failedRequests.length) parts.push(`failed_requests=${failedRequests.length}`);
+            if (httpErrors.length) parts.push(`http_errors=${httpErrors.length}`);
             return parts.length ? parts.join(', ') : 'no browser errors collected';
         },
     };

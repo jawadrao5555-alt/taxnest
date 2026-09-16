@@ -154,8 +154,15 @@ async function writeDiag(name, diag, extra = {}) {
         pageErrors: diag.pageErrors,
         consoleErrors: diag.consoleErrors,
         failedRequests: diag.failedRequests,
+        httpErrors: diag.httpErrors || [],
         ...extra,
     }, null, 2));
+    for (const e of diag.consoleErrors || []) {
+        console.log(`    console: ${e}`);
+    }
+    for (const e of diag.httpErrors || []) {
+        console.log(`    http ${e.status} ${e.method} ${e.resourceType} ${e.url} (from ${e.fromPage})`);
+    }
 }
 
 async function runJourney(browser, label, viewport, creds) {
@@ -387,8 +394,23 @@ async function runJourney(browser, label, viewport, creds) {
         await shot(page, `${prefix}-09-hk-outlet-denied`);
 
         await writeDiag(`${prefix}-diagnostics`, diag, { stayUrl, finalUrl: page.url() });
+        // Intentional auth probes (denied cashier + HK → /pos/hotel/restaurant) return
+        // HTTP 403 by design. Chrome surfaces those as console "Failed to load resource"
+        // lines — they are not product regressions.
+        const unexpectedConsole = (diag.consoleErrors || []).filter((t) => {
+            if (/Failed to load resource:.*403/i.test(t) && /\/pos\/hotel\/restaurant/i.test(t)) return false;
+            return true;
+        });
+        const unexpectedHttp = (diag.httpErrors || []).filter((e) => {
+            if (e.status === 403 && /\/pos\/hotel\/restaurant/i.test(e.url || '')) return false;
+            return true;
+        });
         if (diag.pageErrors.length) bad(`pageerrors: ${diag.pageErrors.slice(0, 3).join(' | ')}`);
-        else ok(`diagnostics: ${diag.summary()}`);
+        else if (unexpectedConsole.length || unexpectedHttp.length) {
+            bad(`unexpected browser errors: console=${unexpectedConsole.length} http=${unexpectedHttp.length}`);
+        } else {
+            ok(`diagnostics: ${diag.summary()} (auth-denial 403 probes excluded from fail gate)`);
+        }
     } catch (e) {
         bad(`${label} journey exception: ${e.message || e}`);
         await shot(page, `${prefix}-99-error`).catch(() => null);

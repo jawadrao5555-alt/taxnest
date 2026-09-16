@@ -7,16 +7,29 @@ PORT="${RC_MARIADB_PORT:-33116}"
 SERVER="${RC_MARIADBD:-${RC_MARIADB_SERVER:-}}"
 if [[ -z "$SERVER" ]]; then SERVER="$(command -v mariadbd 2>/dev/null || command -v mysqld 2>/dev/null || true)"; fi
 SERVER_DIR="$(dirname "$SERVER")"
-CLIENT="${RC_MARIADB_CLIENT:-$SERVER_DIR/mariadb}"
-ADMIN="${RC_MARIADB_ADMIN:-$SERVER_DIR/mariadb-admin}"
-INSTALL_DB="${RC_MARIADB_INSTALL_DB:-$SERVER_DIR/mariadb-install-db}"
+# Nix bundles tools beside the server; distribution/container packages split
+# mariadbd into sbin and the client tools into bin. Explicit overrides must
+# still fail closed rather than silently falling back to another installation.
+resolve_tool() {
+    local override="$1" name="$2"
+    if [[ -n "$override" ]]; then
+        printf '%s\n' "$override"
+    elif [[ -x "$SERVER_DIR/$name" ]]; then
+        printf '%s\n' "$SERVER_DIR/$name"
+    else
+        command -v "$name" 2>/dev/null || true
+    fi
+}
+CLIENT="$(resolve_tool "${RC_MARIADB_CLIENT:-}" mariadb)"
+ADMIN="$(resolve_tool "${RC_MARIADB_ADMIN:-}" mariadb-admin)"
+INSTALL_DB="$(resolve_tool "${RC_MARIADB_INSTALL_DB:-}" mariadb-install-db)"
 DATA="$ROOT/data"; RUN="$ROOT/run"; LOG="$ROOT/log"; SOCKET="$RUN/mariadb.sock"; PID="$RUN/mariadb.pid"; CNF="$ROOT/my.cnf"
 
 fail() { printf 'rc-mariadb-lab: %s\n' "$*" >&2; exit 1; }
 [[ "$ROOT" == /tmp/taxnest-rc-mariadb-* ]] || fail "refusing root outside /tmp/taxnest-rc-mariadb-*"
 [[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT >= 1024 && PORT <= 65535 && PORT != 9000 )) || fail "unsafe port"
 [[ "$PORT" != 33117 || "$ROOT" == /tmp/taxnest-rc-mariadb-browser-* ]] || fail "33117 is reserved for the exact browser fixture"
-[[ -x "$SERVER" && -x "$CLIENT" && -x "$ADMIN" && -x "$INSTALL_DB" ]] || fail "genuine MariaDB 10.6 server/client/install-db binaries unavailable"
+[[ -x "$SERVER" && -x "$CLIENT" && -x "$ADMIN" && -x "$INSTALL_DB" ]] || fail "genuine MariaDB 10.6 server/client/admin/install-db binaries unavailable"
 if [[ "${RC_MARIADB_REQUIRE_EGRESS_GUARD:-0}" == 1 ]]; then
     [[ -r "${RC_MARIADB_LD_PRELOAD:-}" ]] || fail 'required loopback-only egress guard is unavailable'
 fi
@@ -29,10 +42,18 @@ guarded() {
         "$@"
     fi
 }
-SERVER_VERSION="$(guarded "$SERVER" --version 2>&1)"
-CLIENT_VERSION="$(guarded "$CLIENT" --version 2>&1)"
-[[ "$SERVER_VERSION" =~ MariaDB ]] && [[ "$SERVER_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 server: $SERVER_VERSION"
-[[ "$CLIENT_VERSION" =~ MariaDB ]] && [[ "$CLIENT_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 client: $CLIENT_VERSION"
+require_version() {
+    local role="$1" binary="$2" output
+    output="$(guarded "$binary" --version 2>&1)" || fail "$role --version failed: $output"
+    [[ "$output" == *MariaDB* && "$output" =~ (^|[^0-9.])10\.6\.[0-9]+([^0-9.]|$) ]] ||
+        fail "refusing non-MariaDB-10.6 $role: $output"
+    printf '%s\n' "$output"
+}
+SERVER_VERSION="$(require_version server "$SERVER")"
+CLIENT_VERSION="$(require_version client "$CLIENT")"
+ADMIN_VERSION="$(require_version admin "$ADMIN")"
+# install-db is an initialization script, not a version-reporting binary.
+# Do not invoke it during discovery: even --version can initialize a datadir.
 
 write_config() {
     mkdir -p "$ROOT" "$RUN" "$LOG"

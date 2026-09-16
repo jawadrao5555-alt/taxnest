@@ -62,4 +62,5 @@ for lane in workflow-safety dependency-audit-build fullphpunit native-mariadb-di
         fail "$lane lacks its always-uploaded evidence artifact"
 done
 
+python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-discovery-check.py"
 printf 'PASS: MariaDB image, ownership, version-order, and evidence contracts are present.\n'

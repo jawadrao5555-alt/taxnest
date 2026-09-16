@@ -5,7 +5,7 @@ use Illuminate\Contracts\Console\Kernel; use Illuminate\Support\Facades\DB; use 
 require dirname(__DIR__).'/vendor/autoload.php'; $app=require dirname(__DIR__).'/bootstrap/app.php'; $app->make(Kernel::class)->bootstrap();
 $fail=static function(string $m):never{fwrite(STDERR,"RC DI BROWSER FIXTURE REFUSED: {$m}\n");exit(2);};
 $path=(string)getenv('RC_BROWSER_FIXTURE_OUT'); $socket=(string)getenv('DB_SOCKET');
-if(PHP_SAPI!=='cli'||!preg_match('#^/tmp/taxnest-rc-browser-[0-9]+/safe-runtime/browser-state/fixture\.json$#',$path)||!is_file($path)||!preg_match('#^/tmp/taxnest-rc-mariadb-browser-[0-9]+/run/mariadb\.sock$#',$socket)||@filetype($socket)!=='socket'||is_link($socket))$fail('exact isolated fixture/socket required.');
+if(PHP_SAPI!=='cli'||!preg_match('#^/tmp/taxnest-rc-browser-[0-9]+(?:-[A-Za-z0-9_.-]+)?/safe-runtime/browser-state/fixture\.json$#',$path)||!is_file($path)||is_link($path)||!preg_match('#^/tmp/taxnest-rc-mariadb-browser-[0-9]+/run/mariadb\.sock$#',$socket)||@filetype($socket)!=='socket'||is_link($socket))$fail('exact isolated fixture/socket required.');
 if((string)DB::connection()->getDatabaseName()!=='taxnest_rc_browser'||(string)config('database.connections.mysql.host')!=='127.0.0.1'||(string)config('database.connections.mysql.unix_socket')!==$socket)$fail('connection is outside exact allowlist.');
 foreach(['companies','users','invoices','invoice_items'] as $table)if(!Schema::hasTable($table))$fail("missing table {$table}");
 $fixture=json_decode((string)file_get_contents($path),true); if(!is_array($fixture)||empty($fixture['synthetic'])||empty($fixture['readOnlyJourneys'][0]['password']))$fail('generated fixture required.');

@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { assertLocalOnlyBaseUrl, attachDiagnostics, launchLocalBrowser, saveEvidenceScreenshot } from './lib/local-browser.mjs';
 
 const baseUrl = assertLocalOnlyBaseUrl(process.env.BASE_URL);
 const fixturePath = process.env.RC_BROWSER_FIXTURE;
-if (!fixturePath?.startsWith('/tmp/taxnest-rc-browser-')) throw new Error('RC_BROWSER_FIXTURE must be generated under isolated /tmp state');
+if (!fixturePath || !/^\/tmp\/taxnest-rc-browser-[0-9]+(?:-[A-Za-z0-9_.-]+)?\/safe-runtime\/browser-state\/fixture\.json$/.test(fixturePath)) throw new Error('RC_BROWSER_FIXTURE must be generated under exact isolated /tmp state');
+const fixtureStat = lstatSync(fixturePath);
+if (!fixtureStat.isFile() || realpathSync(fixturePath) !== fixturePath) throw new Error('RC_BROWSER_FIXTURE must be a non-symlink regular file at its exact isolated target');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
 if (!fixture.synthetic || !Array.isArray(fixture.readOnlyJourneys) || !Array.isArray(fixture.transactionalJourneys)) throw new Error('synthetic separated fixture required');
 const requested = String(process.env.RC_BROWSER_ONLY || '').split(',').map(x => x.trim()).filter(Boolean);

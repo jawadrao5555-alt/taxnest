@@ -46,6 +46,31 @@ class SeedBulkSubmitBatchJob implements ShouldQueue
         $this->onQueue(BulkSubmitInvoiceJob::QUEUE);
     }
 
+    /**
+     * Identify a delayed recovery payload without relying on jobs-table order.
+     *
+     * A live dispatcher can leave an obsolete recovery row behind when a
+     * sibling observes its lease just before it marks the outbox row sent.
+     * Native recovery proofs use this to select the recovery for their own
+     * batch from a deliberately polluted queue. Queue payloads are local,
+     * database-backed framework payloads; malformed rows are simply ignored.
+     */
+    public static function payloadTargetsBatch(string $payload, int $batchId): bool
+    {
+        try {
+            $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+            $command = $decoded['data']['command'] ?? null;
+            if (!is_string($command)) {
+                return false;
+            }
+            $job = unserialize($command, ['allowed_classes' => [self::class]]);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $job instanceof self && $job->batchId === $batchId;
+    }
+
     public function handle(): void
     {
         // Recover rows committed by a predecessor that died after advancing

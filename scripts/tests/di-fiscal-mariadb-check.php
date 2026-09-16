@@ -79,6 +79,29 @@ function makeDiInvoice(int $companyId, string $suffix): int
 }
 
 /**
+ * Recovery dispatchers may leave an already-obsolete delayed Seed job behind
+ * when another dispatcher owns a live lease.  Do not let that valid queue
+ * state make this fixture execute the wrong batch's recovery job.
+ */
+function delayedSeedForBatch(int $batchId): ?object
+{
+    $rows = DB::table('jobs')
+        ->where('queue', BulkSubmitInvoiceJob::QUEUE)
+        ->where('payload', 'like', '%SeedBulkSubmitBatchJob%')
+        ->where('available_at', '>', time())
+        ->orderBy('id')
+        ->get();
+
+    foreach ($rows as $row) {
+        if (SeedBulkSubmitBatchJob::payloadTargetsBatch((string) $row->payload, $batchId)) {
+            return $row;
+        }
+    }
+
+    return null;
+}
+
+/**
  * @return array{0: int, 1: array<int, string>}
  */
 function runWorkers(string $worker, array $arguments, int $count, bool $synchronize = false): array
@@ -328,6 +351,17 @@ $crashSeed = new SeedBulkSubmitBatchJob($crashBatch->id);
 $claimNextChunk = new ReflectionMethod($crashSeed, 'claimNextChunk');
 $claimNextChunk->setAccessible(true);
 $claimNextChunk->invoke($crashSeed);
+$queue = \Illuminate\Support\Facades\Queue::connection('database');
+$pollutedRecoveryId = $queue->later(
+    now()->addMinutes(10),
+    new SeedBulkSubmitBatchJob($outboxBatch->id),
+    '',
+    BulkSubmitInvoiceJob::QUEUE
+);
+assertDi(
+    is_int($pollutedRecoveryId) || (is_string($pollutedRecoveryId) && ctype_digit($pollutedRecoveryId)),
+    'older delayed recovery fixture was inserted for the other batch'
+);
 $jobsBeforeCrash = $bulkJobCount();
 [$crashWorkers] = runWorkers(
     __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
@@ -358,26 +392,44 @@ assertDi(
 );
 // The immediate retry cannot take a live lease, but it must leave durable
 // delayed Seed work behind rather than relying on a test-only boolean hook.
-$delayedSeed = DB::table('jobs')
-    ->where('queue', BulkSubmitInvoiceJob::QUEUE)
-    ->where('payload', 'like', '%SeedBulkSubmitBatchJob%')
-    ->where('available_at', '>', time())
-    ->orderBy('id')
-    ->first();
+// The concurrent outbox proof above can legitimately leave an obsolete
+// recovery row for its own batch when a live owner wins the race after a
+// sibling observes that live lease.  Select by the serialized batch identity,
+// not by queue insertion order, so this assertion exercises the crash row.
+$delayedSeed = delayedSeedForBatch($crashBatch->id);
+$pollutedSeed = delayedSeedForBatch($outboxBatch->id);
 assertDi(
-    $delayedSeed !== null && (int) $delayedSeed->available_at > time(),
+    $delayedSeed !== null
+    && $pollutedSeed !== null
+    && (int) $pollutedSeed->id < (int) $delayedSeed->id
+    && (int) $delayedSeed->available_at > time(),
     'live lease persisted a delayed Seed recovery queue row'
+);
+assertDi(
+    $delayedSeed !== null
+    && SeedBulkSubmitBatchJob::payloadTargetsBatch((string) $delayedSeed->payload, $crashBatch->id),
+    'selected delayed recovery payload belongs to the crash batch'
 );
 DB::table('invoice_bulk_submission_outbox')->where('id', $crashRow->id)->update([
     'dispatch_claimed_at' => now()->subSeconds(SeedBulkSubmitBatchJob::OUTBOX_CLAIM_SECONDS + 1),
 ]);
+$expiredCrashRow = DB::table('invoice_bulk_submission_outbox')->where('id', $crashRow->id)->first();
+assertDi(
+    $expiredCrashRow !== null
+    && $expiredCrashRow->dispatched_at === null
+    && $expiredCrashRow->dispatch_claim_token !== null
+    && $expiredCrashRow->dispatch_claimed_at < now()->subSeconds(SeedBulkSubmitBatchJob::OUTBOX_CLAIM_SECONDS),
+    'crash hand-off is still undispatched with an expired lease before replay'
+);
 $jobsBeforeRecovery = $bulkJobCount();
 // Model the queue reaching available_at, then execute its serialized delayed
 // job. This validates the real queue payload and recovery path without a
 // daemon or any external endpoint.
 DB::table('jobs')->where('id', $delayedSeed->id)->update(['available_at' => time() - 1]);
 $delayedPayload = json_decode((string) $delayedSeed->payload, true, 512, JSON_THROW_ON_ERROR);
-$delayedJob = unserialize($delayedPayload['data']['command'], ['allowed_classes' => true]);
+$delayedJob = unserialize($delayedPayload['data']['command'], [
+    'allowed_classes' => [SeedBulkSubmitBatchJob::class],
+]);
 config(['queue.default' => 'database']);
 assertDi($delayedJob instanceof SeedBulkSubmitBatchJob, 'delayed queue payload contains a SeedBulkSubmitBatchJob');
 $delayedJob->handle();

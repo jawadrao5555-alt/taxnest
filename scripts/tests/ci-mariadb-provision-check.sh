@@ -5,6 +5,7 @@ set -Eeuo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 workflow="$root/.github/workflows/pr-checks.yml"
 provision="$root/scripts/ci-mariadb-provision.sh"
+browser_fixture_check="$root/scripts/tests/rc-browser-fixture-state-check.sh"
 
 fail() {
     printf 'ci-mariadb-provision-check: %s\n' "$*" >&2
@@ -13,6 +14,7 @@ fail() {
 
 [[ -r "$workflow" ]] || fail 'active PR workflow is missing'
 [[ -x "$provision" ]] || fail 'MariaDB provisioning helper is not executable'
+[[ -x "$browser_fixture_check" ]] || fail 'browser fixture state regression check is not executable'
 
 grep -Fq 'mariadb:10.6.23-jammy@sha256:' "$workflow" ||
     fail 'native/browser jobs must use the pinned MariaDB 10.6.23 jammy image'
@@ -64,4 +66,5 @@ done
 
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-discovery-check.py"
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-startup-check.py"
+bash "$browser_fixture_check"
 printf 'PASS: MariaDB image, ownership, version-order, and evidence contracts are present.\n'

@@ -27,8 +27,9 @@ $socket = (string) getenv('DB_SOCKET');
 if (PHP_SAPI !== 'cli' || getenv('RC_BROWSER_FIXTURE_FRESH') !== '1') {
     $fail('fresh reset acknowledgement is required.');
 }
-if (!preg_match('#^/tmp/taxnest-rc-browser-[0-9]+/safe-runtime/browser-state/fixture\.json$#', $fixturePath)
+if (!preg_match('#^/tmp/taxnest-rc-browser-[0-9]+(?:-[A-Za-z0-9_.-]+)?/safe-runtime/browser-state/fixture\.json$#', $fixturePath)
     || !preg_match('#^/tmp/taxnest-rc-mariadb-browser-[0-9]+/run/mariadb\.sock$#', $socket)
+    || is_link($fixturePath) || is_link($fixturePath.'.tmp')
     || @filetype($socket) !== 'socket' || is_link($socket)) {
     $fail('exact isolated fixture target and MariaDB socket are required.');
 }

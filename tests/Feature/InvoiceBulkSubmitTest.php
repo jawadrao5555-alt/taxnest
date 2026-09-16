@@ -691,6 +691,48 @@ class InvoiceBulkSubmitTest extends TestCase
         }
     }
 
+    public function test_delayed_recovery_selection_ignores_an_older_other_batch_row(): void
+    {
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts');
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
+        $queue = Queue::connection('database');
+        $pollutedId = $queue->later(
+            now()->addMinutes(10),
+            new SeedBulkSubmitBatchJob(701),
+            '',
+            BulkSubmitInvoiceJob::QUEUE
+        );
+        $targetId = $queue->later(
+            now()->addMinutes(10),
+            new SeedBulkSubmitBatchJob(702),
+            '',
+            BulkSubmitInvoiceJob::QUEUE
+        );
+
+        $rows = \DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->orderBy('id')->get();
+        $selected = $rows->first(
+            fn (object $row): bool => SeedBulkSubmitBatchJob::payloadTargetsBatch((string) $row->payload, 702)
+        );
+
+        $this->assertSame((int) $pollutedId, (int) $rows->first()->id);
+        $this->assertNotNull($selected);
+        $this->assertSame((int) $targetId, (int) $selected->id);
+        $this->assertFalse(SeedBulkSubmitBatchJob::payloadTargetsBatch((string) $rows->first()->payload, 702));
+        $this->assertFalse(SeedBulkSubmitBatchJob::payloadTargetsBatch('{not-json', 702));
+        $this->assertFalse(SeedBulkSubmitBatchJob::payloadTargetsBatch(
+            json_encode(['data' => ['command' => serialize(new \stdClass())]], JSON_THROW_ON_ERROR),
+            702
+        ));
+    }
+
     public function test_enqueue_failure_releases_claim_and_schedules_durable_recovery(): void
     {
         Schema::create('invoice_bulk_submission_outbox', function (Blueprint $table) {

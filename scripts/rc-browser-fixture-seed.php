@@ -179,6 +179,15 @@ $admin = AdminUser::create([
     'name' => 'Synthetic RC Platform Administrator', 'email' => 'hotel-admin-manage-as@rc-browser.invalid',
     'password' => Hash::make($password), 'role' => 'super_admin',
 ]);
+$expectedCategoryEmails = [];
+foreach (['pra', 'fbr'] as $panel) {
+    foreach (array_merge(PosFeatureService::categories($panel), ['general']) as $category) {
+        $expectedCategoryEmails[] = "category-user-{$panel}-{$category}@rc-browser.invalid";
+    }
+}
+if (User::withoutGlobalScopes()->whereIn('email', $expectedCategoryEmails)->count() !== count($expectedCategoryEmails)) {
+    $fail('fresh category actor matrix was not persisted.');
+}
 
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,

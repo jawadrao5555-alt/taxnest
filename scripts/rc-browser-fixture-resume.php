@@ -19,7 +19,7 @@ foreach(['pra','fbr'] as $panel)foreach(array_merge(PosFeatureService::categorie
 $categoryUsers=User::whereIn('email',$expectedCategoryEmails)->get()->keyBy('email');
 $admin=AdminUser::where('email','hotel-admin-manage-as@rc-browser.invalid')->first();
 if($users->count()!==count($emails)||$categoryUsers->count()!==count($expectedCategoryEmails)||array_diff($expectedCategoryEmails,$categoryUsers->keys()->all())||!$admin)$fail('synthetic browser identities absent or category matrix differs; fresh setup required.');
-$users=$users->merge($categoryUsers);
+$users=$users->toBase()->merge($categoryUsers->toBase());
 $password='RcBrowser!'.bin2hex(random_bytes(18)); foreach($users as $u)$u->forceFill(['password'=>Hash::make($password),'is_active'=>true])->save(); $admin->forceFill(['password'=>Hash::make($password)])->save();
 $u=static fn(string $email)=>$users[$email]->email; $hotel=(int)$companies['hotel-company@rc-browser.invalid'];$patientIds=DB::table('health_patients')->whereIn('mrn',['RC-OWN-001','RC-OTHER-BRANCH-001','RC-ISOLATED-001'])->pluck('id','mrn');if($patientIds->count()!==3)$fail('synthetic patient isolation rows absent; setup required.');
 $categoryJourneys=[];

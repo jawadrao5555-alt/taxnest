@@ -137,6 +137,7 @@ jobs:
       RC_MARIADB_VERSION: '10.6.23'
     steps:
       - name: Bootstrap pinned MariaDB container before checkout
+        shell: bash
         run: |
           set -Eeuo pipefail
           evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
@@ -195,6 +196,7 @@ jobs:
       RC_MARIADB_VERSION: '10.6.23'
     steps:
       - name: Bootstrap pinned MariaDB container before checkout
+        shell: bash
         run: |
           set -Eeuo pipefail
           evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"

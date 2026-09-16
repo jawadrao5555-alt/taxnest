@@ -47,6 +47,8 @@ function contract(doc,label){
     const image=job.container?.image||'';
     if(!/^mariadb:10\.6\.23-jammy@sha256:[0-9a-f]{64}$/.test(image))throw Error(`${label}: ${name} must pin MariaDB 10.6.23 jammy by digest`);
     if(job.container?.options!=='--user root')throw Error(`${label}: ${name} must run the container as root for targeted bootstrap ownership`);
+    const bootstrap=(job.steps||[]).find(s=>s.name==='Bootstrap pinned MariaDB container before checkout');
+    if(bootstrap?.shell!=='bash')throw Error(`${label}: ${name} pre-checkout bootstrap must explicitly use shell: bash`);
     const checkout=(job.steps||[]).find(s=>s.uses==='actions/checkout@v7');
     if(checkout?.with?.['set-safe-directory']!==false)throw Error(`${label}: ${name} must not use a global safe.directory bypass`);
   }

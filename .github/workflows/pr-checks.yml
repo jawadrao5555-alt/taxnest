@@ -1,14 +1,4 @@
-# Lightweight PR checks. Does not deploy, SSH, or read production secrets.
-# Mark this workflow as a required status check on main.
-#
-# types must be explicit: GitHub's pull_request default is only
-# opened / synchronize / reopened. ready_for_review is NOT default, so a
-# draft that becomes Ready after checks already passed never re-runs this
-# workflow. Keep the default three AND ready_for_review so the owner sees
-# fresh checks before Owner Merge & Deploy.
-# Do not add a pull_request trigger to owner-merge-and-deploy.yml
-# (that would run the write-token job from the PR branch).
-
+# Full disposable PR verification. Does not deploy, use SSH, or read production secrets.
 name: PR checks
 
 on:
@@ -20,30 +10,168 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    name: validate
-    runs-on: ubuntu-latest
+  workflow-safety:
+    name: Workflow and release safety
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
-      - name: Workflow and auto-merge safety checks
-        run: bash scripts/tests/pr-auto-merge-check.sh
-      - name: Issue-to-live workflow safety checks
-        run: bash scripts/tests/issue-to-live-check.sh
-      - name: Auto-merge disabled / owner-handoff checks
-        run: bash scripts/tests/automerge-deploy-handoff-check.sh
-      - name: Production deploy workflow safety checks
-        run: bash scripts/tests/ci-deploy-production-check.sh
-      - name: Unattended Deploy Production safety checks
-        run: bash scripts/tests/deploy-unattended-safety-check.sh
-      - name: Owner Merge & Deploy safety checks
-        run: bash scripts/tests/owner-merge-and-deploy-check.sh
-      - name: Exact-SHA Agent release chain checks
-        run: bash scripts/tests/agent-release-chain-check.sh
-      - name: Live Ops SSH host-key pin checks
-        run: bash scripts/tests/live-ops-ssh-hostkey-check.sh
-      - name: Live Ops daily-ops allow-list checks
-        run: bash scripts/tests/live-ops-daily-ops-check.sh
-      - name: Live Ops autonomous owner-command checks
-        run: bash scripts/tests/live-ops-autonomous-check.sh
-      - name: Approval Relay Dispatch empty-claims parser checks
-        run: bash scripts/tests/approval-dispatch-check.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked JavaScript parser dependency
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Owner-controlled workflow safety checks
+        run: |
+          bash scripts/tests/pr-auto-merge-check.sh
+          bash scripts/tests/issue-to-live-check.sh
+          bash scripts/tests/automerge-deploy-handoff-check.sh
+          bash scripts/tests/ci-deploy-production-check.sh
+          bash scripts/tests/deploy-unattended-safety-check.sh
+          bash scripts/tests/owner-merge-and-deploy-check.sh
+          bash scripts/tests/live-ops-ssh-hostkey-check.sh
+          bash scripts/tests/live-ops-daily-ops-check.sh
+          bash scripts/tests/live-ops-autonomous-check.sh
+          bash scripts/tests/approval-dispatch-check.sh
+      - name: Mandatory PR-check DAG contract
+        run: bash scripts/tests/rc-ci-gates-check.sh
+
+  dependency-audit-build:
+    name: Locked dependency audit, asset build, and guards
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rebuild disposable locked verification lane
+        run: bash scripts/rc-recertify.sh --all-locks
+
+  fullphpunit:
+    name: Full PHPUnit suite
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - name: Install locked PHP dependencies without application scripts
+        run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Run full suite in clean loopback-only environment
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit
+
+  native-mariadb-di:
+    name: Native MariaDB migration, concurrency, and DI
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql
+      - name: Install MariaDB 10.6 and locked PHP dependencies
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client
+          mariadbd --version | grep -E 'MariaDB.*10\.6\.'
+          composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Run disposable data-bearing migration and DI proof
+        env:
+          RC_MARIADB_PORT: '33116'
+        run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --all
+      - name: Run required MariaDB-only supplemental probes
+        env:
+          RC_MARIADB_PORT: '33116'
+        run: bash scripts/rc-mariadb-supplemental.sh
+
+  browserdesktopmobile:
+    name: Browser acceptance at desktop and 390px mobile
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install disposable browser and local database prerequisites
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client
+          mariadbd --version | grep -E 'MariaDB.*10\.6\.'
+          composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install chromium
+      - name: Seed and exercise isolated browser fixture
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: |
+          trap 'bash scripts/rc-browser-fixture.sh stop' EXIT
+          bash scripts/rc-browser-fixture.sh setup
+          bash scripts/rc-browser-fixture.sh run
+
+  jsagentrealtime:
+    name: Node 22 PRA Agent and realtime gateway
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked platform-independent test dependencies
+        run: |
+          npm ci --prefix pra-agent --ignore-scripts --no-audit --no-fund
+          npm ci --prefix agent-realtime-gateway --ignore-scripts --no-audit --no-fund
+      - name: Run PRA Agent JavaScript tests with egress blocked
+        run: |
+          mapfile -t tests < <(find pra-agent/test -maxdepth 1 -type f -name '*.test.js' ! -name 'local-core-internet-cut.test.js' -printf '%p\n' | sort)
+          bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
+      - name: Run realtime gateway tests with egress blocked
+        run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
+
+  manifest-provenance:
+    name: Exact-SHA manifest and release-chain proof
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked PHP dependencies without application scripts
+        run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Verify owner-controlled exact-SHA release chain
+        run: bash scripts/rc-safe-run -- bash scripts/tests/agent-release-chain-check.sh
+      - name: Verify canonical manifest server-side rejection rules
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/AgentReleaseManifestTest.php
+
+  validate:
+    name: validate
+    if: always()
+    needs:
+      - workflow-safety
+      - dependency-audit-build
+      - fullphpunit
+      - native-mariadb-di
+      - browserdesktopmobile
+      - jsagentrealtime
+      - manifest-provenance
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every mandatory verification lane to pass
+        run: |
+          test "${{ needs.workflow-safety.result }}" = success
+          test "${{ needs.dependency-audit-build.result }}" = success
+          test "${{ needs.fullphpunit.result }}" = success
+          test "${{ needs.native-mariadb-di.result }}" = success
+          test "${{ needs.browserdesktopmobile.result }}" = success
+          test "${{ needs.jsagentrealtime.result }}" = success
+          test "${{ needs.manifest-provenance.result }}" = success

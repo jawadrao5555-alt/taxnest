@@ -21,6 +21,19 @@ async function dismiss(page) {
   // Announcement and survey components are mounted after the initial Alpine tick.
   await page.waitForTimeout(350);
   for (let i=0;i<8;i++) {
+    const fbrChoice=page.locator('[data-fbr-decision-card]:visible').locator('xpath=.//button[contains(@click, "fdChoose(\'without_fbr\')")]').first();
+    if (await fbrChoice.count()) {
+      await fbrChoice.click();
+      await page.waitForLoadState('domcontentloaded').catch(()=>{});
+      await page.waitForTimeout(350);
+      continue;
+    }
+    const whatsNew=page.locator('[x-show="wnOpen"]:visible').locator('xpath=.//button[contains(@click, "wnDismiss")]').first();
+    if (await whatsNew.count()) {
+      await whatsNew.click();
+      await page.waitForTimeout(300);
+      continue;
+    }
     const pra=page.locator('[data-pra-elaan-popup]:visible');
     if (await pra.count()) { await pra.locator('button').last().click(); await page.waitForTimeout(250); continue; }
     const b=page.locator('[x-ref="wnBtn"]:visible,button:has-text("Got it"):visible,button:has-text("Samajh gaya"):visible,[data-pos-survey] button:has-text("Baad Mein"):visible,[data-pos-survey] button:has-text("Later"):visible').first();
@@ -99,8 +112,9 @@ async function workflow(page,t,v) {
   for(const [n,val] of Object.entries({customer_name:f.customerName,title:f.title,quantity:f.quantity,unit_price:f.unitPrice,scheduled_at:f.scheduledAt,...Object.fromEntries(Object.entries(f.details).map(([k,x])=>[`details[${k}]`,x]))})) { const el=page.locator(`[name="${n}"]`).first(); if(!await el.count())throw new Error(`${t.name}: form omitted ${n}`);await el.fill(String(val)); }
   const create=page.locator('form[action$="/pos/work-orders"] button[type="submit"],form[action$="/pos/work-orders"] button').first();
   await Promise.all([page.waitForURL(/\/pos\/work-orders\/\d+$/,{timeout:30000,waitUntil:'domcontentloaded'}),create.click()]); const order=new URL(page.url()).pathname;
-  for(const s of f.transitions){const b=page.locator(`button[name="to_status"][value="${s}"]`).first();if(!await b.count())throw new Error(`${t.name}: transition ${s} unavailable`);await b.click();await page.waitForLoadState('domcontentloaded');}
-  const invoice=page.locator('form[action$="/invoice"] button[type="submit"],form[action$="/invoice"] button').first(); await Promise.all([page.waitForURL(/\/pos\/transaction\/\d+$/,{timeout:30000}),invoice.click()]);
+  await dismiss(page);
+  for(const s of f.transitions){const b=page.locator(`button[name="to_status"][value="${s}"]`).first();if(!await b.count())throw new Error(`${t.name}: transition ${s} unavailable`);await b.click();await page.waitForLoadState('domcontentloaded');await dismiss(page);}
+  const invoice=page.locator('form[action$="/invoice"] button[type="submit"],form[action$="/invoice"] button').first(); await Promise.all([page.waitForURL(/\/pos\/transaction\/\d+$/,{timeout:30000}),invoice.click()]); await dismiss(page);
   await page.goto(baseUrl+order,{waitUntil:'domcontentloaded',timeout:30000}); if(!(await page.locator('body').innerText()).includes(f.invoiceMarker))throw new Error(`${t.name}: invoice linkage marker missing`); pass(`${t.name}/${v.width}: actual service create, transitions, and invoice linked`);
 }
 async function categoryMismatch(page,t,v) {

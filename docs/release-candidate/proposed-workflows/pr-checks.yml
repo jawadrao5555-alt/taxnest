@@ -14,12 +14,17 @@ jobs:
     name: Workflow and release safety
     runs-on: ubuntu-22.04
     steps:
+      - name: Initialize sanitized evidence staging
+        run: |
+          evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          mkdir -p "$evidence/logs"
+          printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
       - name: Install locked JavaScript parser dependency
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: bash scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund
       - name: Owner-controlled workflow safety checks
         run: |
           bash scripts/tests/pr-auto-merge-check.sh
@@ -32,27 +37,72 @@ jobs:
           bash scripts/tests/live-ops-daily-ops-check.sh
           bash scripts/tests/live-ops-autonomous-check.sh
           bash scripts/tests/approval-dispatch-check.sh
+          bash scripts/tests/npm-lock-portability-test.sh
+          bash scripts/tests/ci-sanitize-evidence-check.sh
+          bash scripts/tests/rc-failure-observability-check.sh
       - name: Mandatory PR-check DAG contract
         run: bash scripts/tests/rc-ci-gates-check.sh
+      - name: MariaDB container and evidence contract
+        run: bash scripts/tests/ci-mariadb-provision-check.sh
+      - name: Sanitize CI evidence
+        id: sanitize_evidence
+        if: always()
+        run: |
+          bash scripts/ci-sanitize-evidence.sh "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          test -s "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/evidence-metadata.txt"
+          test -f "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/SANITIZED_SUCCESS"
+      - name: Upload sanitized CI evidence
+        if: always() && steps.sanitize_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-evidence-${{ github.job }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
+          if-no-files-found: warn
+          retention-days: 14
 
   dependency-audit-build:
     name: Locked dependency audit, asset build, and guards
     runs-on: ubuntu-22.04
     steps:
+      - name: Initialize sanitized evidence staging
+        run: |
+          evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          mkdir -p "$evidence/logs"
+          printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
       - name: Rebuild disposable locked verification lane
         run: bash scripts/rc-recertify.sh --all-locks
+      - name: Sanitize CI evidence
+        id: sanitize_evidence
+        if: always()
+        run: |
+          bash scripts/ci-sanitize-evidence.sh "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          test -s "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/evidence-metadata.txt"
+          test -f "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/SANITIZED_SUCCESS"
+      - name: Upload sanitized CI evidence
+        if: always() && steps.sanitize_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-evidence-${{ github.job }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
+          if-no-files-found: warn
+          retention-days: 14
 
   fullphpunit:
     name: Full PHPUnit suite
     runs-on: ubuntu-22.04
     steps:
+      - name: Initialize sanitized evidence staging
+        run: |
+          evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          mkdir -p "$evidence/logs"
+          printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
@@ -61,21 +111,55 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
+      - name: Sanitize CI evidence
+        id: sanitize_evidence
+        if: always()
+        run: |
+          bash scripts/ci-sanitize-evidence.sh "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          test -s "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/evidence-metadata.txt"
+          test -f "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/SANITIZED_SUCCESS"
+      - name: Upload sanitized CI evidence
+        if: always() && steps.sanitize_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-evidence-${{ github.job }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
+          if-no-files-found: warn
+          retention-days: 14
 
   native-mariadb-di:
     name: Native MariaDB migration, concurrency, and DI
     runs-on: ubuntu-22.04
+    container:
+      image: mariadb:10.6.23-jammy@sha256:93435df079cf42c7590ad12f7481d88d297d0228c723c152eb0600caa25a157f
+      options: --user root
+    env:
+      RC_MARIADB_VERSION: '10.6.23'
     steps:
+      - name: Bootstrap pinned MariaDB container before checkout
+        run: |
+          set -Eeuo pipefail
+          evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          mkdir -p "$evidence/logs" "$GITHUB_WORKSPACE"
+          exec > >(tee "$evidence/logs/prebootstrap.log") 2>&1
+          printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB"
+          chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+          apt-get update
+          apt-get install -y --no-install-recommends bash ca-certificates git sudo
       - uses: actions/checkout@v7
+        with:
+          set-safe-directory: false
+      - name: Install isolated MariaDB-container build prerequisites
+        run: bash scripts/ci-mariadb-provision.sh install
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
           extensions: pdo_mysql
+          tools: composer
+      - name: Verify PHP and pinned MariaDB toolchain
+        run: bash scripts/ci-mariadb-provision.sh verify
       - name: Install MariaDB 10.6 and locked PHP dependencies
         run: |
-          sudo apt-get update
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client
-          mariadbd --version | grep -E 'MariaDB.*10\.6\.'
           composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Run disposable data-bearing migration and DI proof
         env:
@@ -85,27 +169,63 @@ jobs:
         env:
           RC_MARIADB_PORT: '33116'
         run: bash scripts/rc-mariadb-supplemental.sh
+      - name: Sanitize CI evidence
+        id: sanitize_evidence
+        if: always()
+        run: |
+          bash scripts/ci-sanitize-evidence.sh "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          test -s "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/evidence-metadata.txt"
+          test -f "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/SANITIZED_SUCCESS"
+      - name: Upload sanitized CI evidence
+        if: always() && steps.sanitize_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-evidence-${{ github.job }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
+          if-no-files-found: warn
+          retention-days: 14
 
   browserdesktopmobile:
     name: Browser acceptance at desktop and 390px mobile
     runs-on: ubuntu-22.04
+    container:
+      image: mariadb:10.6.23-jammy@sha256:93435df079cf42c7590ad12f7481d88d297d0228c723c152eb0600caa25a157f
+      options: --user root
+    env:
+      RC_MARIADB_VERSION: '10.6.23'
     steps:
+      - name: Bootstrap pinned MariaDB container before checkout
+        run: |
+          set -Eeuo pipefail
+          evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          mkdir -p "$evidence/logs" "$GITHUB_WORKSPACE"
+          exec > >(tee "$evidence/logs/prebootstrap.log") 2>&1
+          printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB"
+          chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+          apt-get update
+          apt-get install -y --no-install-recommends bash ca-certificates git sudo
       - uses: actions/checkout@v7
+        with:
+          set-safe-directory: false
+      - name: Install isolated MariaDB-container build prerequisites
+        run: bash scripts/ci-mariadb-provision.sh install
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
           extensions: pdo_mysql
+          tools: composer
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
+      - name: Verify PHP, Node 22, and pinned MariaDB toolchain
+        env:
+          RC_REQUIRE_NODE: '1'
+        run: bash scripts/ci-mariadb-provision.sh verify
       - name: Install disposable browser and local database prerequisites
         run: |
-          sudo apt-get update
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client
-          mariadbd --version | grep -E 'MariaDB.*10\.6\.'
           composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx playwright install chromium
+          bash scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund
+          bash scripts/npm-bootstrap-pinned.sh exec -- playwright install --with-deps chromium
       - name: Seed and exercise isolated browser fixture
         env:
           RC_MARIADB_PORT: '33117'
@@ -115,43 +235,98 @@ jobs:
           trap 'bash scripts/rc-browser-fixture.sh stop' EXIT
           bash scripts/rc-browser-fixture.sh setup
           bash scripts/rc-browser-fixture.sh run
+      - name: Sanitize CI evidence
+        id: sanitize_evidence
+        if: always()
+        run: |
+          bash scripts/ci-sanitize-evidence.sh "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          test -s "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/evidence-metadata.txt"
+          test -f "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/SANITIZED_SUCCESS"
+      - name: Upload sanitized CI evidence
+        if: always() && steps.sanitize_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-evidence-${{ github.job }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
+          if-no-files-found: warn
+          retention-days: 14
 
   jsagentrealtime:
     name: Node 22 PRA Agent and realtime gateway
     runs-on: ubuntu-22.04
     steps:
+      - name: Initialize sanitized evidence staging
+        run: |
+          evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          mkdir -p "$evidence/logs"
+          printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
       - name: Install locked platform-independent test dependencies
         run: |
-          npm ci --prefix pra-agent --ignore-scripts --no-audit --no-fund
-          npm ci --prefix agent-realtime-gateway --ignore-scripts --no-audit --no-fund
+          (cd pra-agent && bash ../scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund)
+          (cd agent-realtime-gateway && bash ../scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund)
       - name: Run PRA Agent JavaScript tests with egress blocked
         run: |
           mapfile -t tests < <(find pra-agent/test -maxdepth 1 -type f -name '*.test.js' ! -name 'local-core-internet-cut.test.js' -printf '%p\n' | sort)
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
       - name: Run realtime gateway tests with egress blocked
         run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
+      - name: Sanitize CI evidence
+        id: sanitize_evidence
+        if: always()
+        run: |
+          bash scripts/ci-sanitize-evidence.sh "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          test -s "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/evidence-metadata.txt"
+          test -f "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/SANITIZED_SUCCESS"
+      - name: Upload sanitized CI evidence
+        if: always() && steps.sanitize_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-evidence-${{ github.job }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
+          if-no-files-found: warn
+          retention-days: 14
 
   manifest-provenance:
     name: Exact-SHA manifest and release-chain proof
     runs-on: ubuntu-22.04
     steps:
+      - name: Initialize sanitized evidence staging
+        run: |
+          evidence="$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          mkdir -p "$evidence/logs"
+          printf 'lane=%s\nphase=prebootstrap\n' "$GITHUB_JOB" >"$evidence/logs/prebootstrap.log"
       - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.23.2'
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Verify owner-controlled exact-SHA release chain
         run: bash scripts/rc-safe-run -- bash scripts/tests/agent-release-chain-check.sh
       - name: Verify canonical manifest server-side rejection rules
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/AgentReleaseManifestTest.php
+      - name: Sanitize CI evidence
+        id: sanitize_evidence
+        if: always()
+        run: |
+          bash scripts/ci-sanitize-evidence.sh "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB"
+          test -s "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/evidence-metadata.txt"
+          test -f "$RUNNER_TEMP/taxnest-rc-evidence/$GITHUB_JOB/SANITIZED_SUCCESS"
+      - name: Upload sanitized CI evidence
+        if: always() && steps.sanitize_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-evidence-${{ github.job }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
+          if-no-files-found: warn
+          retention-days: 14
 
   validate:
     name: validate

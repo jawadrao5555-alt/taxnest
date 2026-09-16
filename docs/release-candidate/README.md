@@ -91,25 +91,24 @@ No existing tenant settings are silently rewritten to adopt a new workflow.
 **Why:** The owner explicitly authorized conservative configurable defaults while
 prohibiting invented business rules and destructive category normalization.
 
-## Held workflow proposal integrity
+## Workflow source integrity
 
-The held proposal now includes the native MariaDB supplemental lane: seven
-otherwise SQLite-skipped probes execute with the script's explicit disposable
-loopback connection settings and required-MariaDB flags. This is a local
-proposal only; it is not a workflow commit, push, dispatch, or authorization
-to perform one.
+The workflow copies include all seven mandatory lanes, the native-seven
+supplement, Node 22.23.2 with npm 10.9.2, isolated digest-pinned MariaDB 10.6.23
+containers, and fail-closed sanitized evidence publication. These files and
+hashes identify source, not a successful CI run or permission to deploy.
 
 Current byte-identical active/proposed workflow hashes are:
 
 | Workflow | SHA-256 | Git blob |
 |---|---|---|
 | `build-agent.yml` (both paths) | `0eb9ccc78d9d53ce6beb5ae6ad3d3f0437f6da9e31187ed4b9962615ee5ed6be` | `ea95479996ae6a24f8b36176df3f5e065e673aec` |
-| `pr-checks.yml` (both paths) | `4a408f10e226b330f2a6a9b97ff9cac1d16969f0448f66bc0c8af8aa7c8bd294` | `9776d44a98d1fb34bad25340255945ac0f0de8fc` |
+| `pr-checks.yml` (both paths) | `f3450fe4d7ce7871264f84654fad6e1d703940fccb49cb50755c94088fc435cd` | `f788f3c2d1ce39a9fc98b932b7ee4c88ed96501e` |
 
-Regenerate the held workflow patch only with:
+Regenerate the workflow correction patch against its authoritative base with:
 
 ```bash
-git diff -- .github/workflows | gzip -n \
+git diff b4f7f1610eb3a3c012b76eda599ef43c22abbba5 -- .github/workflows | gzip -n \
   > docs/release-candidate/proposed-workflows/workflow-authorization.patch.gz
 sha256sum .github/workflows/build-agent.yml \
   docs/release-candidate/proposed-workflows/build-agent.yml \
@@ -119,7 +118,7 @@ sha256sum .github/workflows/build-agent.yml \
 ```
 
 The resulting current patch SHA-256 is
-`2a584147a68d26ef9a9150a4fec7fc28867f7821a2673d5ab74c608d2654a262`.
+`54b932741f01cf27cc7094309429b46c1ec7612cdeea77e4b90a725aa69c496f`.
 The prior `recertification/workflow-authorization.json` records tool
 capability for the older proposal only. It is not authorization for this
 final-source proposal and does not attest this new proposal hash.

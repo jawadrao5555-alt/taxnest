@@ -16,6 +16,54 @@ runtime_root=""
 working_tree=0
 all_locks=0
 build_assets=0
+bootstrap_phase=initialization
+diagnostics_written=0
+
+emit_failure_diagnostics() {
+    local exit_code="$1"
+    local diagnostic_root="${runtime_root:-}"
+    local helper="$SCRIPT_DIR/lib/rc-failure-diagnostics.py"
+
+    ((diagnostics_written)) && return 0
+    diagnostics_written=1
+
+    # A failure can happen before --runtime has been created (for example,
+    # while validating --source). Keep a best-effort local runtime so that
+    # even argument/setup failures have an uploadable, sanitized record.
+    if [[ -z "$diagnostic_root" || ! -d "$diagnostic_root" ]]; then
+        mkdir -p "$ROOT/.local/recertification" 2>/dev/null || true
+        diagnostic_root="$(mktemp -d "$ROOT/.local/recertification/bootstrap-failure.XXXXXX" 2>/dev/null || true)"
+    fi
+    if [[ -z "$diagnostic_root" || ! -d "$diagnostic_root" ]]; then
+        diagnostic_root="$(mktemp -d "${TMPDIR:-/tmp}/taxnest-rc-bootstrap-failure.XXXXXX" 2>/dev/null || true)"
+    fi
+
+    if [[ -n "$diagnostic_root" && -d "$diagnostic_root" && -r "$helper" ]] \
+        && command -v python3 >/dev/null 2>&1; then
+        python3 "$helper" \
+            --runtime "$diagnostic_root" \
+            --phase "$bootstrap_phase" \
+            --exit "$exit_code" >&2
+    fi
+    if [[ -n "$diagnostic_root" && -d "$diagnostic_root" ]]; then
+        printf 'RC_FAILURE_RUNTIME=%s\n' "$diagnostic_root" >&2
+        printf 'RC_FAILURE_ARTIFACT_DIR=%s/failure-diagnostics\n' "$diagnostic_root" >&2
+        printf 'RC_FAILURE_SUMMARY=%s/failure-diagnostics/diagnostic.json\n' "$diagnostic_root" >&2
+        printf 'RC_FAILURE_LOG=%s/failure-diagnostics/logs.txt\n' "$diagnostic_root" >&2
+    else
+        printf 'RC_FAILURE_ARTIFACT_DIR=unavailable\n' >&2
+    fi
+}
+
+on_exit() {
+    local exit_code=$?
+    if ((exit_code != 0)); then
+        set +e
+        emit_failure_diagnostics "$exit_code"
+    fi
+    exit "$exit_code"
+}
+trap on_exit EXIT
 
 usage() {
     cat >&2 <<'EOF'
@@ -104,6 +152,12 @@ else
     }
 fi
 
+npm_bootstrap="$source_dir/scripts/npm-bootstrap-pinned.sh"
+[[ -x "$npm_bootstrap" ]] || {
+    echo "rc-bootstrap: pinned npm helper is missing or not executable: $npm_bootstrap" >&2
+    exit 2
+}
+
 home="$runtime_root/home"
 mkdir -p "$home"/{tmp,composer-cache,npm-cache,composer}
 chmod 700 "$home"
@@ -139,6 +193,7 @@ run_logged() {
     local name="$1"
     shift
     local log="$logs/$name.log"
+    bootstrap_phase="$name"
     printf 'BOOTSTRAP command=%s\n' "$name"
     set +e
     (
@@ -181,9 +236,9 @@ fi
 
 run_logged composer-install "$source_dir" composer install \
     --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
-run_logged root-npm-ci "$source_dir" npm ci --ignore-scripts --no-audit --no-fund
-run_logged agent-npm-ci "$source_dir/pra-agent" npm ci --ignore-scripts --no-audit --no-fund
-run_logged realtime-npm-ci "$source_dir/agent-realtime-gateway" npm ci --ignore-scripts --no-audit --no-fund
+run_logged root-npm-ci "$source_dir" "$npm_bootstrap" ci --ignore-scripts --no-audit --no-fund
+run_logged agent-npm-ci "$source_dir/pra-agent" "$npm_bootstrap" ci --ignore-scripts --no-audit --no-fund
+run_logged realtime-npm-ci "$source_dir/agent-realtime-gateway" "$npm_bootstrap" ci --ignore-scripts --no-audit --no-fund
 
 if ((all_locks)); then
     while IFS= read -r lock; do
@@ -193,13 +248,13 @@ if ((all_locks)); then
         package_dir="${lock%/*}"
         [[ "$package_dir" == "$lock" ]] && package_dir="$source_dir" || package_dir="$source_dir/$package_dir"
         name="$(printf '%s' "$lock" | tr '/.' '__')-npm-ci"
-        run_logged "$name" "$package_dir" npm ci --ignore-scripts --no-audit --no-fund
+        run_logged "$name" "$package_dir" "$npm_bootstrap" ci --ignore-scripts --no-audit --no-fund
     done < <(find "$source_dir" -type f -name package-lock.json \
         -not -path '*/node_modules/*' -not -path '*/vendor/*' -printf '%P\n' | sort)
 fi
 
 if ((build_assets)); then
-    run_logged root-web-build "$source_dir" npm run build
+    run_logged root-web-build "$source_dir" "$npm_bootstrap" run build
 fi
 
 # Installation must never turn this into a stateful app checkout.

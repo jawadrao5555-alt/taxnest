@@ -10,6 +10,56 @@ umask 077
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 all_locks=0
+recertification_phase=initialization
+diagnostics_written=0
+run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+runtime="$ROOT/.local/recertification/rc-$run_id"
+
+emit_failure_diagnostics() {
+    local exit_code="$1"
+    local diagnostic_root="$runtime"
+    local helper="$SCRIPT_DIR/lib/rc-failure-diagnostics.py"
+
+    ((diagnostics_written)) && return 0
+    diagnostics_written=1
+
+    # The runtime is created immediately below, but retain a fallback for a
+    # setup failure (for example, a read-only workspace). Never print raw
+    # bootstrap/check output from this boundary.
+    if [[ ! -d "$diagnostic_root" ]]; then
+        mkdir -p "$ROOT/.local/recertification" 2>/dev/null || true
+        diagnostic_root="$(mktemp -d "$ROOT/.local/recertification/rc-failure.XXXXXX" 2>/dev/null || true)"
+    fi
+    if [[ -z "$diagnostic_root" || ! -d "$diagnostic_root" ]]; then
+        diagnostic_root="$(mktemp -d "${TMPDIR:-/tmp}/taxnest-rc-failure.XXXXXX" 2>/dev/null || true)"
+    fi
+
+    if [[ -n "$diagnostic_root" && -d "$diagnostic_root" && -r "$helper" ]] \
+        && command -v python3 >/dev/null 2>&1; then
+        python3 "$helper" \
+            --runtime "$diagnostic_root" \
+            --phase "$recertification_phase" \
+            --exit "$exit_code" >&2
+    fi
+    if [[ -n "$diagnostic_root" && -d "$diagnostic_root" ]]; then
+        printf 'RC_FAILURE_RUNTIME=%s\n' "$diagnostic_root" >&2
+        printf 'RC_FAILURE_ARTIFACT_DIR=%s/failure-diagnostics\n' "$diagnostic_root" >&2
+        printf 'RC_FAILURE_SUMMARY=%s/failure-diagnostics/diagnostic.json\n' "$diagnostic_root" >&2
+        printf 'RC_FAILURE_LOG=%s/failure-diagnostics/logs.txt\n' "$diagnostic_root" >&2
+    else
+        printf 'RC_FAILURE_ARTIFACT_DIR=unavailable\n' >&2
+    fi
+}
+
+on_exit() {
+    local exit_code=$?
+    if ((exit_code != 0)); then
+        set +e
+        emit_failure_diagnostics "$exit_code"
+    fi
+    exit "$exit_code"
+}
+trap on_exit EXIT
 
 usage() {
     echo "usage: $0 [--all-locks]" >&2
@@ -23,8 +73,6 @@ while (($#)); do
     esac
 done
 
-run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
-runtime="$ROOT/.local/recertification/rc-$run_id"
 mkdir -p "$runtime/logs"
 chmod 700 "$runtime" "$runtime/logs"
 results="$runtime/results.tsv"
@@ -33,17 +81,23 @@ results="$runtime/results.tsv"
 bootstrap_log="$runtime/logs/bootstrap.log"
 bootstrap_args=(--source "$ROOT" --runtime "$runtime/bootstrap" --build)
 ((all_locks)) && bootstrap_args+=(--all-locks)
+recertification_phase=bootstrap
 set +e
 bash "$ROOT/scripts/rc-bootstrap.sh" "${bootstrap_args[@]}" >"$bootstrap_log" 2>&1
 bootstrap_status=$?
 set -e
 if ((bootstrap_status != 0)); then
-    echo "rc-recertify: bootstrap failed (exit $bootstrap_status); raw log is $bootstrap_log" >&2
+    echo "rc-recertify: bootstrap failed (exit $bootstrap_status); sanitized diagnostics follow" >&2
     exit "$bootstrap_status"
 fi
 source_dir="$(awk -F= '$1 == "BOOTSTRAP_SOURCE" {print substr($0, index($0, "=") + 1)}' "$bootstrap_log" | tail -1)"
 [[ -n "$source_dir" && -d "$source_dir" ]] || {
     echo "rc-recertify: bootstrap did not report a source directory" >&2
+    exit 2
+}
+npm_bootstrap="$source_dir/scripts/npm-bootstrap-pinned.sh"
+[[ -x "$npm_bootstrap" ]] || {
+    echo "rc-recertify: pinned npm helper is missing or not executable: $npm_bootstrap" >&2
     exit 2
 }
 
@@ -74,6 +128,7 @@ run_check() {
     local cwd="$2"
     shift 2
     local log="$runtime/logs/$name.log"
+    recertification_phase="$name"
     set +e
     (
         cd "$cwd"
@@ -103,9 +158,9 @@ record_skip() {
 # These are dependency operations, so they intentionally run outside
 # rc-safe-run. The application network guard is applied only below.
 run_check composer-audit "$source_dir" composer audit --locked --format=json --no-interaction --no-ansi
-run_check root-npm-audit "$source_dir" npm audit --json --package-lock-only --no-fund --no-progress
-run_check agent-npm-audit "$source_dir/pra-agent" npm audit --json --package-lock-only --no-fund --no-progress
-run_check realtime-npm-audit "$source_dir/agent-realtime-gateway" npm audit --json --package-lock-only --no-fund --no-progress
+run_check root-npm-audit "$source_dir" "$npm_bootstrap" audit --json --package-lock-only --no-fund --no-progress
+run_check agent-npm-audit "$source_dir/pra-agent" "$npm_bootstrap" audit --json --package-lock-only --no-fund --no-progress
+run_check realtime-npm-audit "$source_dir/agent-realtime-gateway" "$npm_bootstrap" audit --json --package-lock-only --no-fund --no-progress
 if ((all_locks)); then
     while IFS= read -r lock; do
         case "$lock" in
@@ -114,14 +169,14 @@ if ((all_locks)); then
         package_dir="${lock%/*}"
         [[ "$package_dir" == "$lock" ]] && package_dir="$source_dir" || package_dir="$source_dir/$package_dir"
         name="$(printf '%s' "$lock" | tr '/.' '__')-npm-audit"
-        run_check "$name" "$package_dir" npm audit --json --package-lock-only --no-fund --no-progress
+        run_check "$name" "$package_dir" "$npm_bootstrap" audit --json --package-lock-only --no-fund --no-progress
     done < <(find "$source_dir" -type f -name package-lock.json \
         -not -path '*/node_modules/*' -not -path '*/vendor/*' -printf '%P\n' | sort)
 fi
 
 # The build is in the independent checkout and therefore cannot alter this
 # worktree's tracked generated assets.
-run_check root-web-asset-build "$source_dir" npm run build
+run_check root-web-asset-build "$source_dir" "$npm_bootstrap" run build
 
 node_major="$(node --version | sed -E 's/^v([0-9]+).*/\1/')"
 if [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major >= 22)); then

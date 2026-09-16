@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="RC Browser acceptance scope-aware union" tests="5" assertions="252" failures="0" errors="0" skipped="0">
+  <testcase classname="browser.union" name="unchanged-current-matrix-23bb" assertions="216"/>
+  <testcase classname="browser.union" name="fresh-remediated-cases-and-health-isolation-1510" assertions="26"/>
+  <testcase classname="browser.union" name="service-workflow-transitions-and-invoice-link-0e73" assertions="4"/>
+  <testcase classname="browser.union" name="fiscal-real-sale-control-and-pointer-trial-58d0" assertions="2"/>
+  <testcase classname="browser.union" name="di-normal-flow-geometry-and-readonly-9828" assertions="4"/>
+  <system-out>Scope-aware union only. See browser-acceptance-union-982826bb.json for the 61 current named cases, 122 case-viewports, 128 canonical route-viewports, raw log hashes, exclusions, and screenshot hashes. This file does not represent one all-green run.</system-out>
+</testsuite>

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-09-16T13:50:29Z",
+  "source_sha": "58d0c164f5920a567d3a817e1c210c3b56e24c00",
+  "checkout": ".local/recertification/view-proof-58d0c164/source",
+  "parent_full_proof": {
+    "source_sha": "2b500f6a67320a1138cc555df342b5f29bdb2377",
+    "tests": 5018,
+    "assertions": 39281,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "junit_sha256": "dd2e9e216b80fe45ce01d8dd2b10400818c02297129e35d58154e284c9b5f197",
+    "classification": "parent-source full-suite PASS; not rerun for this view proof"
+  },
+  "final_source_followup": {
+    "source_sha": "982826bbcc0e97ea5a96c308c76224082ff035c4",
+    "base_source_sha": "58d0c164f5920a567d3a817e1c210c3b56e24c00",
+    "commit_classification": "readability/harness-only follow-up; 58d0 normal-flow and semantic invoice-header logic is unchanged",
+    "changed_files": [
+      {
+        "path": "resources/views/invoice/show.blade.php",
+        "sha256": "48eacdcd02b64bee7c8245f21e57aa9b6a852397b19f30eec8f7d3ecc10cfdc1",
+        "change": "exactly 7 existing dark:text-white classes on buyer/invoice detail values"
+      },
+      {
+        "path": "scripts/rc-di-browser-fixture.php",
+        "sha256": "092167829994836262e86ca57b759898c893e4254766295f07c110d503478a02",
+        "change": "one specific form[action$=\"/confirm-fbr\"] button[type=\"submit\"] usable selector"
+      }
+    ],
+    "dark_text_white_additions": 7,
+    "harness_selector_additions": 1,
+    "focused_proof_reuse": "The exact 58d0 focused 3-test/7-assertion PASS remains valid for the unchanged normal-flow and semantic-header logic; no full-suite repeat is claimed.",
+    "browser_context": "Final DI two-role browser run is separately recorded as running on 982826bb; fiscal 58 both-trial click result is PASS per handoff."
+  },
+  "changed_files": [
+    {
+      "path": "resources/views/invoice/show.blade.php",
+      "sha256": "9e45fa9bd8d0a3734a49215a6d0cd45039496c1b0feb0a38c7c4d898eddf01d8",
+      "changes": [
+        "responsive wrapping for the invoice breadcrumb/title/action region",
+        "semantic invoice heading id invoice-heading",
+        "semantic Invoice actions label on actionButtonsBlock"
+      ]
+    },
+    {
+      "path": "resources/views/layouts/app.blade.php",
+      "sha256": "f0bbab2adeec9a5099b918d14239f9b768abe39814c0b051406e2e0fa5efceec",
+      "changes": [
+        "invoice.show route keeps the global app-bar label compact",
+        "invoice header slot renders once above the document in normal page flow"
+      ]
+    }
+  ],
+  "focused_phpunit": {
+    "command": "scripts/rc-safe-run --root .local/recertification/view-proof-58d0c164/source --runtime .local/recertification/view-proof-58d0c164/runtime-focused -- php vendor/bin/phpunit --configuration phpunit.xml tests/Feature/FbrLogTenantIsolationTest.php tests/Feature/Security/SuperAdminDualPathTest.php --filter '/(invoice_page|company_admin_cannot_read_another_companys_invoice)/' --testdox --log-junit .local/recertification/view-proof-58d0c164/focused.junit.xml",
+    "classes": [
+      "Tests\\Feature\\FbrLogTenantIsolationTest",
+      "Tests\\Feature\\Security\\SuperAdminDualPathTest"
+    ],
+    "methods": [
+      "Tests\\Feature\\FbrLogTenantIsolationTest::test_company_b_user_cannot_read_company_a_fbr_log_through_the_invoice_page",
+      "Tests\\Feature\\FbrLogTenantIsolationTest::test_company_a_user_sees_its_own_fbr_log_on_the_invoice_page",
+      "Tests\\Feature\\Security\\SuperAdminDualPathTest::test_company_admin_cannot_read_another_companys_invoice"
+    ],
+    "tests": 3,
+    "assertions": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit": 0,
+    "log": {
+      "path": ".local/recertification/view-proof-58d0c164/focused.log",
+      "sha256": "3ca0b4e7dfc75d4fc00b48ac36bd7e22a2d8bc4a2966ef7ae3154be71e2ca193"
+    },
+    "junit": {
+      "path": ".local/recertification/view-proof-58d0c164/focused.junit.xml",
+      "sha256": "31b5abd4fcd30aed8191a39a2da3d8e0b64ad7dda93c6982f6b90787dc1173d8"
+    }
+  },
+  "blade_compile": {
+    "command": "scripts/rc-safe-run --root .local/recertification/view-proof-58d0c164/source --runtime .local/recertification/view-proof-58d0c164/runtime-view-cache-proof -- php artisan view:cache",
+    "exit": 0,
+    "log": {
+      "path": ".local/recertification/view-proof-58d0c164/view-cache.log",
+      "sha256": "85a82bdfc232f9930e8f1f874928e30a7f5f19dcece0d408b75a537e61bf4af1"
+    },
+    "compiled_views": [
+      {
+        "source": "resources/views/invoice/show.blade.php",
+        "compiled": "storage/framework/views/cc21074574fefa97eea155bee4faff06.php",
+        "sha256": "ddba73839460202660799155b08efe4a1d53ea92ea9107c897d240fa21f5f1d4"
+      },
+      {
+        "source": "resources/views/layouts/app.blade.php",
+        "compiled": "storage/framework/views/3d67571234b45fc80f873f472f1824b7.php",
+        "sha256": "9ff5b63c9d4bd5eb642037523d2f6a64a2462847522f0cefe50dcd33e89c0569"
+      }
+    ]
+  },
+  "artifact_guard": {
+    "command": "scripts/rc-safe-run --root .local/recertification/view-proof-58d0c164/source --runtime .local/recertification/view-proof-58d0c164/runtime-artifact-guard -- bash scripts/verify-repository-artifacts.sh",
+    "exit": 0,
+    "log": {
+      "path": ".local/recertification/view-proof-58d0c164/artifact-guard.log",
+      "sha256": "c994f7555c388641086d1b6ba4175d86446b429dd43187197213bb7576f42663"
+    },
+    "classification": "run because the changed Blade inputs require a meaningful compiled-view/artifact check"
+  },
+  "classification": "focused changed-view follow-up proof; it supplements and does not replace the parent-source 5018-test PASS"
+}

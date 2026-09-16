@@ -1,0 +1,140 @@
+{
+  "schema_version": 2,
+  "generated_utc": "2026-09-16T13:39:44Z",
+  "source_sha": "2b500f6a67320a1138cc555df342b5f29bdb2377",
+  "source_mode": "fresh-independent-shallow-clone",
+  "source_tracked_state": "clean",
+  "lock_hashes": {
+    "composer.lock": "f77aae4ea1f5d8b5427132fb76e2ca017b7917ebdece26036715055a5fc141e4",
+    "package-lock.json": "ee6faa95cd57839884299d07e871ae9593029be42bd363f523d1b13caac8ff10",
+    "pra-agent/package-lock.json": "288f23ac9c63ec72a2318895ebb582f0cb85b31f07aeefcffc60800d22a74472",
+    "agent-realtime-gateway/package-lock.json": "3c96680d9ce8a9d0c6085fafc250a3b3de4a8df3f099d40b441d4e76f54b461a",
+    "artifacts/mockup-sandbox/package-lock.json": "aecf45ae4de09b7b7bdbe65fe0c21e88504a1ae01704ea6fdb42c2fd9cff861a",
+    "tools/video-pipeline/package-lock.json": "1ea36c806550b001e4b9cf14d35160432094bf0a2e6facd73f8c93a087f7acf8"
+  },
+  "full_phpunit": {
+    "listed_tests": 5018,
+    "junit_testcases": 5018,
+    "unique_testcase_ids": 5018,
+    "missing_testcase_ids": 0,
+    "extra_testcase_ids": 0,
+    "duplicate_testcase_ids": 0,
+    "assertions": 39281,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "partitions": 8,
+    "exit": 0,
+    "sanitized_junit_sha256": "dd2e9e216b80fe45ce01d8dd2b10400818c02297129e35d58154e284c9b5f197"
+  },
+  "checks": [
+    {
+      "name": "composer-audit",
+      "command": "composer audit --locked --format=json --no-interaction --no-ansi",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "advisories=[]; abandoned=[]",
+      "evidence": ".local/recertification/composer-audit.json",
+      "sha256": "e464a6f19a008d852b61fd0966a47b663d20d70ccfba0b30edd6483a787f15f5"
+    },
+    {
+      "name": "root-npm-audit",
+      "command": "npm audit --json --package-lock-only --no-fund --no-progress",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "total vulnerabilities=0",
+      "evidence": ".local/recertification/npm-audit-root.json",
+      "sha256": "e993caa1e6e208484bd6fc7f4c2e0e618bf13755cce7b1b87b9395b5e55f1812"
+    },
+    {
+      "name": "agent-npm-audit",
+      "command": "cd pra-agent && npm audit --json --package-lock-only --no-fund --no-progress",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "total vulnerabilities=0",
+      "evidence": ".local/recertification/npm-audit-pra-agent.json",
+      "sha256": "db0c67b59affd2159f4546bcd93ecb16e156eace88344afb0e329df5ff6bea4a"
+    },
+    {
+      "name": "realtime-npm-audit",
+      "command": "cd agent-realtime-gateway && npm audit --json --package-lock-only --no-fund --no-progress",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "total vulnerabilities=0",
+      "evidence": ".local/recertification/npm-audit-agent-realtime-gateway.json",
+      "sha256": "846fc260eb0bf70e6b21419d4cab9fcc61c224c7362324d4cbc8aebf8355f9bd"
+    },
+    {
+      "name": "artifacts_mockup-sandbox_package-lock_json-npm-audit",
+      "command": "cd artifacts/mockup-sandbox && npm audit --json --package-lock-only --no-fund --no-progress",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "total vulnerabilities=0",
+      "evidence": ".local/recertification/npm-audit-artifacts-mockup-sandbox.json",
+      "sha256": "ba6999e238113a806166a16328550e66d179f2c3f9d15037eda28e7d74885076"
+    },
+    {
+      "name": "tools_video-pipeline_package-lock_json-npm-audit",
+      "command": "cd tools/video-pipeline && npm audit --json --package-lock-only --no-fund --no-progress",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "total vulnerabilities=0",
+      "evidence": ".local/recertification/npm-audit-tools-video-pipeline.json",
+      "sha256": "846fc260eb0bf70e6b21419d4cab9fcc61c224c7362324d4cbc8aebf8355f9bd"
+    },
+    {
+      "name": "root-web-asset-build",
+      "command": "npm run build",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "Vite 7.3.6; built in 5.08s",
+      "evidence": ".local/recertification/web-build.log",
+      "sha256": "45e4c27c07fe845ec97b5944acaef7d07c3bf0bca0c7111a2311b21a30988cb9"
+    },
+    {
+      "name": "agent-node-engine-guard",
+      "command": "PATH=/home/runner/workspace/.local/worktrees/taxnest-maturity-rc/.local/recertification/node22/node_modules/node/bin:/nix/store/a0d7m3zn9p2dfa1h7ag9h2wzzr2w25sn-gcc-wrapper-14.2.1.20250322/bin:/usr/bin:/bin bash scripts/rc-safe-run --root /home/runner/workspace/.local/recertification/full-runner-source-2b500f6a67320a1138cc555df342b5f29bdb2377 --runtime .local/recertification/node22-engine-guard-runtime -- sh -c 'node --version && test \"$(command -v node)\" = \"/home/runner/workspace/.local/worktrees/taxnest-maturity-rc/.local/recertification/node22/node_modules/node/bin/node\" && test \"$(node --version)\" = v22.15.1'",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "Node v22.15.1 resolved through the explicit safe-run PATH",
+      "evidence": ".local/recertification/node22-engine-guard-fresh.log",
+      "sha256": "0718bba2a660eb9e3d02c2733847866396444b44fc872c70ca25d28fa7988de6"
+    },
+    {
+      "name": "compiler-available-guard",
+      "command": "cc --version",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "GCC 14.2.1 available",
+      "evidence": ".local/recertification/compiler-guard.log",
+      "sha256": "14946d38aadab3c465cdbaf712d77d4c109f7b88a984ae98ca1114cf3c381f91"
+    },
+    {
+      "name": "network-egress-guard",
+      "command": "bash scripts/rc-safe-run --runtime .local/recertification/network-egress-runtime -- python3 scripts/tests/rc-network-guard-check.py",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "non-loopback TCP, UDP and resolution denied; loopback resolves",
+      "evidence": ".local/recertification/network-egress-guard.log",
+      "sha256": "4c69ae933098a517ef6c626eefeeb426afa74b2fd8a7c6268823bf75822fb3bc"
+    },
+    {
+      "name": "safe-run-environment",
+      "command": "bash scripts/rc-safe-run --runtime .local/recertification/safe-run-env-runtime -- sh -c 'test HOME is isolated; DATABASE_URL/AWS_ACCESS_KEY_ID are empty; RC_SAFE_RUN=1'",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "isolated environment assertions passed",
+      "evidence": ".local/recertification/safe-run-environment.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "repository-artifact-guard",
+      "command": "bash scripts/verify-repository-artifacts.sh",
+      "status": "PASS",
+      "exit": 0,
+      "finding_summary": "no prohibited tracked artifacts or credential patterns",
+      "evidence": ".local/recertification/repository-artifact-guard-fresh.log",
+      "sha256": "c994f7555c388641086d1b6ba4175d86446b429dd43187197213bb7576f42663"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "observed_at": "2026-09-16T13:57:59.780Z",
+  "pr": {
+    "number": 82,
+    "url": "https://github.com/jawadrao5555-alt/taxnest/pull/82",
+    "state": "open",
+    "draft": true,
+    "merged": false,
+    "auto_merge": null,
+    "head": "982826bbcc0e97ea5a96c308c76224082ff035c4"
+  },
+  "checks": [
+    {
+      "id": 35104942875,
+      "url": "https://github.com/jawadrao5555-alt/taxnest/actions/runs/35104942875",
+      "head_sha": "982826bbcc0e97ea5a96c308c76224082ff035c4",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 104823597571,
+          "name": "validate",
+          "status": "completed",
+          "conclusion": "failure",
+          "failed_steps": [
+            "Exact-SHA Agent release chain checks"
+          ]
+        }
+      ]
+    }
+  ]
+}

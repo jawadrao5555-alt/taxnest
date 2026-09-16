@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "classification": "scope-aware evidence union; not a single all-green browser run",
+  "current_source_sha": "982826bbcc0e97ea5a96c308c76224082ff035c4",
+  "current_fixture": {
+    "path": "/tmp/taxnest-rc-browser-1000/safe-runtime/browser-state/fixture.json",
+    "generated_at": "2026-09-16T18:52:01+05:00",
+    "read_only_cases": 58,
+    "transactional_cases": 1,
+    "di_role_cases": 2,
+    "named_cases": 61,
+    "case_viewports": 122,
+    "canonical_routes_per_viewport": 64,
+    "canonical_route_viewports": 128,
+    "category_cases": 48,
+    "missing_current_case_viewports": 0
+  },
+  "viewports": [
+    { "name": "desktop", "width": 1366, "height": 900 },
+    { "name": "mobile", "width": 390, "height": 844 }
+  ],
+  "accepted_scope_union": [
+    {
+      "source_sha": "23bb5252291f6f5afd5a7f83a70a0b002ae34fc1",
+      "log": ".local/recertification/browser-final-23bb5252/run.log",
+      "log_sha256": "b55212fa6cc55d954bcb58e590be716b9cccba6e1044ca71e755b34f3eb123a5",
+      "accepted_case_viewports": 96,
+      "accepted_canonical_route_viewports": 100,
+      "scope": "48 unchanged named cases at both viewports; cases remediated in later runs excluded"
+    },
+    {
+      "source_sha": "1510be744a335155331e4dc13ca1ae67e4a1d3c4",
+      "log": ".local/recertification/browser-fresh-1510be74/run.log",
+      "log_sha256": "c9e7563840d87fee45a10f81cfdba1adbd07a5e414e950dc3783bf8b042853e1",
+      "accepted_case_viewports": 18,
+      "accepted_canonical_route_viewports": 20,
+      "cases": ["hotel-outlet", "service-work-orders-manager", "category-pra-restaurant", "category-pra-cafe", "category-pra-quick_service", "category-pra-hotel", "category-pra-marquee", "category-pra-catering", "category-pra-general"],
+      "health_isolation_assertions": 6
+    },
+    {
+      "source_sha": "0e73072fdb6ff0ea7b06326a6e871baad1cd81ea",
+      "log": ".local/recertification/browser-last-0e73072f/run.log",
+      "log_sha256": "b963b0ec2c217047be408d6ae2ea5c9b792311a70ee4dfe56cfd821cf8a8fbe7",
+      "accepted_case_viewports": 2,
+      "accepted_canonical_route_viewports": 2,
+      "cases": ["service-work-orders"],
+      "evidence": "actual create, legal transitions, and invoice linkage passed at both viewports"
+    },
+    {
+      "source_sha": "58d0c164f5920a567d3a817e1c210c3b56e24c00",
+      "log": ".local/recertification/browser-visual-58d0c164/resumed-run.log",
+      "log_sha256": "98ad84b17bd7495bce587c1633760b6af777f29cb7761859a618e9774bcefd7c",
+      "accepted_case_viewports": 2,
+      "accepted_canonical_route_viewports": 2,
+      "cases": ["fiscal"],
+      "evidence": "real FBR decision dismissal, Current Order, search control, and pointer trial passed at both viewports"
+    },
+    {
+      "source_sha": "982826bbcc0e97ea5a96c308c76224082ff035c4",
+      "log": ".local/recertification/browser-di-982826bb/run.log",
+      "log_sha256": "e939c7a62145a4313fb25e0d82f98ff70fd010f9945e31ceb2a09895bc0cab02",
+      "accepted_case_viewports": 4,
+      "accepted_canonical_route_viewports": 4,
+      "cases": ["companyAdminPendingVerification", "employeePendingVerification"],
+      "evidence": "latest normal-flow visual/geometry, control trial, and read-only checks passed"
+    }
+  ],
+  "assertion_summary": {
+    "accepted_pass_outcomes": 252,
+    "unique_pass_messages": 250,
+    "category_native_or_gate_messages": 116,
+    "exact_native_surface_messages": 118,
+    "authorization_denial_messages": 6,
+    "service_workflow_messages": 2,
+    "health_isolation_messages": 6,
+    "csv_messages": 4,
+    "expected_external_network_diagnostics": "recorded; loopback-only browser routing blocks non-loopback assets and those ERR_BLOCKED_BY_CLIENT diagnostics are not acceptance failures"
+  },
+  "excluded_runs": [
+    {
+      "log": ".local/recertification/browser-focused-2b500f6a/run.log",
+      "reason": "invalid fixture: Eloquent Collection merge rekeyed email keys, then all logins failed"
+    },
+    {
+      "log": ".local/recertification/browser-last-e07ff421/run.log",
+      "reason": "resume rejected before browser execution"
+    },
+    {
+      "log": ".local/recertification/browser-visual-58d0c164/run.log",
+      "reason": "server was unavailable before browser execution; resumed-run is the valid file"
+    }
+  ],
+  "key_screenshots": [
+    { "path": ".local/browser-evidence/rc-desktop-fiscal.png", "sha256": "fbae0cc0152077738ace5e05446887ffa9b5f2cc579f9d62e9057f36ee48efd1" },
+    { "path": ".local/browser-evidence/rc-mobile-fiscal.png", "sha256": "b5bc754ac67f03d2b302e406590b564c9d1c830585b319dcf345284a95cad1ec" },
+    { "path": ".local/browser-evidence/rc-desktop-service-work-orders.png", "sha256": "153d03b483afdecd48112d66c47aa3788b6ae14af69bd42b2fa6f2a4eea5e0fd" },
+    { "path": ".local/browser-evidence/rc-mobile-service-work-orders.png", "sha256": "54128757dc99b8a1548e92caa57c099691b75346ae3a3487581debbc819c974b" },
+    { "path": ".local/browser-evidence/rc-desktop-health-isolation.png", "sha256": "827f442139b5bfed4a15f6480c31784638e77abb6ebc6b3aa1e16a40e99c3821" },
+    { "path": ".local/browser-evidence/rc-mobile-health-isolation.png", "sha256": "6a3f616234c5429fc7d1297628ada8b85ceb0cbde831d3ab0f119f9fa758d9b5" },
+    { "path": ".local/browser-evidence/rc-desktop-companyAdminPendingVerification.png", "sha256": "fb443b3fa54aed8389940f25c58698fa45070b3d2756886076c471fe23330961" },
+    { "path": ".local/browser-evidence/rc-mobile-companyAdminPendingVerification.png", "sha256": "da0c6fb3b8038fe77c47e180dcdfb4c84a61bd83cd71cef05092a02efa7a4582" },
+    { "path": ".local/browser-evidence/rc-desktop-employeePendingVerification.png", "sha256": "5539cc4223d524cd6e268b1916a3fc6d3ae2e9ef19e650c4a8282024c6402239" },
+    { "path": ".local/browser-evidence/rc-mobile-employeePendingVerification.png", "sha256": "9099c480190020e6b823d3e07ed655cb0fc61da6cad592a110170629d311cb4c" }
+  ],
+  "raw_evidence": {
+    "logs_and_screenshots_are_gitignored": true,
+    "paths": [".local/recertification/browser-*/", ".local/browser-evidence/"]
+  }
+}

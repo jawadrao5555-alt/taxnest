@@ -1,0 +1,149 @@
+{
+  "audits": [
+    {
+      "findings": [
+        "none reported"
+      ],
+      "name": "composer-audit"
+    },
+    {
+      "findings": [
+        "none reported"
+      ],
+      "name": "root-npm-audit"
+    },
+    {
+      "findings": [
+        "none reported"
+      ],
+      "name": "agent-npm-audit"
+    },
+    {
+      "findings": [
+        "none reported"
+      ],
+      "name": "realtime-npm-audit"
+    },
+    {
+      "findings": [
+        "none reported"
+      ],
+      "name": "artifacts_mockup-sandbox_package-lock_json-npm-audit"
+    },
+    {
+      "findings": [
+        "none reported"
+      ],
+      "name": "tools_video-pipeline_package-lock_json-npm-audit"
+    }
+  ],
+  "bootstrap": {
+    "composer": "2.9.2",
+    "lock_hashes": {
+      "agent-realtime-gateway/package-lock.json": "3c96680d9ce8a9d0c6085fafc250a3b3de4a8df3f099d40b441d4e76f54b461a",
+      "artifacts/mockup-sandbox/package-lock.json": "aecf45ae4de09b7b7bdbe65fe0c21e88504a1ae01704ea6fdb42c2fd9cff861a",
+      "composer.lock": "f77aae4ea1f5d8b5427132fb76e2ca017b7917ebdece26036715055a5fc141e4",
+      "package-lock.json": "ee6faa95cd57839884299d07e871ae9593029be42bd363f523d1b13caac8ff10",
+      "pra-agent/package-lock.json": "288f23ac9c63ec72a2318895ebb582f0cb85b31f07aeefcffc60800d22a74472",
+      "tools/video-pipeline/package-lock.json": "1ea36c806550b001e4b9cf14d35160432094bf0a2e6facd73f8c93a087f7acf8"
+    },
+    "node": "v20.20.0",
+    "php": "8.4.16",
+    "source_mode": "independent-local-clone",
+    "source_sha": "b5bbb9a20f3a5f62bd0964f9439cd99e4945fe58"
+  },
+  "checks": [
+    {
+      "exit": 0,
+      "log": "logs/composer-audit.log",
+      "name": "composer-audit",
+      "sha256": "e464a6f19a008d852b61fd0966a47b663d20d70ccfba0b30edd6483a787f15f5",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/root-npm-audit.log",
+      "name": "root-npm-audit",
+      "sha256": "e993caa1e6e208484bd6fc7f4c2e0e618bf13755cce7b1b87b9395b5e55f1812",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/agent-npm-audit.log",
+      "name": "agent-npm-audit",
+      "sha256": "db0c67b59affd2159f4546bcd93ecb16e156eace88344afb0e329df5ff6bea4a",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/realtime-npm-audit.log",
+      "name": "realtime-npm-audit",
+      "sha256": "846fc260eb0bf70e6b21419d4cab9fcc61c224c7362324d4cbc8aebf8355f9bd",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/artifacts_mockup-sandbox_package-lock_json-npm-audit.log",
+      "name": "artifacts_mockup-sandbox_package-lock_json-npm-audit",
+      "sha256": "ba6999e238113a806166a16328550e66d179f2c3f9d15037eda28e7d74885076",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/tools_video-pipeline_package-lock_json-npm-audit.log",
+      "name": "tools_video-pipeline_package-lock_json-npm-audit",
+      "sha256": "846fc260eb0bf70e6b21419d4cab9fcc61c224c7362324d4cbc8aebf8355f9bd",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/root-web-asset-build.log",
+      "name": "root-web-asset-build",
+      "sha256": "3d12755e6b2038186173ac0881e46853c7577e4da957db2b955c925da991f1eb",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/agent-node-engine-guard.log",
+      "name": "agent-node-engine-guard",
+      "sha256": "0c84563e0f22916bcbee42ef9520ea7bb27ed05e5eb2765620dbedfdcb45f717",
+      "status": "SKIP"
+    },
+    {
+      "exit": 0,
+      "log": "logs/compiler-available-guard.log",
+      "name": "compiler-available-guard",
+      "sha256": "14946d38aadab3c465cdbaf712d77d4c109f7b88a984ae98ca1114cf3c381f91",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/network-egress-guard.log",
+      "name": "network-egress-guard",
+      "sha256": "4c69ae933098a517ef6c626eefeeb426afa74b2fd8a7c6268823bf75822fb3bc",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/safe-run-environment.log",
+      "name": "safe-run-environment",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "PASS"
+    },
+    {
+      "exit": 0,
+      "log": "logs/repository-artifact-guard.log",
+      "name": "repository-artifact-guard",
+      "sha256": "c994f7555c388641086d1b6ba4175d86446b429dd43187197213bb7576f42663",
+      "status": "PASS"
+    }
+  ],
+  "errors": 0,
+  "failures": 0,
+  "generated_utc": "2026-09-16T12:06:27.031434Z",
+  "runtime": ".local/recertification/rc-20260916T120502Z-13398",
+  "schema_version": 1,
+  "skipped": 1,
+  "source_sha": "b5bbb9a20f3a5f62bd0964f9439cd99e4945fe58",
+  "tests": 12
+}

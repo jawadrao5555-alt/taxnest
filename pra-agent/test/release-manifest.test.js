@@ -11,7 +11,7 @@ const good = {
   zip_size: 1024,
   zip_sha256: 'a'.repeat(64),
   source_sha: 'b'.repeat(40),
-  build_sha: 'c'.repeat(40),
+  build_sha: 'b'.repeat(40),
   min_agent_version: '1.3.0',
   max_agent_version: '2.99.99',
 };
@@ -26,6 +26,7 @@ test('refuses missing or ambiguous release identity before download', () => {
     { asset_name: 'someone-elses-largest.zip' },
     { product: 'other-agent' },
     { source_sha: 'not-a-sha' },
+    { build_sha: 'c'.repeat(40) },
     { zip_size: 0 },
   ]) {
     assert.equal(validateUpdateInfo({ ...good, ...patch }, '1.13.5').ok, false);

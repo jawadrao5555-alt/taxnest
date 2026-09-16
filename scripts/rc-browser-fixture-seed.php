@@ -7,6 +7,7 @@ use App\Models\HotelRoom;
 use App\Models\User;
 use App\Services\HealthModuleService;
 use App\Services\PosFeatureService;
+use App\Services\PosServiceWorkflowProfiles;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -25,8 +26,8 @@ $socket = (string) getenv('DB_SOCKET');
 if (PHP_SAPI !== 'cli' || getenv('RC_BROWSER_FIXTURE_FRESH') !== '1') {
     $fail('fresh reset acknowledgement is required.');
 }
-if (!preg_match('#^/tmp/taxnest-rc-browser-[0-9]+/fixture\.json$#', $fixturePath)
-    || !preg_match('#^/tmp/taxnest-rc-mariadb-browser-[0-9]+/run/mariadb\.sock$#', $socket)
+if (!preg_match('#^/tmp/taxnest-rc-browser-[0-9]+/safe-runtime/browser-state/fixture\.json$#', $fixturePath)
+    || !preg_match('#^/tmp/taxnest-rc-browser-[0-9]+/safe-runtime/mariadb/run/mariadb\.sock$#', $socket)
     || !is_file($socket) || is_link($socket)) {
     $fail('exact isolated fixture target and MariaDB socket are required.');
 }
@@ -116,6 +117,25 @@ $healthBranch = DB::table('branches')->insertGetId([
     'is_head_office' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
 ]);
 $healthUser = $user($health, 'Synthetic Health Owner', 'health@rc-browser.invalid', 'company_admin', '', null, 'health_owner');
+$healthRestrictedBranch = DB::table('branches')->insertGetId([
+    'company_id' => $health->id, 'name' => 'Synthetic Health Restricted Branch',
+    'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
+]);
+$healthBranchUser = $user($health, 'Synthetic Health Branch Receptionist', 'health-branch@rc-browser.invalid', 'staff', '', null, 'health_receptionist');
+DB::table('branch_user')->insert([
+    'user_id' => $healthBranchUser->id, 'branch_id' => $healthBranch,
+    'access_level' => 'full', 'created_at' => $now, 'updated_at' => $now,
+]);
+$healthOwnPatient = DB::table('health_patients')->insertGetId([
+    'company_id' => $health->id, 'branch_id' => $healthBranch,
+    'mrn' => 'RC-OWN-001', 'name' => 'Synthetic Own Branch Patient',
+    'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
+]);
+$healthOtherBranchPatient = DB::table('health_patients')->insertGetId([
+    'company_id' => $health->id, 'branch_id' => $healthRestrictedBranch,
+    'mrn' => 'RC-OTHER-BRANCH-001', 'name' => 'Synthetic Other Branch Patient',
+    'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
+]);
 $healthOther = $company('Synthetic Isolated Health Tenant', 'health-isolated-company@rc-browser.invalid', 'RCBROWSER005', 'health', [
     'health_org_type' => 'clinic', 'health_modules' => ['opd'], 'health_setup_completed' => true,
 ]);
@@ -123,11 +143,36 @@ $healthOtherBranch = DB::table('branches')->insertGetId([
     'company_id' => $healthOther->id, 'name' => 'Synthetic Isolated Branch',
     'is_head_office' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
 ]);
-DB::table('health_patients')->insert([
+$healthForeignPatient = DB::table('health_patients')->insertGetId([
     'company_id' => $healthOther->id, 'branch_id' => $healthOtherBranch,
     'mrn' => 'RC-ISOLATED-001', 'name' => 'Synthetic Isolated Patient',
     'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
 ]);
+$categoryJourneys = [];
+foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
+    foreach (array_merge(PosFeatureService::categories($panel), ['general']) as $index => $category) {
+        $profileCompany = new Company(['business_category' => $category, 'pos_type' => $category, 'product_type' => $product]);
+        $profile = PosFeatureService::profile($profileCompany);
+        $landing = $profile['landing'];
+        $path = $landing === 'hotel_front_desk' ? '/pos/hotel'
+            : ($landing === 'service_work_orders' ? '/pos/work-orders' : ($panel === 'fbr' ? '/fbr-pos/create' : '/pos/invoice/create'));
+        $nativeMarker = $panel === 'fbr' ? 'New FBR POS Sale' : ($landing === 'hotel_front_desk' ? 'Front Desk' : ($landing === 'service_work_orders' ? PosServiceWorkflowProfiles::forCompany($profileCompany)['noun'].' Board' : 'Current Order'));
+        $companyCategory = $company("Synthetic {$panel} {$category}", "category-{$panel}-{$category}@rc-browser.invalid", 'RCB'.str_pad((string) (600 + count($categoryJourneys)), 8, '0', STR_PAD_LEFT), $product, [
+            'business_category' => $category, 'pos_type' => $category,
+            'feature_flags' => PosFeatureService::defaultsForCategory($category),
+            'fbr_pos_enabled' => $panel === 'fbr', 'pos_setup_completed' => true,
+            'pos_integration_mode' => $panel === 'fbr' ? 'fbr' : 'pra',
+        ]);
+        $categoryUser = $user($companyCategory, "Synthetic {$category} owner", "category-user-{$panel}-{$category}@rc-browser.invalid", 'company_admin', 'pos_admin');
+        $categoryJourneys[] = [
+            'name' => "category-{$panel}-{$category}", 'login' => $categoryUser->email, 'password' => $password,
+            'loginPath' => $panel === 'fbr' ? '/fbr-pos/login' : '/pos/login', 'paths' => [$path],
+            'expectedPaths' => [$path], 'markers' => [$nativeMarker], 'mainMarkers' => [$nativeMarker],
+            'categoryCoverage' => ['panel' => $panel, 'category' => $category, 'landing' => $landing,
+                'mismatchPath' => $landing === 'service_work_orders' ? '/pos/hotel' : '/pos/work-orders'],
+        ];
+    }
+}
 $admin = AdminUser::create([
     'name' => 'Synthetic RC Platform Administrator', 'email' => 'hotel-admin-manage-as@rc-browser.invalid',
     'password' => Hash::make($password), 'role' => 'super_admin',
@@ -135,7 +180,7 @@ $admin = AdminUser::create([
 
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
-    'readOnlyJourneys' => [
+    'readOnlyJourneys' => array_merge([
         ['name' => 'hotel-owner', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk']],
         ['name' => 'hotel-manager', 'login' => $hotelManager->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/rooms'], 'markers' => ['Rooms']],
         ['name' => 'hotel-housekeeping', 'login' => $hotelHousekeeping->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/housekeeping'], 'markers' => ['Housekeeping']],
@@ -146,7 +191,7 @@ $fixture = [
         ['name' => 'fiscal', 'login' => $fiscalUser->email, 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/create'], 'markers' => ['FBR']],
         ['name' => 'hotel-denied', 'login' => $hotelDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel', '/pos/hotel/restaurant'], 'denied' => true],
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
-    ],
+    ], $categoryJourneys),
     'transactionalJourneys' => [[
         'name' => 'service-work-orders', 'login' => $serviceWorker->email, 'password' => $password,
         'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders'], 'markers' => ['Event Plan Board'],
@@ -162,6 +207,10 @@ $fixture = [
     'isolation' => [
         'healthCompanyId' => $health->id, 'healthBranchId' => $healthBranch,
         'foreignHealthCompanyId' => $healthOther->id, 'foreignHealthBranchId' => $healthOtherBranch,
+        'branchUser' => ['login' => $healthBranchUser->email, 'password' => $password, 'loginPath' => '/health/login'],
+        'ownPatient' => ['id' => $healthOwnPatient, 'identifier' => 'RC-OWN-001'],
+        'otherBranchPatient' => ['id' => $healthOtherBranchPatient, 'identifier' => 'RC-OTHER-BRANCH-001'],
+        'foreignTenantPatient' => ['id' => $healthForeignPatient, 'identifier' => 'RC-ISOLATED-001'],
     ],
 ];
 $temporary = "{$fixturePath}.tmp";

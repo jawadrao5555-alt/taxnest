@@ -14,7 +14,6 @@ use App\Models\InvoiceBulkSubmission;
 use App\Services\DiFiscalSubmissionState;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Queue;
 
 require __DIR__.'/../../vendor/autoload.php';
 $app = require __DIR__.'/../../bootstrap/app.php';
@@ -82,7 +81,16 @@ function makeDiInvoice(int $companyId, string $suffix): int
 /**
  * @return array{0: int, 1: array<int, string>}
  */
-function runWorkers(string $worker, array $arguments, int $count): array
+function runWorkers(string $worker, array $arguments, int $count, bool $synchronize = false): array
+{
+    return runWorkerSpecs(array_fill(0, $count, [$worker, $arguments]), $synchronize);
+}
+
+/**
+ * @param array<int, array{0:string,1:array<int,int>}> $specs
+ * @return array{0: int, 1: array<int, string>}
+ */
+function runWorkerSpecs(array $specs, bool $synchronize = false): array
 {
     $env = [];
     foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
@@ -91,16 +99,42 @@ function runWorkers(string $worker, array $arguments, int $count): array
         }
     }
     $env['PATH'] = getenv('PATH') ?: '/usr/bin:/bin';
-    $command = array_merge([PHP_BINARY, $worker], array_map('strval', $arguments));
     $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
     $processes = [];
-    for ($i = 0; $i < $count; $i++) {
+    $barrier = $synchronize ? tempnam(sys_get_temp_dir(), 'taxnest-rc-di-barrier-') : null;
+    if ($barrier !== false && $barrier !== null) {
+        unlink($barrier);
+    }
+    $readyDirectory = $synchronize ? sys_get_temp_dir().'/taxnest-rc-di-ready-'.bin2hex(random_bytes(8)) : null;
+    if ($readyDirectory !== null && !mkdir($readyDirectory, 0700)) {
+        failDi('could not create DI worker ready directory');
+    }
+    foreach ($specs as $position => [$worker, $arguments]) {
         $pipes = [];
+        $command = array_merge([PHP_BINARY, $worker], array_map('strval', $arguments));
+        if ($barrier !== null) {
+            $command[] = $barrier;
+            $command[] = $readyDirectory.'/'.$position;
+        }
         $process = proc_open($command, $descriptors, $pipes, base_path(), $env);
         if (!is_resource($process)) {
             failDi('could not start independent DI worker');
         }
         $processes[] = [$process, $pipes];
+    }
+    if ($barrier !== null) {
+        $deadline = microtime(true) + 20;
+        do {
+            $ready = glob($readyDirectory.'/*') ?: [];
+            if (count($ready) === count($specs)) {
+                break;
+            }
+            usleep(10_000);
+        } while (microtime(true) < $deadline);
+        if (count($ready) !== count($specs)) {
+            failDi('not every DI worker reached the synchronization barrier');
+        }
+        touch($barrier);
     }
 
     $output = [];
@@ -116,6 +150,11 @@ function runWorkers(string $worker, array $arguments, int $count): array
         }
         $successes++;
         $output[] = $stdout;
+    }
+    if ($barrier !== null) {
+        unlink($barrier);
+        array_map('unlink', glob($readyDirectory.'/*') ?: []);
+        rmdir($readyDirectory);
     }
     return [$successes, $output];
 }
@@ -133,7 +172,8 @@ $claimInvoiceId = makeDiInvoice($companyId, 'CLAIM');
 [$claimWorkers, $claimOutput] = runWorkers(
     __DIR__.'/../../tests/native/rc_di_fiscal_claim_worker.php',
     [$claimInvoiceId],
-    10
+    10,
+    true
 );
 assertDi($claimWorkers === 10, '10 independent fiscal claim workers completed');
 assertDi(count(array_filter($claimOutput, fn (string $line): bool => $line === 'claimed')) === 1, 'canonical fiscal claim has exactly one winner');
@@ -162,8 +202,8 @@ assertDi(
     'ambiguous recovery persisted verification evidence'
 );
 
-$resultInvoiceId = makeDiInvoice($companyId, 'RESULT');
-$resultBatch = InvoiceBulkSubmission::create([
+$duplicateInvoiceId = makeDiInvoice($companyId, 'DUPLICATE');
+$duplicateBatch = InvoiceBulkSubmission::create([
     'company_id' => $companyId,
     'state' => 'running',
     'total' => 1,
@@ -173,17 +213,42 @@ $resultBatch = InvoiceBulkSubmission::create([
 ]);
 [$resultWorkers] = runWorkers(
     __DIR__.'/../../tests/native/rc_di_bulk_result_worker.php',
-    [$resultBatch->id, $resultInvoiceId],
-    10
+    [$duplicateBatch->id, $duplicateInvoiceId],
+    10,
+    true
 );
 assertDi($resultWorkers === 10, '10 independent bulk-result workers completed');
-$resultBatch->refresh();
+$duplicateBatch->refresh();
 assertDi(
-    (int) $resultBatch->done === 1
-    && (int) $resultBatch->success === 1
-    && $resultBatch->state === 'completed'
-    && DB::table('invoice_bulk_submission_results')->where('batch_id', $resultBatch->id)->where('invoice_id', $resultInvoiceId)->count() === 1,
-    'bulk-result race and duplicate callback settle exactly once'
+    (int) $duplicateBatch->done === 1
+    && (int) $duplicateBatch->success === 1
+    && $duplicateBatch->state === 'completed'
+    && DB::table('invoice_bulk_submission_results')->where('batch_id', $duplicateBatch->id)->where('invoice_id', $duplicateInvoiceId)->count() === 1,
+    'duplicate callbacks write one durable invoice result'
+);
+
+$terminalOne = makeDiInvoice($companyId, 'TERMINAL-ONE');
+$terminalTwo = makeDiInvoice($companyId, 'TERMINAL-TWO');
+$terminalBatch = InvoiceBulkSubmission::create([
+    'company_id' => $companyId,
+    'state' => 'running',
+    'total' => 2,
+    'dispatched' => 2,
+    'started_at' => now(),
+    'last_progress_at' => now(),
+]);
+[$terminalWorkers] = runWorkerSpecs([
+    [__DIR__.'/../../tests/native/rc_di_bulk_result_worker.php', [$terminalBatch->id, $terminalOne]],
+    [__DIR__.'/../../tests/native/rc_di_bulk_result_worker.php', [$terminalBatch->id, $terminalTwo]],
+], true);
+$terminalBatch->refresh();
+assertDi(
+    $terminalWorkers === 2
+    && (int) $terminalBatch->done === 2
+    && (int) $terminalBatch->success === 2
+    && $terminalBatch->state === 'completed'
+    && DB::table('invoice_bulk_submission_results')->where('batch_id', $terminalBatch->id)->count() === 2,
+    'barrier-synchronized distinct terminal results settle total=2 exactly once'
 );
 
 $recoveryBatch = InvoiceBulkSubmission::create([
@@ -228,17 +293,55 @@ assertDi(
     DB::table('invoice_bulk_submission_outbox')->where('batch_id', $outboxBatch->id)->count() === 2,
     'outbox rows committed with cursor advancement'
 );
-Queue::fake();
-$dispatchOutbox = new ReflectionMethod($seed, 'dispatchOutbox');
-$dispatchOutbox->setAccessible(true);
-$dispatchOutbox->invoke($seed);
-$dispatchOutbox->invoke($seed);
-Queue::assertPushed(BulkSubmitInvoiceJob::class, 2);
+$jobsBefore = (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count();
+[$outboxWorkers] = runWorkers(
+    __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
+    [$outboxBatch->id],
+    2,
+    true
+);
 assertDi(
-    DB::table('invoice_bulk_submission_outbox')->where('batch_id', $outboxBatch->id)->whereNotNull('dispatched_at')->count() === 2,
-    'outbox redelivery dispatches each committed row once'
+    $outboxWorkers === 2
+    && DB::table('invoice_bulk_submission_outbox')->where('batch_id', $outboxBatch->id)->whereNotNull('dispatched_at')->count() === 2
+    && (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count() === $jobsBefore + 2,
+    'concurrent outbox dispatch enqueues each committed row once'
+);
+
+$crashCompanyId = makeDiCompany('OUTBOX-CRASH');
+$crashInvoice = makeDiInvoice($crashCompanyId, 'OUTBOX-CRASH');
+$crashBatch = InvoiceBulkSubmission::create([
+    'company_id' => $crashCompanyId,
+    'state' => 'queued',
+    'target_status' => 'draft',
+    'max_invoice_id' => $crashInvoice,
+    'started_at' => now(),
+    'last_progress_at' => now(),
+]);
+$crashSeed = new SeedBulkSubmitBatchJob($crashBatch->id);
+$claimNextChunk = new ReflectionMethod($crashSeed, 'claimNextChunk');
+$claimNextChunk->setAccessible(true);
+$claimNextChunk->invoke($crashSeed);
+$claimOutbox = new ReflectionMethod($crashSeed, 'claimOutboxRows');
+$claimOutbox->setAccessible(true);
+$claimedOutbox = $claimOutbox->invoke($crashSeed);
+assertDi(count($claimedOutbox) === 1, 'crash-window fixture claimed but did not dispatch outbox row');
+DB::table('invoice_bulk_submission_outbox')->where('id', $claimedOutbox[0]->id)->update([
+    'dispatch_claimed_at' => now()->subSeconds(SeedBulkSubmitBatchJob::OUTBOX_CLAIM_SECONDS + 1),
+]);
+$jobsBeforeRecovery = (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count();
+[$recoveryWorkers] = runWorkers(
+    __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
+    [$crashBatch->id],
+    2,
+    true
+);
+assertDi(
+    $recoveryWorkers === 2
+    && DB::table('invoice_bulk_submission_outbox')->where('id', $claimedOutbox[0]->id)->whereNotNull('dispatched_at')->exists()
+    && (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count() === $jobsBeforeRecovery + 1,
+    'expired outbox claim recovers crash window without duplicate queue hand-off'
 );
 
 printf(
-    "PASS: DI native proof claims=10 result_workers=10 result_rows=1 outbox_rows=2 endpoint_calls=0\n"
+    "PASS: DI native proof claims=10 duplicate_workers=10 terminal_workers=2 terminal_results=2 outbox_workers=4 endpoint_calls=0\n"
 );

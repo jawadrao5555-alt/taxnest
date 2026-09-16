@@ -62,12 +62,17 @@ grep -q "node-version: '22'" "$BUILD" \
   && ok "Agent build pins the reviewed Node 22 runtime" \
   || bad "Agent build must pin reviewed Node 22 runtime"
 
+grep -q 'run: npm ci' "$BUILD" \
+    && ok "Agent build installs the reviewed lockfile exactly" \
+    || bad "Agent build must use npm ci rather than a mutable install"
+
 grep -q "Create canonical release manifest" "$BUILD" \
   && grep -q 'release-manifest.json' "$BUILD" \
   && grep -q 'Get-FileHash -Algorithm SHA256' "$BUILD" \
   && grep -q 'source_sha = \$env:SOURCE_SHA' "$BUILD" \
+    && grep -q 'build_sha = \$env:SOURCE_SHA' "$BUILD" \
   && grep -q 'min_agent_version = "1.3.0"' "$BUILD" \
-  && ok "Agent build publishes a hash-bound canonical release manifest" \
+    && ok "Agent build publishes a hash-bound exact-source canonical release manifest" \
   || bad "Agent canonical release manifest metadata is incomplete"
 
 if grep -qiE 'GH_PAT|PERSONAL_ACCESS_TOKEN|PRODUCTION_SSH_PRIVATE_KEY|LIVE_QA_PASS' "$BUILD" "$OWNER" "$HANDOFF"; then
@@ -187,6 +192,25 @@ for needle in (
 ):
     if needle not in src:
         print("exact target-SHA validation drifted", file=sys.stderr)
+        sys.exit(1)
+
+install = next(step for step in steps if step.get("run") == "npm ci")
+if install.get("if") != "${{ steps.agent-version.outputs.already_released != 'true' }}":
+    print("locked Agent install must remain protected by no-build idempotency", file=sys.stderr)
+    sys.exit(1)
+
+manifest = next(step for step in steps if step.get("name") == "Create canonical release manifest")
+manifest_script = manifest["run"]
+for needle in (
+    '$zip = Get-Item "dist/TaxNest-PRA-Agent-Windows.zip" -ErrorAction Stop',
+    '$exe = Get-Item (Join-Path "dist" $exeName) -ErrorAction Stop',
+    'source_sha = $env:SOURCE_SHA.ToLowerInvariant()',
+    'build_sha = $env:SOURCE_SHA.ToLowerInvariant()',
+    'min_agent_version = "1.3.0"',
+    'max_agent_version = "2.99.99"',
+):
+    if needle not in manifest_script:
+        print("canonical manifest metadata or exact-source binding drifted", file=sys.stderr)
         sys.exit(1)
 sys.exit(0)
 PY

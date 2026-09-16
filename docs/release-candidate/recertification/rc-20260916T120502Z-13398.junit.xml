@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="taxnest-release-candidate" tests="12" failures="0" errors="0" skipped="1">
+  <testcase name="composer-audit" classname="rc-recertify">
+  </testcase>
+  <testcase name="root-npm-audit" classname="rc-recertify">
+  </testcase>
+  <testcase name="agent-npm-audit" classname="rc-recertify">
+  </testcase>
+  <testcase name="realtime-npm-audit" classname="rc-recertify">
+  </testcase>
+  <testcase name="artifacts_mockup-sandbox_package-lock_json-npm-audit" classname="rc-recertify">
+  </testcase>
+  <testcase name="tools_video-pipeline_package-lock_json-npm-audit" classname="rc-recertify">
+  </testcase>
+  <testcase name="root-web-asset-build" classname="rc-recertify">
+  </testcase>
+  <testcase name="agent-node-engine-guard" classname="rc-recertify">
+    <skipped message="environment or owner-controlled external gate"/>
+  </testcase>
+  <testcase name="compiler-available-guard" classname="rc-recertify">
+  </testcase>
+  <testcase name="network-egress-guard" classname="rc-recertify">
+  </testcase>
+  <testcase name="safe-run-environment" classname="rc-recertify">
+  </testcase>
+  <testcase name="repository-artifact-guard" classname="rc-recertify">
+  </testcase>
+</testsuite>

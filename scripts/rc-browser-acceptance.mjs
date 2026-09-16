@@ -60,7 +60,13 @@ async function surface(page,t,path,v) {
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
   if (t.denied) { if ([302,403].includes(status)||page.url().includes('/login')||page.url().includes('/dashboard')) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);
-  if (!(t.markers||[]).some(x=>body.includes(x))) fail(`${t.name}/${v.width}: ${path} omitted every declared marker`); else pass(`${t.name}/${v.width}: ${path} rendered`);
+  const expected=(t.expectedPaths||[])[(t.paths||[t.path]).indexOf(path)]||t.allowRedirectTo||path;
+  if(new URL(page.url()).pathname!==expected)return fail(`${t.name}/${v.width}: ${path} ended at ${new URL(page.url()).pathname}, expected ${expected}`);
+  for(const marker of t.markers||[])if(!body.includes(marker))fail(`${t.name}/${v.width}: ${path} omitted required marker ${marker}`);
+  const main=page.locator('main,[role="main"]').first();
+  if(!await main.count())fail(`${t.name}/${v.width}: ${path} has no main-content landmark`);
+  else for(const marker of t.mainMarkers||t.markers||[])if(!(await main.innerText()).includes(marker))fail(`${t.name}/${v.width}: ${path} main content omitted ${marker}`);
+  pass(`${t.name}/${v.width}: ${path} rendered at its exact native destination`);
   await checkUsability(page,t,path,v);
 }
 async function workflow(page,t,v) {
@@ -73,11 +79,35 @@ async function workflow(page,t,v) {
   const invoice=page.locator('form[action$="/invoice"] button[type="submit"],form[action$="/invoice"] button').first(); await Promise.all([page.waitForURL(/\/pos\/transaction\/\d+$/,{timeout:30000}),invoice.click()]);
   await page.goto(baseUrl+order,{waitUntil:'domcontentloaded',timeout:30000}); if(!(await page.locator('body').innerText()).includes(f.invoiceMarker))throw new Error(`${t.name}: invoice linkage marker missing`); pass(`${t.name}/${v.width}: actual service create, transitions, and invoice linked`);
 }
+async function categoryMismatch(page,t,v) {
+  const path=t.categoryCoverage?.mismatchPath; if(!path)return;
+  const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:30000});
+  const status=response?.status()||0, finalPath=new URL(page.url()).pathname;
+  if(status<400&&finalPath===path)fail(`${t.name}/${v.width}: category mismatch direct URL rendered ${path}`);
+  else pass(`CATEGORY URL GATE PASS: ${t.name}/${v.width}: ${t.categoryCoverage.category} rejected ${path}`);
+}
+async function healthIsolation(browser,label,v,iso) {
+  if(!iso?.branchUser||!iso.ownPatient||!iso.otherBranchPatient||!iso.foreignTenantPatient)throw new Error('health isolation fixture is incomplete');
+  const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(),d=attachDiagnostics(p);
+  try {
+    await login(p,{name:'health-branch-isolation',...iso.branchUser}); await dismiss(p);
+    const own=`/health/patients/${iso.ownPatient.id}`, ownResponse=await p.goto(baseUrl+own,{waitUntil:'domcontentloaded',timeout:30000});
+    if((ownResponse?.status()||0)>=400||new URL(p.url()).pathname!==own||!(await p.locator('body').innerText()).includes(iso.ownPatient.identifier))fail(`HEALTH ISOLATION: ${label}: own branch patient is not accessible`);
+    else pass(`HEALTH ISOLATION PASS: ${label}: own branch patient accessible`);
+    for(const patient of [iso.otherBranchPatient,iso.foreignTenantPatient]) {
+      const response=await p.goto(baseUrl+`/health/patients/${patient.id}`,{waitUntil:'domcontentloaded',timeout:30000});
+      const body=await p.locator('body').innerText().catch(()=> '');
+      if((response?.status()||0)<400||body.includes(patient.identifier))fail(`HEALTH ISOLATION: ${label}: denied patient ${patient.id} escaped scope`);
+      else pass(`HEALTH ISOLATION PASS: ${label}: denied patient ${patient.id} did not escape scope`);
+    }
+    if(d.pageErrors.length||d.consoleErrors.length||d.failedRequests.length)fail(`HEALTH ISOLATION: ${label}: ${d.summary()}`);
+  } finally {await saveEvidenceScreenshot(p,`rc-${label}-health-isolation`).catch(()=>{});await c.close();}
+}
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);if(d.consoleErrors.length)fail(`${t.name}/${label}: console error ${d.consoleErrors[0]}`);if(d.failedRequests.length)fail(`${t.name}/${label}: failed request ${d.failedRequests[0]}`);const unexpectedHttp=d.httpErrors.filter(x=>!t.denied||!t.paths?.some(path=>x.url===baseUrl+path));if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);if(d.consoleErrors.length)fail(`${t.name}/${label}: console error ${d.consoleErrors[0]}`);if(d.failedRequests.length)fail(`${t.name}/${label}: failed request ${d.failedRequests[0]}`);const unexpectedHttp=d.httpErrors.filter(x=>!t.denied||!t.paths?.some(path=>x.url===baseUrl+path));if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();
-try { for(const [label,v]of views)for(const t of cases)await one(browser,label,v,t); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+try { for(const [label,v]of views)for(const t of cases)await one(browser,label,v,t); for(const [label,v]of views)if(!requested.length)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');

@@ -30,7 +30,14 @@ final class AgentReleaseManifest
             || ($manifest['product'] ?? null) !== self::PRODUCT
             || ($manifest['version'] ?? null) !== $version
             || !self::gitSha($manifest['source_sha'] ?? null)
-            || !self::gitSha($manifest['build_sha'] ?? null)) {
+            || !self::gitSha($manifest['build_sha'] ?? null)
+            // The release workflow builds the exact owner-approved source
+            // target. A pair of individually valid but different SHAs would
+            // make that provenance claim ambiguous, so fail closed.
+            || !hash_equals(
+                strtolower((string) $manifest['source_sha']),
+                strtolower((string) $manifest['build_sha'])
+            )) {
             return null;
         }
 

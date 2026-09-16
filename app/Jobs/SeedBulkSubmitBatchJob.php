@@ -31,6 +31,10 @@ class SeedBulkSubmitBatchJob implements ShouldQueue
 
     /** Invoices queued per run before this job re-queues itself. */
     public const CHUNK = 500;
+    /** A dead dispatcher is recoverable; a live dispatcher owns its rows. */
+    public const OUTBOX_CLAIM_SECONDS = 120;
+    /** Claim one hand-off at a time; never let a long queue loop outlive a lease. */
+    public const OUTBOX_CLAIM_CHUNK = 1;
 
     public $tries = 3;
     public $timeout = 120;
@@ -82,6 +86,13 @@ class SeedBulkSubmitBatchJob implements ShouldQueue
         Log::error("SeedBulkSubmitBatchJob: batch #{$this->batchId} failed to dispatch: " . ($e ? $e->getMessage() : 'unknown'));
 
         $batch = InvoiceBulkSubmission::find($this->batchId);
+        if ($batch && $batch->isActive() && $this->hasUndispatchedOutboxRows()) {
+            // The normal queue retry may have been exhausted after a transient
+            // broker failure. Keep the durable outbox recoverable instead of
+            // reporting work as complete while a live lease hides it.
+            $this->scheduleOutboxRecovery();
+            return;
+        }
         if ($batch && $batch->isActive()) {
             // Do NOT rewrite the total down to what was queued: invoices that
             // were never dispatched would then be presented as "all done" and
@@ -152,25 +163,140 @@ class SeedBulkSubmitBatchJob implements ShouldQueue
         });
     }
 
-    /** Deliver committed outbox rows; marking is deliberately after dispatch. */
+    /**
+     * Deliver committed outbox rows. A claim is recorded before enqueueing so
+     * two dispatchers cannot enqueue the same row concurrently; its short
+     * lease deliberately expires after a crash before the queue hand-off.
+     */
     protected function dispatchOutbox(): void
     {
         if (!\Illuminate\Support\Facades\Schema::hasTable('invoice_bulk_submission_outbox')) {
             return;
         }
-        DB::table('invoice_bulk_submission_outbox')
-            ->where('batch_id', $this->batchId)
-            ->whereNull('dispatched_at')
-            ->orderBy('id')
-            ->chunkById(self::CHUNK, function ($rows) {
-                foreach ($rows as $row) {
-                    BulkSubmitInvoiceJob::dispatch((int) $row->invoice_id, (int) $row->batch_id, $row->user_id ? (int) $row->user_id : null);
+        $supportsClaims = \Illuminate\Support\Facades\Schema::hasColumn('invoice_bulk_submission_outbox', 'dispatch_claim_token')
+            && \Illuminate\Support\Facades\Schema::hasColumn('invoice_bulk_submission_outbox', 'dispatch_claimed_at');
+        if (!$supportsClaims) {
+            // Compatibility for installations awaiting the additive migration.
+            // RC certification requires the claim columns and exercises them
+            // below; this branch is retained solely so an upgrade can run.
+            DB::table('invoice_bulk_submission_outbox')
+                ->where('batch_id', $this->batchId)->whereNull('dispatched_at')->orderBy('id')
+                ->chunkById(self::CHUNK, function ($rows) {
+                    foreach ($rows as $row) {
+                        BulkSubmitInvoiceJob::dispatch((int) $row->invoice_id, (int) $row->batch_id, $row->user_id ? (int) $row->user_id : null);
+                        DB::table('invoice_bulk_submission_outbox')->where('id', $row->id)->whereNull('dispatched_at')
+                            ->update(['dispatched_at' => now(), 'updated_at' => now()]);
+                    }
+                });
+            return;
+        }
+
+        while ($rows = $this->claimOutboxRows()) {
+            foreach ($rows as $row) {
+                try {
+                    // Queue hand-off and dispatched_at are deliberately
+                    // at-least-once, never claimed as exactly-once. A crash
+                    // after enqueue but before this UPDATE is replayed after
+                    // lease expiry; the canonical invoice claim/result key
+                    // makes that downstream delivery harmless.
+                    $this->enqueueOutbox($row);
                     DB::table('invoice_bulk_submission_outbox')
                         ->where('id', $row->id)
+                        ->where('dispatch_claim_token', $row->dispatch_claim_token)
                         ->whereNull('dispatched_at')
-                        ->update(['dispatched_at' => now(), 'updated_at' => now()]);
+                        ->update([
+                            'dispatched_at' => now(),
+                            'dispatch_claim_token' => null,
+                            'dispatch_claimed_at' => null,
+                            'updated_at' => now(),
+                        ]);
+                } catch (\Throwable $e) {
+                    // Do not hide a fresh claim until its full lease after an
+                    // enqueue failure: a queue retry can hand it off now.
+                    $this->releaseOutboxClaim($row);
+                    $this->scheduleOutboxRecovery();
+                    throw $e;
                 }
-            });
+            }
+            if (count($rows) < self::OUTBOX_CLAIM_CHUNK) {
+                if ($this->hasUndispatchedOutboxRows()) {
+                    $this->scheduleOutboxRecovery();
+                }
+                return;
+            }
+        }
+        if ($this->hasUndispatchedOutboxRows()) {
+            // Another live dispatcher owns the current lease. Its process can
+            // still die after claiming; retain one delayed recovery job.
+            $this->scheduleOutboxRecovery();
+        }
+    }
+
+    /** @return array<int, object> */
+    protected function claimOutboxRows(): array
+    {
+        return DB::transaction(function (): array {
+            $expired = now()->subSeconds(self::OUTBOX_CLAIM_SECONDS);
+            $rows = DB::table('invoice_bulk_submission_outbox')
+                ->where('batch_id', $this->batchId)
+                ->whereNull('dispatched_at')
+                ->where(function ($query) use ($expired) {
+                    $query->whereNull('dispatch_claimed_at')->orWhere('dispatch_claimed_at', '<', $expired);
+                })
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->limit(self::OUTBOX_CLAIM_CHUNK)
+                ->get();
+            if ($rows->isEmpty()) {
+                return [];
+            }
+            $token = bin2hex(random_bytes(16));
+            $ids = $rows->pluck('id')->all();
+            DB::table('invoice_bulk_submission_outbox')->whereIn('id', $ids)->update([
+                'dispatch_claim_token' => $token,
+                'dispatch_claimed_at' => now(),
+                'updated_at' => now(),
+            ]);
+            return $rows->map(function ($row) use ($token) {
+                $row->dispatch_claim_token = $token;
+                return $row;
+            })->all();
+        });
+    }
+
+    protected function enqueueOutbox(object $row): void
+    {
+        BulkSubmitInvoiceJob::dispatch((int) $row->invoice_id, (int) $row->batch_id, $row->user_id ? (int) $row->user_id : null);
+    }
+
+    protected function releaseOutboxClaim(object $row): void
+    {
+        DB::table('invoice_bulk_submission_outbox')
+            ->where('id', $row->id)
+            ->where('dispatch_claim_token', $row->dispatch_claim_token)
+            ->whereNull('dispatched_at')
+            ->update([
+                'dispatch_claim_token' => null,
+                'dispatch_claimed_at' => null,
+                'updated_at' => now(),
+            ]);
+    }
+
+    protected function hasUndispatchedOutboxRows(): bool
+    {
+        return \Illuminate\Support\Facades\Schema::hasTable('invoice_bulk_submission_outbox')
+            && DB::table('invoice_bulk_submission_outbox')
+                ->where('batch_id', $this->batchId)
+                ->whereNull('dispatched_at')
+                ->exists();
+    }
+
+    protected function scheduleOutboxRecovery(): void
+    {
+        // The delayed job is intentionally durable queue work, not a PHP
+        // timer. It survives the dispatcher process dying immediately after
+        // it makes the claim. A later job sees only expired leases.
+        self::dispatch($this->batchId)->delay(now()->addSeconds(self::OUTBOX_CLAIM_SECONDS + 1));
     }
 
     /** The next page of still-eligible invoice ids for this run. */

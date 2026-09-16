@@ -32,6 +32,10 @@ function validateUpdateInfo(info, currentVersion) {
       || !/^[a-f0-9]{64}$/i.test(String(info.zip_sha256 || ''))
       || !/^[a-f0-9]{40}$/i.test(String(info.source_sha || ''))
       || !/^[a-f0-9]{40}$/i.test(String(info.build_sha || ''))
+      // A valid-looking pair of different commits is not exact-source
+      // provenance. The canonical workflow sets both to its checked-out
+      // owner-approved target, and the updater requires that invariant.
+      || String(info.source_sha).toLowerCase() !== String(info.build_sha).toLowerCase()
       || !Number.isSafeInteger(info.zip_size) || info.zip_size <= 0
       || !semver(info.min_agent_version) || !semver(info.max_agent_version)) {
     return { ok: false, code: 'release_manifest_invalid' };

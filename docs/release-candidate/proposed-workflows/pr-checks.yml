@@ -1,45 +1,173 @@
-# PROPOSED ONLY — NOT the active .github/workflows/pr-checks.yml.
-# Recovery artifact: every unrecertified/lost harness is an explicit red gate,
-# never a skipped/green placeholder.
-name: Proposed RC PR checks
-on: { pull_request: { branches: [main] } }
-permissions: { contents: read }
+# Full disposable PR verification. Does not deploy, use SSH, or read production secrets.
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
 jobs:
-  syntax:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "php -l tests/TestCase.php && node --check scripts/rc-browser-acceptance.mjs" }]
-  fullphpunit:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: recovered RC harness is not recertified after worktree loss'; exit 2" }]
-  native-mariadb:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: native MariaDB bulk evidence/raw logs lost and not rerun'; exit 2" }]
-  isolation-fiscal:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: isolation/fiscal recovery harness is not recertified'; exit 2" }]
-  jsagentrealtime:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: recovered realtime harness is not recertified'; exit 2" }]
-  dependency-audit:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: dependency audit must be rerun in a fresh authorized job'; exit 2" }]
-  browserdesktopmobile:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: fresh browser setup unavailable until lost synthetic fixture seeder is recovered'; exit 2" }]
-  manifestbuild:
-    runs-on: ubuntu-latest
-    steps: [{ uses: actions/checkout@v7 }, { run: "printf '%s\\n' 'BLOCKED: manifest/build evidence must be regenerated'; exit 2" }]
-  validate:
-    if: always()
-    needs: [syntax, fullphpunit, native-mariadb, isolation-fiscal, jsagentrealtime, dependency-audit, browserdesktopmobile, manifestbuild]
-    runs-on: ubuntu-latest
+  workflow-safety:
+    name: Workflow and release safety
+    runs-on: ubuntu-22.04
     steps:
-      - run: |
-          test "${{ needs.syntax.result }}" = success &&
-          test "${{ needs.fullphpunit.result }}" = success &&
-          test "${{ needs.native-mariadb.result }}" = success &&
-          test "${{ needs.isolation-fiscal.result }}" = success &&
-          test "${{ needs.jsagentrealtime.result }}" = success &&
-          test "${{ needs.dependency-audit.result }}" = success &&
-          test "${{ needs.browserdesktopmobile.result }}" = success &&
-          test "${{ needs.manifestbuild.result }}" = success
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked JavaScript parser dependency
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Owner-controlled workflow safety checks
+        run: |
+          bash scripts/tests/pr-auto-merge-check.sh
+          bash scripts/tests/issue-to-live-check.sh
+          bash scripts/tests/automerge-deploy-handoff-check.sh
+          bash scripts/tests/ci-deploy-production-check.sh
+          bash scripts/tests/deploy-unattended-safety-check.sh
+          bash scripts/tests/owner-merge-and-deploy-check.sh
+          bash scripts/tests/live-ops-ssh-hostkey-check.sh
+          bash scripts/tests/live-ops-daily-ops-check.sh
+          bash scripts/tests/live-ops-autonomous-check.sh
+          bash scripts/tests/approval-dispatch-check.sh
+      - name: Mandatory PR-check DAG contract
+        run: bash scripts/tests/rc-ci-gates-check.sh
+
+  dependency-audit-build:
+    name: Locked dependency audit, asset build, and guards
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rebuild disposable locked verification lane
+        run: bash scripts/rc-recertify.sh --all-locks
+
+  fullphpunit:
+    name: Full PHPUnit suite
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - name: Install locked PHP dependencies without application scripts
+        run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Run full suite in clean loopback-only environment
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit
+
+  native-mariadb-di:
+    name: Native MariaDB migration, concurrency, and DI
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql
+      - name: Install MariaDB 10.6 and locked PHP dependencies
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client
+          mariadbd --version | grep -E 'MariaDB.*10\.6\.'
+          composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Run disposable data-bearing migration and DI proof
+        env:
+          RC_MARIADB_PORT: '33116'
+        run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --all
+
+  browserdesktopmobile:
+    name: Browser acceptance at desktop and 390px mobile
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install disposable browser and local database prerequisites
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client
+          mariadbd --version | grep -E 'MariaDB.*10\.6\.'
+          composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install chromium
+      - name: Seed and exercise isolated browser fixture
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: |
+          trap 'bash scripts/rc-browser-fixture.sh stop' EXIT
+          bash scripts/rc-browser-fixture.sh setup
+          bash scripts/rc-browser-fixture.sh run
+
+  jsagentrealtime:
+    name: Node 22 PRA Agent and realtime gateway
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked platform-independent test dependencies
+        run: |
+          npm ci --prefix pra-agent --ignore-scripts --no-audit --no-fund
+          npm ci --prefix agent-realtime-gateway --ignore-scripts --no-audit --no-fund
+      - name: Run PRA Agent JavaScript tests with egress blocked
+        run: |
+          mapfile -t tests < <(find pra-agent/test -maxdepth 1 -type f -name '*.test.js' ! -name 'local-core-internet-cut.test.js' -printf '%p\n' | sort)
+          bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
+      - name: Run realtime gateway tests with egress blocked
+        run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
+
+  manifest-provenance:
+    name: Exact-SHA manifest and release-chain proof
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked PHP dependencies without application scripts
+        run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Verify owner-controlled exact-SHA release chain
+        run: bash scripts/rc-safe-run -- bash scripts/tests/agent-release-chain-check.sh
+      - name: Verify canonical manifest server-side rejection rules
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/AgentReleaseManifestTest.php
+
+  validate:
+    name: validate
+    if: always()
+    needs:
+      - workflow-safety
+      - dependency-audit-build
+      - fullphpunit
+      - native-mariadb-di
+      - browserdesktopmobile
+      - jsagentrealtime
+      - manifest-provenance
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every mandatory verification lane to pass
+        run: |
+          test "${{ needs.workflow-safety.result }}" = success
+          test "${{ needs.dependency-audit-build.result }}" = success
+          test "${{ needs.fullphpunit.result }}" = success
+          test "${{ needs.native-mariadb-di.result }}" = success
+          test "${{ needs.browserdesktopmobile.result }}" = success
+          test "${{ needs.jsagentrealtime.result }}" = success
+          test "${{ needs.manifest-provenance.result }}" = success

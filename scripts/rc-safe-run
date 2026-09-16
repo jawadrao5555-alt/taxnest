@@ -1,17 +1,162 @@
 #!/usr/bin/env bash
-# Fail-closed disposable application runner. Browser mode retains its guarded
-# state until the fixture's explicit stop command so its loopback daemon does
-# not outlive a deleted HOME/LD_PRELOAD path.
+# Fail-closed disposable application runner.
+#
+# This runner is intentionally separate from dependency installation. The
+# bootstrap may reach package registries, while an application command passed
+# here can only resolve/connect to loopback. env -i also makes an inherited
+# database URL, cloud credential, proxy, or .env lookup impossible.
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; browser=0
-[[ "${1:-}" == --browser ]] && { browser=1; shift; }; [[ "${1:-}" == -- ]] || { echo 'usage: rc-safe-run [--browser] -- command' >&2; exit 2; }; shift
-[[ $# -gt 0 && ! -e "$ROOT/.env" ]] || { echo 'rc-safe-run: BLOCKED repository .env or empty command' >&2; exit 2; }
-for x in bootstrap/cache/config.php bootstrap/cache/routes-v7.php bootstrap/cache/events.php; do [[ ! -e "$ROOT/$x" ]] || { echo "rc-safe-run: BLOCKED cached state: $x" >&2; exit 2; }; done
-if ((browser)); then home="/tmp/taxnest-rc-browser-${UID}/runtime"; else home="$(mktemp -d /tmp/taxnest-rc-home.XXXXXX)"; fi
-mkdir -p "$home"/{tmp,cache,composer,guard}; chmod 700 "$home"
-guard="$(RC_NETWORK_GUARD_BUILD_DIR="$home/guard" bash "$ROOT/scripts/rc-network-build.sh")" || exit $?
-[[ -r "$guard" ]] || { echo 'rc-safe-run: BLOCKED egress guard unavailable' >&2; exit 2; }
-envs=("HOME=$home" "TMPDIR=$home/tmp" "XDG_CACHE_HOME=$home/cache" "COMPOSER_HOME=$home/composer" "PATH=$PATH" APP_ENV=testing APP_KEY=base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE= APP_URL=http://127.0.0.1 "APP_CONFIG_CACHE=$home/cache/config.php" "APP_ROUTES_CACHE=$home/cache/routes.php" CACHE_STORE=array DB_CONNECTION=sqlite DB_DATABASE=:memory: SESSION_DRIVER=array QUEUE_CONNECTION=sync MAIL_MAILER=array BROADCAST_CONNECTION=null NO_PROXY=127.0.0.1,localhost,::1 no_proxy=127.0.0.1,localhost,::1 "LD_PRELOAD=$guard")
-if ((browser)); then envs+=(RC_BROWSER_DB=taxnest_rc_browser RC_BROWSER_PORT=5911 RC_BROWSER_SESSION_DRIVER=file "RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${UID}" "RC_MARIADB_ROOT=/tmp/taxnest-rc-mariadb-browser-${UID}" RC_MARIADB_PORT=33117); fi
-env -i "${envs[@]}" "$@"; status=$?
-((browser)) || rm -rf "$home"; exit "$status"
+umask 077
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+run_root="$ROOT"
+browser=0
+runtime_root=""
+
+usage() {
+    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] -- command [args...]" >&2
+    exit 2
+}
+
+while (($#)); do
+    case "$1" in
+        --browser) browser=1; shift ;;
+        --root)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            run_root="$2"
+            shift 2
+            ;;
+        --runtime)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            runtime_root="$2"
+            shift 2
+            ;;
+        --) shift; break ;;
+        *) usage ;;
+    esac
+done
+[[ $# -gt 0 ]] || usage
+run_root="$(cd "$run_root" && pwd)"
+
+for forbidden in \
+    "$run_root/.env" \
+    "$run_root/.env.local" \
+    "$run_root/.env.production" \
+    "$run_root/.env.backup"; do
+    [[ ! -e "$forbidden" ]] || {
+        echo "rc-safe-run: BLOCKED secret environment file: ${forbidden#"$ROOT"/}" >&2
+        exit 2
+    }
+done
+
+# Composer's package discovery and Laravel's test runner may leave PHP caches
+# in this directory. Running against one would make a clean-checkout result
+# dependent on a previous process, so fail closed instead of deleting it.
+shopt -s nullglob
+cache_files=("$run_root"/bootstrap/cache/*.php "$run_root"/storage/framework/cache/data/*)
+if ((${#cache_files[@]})); then
+    echo "rc-safe-run: BLOCKED generated application cache; remove it before testing" >&2
+    printf '  %s\n' "${cache_files[@]#"$ROOT"/}" >&2
+    exit 2
+fi
+shopt -u nullglob
+
+if [[ -z "$runtime_root" ]]; then
+    runtime_root="$(mktemp -d "${TMPDIR:-/tmp}/taxnest-rc-safe.XXXXXX")"
+    cleanup_runtime=1
+else
+    mkdir -p "$runtime_root"
+    cleanup_runtime=0
+fi
+runtime_root="$(cd "$runtime_root" && pwd)"
+home="$runtime_root/home"
+mkdir -p "$home"/{tmp,cache,composer,npm,guard}
+chmod 700 "$runtime_root" "$home"
+
+cleanup() {
+    if ((cleanup_runtime)); then
+        rm -rf -- "$runtime_root"
+    fi
+}
+trap cleanup EXIT
+
+guard="$(
+    RC_NETWORK_GUARD_BUILD_DIR="$home/guard" \
+        bash "$ROOT/scripts/rc-network-build.sh"
+)"
+[[ -r "$guard" ]] || {
+    echo "rc-safe-run: BLOCKED egress guard unavailable" >&2
+    exit 2
+}
+
+# Keep this list deliberately explicit. In particular, no token-, proxy-, or
+# service-related variable can leak through from the invoking shell.
+envs=(
+    "HOME=$home"
+    "TMPDIR=$home/tmp"
+    "XDG_CACHE_HOME=$home/cache"
+    "COMPOSER_HOME=$home/composer"
+    "COMPOSER_CACHE_DIR=$home/composer/cache"
+    "NPM_CONFIG_CACHE=$home/npm"
+    "npm_config_cache=$home/npm"
+    "NPM_CONFIG_USERCONFIG=$home/npmrc"
+    "PATH=${PATH:-/usr/bin:/bin}"
+    "LANG=C"
+    "LC_ALL=C"
+    "TZ=UTC"
+    "CI=1"
+    "APP_ENV=testing"
+    "APP_KEY=base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE="
+    "APP_URL=http://127.0.0.1"
+    "APP_CONFIG_CACHE=$home/cache/config.php"
+    "APP_ROUTES_CACHE=$home/cache/routes.php"
+    "APP_EVENTS_CACHE=$home/cache/events.php"
+    "CACHE_STORE=array"
+    "DB_CONNECTION=sqlite"
+    "DB_DATABASE=:memory:"
+    "SESSION_DRIVER=array"
+    "QUEUE_CONNECTION=sync"
+    "MAIL_MAILER=array"
+    "BROADCAST_CONNECTION=null"
+    "NO_PROXY=*"
+    "no_proxy=*"
+    "RC_SAFE_RUN=1"
+    "LD_PRELOAD=$guard"
+)
+if ((browser)); then
+    browser_state="$runtime_root/browser-state"
+    mariadb_root="$runtime_root/mariadb"
+    mkdir -p "$browser_state" "$mariadb_root"
+    envs+=(
+        "APP_ENV=rc-browser"
+        "RC_BROWSER_DB=taxnest_rc_browser"
+        "RC_BROWSER_PORT=${RC_BROWSER_PORT:-5911}"
+        "RC_BROWSER_SESSION_DRIVER=file"
+        "SESSION_DRIVER=file"
+        "RC_BROWSER_STATE_ROOT=$browser_state"
+        "RC_MARIADB_ROOT=$mariadb_root"
+        "RC_MARIADB_PORT=${RC_MARIADB_PORT:-33117}"
+        "DB_CONNECTION=mysql"
+        "DB_HOST=127.0.0.1"
+        "DB_PORT=${RC_MARIADB_PORT:-33117}"
+        "DB_SOCKET=$mariadb_root/run/mariadb.sock"
+        "DB_DATABASE=taxnest_rc_browser"
+        "DB_USERNAME=root"
+        "DB_PASSWORD="
+        "DB_CONNECT_TIMEOUT=3"
+        "HONOR_DATABASE_URL=0"
+        "RC_BROWSER_FIXTURE_OUT=$browser_state/fixture.json"
+        "TAXNEST_RC_NO_EXTERNAL_FISCAL=1"
+        "FBR_API_URL="
+        "FBR_SANDBOX_URL="
+        "FBR_PRODUCTION_URL="
+        "FBR_TOKEN="
+        "PRA_API_URL="
+        "PRA_SANDBOX_URL="
+        "PRA_PRODUCTION_URL="
+        "PRA_TOKEN="
+    )
+fi
+
+cd "$run_root"
+exec env -i "${envs[@]}" "$@"

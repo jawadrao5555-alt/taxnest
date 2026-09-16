@@ -40,7 +40,7 @@ class AgentReleaseManifestTest extends TestCase
             'product' => AgentReleaseManifest::PRODUCT,
             'version' => '1.13.5',
             'source_sha' => str_repeat('c', 40),
-            'build_sha' => str_repeat('d', 40),
+            'build_sha' => str_repeat('c', 40),
             'compatibility' => ['min_agent_version' => '1.3.0', 'max_agent_version' => '2.99.99'],
             'assets' => [
                 ['name' => 'TaxNest-PRA-Agent-Windows.zip', 'size' => 1024, 'sha256' => str_repeat('a', 64)],
@@ -77,5 +77,18 @@ class AgentReleaseManifestTest extends TestCase
         $assets = $this->releaseAssets();
         $assets[] = ['name' => 'largest-untrusted.zip', 'url' => 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/download/v1.13.5/largest-untrusted.zip', 'size' => 999999, 'digest' => null];
         $this->assertNull(AgentReleaseManifest::validate($this->manifest(), 'v1.13.5', 'jawadrao5555-alt/nestpos-releases', $assets));
+    }
+
+    public function test_refuses_a_manifest_whose_build_sha_does_not_match_its_source_sha(): void
+    {
+        $manifest = $this->manifest();
+        $manifest['build_sha'] = str_repeat('d', 40);
+
+        $this->assertNull(AgentReleaseManifest::validate(
+            $manifest,
+            'v1.13.5',
+            'jawadrao5555-alt/nestpos-releases',
+            $this->releaseAssets()
+        ));
     }
 }

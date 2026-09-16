@@ -78,7 +78,7 @@ upgrade(){
     reset "$UPGRADE_DB"
     rm -rf "$stage"; mkdir -p "$stage"
     while read -r f; do
-        [[ "$f" < 2026_09_16_120000 ]] && ln -s "$ROOT/database/migrations/$f" "$stage/$f"
+        [[ "$f" < 2026_09_15_100000 ]] && ln -s "$ROOT/database/migrations/$f" "$stage/$f"
     done <"$EVIDENCE_DIR/migration-files.txt"
     clean_php php artisan migrate --force --no-interaction --path="$stage" --realpath
     clean_php php "$ROOT/tests/native/rc_mariadb_upgrade_fixture.php" seed

@@ -362,4 +362,62 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString('Minibar Cola', $html);
         $this->assertSame('Minibar Cola', $product->fresh()->name);
     }
+
+    public function test_canonical_profile_recognizes_legacy_hotel_without_rewriting_saved_settings(): void
+    {
+        $legacy = $this->company('hotel', [
+            'business_category' => null,
+            'pos_type' => 'hotel',
+            'restaurant_mode' => true,
+            'hotel_checkout_outstanding' => 'block',
+        ]);
+        $owner = $this->owner($legacy);
+        $before = $legacy->fresh()->only([
+            'business_category', 'pos_type', 'feature_flags', 'restaurant_mode',
+            'hotel_checkout_outstanding', 'pos_custom_access',
+        ]);
+
+        $this->assertSame('hotel', PosFeatureService::profileCategory($legacy));
+        $this->assertTrue(HotelShell::isNativeCategory($legacy));
+        $this->assertSame('/pos/hotel', HotelShell::postLoginPath($owner));
+        $this->actingAs($owner, 'pos')->get('/pos/dashboard')->assertRedirect('/pos/hotel');
+
+        $after = $legacy->fresh()->only([
+            'business_category', 'pos_type', 'feature_flags', 'restaurant_mode',
+            'hotel_checkout_outstanding', 'pos_custom_access',
+        ]);
+        $this->assertSame($before, $after);
+    }
+
+    public function test_unknown_category_never_becomes_hotel_and_explicit_rooms_off_stays_closed(): void
+    {
+        $rooms = PosFeatureService::defaultsForCategory('hotel');
+
+        $unknown = $this->company('hotel', [
+            'business_category' => 'guest_house_unknown',
+            'pos_type' => 'unknown',
+            'feature_flags' => $rooms,
+        ]);
+        $this->assertSame('general', PosFeatureService::profileCategory($unknown));
+        $this->assertFalse(HotelShell::isNativeCategory($unknown));
+        $this->assertSame('/pos/invoice/create', HotelShell::postLoginPath($this->owner($unknown)));
+
+        $legacyOff = $this->company('hotel', [
+            'business_category' => null,
+            'pos_type' => 'hotel',
+            'feature_flags' => array_merge($rooms, ['rooms' => false]),
+        ]);
+        $this->assertSame('hotel', PosFeatureService::profileCategory($legacyOff));
+        $this->assertFalse(HotelShell::isNativeCategory($legacyOff));
+        $this->assertSame('/pos/invoice/create', HotelShell::postLoginPath($this->owner($legacyOff)));
+
+        $knownRetailWins = $this->company('hotel', [
+            'business_category' => 'retail',
+            'pos_type' => 'hotel',
+            'feature_flags' => $rooms,
+        ]);
+        $this->assertSame('retail', PosFeatureService::profileCategory($knownRetailWins));
+        $this->assertFalse(HotelShell::isNativeCategory($knownRetailWins));
+    }
+
 }

@@ -222,7 +222,11 @@
                                 </a>
                             @endif
                             @isset($header)
-                                <div class="text-sm flex-1 min-w-0">{{ $header }}</div>
+                                @if(request()->routeIs('invoice.show'))
+                                    <span class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">Invoice</span>
+                                @else
+                                    <div class="text-sm flex-1 min-w-0">{{ $header }}</div>
+                                @endif
                             @endisset
                         </div>
                         <div class="flex items-center gap-3">
@@ -347,6 +351,12 @@
                 @endif
 
                 <main class="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 main-scroll bg-gray-50 dark:bg-gray-950 page-fade">
+                    @if(request()->routeIs('invoice.show') && isset($header))
+                        {{-- Render the single invoice toolbar in page flow, never inside the fixed-height app bar. --}}
+                        <div class="max-w-7xl mx-auto w-full min-w-0 mb-6">
+                            {{ $header }}
+                        </div>
+                    @endif
                     @if(session('success'))
                         <div class="max-w-7xl mx-auto mb-4">
                             <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">

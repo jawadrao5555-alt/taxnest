@@ -11,9 +11,11 @@ use App\Services\HotelAccessService;
 use App\Services\HotelCheckoutPolicy;
 use App\Services\HotelFolioCatalog;
 use App\Services\HotelFolioService;
+use App\Services\HotelShell;
 use App\Services\HotelStayService;
 use App\Services\PosFeatureService;
 use App\Services\PosUnitCatalog;
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
@@ -28,6 +30,7 @@ class HotelController extends Controller
 
     public function dashboard()
     {
+        HotelShell::leaveRestaurantOutlet();
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $companyId = (int) app('currentCompanyId');
         $branchId = $this->branches->getActiveBranchId();
@@ -36,6 +39,49 @@ class HotelController extends Controller
         $roomCards = $this->stays->roomCards($companyId, $branchId);
 
         return view('pos.hotel.dashboard', $board + compact('money', 'roomCards'));
+    }
+
+    /**
+     * Open the separated Restaurant Outlet (canonical NestPOS sale engine).
+     * Fail-closed when restaurant_mode is OFF or the caller is housekeeping-only.
+     */
+    public function restaurantOutlet(Request $request)
+    {
+        $company = Company::find(app('currentCompanyId'));
+        $user = auth('pos')->user();
+        if (!HotelShell::restaurantOutletOn($company)) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => __('pos.hotel_restaurant_outlet_off')], 403);
+            }
+            $home = HotelAccessService::canFrontDesk($user)
+                ? route('pos.hotel.dashboard')
+                : (HotelAccessService::canHousekeeping($user) ? route('pos.hotel.housekeeping') : route('pos.dashboard'));
+
+            return redirect($home)->with('error', __('pos.hotel_restaurant_outlet_off'));
+        }
+        if (!HotelShell::canOpenRestaurantOutlet($user, $company)) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => __('pos.custom_access_denied')], 403);
+            }
+            abort(403, __('pos.custom_access_denied'));
+        }
+        HotelShell::enterRestaurantOutlet();
+
+        return redirect()->route('pos.invoice.create');
+    }
+
+    public function leaveRestaurantOutlet()
+    {
+        HotelShell::leaveRestaurantOutlet();
+        $user = auth('pos')->user();
+        if (HotelAccessService::canFrontDesk($user)) {
+            return redirect()->route('pos.hotel.dashboard');
+        }
+        if (HotelAccessService::canHousekeeping($user)) {
+            return redirect()->route('pos.hotel.housekeeping');
+        }
+
+        return redirect()->route('pos.dashboard');
     }
 
     public function rooms()

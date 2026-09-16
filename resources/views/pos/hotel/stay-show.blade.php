@@ -80,7 +80,7 @@
             <h3 class="text-sm font-semibold">{{ __('pos.hotel_post_charge') }}</h3>
             <input name="description" placeholder="{{ __('pos.hotel_charge_desc') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
             @if(isset($products) && $products->isNotEmpty())
-            <select name="product_id" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+            <select name="product_id" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm" data-hotel-stay-extras="1">
                 <option value="">{{ __('pos.hotel_from_product') }}</option>
                 @foreach($products as $product)
                 <option value="{{ $product->id }}">{{ $product->name }} · Rs {{ number_format((float) $product->price, 2) }} {{ $product->uom }}</option>
@@ -88,7 +88,7 @@
             </select>
             @endif
             @if(isset($services) && $services->isNotEmpty())
-            <select name="service_id" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+            <select name="service_id" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm" data-hotel-stay-services="1">
                 <option value="">{{ __('pos.hotel_from_service') }}</option>
                 @foreach($services as $service)
                 <option value="{{ $service->id }}">{{ $service->name }} · Rs {{ number_format((float) $service->price, 2) }}</option>

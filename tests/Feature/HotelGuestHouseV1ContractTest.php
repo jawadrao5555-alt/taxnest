@@ -88,6 +88,8 @@ class HotelGuestHouseV1ContractTest extends TestCase
         $this->assertSame('hotel_housekeeping', PosAccessService::featureForPath('/pos/hotel/rooms'));
         $this->assertSame('hotel_housekeeping', PosAccessService::featureForPath('pos/hotel/housekeeping'));
         $this->assertSame('hotel_housekeeping', PosAccessService::featureForPath('pos/hotel/rooms/3/housekeeping'));
+        $this->assertNull(PosAccessService::featureForPath('pos/hotel/restaurant'));
+        $this->assertNull(PosAccessService::featureForPath('pos/hotel/restaurant/exit'));
         $this->assertContains('hotel', PosAccessService::FEATURES);
         $this->assertContains('hotel_housekeeping', PosAccessService::FEATURES);
     }

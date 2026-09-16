@@ -440,3 +440,12 @@ Agar Recipes feature band hai lekin purane ingredients record mein mojood hain, 
 ### Inventory Master Excel mein duplicate row
 
 Agar aik workbook mein wohi Product Code/naam, Ingredient Code/naam-unit, ya wohi Product + Ingredient recipe dobara ho to system pehli row rakhta hai aur doosri row ka number issue list mein dikhata hai. Duplicate ko chup-chaap overwrite nahi kiya jata. Dono rows ki sahi information aik row mein mila kar file dobara upload karein. Baad mein wohi saaf file dobara upload karna safe aur idempotent rehta hai.
+
+### Hotel / Guest House — Front Desk aur Restaurant Outlet
+
+- Business category Hotel / Guest House + Rooms ON: login aur Admin Manage as Company **Front Desk** (`/pos/hotel`) kholta hai — generic New Sale ghar nahi.
+- Hotel primary navigation: Front Desk, Reservations, Rooms, Housekeeping, Guests, Folios/Payments, Hotel Reports. Primary actions: New Booking, Walk-in, Check-in, Check-out, Add Charge, Receive Payment, Housekeeping.
+- Agar property ne pehle se restaurant/kitchen (`restaurant_mode`) ON rakha hai to **Restaurant Outlet** Hotel shell ke andar alag entry hai. Wahan purana NestPOS sale/restaurant engine chalta hai aur **Back to Front Desk** se wapas aate hain. restaurant_mode OFF ho to outlet menu aur `/pos/invoice/create` dono band.
+- Stay folio par products **Minibar / Room Service / Stay Extra** aur services **Stay Service / Charge** ke labels se chunte hain — products rename/reset nahi hote; branch availability pehle jaisi rehti hai.
+- Housekeeping-only staff Rooms/HK board dekhte hain; folios aur Restaurant Outlet un ke liye band.
+- Saved modules, permissions, kitchen settings, rooms, stock, tax aur purane stays/folios silently change nahi hote.

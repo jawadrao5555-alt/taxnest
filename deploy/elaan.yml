@@ -2,9 +2,10 @@
 # deployment_key; customer-visible title/points never contain provenance.
 # Do not reuse Daily L001. Do not use skip_elaan except emergencies.
 
-title: "Hotel check-out rule aur folio extras ab branch-safe hain"
+title: "Hotel Front Desk ab Restaurant Outlet se alag rehta hai"
 audience: pos
 type: improvement
 points:
-  - "Baqaya folio par check-out ab confirm-allow rehta hai jab tak aap Rooms se block na chunein — purani setting khud nahi badalti."
-  - "Stay extras sirf usi branch ke product/service dikhate hain, payment aur charge labels en/rur/ur mein hain, aur folio table mobile par sideways scroll hoti hai."
+  - "Hotel / Guest House login aur Manage as Company hamesha Front Desk kholta hai — New Sale Hotel ka ghar nahi."
+  - "Agar restaurant_mode pehle se ON hai to Restaurant Outlet Hotel shell ke andar alag module hai, Back to Front Desk ke sath."
+  - "restaurant_mode OFF ho to outlet menu aur sale URL dono band — purani modules, kitchen settings, rooms aur folio history preserve."

@@ -712,7 +712,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Buyer Details</h4>
-                            <p class="text-sm font-semibold text-gray-900">{{ $invoice->buyer_name }}</p>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ $invoice->buyer_name }}</p>
                             @if(!empty($invoice->buyer_ntn))
                             <p class="text-sm text-gray-600 dark:text-gray-400">NTN: {{ $invoice->buyer_ntn }}</p>
                             @endif
@@ -731,27 +731,27 @@
                         </div>
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Invoice Details</h4>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->display_invoice_number }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Internal #: <span class="font-semibold text-gray-900 dark:text-white">{{ $invoice->display_invoice_number }}</span></p>
 @if($invoice->fbr_invoice_number)
 <p class="text-sm text-gray-600 dark:text-gray-400">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
 @elseif($invoice->status === 'pending_verification')
 <p class="text-xs text-amber-700 mt-1">Portal verification is required; use the recorded confirmation controls above.</p>
 @endif
 @if($invoice->fbr_submission_date)
-<p class="text-sm text-gray-600 dark:text-gray-400">FBR Date: <span class="font-semibold text-gray-900">{{ $invoice->fbr_submission_date->format('d M Y H:i') }}</span></p>
+<p class="text-sm text-gray-600 dark:text-gray-400">FBR Date: <span class="font-semibold text-gray-900 dark:text-white">{{ $invoice->fbr_submission_date->format('d M Y H:i') }}</span></p>
 @endif
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Date: <span class="font-semibold text-gray-900">{{ $invoice->created_at->format('d M Y') }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Date: <span class="font-semibold text-gray-900 dark:text-white">{{ $invoice->created_at->format('d M Y') }}</span></p>
                             @if($invoice->branch)
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Branch: <span class="font-semibold text-gray-900">{{ $invoice->branch->name }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Branch: <span class="font-semibold text-gray-900 dark:text-white">{{ $invoice->branch->name }}</span></p>
                             @endif
                             @if($invoice->document_type && $invoice->document_type !== 'Sale Invoice')
                             <p class="text-sm text-gray-600 dark:text-gray-400">Type: <span class="font-semibold text-amber-700">{{ $invoice->document_type }}</span></p>
                             @endif
                             @if($invoice->reference_invoice_number)
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Ref Invoice: <span class="font-semibold text-gray-900">{{ $invoice->reference_invoice_number }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Ref Invoice: <span class="font-semibold text-gray-900 dark:text-white">{{ $invoice->reference_invoice_number }}</span></p>
                             @endif
                             @if($invoice->supplier_province)
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Supplier Province: <span class="font-semibold text-gray-900">{{ $invoice->supplier_province }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Supplier Province: <span class="font-semibold text-gray-900 dark:text-white">{{ $invoice->supplier_province }}</span></p>
                             @endif
                             @if($invoice->integrity_hash)
                             <p class="text-xs text-gray-400 mt-2 font-mono break-all">Hash: {{ $invoice->integrity_hash }}</p>

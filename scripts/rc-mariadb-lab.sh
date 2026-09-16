@@ -73,12 +73,41 @@ EOF
 }
 alive() { guarded "$ADMIN" --protocol=socket --socket="$SOCKET" -uroot ping --silent >/dev/null 2>&1; }
 start() {
+    local launch_uid mysql_uid mysql_gid links
+    local -a user_args=()
+    launch_uid="$(id -u)" || fail 'cannot determine startup user'
+    [[ "$launch_uid" =~ ^[0-9]+$ ]] || fail 'invalid startup user ID'
+    if ((launch_uid == 0)); then
+        # The official image runs CI as root; only its fixed, unprivileged
+        # mysql account may own/run the disposable database. No user override.
+        mysql_uid="$(id -u mysql)" || fail 'root startup requires the mysql account'
+        mysql_gid="$(id -g mysql)" || fail 'root startup requires the mysql group'
+        [[ "$mysql_uid" =~ ^[0-9]+$ && "$mysql_gid" =~ ^[0-9]+$ ]] ||
+            fail 'invalid mysql account IDs'
+        ((mysql_uid > 0 && mysql_gid > 0)) || fail 'mysql account must be unprivileged'
+        user_args=(--user=mysql)
+        if [[ -e "$ROOT" ]]; then
+            links="$(find -P "$ROOT" -type l -print -quit)" ||
+                fail 'cannot inspect disposable lab ownership boundary'
+            [[ -z "$links" ]] || fail 'refusing symlinks in root-launched disposable lab'
+        fi
+    fi
     write_config
     if alive; then printf 'MariaDB already ready: %s\n' "$SOCKET"; return; fi
-    if [[ ! -d "$DATA/mysql" ]]; then
-        guarded "$INSTALL_DB" --defaults-file="$CNF" --datadir="$DATA" --auth-root-authentication-method=normal --skip-test-db
+    if ((launch_uid == 0)); then
+        mkdir -p "$DATA" "$RUN" "$LOG" "$ROOT/home"
+        # Keep configuration root-owned and non-writable by mysql. Only the
+        # mutable database/runtime directories are recursively reassigned.
+        chown "0:$mysql_gid" "$ROOT" "$CNF"
+        chmod 0750 "$ROOT"
+        chmod 0640 "$CNF"
+        chown -R --no-dereference "$mysql_uid:$mysql_gid" "$DATA" "$RUN" "$LOG" "$ROOT/home"
+        chmod 0750 "$DATA" "$RUN" "$LOG" "$ROOT/home"
     fi
-    guarded "$SERVER" --defaults-file="$CNF" &
+    if [[ ! -d "$DATA/mysql" ]]; then
+        guarded "$INSTALL_DB" --defaults-file="$CNF" "${user_args[@]}" --datadir="$DATA" --auth-root-authentication-method=normal --skip-test-db
+    fi
+    guarded "$SERVER" --defaults-file="$CNF" "${user_args[@]}" &
     for _ in $(seq 1 80); do alive && { printf 'MariaDB ready: socket=%s port=%s\n' "$SOCKET" "$PORT"; return; }; sleep .25; done
     fail "MariaDB did not become ready; see $LOG/mariadb.err"
 }

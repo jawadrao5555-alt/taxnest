@@ -28,14 +28,13 @@ checks. This prevents a manifest from claiming a build from a different valid
 commit. Existing owner-only dispatch, main-ancestry, tag-collision, serialized
 dispatch, and no-replace controls are retained.
 
-The exact proposed workflow artifact is
-`docs/release-candidate/proposed-workflows/build-agent.yml`; its expected
-git blob is `ea95479996ae6a24f8b36176df3f5e065e673aec`. The corresponding
-unstaged active-path proposal has expected blob
-`326276fafa4dce4e7b771974bd65c02a67fd2351` (the only byte-level difference
-is the trailing newline). Owner authorization is still required to commit and
-push the active workflow path; this report does not claim it is active
-remotely.
+The exact full workflow artifact is
+`docs/release-candidate/proposed-workflows/build-agent.yml`. It is now
+byte-identical to `.github/workflows/build-agent.yml`, including EOF: both
+have git blob `ea95479996ae6a24f8b36176df3f5e065e673aec` and SHA-256
+`0eb9ccc78d9d53ce6beb5ae6ad3d3f0437f6da9e31187ed4b9962615ee5ed6be`.
+Owner authorization is still required to commit and push the active workflow
+path; this report does not claim it is active remotely.
 
 ## Fresh results
 
@@ -54,6 +53,26 @@ internet-cut harness is included in the 43 passing PRA Agent tests.
 `pkgs.nspr` is already available without changing the environment:
 `/nix/store/gpb87pb8s826aggy1s3f352alp40dkj8-nspr-4.36/lib/libnspr4.so`.
 No Windows packaging claim follows from that availability.
+
+## Bounded Linux Electron attempt — 12:10:09
+
+At 12:10:09, a fresh workflow-authorization lookup observed HTTP 404. This
+records only that authorization observation; it did not dispatch, alter, or
+publish a workflow.
+
+The Linux Electron release-gate testcase was then actually invoked with the
+existing isolated Node `v22.15.1`, a fresh `env -i` home, the loopback-only
+`LD_PRELOAD` network guard, and
+`LD_LIBRARY_PATH=/nix/store/gpb87pb8s826aggy1s3f352alp40dkj8-nspr-4.36/lib`.
+`xvfb-run` was not installed (although `Xvfb` itself was present), so the
+testcase selected its documented headless fallback. It exited `1` before any
+application assertion because the installed Electron package contains no
+Linux runtime at
+`pra-agent/node_modules/electron/dist/electron` (`spawn ... ENOENT`).
+
+This is a concrete missing-Electron-runtime dependency failure, not a pass or
+a GUI skip. No Electron download, native application build, Windows build,
+release build, publication, or workflow change was attempted.
 
 ## Raw evidence
 

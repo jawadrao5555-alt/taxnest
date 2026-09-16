@@ -624,8 +624,11 @@ class InvoiceBulkSubmitTest extends TestCase
             $table->unsignedBigInteger('invoice_id');
             $table->unsignedBigInteger('user_id')->nullable();
             $table->timestamp('dispatched_at')->nullable();
+            $table->string('dispatch_claim_token', 64)->nullable();
+            $table->timestamp('dispatch_claimed_at')->nullable();
             $table->timestamps();
             $table->unique(['batch_id', 'invoice_id']);
+            $table->index(['batch_id', 'dispatch_claimed_at'], 'bulk_outbox_claim_recovery');
         });
         $one = $this->makeDraft();
         $two = $this->makeDraft();
@@ -647,6 +650,85 @@ class InvoiceBulkSubmitTest extends TestCase
         $flush->invoke($job); // replacement worker recovery
         Queue::assertPushed(BulkSubmitInvoiceJob::class, 2);
         $this->assertSame(2, \DB::table('invoice_bulk_submission_outbox')->whereNotNull('dispatched_at')->count());
+    }
+
+    public function test_live_outbox_claim_is_not_stolen_but_an_expired_claim_is_recoverable(): void
+    {
+        Schema::create('invoice_bulk_submission_outbox', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('batch_id');
+            $table->unsignedBigInteger('invoice_id');
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->timestamp('dispatched_at')->nullable();
+            $table->string('dispatch_claim_token', 64)->nullable();
+            $table->timestamp('dispatch_claimed_at')->nullable();
+            $table->timestamps();
+            $table->unique(['batch_id', 'invoice_id']);
+            $table->index(['batch_id', 'dispatch_claimed_at'], 'bulk_outbox_claim_recovery');
+        });
+        $invoice = $this->makeDraft();
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id, 'state' => 'queued', 'target_status' => 'draft',
+            'max_invoice_id' => $invoice->id,
+        ]);
+        $job = new SeedBulkSubmitBatchJob($batch->id);
+        foreach (['claimNextChunk', 'claimOutboxRows'] as $method) {
+            $reflection = new \ReflectionMethod($job, $method);
+            $reflection->setAccessible(true);
+            if ($method === 'claimNextChunk') {
+                $reflection->invoke($job);
+            } else {
+                $first = $reflection->invoke($job);
+                $this->assertCount(1, $first);
+                $this->assertSame([], $reflection->invoke($job), 'a live claim belongs to its dispatcher');
+                \DB::table('invoice_bulk_submission_outbox')->where('id', $first[0]->id)->update([
+                    'dispatch_claimed_at' => now()->subSeconds(SeedBulkSubmitBatchJob::OUTBOX_CLAIM_SECONDS + 1),
+                ]);
+                $recovered = $reflection->invoke($job);
+                $this->assertCount(1, $recovered);
+                $this->assertNotSame($first[0]->dispatch_claim_token, $recovered[0]->dispatch_claim_token);
+            }
+        }
+    }
+
+    public function test_enqueue_failure_releases_claim_and_schedules_durable_recovery(): void
+    {
+        Schema::create('invoice_bulk_submission_outbox', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('batch_id');
+            $table->unsignedBigInteger('invoice_id');
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->timestamp('dispatched_at')->nullable();
+            $table->string('dispatch_claim_token', 64)->nullable();
+            $table->timestamp('dispatch_claimed_at')->nullable();
+            $table->timestamps();
+            $table->unique(['batch_id', 'invoice_id']);
+            $table->index(['batch_id', 'dispatch_claimed_at'], 'bulk_outbox_claim_recovery');
+        });
+        $invoice = $this->makeDraft();
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id, 'state' => 'queued', 'target_status' => 'draft',
+            'max_invoice_id' => $invoice->id,
+        ]);
+        $job = new class($batch->id) extends SeedBulkSubmitBatchJob {
+            public bool $recoveryScheduled = false;
+            public function claim(): void { $this->claimNextChunk(); }
+            public function flush(): void { $this->dispatchOutbox(); }
+            protected function enqueueOutbox(object $row): void { throw new \RuntimeException('queue unavailable'); }
+            protected function scheduleOutboxRecovery(): void { $this->recoveryScheduled = true; }
+        };
+        $job->claim();
+        try {
+            $job->flush();
+            $this->fail('The queue error must be visible to normal queue retry handling.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('queue unavailable', $e->getMessage());
+        }
+        $row = \DB::table('invoice_bulk_submission_outbox')->where('batch_id', $batch->id)->first();
+        $this->assertNull($row->dispatch_claim_token);
+        $this->assertNull($row->dispatch_claimed_at);
+        $this->assertNull($row->dispatched_at);
+        $this->assertTrue($job->recoveryScheduled);
     }
 
     public function test_duplicate_inflight_delivery_never_records_a_skipped_terminal_outcome(): void

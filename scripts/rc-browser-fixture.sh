@@ -5,14 +5,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LAB_CTL="$ROOT/scripts/rc-mariadb-lab.sh"
 STATE_BASE="$(realpath -m "${RC_BROWSER_STATE_ROOT:-/tmp/taxnest-rc-browser-${UID}}")"
 SAFE_RUNTIME="$STATE_BASE/safe-runtime"
-LAB_ROOT="$SAFE_RUNTIME/mariadb"
+LAB_ROOT="$(realpath -m "${RC_MARIADB_ROOT:-/tmp/taxnest-rc-mariadb-browser-${UID}}")"
 DB_PORT="${RC_MARIADB_PORT:-33117}"
 DATABASE="${RC_BROWSER_DB:-taxnest_rc_browser}"
 STATE_ROOT="$SAFE_RUNTIME/browser-state"
 FIXTURE="$STATE_ROOT/fixture.json"; SERVER_PID="$STATE_ROOT/php-server.pid"; SERVER_LOG="$STATE_ROOT/php-server.log"
 BROWSER_PORT="${RC_BROWSER_PORT:-5911}"
 fail(){ printf 'rc-browser-fixture: %s\n' "$*" >&2; exit 2; }
-[[ "$STATE_BASE" == /tmp/taxnest-rc-browser-* && "$LAB_ROOT" == "$STATE_BASE/safe-runtime/mariadb" && "$STATE_ROOT" == "$STATE_BASE/safe-runtime/browser-state" ]] || fail 'isolated paths required'
+[[ "$STATE_BASE" == /tmp/taxnest-rc-browser-* && "$LAB_ROOT" == /tmp/taxnest-rc-mariadb-browser-* && "$STATE_ROOT" == "$STATE_BASE/safe-runtime/browser-state" ]] || fail 'isolated paths required'
 [[ "$DATABASE" == taxnest_rc_browser && "$BROWSER_PORT" == 5911 ]] || fail 'exact browser database and port required'
 resolve_mariadbd() {
   [[ -n "${RC_MARIADBD:-}" && -x "$RC_MARIADBD" ]] && return
@@ -22,7 +22,7 @@ resolve_mariadbd() {
   done
   fail 'no local MariaDB server found'
 }
-safe_browser() { "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" -- "$@"; }
+safe_browser() { "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" -- "$@"; }
 lab() { RC_MARIADB_ROOT="$LAB_ROOT" RC_MARIADB_PORT="$DB_PORT" bash "$LAB_CTL" "$@"; }
 start_server() {
   rm -f "$SERVER_PID"

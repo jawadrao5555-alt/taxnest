@@ -1,0 +1,24 @@
+{
+  "observed_utc": "2026-09-16T12:10:09.738Z",
+  "mechanism": "existing GitHub OAuth integration only",
+  "workflow_tree_write_http_status": 404,
+  "workflow_tree_write_message": "Not Found",
+  "pat_or_ssh_used": false,
+  "branch_changed_by_permission_probe": false,
+  "workflow_dispatched": false,
+  "original_local_only_commit": "301873a3160dde0adce2133700d5250cfd309150",
+  "original_local_only_difference": [".github/workflows/build-agent.yml"],
+  "held_workflow_commit": "1e016668037fae4f80b629410007a7793c1a5e27",
+  "held_workflow_parent": "5f887ddd671e3cad69a5b667ee429a9a9053f900",
+  "held_local_ref": "refs/rc-held/proposed-workflows-20260916",
+  "patch": "docs/release-candidate/proposed-workflows/workflow-authorization.patch.gz",
+  "patch_sha256": "f6f82adffbb36d5f1961a9b5ef4d3c1c48480cbe57af443383fe9ad85b4b35dd",
+  "decompressed_patch_sha256": "95b126eb5ac40955cdb2b9ad1a866df7291846797e5c51b5c85f5d3588bc01f6",
+  "patch_format": "gzip -n; preserves exact unified-diff context whitespace without weakening source whitespace checks",
+  "expected_workflow_blobs": {
+    ".github/workflows/build-agent.yml": "ea95479996ae6a24f8b36176df3f5e065e673aec",
+    ".github/workflows/pr-checks.yml": "dded75f0f3d987665db34e68e1a4998efba538ef"
+  },
+  "minimal_owner_authorized_action": "Using an owner-authorized GitHub session with workflow write permission, commit the exact two proposed workflow files to the existing RC branch and verify their blob IDs. No merge, release approval or deployment is part of this action.",
+  "active_ci_upgrade": false
+}

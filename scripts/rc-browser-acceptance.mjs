@@ -86,6 +86,13 @@ async function categoryMismatch(page,t,v) {
   if(status<400&&finalPath===path)fail(`${t.name}/${v.width}: category mismatch direct URL rendered ${path}`);
   else pass(`CATEGORY URL GATE PASS: ${t.name}/${v.width}: ${t.categoryCoverage.category} rejected ${path}`);
 }
+async function sameProductCategorySurface(page,t,v) {
+  const path=t.categoryCoverage?.sameProductPositivePath; if(!path)return;
+  const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:30000});
+  const status=response?.status()||0, finalPath=new URL(page.url()).pathname, main=page.locator('main,[role="main"]').first();
+  if(status>=400||finalPath!==path||!await main.count())fail(`${t.name}/${v.width}: same-product category surface ${path} did not render`);
+  else pass(`CATEGORY NATIVE PASS: ${t.name}/${v.width}: ${t.categoryCoverage.category} rendered ${path}`);
+}
 async function healthIsolation(browser,label,v,iso) {
   if(!iso?.branchUser||!iso.ownPatient||!iso.otherBranchPatient||!iso.foreignTenantPatient)throw new Error('health isolation fixture is incomplete');
   const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(),d=attachDiagnostics(p);
@@ -105,7 +112,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);if(d.consoleErrors.length)fail(`${t.name}/${label}: console error ${d.consoleErrors[0]}`);if(d.failedRequests.length)fail(`${t.name}/${label}: failed request ${d.failedRequests[0]}`);const unexpectedHttp=d.httpErrors.filter(x=>!t.denied||!t.paths?.some(path=>x.url===baseUrl+path));if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);if(d.consoleErrors.length)fail(`${t.name}/${label}: console error ${d.consoleErrors[0]}`);if(d.failedRequests.length)fail(`${t.name}/${label}: failed request ${d.failedRequests[0]}`);const unexpectedHttp=d.httpErrors.filter(x=>!t.denied||!t.paths?.some(path=>x.url===baseUrl+path));if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

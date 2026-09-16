@@ -21,6 +21,18 @@ SERVER_VERSION="$("$SERVER" --version 2>&1)"
 CLIENT_VERSION="$("$CLIENT" --version 2>&1)"
 [[ "$SERVER_VERSION" =~ MariaDB ]] && [[ "$SERVER_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 server: $SERVER_VERSION"
 [[ "$CLIENT_VERSION" =~ MariaDB ]] && [[ "$CLIENT_VERSION" =~ 10\.6\.[0-9]+ ]] || fail "refusing non-MariaDB-10.6 client: $CLIENT_VERSION"
+if [[ "${RC_MARIADB_REQUIRE_EGRESS_GUARD:-0}" == 1 ]]; then
+    [[ -r "${RC_MARIADB_LD_PRELOAD:-}" ]] || fail 'required loopback-only egress guard is unavailable'
+fi
+guarded() {
+    if [[ -n "${RC_MARIADB_LD_PRELOAD:-}" ]]; then
+        mkdir -p "$ROOT/home"
+        env -i PATH="$PATH" HOME="$ROOT/home" TMPDIR="$RUN" LANG=C LC_ALL=C TZ=UTC NO_PROXY='*' no_proxy='*' \
+            LD_PRELOAD="$RC_MARIADB_LD_PRELOAD" "$@"
+    else
+        "$@"
+    fi
+}
 
 write_config() {
     mkdir -p "$ROOT" "$RUN" "$LOG"
@@ -38,20 +50,20 @@ collation-server=utf8mb4_unicode_ci
 sql_mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION
 EOF
 }
-alive() { "$ADMIN" --protocol=socket --socket="$SOCKET" -uroot ping --silent >/dev/null 2>&1; }
+alive() { guarded "$ADMIN" --protocol=socket --socket="$SOCKET" -uroot ping --silent >/dev/null 2>&1; }
 start() {
     write_config
     if alive; then printf 'MariaDB already ready: %s\n' "$SOCKET"; return; fi
     if [[ ! -d "$DATA/mysql" ]]; then
-        "$INSTALL_DB" --defaults-file="$CNF" --datadir="$DATA" --auth-root-authentication-method=normal --skip-test-db
+        guarded "$INSTALL_DB" --defaults-file="$CNF" --datadir="$DATA" --auth-root-authentication-method=normal --skip-test-db
     fi
-    "$SERVER" --defaults-file="$CNF" &
+    guarded "$SERVER" --defaults-file="$CNF" &
     for _ in $(seq 1 80); do alive && { printf 'MariaDB ready: socket=%s port=%s\n' "$SOCKET" "$PORT"; return; }; sleep .25; done
     fail "MariaDB did not become ready; see $LOG/mariadb.err"
 }
 stop() {
     alive || { printf 'MariaDB stopped\n'; return; }
-    "$ADMIN" --protocol=socket --socket="$SOCKET" -uroot shutdown
+    guarded "$ADMIN" --protocol=socket --socket="$SOCKET" -uroot shutdown
     printf 'MariaDB stopped: %s\n' "$ROOT"
 }
 case "${1:-}" in

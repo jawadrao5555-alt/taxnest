@@ -27,8 +27,8 @@ if (PHP_SAPI !== 'cli' || getenv('RC_BROWSER_FIXTURE_FRESH') !== '1') {
     $fail('fresh reset acknowledgement is required.');
 }
 if (!preg_match('#^/tmp/taxnest-rc-browser-[0-9]+/safe-runtime/browser-state/fixture\.json$#', $fixturePath)
-    || !preg_match('#^/tmp/taxnest-rc-browser-[0-9]+/safe-runtime/mariadb/run/mariadb\.sock$#', $socket)
-    || !is_file($socket) || is_link($socket)) {
+    || !preg_match('#^/tmp/taxnest-rc-mariadb-browser-[0-9]+/run/mariadb\.sock$#', $socket)
+    || @filetype($socket) !== 'socket' || is_link($socket)) {
     $fail('exact isolated fixture target and MariaDB socket are required.');
 }
 if (DB::connection()->getDriverName() !== 'mysql'
@@ -42,8 +42,9 @@ foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_s
         $fail("required migrated table is absent: {$table}");
     }
 }
-if (Company::withoutGlobalScopes()->exists() || User::withoutGlobalScopes()->exists()) {
-    $fail('fresh browser database is not empty after reset.');
+if (Company::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid')->exists()
+    || User::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid')->exists()) {
+    $fail('fresh browser database already contains a synthetic fixture.');
 }
 
 $password = 'RcBrowser!'.bin2hex(random_bytes(18));
@@ -154,13 +155,13 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
         $profileCompany = new Company(['business_category' => $category, 'pos_type' => $category, 'product_type' => $product]);
         $profile = PosFeatureService::profile($profileCompany);
         $landing = $profile['landing'];
-        $path = $landing === 'hotel_front_desk' ? '/pos/hotel'
-            : ($landing === 'service_work_orders' ? '/pos/work-orders' : ($panel === 'fbr' ? '/fbr-pos/create' : '/pos/invoice/create'));
-        $nativeMarker = $panel === 'fbr' ? 'New FBR POS Sale' : ($landing === 'hotel_front_desk' ? 'Front Desk' : ($landing === 'service_work_orders' ? PosServiceWorkflowProfiles::forCompany($profileCompany)['noun'].' Board' : 'Current Order'));
+        $path = $panel === 'fbr' ? '/fbr-pos/billing' : ($landing === 'hotel_front_desk' ? '/pos/hotel'
+            : ($landing === 'service_work_orders' ? '/pos/work-orders' : '/pos/invoice/create'));
+        $nativeMarker = $panel === 'fbr' ? 'FBR POS Plans' : ($landing === 'hotel_front_desk' ? 'Front Desk' : ($landing === 'service_work_orders' ? PosServiceWorkflowProfiles::forCompany($profileCompany)['noun'].' Board' : 'Current Order'));
         $companyCategory = $company("Synthetic {$panel} {$category}", "category-{$panel}-{$category}@rc-browser.invalid", 'RCB'.str_pad((string) (600 + count($categoryJourneys)), 8, '0', STR_PAD_LEFT), $product, [
             'business_category' => $category, 'pos_type' => $category,
             'feature_flags' => PosFeatureService::defaultsForCategory($category),
-            'fbr_pos_enabled' => $panel === 'fbr', 'pos_setup_completed' => true,
+            'fbr_pos_enabled' => $panel === 'fbr', 'pos_module_extras' => [], 'pos_setup_completed' => true,
             'pos_integration_mode' => $panel === 'fbr' ? 'fbr' : 'pra',
         ]);
         $categoryUser = $user($companyCategory, "Synthetic {$category} owner", "category-user-{$panel}-{$category}@rc-browser.invalid", 'company_admin', 'pos_admin');
@@ -169,7 +170,8 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
             'loginPath' => $panel === 'fbr' ? '/fbr-pos/login' : '/pos/login', 'paths' => [$path],
             'expectedPaths' => [$path], 'markers' => [$nativeMarker], 'mainMarkers' => [$nativeMarker],
             'categoryCoverage' => ['panel' => $panel, 'category' => $category, 'landing' => $landing,
-                'mismatchPath' => $landing === 'service_work_orders' ? '/pos/hotel' : '/pos/work-orders'],
+                'mismatchPath' => $panel === 'fbr' ? '/fbr-pos/services' : ($landing === 'service_work_orders' ? '/pos/hotel' : '/pos/work-orders'),
+                'sameProductPositivePath' => $panel === 'fbr' ? ($category === 'pharmacy' ? '/fbr-pos/pharmacy/batches' : '/fbr-pos/stock') : null],
         ];
     }
 }

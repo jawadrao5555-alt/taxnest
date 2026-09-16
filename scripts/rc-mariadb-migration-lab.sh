@@ -37,6 +37,9 @@ LOG="$EVIDENCE_DIR/mariadb-${MODE}.log"
 exec > >(tee "$LOG") 2>&1
 
 CTL="$ROOT/scripts/rc-mariadb-lab.sh"
+GUARD="$(RC_NETWORK_GUARD_BUILD_DIR="$EVIDENCE_DIR/guard" bash "$ROOT/scripts/rc-network-build.sh")"
+[[ -r "$GUARD" ]] || fail 'loopback-only egress guard could not be built'
+export RC_MARIADB_LD_PRELOAD="$GUARD" RC_MARIADB_REQUIRE_EGRESS_GUARD=1
 cleanup(){ ((KEEP)) || bash "$CTL" stop || true; }
 trap cleanup EXIT
 bash "$CTL" start
@@ -50,10 +53,11 @@ clean_php() {
         DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT="$RC_MARIADB_PORT" DB_SOCKET="$SOCKET" DB_DATABASE="$DB_DATABASE" DB_USERNAME=root DB_PASSWORD='' DB_CONNECT_TIMEOUT=3 \
         HONOR_DATABASE_URL=0 CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync MAIL_MAILER=array BROADCAST_CONNECTION=null \
         TAXNEST_RC_NO_EXTERNAL_FISCAL=1 FBR_API_URL='' FBR_SANDBOX_URL='' FBR_PRODUCTION_URL='' FBR_TOKEN='' PRA_API_URL='' PRA_SANDBOX_URL='' PRA_PRODUCTION_URL='' PRA_TOKEN='' \
+        LD_PRELOAD="$GUARD" NO_PROXY='*' no_proxy='*' \
         RC_MARIADB_EVIDENCE_DIR="$EVIDENCE_DIR" \
         "$@"
 }
-mysql(){ "$CLIENT" --protocol=socket --socket="$SOCKET" -uroot "$@"; }
+mysql(){ env -i PATH="$PATH" HOME="$LAB_ROOT/home" TMPDIR="$LAB_ROOT/run" LANG=C LC_ALL=C TZ=UTC NO_PROXY='*' no_proxy='*' LD_PRELOAD="$GUARD" "$CLIENT" --protocol=socket --socket="$SOCKET" -uroot "$@"; }
 reset(){
     [[ "$1" =~ ^taxnest_rc_[a-z0-9_]+$ ]] || fail unsafe-db
     mysql -e "DROP DATABASE IF EXISTS \`$1\`; CREATE DATABASE \`$1\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"

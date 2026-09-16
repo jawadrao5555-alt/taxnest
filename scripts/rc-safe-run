@@ -12,9 +12,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 run_root="$ROOT"
 browser=0
 runtime_root=""
+browser_mariadb_root=""
 
 usage() {
-    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] -- command [args...]" >&2
+    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] [--mariadb-root DIR] -- command [args...]" >&2
     exit 2
 }
 
@@ -29,6 +30,11 @@ while (($#)); do
         --runtime)
             [[ $# -ge 2 && -n "$2" ]] || usage
             runtime_root="$2"
+            shift 2
+            ;;
+        --mariadb-root)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            browser_mariadb_root="$2"
             shift 2
             ;;
         --) shift; break ;;
@@ -49,11 +55,14 @@ for forbidden in \
     }
 done
 
-# Composer's package discovery and Laravel's test runner may leave PHP caches
-# in this directory. Running against one would make a clean-checkout result
-# dependent on a previous process, so fail closed instead of deleting it.
+# Laravel's application caches make a clean-checkout result depend on a previous
+# process. Composer's packages.php/services.php are dependency metadata created
+# during the approved install step, so they remain permitted.
 shopt -s nullglob
-cache_files=("$run_root"/bootstrap/cache/*.php "$run_root"/storage/framework/cache/data/*)
+cache_files=()
+for cache_file in "$run_root"/bootstrap/cache/config.php "$run_root"/bootstrap/cache/routes*.php "$run_root"/bootstrap/cache/events.php "$run_root"/storage/framework/cache/data/*; do
+    [[ -e "$cache_file" ]] && cache_files+=("$cache_file")
+done
 if ((${#cache_files[@]})); then
     echo "rc-safe-run: BLOCKED generated application cache; remove it before testing" >&2
     printf '  %s\n' "${cache_files[@]#"$ROOT"/}" >&2
@@ -125,7 +134,12 @@ envs=(
 )
 if ((browser)); then
     browser_state="$runtime_root/browser-state"
-    mariadb_root="$runtime_root/mariadb"
+    mariadb_root="${browser_mariadb_root:-$runtime_root/mariadb}"
+    mariadb_root="$(realpath -m "$mariadb_root")"
+    [[ "$mariadb_root" == /tmp/taxnest-rc-mariadb-browser-[0-9]* ]] || {
+        echo "rc-safe-run: BLOCKED non-browser MariaDB root" >&2
+        exit 2
+    }
     mkdir -p "$browser_state" "$mariadb_root"
     envs+=(
         "APP_ENV=rc-browser"

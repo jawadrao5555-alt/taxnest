@@ -92,6 +92,10 @@ function runWorkers(string $worker, array $arguments, int $count, bool $synchron
  */
 function runWorkerSpecs(array $specs, bool $synchronize = false): array
 {
+    $guard = (string) getenv('LD_PRELOAD');
+    if (!is_file($guard)) {
+        failDi('independent DI workers require the loopback-only egress guard');
+    }
     $env = [];
     foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
         if (is_string($key) && (is_string($value) || is_int($value) || is_float($value))) {
@@ -99,6 +103,7 @@ function runWorkerSpecs(array $specs, bool $synchronize = false): array
         }
     }
     $env['PATH'] = getenv('PATH') ?: '/usr/bin:/bin';
+    $env['LD_PRELOAD'] = $guard;
     $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
     $processes = [];
     $barrier = $synchronize ? tempnam(sys_get_temp_dir(), 'taxnest-rc-di-barrier-') : null;
@@ -166,6 +171,7 @@ assertDi(
     && (string) getenv('PRA_PRODUCTION_URL') === '',
     'clean process has no fiscal endpoint configured'
 );
+assertDi(is_file((string) getenv('LD_PRELOAD')), 'clean process and independent workers use the loopback-only egress guard');
 
 $companyId = makeDiCompany('CLAIM');
 $claimInvoiceId = makeDiInvoice($companyId, 'CLAIM');
@@ -293,17 +299,18 @@ assertDi(
     DB::table('invoice_bulk_submission_outbox')->where('batch_id', $outboxBatch->id)->count() === 2,
     'outbox rows committed with cursor advancement'
 );
-$jobsBefore = (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count();
+$bulkJobCount = fn (): int => (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->where('payload', 'like', '%BulkSubmitInvoiceJob%')->count();
+$jobsBefore = $bulkJobCount();
 [$outboxWorkers] = runWorkers(
     __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
-    [$outboxBatch->id],
+    [$outboxBatch->id, 'dispatch'],
     2,
     true
 );
 assertDi(
     $outboxWorkers === 2
     && DB::table('invoice_bulk_submission_outbox')->where('batch_id', $outboxBatch->id)->whereNotNull('dispatched_at')->count() === 2
-    && (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count() === $jobsBefore + 2,
+    && $bulkJobCount() === $jobsBefore + 2,
     'concurrent outbox dispatch enqueues each committed row once'
 );
 
@@ -321,25 +328,62 @@ $crashSeed = new SeedBulkSubmitBatchJob($crashBatch->id);
 $claimNextChunk = new ReflectionMethod($crashSeed, 'claimNextChunk');
 $claimNextChunk->setAccessible(true);
 $claimNextChunk->invoke($crashSeed);
-$claimOutbox = new ReflectionMethod($crashSeed, 'claimOutboxRows');
-$claimOutbox->setAccessible(true);
-$claimedOutbox = $claimOutbox->invoke($crashSeed);
-assertDi(count($claimedOutbox) === 1, 'crash-window fixture claimed but did not dispatch outbox row');
-DB::table('invoice_bulk_submission_outbox')->where('id', $claimedOutbox[0]->id)->update([
+$jobsBeforeCrash = $bulkJobCount();
+[$crashWorkers] = runWorkers(
+    __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
+    [$crashBatch->id, 'crash_after_enqueue'],
+    1,
+    true
+);
+$crashRow = DB::table('invoice_bulk_submission_outbox')->where('batch_id', $crashBatch->id)->first();
+assertDi(
+    $crashWorkers === 1
+    && $crashRow->dispatched_at === null
+    && $crashRow->dispatch_claim_token !== null
+    && $bulkJobCount() === $jobsBeforeCrash + 1,
+    'post-enqueue pre-mark crash leaves one leased row for at-least-once recovery'
+);
+$liveBefore = $bulkJobCount();
+[$liveWorkers] = runWorkers(
+    __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
+    [$crashBatch->id, 'dispatch'],
+    2,
+    true
+);
+assertDi(
+    $liveWorkers === 2
+    && $crashRow->dispatched_at === null
+    && $bulkJobCount() === $liveBefore,
+    'live outbox lease is not stolen by immediate retry'
+);
+DB::table('invoice_bulk_submission_outbox')->where('id', $crashRow->id)->update([
     'dispatch_claimed_at' => now()->subSeconds(SeedBulkSubmitBatchJob::OUTBOX_CLAIM_SECONDS + 1),
 ]);
-$jobsBeforeRecovery = (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count();
+$jobsBeforeRecovery = $bulkJobCount();
 [$recoveryWorkers] = runWorkers(
     __DIR__.'/../../tests/native/rc_di_outbox_dispatch_worker.php',
-    [$crashBatch->id],
+    [$crashBatch->id, 'dispatch'],
     2,
     true
 );
 assertDi(
     $recoveryWorkers === 2
-    && DB::table('invoice_bulk_submission_outbox')->where('id', $claimedOutbox[0]->id)->whereNotNull('dispatched_at')->exists()
-    && (int) DB::table('jobs')->where('queue', BulkSubmitInvoiceJob::QUEUE)->count() === $jobsBeforeRecovery + 1,
-    'expired outbox claim recovers crash window without duplicate queue hand-off'
+    && DB::table('invoice_bulk_submission_outbox')->where('id', $crashRow->id)->whereNotNull('dispatched_at')->exists()
+    && $bulkJobCount() === $jobsBeforeRecovery + 1,
+    'expired outbox claim replays one at-least-once hand-off'
+);
+[$downstreamWorkers] = runWorkers(
+    __DIR__.'/../../tests/native/rc_di_bulk_result_worker.php',
+    [$crashBatch->id, $crashInvoice],
+    2,
+    true
+);
+$crashBatch->refresh();
+assertDi(
+    $downstreamWorkers === 2
+    && (int) $crashBatch->done === 1
+    && DB::table('invoice_bulk_submission_results')->where('batch_id', $crashBatch->id)->where('invoice_id', $crashInvoice)->count() === 1,
+    'at-least-once outbox replay reaches one downstream fiscal result'
 );
 
 printf(

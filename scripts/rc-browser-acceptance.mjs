@@ -31,11 +31,24 @@ async function login(page,t) {
   await Promise.all([page.waitForURL(u=>!u.pathname.endsWith(t.loginPath),{timeout:30000}).catch(()=>null),p.press('Enter')]);
   if (page.url().endsWith(t.loginPath)) throw new Error(`${t.name}: authentication remained on login page`);
 }
+async function checkUsability(page,t,path,v) {
+  const width=await page.evaluate(()=>Math.max(document.documentElement.scrollWidth,document.body.scrollWidth));
+  if(width>v.width+2) fail(`${t.name}/${v.width}: horizontal overflow (${width}px)`);
+  for(const text of t.absenceMarkers||[])if((await page.locator('body').innerText()).includes(text))fail(`${t.name}/${v.width}: forbidden control rendered: ${text}`);
+  for(const mutation of t.blockedMutationPaths||[])if(await page.locator(`[href="${mutation}"],form[action="${mutation}"]`).count())fail(`${t.name}/${v.width}: mutation route rendered`);
+  for(const selector of t.usableSelectors||[]){
+    const el=page.locator(selector).first();
+    if(!await el.count()) { fail(`${t.name}/${v.width}: required usable control missing: ${selector}`); continue; }
+    await el.scrollIntoViewIfNeeded();
+    const box=await el.boundingBox();
+    if(!box||box.width<20||box.height<12||box.width>v.width+2)fail(`${t.name}/${v.width}: unusable control ${selector}`);
+  }
+}
 async function surface(page,t,path,v) {
   if (path.endsWith('.csv')) {
     if (t.denied) {
       const status=await page.evaluate(async p=>(await fetch(p,{credentials:'same-origin'})).status,path);
-      if (![302,401,403].includes(status)) fail(`${t.name}/${v.width}: denied CSV unexpectedly returned ${status}`); else pass(`${t.name}/${v.width}: denied CSV stayed denied`);
+      if (![302,401,403].includes(status)) fail(`${t.name}/${v.width}: denied CSV unexpectedly returned ${status}`); else pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied CSV stayed denied`);
       return;
     }
     const [dl]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.evaluate(p=>location.assign(p),path)]);
@@ -45,10 +58,10 @@ async function surface(page,t,path,v) {
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000}); await dismiss(page);
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
-  if (t.denied) { if ([302,403].includes(status)||page.url().includes('/login')||page.url().includes('/dashboard')) pass(`${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
+  if (t.denied) { if ([302,403].includes(status)||page.url().includes('/login')||page.url().includes('/dashboard')) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);
   if (!(t.markers||[]).some(x=>body.includes(x))) fail(`${t.name}/${v.width}: ${path} omitted every declared marker`); else pass(`${t.name}/${v.width}: ${path} rendered`);
-  const width=await page.evaluate(()=>Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)); if(width>v.width+2) fail(`${t.name}/${v.width}: horizontal overflow (${width}px)`);
+  await checkUsability(page,t,path,v);
 }
 async function workflow(page,t,v) {
   const f=t.serviceWorkflow; if(!f)return;
@@ -62,7 +75,7 @@ async function workflow(page,t,v) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);for(const text of t.absenceMarkers||[])if((await p.locator('body').innerText()).includes(text))fail(`${t.name}/${label}: forbidden control rendered: ${text}`); for(const path of t.blockedMutationPaths||[])if(await p.locator(`[href="${path}"],form[action="${path}"]`).count())fail(`${t.name}/${label}: mutation route rendered`); if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`); }
+  try { await login(p,t); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);if(d.consoleErrors.length)fail(`${t.name}/${label}: console error ${d.consoleErrors[0]}`);if(d.failedRequests.length)fail(`${t.name}/${label}: failed request ${d.failedRequests[0]}`);const unexpectedHttp=d.httpErrors.filter(x=>!t.denied||!t.paths?.some(path=>x.url===baseUrl+path));if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

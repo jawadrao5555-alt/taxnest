@@ -541,7 +541,7 @@
             <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6" x-data="{ editingFbr: false, fbrNum: '{{ $invoice->fbr_invoice_number ?? '' }}' }">
                 <div class="flex items-start gap-3">
                     <svg class="w-6 h-6 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <div class="flex-1">
+                    <div class="flex-1 min-w-0">
                         <p class="text-sm font-bold text-emerald-800">
                             FBR {{ $invoice->fiscal_submission_environment === 'sandbox' ? 'Sandbox acknowledgement' : 'Accepted' }} — Invoice Locked
                         </p>
@@ -584,32 +584,32 @@
             <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <div class="flex items-start gap-3">
                     <svg class="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-                    <div class="flex-1">
+                    <div class="flex-1 min-w-0">
                         <p class="text-sm font-bold text-amber-800">Pending FBR Verification</p>
                         <p class="mt-1 text-sm text-amber-700">The regulator outcome is unknown. This invoice is deliberately protected from retry, editing, deletion, and fiscal re-posting until a portal check is recorded.</p>
                         @if(in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                        <div class="mt-3 space-y-3">
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-wrap items-end gap-2">
+                        <div class="mt-3 space-y-3 min-w-0">
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-2">
                                 @csrf
                                 <input type="hidden" name="action" value="confirm">
-                                <div>
+                                <div class="min-w-0 w-full sm:w-64">
                                     <label class="block text-xs font-medium text-amber-800 mb-1">FBR Invoice Number (from portal)</label>
-                                    <input required minlength="5" type="text" name="fbr_invoice_number" placeholder="e.g. 3620291786117DIA..." class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 w-64">
+                                    <input required minlength="5" type="text" name="fbr_invoice_number" placeholder="e.g. 3620291786117DIA..." class="w-full min-w-0 px-3 py-1.5 text-xs border border-amber-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
-                                <div>
+                                <div class="min-w-0 w-full sm:w-72">
                                     <label class="block text-xs font-medium text-amber-800 mb-1">Portal verification note</label>
-                                    <input required minlength="10" type="text" name="verification_reason" placeholder="What was verified? (min. 10 characters)" class="px-3 py-1.5 text-xs border border-amber-300 rounded-lg w-72">
+                                    <input required minlength="10" type="text" name="verification_reason" placeholder="What was verified? (min. 10 characters)" class="w-full min-w-0 px-3 py-1.5 text-xs border border-amber-300 rounded-lg">
                                 </div>
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition">Portal confirms acceptance</button>
+                                <button type="submit" class="inline-flex w-full items-center justify-center px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition sm:w-auto">Portal confirms acceptance</button>
                             </form>
-                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-wrap items-end gap-2">
+                            <form method="POST" action="/invoice/{{ $invoice->id }}/confirm-fbr" class="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-2">
                                 @csrf
                                 <input type="hidden" name="action" value="reject">
-                                <div>
+                                <div class="min-w-0 w-full sm:w-72">
                                     <label class="block text-xs font-medium text-amber-800 mb-1">Portal verification note</label>
-                                    <input required minlength="10" type="text" name="verification_reason" placeholder="Explain the portal search (min. 10 characters)" class="px-3 py-1.5 text-xs border border-red-300 rounded-lg w-72">
+                                    <input required minlength="10" type="text" name="verification_reason" placeholder="Explain the portal search (min. 10 characters)" class="w-full min-w-0 px-3 py-1.5 text-xs border border-red-300 rounded-lg">
                                 </div>
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition">Portal shows no acceptance — return to draft</button>
+                                <button type="submit" class="inline-flex w-full items-center justify-center px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition sm:w-auto">Portal shows no acceptance — return to draft</button>
                             </form>
                         </div>
                         @endif

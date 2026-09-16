@@ -20,6 +20,41 @@ function indexCheck(PDO $pdo, string $database, string $table, string $index, ar
     $q->execute([$database, $table, $index]); $rows=$q->fetchAll(PDO::FETCH_ASSOC);
     if (!$rows || array_column($rows, 'column_name') !== $want || (((int)$rows[0]['non_unique'] === 0) !== $unique)) failSchema("index mismatch $table.$index");
 }
+function quoteIdentifier(string $name): string {
+    return '`'.str_replace('`', '``', $name).'`';
+}
+function orphanCheck(PDO $pdo, string $database): int {
+    $sql = 'SELECT k.constraint_name,k.table_name,k.column_name,k.referenced_table_name,k.referenced_column_name,k.ordinal_position
+        FROM information_schema.key_column_usage k
+        WHERE k.table_schema=? AND k.referenced_table_schema=? AND k.referenced_table_name IS NOT NULL
+        ORDER BY k.constraint_name,k.ordinal_position';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$database, $database]);
+    $constraints = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $key = $row['table_name'].'|'.$row['constraint_name'];
+        $constraints[$key][] = $row;
+    }
+    foreach ($constraints as $columns) {
+        $child = quoteIdentifier($columns[0]['table_name']);
+        $parent = quoteIdentifier($columns[0]['referenced_table_name']);
+        $on = [];
+        $present = [];
+        foreach ($columns as $column) {
+            $on[] = 'c.'.quoteIdentifier($column['column_name']).'=p.'.quoteIdentifier($column['referenced_column_name']);
+            $present[] = 'c.'.quoteIdentifier($column['column_name']).' IS NOT NULL';
+        }
+        $parentKey = quoteIdentifier($columns[0]['referenced_column_name']);
+        $orphans = (int) $pdo->query(
+            'SELECT COUNT(*) FROM '.$child.' c LEFT JOIN '.$parent.' p ON '.implode(' AND ', $on)
+            .' WHERE '.implode(' AND ', $present).' AND p.'.$parentKey.' IS NULL'
+        )->fetchColumn();
+        if ($orphans !== 0) {
+            failSchema('orphan rows for '.$columns[0]['table_name'].'.'.$columns[0]['constraint_name']);
+        }
+    }
+    return count($constraints);
+}
 $required = [
     'companies'=>['id'], 'branches'=>['id','company_id'],
     'invoices'=>['id','company_id','invoice_number','fiscal_submission_state'],
@@ -44,10 +79,11 @@ indexCheck($pdo,$database,'fbr_day_close_reports','fbr_day_close_reports_company
 indexCheck($pdo,$database,'inventory_stocks','inventory_stocks_product_id_foreign',['product_id'],false);
 indexCheck($pdo,$database,'invoice_import_batches','invoice_import_batches_status_index',['status'],false);
 indexCheck($pdo,$database,'job_batches','PRIMARY',['id'],true);
+$foreignKeyCount=orphanCheck($pdo,$database);
 $files=glob(__DIR__.'/../../database/migrations/*.php') ?: [];
 $ledger=$pdo->query('SELECT migration FROM migrations')->fetchAll(PDO::FETCH_COLUMN);
 if (count($files) !== count($ledger) || array_diff(array_map(fn($p)=>basename($p,'.php'),$files),$ledger)) failSchema('migration ledger does not equal filesystem migrations');
 $manifest=json_decode((string)file_get_contents(__DIR__.'/../../database/schema-manifest.json'),true);
 $manifestTables=is_array($manifest['tables'] ?? null) ? count($manifest['tables']) : 0;
 $tableCount=(int)$pdo->query('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()')->fetchColumn();
-printf("PASS: manifest tables=%d, migrated tables=%d, migration ledger=%d, integrity indexes=7\n",$manifestTables,$tableCount,count($ledger));
+printf("PASS: manifest tables=%d, migrated tables=%d, migration ledger=%d, integrity indexes=7, foreign-key orphan checks=%d\n",$manifestTables,$tableCount,count($ledger),$foreignKeyCount);

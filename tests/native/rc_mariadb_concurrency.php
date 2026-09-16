@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 $db=getenv('DB_DATABASE')?:''; $socket=getenv('DB_SOCKET')?:'';
-if ($db !== 'taxnest_rc_migration' || !str_starts_with($socket,'/tmp/taxnest-rc-mariadb-')) { fwrite(STDERR,"FAIL unsafe target\n"); exit(2); }
+if (!preg_match('/^taxnest_rc_[a-z0-9_]+_full$/', $db) || !str_starts_with($socket,'/tmp/taxnest-rc-mariadb-')) { fwrite(STDERR,"FAIL unsafe target\n"); exit(2); }
 $pdo=new PDO("mysql:unix_socket=$socket;dbname=$db",'root','',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
 $pdo->exec('CREATE TABLE IF NOT EXISTS rc_native_stock_lock (id BIGINT PRIMARY KEY, quantity INT NOT NULL) ENGINE=InnoDB');
 $pdo->exec('DELETE FROM rc_native_stock_lock'); $pdo->exec('INSERT INTO rc_native_stock_lock VALUES (1,10)');

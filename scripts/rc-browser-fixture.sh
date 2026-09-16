@@ -38,7 +38,10 @@ setup() {
   SOCKET="$LAB_ROOT/run/mariadb.sock"; [[ -S "$SOCKET" ]] || fail 'MariaDB socket absent'; configure_app; cd "$ROOT"
   CLIENT="$(bash "$LAB_CTL" env | awk -F= '$1=="RC_MARIADB_CLIENT"{print substr($0,index($0,"=")+1)}')"
   "$CLIENT" --protocol=socket --socket="$SOCKET" -uroot -e "DROP DATABASE IF EXISTS \`$DATABASE\`; CREATE DATABASE \`$DATABASE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-  php artisan migrate --force --no-interaction; php scripts/rc-browser-fixture-seed.php; php scripts/rc-di-browser-fixture.php; start_server
+  RC_BROWSER_FIXTURE_FRESH=1 php artisan migrate --force --no-interaction
+  RC_BROWSER_FIXTURE_FRESH=1 php scripts/rc-browser-fixture-seed.php
+  php scripts/rc-di-browser-fixture.php
+  start_server
   printf 'RC_BROWSER_FIXTURE=%s\n' "$FIXTURE"
 }
 resume() {

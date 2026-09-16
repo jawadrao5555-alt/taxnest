@@ -6,8 +6,8 @@ ROOT="$(realpath -m "${RC_MARIADB_ROOT:-/tmp/taxnest-rc-mariadb-${UID}}")"
 PORT="${RC_MARIADB_PORT:-33116}"
 SERVER="${RC_MARIADBD:-${RC_MARIADB_SERVER:-}}"
 if [[ -z "$SERVER" ]]; then SERVER="$(command -v mariadbd 2>/dev/null || command -v mysqld 2>/dev/null || true)"; fi
-CLIENT="$(dirname "$SERVER")/mariadb"
-ADMIN="$(dirname "$SERVER")/mariadb-admin"
+CLIENT="${RC_MARIADB_CLIENT:-$(command -v mariadb 2>/dev/null || command -v mysql 2>/dev/null || true)}"
+ADMIN="${RC_MARIADB_ADMIN:-$(command -v mariadb-admin 2>/dev/null || command -v mysqladmin 2>/dev/null || true)}"
 DATA="$ROOT/data"; RUN="$ROOT/run"; LOG="$ROOT/log"; SOCKET="$RUN/mariadb.sock"; PID="$RUN/mariadb.pid"; CNF="$ROOT/my.cnf"
 
 fail() { printf 'rc-mariadb-lab: %s\n' "$*" >&2; exit 1; }

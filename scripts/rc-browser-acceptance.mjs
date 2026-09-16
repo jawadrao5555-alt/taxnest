@@ -21,14 +21,18 @@ async function dismiss(page) {
   // Announcement and survey components are mounted after the initial Alpine tick.
   await page.waitForTimeout(350);
   for (let i=0;i<8;i++) {
-    const fbrChoice=page.locator('[data-fbr-decision-card]:visible').locator('xpath=.//button[contains(@click, "fdChoose(\'without_fbr\')")]').first();
+    const fbrChoice=page.locator('[data-fbr-decision-card]:visible').locator(`xpath=.//button[contains(@*[name()="@click"], "fdChoose('without_fbr')")]`).first();
     if (await fbrChoice.count()) {
       await fbrChoice.click();
+      // The decision is persisted asynchronously and then reloads. Waiting only
+      // for the current load state races that reload on mobile; wait until this
+      // actual blocking card is no longer visible before any sale control click.
+      await page.locator('[data-fbr-decision-card]').waitFor({state:'hidden',timeout:15000}).catch(()=>{});
       await page.waitForLoadState('domcontentloaded').catch(()=>{});
-      await page.waitForTimeout(350);
+      await page.waitForTimeout(500);
       continue;
     }
-    const whatsNew=page.locator('[x-show="wnOpen"]:visible').locator('xpath=.//button[contains(@click, "wnDismiss")]').first();
+    const whatsNew=page.locator('[x-show="wnOpen"]:visible').locator(`xpath=.//button[contains(@*[name()="@click"], "wnDismiss")]`).first();
     if (await whatsNew.count()) {
       await whatsNew.click();
       await page.waitForTimeout(300);
@@ -76,6 +80,30 @@ async function checkUsability(page,t,path,v) {
     await el.scrollIntoViewIfNeeded();
     const box=await el.boundingBox();
     if(!box||box.width<20||box.height<12||box.width>v.width+2)fail(`${t.name}/${v.width}: unusable control ${selector}`);
+    if(t.name==='fiscal'||t.readOnly) {
+      try { await el.click({trial:true,timeout:5000}); }
+      catch { fail(`${t.name}/${v.width}: sale control is not pointer-actionable: ${selector}`); }
+    }
+  }
+  if(t.readOnly) {
+    const title=page.locator('main #invoice-heading');
+    const titleBox=await title.boundingBox();
+    if(!titleBox||titleBox.width<120||titleBox.height<18)fail(`${t.name}/${v.width}: invoice title is not usefully readable`);
+    const invoiceContent=page.locator('main table').first();
+    const contentBox=await invoiceContent.boundingBox();
+    const actions=page.locator('main a,main button').filter({hasText:/Duplicate|Download|Email|WhatsApp/i});
+    for(let i=0;i<await actions.count();i++) {
+      const action=actions.nth(i);
+      if(!await action.isVisible())continue;
+      const box=await action.boundingBox();
+      const position=await action.evaluate(el=>getComputedStyle(el).position);
+      if(position==='fixed'||(box&&contentBox&&box.x<contentBox.x+contentBox.width&&box.x+box.width>contentBox.x&&box.y<contentBox.y+contentBox.height&&box.y+box.height>contentBox.y)) {
+        fail(`${t.name}/${v.width}: invoice action toolbar overlaps document content`);
+        break;
+      }
+      try { await action.click({trial:true,timeout:5000}); }
+      catch { fail(`${t.name}/${v.width}: invoice action is not pointer-actionable`); break; }
+    }
   }
 }
 async function surface(page,t,path,v) {

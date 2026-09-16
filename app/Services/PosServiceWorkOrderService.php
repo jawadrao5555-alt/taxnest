@@ -25,6 +25,7 @@ class PosServiceWorkOrderService
         $quantity = max(0.001, (float) ($data['quantity'] ?? 1));
         $unitPrice = max(0, (float) ($data['unit_price'] ?? ($service?->price ?? 0)));
         $details = $this->filterDetails($profile, $data['details'] ?? []);
+        $this->assertRequiredDetails($profile, $details);
 
         return $this->transactionWithRetry(function () use ($company, $profile, $data, $branchId, $actorId, $service, $quantity, $unitPrice, $details) {
             $now = now();
@@ -116,6 +117,16 @@ class PosServiceWorkOrderService
         }
 
         return $out;
+    }
+
+    private function assertRequiredDetails(array $profile, array $details): void
+    {
+        foreach (PosServiceWorkflowProfiles::requiredFields($profile) as $key) {
+            if (trim((string) ($details[$key] ?? '')) === '') {
+                $label = $profile['fields'][$key] ?? $key;
+                throw new InvalidArgumentException("{$label} is required for this {$profile['noun']}.");
+            }
+        }
     }
 
     private function transactionWithRetry(callable $callback)

@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Models\Company;
 use App\Services\PosCategoryProfiles;
 use App\Services\PosFeatureService;
+use App\Services\PosServiceWorkflowProfiles;
 use App\Support\PosVocabulary;
 use Tests\TestCase;
 
@@ -115,6 +116,44 @@ class PosCategoryProfilesTest extends TestCase
         foreach (array_keys(PosCategoryProfiles::PROFILES) as $cat) {
             $this->assertContains($cat, PosCategoryProfiles::requiredCategories(), "Profile '{$cat}' names a category no panel offers");
         }
+    }
+
+    /**
+     * Generated release gate: a new marketed profile cannot be "just a label".
+     * It must name an owned landing surface, vocabulary family, module policy,
+     * workflow engine and an existing regression fixture. Service verticals
+     * additionally must be executable by the shared typed work-order engine.
+     */
+    public function test_every_marketed_profile_has_a_complete_native_coverage_contract(): void
+    {
+        $marketed = PosCategoryProfiles::marketedCategories();
+        $this->assertCount(46, $marketed, '46 commercial profiles are marketed; general is fallback only.');
+        $this->assertNotContains('general', $marketed);
+
+        foreach ($marketed as $category) {
+            $profile = PosCategoryProfiles::profile($category);
+            $this->assertNotEmpty($profile['family'], "{$category}: vocabulary family missing");
+            $this->assertNotEmpty($profile['landing'], "{$category}: landing surface missing");
+            $this->assertNotEmpty($profile['workflow'], "{$category}: workflow classification missing");
+            $this->assertNotEmpty($profile['modules'], "{$category}: module policy missing");
+            $this->assertFileExists(base_path($profile['regression_fixture']), "{$category}: regression fixture missing");
+
+            if ($profile['workflow'] === 'typed_work_order') {
+                $workflow = PosServiceWorkflowProfiles::PROFILES[$category] ?? null;
+                $this->assertNotNull($workflow, "{$category}: service workflow profile missing");
+                $this->assertNotEmpty($workflow['noun']);
+                $this->assertNotEmpty($workflow['fields']);
+                $this->assertNotEmpty($workflow['stages']);
+                $this->assertNotEmpty($workflow['terminal']);
+            } else {
+                $this->assertArrayNotHasKey($category, PosServiceWorkflowProfiles::PROFILES, "{$category}: must stay in its owned engine");
+            }
+        }
+
+        $fallback = PosCategoryProfiles::profile('general');
+        $this->assertSame('catalogue_billing', $fallback['landing']);
+        $this->assertSame('catalogue_billing_fallback', $fallback['workflow']);
+        $this->assertArrayNotHasKey('general', PosServiceWorkflowProfiles::PROFILES);
     }
 
     public function test_every_family_has_its_nouns_in_all_three_languages(): void

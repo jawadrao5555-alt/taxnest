@@ -30,7 +30,7 @@ class HotelShell
 
     public static function isNativeCategory(?Company $company): bool
     {
-        return ($company->business_category ?? '') === 'hotel' && self::roomsOn($company);
+        return PosFeatureService::profileCategory($company) === 'hotel' && self::roomsOn($company);
     }
 
     /**
@@ -103,7 +103,7 @@ class HotelShell
         $company = $user->relationLoaded('company')
             ? $user->company
             : Company::find($user->company_id);
-        if (($company->business_category ?? '') !== 'hotel' || !self::roomsOn($company)) {
+        if (!self::isNativeCategory($company)) {
             return '/pos/invoice/create';
         }
         if (HotelAccessService::canFrontDesk($user)) {

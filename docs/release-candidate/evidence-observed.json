@@ -56,5 +56,16 @@
     "credential_status_observed_utc": "2026-09-16T10:38:33Z",
     "credential_value_exposed": false
   },
+  "post_recovery_checks": {
+    "locked_root_dependencies_installed": 173,
+    "semantic_proposed_ci_dag": "passed",
+    "build_agent_yaml_parse": "passed for active file and proposal",
+    "network_guard_tcp_udp_dns": "passed",
+    "network_guard_loopback_resolution_control": "passed",
+    "network_guard_observed_utc": "2026-09-16T11:17:38Z",
+    "repository_artifact_guard": "passed",
+    "repository_artifact_guard_observed_utc": "2026-09-16T11:21:00Z",
+    "full_native_browser_recertification": false
+  },
   "production_actions_executed": false
 }

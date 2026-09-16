@@ -20,7 +20,7 @@ Historical observations are not fresh certification:
 - Earlier regular Hotel/Admin/Service/Health/FBR checks had partial pass
   observations; raw logs/screenshots are lost and these must be treated as
   unconfirmed.
-- Historical `5014` assertions / exit 0 remains an observed prior result only;
+- Historical `5014` tests / `39265` assertions / exit 0 remains an observed prior result only;
   the reconstructed harness has **not** been recertified.
 
 ## Explicit missing artifacts
@@ -33,8 +33,13 @@ production-oriented seeders. Native bulk MariaDB logs/results, full PHPUnit,
 dependency audit, build/manifest, and browser evidence also require fresh
 authorized runs.
 
-Only bounded source syntax checks were performed after reconstruction; no
-server, database, dependency install, workflow, full suite, or browser run was
-started during recovery. The semantic proposed-DAG check requires the locked
-`js-yaml` dependency; this recovered worktree has no `node_modules`, so it
-correctly reports `BLOCKED` until a fresh authorized `npm ci` verification.
+Post-recovery verification installed the unchanged root lockfile in the
+isolated worktree (`npm ci --ignore-scripts`, 173 packages). The semantic
+proposed-DAG check passed with locked `js-yaml`; both build-agent workflow
+copies parsed successfully. A freshly compiled network guard denied
+non-loopback TCP, UDP and DNS resolution while allowing loopback resolution
+at 11:17:38 UTC. The repository artifact guard passed at 11:21 UTC.
+
+These are current, bounded checks—not a recertified browser/native/full-suite
+result. No server, database, workflow, full suite or browser was started during
+recovery. The explicit blocking seed/native gates remain unresolved.

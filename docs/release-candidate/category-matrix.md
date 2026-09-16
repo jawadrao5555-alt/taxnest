@@ -1,10 +1,12 @@
 # TaxNest marketed category matrix
 
-**Recovery state:** reconstructed from the retained `PosCategoryProfiles`
-source after the temporary worktree loss. The rows below are the exact
+**Recovery state:** recovered from `PosCategoryProfiles` at code/tooling
+checkpoint `75466819e4b5bcefff37b28fbd51d8f8d0025721` after the temporary
+worktree loss. The rows below are the exact
 advertised profiles in that source: **46 commercial categories plus the
-non-commercial `general` fallback**. This table is a source contract, not
-current native/browser acceptance.
+non-commercial `general` fallback**. This table is a source contract; native
+category verification is explicitly **BLOCKED** after loss and this is not
+current browser/native acceptance.
 
 | # | Category | Family | Landing surface | Workflow classification | Regression fixture |
 |---:|---|---|---|---|---|

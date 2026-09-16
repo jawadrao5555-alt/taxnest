@@ -9,16 +9,17 @@ evidence index, not proof that lost raw logs or uncommitted files remain.
 | Item | Retained value |
 |---|---|
 | Audited remote `main` baseline | `0677abbc3fec912b3011dd6449be6a17263db84d` |
-| Restored pushed head | `93de2ccf` |
+| Code/tooling checkpoint | `75466819e4b5bcefff37b28fbd51d8f8d0025721` |
+| Last pre-loss checkpoint | `93de2ccf` (historical reference only; not current head) |
 | Worktree | `/tmp/taxnest-maturity-rc` |
 | Branch | `replit/taxnest-full-maturity-rc-20260916` |
 | Draft PR | [#82](https://github.com/jawadrao5555-alt/taxnest/pull/82), remains Draft |
-| Recovery loss | Temporary worktree and raw logs lost 11:04–11:06 UTC; committed code restored |
+| Recovery loss | Temporary worktree and raw logs lost 11:04–11:06 UTC; full working code and guards recovered at the code/tooling checkpoint |
 | Production boundary | No production query, fiscal submission, workflow dispatch, merge, release or deployment |
 
 The baseline is an audited remote-main reference, not a claim about the current
-production SHA. The reconstructed harness is not recertified from historical
-counts alone.
+production SHA. Full working application code and guards are recovered, not
+docs-only. The global harness is not recertified from historical counts alone.
 
 ## Requirement-to-evidence map
 
@@ -27,7 +28,7 @@ counts alone.
 | DI acknowledgement, provenance and timeout | `app/Services/DiFiscalSubmissionState.php`; DI controllers/jobs; additive migrations | DI focused `35/169`; historical final suite exit `0` | Reduced; DI 12-assertion shell timeout indeterminate |
 | PRA lock, claim and day-close | PRA integration/service/controller paths | Separate `22/168` settings regression at 10:58:17; generic lock/fiscal claim native exit `0` | Reduced; later DI bulk race not executed |
 | FBR errors and redaction | `FbrPosController`; `FbrService`; FBR feature tests | Historical focused FBR evidence and suite observation | Reduced; raw logs lost |
-| Dependency and artifact safety | lockfiles; repository guards; artifact tests | Historical Composer/root npm/PRA audits `0`; artifact fix recorded | Reduced; current guard not recertified |
+| Dependency and artifact safety | lockfiles; repository guards; artifact tests | Historical Composer/root npm/PRA audits `0`; current npm CI locked `173` packages | Reduced; fresh compiled TCP+UDP+DNS non-loopback denial/control passed 11:17:38 |
 | Hotel canonical category | `HotelShell`; layout/banner; Hotel tests | Historical Hotel/service runs; browser first pass `9` failures | Reduced; corrected browser rerun unconfirmed |
 | Category engines | `PosCategoryProfiles`; service workflow profiles | Exact 46 commercial + `general` matrix; category-native lab exit `0` | Reduced; browser/native acceptance pending |
 | Service workflows | service profile/controller/service/views | Historical typed workflow evidence | Reduced; current reconstructed harness unrecertified |
@@ -38,8 +39,27 @@ counts alone.
 | DI shell and bulk race | DI assertion runner and bulk-result race harness | `12 assertions / 0 failures` printed, outer `ShellExec` timed out; later bulk race not executed | Blocked; exit indeterminate and race gap remains |
 | Health/Hospital | Health controllers/middleware/tests | Historical `416/2261`, including HR tests | Reduced; no-hospital-pilot coverage separate |
 | Backup/recovery | operations scripts and artifacts | Native encrypted restore 10:28:27; 2 accounts/3 invoices/integrity/tamper rejection | Reduced; raw logs lost; production restore not run |
-| CI/browser/workflow | safe-run/network/browser helpers and workflow proposals | Historical full suite exit `0`; first browser pass `9` failures | Blocked; current harness and corrected rerun unconfirmed |
+| CI/browser/workflow | safe-run/network/browser helpers and workflow proposals | Semantic proposed CI DAG pass; both build-workflow YAML files parse; actual `pr-checks` remains baseline | Blocked; fresh browser seed is blocked and global harness is not recertified |
 | Deployment/release | manifests, artifact inventory, rollback/runbooks | Draft PR only; no activation/merge/release | Blocked pending approvals and fresh evidence |
+
+## Current post-recovery gate state
+
+- npm CI locked `173` packages.
+- Semantic proposed CI DAG validation passed.
+- Both build-workflow YAML files parsed successfully. The complete proposed DAG
+  intentionally fails blocked jobs; actual `.github/workflows/pr-checks.yml`
+  remains baseline. The full build workflow is recovered but held local-only
+  by scope.
+- Fresh compiled guard TCP + UDP + DNS non-loopback denial/control passed at
+  `11:17:38`.
+- Global harness is **NOT RECERTIFIED**. Fresh browser seed is explicitly
+  **BLOCKED** executable; native DI, category-native and skipped-case
+  verification modes are explicitly **BLOCKED** after loss. Missing original
+  harness segments were not recovered.
+- Retained browser observations: service create→transition→invoice passed on
+  desktop/mobile; DI pending roles rendered on both; actual mobile overflow was
+  observed at `570px/390px`; denied CSV handling and the mobile outlet marker
+  remain unresolved. No green whole-browser pass exists.
 
 ## Immutable R findings
 
@@ -94,7 +114,7 @@ The retained historical final suite result was:
 - exit `0`
 - JUnit SHA-256
   `cc045d97d8501c054820fda8c7ec8f8380c34c591d57642600d7541df415a5bb`
-- summary path `evidence/release-suite-summary.json`
+- committed observation record [`evidence-observed.json`](evidence-observed.json)
 
 This is an observed historical result. Raw logs are gone and the recreated
 harness is not recertified. The separate `PosDayCloseAutoFinalizeTest`

@@ -81,6 +81,10 @@ jobs:
         env:
           RC_MARIADB_PORT: '33116'
         run: bash scripts/rc-safe-run -- bash scripts/rc-mariadb-migration-lab.sh --all
+      - name: Run required MariaDB-only supplemental probes
+        env:
+          RC_MARIADB_PORT: '33116'
+        run: bash scripts/rc-mariadb-supplemental.sh
 
   browserdesktopmobile:
     name: Browser acceptance at desktop and 390px mobile

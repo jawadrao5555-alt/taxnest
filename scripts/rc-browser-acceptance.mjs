@@ -17,31 +17,50 @@ let failures = 0; const fail = m => { failures++; console.error(`FAIL: ${m}`); }
 const views = [['desktop', { width: 1366, height: 900 }], ['mobile', { width: 390, height: 844 }]];
 const loopback = host => ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host);
 function valid(t) { if (!String(t.login).endsWith('.invalid') || !t.password || !t.loginPath?.startsWith('/')) throw new Error(`${t.name}: reserved synthetic credentials and relative login required`); }
+async function dismissOverlay(overlay, action, label, hiddenTimeout=5000) {
+  if (!await overlay.isVisible()) return false;
+  try {
+    await action.click({timeout:3000});
+  } catch (error) {
+    // Alpine may remove an observed control between locator resolution and the
+    // pointer action. That is only acceptable when the corresponding real
+    // overlay has actually become hidden; a visible/covered overlay remains an
+    // assertion failure and retains the original click error.
+    try {
+      await overlay.waitFor({state:'hidden',timeout:1500});
+      return true;
+    } catch {
+      throw new Error(`${label} remained visible after its dismissal action failed: ${error.message}`);
+    }
+  }
+  await overlay.waitFor({state:'hidden',timeout:hiddenTimeout});
+  return true;
+}
 async function dismiss(page) {
   // Announcement and survey components are mounted after the initial Alpine tick.
   await page.waitForTimeout(350);
   for (let i=0;i<8;i++) {
-    const fbrChoice=page.locator('[data-fbr-decision-card]:visible').locator(`xpath=.//button[contains(@*[name()="@click"], "fdChoose('without_fbr')")]`).first();
-    if (await fbrChoice.count()) {
-      await fbrChoice.click();
+    const fbrCard=page.locator('[data-fbr-decision-card]:visible').first();
+    const fbrChoice=fbrCard.locator(`xpath=.//button[contains(@*[name()="@click"], "fdChoose('without_fbr')")]`).first();
+    if (await dismissOverlay(fbrCard,fbrChoice,'FBR integration decision',15000)) {
       // The decision is persisted asynchronously and then reloads. Waiting only
       // for the current load state races that reload on mobile; wait until this
       // actual blocking card is no longer visible before any sale control click.
-      await page.locator('[data-fbr-decision-card]').waitFor({state:'hidden',timeout:15000}).catch(()=>{});
       await page.waitForLoadState('domcontentloaded').catch(()=>{});
       await page.waitForTimeout(500);
       continue;
     }
-    const whatsNew=page.locator('[x-show="wnOpen"]:visible').locator(`xpath=.//button[contains(@*[name()="@click"], "wnDismiss")]`).first();
-    if (await whatsNew.count()) {
-      await whatsNew.click();
+    const whatsNewOverlay=page.locator('[x-show="wnOpen"]:visible').first();
+    const whatsNew=whatsNewOverlay.locator(`xpath=.//button[contains(@*[name()="@click"], "wnDismiss")]`).first();
+    if (await dismissOverlay(whatsNewOverlay,whatsNew,'What’s New')) {
       await page.waitForTimeout(300);
       continue;
     }
-    const pra=page.locator('[data-pra-elaan-popup]:visible');
-    if (await pra.count()) { await pra.locator('button').last().click(); await page.waitForTimeout(250); continue; }
-    const b=page.locator('[x-ref="wnBtn"]:visible,button:has-text("Got it"):visible,button:has-text("Samajh gaya"):visible,[data-pos-survey] button:has-text("Baad Mein"):visible,[data-pos-survey] button:has-text("Later"):visible').first();
-    if (!await b.count()) break; await b.click(); await page.waitForTimeout(250);
+    const pra=page.locator('[data-pra-elaan-popup]:visible').first();
+    if (await dismissOverlay(pra,pra.locator('button').last(),'PRA announcement')) { await page.waitForTimeout(250); continue; }
+    const survey=page.locator('[data-pos-survey]:visible').first();
+    if (await dismissOverlay(survey,survey.locator(`xpath=.//button[contains(@*[name()="@click"], "svDismiss")]`).first(),'POS survey')) { await page.waitForTimeout(250); continue; }
+    break;
   }
 }
 async function waitForOperationalSurface(page) {

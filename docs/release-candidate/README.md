@@ -90,3 +90,36 @@ No existing tenant settings are silently rewritten to adopt a new workflow.
 
 **Why:** The owner explicitly authorized conservative configurable defaults while
 prohibiting invented business rules and destructive category normalization.
+
+## Held workflow proposal integrity
+
+The held proposal now includes the native MariaDB supplemental lane: seven
+otherwise SQLite-skipped probes execute with the script's explicit disposable
+loopback connection settings and required-MariaDB flags. This is a local
+proposal only; it is not a workflow commit, push, dispatch, or authorization
+to perform one.
+
+Current byte-identical active/proposed workflow hashes are:
+
+| Workflow | SHA-256 | Git blob |
+|---|---|---|
+| `build-agent.yml` (both paths) | `0eb9ccc78d9d53ce6beb5ae6ad3d3f0437f6da9e31187ed4b9962615ee5ed6be` | `ea95479996ae6a24f8b36176df3f5e065e673aec` |
+| `pr-checks.yml` (both paths) | `4a408f10e226b330f2a6a9b97ff9cac1d16969f0448f66bc0c8af8aa7c8bd294` | `9776d44a98d1fb34bad25340255945ac0f0de8fc` |
+
+Regenerate the held workflow patch only with:
+
+```bash
+git diff -- .github/workflows | gzip -n \
+  > docs/release-candidate/proposed-workflows/workflow-authorization.patch.gz
+sha256sum .github/workflows/build-agent.yml \
+  docs/release-candidate/proposed-workflows/build-agent.yml \
+  .github/workflows/pr-checks.yml \
+  docs/release-candidate/proposed-workflows/pr-checks.yml \
+  docs/release-candidate/proposed-workflows/workflow-authorization.patch.gz
+```
+
+The resulting current patch SHA-256 is
+`2a584147a68d26ef9a9150a4fec7fc28867f7821a2673d5ab74c608d2654a262`.
+The prior `recertification/workflow-authorization.json` records tool
+capability for the older proposal only. It is not authorization for this
+final-source proposal and does not attest this new proposal hash.

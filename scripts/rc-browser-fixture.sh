@@ -24,6 +24,16 @@ resolve_mariadbd() {
 }
 safe_browser() { "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" -- "$@"; }
 lab() { RC_MARIADB_ROOT="$LAB_ROOT" RC_MARIADB_PORT="$DB_PORT" bash "$LAB_CTL" "$@"; }
+ensure_fixture_storage_link() {
+  local public_storage="$ROOT/public/storage" fixture_storage="$ROOT/storage/app/public"
+  [[ -r "$fixture_storage/app-updates/return-elaan-fbr.png" ]] || fail 'fresh fixture announcement image is absent'
+  if [[ -e "$public_storage" || -L "$public_storage" ]]; then
+    [[ -L "$public_storage" && "$(realpath -m "$public_storage")" == "$fixture_storage" ]] || fail 'public storage target is not this isolated worktree'
+  else
+    ln -s ../storage/app/public "$public_storage"
+  fi
+  [[ -r "$public_storage/app-updates/return-elaan-fbr.png" ]] || fail 'fixture announcement image is not browser-readable'
+}
 start_server() {
   rm -f "$SERVER_PID"
   safe_browser php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
@@ -38,13 +48,14 @@ setup() {
   safe_browser env RC_BROWSER_FIXTURE_FRESH=1 php artisan migrate --force --no-interaction
   safe_browser env RC_BROWSER_FIXTURE_FRESH=1 php scripts/rc-browser-fixture-seed.php
   safe_browser php scripts/rc-di-browser-fixture.php
+  ensure_fixture_storage_link
   start_server
   printf 'RC_BROWSER_FIXTURE=%s\n' "$FIXTURE"
 }
 resume() {
   mkdir -p "$STATE_ROOT"; chmod 700 "$STATE_ROOT"; resolve_mariadbd; lab start
   SOCKET="$LAB_ROOT/run/mariadb.sock"; [[ -S "$SOCKET" && -d "$LAB_ROOT/data/$DATABASE" ]] || fail 'resume requires existing isolated database data'
-  cd "$ROOT"; safe_browser php scripts/rc-browser-fixture-resume.php; safe_browser php scripts/rc-di-browser-fixture.php; start_server
+  cd "$ROOT"; safe_browser php scripts/rc-browser-fixture-resume.php; safe_browser php scripts/rc-di-browser-fixture.php; ensure_fixture_storage_link; start_server
   printf 'RC_BROWSER_FIXTURE=%s\n' "$FIXTURE"
 }
 run() { [[ -s "$FIXTURE" && -s "$SERVER_PID" ]] || fail 'run requires setup or resume'; kill -0 "$(cat "$SERVER_PID")" 2>/dev/null || fail 'loopback PHP server is not running'; cd "$ROOT"; safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" RC_BROWSER_FIXTURE="$FIXTURE" node scripts/rc-browser-acceptance.mjs; }

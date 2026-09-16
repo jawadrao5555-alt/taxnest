@@ -10,6 +10,7 @@ use App\Services\PosFeatureService;
 use App\Services\PosServiceWorkflowProfiles;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
@@ -41,6 +42,24 @@ foreach (['companies', 'users', 'admin_users', 'branches', 'hotel_rooms', 'pos_s
     if (!Schema::hasTable($table)) {
         $fail("required migrated table is absent: {$table}");
     }
+}
+$announcementSource = resource_path('whats-new/return-elaan-fbr.png');
+$announcementDestination = storage_path('app/public/app-updates/return-elaan-fbr.png');
+if (!is_file($announcementSource)) {
+    $fail('repository-owned FBR announcement image is absent.');
+}
+if (!is_file($announcementDestination)) {
+    try {
+        File::ensureDirectoryExists(dirname($announcementDestination));
+        if (!File::copy($announcementSource, $announcementDestination)) {
+            $fail('could not materialize the synthetic FBR announcement image.');
+        }
+    } catch (Throwable $e) {
+        $fail('could not materialize the synthetic FBR announcement image.');
+    }
+}
+if (!is_file($announcementDestination) || hash_file('sha256', $announcementSource) !== hash_file('sha256', $announcementDestination)) {
+    $fail('synthetic FBR announcement image does not match the repository asset.');
 }
 if (Company::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid')->exists()
     || User::withoutGlobalScopes()->where('email', 'like', '%@rc-browser.invalid')->exists()) {

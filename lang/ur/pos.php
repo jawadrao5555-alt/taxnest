@@ -6987,4 +6987,11 @@ return [
     'hotel_timeline_room' => 'کمرہ :room تفویض',
     'hotel_reports_hint' => 'اس برانچ کی حاضری اور آج کی کھاتہ رقم۔ ٹیکس بل مہمان کھاتے پر رہتا ہے۔',
     // ---- Task 1582 end ----
+    'waiter_edit_save_kitchen' => 'کچن اپ ڈیٹ محفوظ کریں',
+    'waiter_edit_take_payment' => 'ادائیگی لیں',
+    'waiter_edit_saving' => 'محفوظ ہو رہا ہے…',
+    'waiter_edit_saved' => 'ویٹر آرڈر کی کچن اپ ڈیٹ محفوظ ہو گئی۔',
+    'waiter_edit_error' => 'کچن اپ ڈیٹ محفوظ نہیں ہو سکی۔ کنکشن چیک کریں۔',
+    'waiter_edit_conflict' => 'یہ ویٹر آرڈر کہیں اور تبدیل ہو چکا ہے؛ دوبارہ لوڈ کریں۔',
+    'recall_stay_btn' => 'یہیں رہیں',
 ];

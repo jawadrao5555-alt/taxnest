@@ -280,7 +280,7 @@
                 try { localStorage.setItem(key, dark ? '1' : '0'); } catch (_) {}
             })(document.documentElement, @json((string) ($posUserLayout->getKey() ?? 'guest')), @json((bool) $isDarkMode));
         </script>
-        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.8') }}">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.9') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">

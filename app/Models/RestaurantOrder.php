@@ -25,6 +25,8 @@ class RestaurantOrder extends Model
         // proof bill prints ONLINE instead of NOT PAID and the bill cannot be
         // finalized until the counter confirms the payment landed.
         'online_payment_awaited_at', 'online_payment_marked_by',
+        'edit_revision',
+        'last_edit_uuid',
     ];
 
     protected $casts = [
@@ -48,6 +50,7 @@ class RestaurantOrder extends Model
         'kitchen_cleared_at' => 'datetime',
         'online_payment_awaited_at' => 'datetime',
         'online_payment_marked_by' => 'integer',
+        'edit_revision' => 'integer',
     ];
 
     /** Owner batch 26 Aug 2026: is this order waiting on an online transfer? */

@@ -727,10 +727,16 @@ class RestaurantWaiterController extends Controller
                 'total_amount' => round($newSubtotal),
                 'kot_sent_at' => now(),
             ]);
+            if (Schema::hasColumn('restaurant_orders', 'edit_revision')) {
+                RestaurantOrder::whereKey($order->id)->update([
+                    'edit_revision' => DB::raw('COALESCE(edit_revision, 0) + 1'),
+                    'updated_at' => now(),
+                ]);
+            }
 
             // ZFC issue #10: print the DELTA ticket (only unprinted rows) right away.
             $company = Company::find($companyId);
-            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true);
+            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true, true);
             if ($kot['printed'] && !empty($kot['job_ids'])) {
                 // Query-builder update (NOT $order->update): the model's
                 // 'integer' cast chokes on DB::raw Expression —
@@ -747,6 +753,232 @@ class RestaurantWaiterController extends Controller
 
             return response()->json(['success' => true, 'kot_printed' => (bool) $kot['printed'], 'message' => $msg]);
         });
+    }
+
+    /**
+     * Cashier edits the already-held waiter order in place. This is deliberately
+     * separate from appendItems(): the client sends the complete cart snapshot,
+     * while this endpoint owns the same order id, revision fence and KOT delta.
+     */
+    public function updateIncomingOrder(Request $request, $id)
+    {
+        $companyId = (int) app('currentCompanyId');
+        $user = auth('pos')->user();
+        if (!$user || (!$user->isPosCashier() && !$user->isPosAdmin())) {
+            return response()->json(['success' => false, 'message' => 'Cashier access required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'items' => 'present|array',
+            'items.*.name' => 'required|string|max:255',
+            'items.*.quantity' => 'required|numeric|min:0.01|max:9999',
+            'items.*.unit_price' => 'required|numeric|min:0|max:99999999',
+            'items.*.item_id' => 'nullable|integer',
+            'items.*.item_type' => 'nullable|string|max:32',
+            'items.*.line_id' => 'nullable|integer',
+            'items.*.special_notes' => 'nullable|string|max:500',
+            'revision' => 'required|integer|min:0',
+            'edit_uuid' => 'required|string|max:64',
+            'allow_cancel' => 'nullable|boolean',
+        ]);
+        if (empty($validated['items']) && empty($validated['allow_cancel'])) {
+            return response()->json(['success' => false, 'message' => 'An empty cart is not a valid order edit; cancel the order explicitly.'], 422);
+        }
+        $editUuid = trim((string) $validated['edit_uuid']);
+        $result = DB::transaction(function () use ($companyId, $user, $id, $validated, $editUuid) {
+            $query = RestaurantOrder::where('company_id', $companyId)
+                ->where('id', $id)->where('source', 'waiter');
+            $order = (clone $query)->lockForUpdate()->with('items')->first();
+            if (!$order) {
+                return ['response' => response()->json(['success' => false, 'message' => 'Order not found.'], 404)];
+            }
+            if (!in_array($order->status, ['held', 'preparing', 'ready'], true)
+                || $order->pos_transaction_id || $order->payment_method) {
+                return ['response' => response()->json(['success' => false, 'message' => 'Paid or closed waiter orders cannot be edited.'], 409)];
+            }
+            if (!$user->isPosAdmin() && $order->assigned_cashier_id
+                && (int) $order->assigned_cashier_id !== (int) $user->id) {
+                return ['response' => response()->json(['success' => false, 'message' => 'This waiter order is assigned to another cashier.'], 403)];
+            }
+            $attemptModel = \App\Models\RestaurantOrderEditAttempt::where('company_id', $companyId)
+                ->where('order_id', $order->id)->where('edit_uuid', $editUuid)->first();
+            if ($attemptModel) {
+                if (in_array($attemptModel->kot_status, ['queued', 'completed', 'unchanged'], true)) {
+                    return ['response' => response()->json([
+                        'success' => true, 'replayed' => true, 'order_id' => (int) $order->id,
+                        'revision' => (int) $attemptModel->revision, 'kot' => ['status' => $attemptModel->kot_status],
+                    ])];
+                }
+                return ['order' => $order->fresh(['items', 'table']), 'void' => $attemptModel->void_payload ?? [],
+                    'new' => !empty($attemptModel->add_payload), 'attempt' => $attemptModel, 'resume' => true];
+            }
+            $actualRevision = (int) ($order->edit_revision ?? 0);
+            if ($actualRevision !== (int) $validated['revision']) {
+                return ['response' => response()->json([
+                    'success' => false, 'conflict' => true,
+                    'message' => 'This waiter order changed elsewhere. Reload and review it before saving.',
+                    'revision' => $actualRevision,
+                ], 409)];
+            }
+
+            $before = $order->items->map(fn ($item) => [
+                'id' => (int) $item->id, 'item_id' => $item->item_id,
+                'name' => $item->item_name, 'quantity' => (float) $item->quantity,
+                'unit_price' => (float) $item->unit_price, 'notes' => $item->special_notes,
+            ])->values()->all();
+            $remaining = $order->items->keyBy(fn ($item) => implode('|', [
+                $item->item_type, $item->item_id ?: '', mb_strtolower(trim($item->item_name)),
+            ]));
+            $voidItems = []; $changed = []; $hasNewKitchen = false;
+            foreach ($validated['items'] as $input) {
+                $key = implode('|', [
+                    $input['item_type'] ?? (!empty($input['item_id']) ? 'product' : 'manual'),
+                    $input['item_id'] ?? '', mb_strtolower(trim($input['name'])),
+                ]);
+                $line = !empty($input['line_id'])
+                    ? $remaining->first(fn ($candidate) => (int) $candidate->id === (int) $input['line_id'])
+                    : $remaining->get($key);
+                if ($line) {
+                    $remaining->forget($remaining->search(fn ($candidate) => (int) $candidate->id === (int) $line->id));
+                }
+                $qty = (float) $input['quantity'];
+                $notes = $input['special_notes'] ?? null;
+                if (!empty($input['item_id'])) {
+                    $product = PosProduct::where('company_id', $companyId)
+                        ->where('id', (int) $input['item_id'])->where('is_active', true)->first();
+                    if (!$product) {
+                        abort(response()->json(['success' => false, 'message' => 'Product is unavailable for this branch.'], 422));
+                    }
+                    $input['name'] = $product->name;
+                    $input['unit_price'] = (float) $product->price;
+                    $input['is_tax_exempt'] = (bool) $product->is_tax_exempt;
+                }
+                if (!$line) {
+                    $new = RestaurantOrderItem::create([
+                        'order_id' => $order->id, 'item_type' => $input['item_type'] ?? ($input['item_id'] ? 'product' : 'manual'),
+                        'item_id' => $input['item_id'] ?? null, 'item_name' => $input['name'],
+                        'quantity' => $qty, 'unit_price' => round((float) $input['unit_price'], 2),
+                        'subtotal' => round($qty * (float) $input['unit_price'], 2),
+                        'special_notes' => $notes, 'kot_printed_at' => null,
+                        'is_tax_exempt' => (bool) ($input['is_tax_exempt'] ?? false),
+                    ]);
+                    $hasNewKitchen = true;
+                    $changed[] = ['action' => 'ADD', 'item_name' => $input['name'], 'quantity' => $qty];
+                    continue;
+                }
+                $oldQty = (float) $line->quantity;
+                $oldNotes = (string) ($line->special_notes ?? '');
+                $modifierChanged = $oldNotes !== (string) $notes && $line->kot_printed_at;
+                if ($modifierChanged) {
+                    // A modifier replacement is one normalized pair: void the
+                    // complete old line, then add the complete new line. Never
+                    // also emit a quantity-decrease void for this same line.
+                    $voidItems[] = ['item_type' => $line->item_type, 'item_id' => $line->item_id,
+                        'item_name' => $line->item_name, 'notes' => $oldNotes, 'qty' => $oldQty];
+                    $hasNewKitchen = true;
+                    $changed[] = ['action' => 'MODIFIER', 'item_name' => $line->item_name,
+                        'before' => $oldNotes, 'after' => (string) $notes, 'quantity' => $qty];
+                    $line->kot_printed_at = null;
+                } elseif ($qty < $oldQty && $line->kot_printed_at) {
+                    $voidItems[] = ['item_type' => $line->item_type, 'item_id' => $line->item_id,
+                        'item_name' => $line->item_name, 'notes' => $oldNotes, 'qty' => $oldQty - $qty];
+                } elseif ($qty > $oldQty && $line->kot_printed_at) {
+                    $increment = $qty - $oldQty;
+                    RestaurantOrderItem::create([
+                        'order_id' => $order->id, 'item_type' => $line->item_type, 'item_id' => $line->item_id,
+                        'item_name' => $line->item_name, 'quantity' => $increment,
+                        'unit_price' => $line->unit_price, 'subtotal' => round($increment * (float) $line->unit_price, 2),
+                        'special_notes' => $notes, 'kot_printed_at' => null,
+                    ]);
+                    $qty = $oldQty;
+                    $hasNewKitchen = true;
+                    $changed[] = ['action' => 'ADD', 'item_name' => $line->item_name, 'quantity' => $increment];
+                }
+                $line->quantity = $qty;
+                $line->unit_price = round((float) $input['unit_price'], 2);
+                $line->subtotal = round($qty * (float) $input['unit_price'], 2);
+                $line->special_notes = $notes;
+                if (array_key_exists('is_tax_exempt', $input)) {
+                    $line->is_tax_exempt = (bool) $input['is_tax_exempt'];
+                }
+                $line->save();
+            }
+            foreach ($remaining as $line) {
+                if ($line->kot_printed_at) {
+                    $voidItems[] = ['item_type' => $line->item_type, 'item_id' => $line->item_id,
+                        'item_name' => $line->item_name, 'notes' => (string) ($line->special_notes ?? ''),
+                        'qty' => (float) $line->quantity];
+                }
+                $changed[] = ['action' => 'VOID', 'item_name' => $line->item_name, 'quantity' => (float) $line->quantity];
+                $line->delete();
+            }
+            $newSubtotal = round((float) RestaurantOrderItem::where('order_id', $order->id)->sum('subtotal'), 2);
+            $oldSubtotal = (float) $order->subtotal;
+            $taxRate = $oldSubtotal > 0 ? (float) $order->tax_amount / $oldSubtotal : 0;
+            $newTax = round($newSubtotal * $taxRate, 2);
+            $discount = min((float) ($order->discount_amount ?? 0), $newSubtotal + $newTax);
+            $order->subtotal = $newSubtotal; $order->tax_amount = $newTax;
+            $order->discount_amount = $discount;
+            $order->total_amount = round($newSubtotal + $newTax - $discount, 2);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'edit_revision')) {
+                $order->edit_revision = $actualRevision + 1;
+                $order->last_edit_uuid = $editUuid;
+            }
+            $order->save();
+            $savedOrder = $order->fresh(['items', 'table']);
+            $addPayload = $savedOrder->items->whereNull('kot_printed_at')->map(fn ($item) => [
+                'item_id' => $item->item_id, 'item_type' => $item->item_type,
+                'item_name' => $item->item_name, 'notes' => (string) ($item->special_notes ?? ''),
+                'qty' => (float) $item->quantity, 'line_id' => (int) $item->id,
+            ])->values()->all();
+            $attempt = null;
+            if (Schema::hasTable('restaurant_order_edit_attempts')) {
+                $attempt = \App\Models\RestaurantOrderEditAttempt::create([
+                    'company_id' => $companyId, 'order_id' => $order->id, 'edit_uuid' => $editUuid,
+                    'revision' => (int) ($order->edit_revision ?? ($actualRevision + 1)), 'kot_status' => 'pending',
+                    'add_payload' => $hasNewKitchen ? $addPayload : null,
+                    'void_payload' => $voidItems ?: null,
+                ]);
+            }
+            try {
+                if (class_exists(\App\Services\AuditLogService::class)) {
+                    \App\Services\AuditLogService::log('waiter_order_edited', 'restaurant_order', $order->id,
+                        ['items' => $before, 'revision' => $actualRevision],
+                        ['items' => $changed, 'revision' => $actualRevision + 1],
+                        $companyId, $user->id);
+                }
+            } catch (\Throwable $e) { Log::warning('waiter edit audit failed: '.$e->getMessage()); }
+            return ['order' => $savedOrder, 'void' => $voidItems, 'new' => $hasNewKitchen, 'attempt' => $attempt];
+        });
+        if (isset($result['response'])) return $result['response'];
+        $company = Company::find($companyId);
+        $queued = ['add' => [], 'void' => []];
+        try {
+            $dedupeBase = $result['attempt'] ? 'waiter-edit:' . $result['attempt']->id : null;
+            if ($company && $result['new']) {
+                $queued['add'] = \App\Services\KotPrintService::enqueueForOrder($company, $result['order'], $user->id, true, true, $dedupeBase . ':add');
+            }
+            if ($company && $result['void']) {
+                $queued['void'] = \App\Services\KotPrintService::enqueueVoid($company, $result['order'], $result['void'], $user->id, true, $dedupeBase . ':void');
+            }
+        } catch (\Throwable $e) {
+            Log::warning('waiter edit KOT outbox resume failed: '.$e->getMessage(), ['order_id' => $id]);
+            $queued = ['add' => ['reason' => 'error'], 'void' => ['reason' => 'error']];
+        }
+        if ($result['attempt']) {
+            $hasWork = $result['new'] || !empty($result['void']);
+            $status = !$hasWork ? 'unchanged'
+                : ((!empty($queued['add']['job_ids']) || !empty($queued['void']['job_ids'])) ? 'completed' : 'error');
+            $result['attempt']->update(['kot_status' => $status, 'kot_error' => $status === 'error' ? 'KOT requires retry or manual action.' : null]);
+        }
+        return response()->json([
+            'success' => true, 'order_id' => (int) $result['order']->id,
+            'revision' => (int) ($result['order']->edit_revision ?? 0),
+            'total' => (float) $result['order']->total_amount,
+            'order' => $this->orderJson($result['order']),
+            'replayed' => !empty($result['resume']),
+            'kot' => $queued, 'kot_status' => $result['attempt']?->fresh()->kot_status ?? 'action_required',
+        ]);
     }
 
     /**
@@ -1167,7 +1399,7 @@ class RestaurantWaiterController extends Controller
      * order id is client-supplied on both call paths, so this guard is the
      * security boundary — never relax it to company-scope alone.
      */
-    public static function settleWaiterOrder(int $companyId, int $orderId, \App\Models\PosTransaction $txn, ?\App\Models\User $user, bool $onlineConfirmed = false): bool
+    public static function settleWaiterOrder(int $companyId, int $orderId, \App\Models\PosTransaction $txn, ?\App\Models\User $user, bool $onlineConfirmed = false, ?int $expectedRevision = null): bool
     {
         if (!$user) {
             return false;
@@ -1176,6 +1408,9 @@ class RestaurantWaiterController extends Controller
         $claimQuery = RestaurantOrder::where('company_id', $companyId)
             ->where('id', $orderId)
             ->where('source', 'waiter');
+        if ($expectedRevision !== null && Schema::hasColumn('restaurant_orders', 'edit_revision')) {
+            $claimQuery->where('edit_revision', $expectedRevision);
+        }
         self::whereOpenWaiterOrder($claimQuery);
         // ONLINE-PAYMENT GATE (owner batch, 26 Aug 2026). An order marked
         // "paisay online aa rahay hain" is not final until a human confirms the
@@ -1348,12 +1583,14 @@ class RestaurantWaiterController extends Controller
             'subtotal' => (float) $o->subtotal,
             'total_amount' => (float) $o->total_amount,
             'unprinted_count' => $o->items->whereNull('kot_printed_at')->count(),
+            'edit_revision' => (int) ($o->edit_revision ?? 0),
             // Waiter self-cancel modal (Task 412): KOT-already-sent warning gate.
             'kot_sent_at' => $o->kot_sent_at,
             'items' => $o->items->map(fn($i) => [
                 // Task #645: real row id + subtotal — cancel modal's Made/Not-Made
                 // ticks post these ids as made_item_ids to deleteOrder.
                 'id' => $i->id,
+                'line_id' => (int) $i->id,
                 'subtotal' => (float) $i->subtotal,
                 'item_id' => $i->item_id,
                 'item_type' => $i->item_type,

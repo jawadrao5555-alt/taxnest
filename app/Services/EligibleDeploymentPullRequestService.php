@@ -60,7 +60,7 @@ class EligibleDeploymentPullRequestService
             throw new \InvalidArgumentException('GitHub eligibility check is temporarily unavailable. No approval was created.');
         }
         if (! $response->successful() || ! $this->basicEligibility($response->json())) {
-            throw new \InvalidArgumentException('Pull request is not an eligible open cursor/* release.');
+            throw new \InvalidArgumentException('Pull request is not an eligible open cursor/* or replit/* release.');
         }
 
         $pr = $response->json();
@@ -96,7 +96,7 @@ class EligibleDeploymentPullRequestService
             && data_get($pr, 'base.ref') === 'main'
             && data_get($pr, 'base.repo.full_name') === self::REPOSITORY
             && data_get($pr, 'head.repo.full_name') === self::REPOSITORY
-            && str_starts_with((string) data_get($pr, 'head.ref'), 'cursor/')
+            && OwnerDeploymentApprovalService::isTrustedHeadBranch(data_get($pr, 'head.ref'))
             && preg_match('/^[0-9a-f]{40}$/i', (string) data_get($pr, 'head.sha')) === 1;
     }
 

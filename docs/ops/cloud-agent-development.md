@@ -93,11 +93,11 @@ Replit’s older MySQL Staging path (`.local/mysql_run`, port `9000`, `scripts/d
 
 ```
 latest origin/main
-  → cursor/* branch
+  → cursor/* or replit/* branch
   → reproduce (local) → fix → re-test + evidence
   → PR to main
   → PR checks
-  → automatic squash merge (cursor/*)
+  → owner-approved squash merge (cursor/* or replit/*)
   → main
   → manual GitHub Environment "production" approval
   → GitHub Actions production deploy

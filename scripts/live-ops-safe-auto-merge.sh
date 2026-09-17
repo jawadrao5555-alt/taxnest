@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Classify a cursor/* PR; if AUTO_DEPLOY, ask production (runner token) to
+# Classify a cursor/* or replit/* PR; if AUTO_DEPLOY, ask production (runner token) to
 # approve via the existing owner-approval relay. Does NOT squash-merge here,
 # does NOT dispatch Deploy Production, does NOT skip Elaan, does NOT SSH.
 # Owner Merge & Deploy remains the only merge+exact-SHA deploy initiator.
@@ -37,8 +37,8 @@ sha=(head.get("sha") or "").lower()
 ref=head.get("ref") or ""
 if sha != exp:
     raise SystemExit(f"PR HEAD moved live={sha} expected={exp}")
-if not ref.startswith("cursor/"):
-    raise SystemExit("non-cursor/ branch rejected")
+if not ref.startswith(("cursor/", "replit/")):
+    raise SystemExit("branch must use cursor/* or replit/*")
 if pr.get("draft"):
     raise SystemExit("draft PR rejected")
 if (pr.get("base") or {}).get("ref") != "main":

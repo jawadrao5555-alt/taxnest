@@ -1,11 +1,11 @@
-# RETIRED automatic Cursor merge.
+# RETIRED automatic Cursor/Replit merge.
 #
-# Cursor PRs are no longer squash-merged or deployed by this workflow.
+# Cursor/Replit PRs are no longer squash-merged or deployed by this workflow.
 # Owner initiation is `.github/workflows/owner-merge-and-deploy.yml`.
 #
 # Kept as a workflow_run listener on the default branch so a pull_request
 # trigger is never added (that would run a write-token job from the PR
-# branch). The job only logs that Cursor merge-on-green is disabled.
+# branch). The job only logs that Cursor/Replit merge-on-green is disabled.
 #
 # MUST NOT: native GitHub merge-on-green, REST squash of the pull request,
 # Actions dispatch of Deploy Production, checkout PR code, or hold
@@ -29,11 +29,11 @@ jobs:
       github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse automatic Cursor merge and deploy
+      - name: Refuse automatic Cursor/Replit merge and deploy
         run: |
           set -euo pipefail
-          echo "Automatic Cursor PR merge is disabled."
+          echo "Automatic Cursor/Replit PR merge is disabled."
           echo "PR checks succeeded for SHA ${{ github.event.workflow_run.head_sha }}."
           echo "Owner must run Actions workflow 'Owner Merge & Deploy' with:"
-          echo "  pull_number, expected_head_sha, confirm='Approved — Merge & Deploy'"
+          echo "  pull_number, expected_head_sha, approval_request_id"
           echo "This job does not merge, dispatch Deploy Production, or hold secrets."

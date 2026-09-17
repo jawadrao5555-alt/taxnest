@@ -123,8 +123,9 @@ else
 fi
 grep -q 'live-ops/v1/safe-auto-deploy' "$SAFE_SH" && ok "safe-auto-merge calls runner safe-auto-deploy" \
   || bad "missing runner safe-auto-deploy call"
-grep -q 'cursor/' "$SAFE_SH" && ok "safe-auto-merge requires cursor/*" \
-  || bad "must require cursor/*"
+grep -q 'cursor/' "$SAFE_SH" && grep -q 'replit/' "$SAFE_SH" \
+  && ok "safe-auto-merge requires cursor/* or replit/*" \
+  || bad "must require both trusted release prefixes"
 
 grep -q 'HTTP 403' "$CLOUD" && grep -q 'exit 3' "$CLOUD" && ok "cloud helper fail-closes workflow_dispatch 403" \
   || bad "cloud helper must handle 403 / exit 3"

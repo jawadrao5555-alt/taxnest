@@ -81,12 +81,12 @@
                             <option value="">Select a green PR</option>
                             @foreach($eligiblePullRequests as $pr)
                                 <option value="{{ $pr['number'] }}" @selected((string) old('pull_request_number') === (string) $pr['number'])>
-                                    #{{ $pr['number'] }} — {{ $pr['title'] }} — {{ substr($pr['head_sha'], 0, 12) }}
+                                    #{{ $pr['number'] }} — {{ $pr['title'] }} — {{ $pr['head_ref'] }} — {{ substr($pr['head_sha'], 0, 12) }}
                                 </option>
                             @endforeach
                         </select>
                         @if(empty($eligiblePullRequests))
-                            <span class="mt-2 block text-xs text-amber-300">No eligible green cursor/* PR is currently available.</span>
+                            <span class="mt-2 block text-xs text-amber-300">No eligible green cursor/* or replit/* PR is currently available.</span>
                         @endif
                     </label>
                     <label class="block">

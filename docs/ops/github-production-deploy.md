@@ -3,7 +3,7 @@
 Permanent production deploy path after code is already on `main`:
 
 ```
-Cloud Agent → cursor/* feature branch → PR (include deploy/elaan.yml for POS-visible changes)
+Cloud Agent → cursor/* or replit/* feature branch → PR (include deploy/elaan.yml for POS-visible changes)
   → PR checks (no deploy) → STOP for owner
   → Owner approves the exact PR + head SHA from SaaS Admin → Deploy Approvals
   → scheduled Approval Relay Dispatch authenticates with GitHub Actions OIDC
@@ -44,7 +44,7 @@ Supported handoff (no Cloud Agent secrets):
    relay with GitHub Actions OIDC, leases the approval, and dispatches
    `.github/workflows/owner-merge-and-deploy.yml`.
 3. The owner workflow claims a one-time receipt, then squash-merges
-   **only** a Ready, same-repo `cursor/*` PR to `main`
+   **only** a Ready, same-repo `cursor/*` or `replit/*` PR to `main`
    whose head SHA still matches and whose **PR checks / validate** succeeded.
 4. It reads the **exact squash/merge commit SHA** on `main` and refuses if that
    SHA is not the current `origin/main` **tip**.
@@ -72,7 +72,7 @@ These are separate gates:
 
 | Gate | What happens | Who/what waits |
 |---|---|---|
-| PR checks | `.github/workflows/pr-checks.yml` on `cursor/*` PRs. Does not merge or deploy. | Agent + owner review the report. |
+| PR checks | `.github/workflows/pr-checks.yml` on `cursor/*` or `replit/*` PRs. Does not merge or deploy. | Agent + owner review the report. |
 | Owner approval relay | Authenticated super-admin approval bound to one repository, PR, head SHA, request ID, and expiry. GitHub OIDC dispatcher starts Owner Merge & Deploy. | **Owner** approves on mobile; scheduled GitHub dispatcher waits for that approval. |
 | Owner Merge & Deploy | Revalidates and squash-merges one relay-approved PR, then consumes its receipt while registering the exact nonce-correlated Deploy run. | Fail-closed relay claim; no phrase or manual workflow input is authority. |
 | Deploy Production (`production-deploy`) | `.github/workflows/deploy-production.yml` on `workflow_dispatch` with exact tip SHA + approval ID + correlation nonce | Registered run ID/attempt + OIDC workflow SHA + nonce provenance, exact origin/main tip, serialized SSH (`production-deploy`, `cancel-in-progress: false`), Elaan freshness, dirty-worktree preflight, exact-SHA apply, `ci-live-verify.sh`. **No human Environment reviewer** on this Environment. |
@@ -165,7 +165,7 @@ Host identity is pinned in `scripts/lib/live-known-hosts`. Host metadata (IP, pa
 
 ## Issue → live (Cloud Agent)
 
-After a `cursor/*` PR is **Ready** and green, the owner follows
+After a `cursor/*` or `replit/*` PR is **Ready** and green, the owner follows
 **`docs/ops/owner-merge-and-deploy.md`**, then
 **`docs/ops/cloud-agent-issue-to-live.md`**:
 

@@ -27,7 +27,7 @@ Issue (owner)
   → Cloud Agent investigation + local MariaDB + Chrome reproduction
   → root-cause fix + targeted tests + original-issue re-test
   → full php artisan test (+ npm build if assets)
-  → one focused cursor/* PR with evidence
+  → one focused cursor/* or replit/* PR with evidence
   → PR checks (still run; ready_for_review retriggers checks)
   → STOP — wait for explicit owner approval
   → Owner runs Actions workflow "Owner Merge & Deploy" with
@@ -155,7 +155,7 @@ FAIL (Actions evidence)
   → collect exact logs (gh run view --log / step summary) — no production secrets
   → diagnose root cause
   → use stronger tools / subagents when useful (see Multi-agent strategy)
-  → implement a better fix on a NEW cursor/* branch from latest origin/main
+  → implement a better fix on a NEW cursor/* or replit/* branch from latest origin/main
   → reproduce locally (MariaDB + Chrome)
   → targeted PHPUnit + original-issue re-test
   → full suite when feasible
@@ -204,7 +204,8 @@ Agents SHOULD use stronger available capabilities, for example:
 | Parallel research | Multiple subagents on **disjoint** questions; do not dual-edit the same files |
 | CI / PR waiting | `cursor-subscriptions` (CI + PR), not sleep-poll loops |
 
-Do not spawn conflicting writers on one branch. One focused `cursor/*` PR per
+Do not spawn conflicting writers on one branch. One focused `cursor/*` or
+`replit/*` PR per
 iteration.
 
 ---

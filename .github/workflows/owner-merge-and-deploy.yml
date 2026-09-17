@@ -1,14 +1,16 @@
 # Owner Merge & Deploy — explicit owner initiation only.
 #
-# Cursor Cloud Agents prepare cursor/* PRs and STOP. They must not merge or
-# dispatch this workflow (and typically cannot: workflow_dispatch 403).
+# Cursor/Replit Cloud Agents prepare cursor/* or replit/* PRs and STOP. They
+# must not merge or dispatch this workflow (and typically cannot:
+# workflow_dispatch 403).
 #
 # Owner approval is issued by the production approval relay. Inputs alone are
 # never authorization.
 #
 # Flow:
-#   relay claim (OIDC + approval_request_id + exact repo/PR/HEAD)
-#   + cursor/* + not draft + targets main + expected head SHA
+#   relay claim (OIDC + approval_request_id + exact jawadrao5555-alt/taxnest
+#   repo/PR/HEAD)
+#   + cursor/* or replit/* + not draft + targets main + expected head SHA
 #   + PR checks / validate success + mergeable
 #   → squash merge pinned to that head SHA
 #   → resulting squash SHA MUST equal current origin/main tip
@@ -19,7 +21,7 @@
 #   - use a GitHub Environment (no secrets on this job)
 #   - expose emergency/manual deployment bypasses
 #   - checkout untrusted PR code (checks out the workflow ref = main)
-#   - merge non-cursor/, drafts, forks, failed checks, or moved SHAs
+#   - merge other branches, drafts, forks, failed checks, or moved SHAs
 #
 # Deploy Production stays unattended after this initiation (Environment
 # production-deploy, no reviewers). Live Ops stays on Environment production

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Owner-triggered squash merge of ONE cursor/* PR, then exact-SHA Deploy Production.
+# Owner-triggered squash merge of ONE cursor/* or replit/* PR, then exact-SHA
+# Deploy Production.
 # Does NOT read production secrets, SSH, or skip Elaan.
 # Usage (Actions):
 #   bash scripts/owner-merge-and-deploy.sh \
@@ -33,6 +34,10 @@ echo "$PULL" | grep -Eq '^[0-9]+$' || { echo "pull_number must be numeric" >&2; 
 
 REPO="${GITHUB_REPOSITORY:-}"
 [ -n "$REPO" ] || REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+[ "$REPO" = "jawadrao5555-alt/taxnest" ] || {
+  echo "refusing repository outside jawadrao5555-alt/taxnest" >&2
+  exit 1
+}
 OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
 TMP=$(mktemp -d /tmp/owner-merge.XXXXXX)
@@ -99,7 +104,10 @@ payload = {
         "mergeable": pr_obj.get("mergeable"),
         "mergeable_state": pr_obj.get("mergeable_state"),
         "merge_commit_sha": pr_obj.get("merge_commit_sha"),
-        "base": {"ref": (pr_obj.get("base") or {}).get("ref")},
+        "base": {
+            "ref": (pr_obj.get("base") or {}).get("ref"),
+            "repo": {"full_name": ((pr_obj.get("base") or {}).get("repo") or {}).get("full_name")},
+        },
         "head": {
             "ref": (pr_obj.get("head") or {}).get("ref"),
             "sha": (pr_obj.get("head") or {}).get("sha"),

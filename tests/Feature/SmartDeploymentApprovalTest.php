@@ -108,6 +108,36 @@ class SmartDeploymentApprovalTest extends TestCase
         $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
     }
 
+    public function test_replit_branch_is_eligible_when_all_other_release_bindings_match(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/pulls/55' => Http::response(
+                array_replace_recursive($this->eligiblePr(), ['head' => ['ref' => 'replit/bootstrap-release']]),
+                200
+            ),
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/commits/'.self::SHA.'/check-runs*' => Http::response([
+                'check_runs' => [['name' => 'validate', 'status' => 'completed', 'conclusion' => 'success']],
+            ], 200),
+        ]);
+        $owner = AdminUser::query()->create([
+            'name' => 'Owner',
+            'email' => 'replit-owner@example.test',
+            'password' => 'secret-password',
+            'role' => 'super_admin',
+        ]);
+
+        $this->actingAs($owner, 'admin')->post('/admin/deployment-approval', [
+            'pull_request_number' => 55,
+            'password' => 'secret-password',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->assertDatabaseHas('owner_deployment_approval_requests', [
+            'pull_request_number' => 55,
+            'head_sha' => self::SHA,
+            'status' => 'approved',
+        ]);
+    }
+
     public function test_password_is_required_and_wrong_password_does_not_create_a_request(): void
     {
         Http::fake();

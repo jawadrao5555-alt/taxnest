@@ -124,24 +124,73 @@ $products = [
     ],
 ];
 
+$fixtureAssetRoot = $root . '/docs/ui-premium/fixture-assets';
 $imageRoot = $root . '/storage/app/public/products/rc-premium';
-if (is_link($imageRoot) || (!is_dir($imageRoot) && !mkdir($imageRoot, 0700, true) && !is_dir($imageRoot))) {
+if (
+    is_link($fixtureAssetRoot)
+    || !is_dir($fixtureAssetRoot)
+    || is_link($imageRoot)
+    || (!is_dir($imageRoot) && !mkdir($imageRoot, 0700, true) && !is_dir($imageRoot))
+) {
     fwrite(STDERR, "premium-ui-fixture-extension: unsafe synthetic image directory\n");
     exit(2);
 }
-foreach ($products as $rows) {
-    foreach ($rows as $row) {
-        $svg = sprintf(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220"><rect width="320" height="220" rx="28" fill="%s"/><circle cx="160" cy="92" r="55" fill="#ffffff" fill-opacity=".25"/><path d="M123 105h74M137 85h46M145 125h30" stroke="#fff" stroke-width="9" stroke-linecap="round"/><text x="160" y="184" fill="#fff" font-family="Arial,sans-serif" font-size="16" font-weight="700" text-anchor="middle">%s</text></svg>',
-            $row['color'],
-            htmlspecialchars(strtoupper(substr($row['slug'], 0, 18)), ENT_QUOTES | ENT_XML1),
-        );
-        $imagePath = $imageRoot . '/' . $row['slug'] . '.svg';
-        if (is_link($imagePath) || file_put_contents($imagePath, $svg, LOCK_EX) === false) {
-            fwrite(STDERR, "premium-ui-fixture-extension: synthetic image write failed\n");
-            exit(2);
-        }
-        chmod($imagePath, 0600);
+
+/*
+ * Keep the PRA visual fixture honest: these are eight locally versioned,
+ * compact JPGs from the attributed source manifest, copied into the same
+ * isolated public directory that the existing image field already serves.
+ * FBR's legacy products table has no image column and intentionally remains
+ * monogram-only; no retail photo is invented for that catalogue.
+ */
+$praImageAssets = [
+    'hotel-garden-burger' => 'burger.jpg',
+    'hotel-citrus-cooler' => 'citrus-cooler.jpg',
+    'hotel-lemon-herb-bowl' => 'lemon-herb-bowl.jpg',
+    'hotel-firecracker-fries' => 'firecracker-fries.jpg',
+    'hotel-mango-sparkler' => 'mango-sparkler.jpg',
+    'hotel-creamy-pasta' => 'creamy-pasta.jpg',
+    'hotel-green-salad' => 'green-salad.jpg',
+    'hotel-cocoa-brownie' => 'cocoa-brownie.jpg',
+    'restaurant-garden-burger' => 'burger.jpg',
+    'restaurant-citrus-cooler' => 'citrus-cooler.jpg',
+    'restaurant-lemon-herb-bowl' => 'lemon-herb-bowl.jpg',
+    'restaurant-firecracker-fries' => 'firecracker-fries.jpg',
+    'restaurant-mango-sparkler' => 'mango-sparkler.jpg',
+    'restaurant-creamy-pasta' => 'creamy-pasta.jpg',
+    'restaurant-green-salad' => 'green-salad.jpg',
+    'restaurant-cocoa-brownie' => 'cocoa-brownie.jpg',
+];
+
+foreach ($praImageAssets as $slug => $assetName) {
+    $sourcePath = $fixtureAssetRoot . '/' . $assetName;
+    $imagePath = $imageRoot . '/' . $slug . '.jpg';
+    $imageInfo = is_link($sourcePath) ? false : @getimagesize($sourcePath);
+    if (
+        is_link($sourcePath)
+        || !is_file($sourcePath)
+        || $imageInfo === false
+        || ($imageInfo['mime'] ?? null) !== 'image/jpeg'
+        || (filesize($sourcePath) ?: 0) > 100 * 1024
+        || is_link($imagePath)
+        || !copy($sourcePath, $imagePath)
+    ) {
+        fwrite(STDERR, "premium-ui-fixture-extension: synthetic JPG copy failed\n");
+        exit(2);
+    }
+    chmod($imagePath, 0600);
+}
+
+/*
+ * A reused disposable runtime may still contain the first-generation SVGs.
+ * Remove only those generated fixture files so stale generic symbols cannot
+ * appear in a capture; this path is already protected by the exact RC DB and
+ * socket guards above.
+ */
+foreach (glob($imageRoot . '/*.svg') ?: [] as $legacyImage) {
+    if (is_link($legacyImage) || !is_file($legacyImage) || !unlink($legacyImage)) {
+        fwrite(STDERR, "premium-ui-fixture-extension: stale synthetic image cleanup failed\n");
+        exit(2);
     }
 }
 
@@ -163,7 +212,9 @@ foreach ($products as $email => $rows) {
             'tax_rate' => 0,
             'uom' => 'NOS',
             'category' => $row['category'],
-            'image' => 'rc-premium/' . $row['slug'] . '.svg',
+            'image' => $email === 'fiscal-company@rc-browser.invalid'
+                ? null
+                : 'rc-premium/' . $row['slug'] . '.jpg',
             'sku' => $row['sku'],
             'barcode' => $row['sku'],
             'is_active' => true,

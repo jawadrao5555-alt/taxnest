@@ -2,6 +2,7 @@ import { lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFile
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertLocalOnlyBaseUrl, attachDiagnostics, launchLocalBrowser } from './lib/local-browser.mjs';
+import { auditPremiumVisualPage, assertPremiumVisualAudit } from './premium-ui-assertions.mjs';
 
 const baseUrl = assertLocalOnlyBaseUrl(process.env.BASE_URL || 'http://localhost:5911');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -149,6 +150,22 @@ async function capture(browser, label, journey, pathName, viewport) {
             // The baseline migration has a non-synthetic-looking DI bootstrap
             // row; publish only the explicitly synthetic PRA company tab.
             await page.getByRole('button', { name: /PRA POS/ }).click();
+        }
+        // Selecting a below-fold tab must not turn dashboard evidence into
+        // a scrolled company-table screenshot.
+        await page.evaluate(() => {
+            window.scrollTo(0, 0);
+            for (const element of document.querySelectorAll('main, [class*="overflow"]')) {
+                element.scrollTop = 0;
+            }
+        });
+        if (phase !== 'before') {
+            const audit = await page.evaluate(auditPremiumVisualPage);
+            writeFileSync(
+                path.join(evidenceDir, `${phase}-${label}-${viewport.width}-audit.json`),
+                JSON.stringify(audit, null, 2) + '\n',
+            );
+            assertPremiumVisualAudit(audit);
         }
         const screenshot = path.join(evidenceDir, `${phase}-${label}-${viewport.width}.png`);
         await page.screenshot({ path: screenshot, fullPage: false });

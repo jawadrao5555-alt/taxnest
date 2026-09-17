@@ -64,7 +64,7 @@
     {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur'. --}}
     @include('partials.urdu-font')
     @include('partials.premium-ui')
-    <link rel="stylesheet" href="{{ asset('css/premium-admin.css?v=1') }}">
+    <link rel="stylesheet" href="{{ asset('css/premium-admin.css') }}?v={{ @filemtime(public_path('css/premium-admin.css')) }}">
 </head>
 <body class="h-full bg-gray-950 text-gray-100 admin-themed tn-premium-shell" x-data="{ sidebarOpen: false, themeOpen: false }">
     <div class="flex h-full tn-admin-shell">

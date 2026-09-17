@@ -1,0 +1,47 @@
+{
+  "purpose": "Synthetic PRA visual fixture catalogue photos",
+  "license": "Unsplash License",
+  "local_max_bytes": 102400,
+  "assets": [
+    {
+      "file": "burger.jpg",
+      "use": "Synthetic Garden Burger",
+      "source_image": "https://images.unsplash.com/photo-1654009782508-b3c526a36120"
+    },
+    {
+      "file": "citrus-cooler.jpg",
+      "use": "Synthetic Citrus Cooler",
+      "source_image": "https://images.unsplash.com/photo-1575596510825-f748919a2bf7"
+    },
+    {
+      "file": "lemon-herb-bowl.jpg",
+      "use": "Synthetic Lemon Herb Bowl",
+      "source_image": "https://images.unsplash.com/photo-1551276928-735cffcdcbc8"
+    },
+    {
+      "file": "firecracker-fries.jpg",
+      "use": "Synthetic Firecracker Fries",
+      "source_image": "https://images.unsplash.com/photo-1534938665420-4193effeacc4"
+    },
+    {
+      "file": "mango-sparkler.jpg",
+      "use": "Synthetic Mango Sparkler",
+      "source_image": "https://images.unsplash.com/photo-1546173159-315724a31696"
+    },
+    {
+      "file": "creamy-pasta.jpg",
+      "use": "Synthetic Creamy Pasta",
+      "source_image": "https://images.unsplash.com/photo-1546549032-9571cd6b27df"
+    },
+    {
+      "file": "green-salad.jpg",
+      "use": "Synthetic Green Salad",
+      "source_image": "https://images.unsplash.com/photo-1626711934535-9749ea30dba8"
+    },
+    {
+      "file": "cocoa-brownie.jpg",
+      "use": "Synthetic Cocoa Brownie",
+      "source_image": "https://images.unsplash.com/photo-1566855833528-35bcc17ae9ce"
+    }
+  ]
+}

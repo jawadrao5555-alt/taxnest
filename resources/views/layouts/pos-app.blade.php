@@ -689,7 +689,7 @@
                             </div>
                         </div>
 
-                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-2 rounded-lg text-white hover:bg-white/15 transition">
+                        <button data-mobile-nav-toggle @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-2 rounded-lg text-white hover:bg-white/15 transition">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         </button>
 
@@ -1097,7 +1097,7 @@
                     </div>
                 </div>
 
-                <div x-show="mobileMenuOpen" x-cloak
+                <div data-mobile-nav x-show="mobileMenuOpen" x-cloak
                      x-transition:enter="transition ease-out duration-150"
                      x-transition:enter-start="opacity-0 -translate-y-2"
                      x-transition:enter-end="opacity-100 translate-y-0"

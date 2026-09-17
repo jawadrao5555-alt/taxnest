@@ -402,7 +402,7 @@ input:focus:not(:focus-visible) { outline: none; }
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 </style>
-<link rel="stylesheet" href="{{ asset('css/premium-pos.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/premium-pos.css') }}?v={{ @filemtime(public_path('css/premium-pos.css')) }}">
 {{-- Task 658 (Aug 2026): bake only the TXT.* keys this screen actually uses —
      see pos/universal.blade.php twin note. QA: scripts/pos-i18n-check.php in
      the deploy preflight. --}}

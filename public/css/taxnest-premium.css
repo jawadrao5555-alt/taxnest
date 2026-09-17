@@ -52,9 +52,47 @@
 }
 
 .tn-premium-shell .topnav-bar {
-    background: var(--tn-surface) !important;
-    border-color: var(--tn-line) !important;
+    /* POS navigation intentionally contains white labels/icons in both modes.
+       Keep an opaque, dark brand surface; a light canvas makes them disappear. */
+    background: #073943 !important;
+    color: #FFFFFF;
+    border-color: #315158 !important;
     box-shadow: 0 1px 0 rgba(10, 77, 92, .04);
+}
+.tn-premium-shell .topnav-bar::after { background: none; }
+.tn-premium-shell .topnav-bar .nav-pill {
+    color: #FFFFFF !important;
+}
+.tn-premium-shell .topnav-bar :is(button, a):focus-visible {
+    outline: 2px solid #E7BF3B;
+    outline-offset: 2px;
+}
+.tn-premium-shell .topnav-bar .tn-key-chip {
+    background: #073943 !important;
+    color: #FFFFFF !important;
+}
+.tn-premium-shell .topnav-bar .avatar-themed {
+    background: #E7BF3B !important;
+    color: #10272D !important;
+}
+.tn-premium-shell .topnav-bar .avatar-ring-fbr > div {
+    background: #E7BF3B !important;
+    color: #10272D !important;
+}
+.tn-premium-shell .topnav-bar #tn-nav-sale-tools button {
+    background: #124E59 !important;
+    color: #FFFFFF !important;
+}
+.tn-premium-shell .topnav-bar #tn-nav-sale-tools button :is(span, kbd) {
+    color: inherit !important;
+}
+.tn-premium-shell .topnav-bar #tn-nav-sale-tools .text-\[9px\] {
+    background: #073943 !important;
+    color: #FFFFFF !important;
+}
+.tn-premium-shell .topnav-bar button span.absolute.rounded-full {
+    background: #B91C1C !important;
+    color: #FFFFFF !important;
 }
 
 .tn-premium-shell .sidebar,

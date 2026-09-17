@@ -1,0 +1,1721 @@
+{
+  "route": "/admin/dashboard",
+  "states": {
+    "tablet": {
+      "ui": {
+        "route": "/admin/dashboard",
+        "scrollTop": 0,
+        "heading": true,
+        "metrics": false,
+        "bg": "rgb(244, 246, 243)",
+        "overflow": {
+          "scrollWidth": 834,
+          "clientWidth": 834
+        }
+      },
+      "raw": {
+        "ok": false,
+        "generatedAt": "2026-09-17T09:29:01.070Z",
+        "durationMs": 5,
+        "viewport": {
+          "width": 834,
+          "height": 960,
+          "devicePixelRatio": 1
+        },
+        "viewportClass": "tablet",
+        "responsive": {
+          "current": "tablet",
+          "metrics": {
+            "viewportWidth": 834,
+            "viewportHeight": 960,
+            "headerWidth": 834,
+            "headerHeight": 73.594,
+            "headerVisible": true,
+            "headerStickyOrFixed": false,
+            "paymentVisible": false,
+            "paymentIntersecting": false
+          },
+          "breakpoints": {
+            "mobile": {
+              "maxWidth": 600
+            },
+            "tablet": {
+              "minWidth": 601,
+              "maxWidth": 1024
+            },
+            "desktop": {
+              "minWidth": 1025
+            }
+          }
+        },
+        "theme": {
+          "darkClass": false,
+          "colorScheme": "normal",
+          "dataTheme": null,
+          "prefersDark": false
+        },
+        "darkMode": {
+          "darkClass": false,
+          "colorScheme": "normal",
+          "dataTheme": null,
+          "prefersDark": false
+        },
+        "header": {
+          "found": true,
+          "visible": true,
+          "dimensions": {
+            "left": 0,
+            "top": 0,
+            "width": 834,
+            "height": 73.594
+          }
+        },
+        "categories": {
+          "headerLabels": {
+            "category": "header-labels",
+            "candidateCount": 1,
+            "visibleCount": 2,
+            "records": [
+              {
+                "tag": "p",
+                "selector": "p.text-\\[10px\\].uppercase",
+                "text": "TAXNEST",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 4.675,
+                "contrastRatios": [
+                  4.675,
+                  4.677,
+                  4.68,
+                  4.684,
+                  4.687,
+                  4.691,
+                  4.696,
+                  4.7,
+                  4.705
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.42,
+                  0.447,
+                  0.502
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.42,
+                  0.447,
+                  0.502,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              },
+              {
+                "tag": "h1",
+                "selector": "h1.text-sm.font-bold",
+                "text": "Administration",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 2.884,
+                "contrastRatios": [
+                  2.884,
+                  2.886,
+                  2.888,
+                  2.89,
+                  2.892,
+                  2.895,
+                  2.897,
+                  2.9,
+                  2.903
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.506,
+                  0.549,
+                  0.973
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.506,
+                  0.549,
+                  0.973,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-4.5"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "headerIcons": {
+            "category": "header-icons",
+            "candidateCount": 1,
+            "visibleCount": 1,
+            "records": [
+              {
+                "tag": "svg",
+                "selector": "svg",
+                "text": "",
+                "ariaLabel": "",
+                "category": "header-icons",
+                "kind": "icon",
+                "visible": true,
+                "contrastRatio": 2.455,
+                "contrastRatios": [
+                  2.455,
+                  2.456,
+                  2.458,
+                  2.46,
+                  2.462,
+                  2.464,
+                  2.466,
+                  2.468,
+                  2.471
+                ],
+                "requiredContrastRatio": 3,
+                "foreground": [
+                  0.612,
+                  0.639,
+                  0.686
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.612,
+                  0.639,
+                  0.686,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-3"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "grandTotal": {
+            "category": "grand-total",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "productNames": {
+            "category": "product-names",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "quantityControls": {
+            "category": "quantity-controls",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "paymentControls": {
+            "category": "payment-controls",
+            "candidateCount": 13,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-payment-looking"
+          }
+        },
+        "contrast": {
+          "headerLabels": {
+            "category": "header-labels",
+            "candidateCount": 1,
+            "visibleCount": 2,
+            "records": [
+              {
+                "tag": "p",
+                "selector": "p.text-\\[10px\\].uppercase",
+                "text": "TAXNEST",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 4.675,
+                "contrastRatios": [
+                  4.675,
+                  4.677,
+                  4.68,
+                  4.684,
+                  4.687,
+                  4.691,
+                  4.696,
+                  4.7,
+                  4.705
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.42,
+                  0.447,
+                  0.502
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.42,
+                  0.447,
+                  0.502,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              },
+              {
+                "tag": "h1",
+                "selector": "h1.text-sm.font-bold",
+                "text": "Administration",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 2.884,
+                "contrastRatios": [
+                  2.884,
+                  2.886,
+                  2.888,
+                  2.89,
+                  2.892,
+                  2.895,
+                  2.897,
+                  2.9,
+                  2.903
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.506,
+                  0.549,
+                  0.973
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.506,
+                  0.549,
+                  0.973,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-4.5"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "headerIcons": {
+            "category": "header-icons",
+            "candidateCount": 1,
+            "visibleCount": 1,
+            "records": [
+              {
+                "tag": "svg",
+                "selector": "svg",
+                "text": "",
+                "ariaLabel": "",
+                "category": "header-icons",
+                "kind": "icon",
+                "visible": true,
+                "contrastRatio": 2.455,
+                "contrastRatios": [
+                  2.455,
+                  2.456,
+                  2.458,
+                  2.46,
+                  2.462,
+                  2.464,
+                  2.466,
+                  2.468,
+                  2.471
+                ],
+                "requiredContrastRatio": 3,
+                "foreground": [
+                  0.612,
+                  0.639,
+                  0.686
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.612,
+                  0.639,
+                  0.686,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-3"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "grandTotal": {
+            "category": "grand-total",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "productNames": {
+            "category": "product-names",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "quantityControls": {
+            "category": "quantity-controls",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "paymentControls": {
+            "category": "payment-controls",
+            "candidateCount": 13,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-payment-looking"
+          }
+        },
+        "overflow": {
+          "document": {
+            "name": "document",
+            "present": true,
+            "checked": false,
+            "intentionalScrollable": true,
+            "scrollWidth": 834,
+            "clientWidth": 834,
+            "horizontalOverflow": false,
+            "scrollHeight": 960,
+            "clientHeight": 960,
+            "verticalOverflow": false
+          },
+          "body": {
+            "name": "body",
+            "present": true,
+            "checked": false,
+            "intentionalScrollable": true,
+            "scrollWidth": 834,
+            "clientWidth": 834,
+            "horizontalOverflow": false,
+            "scrollHeight": 960,
+            "clientHeight": 960,
+            "verticalOverflow": false
+          },
+          "main": {
+            "name": "main",
+            "present": true,
+            "checked": false,
+            "intentionalScrollable": true,
+            "scrollWidth": 819,
+            "clientWidth": 819,
+            "horizontalOverflow": false,
+            "scrollHeight": 3700,
+            "clientHeight": 886,
+            "verticalOverflow": true
+          },
+          "intentionallyScrollableContainers": 6
+        },
+        "stickyPayment": {
+          "candidateCount": 1,
+          "visibleCount": 0,
+          "intersectingCount": 0,
+          "stickyOrFixedCount": 0,
+          "controls": [
+            {
+              "tag": "button",
+              "selector": "button.text-gray-500.dark\\:text-gray-400",
+              "text": "",
+              "ariaLabel": "",
+              "visible": false,
+              "intersectingViewport": false,
+              "position": "static",
+              "stickyOrFixed": false,
+              "rect": {
+                "left": -36,
+                "top": 899,
+                "width": 20,
+                "height": 20
+              },
+              "disabled": false
+            }
+          ]
+        },
+        "requiredCategoryFailures": [],
+        "findings": [
+          {
+            "type": "unresolved-foreground-or-background",
+            "category": "header-labels",
+            "record": {
+              "tag": "p",
+              "selector": "p.text-\\[10px\\].uppercase",
+              "text": "TAXNEST",
+              "ariaLabel": "",
+              "category": "header-labels",
+              "kind": "text",
+              "visible": true,
+              "contrastRatio": 4.675,
+              "contrastRatios": [
+                4.675,
+                4.677,
+                4.68,
+                4.684,
+                4.687,
+                4.691,
+                4.696,
+                4.7,
+                4.705
+              ],
+              "requiredContrastRatio": 4.5,
+              "foreground": [
+                0.42,
+                0.447,
+                0.502
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.42,
+                0.447,
+                0.502,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "unresolved-foreground-or-background",
+            "category": "header-labels",
+            "record": {
+              "tag": "h1",
+              "selector": "h1.text-sm.font-bold",
+              "text": "Administration",
+              "ariaLabel": "",
+              "category": "header-labels",
+              "kind": "text",
+              "visible": true,
+              "contrastRatio": 2.884,
+              "contrastRatios": [
+                2.884,
+                2.886,
+                2.888,
+                2.89,
+                2.892,
+                2.895,
+                2.897,
+                2.9,
+                2.903
+              ],
+              "requiredContrastRatio": 4.5,
+              "foreground": [
+                0.506,
+                0.549,
+                0.973
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.506,
+                0.549,
+                0.973,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-4.5"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "contrast-below-4.5",
+            "category": "header-labels",
+            "record": {
+              "tag": "h1",
+              "selector": "h1.text-sm.font-bold",
+              "text": "Administration",
+              "ariaLabel": "",
+              "category": "header-labels",
+              "kind": "text",
+              "visible": true,
+              "contrastRatio": 2.884,
+              "contrastRatios": [
+                2.884,
+                2.886,
+                2.888,
+                2.89,
+                2.892,
+                2.895,
+                2.897,
+                2.9,
+                2.903
+              ],
+              "requiredContrastRatio": 4.5,
+              "foreground": [
+                0.506,
+                0.549,
+                0.973
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.506,
+                0.549,
+                0.973,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-4.5"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "unresolved-foreground-or-background",
+            "category": "header-icons",
+            "record": {
+              "tag": "svg",
+              "selector": "svg",
+              "text": "",
+              "ariaLabel": "",
+              "category": "header-icons",
+              "kind": "icon",
+              "visible": true,
+              "contrastRatio": 2.455,
+              "contrastRatios": [
+                2.455,
+                2.456,
+                2.458,
+                2.46,
+                2.462,
+                2.464,
+                2.466,
+                2.468,
+                2.471
+              ],
+              "requiredContrastRatio": 3,
+              "foreground": [
+                0.612,
+                0.639,
+                0.686
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.612,
+                0.639,
+                0.686,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-3"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "contrast-below-3",
+            "category": "header-icons",
+            "record": {
+              "tag": "svg",
+              "selector": "svg",
+              "text": "",
+              "ariaLabel": "",
+              "category": "header-icons",
+              "kind": "icon",
+              "visible": true,
+              "contrastRatio": 2.455,
+              "contrastRatios": [
+                2.455,
+                2.456,
+                2.458,
+                2.46,
+                2.462,
+                2.464,
+                2.466,
+                2.468,
+                2.471
+              ],
+              "requiredContrastRatio": 3,
+              "foreground": [
+                0.612,
+                0.639,
+                0.686
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.612,
+                0.639,
+                0.686,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-3"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          }
+        ]
+      },
+      "failures": []
+    },
+    "mobile": {
+      "ui": {
+        "route": "/admin/dashboard",
+        "scrollTop": 0,
+        "heading": true,
+        "metrics": false,
+        "bg": "rgb(244, 246, 243)",
+        "overflow": {
+          "scrollWidth": 390,
+          "clientWidth": 390
+        }
+      },
+      "raw": {
+        "ok": false,
+        "generatedAt": "2026-09-17T09:29:01.838Z",
+        "durationMs": 3,
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "devicePixelRatio": 1
+        },
+        "viewportClass": "mobile",
+        "responsive": {
+          "current": "mobile",
+          "metrics": {
+            "viewportWidth": 390,
+            "viewportHeight": 844,
+            "headerWidth": 390,
+            "headerHeight": 73.594,
+            "headerVisible": true,
+            "headerStickyOrFixed": false,
+            "paymentVisible": false,
+            "paymentIntersecting": false
+          },
+          "breakpoints": {
+            "mobile": {
+              "maxWidth": 600
+            },
+            "tablet": {
+              "minWidth": 601,
+              "maxWidth": 1024
+            },
+            "desktop": {
+              "minWidth": 1025
+            }
+          }
+        },
+        "theme": {
+          "darkClass": false,
+          "colorScheme": "normal",
+          "dataTheme": null,
+          "prefersDark": false
+        },
+        "darkMode": {
+          "darkClass": false,
+          "colorScheme": "normal",
+          "dataTheme": null,
+          "prefersDark": false
+        },
+        "header": {
+          "found": true,
+          "visible": true,
+          "dimensions": {
+            "left": 0,
+            "top": 0,
+            "width": 390,
+            "height": 73.594
+          }
+        },
+        "categories": {
+          "headerLabels": {
+            "category": "header-labels",
+            "candidateCount": 1,
+            "visibleCount": 2,
+            "records": [
+              {
+                "tag": "p",
+                "selector": "p.text-\\[10px\\].uppercase",
+                "text": "TAXNEST",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 4.675,
+                "contrastRatios": [
+                  4.675,
+                  4.677,
+                  4.68,
+                  4.684,
+                  4.687,
+                  4.691,
+                  4.696,
+                  4.7,
+                  4.705
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.42,
+                  0.447,
+                  0.502
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.42,
+                  0.447,
+                  0.502,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              },
+              {
+                "tag": "h1",
+                "selector": "h1.text-sm.font-bold",
+                "text": "Administration",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 2.884,
+                "contrastRatios": [
+                  2.884,
+                  2.886,
+                  2.888,
+                  2.89,
+                  2.892,
+                  2.895,
+                  2.897,
+                  2.9,
+                  2.903
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.506,
+                  0.549,
+                  0.973
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.506,
+                  0.549,
+                  0.973,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-4.5"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "headerIcons": {
+            "category": "header-icons",
+            "candidateCount": 1,
+            "visibleCount": 1,
+            "records": [
+              {
+                "tag": "svg",
+                "selector": "svg",
+                "text": "",
+                "ariaLabel": "",
+                "category": "header-icons",
+                "kind": "icon",
+                "visible": true,
+                "contrastRatio": 2.455,
+                "contrastRatios": [
+                  2.455,
+                  2.456,
+                  2.458,
+                  2.46,
+                  2.462,
+                  2.464,
+                  2.466,
+                  2.468,
+                  2.471
+                ],
+                "requiredContrastRatio": 3,
+                "foreground": [
+                  0.612,
+                  0.639,
+                  0.686
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.612,
+                  0.639,
+                  0.686,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-3"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "grandTotal": {
+            "category": "grand-total",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "productNames": {
+            "category": "product-names",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "quantityControls": {
+            "category": "quantity-controls",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "paymentControls": {
+            "category": "payment-controls",
+            "candidateCount": 13,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-payment-looking"
+          }
+        },
+        "contrast": {
+          "headerLabels": {
+            "category": "header-labels",
+            "candidateCount": 1,
+            "visibleCount": 2,
+            "records": [
+              {
+                "tag": "p",
+                "selector": "p.text-\\[10px\\].uppercase",
+                "text": "TAXNEST",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 4.675,
+                "contrastRatios": [
+                  4.675,
+                  4.677,
+                  4.68,
+                  4.684,
+                  4.687,
+                  4.691,
+                  4.696,
+                  4.7,
+                  4.705
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.42,
+                  0.447,
+                  0.502
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.42,
+                  0.447,
+                  0.502,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              },
+              {
+                "tag": "h1",
+                "selector": "h1.text-sm.font-bold",
+                "text": "Administration",
+                "ariaLabel": "",
+                "category": "header-labels",
+                "kind": "text",
+                "visible": true,
+                "contrastRatio": 2.884,
+                "contrastRatios": [
+                  2.884,
+                  2.886,
+                  2.888,
+                  2.89,
+                  2.892,
+                  2.895,
+                  2.897,
+                  2.9,
+                  2.903
+                ],
+                "requiredContrastRatio": 4.5,
+                "foreground": [
+                  0.506,
+                  0.549,
+                  0.973
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.506,
+                  0.549,
+                  0.973,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-4.5"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "headerIcons": {
+            "category": "header-icons",
+            "candidateCount": 1,
+            "visibleCount": 1,
+            "records": [
+              {
+                "tag": "svg",
+                "selector": "svg",
+                "text": "",
+                "ariaLabel": "",
+                "category": "header-icons",
+                "kind": "icon",
+                "visible": true,
+                "contrastRatio": 2.455,
+                "contrastRatios": [
+                  2.455,
+                  2.456,
+                  2.458,
+                  2.46,
+                  2.462,
+                  2.464,
+                  2.466,
+                  2.468,
+                  2.471
+                ],
+                "requiredContrastRatio": 3,
+                "foreground": [
+                  0.612,
+                  0.639,
+                  0.686
+                ],
+                "background": [
+                  0.981,
+                  0.986,
+                  0.982
+                ],
+                "sourceForeground": [
+                  0.612,
+                  0.639,
+                  0.686,
+                  1
+                ],
+                "transparentAncestors": 5,
+                "opacityAncestors": 0,
+                "explicitPaymentControl": false,
+                "unresolved": [
+                  "unsupported-background-image:none"
+                ],
+                "unsupportedBackgroundImage": true,
+                "disabled": false,
+                "nativeDisabledAttribute": false,
+                "deliberateDisabledState": false,
+                "pass": false,
+                "failures": [
+                  "unresolved-foreground-or-background",
+                  "contrast-below-3"
+                ],
+                "failure": "unresolved-foreground-or-background"
+              }
+            ],
+            "pass": false,
+            "status": "checked"
+          },
+          "grandTotal": {
+            "category": "grand-total",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "productNames": {
+            "category": "product-names",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "quantityControls": {
+            "category": "quantity-controls",
+            "candidateCount": 0,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-found"
+          },
+          "paymentControls": {
+            "category": "payment-controls",
+            "candidateCount": 13,
+            "visibleCount": 0,
+            "records": [],
+            "pass": true,
+            "status": "not-payment-looking"
+          }
+        },
+        "overflow": {
+          "document": {
+            "name": "document",
+            "present": true,
+            "checked": false,
+            "intentionalScrollable": true,
+            "scrollWidth": 390,
+            "clientWidth": 390,
+            "horizontalOverflow": false,
+            "scrollHeight": 844,
+            "clientHeight": 844,
+            "verticalOverflow": false
+          },
+          "body": {
+            "name": "body",
+            "present": true,
+            "checked": false,
+            "intentionalScrollable": true,
+            "scrollWidth": 390,
+            "clientWidth": 390,
+            "horizontalOverflow": false,
+            "scrollHeight": 844,
+            "clientHeight": 844,
+            "verticalOverflow": false
+          },
+          "main": {
+            "name": "main",
+            "present": true,
+            "checked": false,
+            "intentionalScrollable": true,
+            "scrollWidth": 386,
+            "clientWidth": 386,
+            "horizontalOverflow": false,
+            "scrollHeight": 4358,
+            "clientHeight": 770,
+            "verticalOverflow": true
+          },
+          "intentionallyScrollableContainers": 6
+        },
+        "stickyPayment": {
+          "candidateCount": 1,
+          "visibleCount": 0,
+          "intersectingCount": 0,
+          "stickyOrFixedCount": 0,
+          "visible": false,
+          "intersecting": false,
+          "controls": [
+            {
+              "tag": "button",
+              "selector": "button.text-gray-500.dark\\:text-gray-400",
+              "text": "",
+              "ariaLabel": "",
+              "visible": false,
+              "intersectingViewport": false,
+              "position": "static",
+              "stickyOrFixed": false,
+              "rect": {
+                "left": -36,
+                "top": 786,
+                "width": 20,
+                "height": 40
+              },
+              "disabled": false
+            }
+          ]
+        },
+        "requiredCategoryFailures": [],
+        "findings": [
+          {
+            "type": "unresolved-foreground-or-background",
+            "category": "header-labels",
+            "record": {
+              "tag": "p",
+              "selector": "p.text-\\[10px\\].uppercase",
+              "text": "TAXNEST",
+              "ariaLabel": "",
+              "category": "header-labels",
+              "kind": "text",
+              "visible": true,
+              "contrastRatio": 4.675,
+              "contrastRatios": [
+                4.675,
+                4.677,
+                4.68,
+                4.684,
+                4.687,
+                4.691,
+                4.696,
+                4.7,
+                4.705
+              ],
+              "requiredContrastRatio": 4.5,
+              "foreground": [
+                0.42,
+                0.447,
+                0.502
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.42,
+                0.447,
+                0.502,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "unresolved-foreground-or-background",
+            "category": "header-labels",
+            "record": {
+              "tag": "h1",
+              "selector": "h1.text-sm.font-bold",
+              "text": "Administration",
+              "ariaLabel": "",
+              "category": "header-labels",
+              "kind": "text",
+              "visible": true,
+              "contrastRatio": 2.884,
+              "contrastRatios": [
+                2.884,
+                2.886,
+                2.888,
+                2.89,
+                2.892,
+                2.895,
+                2.897,
+                2.9,
+                2.903
+              ],
+              "requiredContrastRatio": 4.5,
+              "foreground": [
+                0.506,
+                0.549,
+                0.973
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.506,
+                0.549,
+                0.973,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-4.5"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "contrast-below-4.5",
+            "category": "header-labels",
+            "record": {
+              "tag": "h1",
+              "selector": "h1.text-sm.font-bold",
+              "text": "Administration",
+              "ariaLabel": "",
+              "category": "header-labels",
+              "kind": "text",
+              "visible": true,
+              "contrastRatio": 2.884,
+              "contrastRatios": [
+                2.884,
+                2.886,
+                2.888,
+                2.89,
+                2.892,
+                2.895,
+                2.897,
+                2.9,
+                2.903
+              ],
+              "requiredContrastRatio": 4.5,
+              "foreground": [
+                0.506,
+                0.549,
+                0.973
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.506,
+                0.549,
+                0.973,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-4.5"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "unresolved-foreground-or-background",
+            "category": "header-icons",
+            "record": {
+              "tag": "svg",
+              "selector": "svg",
+              "text": "",
+              "ariaLabel": "",
+              "category": "header-icons",
+              "kind": "icon",
+              "visible": true,
+              "contrastRatio": 2.455,
+              "contrastRatios": [
+                2.455,
+                2.456,
+                2.458,
+                2.46,
+                2.462,
+                2.464,
+                2.466,
+                2.468,
+                2.471
+              ],
+              "requiredContrastRatio": 3,
+              "foreground": [
+                0.612,
+                0.639,
+                0.686
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.612,
+                0.639,
+                0.686,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-3"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          },
+          {
+            "type": "contrast-below-3",
+            "category": "header-icons",
+            "record": {
+              "tag": "svg",
+              "selector": "svg",
+              "text": "",
+              "ariaLabel": "",
+              "category": "header-icons",
+              "kind": "icon",
+              "visible": true,
+              "contrastRatio": 2.455,
+              "contrastRatios": [
+                2.455,
+                2.456,
+                2.458,
+                2.46,
+                2.462,
+                2.464,
+                2.466,
+                2.468,
+                2.471
+              ],
+              "requiredContrastRatio": 3,
+              "foreground": [
+                0.612,
+                0.639,
+                0.686
+              ],
+              "background": [
+                0.981,
+                0.986,
+                0.982
+              ],
+              "sourceForeground": [
+                0.612,
+                0.639,
+                0.686,
+                1
+              ],
+              "transparentAncestors": 5,
+              "opacityAncestors": 0,
+              "explicitPaymentControl": false,
+              "unresolved": [
+                "unsupported-background-image:none"
+              ],
+              "unsupportedBackgroundImage": true,
+              "disabled": false,
+              "nativeDisabledAttribute": false,
+              "deliberateDisabledState": false,
+              "pass": false,
+              "failures": [
+                "unresolved-foreground-or-background",
+                "contrast-below-3"
+              ],
+              "failure": "unresolved-foreground-or-background"
+            }
+          }
+        ]
+      },
+      "failures": []
+    }
+  },
+  "meta": {
+    "helperVersion": "auditPremiumVisualPage latest module",
+    "sourceHash": "96eec2a6df05a63d7016d7661ec9dbacffe641079bfe15591130693201fcdbb2",
+    "sourceBytes": 37100,
+    "generatedAt": "2026-09-17T09:29:06.076Z"
+  }
+}

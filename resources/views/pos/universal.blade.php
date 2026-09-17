@@ -547,7 +547,7 @@ input:focus:not(:focus-visible) { outline: none; }
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 </style>
-<link rel="stylesheet" href="{{ asset('css/premium-pos.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/premium-pos.css') }}?v={{ @filemtime(public_path('css/premium-pos.css')) }}">
 <script>
 window.history.pushState(null, null, window.location.href);
 window.addEventListener('popstate', function() {

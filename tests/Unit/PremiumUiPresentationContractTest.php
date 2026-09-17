@@ -142,6 +142,45 @@ class PremiumUiPresentationContractTest extends TestCase
         );
     }
 
+    public function test_browser_presentation_audit_is_reusable_and_does_not_launch_a_browser(): void
+    {
+        $path = base_path('scripts/premium-ui-assertions.mjs');
+        $this->assertFileExists($path, 'missing reusable premium browser presentation audit');
+
+        $source = (string) file_get_contents($path);
+        foreach ([
+            'export const auditPremiumVisualPage',
+            'export function findPremiumVisualAuditFailures',
+            'export function assertPremiumVisualAudit',
+            'export function classifyPremiumDisabledControl',
+            'export function hasPremiumDisabledAppearance',
+            'export function assessPremiumMobilePayBounds',
+            'export async function verifyPremiumNavigation',
+            'export const auditPremiumVisualPageSource',
+            'contrastRatio',
+            'contrastRatios',
+            'requiredContrastRatio',
+            'color\\(\\s*srgb',
+            'linear-gradient',
+            'unsupported-background-image',
+            'unresolved',
+            'transparentAncestors',
+            'horizontal-overflow',
+            'stickyOrFixed',
+            'mobile-pay-outside-viewport',
+            'fullyInsideViewport',
+            'darkClass',
+        ] as $contract) {
+            $this->assertStringContainsString($contract, $source, "browser audit is missing {$contract}");
+        }
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?:launchLocalBrowser|chromium\\.launch|browserType\\.launch)/',
+            $source,
+            'the reusable presentation audit must not launch a browser',
+        );
+    }
+
     private function read(string $relativePath): string
     {
         $path = resource_path($relativePath);

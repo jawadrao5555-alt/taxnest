@@ -4,7 +4,9 @@
  * existing admin-theme variables applied by layouts/admin-app.blade.php.
  */
 
-:root {
+/* Resolve aliases on the same element as the mode tokens, not :root where
+   body-scoped dark tokens would be unavailable and freeze the fallbacks. */
+.tn-premium-shell {
     --tn-admin-rail: var(--admin-sidebar, #102b34);
     --tn-admin-rail-line: var(--admin-sidebar-border, rgba(231, 191, 59, .18));
     --tn-admin-accent: var(--admin-accent, var(--tn-brand));
@@ -110,8 +112,11 @@ body.admin-themed.tn-premium-shell {
 .tn-admin-workspace-header {
     min-height: 4.6rem;
     border-color: var(--tn-admin-line) !important;
-    background: color-mix(in srgb, var(--tn-admin-surface) 88%, transparent) !important;
+    background: var(--tn-admin-surface) !important;
     backdrop-filter: blur(12px);
+}
+.tn-admin-workspace-header :is(h1, p, button) {
+    color: var(--tn-admin-text) !important;
 }
 
 .tn-admin-main {

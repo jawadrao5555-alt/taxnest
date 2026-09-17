@@ -272,7 +272,7 @@ fi
 echo ""
 if [ "$FAIL" -ne 0 ]; then
   echo "CI LIVE VERIFY: FAILED ($FAIL assertion(s)) — treat as NEW diagnosis cycle for the original issue." >&2
-  echo "Cloud Agent: do NOT claim LIVE VERIFIED. Collect Actions logs, fix locally, new cursor/* PR." >&2
+  echo "Cloud Agent: do NOT claim LIVE VERIFIED. Collect Actions logs, fix locally, new cursor/* or replit/* PR." >&2
   exit 1
 fi
 echo "CI LIVE VERIFY: PASS — SHA matched and NestPOS markers present (profile=${PROFILE})."

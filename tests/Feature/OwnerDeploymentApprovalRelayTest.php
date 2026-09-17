@@ -33,10 +33,10 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         ]);
     }
 
-    private function github(bool $shaMatches = true, ?string $mergedSha = null): void
+    private function github(bool $shaMatches = true, ?string $mergedSha = null, string $branch = 'cursor/forensic-release-readiness'): void
     {
         $head = $shaMatches ? self::SHA : str_repeat('c', 40);
-        Http::fake(function ($request) use ($head, $mergedSha) {
+        Http::fake(function ($request) use ($head, $mergedSha, $branch) {
             $url = $request->url();
             if (str_ends_with($url, '/commits/main')) {
                 return Http::response(['sha' => $mergedSha]);
@@ -60,7 +60,7 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
                 'draft' => false, 'base' => [
                     'ref' => 'main', 'repo' => ['full_name' => config('deployment_approval.repository')],
                 ], 'head' => [
-                    'ref' => 'cursor/forensic-release-readiness',
+                    'ref' => $branch,
                     'sha' => $head,
                     'repo' => ['full_name' => config('deployment_approval.repository')],
                 ],
@@ -115,6 +115,20 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         app(OwnerDeploymentApprovalService::class)->validatePullRequest(18, 'moved-sha');
+    }
+
+    public function test_replit_release_branch_is_accepted_by_the_same_exact_sha_gates(): void
+    {
+        $admin = $this->admin();
+        $this->github(true, null, 'replit/bootstrap-release');
+
+        $approval = app(OwnerDeploymentApprovalService::class)->create([
+            'pull_request_number' => 17,
+            'head_sha' => self::SHA,
+        ], $admin->id);
+
+        $this->assertSame('pending', $approval->status);
+        $this->assertSame(self::SHA, $approval->head_sha);
     }
 
     public function test_bad_password_stale_sha_and_expired_approval_are_rejected(): void

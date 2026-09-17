@@ -63,7 +63,8 @@ Guards are isolated — no cross-login except admin auto-detect rules documented
 
 ## Deploy / Git (summary)
 
-- Feature work only on `cursor/*` branches; PR to `main`; do not commit on `main`.
+- Feature work only on `cursor/*` or `replit/*` branches; PR to `main`; do
+  not commit on `main`.
 - Production code deploy: GitHub Actions on Environment `production-deploy` (no reviewers; repository fail-closed gates) after **Owner Merge & Deploy**. Live Ops stays on Environment `production` with required reviewers. See `docs/ops/github-production-deploy.md` and `docs/ops/owner-merge-and-deploy.md`.
 - Elaan / What’s New remains part of production deploy gates.
 - Rollback: `deployment/ROLLBACK.md`.

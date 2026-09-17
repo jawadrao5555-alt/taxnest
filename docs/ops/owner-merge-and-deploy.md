@@ -1,6 +1,7 @@
 # Owner Merge & Deploy
 
-Agents implement, test, and open **one focused `cursor/*` PR**, then **STOP**.
+Agents implement, test, and open **one focused `cursor/*` or `replit/*` PR**,
+then **STOP**.
 They must not merge, approve, or dispatch production.
 
 The owner authorizes an exact release from the authenticated TaxNest SaaS admin
@@ -9,7 +10,8 @@ panel. Plain chat text is intent, not authentication.
 ## Mobile owner approval
 
 1. Wait until the PR is Ready, targets `main`, comes from a same-repository
-   `cursor/*` branch, and its current **PR checks / validate** check is green.
+   `cursor/*` or `replit/*` branch, and its current **PR checks / validate**
+   check is green.
 2. Copy the PR number and its full 40-character head SHA from the agent's PR
    report.
 3. On a signed-in phone or browser, open SaaS Admin → **Deploy Approvals**.
@@ -97,7 +99,7 @@ inputs.
 - non-super-admin or wrong current password
 - expired approval
 - wrong repository, PR, request ID, head SHA, workflow, audience, ref, or OIDC signature
-- draft, fork, non-`cursor/`, non-main, moved, conflicted, or stale PR
+- draft, fork, non-`cursor/`/`replit/`, non-main, moved, conflicted, or stale PR
 - failed or missing `validate` check
 - duplicate claim or provenance receipt replay
 - merge SHA different from the current `origin/main` tip

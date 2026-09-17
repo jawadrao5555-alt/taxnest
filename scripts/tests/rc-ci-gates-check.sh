@@ -20,7 +20,7 @@ const mandatoryCommands={
   'dependency-audit-build':['rc-recertify.sh --all-locks'],
   fullphpunit:['rc-safe-run -- vendor/bin/phpunit'],
   'native-mariadb-di':['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-mariadb-migration-lab.sh --all'],
-  browserdesktopmobile:['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-browser-fixture.sh run','npm-bootstrap-pinned.sh exec -- playwright install --with-deps chromium'],
+  browserdesktopmobile:['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-browser-fixture.sh run','rc-playwright-install.sh','local-browser-discovery-check.mjs'],
   jsagentrealtime:['rc-safe-run -- node --test'],
   'manifest-provenance':['AgentReleaseManifestTest.php']
 };

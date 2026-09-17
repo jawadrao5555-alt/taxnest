@@ -12,9 +12,14 @@ STATE_ROOT="$STATE_BASE/safe-runtime/browser-state"
 SOCKET="$LAB_ROOT/run/mariadb.sock"
 FIXTURE="$STATE_ROOT/fixture.json"
 SERVER_PID_FILE="$STATE_ROOT/php-server.pid"
+CACHE_ROOT="$STATE_BASE/playwright-cache"
+CACHE_EXECUTABLE="$CACHE_ROOT/chromium-1234/chrome-linux64/chrome"
+CACHE_EXECUTABLE_TARGET="$CACHE_ROOT/chromium-1234/chrome-linux64/chrome-real"
+CACHE_FFMPEG="$CACHE_ROOT/ffmpeg-1011/ffmpeg-linux"
 SOCKET_PID=''
 SERVER_PID=''
 MARKER="$TOOLS/node-ran"
+REAL_NODE="$(command -v node)"
 
 cleanup() {
     [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null || true
@@ -42,12 +47,18 @@ done
 cat >"$TOOLS/node" <<EOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
-printf 'node acceptance handoff reached\n' >"$MARKER"
+printf 'node acceptance handoff reached\nHOME=%s\nPLAYWRIGHT_BROWSERS_PATH=%s\n' "\${HOME:-}" "\${PLAYWRIGHT_BROWSERS_PATH:-}" >"$MARKER"
 EOF
 chmod 700 "$TOOLS/node"
 
-mkdir -p "$STATE_ROOT" "$LAB_ROOT/run"
+mkdir -p "$STATE_ROOT" "$LAB_ROOT/run" "$(dirname "$CACHE_EXECUTABLE")"
+mkdir -p "$(dirname "$CACHE_FFMPEG")"
 chmod 700 "$STATE_BASE" "$STATE_ROOT" "$LAB_ROOT"
+printf '#!/bin/sh\nexit 0\n' >"$CACHE_EXECUTABLE_TARGET"
+chmod 700 "$CACHE_EXECUTABLE_TARGET"
+ln -s "$CACHE_EXECUTABLE_TARGET" "$CACHE_EXECUTABLE"
+printf '#!/bin/sh\nexit 0\n' >"$CACHE_FFMPEG"
+chmod 700 "$CACHE_FFMPEG"
 printf '{"synthetic":true}\n' >"$FIXTURE"
 sleep 30 &
 SERVER_PID="$!"
@@ -71,8 +82,13 @@ fixture=$FIXTURE
 server_pid=$SERVER_PID_FILE
 database=taxnest_rc_browser
 browser_port=5911
+playwright_browsers_path=$CACHE_ROOT
 EOF
 chmod 600 "$STATE_BASE/browser-fixture.state"
+
+"$REAL_NODE" "$ROOT/scripts/lib/playwright-cache.mjs" "$CACHE_ROOT" >/dev/null ||
+    fail 'legitimate in-revision executable symlink/cache contract was rejected'
+pass 'legitimate in-revision executable symlink is accepted in dedicated cache'
 
 run_helper() {
     env -u RC_MARIADB_ROOT \
@@ -96,7 +112,77 @@ expect_failure() {
 
 run_helper
 [[ -s "$MARKER" ]] || fail 'separate run did not reload the persisted fixture target/socket'
-pass 'separate run reloads persisted MariaDB root without its original env'
+grep -Fq "PLAYWRIGHT_BROWSERS_PATH=$CACHE_ROOT" "$MARKER" ||
+  fail 'separate run did not preserve the persisted Playwright cache path'
+grep -Fq "HOME=$STATE_BASE/safe-runtime/home" "$MARKER" ||
+  fail 'separate run did not use the isolated HOME'
+pass 'separate run preserves cache A while HOME is isolated to B'
+
+expect_runner_failure() {
+    local label="$1" cache_path="$2"
+    if bash "$ROOT/scripts/rc-safe-run" --browser --runtime "$STATE_BASE/safe-runtime" \
+        --mariadb-root "$LAB_ROOT" --playwright-browsers-path "$cache_path" -- true >/dev/null 2>&1; then
+        fail "$label was accepted"
+    fi
+    pass "$label is rejected"
+}
+expect_runner_failure 'non-canonical runtime-associated Playwright cache path' \
+    "$STATE_BASE/safe-runtime/../playwright-cache"
+ln -s "$CACHE_ROOT" "$STATE_BASE/cache-link"
+expect_runner_failure 'symlinked runtime-associated Playwright cache path' "$STATE_BASE/cache-link"
+rm -f "$STATE_BASE/cache-link"
+mv "$CACHE_ROOT" "$STATE_BASE/playwright-cache-missing"
+expect_runner_failure 'missing exact runtime-associated Playwright cache' "$CACHE_ROOT"
+mv "$STATE_BASE/playwright-cache-missing" "$CACHE_ROOT"
+mv "$CACHE_ROOT/chromium-1234" "$CACHE_ROOT/chromium-9999"
+expect_runner_failure 'stale exact runtime-associated Playwright cache' "$CACHE_ROOT"
+mv "$CACHE_ROOT/chromium-9999" "$CACHE_ROOT/chromium-1234"
+chmod 600 "$CACHE_FFMPEG"
+expect_runner_failure 'non-executable exact runtime-associated Playwright cache' "$CACHE_ROOT"
+chmod 700 "$CACHE_FFMPEG"
+rm -f "$CACHE_EXECUTABLE"
+ln -s "$TOOLS/outside-browser" "$CACHE_EXECUTABLE"
+expect_runner_failure 'escaping exact runtime-associated Playwright cache' "$CACHE_ROOT"
+rm -f "$CACHE_EXECUTABLE"
+ln -s "$CACHE_EXECUTABLE_TARGET" "$CACHE_EXECUTABLE"
+
+expect_cache_failure() {
+    local label="$1"
+    if "$REAL_NODE" "$ROOT/scripts/lib/playwright-cache.mjs" "$CACHE_ROOT" >/dev/null 2>&1; then
+        fail "$label was accepted"
+    fi
+    pass "$label is rejected"
+}
+
+mv "$CACHE_ROOT/ffmpeg-1011" "$CACHE_ROOT/ffmpeg-9999"
+expect_cache_failure 'stale Playwright FFmpeg revision'
+mv "$CACHE_ROOT/ffmpeg-9999" "$CACHE_ROOT/ffmpeg-1011"
+chmod 600 "$CACHE_FFMPEG"
+expect_cache_failure 'non-executable Playwright FFmpeg executable'
+chmod 700 "$CACHE_FFMPEG"
+
+ln -s "$TOOLS/outside-browser" "$CACHE_ROOT/chromium-1234/unexpected-link"
+expect_cache_failure 'arbitrary nested Playwright cache symlink'
+rm -f "$CACHE_ROOT/chromium-1234/unexpected-link"
+
+mv "$CACHE_ROOT/chromium-1234" "$CACHE_ROOT/chromium-9999"
+expect_cache_failure 'stale Playwright revision'
+mv "$CACHE_ROOT/chromium-9999" "$CACHE_ROOT/chromium-1234"
+rm -f "$CACHE_EXECUTABLE"
+expect_cache_failure 'missing Playwright executable'
+printf '#!/bin/sh\nexit 0\n' >"$CACHE_EXECUTABLE"
+chmod 600 "$CACHE_EXECUTABLE"
+expect_cache_failure 'non-executable Playwright executable'
+chmod 700 "$CACHE_EXECUTABLE"
+rm -f "$CACHE_EXECUTABLE"
+ln -s "$TOOLS/outside-browser" "$CACHE_EXECUTABLE"
+expect_cache_failure 'escaping Playwright executable symlink'
+rm -f "$CACHE_EXECUTABLE"
+printf '#!/bin/sh\nexit 0\n' >"$CACHE_EXECUTABLE"
+chmod 700 "$CACHE_EXECUTABLE"
+mkdir "$CACHE_ROOT/arbitrary-entry"
+expect_cache_failure 'arbitrary Playwright cache entry'
+rm -rf "$CACHE_ROOT/arbitrary-entry"
 
 mv "$STATE_BASE/browser-fixture.state" "$STATE_BASE/browser-fixture.state.missing"
 expect_failure 'missing browser fixture state'
@@ -128,7 +214,9 @@ ln -s "$TOOLS/outside-fixture" "$FIXTURE"
 expect_failure 'fixture symlink'
 
 bash -n "$FIXTURE_HELPER"
+bash -n "$ROOT/scripts/rc-playwright-install.sh"
 node --check "$ROOT/scripts/rc-browser-acceptance.mjs" >/dev/null
+node --check "$ROOT/scripts/lib/playwright-cache.mjs" >/dev/null
 php -l "$ROOT/scripts/rc-browser-fixture-seed.php" >/dev/null
 php -l "$ROOT/scripts/rc-browser-fixture-resume.php" >/dev/null
 php -l "$ROOT/scripts/rc-di-browser-fixture.php" >/dev/null

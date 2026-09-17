@@ -227,7 +227,9 @@ jobs:
         run: |
           composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
           bash scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund
-          bash scripts/npm-bootstrap-pinned.sh exec -- playwright install --with-deps chromium
+          RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} \
+            bash scripts/rc-playwright-install.sh
+          node scripts/tests/local-browser-discovery-check.mjs
       - name: Seed and exercise isolated browser fixture
         env:
           RC_MARIADB_PORT: '33117'

@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import pw from 'playwright-core';
 import {
     chromiumResolutionDiagnostics,
     formatChromiumResolutionDiagnostics,
     resolveChromiumPath,
 } from '../lib/local-browser.mjs';
+import { expectedChromiumRevision, expectedFfmpegRevision, validatePlaywrightCache } from '../lib/playwright-cache.mjs';
 
 const { chromium } = pw;
 const root = mkdtempSync(path.join(os.tmpdir(), 'taxnest-local-browser-'));
@@ -57,8 +59,47 @@ const playwrightRoot = path.join(root, 'playwright-cache');
 const publicApiPath = chromium.executablePath();
 const publicApiInstall = publicApiPath.split(/[\\/]/).find((part) => /^chromium-\d+$/.test(part));
 assert.ok(publicApiInstall, 'public Playwright API exposes a chromium revision path');
+const chromiumRevision = expectedChromiumRevision();
+const ffmpegRevision = expectedFfmpegRevision();
+assert.equal(publicApiInstall, `chromium-${chromiumRevision}`, 'public Playwright API matches package Chromium revision');
+const dryRunCache = path.join(root, 'dry-run-cache');
+const dryRun = spawnSync(path.resolve('node_modules/.bin/playwright'), ['install', '--dry-run', 'chromium'], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: dryRunCache },
+});
+assert.equal(dryRun.status, 0, `installed Playwright dry-run failed: ${dryRun.stderr}`);
+const dryRunOutput = `${dryRun.stdout}\n${dryRun.stderr}`;
+for (const entry of [`chromium-${chromiumRevision}`, `chromium_headless_shell-${chromiumRevision}`, `ffmpeg-${ffmpegRevision}`]) {
+    assert.match(dryRunOutput, new RegExp(entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `dry-run declares ${entry}`);
+}
+assert.equal(existsSync(dryRunCache), false, 'Playwright dry-run did not create/download a cache');
+console.log(`PASS: installed Playwright dry-run declares exact Chromium/headless/FFmpeg revisions (${chromiumRevision}/${ffmpegRevision}) without downloads`);
 const playwrightChrome = path.join(playwrightRoot, publicApiInstall, 'chrome-linux64', 'chrome');
 executable(playwrightChrome);
+const playwrightFfmpeg = path.join(playwrightRoot, `ffmpeg-${ffmpegRevision}`, 'ffmpeg-linux');
+executable(playwrightFfmpeg);
+assert.deepEqual(
+    validatePlaywrightCache(playwrightRoot).revision,
+    publicApiInstall.replace(/^chromium-/, ''),
+    'dedicated cache validates the exact package revision',
+);
+const legitimateTarget = executable(path.join(playwrightRoot, publicApiInstall, 'chrome-linux64', 'chrome-real'));
+const legitimateSymlink = path.join(playwrightRoot, publicApiInstall, 'chrome-linux', 'chrome');
+mkdirSync(path.dirname(legitimateSymlink), { recursive: true });
+symlinkSync(legitimateTarget, legitimateSymlink);
+assert.equal(
+    resolveChromiumPath({
+        candidates: [legitimateSymlink],
+        playwrightExecutablePath: null,
+        playwrightBrowsersPath: playwrightRoot,
+        trustedRoots: [playwrightRoot],
+        allowSystemRoots: false,
+        diagnostics: false,
+    }),
+    legitimateSymlink,
+    'in-revision executable symlink is accepted only inside the dedicated cache',
+);
 const headless = executable(path.join(
     playwrightRoot,
     publicApiInstall.replace(/^chromium-/, 'chromium_headless_shell-'),
@@ -104,6 +145,10 @@ assert.equal(
     headless,
     'Playwright headless-shell layout is discovered',
 );
+
+const staleCacheEntry = path.join(playwrightRoot, 'chromium-9999');
+mkdirSync(staleCacheEntry, { recursive: true });
+assert.throws(() => validatePlaywrightCache(playwrightRoot), /unexpected Playwright cache entry/);
 
 const diagnosticState = chromiumResolutionDiagnostics({
     candidates: [regular, symlink, nonExecutable, outside, path.join(outsideRoot, 'secret-looking', 'chrome')],

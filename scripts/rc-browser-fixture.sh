@@ -11,6 +11,7 @@ LAB_ROOT="$(realpath -m -- "$LAB_INPUT")"
 DB_PORT="${RC_MARIADB_PORT:-33117}"
 DATABASE="${RC_BROWSER_DB:-taxnest_rc_browser}"
 STATE_ROOT="$SAFE_RUNTIME/browser-state"
+PLAYWRIGHT_BROWSERS_PATH="$STATE_BASE/playwright-cache"
 FIXTURE="$STATE_ROOT/fixture.json"; SERVER_PID="$STATE_ROOT/php-server.pid"; SERVER_LOG="$STATE_ROOT/php-server.log"
 BROWSER_PORT="${RC_BROWSER_PORT:-5911}"
 STATE_RECORD="$STATE_BASE/browser-fixture.state"
@@ -43,9 +44,19 @@ assert_state_tree() {
   assert_no_symlink "$STATE_ROOT" 'browser fixture state'
   if [[ -d "$STATE_BASE" ]]; then
     local link
-    link="$(find -P "$STATE_BASE" -type l -print -quit)" || fail 'cannot inspect browser state symlinks'
+    # The dedicated Playwright cache is the sole permitted symlink-bearing
+    # subtree; validate its exact revision/targets separately below.
+    link="$(find -P "$STATE_BASE" -path "$PLAYWRIGHT_BROWSERS_PATH" -prune -o -type l -print -quit)" ||
+      fail 'cannot inspect browser state symlinks'
     [[ -z "$link" ]] || fail "browser state contains symlink: $link"
   fi
+}
+assert_playwright_cache() {
+  [[ "$PLAYWRIGHT_BROWSERS_PATH" == "$STATE_BASE/playwright-cache" && ! -L "$PLAYWRIGHT_BROWSERS_PATH" ]] ||
+    fail 'Playwright cache is outside the exact disposable state root'
+  [[ -d "$PLAYWRIGHT_BROWSERS_PATH" ]] || fail 'dedicated Playwright cache is absent'
+  node "$ROOT/scripts/lib/playwright-cache.mjs" "$PLAYWRIGHT_BROWSERS_PATH" >/dev/null ||
+    fail 'dedicated Playwright cache failed exact revision/executable validation'
 }
 assert_lab_tree() {
   assert_no_symlink "$LAB_ROOT" 'MariaDB root'
@@ -83,6 +94,7 @@ write_state() {
     printf 'server_pid=%s\n' "$SERVER_PID"
     printf 'database=%s\n' "$DATABASE"
     printf 'browser_port=%s\n' "$BROWSER_PORT"
+    printf 'playwright_browsers_path=%s\n' "$PLAYWRIGHT_BROWSERS_PATH"
   } >"$temporary"
   chmod 600 "$temporary"
   mv -f -- "$temporary" "$STATE_RECORD"
@@ -90,7 +102,7 @@ write_state() {
 load_state() {
   local key value
   local state_version='' state_base='' safe_runtime='' state_root='' mariadb_root=''
-  local mariadb_port='' socket='' fixture='' server_pid='' database='' browser_port=''
+  local mariadb_port='' socket='' fixture='' server_pid='' database='' browser_port='' playwright_browsers_path=''
   declare -A seen=()
   assert_state_tree
   [[ -f "$STATE_RECORD" && ! -L "$STATE_RECORD" ]] || fail 'setup state record is absent or unsafe'
@@ -110,6 +122,7 @@ load_state() {
       server_pid) server_pid="$value" ;;
       database) database="$value" ;;
       browser_port) browser_port="$value" ;;
+      playwright_browsers_path) playwright_browsers_path="$value" ;;
       *) fail "unknown browser fixture state record key: $key" ;;
     esac
   done <"$STATE_RECORD"
@@ -118,7 +131,8 @@ load_state() {
     "$mariadb_port" =~ ^[0-9]+$ && "$mariadb_port" == "$DB_PORT" &&
     "$socket" == "$LAB_ROOT/run/mariadb.sock" && "$fixture" == "$STATE_ROOT/fixture.json" &&
     "$server_pid" == "$STATE_ROOT/php-server.pid" && "$database" == "$DATABASE" &&
-    "$browser_port" == "$BROWSER_PORT" ]] || fail 'browser fixture state does not match this isolated contract'
+    "$browser_port" == "$BROWSER_PORT" && "$playwright_browsers_path" == "$PLAYWRIGHT_BROWSERS_PATH" ]] ||
+    fail 'browser fixture state does not match this isolated contract'
   SOCKET="$socket"; FIXTURE="$fixture"; SERVER_PID="$server_pid"
   assert_socket
   assert_fixture
@@ -131,7 +145,7 @@ resolve_mariadbd() {
   done
   fail 'no local MariaDB server found'
 }
-safe_browser() { "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" -- "$@"; }
+safe_browser() { "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" --playwright-browsers-path "$PLAYWRIGHT_BROWSERS_PATH" -- "$@"; }
 lab() { RC_MARIADB_ROOT="$LAB_ROOT" RC_MARIADB_PORT="$DB_PORT" bash "$LAB_CTL" "$@"; }
 ensure_fixture_storage_link() {
   local public_storage="$ROOT/public/storage" fixture_storage="$ROOT/storage/app/public"
@@ -155,6 +169,7 @@ setup() {
   mkdir -p "$STATE_ROOT"; chmod 700 "$STATE_BASE" "$SAFE_RUNTIME" "$STATE_ROOT"; assert_state_tree
   assert_no_symlink "$STATE_RECORD" 'browser fixture state record'
   resolve_mariadbd; lab start
+  assert_playwright_cache
   SOCKET="$LAB_ROOT/run/mariadb.sock"; assert_socket; cd "$ROOT"
   CLIENT="$(lab env | awk -F= '$1=="RC_MARIADB_CLIENT"{print substr($0,index($0,"=")+1)}')"
   "$CLIENT" --protocol=socket --socket="$SOCKET" -uroot -e "DROP DATABASE IF EXISTS \`$DATABASE\`; CREATE DATABASE \`$DATABASE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
@@ -171,6 +186,7 @@ resume() {
   mkdir -p "$STATE_ROOT"; chmod 700 "$STATE_BASE" "$SAFE_RUNTIME" "$STATE_ROOT"; assert_state_tree
   if [[ -e "$STATE_RECORD" || -L "$STATE_RECORD" ]]; then load_state; fi
   resolve_mariadbd; lab start
+  assert_playwright_cache
   SOCKET="$LAB_ROOT/run/mariadb.sock"; assert_socket
   [[ -d "$LAB_ROOT/data/$DATABASE" ]] || fail 'resume requires existing isolated database data'
   cd "$ROOT"; safe_browser php scripts/rc-browser-fixture-resume.php; safe_browser php scripts/rc-di-browser-fixture.php; ensure_fixture_storage_link; start_server
@@ -180,6 +196,7 @@ resume() {
 }
 run() {
   load_state
+  assert_playwright_cache
   [[ -s "$SERVER_PID" && ! -L "$SERVER_PID" ]] || fail 'run requires setup or resume'
   local server_pid
   server_pid="$(cat "$SERVER_PID")"

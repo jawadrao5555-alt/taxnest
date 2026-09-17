@@ -93,18 +93,26 @@ function isPathInside(root, filePath) {
     return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
-function isRegularExecutable(filePath, trustedRoots) {
+function isRegularExecutable(filePath, trustedRoots, allowSymlink = false) {
     if (!filePath || !path.isAbsolute(filePath) || hasParentPathEscape(filePath)) return false;
     if (!CHROMIUM_EXECUTABLE_NAMES.has(path.basename(filePath))) return false;
     const roots = trustedRoots.filter((root) => root && path.isAbsolute(root) && !hasParentPathEscape(root));
     if (!roots.some((root) => isPathInside(root, filePath))) return false;
     try {
-        // lstat is deliberate: a browser executable must not be a symlink.
         const stat = lstatSync(filePath);
-        if (!stat.isFile()) return false;
-        if (process.platform !== 'win32' && (stat.mode & 0o111) === 0) return false;
-        accessSync(filePath, constants.X_OK);
-        // Also reject a parent symlink escaping the allowlisted install root.
+        let target = filePath;
+        if (!stat.isFile() && !stat.isSymbolicLink()) return false;
+        if (stat.isSymbolicLink()) {
+            if (!allowSymlink) return false;
+            target = realpathSync(filePath);
+        }
+        const targetStat = stat.isSymbolicLink() ? lstatSync(target) : stat;
+        if (!targetStat.isFile()) return false;
+        if (process.platform !== 'win32' && (targetStat.mode & 0o111) === 0) return false;
+        accessSync(target, constants.X_OK);
+        const descriptor = playwrightInstallDescriptor(filePath);
+        if (descriptor && descriptor.revision !== expectedChromiumPackageRevision()) return false;
+        // Also reject a parent/executable symlink escaping the allowlisted install root.
         const actual = realpathSync(filePath);
         return roots.some((root) => {
             try { return isPathInside(realpathSync(root), actual); } catch { return false; }
@@ -250,6 +258,7 @@ function diagnosticTrustedRoots(options, playwrightPath) {
     const descriptor = playwrightInstallDescriptor(playwrightPath);
     return [
         ...(options.allowSystemRoots === false ? [] : ['/usr/local/bin', '/usr/bin', '/nix/store', '/tmp/cursor-sandbox-cache']),
+        process.env.PLAYWRIGHT_BROWSERS_PATH,
         headless.root,
         descriptor?.root,
         ...(options.trustedRoots || []),
@@ -328,8 +337,10 @@ export function formatChromiumResolutionDiagnostics(diagnostics) {
  */
 export function resolveChromiumPath(options = {}) {
     const env = process.env;
+    const dedicatedCache = options.playwrightBrowsersPath || env.PLAYWRIGHT_BROWSERS_PATH || '';
+    const dedicatedOnly = Boolean(dedicatedCache);
     const tries = options.candidates ? [...options.candidates] : [];
-    if (!options.candidates) {
+    if (!options.candidates && !dedicatedOnly) {
         if (env.CHROMIUM_BIN) tries.push(env.CHROMIUM_BIN);
         if (env.GOOGLE_CHROME_BIN) tries.push(env.GOOGLE_CHROME_BIN);
         tries.push('/usr/local/bin/google-chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
@@ -344,15 +355,15 @@ export function resolveChromiumPath(options = {}) {
     const headless = playwrightHeadlessShellCandidates(playwrightPath);
     tries.push(...headless.paths);
     const trustedRoots = [
-        ...(options.allowSystemRoots === false ? [] : ['/usr/local/bin', '/usr/bin', '/nix/store', '/tmp/cursor-sandbox-cache']),
+        ...(dedicatedOnly ? [dedicatedCache] : (options.allowSystemRoots === false ? [] : ['/usr/local/bin', '/usr/bin', '/nix/store', '/tmp/cursor-sandbox-cache'])),
         headless.root,
         ...(options.trustedRoots || []),
     ].filter(Boolean);
 
     for (const candidate of tries) {
-        if (isRegularExecutable(candidate, trustedRoots)) return candidate;
+        if (isRegularExecutable(candidate, trustedRoots, dedicatedOnly)) return candidate;
     }
-    if (options.allowSystemRoots === false) {
+    if (options.allowSystemRoots === false || dedicatedOnly) {
         if (options.diagnostics !== false) {
             console.error(formatChromiumResolutionDiagnostics(chromiumResolutionDiagnostics(options)));
         }

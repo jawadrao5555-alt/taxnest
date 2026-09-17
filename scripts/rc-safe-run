@@ -13,9 +13,10 @@ run_root="$ROOT"
 browser=0
 runtime_root=""
 browser_mariadb_root=""
+playwright_browsers_path=""
 
 usage() {
-    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] [--mariadb-root DIR] -- command [args...]" >&2
+    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] [--mariadb-root DIR] [--playwright-browsers-path DIR] -- command [args...]" >&2
     exit 2
 }
 
@@ -35,6 +36,11 @@ while (($#)); do
         --mariadb-root)
             [[ $# -ge 2 && -n "$2" ]] || usage
             browser_mariadb_root="$2"
+            shift 2
+            ;;
+        --playwright-browsers-path)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            playwright_browsers_path="$2"
             shift 2
             ;;
         --) shift; break ;;
@@ -140,6 +146,29 @@ if ((browser)); then
         echo "rc-safe-run: BLOCKED non-browser MariaDB root" >&2
         exit 2
     }
+    [[ -n "$playwright_browsers_path" ]] || {
+        echo "rc-safe-run: BLOCKED browser run without explicit Playwright cache" >&2
+        exit 2
+    }
+    playwright_browsers_path_raw="$playwright_browsers_path"
+    expected_playwright_cache="$(dirname "$runtime_root")/playwright-cache"
+    [[ "$playwright_browsers_path_raw" == "$expected_playwright_cache" ]] || {
+        echo "rc-safe-run: BLOCKED Playwright cache is not associated with this runtime" >&2
+        exit 2
+    }
+    [[ ! -L "$playwright_browsers_path_raw" ]] || {
+        echo "rc-safe-run: BLOCKED symlinked Playwright cache" >&2
+        exit 2
+    }
+    playwright_browsers_path="$(realpath -m -- "$playwright_browsers_path_raw")"
+    [[ "$playwright_browsers_path" == "$playwright_browsers_path_raw" ]] || {
+        echo "rc-safe-run: BLOCKED non-canonical Playwright cache" >&2
+        exit 2
+    }
+    if ! node "$ROOT/scripts/lib/playwright-cache.mjs" "$playwright_browsers_path" >/dev/null; then
+        echo "rc-safe-run: BLOCKED Playwright cache failed exact revision/executable validation" >&2
+        exit 2
+    fi
     mkdir -p "$browser_state" "$mariadb_root"
     envs+=(
         "APP_ENV=rc-browser"
@@ -149,6 +178,7 @@ if ((browser)); then
         "SESSION_DRIVER=file"
         "RC_BROWSER_ONLY=${RC_BROWSER_ONLY:-}"
         "RC_BROWSER_STATE_ROOT=$browser_state"
+        "PLAYWRIGHT_BROWSERS_PATH=$playwright_browsers_path"
         "RC_MARIADB_ROOT=$mariadb_root"
         "RC_MARIADB_PORT=${RC_MARIADB_PORT:-33117}"
         "DB_CONNECTION=mysql"

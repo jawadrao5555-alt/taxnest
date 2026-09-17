@@ -3,7 +3,11 @@ import { chmodSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'n
 import os from 'node:os';
 import path from 'node:path';
 import pw from 'playwright-core';
-import { resolveChromiumPath } from '../lib/local-browser.mjs';
+import {
+    chromiumResolutionDiagnostics,
+    formatChromiumResolutionDiagnostics,
+    resolveChromiumPath,
+} from '../lib/local-browser.mjs';
 
 const { chromium } = pw;
 const root = mkdtempSync(path.join(os.tmpdir(), 'taxnest-local-browser-'));
@@ -20,6 +24,7 @@ const discover = (candidate, trustedRoot = root) =>
         trustedRoots: [trustedRoot],
         playwrightExecutablePath: null,
         allowSystemRoots: false,
+        diagnostics: false,
     });
 
 const regular = executable(chromePath('regular'));
@@ -72,6 +77,7 @@ assert.equal(
         playwrightExecutablePath: playwrightChrome,
         trustedRoots: [playwrightRoot],
         allowSystemRoots: false,
+        diagnostics: false,
     }),
     playwrightChrome,
     'public Playwright API Chromium path is discovered',
@@ -82,6 +88,7 @@ assert.equal(
         playwrightExecutablePath: path.join(playwrightRoot, 'chromium-9999', 'chrome-linux64', 'chrome'),
         trustedRoots: [playwrightRoot],
         allowSystemRoots: false,
+        diagnostics: false,
     }),
     null,
     'stale headless-shell revision is not selected',
@@ -92,9 +99,63 @@ assert.equal(
         playwrightExecutablePath: path.join(playwrightRoot, publicApiInstall, 'chrome-linux64', 'missing-chrome'),
         trustedRoots: [playwrightRoot],
         allowSystemRoots: false,
+        diagnostics: false,
     }),
     headless,
     'Playwright headless-shell layout is discovered',
 );
+
+const diagnosticState = chromiumResolutionDiagnostics({
+    candidates: [regular, symlink, nonExecutable, outside, path.join(outsideRoot, 'secret-looking', 'chrome')],
+    playwrightExecutablePath: path.join(playwrightRoot, publicApiInstall, 'chrome-linux64', 'missing-chrome'),
+    trustedRoots: [root, playwrightRoot],
+    allowSystemRoots: false,
+});
+assert.equal(diagnosticState.expectedPackageRevision, publicApiInstall.replace(/^chromium-/, ''), 'diagnostic reports package Chromium revision');
+assert.ok(diagnosticState.revisionDirectories.includes(publicApiInstall), 'diagnostic reports revision directory names');
+assert.ok(diagnosticState.candidates.every((candidate) => Object.hasOwn(candidate, 'exists')), 'diagnostic reports existence per candidate');
+assert.ok(diagnosticState.candidates.every((candidate) => Object.hasOwn(candidate, 'regular')), 'diagnostic reports regular-file state per candidate');
+assert.ok(diagnosticState.candidates.every((candidate) => Object.hasOwn(candidate, 'executable')), 'diagnostic reports executable state per candidate');
+assert.ok(diagnosticState.candidates.every((candidate) => Object.hasOwn(candidate, 'symlink')), 'diagnostic reports symlink state per candidate');
+assert.ok(diagnosticState.candidates.every((candidate) => Object.hasOwn(candidate, 'trustedRoot')), 'diagnostic reports trust-root state per candidate');
+assert.equal(diagnosticState.candidates[0].path, 'regular/chrome', 'diagnostic candidate path is relative/basename-only');
+assert.deepEqual(
+    diagnosticState.candidates.slice(0, 4).map(({ exists, regular: isRegular, executable, symlink: isSymlink, trustedRoot }) => ({
+        exists, regular: isRegular, executable, symlink: isSymlink, trustedRoot,
+    })),
+    [
+        { exists: true, regular: true, executable: true, symlink: false, trustedRoot: true },
+        { exists: true, regular: false, executable: true, symlink: true, trustedRoot: true },
+        { exists: true, regular: true, executable: false, symlink: false, trustedRoot: true },
+        { exists: true, regular: true, executable: true, symlink: false, trustedRoot: false },
+    ],
+    'diagnostic reports fact-backed candidate states',
+);
+const diagnosticText = formatChromiumResolutionDiagnostics(diagnosticState);
+assert.match(diagnosticText, /CHROMIUM RESOLUTION DIAGNOSTICS \(bounded\)/);
+assert.match(diagnosticText, /expected_package_revision=/);
+assert.match(diagnosticText, /HOME=/);
+assert.match(diagnosticText, /PLAYWRIGHT_BROWSERS_PATH=/);
+assert.match(diagnosticText, /exists=false regular=false executable=false symlink=false trusted_root=false/);
+assert.ok(!diagnosticText.includes(outsideRoot), 'diagnostic does not print an absolute candidate path');
+
+let failedResolverOutput = '';
+const originalConsoleError = console.error;
+console.error = (message) => { failedResolverOutput += `${message}\n`; };
+try {
+    assert.equal(
+        resolveChromiumPath({
+            candidates: [],
+            playwrightExecutablePath: path.join(playwrightRoot, 'chromium-9999', 'chrome-linux64', 'missing-chrome'),
+            trustedRoots: [playwrightRoot],
+            allowSystemRoots: false,
+        }),
+        null,
+        'failed resolver returns null after diagnostics',
+    );
+} finally {
+    console.error = originalConsoleError;
+}
+assert.match(failedResolverOutput, /CHROMIUM RESOLUTION DIAGNOSTICS \(bounded\)/, 'failed resolver emits bounded diagnostics');
 
 console.log('local-browser-discovery-check: ALL PASS');

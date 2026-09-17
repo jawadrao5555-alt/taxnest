@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -145,6 +146,31 @@ assert.equal(
     headless,
     'Playwright headless-shell layout is discovered',
 );
+
+// Bind an actual Unix socket at the path Chromium uses for its singleton
+// lock. This keeps the path-limit regression deterministic and independent of
+// browser availability or network access; the real pinned launch is exercised
+// only inside the isolated fixture runner.
+const chromiumTmpdir = mkdtempSync('/tmp/rcpw.XXXXXX');
+chmodSync(chromiumTmpdir, 0o700);
+const singletonSocketPath = path.join(chromiumTmpdir, 'org.chromium.Chromium', 'SingletonSocket');
+mkdirSync(path.dirname(singletonSocketPath), { recursive: true });
+assert.ok(
+    Buffer.byteLength(singletonSocketPath) < 108,
+    'short Chromium TMPDIR leaves SingletonSocket below the AF_UNIX byte limit',
+);
+try {
+    const singletonServer = createServer();
+    await new Promise((resolve, reject) => {
+        singletonServer.once('error', reject);
+        singletonServer.listen(singletonSocketPath, () => resolve());
+    });
+    assert.ok(lstatSync(singletonSocketPath).isSocket(), 'SingletonSocket path binds as a real Unix socket');
+    await new Promise((resolve, reject) => singletonServer.close((error) => error ? reject(error) : resolve()));
+} finally {
+    rmSync(chromiumTmpdir, { recursive: true, force: true });
+}
+console.log('PASS: real Unix SingletonSocket path binds below the AF_UNIX byte limit');
 
 const staleCacheEntry = path.join(playwrightRoot, 'chromium-9999');
 mkdirSync(staleCacheEntry, { recursive: true });

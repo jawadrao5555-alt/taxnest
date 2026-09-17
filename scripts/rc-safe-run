@@ -14,9 +14,10 @@ browser=0
 runtime_root=""
 browser_mariadb_root=""
 playwright_browsers_path=""
+browser_tmpdir=""
 
 usage() {
-    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] [--mariadb-root DIR] [--playwright-browsers-path DIR] -- command [args...]" >&2
+    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] [--mariadb-root DIR] [--playwright-browsers-path DIR] [--browser-tmpdir DIR] -- command [args...]" >&2
     exit 2
 }
 
@@ -41,6 +42,11 @@ while (($#)); do
         --playwright-browsers-path)
             [[ $# -ge 2 && -n "$2" ]] || usage
             playwright_browsers_path="$2"
+            shift 2
+            ;;
+        --browser-tmpdir)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            browser_tmpdir="$2"
             shift 2
             ;;
         --) shift; break ;;
@@ -150,6 +156,39 @@ if ((browser)); then
         echo "rc-safe-run: BLOCKED browser run without explicit Playwright cache" >&2
         exit 2
     }
+    [[ -n "$browser_tmpdir" ]] || {
+        echo "rc-safe-run: BLOCKED browser run without explicit short Chromium TMPDIR" >&2
+        exit 2
+    }
+    [[ "$browser_tmpdir" =~ ^/tmp/rcpw\.[A-Za-z0-9]+$ && -d "$browser_tmpdir" && ! -L "$browser_tmpdir" ]] || {
+        echo "rc-safe-run: BLOCKED invalid Chromium TMPDIR" >&2
+        exit 2
+    }
+    browser_tmpdir_real="$(realpath -- "$browser_tmpdir")"
+    [[ "$browser_tmpdir_real" == "$browser_tmpdir" ]] || {
+        echo "rc-safe-run: BLOCKED non-canonical Chromium TMPDIR" >&2
+        exit 2
+    }
+    browser_tmpdir_stat="$(stat -c '%u %a %F' -- "$browser_tmpdir" 2>/dev/null || true)"
+    [[ "$browser_tmpdir_stat" == "$(id -u) 700 directory" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR owner/mode" >&2
+        exit 2
+    }
+    browser_tmpdir_marker="$browser_tmpdir/.taxnest-rc-browser-tmpdir"
+    [[ -f "$browser_tmpdir_marker" && ! -L "$browser_tmpdir_marker" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR association marker" >&2
+        exit 2
+    }
+    browser_tmpdir_marker_stat="$(stat -c '%u %a %F' -- "$browser_tmpdir_marker" 2>/dev/null || true)"
+    [[ "$browser_tmpdir_marker_stat" == "$(id -u) 600 regular file" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR marker owner/mode" >&2
+        exit 2
+    }
+    expected_browser_tmpdir_marker=$'version=1\nstate_base='"$(dirname "$runtime_root")"$'\nbrowser_tmpdir='"$browser_tmpdir"
+    [[ "$(cat -- "$browser_tmpdir_marker")" == "$expected_browser_tmpdir_marker" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR association marker contents" >&2
+        exit 2
+    }
     playwright_browsers_path_raw="$playwright_browsers_path"
     expected_playwright_cache="$(dirname "$runtime_root")/playwright-cache"
     [[ "$playwright_browsers_path_raw" == "$expected_playwright_cache" ]] || {
@@ -172,6 +211,7 @@ if ((browser)); then
     mkdir -p "$browser_state" "$mariadb_root"
     envs+=(
         "APP_ENV=rc-browser"
+        "TMPDIR=$browser_tmpdir"
         "RC_BROWSER_DB=taxnest_rc_browser"
         "RC_BROWSER_PORT=${RC_BROWSER_PORT:-5911}"
         "RC_BROWSER_SESSION_DRIVER=file"

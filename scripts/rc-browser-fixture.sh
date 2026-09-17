@@ -15,6 +15,12 @@ PLAYWRIGHT_BROWSERS_PATH="$STATE_BASE/playwright-cache"
 FIXTURE="$STATE_ROOT/fixture.json"; SERVER_PID="$STATE_ROOT/php-server.pid"; SERVER_LOG="$STATE_ROOT/php-server.log"
 BROWSER_PORT="${RC_BROWSER_PORT:-5911}"
 STATE_RECORD="$STATE_BASE/browser-fixture.state"
+BROWSER_TMPDIR=""
+BROWSER_TMPDIR_INODE=""
+BROWSER_TMPDIR_MARKER_INODE=""
+BROWSER_TMPDIR_MARKER_NAME=".taxnest-rc-browser-tmpdir"
+BROWSER_TMPDIR_PERSIST=0
+BROWSER_TMPDIR_CREATED=0
 STATE_BASE_RE='^/tmp/taxnest-rc-browser-[0-9]+(-[A-Za-z0-9_.-]+)?$'
 LAB_ROOT_RE='^/tmp/taxnest-rc-mariadb-browser-[0-9]+$'
 ACTION="${1:-}"
@@ -75,6 +81,45 @@ assert_fixture() {
   [[ "$FIXTURE" == "$STATE_ROOT/fixture.json" && -f "$FIXTURE" && ! -L "$FIXTURE" ]] ||
     fail 'exact isolated fixture target is required'
 }
+browser_tmpdir_is_valid() {
+  local marker="$1" expected actual dir_stat marker_stat
+  [[ "$BROWSER_TMPDIR" =~ ^/tmp/rcpw\.[A-Za-z0-9]+$ && -d "$BROWSER_TMPDIR" && ! -L "$BROWSER_TMPDIR" ]] || return 1
+  [[ "$(realpath -- "$BROWSER_TMPDIR")" == "$BROWSER_TMPDIR" ]] || return 1
+  dir_stat="$(stat -c '%u %a %F' -- "$BROWSER_TMPDIR" 2>/dev/null || true)"
+  [[ "$dir_stat" == "$(id -u) 700 directory" ]] || return 1
+  [[ -f "$marker" && ! -L "$marker" ]] || return 1
+  [[ "$(realpath -- "$marker")" == "$marker" ]] || return 1
+  marker_stat="$(stat -c '%u %a %F' -- "$marker" 2>/dev/null || true)"
+  [[ "$marker_stat" == "$(id -u) 600 regular file" ]] || return 1
+  expected=$'version=1\nstate_base='"$STATE_BASE"$'\nbrowser_tmpdir='"$BROWSER_TMPDIR"
+  actual="$(cat -- "$marker")"
+  [[ "$actual" == "$expected" ]] || return 1
+  [[ -n "$BROWSER_TMPDIR_INODE" && "$(stat -c '%i' -- "$BROWSER_TMPDIR")" == "$BROWSER_TMPDIR_INODE" ]] || return 1
+  [[ -n "$BROWSER_TMPDIR_MARKER_INODE" && "$(stat -c '%i' -- "$marker")" == "$BROWSER_TMPDIR_MARKER_INODE" ]] || return 1
+}
+assert_browser_tmpdir() {
+  browser_tmpdir_is_valid "$BROWSER_TMPDIR/$BROWSER_TMPDIR_MARKER_NAME" ||
+    fail 'exact current-owner Chromium TMPDIR marker/inode contract is required'
+}
+create_browser_tmpdir() {
+  [[ -z "$BROWSER_TMPDIR" ]] || fail 'Chromium TMPDIR was already assigned'
+  BROWSER_TMPDIR="$(mktemp -d /tmp/rcpw.XXXXXX)"
+  BROWSER_TMPDIR_CREATED=1
+  chmod 700 "$BROWSER_TMPDIR"
+  local marker="$BROWSER_TMPDIR/$BROWSER_TMPDIR_MARKER_NAME"
+  umask 077
+  printf 'version=1\nstate_base=%s\nbrowser_tmpdir=%s' "$STATE_BASE" "$BROWSER_TMPDIR" >"$marker"
+  chmod 600 "$marker"
+  BROWSER_TMPDIR_INODE="$(stat -c '%i' -- "$BROWSER_TMPDIR")"
+  BROWSER_TMPDIR_MARKER_INODE="$(stat -c '%i' -- "$marker")"
+  assert_browser_tmpdir
+}
+cleanup_browser_tmpdir() {
+  [[ -n "$BROWSER_TMPDIR" ]] || return 0
+  browser_tmpdir_is_valid "$BROWSER_TMPDIR/$BROWSER_TMPDIR_MARKER_NAME" || return 0
+  rm -rf -- "$BROWSER_TMPDIR"
+}
+trap 'if ((BROWSER_TMPDIR_CREATED == 1 && BROWSER_TMPDIR_PERSIST == 0)); then cleanup_browser_tmpdir; fi' EXIT
 write_state() {
   local temporary="$STATE_RECORD.tmp.$$"
   assert_state_tree
@@ -95,6 +140,9 @@ write_state() {
     printf 'database=%s\n' "$DATABASE"
     printf 'browser_port=%s\n' "$BROWSER_PORT"
     printf 'playwright_browsers_path=%s\n' "$PLAYWRIGHT_BROWSERS_PATH"
+    printf 'browser_tmpdir=%s\n' "$BROWSER_TMPDIR"
+    printf 'browser_tmpdir_inode=%s\n' "$BROWSER_TMPDIR_INODE"
+    printf 'browser_tmpdir_marker_inode=%s\n' "$BROWSER_TMPDIR_MARKER_INODE"
   } >"$temporary"
   chmod 600 "$temporary"
   mv -f -- "$temporary" "$STATE_RECORD"
@@ -103,6 +151,7 @@ load_state() {
   local key value
   local state_version='' state_base='' safe_runtime='' state_root='' mariadb_root=''
   local mariadb_port='' socket='' fixture='' server_pid='' database='' browser_port='' playwright_browsers_path=''
+  local browser_tmpdir='' browser_tmpdir_inode='' browser_tmpdir_marker_inode=''
   declare -A seen=()
   assert_state_tree
   [[ -f "$STATE_RECORD" && ! -L "$STATE_RECORD" ]] || fail 'setup state record is absent or unsafe'
@@ -123,6 +172,9 @@ load_state() {
       database) database="$value" ;;
       browser_port) browser_port="$value" ;;
       playwright_browsers_path) playwright_browsers_path="$value" ;;
+      browser_tmpdir) browser_tmpdir="$value" ;;
+      browser_tmpdir_inode) browser_tmpdir_inode="$value" ;;
+      browser_tmpdir_marker_inode) browser_tmpdir_marker_inode="$value" ;;
       *) fail "unknown browser fixture state record key: $key" ;;
     esac
   done <"$STATE_RECORD"
@@ -131,9 +183,14 @@ load_state() {
     "$mariadb_port" =~ ^[0-9]+$ && "$mariadb_port" == "$DB_PORT" &&
     "$socket" == "$LAB_ROOT/run/mariadb.sock" && "$fixture" == "$STATE_ROOT/fixture.json" &&
     "$server_pid" == "$STATE_ROOT/php-server.pid" && "$database" == "$DATABASE" &&
-    "$browser_port" == "$BROWSER_PORT" && "$playwright_browsers_path" == "$PLAYWRIGHT_BROWSERS_PATH" ]] ||
+    "$browser_port" == "$BROWSER_PORT" && "$playwright_browsers_path" == "$PLAYWRIGHT_BROWSERS_PATH" &&
+    "$browser_tmpdir" =~ ^/tmp/rcpw\.[A-Za-z0-9]+$ && "$browser_tmpdir_inode" =~ ^[0-9]+$ &&
+    "$browser_tmpdir_marker_inode" =~ ^[0-9]+$ ]] ||
     fail 'browser fixture state does not match this isolated contract'
+  BROWSER_TMPDIR="$browser_tmpdir"; BROWSER_TMPDIR_INODE="$browser_tmpdir_inode"
+  BROWSER_TMPDIR_MARKER_INODE="$browser_tmpdir_marker_inode"
   SOCKET="$socket"; FIXTURE="$fixture"; SERVER_PID="$server_pid"
+  assert_browser_tmpdir
   assert_socket
   assert_fixture
 }
@@ -145,7 +202,7 @@ resolve_mariadbd() {
   done
   fail 'no local MariaDB server found'
 }
-safe_browser() { "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" --playwright-browsers-path "$PLAYWRIGHT_BROWSERS_PATH" -- "$@"; }
+safe_browser() { "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" --playwright-browsers-path "$PLAYWRIGHT_BROWSERS_PATH" --browser-tmpdir "$BROWSER_TMPDIR" -- "$@"; }
 lab() { RC_MARIADB_ROOT="$LAB_ROOT" RC_MARIADB_PORT="$DB_PORT" bash "$LAB_CTL" "$@"; }
 ensure_fixture_storage_link() {
   local public_storage="$ROOT/public/storage" fixture_storage="$ROOT/storage/app/public"
@@ -168,6 +225,7 @@ start_server() {
 setup() {
   mkdir -p "$STATE_ROOT"; chmod 700 "$STATE_BASE" "$SAFE_RUNTIME" "$STATE_ROOT"; assert_state_tree
   assert_no_symlink "$STATE_RECORD" 'browser fixture state record'
+  create_browser_tmpdir
   resolve_mariadbd; lab start
   assert_playwright_cache
   SOCKET="$LAB_ROOT/run/mariadb.sock"; assert_socket; cd "$ROOT"
@@ -180,11 +238,12 @@ setup() {
   start_server
   assert_fixture
   write_state
+  BROWSER_TMPDIR_PERSIST=1
   printf 'RC_BROWSER_FIXTURE=%s\n' "$FIXTURE"
 }
 resume() {
   mkdir -p "$STATE_ROOT"; chmod 700 "$STATE_BASE" "$SAFE_RUNTIME" "$STATE_ROOT"; assert_state_tree
-  if [[ -e "$STATE_RECORD" || -L "$STATE_RECORD" ]]; then load_state; fi
+  if [[ -e "$STATE_RECORD" || -L "$STATE_RECORD" ]]; then load_state; else create_browser_tmpdir; fi
   resolve_mariadbd; lab start
   assert_playwright_cache
   SOCKET="$LAB_ROOT/run/mariadb.sock"; assert_socket
@@ -192,10 +251,12 @@ resume() {
   cd "$ROOT"; safe_browser php scripts/rc-browser-fixture-resume.php; safe_browser php scripts/rc-di-browser-fixture.php; ensure_fixture_storage_link; start_server
   assert_fixture
   write_state
+  BROWSER_TMPDIR_PERSIST=1
   printf 'RC_BROWSER_FIXTURE=%s\n' "$FIXTURE"
 }
 run() {
   load_state
+  BROWSER_TMPDIR_PERSIST=1
   assert_playwright_cache
   [[ -s "$SERVER_PID" && ! -L "$SERVER_PID" ]] || fail 'run requires setup or resume'
   local server_pid
@@ -204,10 +265,13 @@ run() {
   resolve_mariadbd; lab start; assert_socket
   kill -0 "$server_pid" 2>/dev/null || fail 'loopback PHP server is not running'
   cd "$ROOT"
+  safe_browser node scripts/tests/rc-browser-chromium-socket-check.mjs
   safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" RC_BROWSER_FIXTURE="$FIXTURE" node scripts/rc-browser-acceptance.mjs
 }
 serve() { resume; wait "$(cat "$SERVER_PID")"; }
 stop() {
+  if [[ -f "$STATE_RECORD" && ! -L "$STATE_RECORD" ]]; then load_state; fi
+  cleanup_browser_tmpdir
   if [[ -s "$SERVER_PID" && ! -L "$SERVER_PID" ]]; then
     local server_pid
     server_pid="$(cat "$SERVER_PID")"

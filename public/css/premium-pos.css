@@ -225,6 +225,9 @@
 .tn-premium-sale :is(.tn-qty-decrement, .tn-qty-increment):hover {
     background: color-mix(in srgb, var(--tn-premium-accent) 27%, var(--tn-premium-surface));
 }
+.dark .tn-premium-sale :is(.tn-qty-decrement, .tn-qty-increment):hover {
+    color: var(--tn-premium-ink);
+}
 .tn-premium-sale .tn-qty-value {
     min-width: 32px;
     color: var(--tn-premium-ink);

@@ -2,7 +2,13 @@ import { lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFile
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertLocalOnlyBaseUrl, attachDiagnostics, launchLocalBrowser } from './lib/local-browser.mjs';
-import { auditPremiumVisualPage, assertPremiumVisualAudit } from './premium-ui-assertions.mjs';
+import {
+    auditPremiumCartState,
+    auditPremiumVisualPage,
+    assertPremiumCartState,
+    assertPremiumVisualAudit,
+} from './premium-ui-assertions.mjs';
+import { runPremiumUiMobileRegression } from './premium-ui-mobile-regression.mjs';
 
 const baseUrl = assertLocalOnlyBaseUrl(process.env.BASE_URL || 'http://localhost:5911');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,6 +29,11 @@ const phase = String(process.env.RC_PREMIUM_PHASE || 'before').replace(/[^a-z0-9
 const evidenceDir = path.resolve(process.cwd(), 'docs/ui-premium/evidence');
 mkdirSync(evidenceDir, { recursive: true, mode: 0o700 });
 const requested = String(process.env.RC_PREMIUM_ONLY || '').split(',').map(value => value.trim()).filter(Boolean);
+const expectedTheme = process.env.RC_PREMIUM_EXPECTED_THEME === 'dark'
+    || process.env.RC_PREMIUM_EXPECTED_THEME === 'light'
+    ? process.env.RC_PREMIUM_EXPECTED_THEME
+    : null;
+const runMobileRegression = process.env.RC_PREMIUM_MOBILE_REGRESSION === '1';
 const views = [
     ['desktop', { width: 1440, height: 960 }],
     ['tablet', { width: 834, height: 960 }],
@@ -50,6 +61,9 @@ const aliases = {
 const selectedLabels = requested.length ? requested.map(label => aliases[label] || label) : labels;
 const unknownLabels = selectedLabels.filter(label => !labels.includes(label));
 if (unknownLabels.length) throw new Error(`unknown RC_PREMIUM_ONLY surface(s): ${unknownLabels.join(', ')}`);
+if (runMobileRegression && !selectedLabels.includes('retail')) {
+    throw new Error('RC_PREMIUM_MOBILE_REGRESSION=1 requires the retail surface to be selected');
+}
 for (const [label, name] of Object.entries(required)) {
     if (!journeyByName.has(name)) throw new Error(`fixture journey missing: ${label}/${name}`);
 }
@@ -111,6 +125,61 @@ async function waitForSurface(page) {
     await dismissKnownOverlays(page);
 }
 
+async function activateExpectedTheme(page, theme) {
+    if (!theme) return;
+    await page.emulateMedia({ colorScheme: theme });
+    const matchesExpectedTheme = state => state.dark === (state.expected === 'dark')
+        && new RegExp(`\\b${state.expected}\\b`, 'i').test(state.colorScheme || '');
+    let state = await page.evaluate(expected => {
+        const root = document.documentElement;
+        return {
+            expected,
+            dark: root.classList.contains('dark'),
+            colorScheme: getComputedStyle(root).colorScheme || '',
+        };
+    }, theme);
+    if (!matchesExpectedTheme(state)) {
+        const toggle = page.locator(
+            'button[aria-label*="dark mode" i]:visible, button[title*="dark mode" i]:visible',
+        ).first();
+        // PRA exposes its real persisted toggle through the command palette,
+        // not the separate colour-palette picker (Midnight is not dark mode).
+        let command = null;
+        if (!await toggle.count()) {
+            await page.keyboard.press('Control+k');
+            const search = page.locator('input[x-ref="cmdInput"]:visible');
+            await search.fill('dark');
+            command = page.locator('.cmd-item:visible').filter({ hasText: /dark mode/i }).first();
+            if (!await command.count()) throw new Error(`expected ${theme} command is not visible`);
+        }
+        const persistedModeResponse = page.waitForResponse(response => (
+            response.request().method() === 'POST' && /dark-mode|set-dark-mode/i.test(response.url())
+        ), { timeout: 8000 });
+        await (command || toggle).click();
+        const response = await persistedModeResponse;
+        const saved = await response.json();
+        if (!response.ok() || saved.success !== true || Boolean(saved.dark) !== (theme === 'dark')) {
+            throw new Error(`expected ${theme} mode was not saved`);
+        }
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await waitForSurface(page);
+    }
+    await page.waitForFunction(expected => {
+        const root = document.documentElement;
+        const colorScheme = getComputedStyle(root).colorScheme || '';
+        return root.classList.contains('dark') === (expected === 'dark')
+            && new RegExp(`\\b${expected}\\b`, 'i').test(colorScheme);
+    }, theme, { timeout: 15000 });
+    state = await page.evaluate(expected => ({
+        expected,
+        dark: document.documentElement.classList.contains('dark'),
+        colorScheme: getComputedStyle(document.documentElement).colorScheme || '',
+    }), theme);
+    if (!matchesExpectedTheme(state)) throw new Error(`expected ${theme} mode did not activate`);
+}
+
+let mobileRegressionCompleted = false;
+
 async function capture(browser, label, journey, pathName, viewport) {
     // Compare server-rendered versions, not a previously cached sale shell.
     const context = await browser.newContext({ viewport, serviceWorkers: 'block' });
@@ -159,13 +228,29 @@ async function capture(browser, label, journey, pathName, viewport) {
                 element.scrollTop = 0;
             }
         });
+        await activateExpectedTheme(page, expectedTheme);
         if (phase !== 'before') {
-            const audit = await page.evaluate(auditPremiumVisualPage);
+            const audit = await page.evaluate(auditPremiumVisualPage, expectedTheme ? {
+                expectedTheme,
+            } : {});
             writeFileSync(
                 path.join(evidenceDir, `${phase}-${label}-${viewport.width}-audit.json`),
                 JSON.stringify(audit, null, 2) + '\n',
             );
             assertPremiumVisualAudit(audit);
+        }
+        if (runMobileRegression && label === 'retail-sale' && viewport.width === 390) {
+            const regression = await runPremiumUiMobileRegression(page, {
+                auditCartState: auditPremiumCartState,
+                assertCartState: assertPremiumCartState,
+                auditVisualPage: auditPremiumVisualPage,
+                assertVisualAudit: assertPremiumVisualAudit,
+                expectedTheme: expectedTheme || 'light',
+            });
+            const regressionPath = path.join(evidenceDir, `${phase}-mobile-regression.json`);
+            writeFileSync(regressionPath, JSON.stringify(regression, null, 2) + '\n', { mode: 0o600 });
+            console.log(`MOBILE_REGRESSION ${regressionPath}`);
+            mobileRegressionCompleted = true;
         }
         const screenshot = path.join(evidenceDir, `${phase}-${label}-${viewport.width}.png`);
         await page.screenshot({ path: screenshot, fullPage: false });
@@ -212,5 +297,8 @@ try {
     writeFileSync(temporary, `${JSON.stringify(overflowReport, null, 2)}\n`, { mode: 0o600 });
     renameSync(temporary, overflowPath);
     console.log(`OVERFLOW_REPORT ${overflowPath}`);
+}
+if (runMobileRegression && !mobileRegressionCompleted) {
+    throw new Error('RC_PREMIUM_MOBILE_REGRESSION=1 did not complete the retail mobile regression');
 }
 console.log(`PREMIUM UI ${phase.toUpperCase()} SCREENSHOTS COMPLETE: ${evidenceDir}`);

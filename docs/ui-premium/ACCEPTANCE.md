@@ -1,25 +1,66 @@
 # Acceptance record
 
-## Current status: BLOCKED — not final acceptance
+## Current status: PASS — remaining mobile blockers verified
 
-The final mobile visibility check did **not** pass. This branch must not be
-treated as ready to merge or deploy based on the earlier colour-only results.
+The corrected 390×844 FBR journeys pass in light and genuine dark mode.
+PRA's mobile dark catalog, filled cart and payment dialog have also been
+recaptured and checked in genuine dark mode. This is evidence for review,
+not approval to merge or deploy.
 
-- On the correct fresh `/fbr-pos/create` fixture, PAY and Provisional now fit
-  the 390×844 viewport, but the cart names still render blank after resetting
-  scroll positions. The underlying cart contains the expected three lines and
-  Rs. 1,230. This is an unresolved presentation defect.
-- PRA's mobile row-width defect was corrected and its names/quantity controls
-  are visible with the remaining rows reachable by internal scrolling.
-- The most recent PRA mobile files labelled “dark” were actually a Midnight
-  palette on a light canvas, not an `html.dark` capture. They are not accepted
-  as dark-mode evidence.
-- Superseded FBR mobile and mislabelled PRA mobile captures have been moved to
-  `evidence/visual-correction/superseded/`. The gallery generator deliberately
-  refuses to produce a final gallery while those required captures are missing.
-- Raw audit JSON retains earlier measurements and later correction notes.
-  Earlier zero contrast findings are **not** proof of current mobile visibility
-  or of the mode shown in a subsequently replaced screenshot.
+### Measured FBR root cause and fix
+
+The live CART state contained the correct names and quantities. Its first
+name span was 198×20px, but the cart list was only 6.59px high (clientHeight 7):
+the name started 10px below the list's top and was therefore clipped out.
+This was not missing item data, an empty name, or a hidden MENU tab.
+
+`mobile.css` collapsed the fixed payment groups into one column. The FBR
+template now uses that stylesheet's existing `grid-cols-2-keep` and
+`grid-cols-4-keep` DOM opt-ins. The payment groups retain their columns,
+giving the cart a measured 230.59px viewport (clientHeight 231). The first
+row/name is visible at scrollTop 0; the remaining rows scroll inside the
+list. No fallback names, fiscal changes or cart-state rewriting were added.
+The dark quantity-button hover foreground was separately corrected without
+lowering the audit's contrast threshold.
+
+### Persistent regression and current evidence
+
+`scripts/premium-ui-mobile-regression.mjs` is the committed real-page journey.
+The existing screenshot runner dispatches it with
+`RC_PREMIUM_MOBILE_REGRESSION=1` and `RC_PREMIUM_ONLY=retail`; it now fails
+closed if the journey is selected but never runs. Set
+`RC_PREMIUM_EXPECTED_THEME=light` or `dark` and a non-`before` phase when using
+the existing isolated RC browser runner.
+
+- Actual product-card clicks: Mug 450 + Notebook 250 + Gel Pen 80 = **780**.
+- Menu → cart → menu → cart; Mug quantity + / − / + produces
+  **1,230 → 780 → 1,230**, with matching live Alpine and rendered row values.
+- Payment opens and cancels without submitting. All required visible
+  name, quantity, amount, header and payment categories pass their audits.
+- The real debounced safety backup is checked before reload. FBR intentionally
+  opens an **empty cart after reload**; auto-restore remains disabled. The test
+  preserves that existing product contract and separately proves mode persistence.
+- Body/document/main have no horizontal overflow; primary PAY is fully within
+  the phone viewport. Cart scrolling is internal. Vertical scroll metrics are
+  retained in the raw reports, not represented as zero overflow everywhere.
+- `fbr-mobile-light-regression.json` and `fbr-mobile-dark-regression.json` each
+  contain eight passing cart states and seven passing visual audits. Their
+  checkpoint screenshots are the canonical light/dark mobile filled/payment files.
+- `pra-mobile-dark-verification.json` records passing catalog, filled and payment
+  audits. Actual command-palette **Toggle Dark Mode** was used, not Midnight:
+  html.dark, computed colorScheme dark, dark browser media and shell luminance
+  0.002 were checked. Burger 850 + Cooler 320 + Bowl 690 = **1,860**.
+- The three `pra-dark-mobile-{catalog,filled,payment}.png` files are fresh genuine
+  dark captures. All 30 required gallery screenshots are present.
+
+Current reports and captures are under `evidence/visual-correction/`.
+Superseded captures, failed intermediate diagnostics and older supplemental
+FBR catalogs are retained under `superseded/`, not accepted as current evidence.
+The older aggregate audit files below are historical; the three reports named
+above are the authority for this mobile correction.
+
+Final static checks: **6 PHPUnit tests / 104 assertions**, assertion self-tests,
+JavaScript/PHP syntax, exact-base presentation boundary and whitespace checks pass.
 
 No merge, deployment, approval or manual workflow rerun was performed.
 
@@ -109,7 +150,7 @@ The browser checks do not exercise offline service-worker behavior, hardware
 printing, real regulator connectivity, every saved theme, or every permission
 combination. Those underlying paths are intentionally unchanged.
 
-## Visual-correction verification history (incomplete)
+## Earlier visual-correction verification history
 
 The `evidence/visual-correction/` directory supersedes the initial visual
 captures for the admin dashboard and PRA/FBR billing screens.
@@ -185,7 +226,7 @@ node scripts/premium-ui-boundary-check.mjs
 bash scripts/rc-safe-run -- php vendor/bin/phpunit tests/Unit/PremiumUiPresentationContractTest.php
 ```
 
-Final no-browser verification passed: **5 PHPUnit tests / 80 assertions**,
+Earlier no-browser verification passed: **5 PHPUnit tests / 80 assertions**,
 the functional assertion self-tests, JavaScript/PHP syntax checks, the exact-base
 presentation boundary check, and `git diff --check`.
 

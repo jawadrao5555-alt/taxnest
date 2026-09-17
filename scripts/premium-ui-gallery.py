@@ -232,8 +232,9 @@ self-contained and makes no external network requests.</p>
 <div class="annotation"><div><strong>Fixture</strong>Admin light desktop
 above-fold capture leads this review; it is not an old scrolled admin view.</div>
 <div><strong>Safety</strong>All screenshots are synthetic and nonproduction.
-No payments were submitted.</div><div><strong>Verification</strong>Mode
-visual verification only; this is not the save-preference path.</div></div>
+No payments were submitted.</div><div><strong>Verification</strong>FBR mobile
+checks saved mode across reload; PRA mobile uses its actual command-palette
+dark toggle. See the acceptance record for the older visual-only checks.</div></div>
 <div class="lead">""" + lead + """</div>
 <p class="note"><strong>Catalog annotation:</strong> PRA uses locally attributed
 stock food images in its synthetic catalog. FBR's backend has no image field,

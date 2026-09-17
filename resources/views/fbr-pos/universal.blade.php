@@ -1739,7 +1739,10 @@ window.addEventListener('popstate', function() {
                          Alt+1/Alt+2 keyboard shortcut handler. FBR tax is per-item, so the
                          charge equals the band total for either method. PAY (F8) keeps the
                          modal (method choice + buyer NTN etc.). --}}
-                    <div class="grid grid-cols-2 gap-2">
+                    {{-- Preserve the payment groups on phones: mobile.css otherwise
+                         stacks these fixed-footer controls and leaves cartList ~7px tall.
+                         Use its existing opt-ins; the cart remains the scroll owner. --}}
+                    <div class="grid grid-cols-2 grid-cols-2-keep gap-2">
                         <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; payPrintReceipt = billPrintDefault(); processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
@@ -1749,7 +1752,7 @@ window.addEventListener('popstate', function() {
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
                     </div>
-                    <div class="grid grid-cols-4 gap-2">
+                    <div class="grid grid-cols-4 grid-cols-4-keep gap-2">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
                         {{-- Task 1271: Cart drafts — modal has "save current cart" + recall/delete list.
                              Drafts are JSON rows (fbr_pos_drafts), never held sales / FBR serials. --}}

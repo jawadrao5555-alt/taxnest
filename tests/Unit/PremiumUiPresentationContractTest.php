@@ -170,6 +170,11 @@ class PremiumUiPresentationContractTest extends TestCase
             'mobile-pay-outside-viewport',
             'fullyInsideViewport',
             'darkClass',
+            'expectedTheme',
+            'shellBackgroundLuminance',
+            'cartNames',
+            'cartLineTotals',
+            'body',
         ] as $contract) {
             $this->assertStringContainsString($contract, $source, "browser audit is missing {$contract}");
         }
@@ -178,6 +183,45 @@ class PremiumUiPresentationContractTest extends TestCase
             '/(?:launchLocalBrowser|chromium\\.launch|browserType\\.launch)/',
             $source,
             'the reusable presentation audit must not launch a browser',
+        );
+    }
+
+    public function test_mobile_regression_is_a_credential_free_page_journey_and_never_submits_payment(): void
+    {
+        $path = base_path('scripts/premium-ui-mobile-regression.mjs');
+        $this->assertFileExists($path, 'missing persistent mobile premium regression');
+
+        $source = (string) file_get_contents($path);
+        foreach ([
+            'export async function runPremiumUiMobileRegression',
+            'auditCartState',
+            'assertCartState',
+            '390x844',
+            'item_name',
+            'Mug',
+            'Notebook',
+            'Pen',
+            'Synthetic Retail Ceramic Mug',
+            'Synthetic Retail Notebook',
+            'Synthetic Retail Gel Pen',
+            'scrollTop',
+            'payment-open-cancel',
+            'emulateMedia',
+            'darkModeToggle',
+            'pay-btn-premium',
+        ] as $contract) {
+            $this->assertStringContainsString($contract, $source, "mobile regression is missing {$contract}");
+        }
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?:password|secret|credential|login|email)\\s*[:=]/i',
+            $source,
+            'mobile regression must receive an already-authenticated page',
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?:processPayment|payUdhaar|saveProvisionalDirect|submitPayment|finalizePayment)/i',
+            $source,
+            'mobile regression must not final-submit a payment',
         );
     }
 

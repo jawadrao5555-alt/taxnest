@@ -15,7 +15,7 @@
 /**
  * Inspect the currently rendered page without changing it.
  *
- * @param {{ requireCategories?: string[] }} [options]
+ * @param {{ requireCategories?: string[], expectedTheme?: 'light'|'dark' }} [options]
  * @returns {object}
  */
 export const auditPremiumVisualPage = function auditPremiumVisualPage(options = {}) {
@@ -33,6 +33,9 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
     const requiredCategories = Array.isArray(options.requireCategories)
         ? options.requireCategories
         : [];
+    const expectedTheme = options.expectedTheme === 'dark' || options.expectedTheme === 'light'
+        ? options.expectedTheme
+        : null;
 
     const clamp = value => Math.max(0, Math.min(1, value));
     const finite = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
@@ -252,7 +255,7 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
         .split(/\s+/)
         .some(token => tokens.includes(token));
     const describe = element => {
-        const text = (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim();
+        const text = (element.value || element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim();
         const aria = element.getAttribute('aria-label') || element.getAttribute('title') || '';
         const id = element.id ? `#${cssEscape(element.id)}` : '';
         const classes = typeof element.className === 'string'
@@ -516,7 +519,25 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
     paymentControls.pass = paymentControls.records.every(record => record.pass);
     paymentControls.status = paymentControls.records.length ? 'checked' : paymentControls.candidateCount ? 'not-payment-looking' : 'not-found';
 
-    const categories = { headerLabels, headerIcons, grandTotal, productNames, quantityControls, paymentControls };
+    // These selectors deliberately target rendered Alpine nodes, rather than
+    // x-for/template roots.  A template is not a readable cart row.
+    const cartNames = collectCategory('cart-names', [
+        '.tn-cart-line [x-text="item.item_name"]',
+        '.tn-cart-line [data-cart-name]',
+        '[data-cart-item] [data-name]',
+    ]);
+    const cartQuantities = collectCategory('cart-quantities', [
+        '.tn-cart-line [data-qty-input]',
+        '.tn-cart-line .tn-qty-value',
+    ], { controls: true });
+    const cartLineTotals = collectCategory('cart-line-totals', [
+        '.tn-cart-line .tn-line-total',
+        '.tn-cart-line [data-line-total]',
+    ]);
+    const categories = {
+        headerLabels, headerIcons, grandTotal, productNames, quantityControls,
+        paymentControls, cartNames, cartQuantities, cartLineTotals,
+    };
     const paymentElements = allMatching([
         '[data-payment]', '[data-payment-method]', '[data-checkout]',
         'button[type="submit"]', 'button',
@@ -610,8 +631,7 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
     };
     const headerRect = header?.getBoundingClientRect();
     const headerStyle = header ? getComputedStyle(header) : null;
-    const darkClass = document.documentElement.classList.contains('dark')
-        || document.body?.classList.contains('dark');
+    const darkClass = document.documentElement.classList.contains('dark');
     const theme = {
         darkClass,
         colorScheme: getComputedStyle(document.documentElement).colorScheme || 'normal',
@@ -620,6 +640,34 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
             || null,
         prefersDark: window.matchMedia?.('(prefers-color-scheme: dark)').matches || false,
     };
+    const shell = firstMatching([
+        '[data-tn-sale-root]', '.tn-premium-shell', 'main', '[role="main"]', 'body',
+    ]);
+    const shellBackground = shell ? effectiveBackground(shell) : { variants: [], unresolved: [] };
+    const shellLuminances = (shellBackground.variants || []).map(item => round(luminance(item.color)));
+    const shellBackgroundLuminance = shellLuminances.length
+        ? round(shellLuminances.reduce((sum, item) => sum + item, 0) / shellLuminances.length)
+        : null;
+    theme.expectedTheme = expectedTheme;
+    theme.shellSelector = shell ? describe(shell).selector : null;
+    theme.shellBackgroundLuminance = shellBackgroundLuminance;
+    theme.shellBackgroundLuminances = shellLuminances;
+    theme.failures = [];
+    if (expectedTheme === 'dark') {
+        if (!darkClass) theme.failures.push('expected-dark-html-class');
+        if (!/\bdark\b/i.test(theme.colorScheme)) theme.failures.push('expected-dark-color-scheme');
+        if (shellBackgroundLuminance == null || shellBackgroundLuminance >= 0.45) {
+            theme.failures.push('expected-dark-shell-background');
+        }
+    } else if (expectedTheme === 'light') {
+        if (darkClass) theme.failures.push('expected-light-html-class');
+        if (!/\blight\b/i.test(theme.colorScheme) || /\bdark\b/i.test(theme.colorScheme)) {
+            theme.failures.push('expected-light-color-scheme');
+        }
+        if (shellBackgroundLuminance == null || shellBackgroundLuminance <= 0.45) {
+            theme.failures.push('expected-light-shell-background');
+        }
+    }
     const report = {
         ok: Object.values(categories).every(category => category.pass),
         generatedAt: new Date().toISOString(),
@@ -674,7 +722,13 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
             mobilePayOutsideViewport,
             controls: primaryPayBounds,
         },
-        requiredCategoryFailures: requiredCategories.filter(category => !categories[category] || categories[category].status === 'not-found'),
+        requiredCategoryFailures: requiredCategories.filter(category => {
+            const selected = Object.values(categories).find(entry => entry.category === category)
+                || categories[category];
+            return !selected
+                || selected.status !== 'checked'
+                || !selected.records?.some(record => record.visible);
+        }),
         findings: [],
     };
     for (const category of Object.values(categories)) {
@@ -689,6 +743,7 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
     for (const key of ['document', 'main']) {
         if (overflow[key].horizontalOverflow) report.findings.push({ type: 'horizontal-overflow', target: key });
     }
+    if (overflow.body.horizontalOverflow) report.findings.push({ type: 'horizontal-overflow', target: 'body' });
     if (mobilePayOutsideViewport) {
         report.findings.push({
             type: 'mobile-pay-outside-viewport',
@@ -697,6 +752,9 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
     }
     if (report.requiredCategoryFailures.length) {
         report.findings.push({ type: 'required-category-missing', categories: report.requiredCategoryFailures });
+    }
+    for (const failure of theme.failures) {
+        report.findings.push({ type: failure, expectedTheme });
     }
     report.ok = report.findings.length === 0;
     return report;
@@ -717,9 +775,30 @@ export function findPremiumVisualAuditFailures(report, options = {}) {
     }
     if (options.requireCategories) {
         for (const category of options.requireCategories) {
-            if (!report?.categories?.[category] || report.categories[category].status === 'not-found') {
+            const selected = Object.values(report?.categories || {}).find(entry => entry.category === category)
+                || report?.categories?.[category];
+            if (!selected || selected.status !== 'checked'
+                || !selected.records?.some(record => record.visible)) {
                 failures.push({ type: 'required-category-missing', category });
             }
+        }
+    }
+    if (options.expectedTheme && report?.theme) {
+        const theme = report.theme;
+        const expected = options.expectedTheme;
+        if (expected === 'dark' && !theme.darkClass) failures.push({ type: 'expected-dark-html-class' });
+        if (expected === 'light' && theme.darkClass) failures.push({ type: 'expected-light-html-class' });
+        if (expected === 'dark' && !/\bdark\b/i.test(theme.colorScheme || '')) {
+            failures.push({ type: 'expected-dark-color-scheme' });
+        }
+        if (expected === 'light' && (!/\blight\b/i.test(theme.colorScheme || '') || /\bdark\b/i.test(theme.colorScheme || ''))) {
+            failures.push({ type: 'expected-light-color-scheme' });
+        }
+        const luminance = Number(theme.shellBackgroundLuminance);
+        if (!Number.isFinite(luminance)
+            || (expected === 'dark' && luminance >= 0.45)
+            || (expected === 'light' && luminance <= 0.45)) {
+            failures.push({ type: `expected-${expected}-shell-background` });
         }
     }
     return failures;
@@ -768,6 +847,170 @@ export function assessPremiumMobilePayBounds(rect, viewport, tolerance = 2) {
         && Number(rect.right) <= Number(viewport.width) + tolerance
         && Number(rect.bottom) <= Number(viewport.height) + tolerance;
     return { styleVisible, fullyInsideViewport, outsideViewport: styleVisible && !fullyInsideViewport };
+}
+
+/**
+ * Inspect real, rendered cart rows.  This intentionally uses the sale
+ * template's concrete hooks and ignores <template x-for> nodes.
+ *
+ * @param {{items?: Array<{item_name:string, quantity?:number, total?:number}>,
+ *          total?:number}} [expected]
+ */
+export const auditPremiumCartState = function auditPremiumCartState(expected = {}) {
+    const numberFromText = value => {
+        const matches = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/g);
+        return matches?.length ? Number(matches[matches.length - 1]) : null;
+    };
+    const visible = element => {
+        if (!element || !(element instanceof Element)) return false;
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden'
+            && Number(style.opacity || 1) > 0 && rect.width > 0 && rect.height > 0;
+    };
+    const layoutVisible = element => {
+        if (!element || !(element instanceof Element)) return false;
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden'
+            && Number(style.opacity || 1) > 0 && rect.width > 0 && rect.height > 0;
+    };
+    const requireVisible = expected.requireVisible !== false;
+    const includeHidden = expected.includeHidden === true;
+    const list = document.querySelector('[x-ref="cartList"]')
+        || document.querySelector('.tn-cart-list');
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const rows = list
+        ? [...list.querySelectorAll('.tn-cart-line[data-cart-index], [data-cart-item][data-cart-index]')]
+            .filter(row => row.tagName !== 'TEMPLATE' && !row.closest('template')
+                && (includeHidden || layoutVisible(row)))
+        : [];
+    const rendered = rows.map(row => {
+        const nameElement = row.querySelector('[x-text="item.item_name"], [data-cart-name], [data-name]');
+        const quantityElement = row.querySelector('[data-qty-input], .tn-qty-value');
+        const totalElement = row.querySelector('.tn-line-total, [data-line-total]');
+        const rect = row.getBoundingClientRect();
+        const nameRect = nameElement?.getBoundingClientRect();
+        const name = (nameElement?.innerText || nameElement?.textContent || '').replace(/\s+/g, ' ').trim();
+        return {
+            item_name: name,
+            name,
+            quantity: numberFromText(quantityElement?.value ?? quantityElement?.textContent),
+            total: numberFromText(totalElement?.innerText || totalElement?.textContent),
+            visible: visible(row),
+            nameVisible: layoutVisible(nameElement),
+            width: rect.width,
+            height: rect.height,
+            nameWidth: nameRect?.width || 0,
+            nameHeight: nameRect?.height || 0,
+            nameRect: nameRect
+                ? { left: nameRect.left, top: nameRect.top, right: nameRect.right, bottom: nameRect.bottom }
+                : null,
+            rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+        };
+    });
+    const listRect = list?.getBoundingClientRect();
+    const listStyle = list ? getComputedStyle(list) : null;
+    const scrollTop = list?.scrollTop || 0;
+    const scrollHeight = list?.scrollHeight || 0;
+    const clientHeight = list?.clientHeight || 0;
+    const clientWidth = list?.clientWidth || 0;
+    const internalScrolling = Boolean(list && scrollHeight > clientHeight + 1
+        && ['auto', 'scroll'].includes(listStyle?.overflowY));
+    const first = rendered[0] || null;
+    const firstRowAtTop = Boolean(first && scrollTop <= 1
+        && listRect && first.rect.top >= listRect.top - 1
+        && first.rect.bottom <= listRect.bottom + 1);
+    const firstNameAtTop = Boolean(first && scrollTop <= 1
+        && first.nameRect && listRect
+        && first.nameRect.bottom > listRect.top
+        && first.nameRect.top < listRect.bottom
+        && first.nameRect.right > listRect.left
+        && first.nameRect.left < listRect.right);
+    const saleRoot = document.querySelector('[data-tn-sale-root]');
+    let alpineCart = null;
+    let alpineCartError = null;
+    try {
+        const data = window.Alpine?.$data?.(saleRoot);
+        if (Array.isArray(data?.cart)) {
+            alpineCart = data.cart.map(item => ({
+                item_name: String(item?.item_name || '').trim(),
+                quantity: Number(item?.quantity),
+            }));
+        } else {
+            alpineCartError = 'alpine-cart-unavailable';
+        }
+    } catch (error) {
+        alpineCartError = `alpine-cart-read-failed:${String(error?.message || error).slice(0, 120)}`;
+    }
+    const expectedItems = Array.isArray(expected.items) ? expected.items : [];
+    const mismatches = [];
+    if (requireVisible && (!list || !visible(list))) mismatches.push('cart-viewport-not-visible');
+    if (requireVisible && (!clientWidth || !clientHeight || !viewport.width || !viewport.height)) mismatches.push('cart-viewport-collapsed');
+    if (expectedItems.length && rendered.length !== expectedItems.length) mismatches.push('rendered-row-count');
+    if (alpineCartError) mismatches.push(alpineCartError);
+    if (alpineCart && alpineCart.length !== rendered.length) mismatches.push('alpine-cart-row-count-mismatch');
+    rendered.forEach((actual, index) => {
+        const state = alpineCart?.[index];
+        if (state && actual.item_name !== state.item_name) mismatches.push(`row-${index}-state-dom-name-mismatch`);
+        if (state && actual.quantity !== state.quantity) mismatches.push(`row-${index}-state-dom-quantity-mismatch`);
+    });
+    expectedItems.forEach((item, index) => {
+        const actual = rendered[index];
+        const wantedName = String(item.item_name || '').trim();
+        if (!actual?.name) mismatches.push(`row-${index}-name-empty`);
+        if (wantedName && actual?.name !== wantedName) mismatches.push(`row-${index}-name-mismatch`);
+        if (item.quantity != null && actual?.quantity !== Number(item.quantity)) mismatches.push(`row-${index}-quantity-mismatch`);
+        if (item.total != null && actual?.total !== Number(item.total)) mismatches.push(`row-${index}-total-mismatch`);
+    });
+    if (requireVisible && rendered.some(row => !row.width || !row.height)) mismatches.push('rendered-row-collapsed');
+    if (requireVisible && rendered.some(row => !row.nameWidth || !row.nameHeight)) mismatches.push('rendered-name-collapsed');
+    if (requireVisible && scrollTop <= 1 && rendered.length && !firstRowAtTop) mismatches.push('first-row-clipped-at-scroll-top-zero');
+    if (requireVisible && scrollTop <= 1 && rendered.length && !firstNameAtTop) mismatches.push('first-name-not-intersecting-list-clip');
+    if (requireVisible && list && !internalScrolling && scrollHeight > clientHeight + 1) mismatches.push('list-clipped-without-internal-scroll');
+    if (requireVisible && list && listStyle?.display === 'none') mismatches.push('cart-list-collapsed');
+    if (expected.total != null) {
+        const totalElement = document.querySelector(
+            '[data-grand-total], [data-cart-total], [data-total], .grand-total, .cart-total, .tn-grand-total',
+        );
+        const actualTotal = numberFromText(totalElement?.innerText || totalElement?.textContent);
+        if (actualTotal !== Number(expected.total)) mismatches.push('grand-total-mismatch');
+    }
+    return {
+        ok: mismatches.length === 0,
+        viewport,
+        list: list ? {
+            selector: list.className ? `.${String(list.className).trim().split(/\s+/)[0]}` : '[x-ref="cartList"]',
+            visible: visible(list),
+            width: clientWidth,
+            height: clientHeight,
+            scrollTop,
+            scrollHeight,
+            clientHeight,
+            internalScrolling,
+            clippedOrCollapsed: !visible(list) || !clientWidth || !clientHeight
+                || (scrollHeight > clientHeight + 1 && !internalScrolling),
+            firstRowAtTop,
+            firstNameAtTop,
+        } : null,
+        rows: rendered,
+        alpineCart,
+        mismatches,
+    };
+};
+
+export const auditPremiumCartStateSource = auditPremiumCartState.toString();
+
+export function findPremiumCartStateFailures(report) {
+    return (report?.mismatches || []).map(type => ({ type }));
+}
+
+export function assertPremiumCartState(report) {
+    const failures = findPremiumCartStateFailures(report);
+    if (failures.length) {
+        throw new Error(`Premium cart state failed (${failures.length}): ${failures.slice(0, 8).map(item => item.type).join(', ')}`);
+    }
+    return report;
 }
 
 /**

@@ -30,6 +30,7 @@ const ALLOWED_CHANGED = [
     /^scripts\/premium-ui-boundary-check\.mjs$/,
     /^scripts\/premium-ui-gallery\.py$/,
     /^scripts\/premium-ui-assertions(?:\.self-test)?\.mjs$/,
+    /^scripts\/premium-ui-mobile-regression\.mjs$/,
     /^scripts\/premium-ui-(?:browser|fixture-extension)\.(?:mjs|php)$/,
     /^tests\/Unit\/PremiumUiPresentationContractTest\.php$/,
     /^docs\/ui-premium(?:\/|$)/,

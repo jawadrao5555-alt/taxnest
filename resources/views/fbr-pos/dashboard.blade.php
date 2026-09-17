@@ -1,5 +1,5 @@
 <x-fbr-pos-layout>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+<div class="tn-page tn-dashboard tn-retail-dashboard max-w-7xl mx-auto px-4 sm:px-6 py-5">
     <x-pwa-banner color="blue" appName="Nest FBR Pos" />
     <x-pwa-push scope="fbrpos" />
 

@@ -1,5 +1,5 @@
 <x-pos-layout>
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="tn-page tn-hotel-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('pos.hotel._nav')
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ __('pos.nav_hotel_reports') }}</h1>
     <p class="text-sm text-gray-500 mb-5">{{ __('pos.hotel_reports_hint') }}</p>
@@ -18,7 +18,7 @@
             <p class="text-xl font-extrabold mt-1">Rs {{ number_format($money['invoiced'] ?? 0) }}</p>
         </div>
     </div>
-    <div class="bg-white dark:bg-gray-900 rounded-xl border p-4">
+    <div class="tn-panel bg-white dark:bg-gray-900 rounded-xl border p-4">
         <h2 class="text-sm font-bold uppercase tracking-wide mb-3">{{ __('pos.hotel_pending_balances') }}</h2>
         @forelse($pending as $stay)
         <a href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="flex items-center justify-between py-2 border-b last:border-0">

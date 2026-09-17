@@ -20,8 +20,8 @@
 @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 </style>
 
-<div class="w-full overflow-x-hidden" x-data="rDash()" x-init="init()">
-    <div class="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
+<div class="tn-restaurant-dashboard w-full overflow-x-hidden" x-data="rDash()" x-init="init()">
+    <div class="tn-page px-4 sm:px-6 py-5 max-w-7xl mx-auto">
         @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')
         @if(!empty($hotelOccupancy))
@@ -50,7 +50,7 @@
                 return (fmod($m, 1) == 0.0 ? (string) (int) $m : (string) $m) . __('pos.min_suffix');
             };
         @endphp
-        <div class="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+        <div class="tn-restaurant-command mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
             <div class="flex items-center justify-between gap-3 mb-4">
                 <div>
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.kitchen_efficiency') }}</h3>

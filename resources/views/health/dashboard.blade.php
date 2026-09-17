@@ -3,10 +3,10 @@
     use App\Support\HealthPanel;
 @endphp
 <x-health-layout>
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+    <div class="tn-page tn-health-dashboard max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
         {{-- ── Heading ── --}}
-        <div class="flex flex-wrap items-end justify-between gap-3">
+        <div class="tn-page-header flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h1 class="text-xl sm:text-2xl font-black tracking-tight">{{ __('health.welcome_back', ['name' => $healthUser->name ?? '']) }}</h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -47,7 +47,7 @@
              person may open the desk at all — the controller returns null
              otherwise, so the dashboard never leaks patient volume sideways. ── --}}
         @if(!empty($opdToday))
-            <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+            <div class="tn-health-briefing rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="text-base font-black">{{ __('health.dash_opd_today') }}</h2>
                     @if(in_array('appointments.manage', $healthCapabilities ?? [], true))
@@ -85,7 +85,7 @@
                 }
             @endphp
             @foreach($tiles as $tile)
-                <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
+                <div class="tn-stat-card rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
                     <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $tile['label'] }}</p>
                     <p class="mt-1 text-2xl font-black">{{ $tile['value'] }}</p>
                 </div>
@@ -131,7 +131,7 @@
                             }
                             if (!$entry) { $anyPending = true; }
                         @endphp
-                        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                        <div class="tn-health-module rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                             <div class="flex items-center gap-2">
                                 <span class="text-lg leading-none">{{ HealthModuleService::MODULE_META[$module]['icon'] ?? '•' }}</span>
                                 <span class="text-sm font-black">{{ __(HealthModuleService::moduleLabelKey($module)) }}</span>

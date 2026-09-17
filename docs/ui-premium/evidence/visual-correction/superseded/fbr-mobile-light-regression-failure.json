@@ -1,0 +1,47 @@
+{
+  "capturedAt": "2026-09-17T13:36:38.309Z",
+  "failure": {
+    "name": "Error",
+    "message": "Premium cart state failed (14): rendered-row-count, row-0-name-empty, row-0-name-mismatch, row-0-quantity-mismatch, row-0-total-mismatch, row-1-name-empty, row-1-name-mismatch, row-1-quantity-mismatch",
+    "phase": "after-reload-persisted"
+  },
+  "postReloadState": {
+    "url": "http://127.0.0.1:5911/fbr-pos/create",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "mobileView": "cart",
+    "alpineCart": [],
+    "rows": [],
+    "list": {
+      "x": 15,
+      "y": 301.78125,
+      "width": 361,
+      "height": 246.34375,
+      "display": "block",
+      "visibility": "visible",
+      "overflow": "hidden auto"
+    },
+    "scroll": {
+      "scrollTop": 0,
+      "clientHeight": 246,
+      "scrollHeight": 246
+    },
+    "localStorage": [
+      {
+        "key": "fbrpos_cart_10_4",
+        "value": "[{\"cart_uid\":\"c1789652169648_zt1fum3\",\"item_id\":6,\"item_type\":\"product\",\"item_name\":\"Synthetic Retail Ceramic Mug\",\"quantity\":2,\"unit_price\":450,\"special_notes\":\"\",\"is_tax_exempt\":true,\"is_third_schedule\":false,\"hs_code\":\"96081000\",\"uom\":\"NOS\",\"tax_rate\":0,\"item_discount_type\":\"percentage\",\"item_discount_value\":0,\"showItemDiscount\":false,\"showFbrPanel\":false,\"peti_pack_size\":null,\"peti_rate\":null,\"peti_retail_price\":450,\"is_peti_rate\":false,\"_petiManual\":false},{\"cart_uid\":\"c1789652171564_j9odyb"
+      }
+    ],
+    "paymentActions": {
+      "x": 15,
+      "y": 677,
+      "width": 361,
+      "height": 171,
+      "display": "block",
+      "visibility": "visible",
+      "overflow": "visible"
+    }
+  }
+}

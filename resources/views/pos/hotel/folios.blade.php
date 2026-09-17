@@ -1,8 +1,8 @@
 <x-pos-layout>
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="tn-page tn-hotel-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('pos.hotel._nav', ['showHotelPrimaryActions' => true])
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-5">{{ __('pos.nav_hotel_folios') }}</h1>
-    <div class="bg-white dark:bg-gray-900 rounded-xl border overflow-x-auto">
+    <div class="tn-table-shell bg-white dark:bg-gray-900 rounded-xl border overflow-x-auto">
         <table class="min-w-[40rem] w-full text-sm">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 uppercase">

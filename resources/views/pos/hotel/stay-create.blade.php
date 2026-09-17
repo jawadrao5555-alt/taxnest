@@ -1,12 +1,12 @@
 <x-pos-layout>
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="tn-page tn-hotel-page max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('pos.hotel._nav')
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ !empty($walkIn) ? __('pos.hotel_action_walkin') : __('pos.hotel_action_booking') }}</h1>
     <p class="text-sm text-gray-500 mb-5">{{ __('pos.hotel_charging_rule_note') }}</p>
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{{ session('error') }}</div>
     @endif
-    <form method="POST" action="{{ route('pos.hotel.stays.store') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form method="POST" action="{{ route('pos.hotel.stays.store') }}" class="tn-panel bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         @csrf
         <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
         <div class="sm:col-span-2">

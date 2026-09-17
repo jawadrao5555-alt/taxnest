@@ -402,6 +402,7 @@ input:focus:not(:focus-visible) { outline: none; }
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 </style>
+<link rel="stylesheet" href="{{ asset('css/premium-pos.css') }}?v={{ @filemtime(public_path('css/premium-pos.css')) }}">
 {{-- Task 658 (Aug 2026): bake only the TXT.* keys this screen actually uses —
      see pos/universal.blade.php twin note. QA: scripts/pos-i18n-check.php in
      the deploy preflight. --}}
@@ -432,7 +433,7 @@ window.addEventListener('popstate', function() {
 {{-- Screen Fit (Jul 2026, ported from PRA universal): fitStyleStr applies CSS zoom +
      a /zoom-compensated px height so the sale screen renders correctly on ANY display.
      Auto mode picks the zoom from viewport size; manual % saved per device. --}}
-<div data-tn-sale-document="fbr" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
+<div data-tn-sale-document="fbr" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
     {{-- ═══════════ NAV SWITCHES (Aug 2026, PRA parity — owner request) ═══════════
          Desktop (md+): FBR Reporting / Auto-Print / Auto-KOT live INSIDE the blue top-nav
          as a "Switches" dropdown — teleported into #tn-nav-sale-tools (fbr-pos-app.blade.php)
@@ -1138,9 +1139,9 @@ window.addEventListener('popstate', function() {
     {{-- Wide-cart (Variant A) port from PRA screen (owner, 30 Jul 2026): Products OFF
          + desktop = body row flips to column, grid hides, cart goes wide LEFT with a
          400px payment column RIGHT (.tn-cart-side = the existing footer block). --}}
-    <div class="tn-body-row flex flex-1 overflow-hidden" :class="!showProducts ? 'tn-widecart' : ''">
+    <div class="tn-body-row tn-sale-workspace flex flex-1 overflow-hidden" :class="!showProducts ? 'tn-widecart' : ''">
 
-        <div class="tn-left-col flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
+        <div class="tn-left-col tn-product-panel flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
 
             <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
@@ -1190,10 +1191,10 @@ window.addEventListener('popstate', function() {
                 
             </div>
 
-            <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
+            <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="tn-product-grid flex-1 overflow-y-auto p-3 outline-none">
 
                 <template x-if="loading">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <div class="tn-product-grid-list grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         <template x-for="i in 12"><div class="rounded-xl overflow-hidden flex items-center gap-2 px-2.5 py-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800"><div class="skeleton w-8 h-8 rounded-lg flex-shrink-0"></div><div class="flex-1 space-y-1.5"><div class="skeleton h-3 rounded w-3/4"></div><div class="skeleton h-2.5 rounded w-1/3"></div></div></div></template>
                     </div>
                 </template>
@@ -1207,14 +1208,17 @@ window.addEventListener('popstate', function() {
                      .prod-card / .price-badge / .cart-qty-badge / .quick-add / .stock-out kept
                      (CSS + tests rely on them). Task 1271: gridEditMode ported (per-user grid prefs). --}}
                 <template x-if="!loading">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <div class="tn-product-grid-list grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
                             {{-- Task 1271: gridEditMode (PRA port) — click toggles THIS user's visibility pref; hidden items dim to 40%. --}}
-                            <div :id="'grid-item-' + idx" class="prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-blue-500' : '', gridEditMode ? '' : (item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')), gridEditMode && !isItemVisible(item) ? 'opacity-40' : '']" @click="gridEditMode ? toggleItemVisibility(item) : handleProductClick(item)">
+                            <div :id="'grid-item-' + idx" class="tn-product-card prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-blue-500' : '', gridEditMode ? '' : (item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')), gridEditMode && !isItemVisible(item) ? 'opacity-40' : '']" @click="gridEditMode ? toggleItemVisibility(item) : handleProductClick(item)">
                                 <template x-if="item.image">
-                                    <img :src="item.image" :alt="item.name" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" loading="lazy" onerror="this.style.display='none';">
+                                    <img :src="item.image" :alt="item.name" class="tn-product-media w-9 h-9 rounded-lg object-cover flex-shrink-0" loading="lazy" onerror="this.style.display='none';">
                                 </template>
-                                <div class="flex-1 min-w-0">
+                                <template x-if="!item.image">
+                                    <div class="tn-product-fallback" aria-hidden="true" x-text="(item.name || '').slice(0, 1)"></div>
+                                </template>
+                                <div class="tn-product-meta flex-1 min-w-0">
                                     <div class="flex items-center gap-1.5 min-w-0">
                                         <p class="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.name"></p>
                                         @if($company->inventory_enabled)
@@ -1236,7 +1240,7 @@ window.addEventListener('popstate', function() {
                                          <p class="text-[10px] text-orange-600 dark:text-orange-400 truncate leading-tight mt-0.5" x-text="[(item.remaining_total !== null ? window.TXT.deal_remaining_total + ': ' + item.remaining_total : ''), (item.remaining_daily !== null ? window.TXT.deal_remaining_today + ': ' + item.remaining_daily : ''), (item.special_start_time ? item.special_start_time.slice(0,5) + '–' + item.special_end_time.slice(0,5) : '')].filter(Boolean).join(' · ')"></p>
                                      </template>
                                 </div>
-                                <span class="price-badge text-sm font-extrabold text-blue-600 dark:text-blue-400 flex-shrink-0" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
+                                <span class="tn-product-price price-badge text-sm font-extrabold text-blue-600 dark:text-blue-400 flex-shrink-0" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
                                 <template x-if="getCartQty(item) > 0">
                                     <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-blue-500 to-blue-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0" x-text="getCartQty(item)"></span>
                                 </template>
@@ -1319,7 +1323,7 @@ window.addEventListener('popstate', function() {
             </button>
         </div>
 
-        <div class="tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+        <div class="tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
             <div class="tn-cart-main">
             <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg">
@@ -1423,7 +1427,7 @@ window.addEventListener('popstate', function() {
                 </div>
             </template>
 
-            <div class="flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
+            <div class="tn-cart-list flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
                 <template x-if="cart.length === 0">
                     <div class="tn-empty flex flex-col items-center justify-center h-full text-gray-400 py-16 px-6 text-center">
                         <div class="tn-empty-icon w-24 h-24 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mb-5">
@@ -1440,7 +1444,7 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
                 <template x-for="(item, index) in cart" :key="item.cart_uid">
-                    <div class="cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative"
+                    <div class="tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative"
                         :class="activeCartIndex === index ? 'cart-row-active' : ''"
                         @click="selectCartRow(index)" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
@@ -1482,8 +1486,8 @@ window.addEventListener('popstate', function() {
                                     </div>
                                 </template>
                             </div>
-                            <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5">
-                                <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
+                            <div class="tn-qty-stepper flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5">
+                                <button @click.stop="updateQty(index, -1)" class="tn-qty-decrement w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
                                 <input type="text" inputmode="decimal" autocomplete="off"
@@ -1497,8 +1501,8 @@ window.addEventListener('popstate', function() {
                                     @keydown="onQtyKeydown(index, $event)"
                                     @input.stop="onQtyInput(index, $event)"
                                     @blur="onQtyBlur(index, $event)"
-                                    class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
-                                <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
+                                    class="tn-qty-value w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
+                                <button @click.stop="updateQty(index, 1)" class="tn-qty-increment w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                                 {{-- Retail Core (Aug 2026): unit chip — weight/measure units (KG/LTR/MTR...)
@@ -1508,7 +1512,7 @@ window.addEventListener('popstate', function() {
                                       x-text="item.uom"></span>
                             </div>
                             <div class="text-right min-w-[60px]">
-                                <p class="text-sm font-extrabold text-gray-900 dark:text-white" x-text="'Rs.' + getItemTotal(item).toLocaleString()"></p>
+                                <p class="tn-line-total text-sm font-extrabold text-gray-900 dark:text-white" x-text="'Rs.' + getItemTotal(item).toLocaleString()"></p>
                             </div>
                             <button @click.stop="removeFromCart(index)" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -1637,7 +1641,7 @@ window.addEventListener('popstate', function() {
             </div>
             </div>{{-- closes .tn-cart-main --}}
 
-            <div class="tn-cart-side border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <div class="tn-cart-side tn-payment-dock border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
                 {{-- 7 Aug 2026 — PRA universal redesign port (owner video note): always-open
                      notes textarea + inline discount strip replaced by one slim Note/Discount
                      chip row; both panels collapsible. kitchenNotes model unchanged. --}}
@@ -1695,7 +1699,7 @@ window.addEventListener('popstate', function() {
                      the FBR theme engine remaps blue-* per company theme), big white total,
                      items·qty pill. All original rows kept. FBR = per-item tax (method-independent),
                      so no cash/card method hint — the band total IS the charge for either button. --}}
-                <div class="tn-total-band px-3 py-2 bg-blue-900">
+                <div class="tn-order-summary tn-total-band px-3 py-2 bg-blue-900">
                     <div class="flex items-end justify-between gap-2">
                         <div class="min-w-0 space-y-0.5 text-[11px] leading-tight text-white/75">
                             <div class="flex gap-2"><span>{{ __('pos.subtotal') }}</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>
@@ -1719,7 +1723,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <div class="text-right shrink-0">
                             <div class="text-[9px] font-bold tracking-widest text-white/60 uppercase">{{ __('pos.total_word') }}</div>
-                            <div class="total-animate total-line text-3xl font-black text-white leading-none" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''"></div>
+                            <div class="tn-grand-total total-animate total-line text-3xl font-black text-white leading-none" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''"></div>
                         </div>
                     </div>
                     <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-white/50 pt-1">
@@ -1729,13 +1733,16 @@ window.addEventListener('popstate', function() {
                         <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - getCartCost()).toLocaleString()"></span>
                     </div>
                 </div>
-                <div class="px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
+                <div class="tn-payment-actions px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
                     {{-- ONE-TAP method buttons (PRA parity, 7 Aug 2026): CASH/CARD finalize
                          DIRECTLY with that method — same guards + sequence as the existing
                          Alt+1/Alt+2 keyboard shortcut handler. FBR tax is per-item, so the
                          charge equals the band total for either method. PAY (F8) keeps the
                          modal (method choice + buyer NTN etc.). --}}
-                    <div class="grid grid-cols-2 gap-2">
+                    {{-- Preserve the payment groups on phones: mobile.css otherwise
+                         stacks these fixed-footer controls and leaves cartList ~7px tall.
+                         Use its existing opt-ins; the cart remains the scroll owner. --}}
+                    <div class="grid grid-cols-2 grid-cols-2-keep gap-2">
                         <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; payPrintReceipt = billPrintDefault(); processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
@@ -1745,7 +1752,7 @@ window.addEventListener('popstate', function() {
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
                     </div>
-                    <div class="grid grid-cols-4 gap-2">
+                    <div class="grid grid-cols-4 grid-cols-4-keep gap-2">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
                         {{-- Task 1271: Cart drafts — modal has "save current cart" + recall/delete list.
                              Drafts are JSON rows (fbr_pos_drafts), never held sales / FBR serials. --}}

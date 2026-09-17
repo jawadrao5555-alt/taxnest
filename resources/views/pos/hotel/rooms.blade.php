@@ -1,5 +1,5 @@
 <x-pos-layout>
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="tn-page tn-hotel-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('pos.hotel._nav')
     <div class="flex items-center justify-between mb-5">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ !empty($housekeepingView) ? __('pos.nav_hotel_housekeeping') : __('pos.hotel_rooms') }}</h1>
@@ -14,7 +14,7 @@
     @include('pos.hotel._room-board')
 
     @if(empty($housekeepingView) && !auth('pos')->user()?->posCashierBlocked())
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+    <div class="tn-panel bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
         <h3 class="text-sm font-semibold mb-4">{{ __('pos.hotel_add_room') }}</h3>
         <form method="POST" action="{{ route('pos.hotel.rooms.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             @csrf

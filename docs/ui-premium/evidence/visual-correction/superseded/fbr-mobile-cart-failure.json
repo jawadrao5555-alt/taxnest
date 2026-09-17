@@ -1,0 +1,972 @@
+{
+  "capturedAt": "2026-09-17T13:26:46.264Z",
+  "failure": "row-0-total-mismatch,row-1-total-mismatch,row-2-total-mismatch,grand-total-mismatch",
+  "auditJSON": {
+    "ok": false,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "list": {
+      "selector": ".tn-cart-list",
+      "visible": false,
+      "width": 0,
+      "height": 0,
+      "scrollTop": 0,
+      "scrollHeight": 0,
+      "clientHeight": 0,
+      "internalScrolling": false,
+      "clippedOrCollapsed": true,
+      "firstRowAtTop": true,
+      "firstNameAtTop": false
+    },
+    "rows": [
+      {
+        "item_name": "Synthetic Retail Ceramic Mug",
+        "name": "Synthetic Retail Ceramic Mug",
+        "quantity": 1,
+        "total": 430,
+        "visible": false,
+        "nameVisible": false,
+        "width": 0,
+        "height": 0,
+        "nameWidth": 0,
+        "nameHeight": 0,
+        "nameRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      {
+        "item_name": "Synthetic Retail Notebook",
+        "name": "Synthetic Retail Notebook",
+        "quantity": 1,
+        "total": 275,
+        "visible": false,
+        "nameVisible": false,
+        "width": 0,
+        "height": 0,
+        "nameWidth": 0,
+        "nameHeight": 0,
+        "nameRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      {
+        "item_name": "Synthetic Retail Gel Pen",
+        "name": "Synthetic Retail Gel Pen",
+        "quantity": 1,
+        "total": 95,
+        "visible": false,
+        "nameVisible": false,
+        "width": 0,
+        "height": 0,
+        "nameWidth": 0,
+        "nameHeight": 0,
+        "nameRect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      }
+    ],
+    "alpineCart": [
+      {
+        "item_name": "Synthetic Retail Ceramic Mug",
+        "quantity": 1
+      },
+      {
+        "item_name": "Synthetic Retail Notebook",
+        "quantity": 1
+      },
+      {
+        "item_name": "Synthetic Retail Gel Pen",
+        "quantity": 1
+      }
+    ],
+    "mismatches": [
+      "row-0-total-mismatch",
+      "row-1-total-mismatch",
+      "row-2-total-mismatch",
+      "grand-total-mismatch"
+    ]
+  },
+  "diagnostic": {
+    "url": "http://127.0.0.1:5911/fbr-pos/create",
+    "htmlClass": "",
+    "colorScheme": "light",
+    "alpine": {
+      "mobileView": "menu",
+      "cart": [
+        {
+          "item_name": "Synthetic Retail Ceramic Mug",
+          "quantity": 1
+        },
+        {
+          "item_name": "Synthetic Retail Notebook",
+          "quantity": 1
+        },
+        {
+          "item_name": "Synthetic Retail Gel Pen",
+          "quantity": 1
+        }
+      ]
+    },
+    "root": {
+      "x": 14,
+      "y": 76,
+      "width": 362,
+      "height": 772,
+      "top": 76,
+      "bottom": 848,
+      "display": "flex",
+      "visibility": "visible",
+      "overflow": "hidden",
+      "position": "static"
+    },
+    "cartList": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "bottom": 0,
+      "display": "block",
+      "visibility": "visible",
+      "overflow": "hidden auto",
+      "position": "static"
+    },
+    "scroll": {
+      "scrollTop": 0,
+      "clientHeight": 0,
+      "scrollHeight": 0
+    },
+    "rows": [
+      {
+        "index": 0,
+        "row": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "bottom": 0,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "visible",
+          "position": "relative"
+        },
+        "name": {
+          "text": "Synthetic Retail Ceramic Mug",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "bottom": 0,
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden",
+            "position": "static"
+          },
+          "ancestors": [
+            {
+              "tag": "SPAN",
+              "id": "",
+              "cls": "truncate",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "P",
+              "id": "",
+              "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex-1 min-w-0",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex items-center gap-2.5",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "relative"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-main",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "contents",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl hidden md:flex",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "none",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+              "rect": {
+                "x": 14,
+                "y": 76,
+                "width": 362,
+                "height": 772,
+                "top": 76,
+                "bottom": 848,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "MAIN",
+              "id": "",
+              "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+              "rect": {
+                "x": 0,
+                "y": 48,
+                "width": 390,
+                "height": 796,
+                "top": 48,
+                "bottom": 844,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex flex-col h-full",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            }
+          ]
+        },
+        "allNameSpans": [
+          {
+            "text": "Synthetic Retail Ceramic Mug",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "top": 0,
+              "bottom": 0,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            },
+            "display": "block"
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "row": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "bottom": 0,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "visible",
+          "position": "relative"
+        },
+        "name": {
+          "text": "Synthetic Retail Notebook",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "bottom": 0,
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden",
+            "position": "static"
+          },
+          "ancestors": [
+            {
+              "tag": "SPAN",
+              "id": "",
+              "cls": "truncate",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "P",
+              "id": "",
+              "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex-1 min-w-0",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex items-center gap-2.5",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "relative"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-main",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "contents",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl hidden md:flex",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "none",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+              "rect": {
+                "x": 14,
+                "y": 76,
+                "width": 362,
+                "height": 772,
+                "top": 76,
+                "bottom": 848,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "MAIN",
+              "id": "",
+              "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+              "rect": {
+                "x": 0,
+                "y": 48,
+                "width": 390,
+                "height": 796,
+                "top": 48,
+                "bottom": 844,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex flex-col h-full",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            }
+          ]
+        },
+        "allNameSpans": [
+          {
+            "text": "Synthetic Retail Notebook",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "top": 0,
+              "bottom": 0,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            },
+            "display": "block"
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "row": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "top": 0,
+          "bottom": 0,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "visible",
+          "position": "relative"
+        },
+        "name": {
+          "text": "Synthetic Retail Gel Pen",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "top": 0,
+            "bottom": 0,
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden",
+            "position": "static"
+          },
+          "ancestors": [
+            {
+              "tag": "SPAN",
+              "id": "",
+              "cls": "truncate",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "P",
+              "id": "",
+              "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex-1 min-w-0",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex items-center gap-2.5",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative cart-row-active",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "relative"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-main",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "contents",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl hidden md:flex",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "display": "none",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+              "rect": {
+                "x": 14,
+                "y": 76,
+                "width": 362,
+                "height": 772,
+                "top": 76,
+                "bottom": 848,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "MAIN",
+              "id": "",
+              "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+              "rect": {
+                "x": 0,
+                "y": 48,
+                "width": 390,
+                "height": 796,
+                "top": 48,
+                "bottom": 844,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex flex-col h-full",
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            }
+          ]
+        },
+        "allNameSpans": [
+          {
+            "text": "Synthetic Retail Gel Pen",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "top": 0,
+              "bottom": 0,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            },
+            "display": "block"
+          }
+        ]
+      }
+    ],
+    "ancestorRects": {
+      "cartMain": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "bottom": 0,
+        "display": "contents",
+        "visibility": "visible",
+        "overflow": "visible",
+        "position": "static"
+      },
+      "cartCol": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "bottom": 0,
+        "display": "none",
+        "visibility": "visible",
+        "overflow": "visible",
+        "position": "static"
+      },
+      "workspace": null,
+      "main": {
+        "x": 0,
+        "y": 48,
+        "width": 390,
+        "height": 796,
+        "top": 48,
+        "bottom": 844,
+        "display": "block",
+        "visibility": "visible",
+        "overflow": "hidden",
+        "position": "static"
+      }
+    }
+  }
+}

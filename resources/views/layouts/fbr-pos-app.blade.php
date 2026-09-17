@@ -374,8 +374,9 @@
                 });
             }
         </script>
+        @include('partials.premium-ui')
     </head>
-    <body class="h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
+    <body class="tn-premium-shell h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}', {{ $isDarkMode ? 'true' : 'false' }})" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
 
@@ -790,14 +791,14 @@
                             </div>
                         </div>
 
-                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition">
+                        <button data-mobile-nav-toggle @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition">
                             <svg x-show="!mobileMenuOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                             <svg x-show="mobileMenuOpen" x-cloak class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
                 </div>
 
-                <div x-show="mobileMenuOpen" x-cloak
+                <div data-mobile-nav x-show="mobileMenuOpen" x-cloak
                      x-transition:enter="transition ease-out duration-150"
                      x-transition:enter-start="opacity-0 -translate-y-2"
                      x-transition:enter-end="opacity-100 translate-y-0"

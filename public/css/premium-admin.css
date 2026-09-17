@@ -1,0 +1,390 @@
+/*
+ * TaxNest Admin — Ledger Atelier
+ * This layer intentionally consumes the shared premium variables and the
+ * existing admin-theme variables applied by layouts/admin-app.blade.php.
+ */
+
+/* Resolve aliases on the same element as the mode tokens, not :root where
+   body-scoped dark tokens would be unavailable and freeze the fallbacks. */
+.tn-premium-shell {
+    --tn-admin-rail: var(--admin-sidebar, #102b34);
+    --tn-admin-rail-line: var(--admin-sidebar-border, rgba(231, 191, 59, .18));
+    --tn-admin-accent: var(--admin-accent, var(--tn-brand));
+    --tn-admin-accent-text: var(--admin-accent-text, var(--tn-accent));
+    --tn-admin-accent-wash: var(--admin-accent-bg, rgba(10, 77, 92, .14));
+    --tn-admin-canvas: var(--tn-canvas, #edf1ee);
+    --tn-admin-surface: var(--tn-surface, #f8faf7);
+    --tn-admin-text: var(--tn-text, #19333a);
+    --tn-admin-muted: var(--tn-muted, #64767a);
+    --tn-admin-line: var(--tn-line, #d8e0dc);
+    --tn-admin-radius: var(--tn-radius, 16px);
+    --tn-admin-shadow: var(--tn-shadow, 0 16px 42px rgba(25, 51, 58, .08));
+}
+
+body.admin-themed.tn-premium-shell {
+    background: var(--tn-admin-canvas) !important;
+    color: var(--tn-admin-text);
+}
+
+.tn-admin-shell {
+    min-height: 100dvh;
+    background:
+        linear-gradient(90deg, rgba(10, 77, 92, .035) 1px, transparent 1px),
+        var(--tn-admin-canvas);
+    background-size: 42px 42px;
+}
+
+.tn-admin-sidebar {
+    width: 17.25rem;
+    background: var(--tn-admin-rail) !important;
+    border-color: var(--tn-admin-rail-line) !important;
+    box-shadow: 14px 0 40px rgba(5, 22, 28, .10);
+}
+
+.tn-admin-brand {
+    border-color: var(--tn-admin-rail-line) !important;
+}
+
+.tn-admin-brand-mark {
+    display: grid;
+    width: 2.25rem;
+    height: 2.25rem;
+    place-items: center;
+    border: 1px solid rgba(231, 191, 59, .45);
+    border-radius: 9px;
+    background: rgba(231, 191, 59, .10);
+    color: var(--tn-accent, #e7bf3b);
+    font-weight: 800;
+    letter-spacing: -.08em;
+}
+
+.tn-admin-brand-title {
+    color: #f2f3e9;
+    font-size: 1rem;
+    font-weight: 750;
+    letter-spacing: -.035em;
+}
+
+.tn-admin-brand-subtitle,
+.tn-admin-sidebar .text-gray-500 {
+    color: rgba(221, 235, 231, .60) !important;
+}
+
+.tn-admin-sidebar nav > p {
+    color: rgba(231, 191, 59, .58) !important;
+    font-size: .62rem;
+    letter-spacing: .16em;
+}
+
+.tn-admin-sidebar nav > a {
+    position: relative;
+    min-height: 2.7rem;
+    border-radius: 8px !important;
+    color: rgba(232, 240, 237, .70) !important;
+}
+
+.tn-admin-sidebar nav > a:hover {
+    background: rgba(255, 255, 255, .065) !important;
+    color: #f8fbf4 !important;
+}
+
+.tn-admin-sidebar nav > a.admin-active-link {
+    background: var(--tn-admin-accent-wash) !important;
+    color: var(--tn-admin-accent-text) !important;
+    box-shadow: inset 2px 0 0 var(--tn-admin-accent);
+}
+
+.tn-admin-sidebar nav > a.admin-active-link svg {
+    stroke-width: 2.15;
+}
+
+.tn-admin-sidebar .bg-amber-500,
+.tn-admin-sidebar .bg-red-600,
+.tn-admin-sidebar .bg-red-500 {
+    box-shadow: 0 0 0 2px var(--tn-admin-rail);
+}
+
+.tn-admin-workspace {
+    min-width: 0;
+    background: transparent;
+}
+
+.tn-admin-workspace-header {
+    min-height: 4.6rem;
+    border-color: var(--tn-admin-line) !important;
+    background: var(--tn-admin-surface) !important;
+    backdrop-filter: blur(12px);
+}
+.tn-admin-workspace-header :is(h1, p, button) {
+    color: var(--tn-admin-text) !important;
+}
+
+.tn-admin-main {
+    max-width: 90rem;
+    margin: 0 auto;
+    padding: clamp(1.25rem, 2.4vw, 2.7rem);
+}
+
+.tn-dashboard-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.85rem;
+}
+
+.tn-eyebrow {
+    margin-bottom: .35rem;
+    color: var(--tn-admin-muted);
+    font-size: .66rem;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+
+.tn-dashboard-title {
+    color: var(--tn-admin-text) !important;
+    font-size: clamp(1.65rem, 3vw, 2.35rem) !important;
+    font-weight: 800 !important;
+    letter-spacing: -.055em;
+    line-height: 1;
+}
+
+.tn-dashboard-note {
+    max-width: 23rem;
+    color: var(--tn-admin-muted);
+    font-size: .78rem;
+    line-height: 1.5;
+    text-align: right;
+}
+
+.tn-alert {
+    border: 1px solid rgba(185, 28, 28, .30) !important;
+    border-left: 4px solid #dc2626 !important;
+    border-radius: var(--tn-admin-radius) !important;
+    background: color-mix(in srgb, #fef2f2 88%, var(--tn-admin-surface)) !important;
+    box-shadow: var(--tn-admin-shadow);
+}
+
+.tn-metric-ledger {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: hidden;
+    margin-bottom: 1.35rem;
+    border: 1px solid var(--tn-admin-line);
+    border-radius: var(--tn-admin-radius);
+    background: var(--tn-admin-surface);
+    box-shadow: var(--tn-admin-shadow);
+}
+
+.tn-metric-ledger > div {
+    min-height: 7.2rem;
+    padding: 1.15rem 1.25rem;
+    border: 0;
+    border-radius: 0;
+    border-right: 1px solid var(--tn-admin-line);
+    border-bottom: 1px solid var(--tn-admin-line);
+    background: transparent !important;
+}
+
+.tn-metric-ledger > div:nth-child(4n) { border-right: 0; }
+.tn-metric-ledger > div:nth-last-child(-n+4) { border-bottom: 0; }
+
+.tn-metric-ledger p:first-child,
+.tn-channel-ledger p:first-child {
+    color: var(--tn-admin-muted) !important;
+    font-size: .62rem !important;
+    font-weight: 800;
+    letter-spacing: .11em;
+}
+
+.tn-metric-ledger p:nth-child(2),
+.tn-channel-ledger p:nth-child(2) {
+    color: var(--tn-admin-text) !important;
+    font-size: 1.55rem !important;
+    font-weight: 780 !important;
+    letter-spacing: -.05em;
+}
+
+.tn-metric-ledger a,
+.tn-channel-ledger a {
+    color: var(--tn-admin-accent) !important;
+    font-weight: 750;
+}
+
+.tn-channel-ledger {
+    display: grid;
+    grid-template-columns: 1.4fr 1.4fr 1.4fr 1fr 1fr;
+    margin-bottom: 2.25rem;
+    border-top: 1px solid var(--tn-admin-line);
+    border-bottom: 1px solid var(--tn-admin-line);
+}
+
+.tn-channel-ledger > div {
+    min-height: 6.5rem;
+    padding: 1rem 1.15rem;
+    border: 0;
+    border-radius: 0;
+    border-right: 1px solid var(--tn-admin-line);
+    background: transparent !important;
+}
+
+.tn-channel-ledger > div:last-child { border-right: 0; }
+.tn-channel-ledger p:last-child { color: var(--tn-admin-muted) !important; }
+
+.tn-company-workspace {
+    margin-bottom: 2.25rem;
+    border: 1px solid var(--tn-admin-line);
+    border-radius: var(--tn-admin-radius);
+    background: var(--tn-admin-surface);
+    box-shadow: var(--tn-admin-shadow);
+}
+
+.tn-company-tabs {
+    padding: .45rem .6rem 0;
+    border-color: var(--tn-admin-line) !important;
+}
+
+.tn-company-tabs button {
+    border-radius: 8px 8px 0 0;
+    color: var(--tn-admin-muted) !important;
+}
+
+.tn-company-tabs button:hover { color: var(--tn-admin-text) !important; background: rgba(10, 77, 92, .055); }
+.tn-company-tabs button[class*="border-emerald"],
+.tn-company-tabs button[class*="border-purple"],
+.tn-company-tabs button[class*="border-blue"] {
+    border-color: var(--tn-admin-accent) !important;
+    color: var(--tn-admin-text) !important;
+}
+
+.tn-company-panel {
+    border: 0 !important;
+    border-radius: 0 0 var(--tn-admin-radius) var(--tn-admin-radius) !important;
+    background: transparent !important;
+}
+
+.tn-company-panel thead tr {
+    background: rgba(10, 77, 92, .045) !important;
+    border-color: var(--tn-admin-line) !important;
+}
+
+.tn-company-panel thead th {
+    color: var(--tn-admin-muted) !important;
+    font-size: .63rem !important;
+    font-weight: 800;
+    letter-spacing: .1em;
+}
+
+.tn-company-panel tbody { color: var(--tn-admin-text); }
+.tn-company-panel tbody.divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--tn-admin-line) !important; }
+.tn-company-panel tbody tr:hover { background: rgba(10, 77, 92, .045) !important; }
+.tn-company-panel .text-white,
+.tn-company-panel .text-gray-300 { color: var(--tn-admin-text) !important; }
+.tn-company-panel .text-gray-400,
+.tn-company-panel .text-gray-500,
+.tn-company-panel .text-gray-600 { color: var(--tn-admin-muted) !important; }
+.tn-company-panel a[class*="bg-"] { border-radius: 6px; font-weight: 750; }
+.tn-company-panel a[class*="bg-"] {
+    background: var(--tn-brand-soft) !important;
+    color: var(--tn-brand-deep) !important;
+}
+.tn-company-panel .text-emerald-400,
+.tn-company-panel .text-green-400 { color: #166534 !important; }
+.tn-company-panel .text-red-400 { color: #b91c1c !important; }
+.tn-company-panel .text-amber-400 { color: #92400e !important; }
+.dark .tn-company-panel .text-emerald-400,
+.dark .tn-company-panel .text-green-400 { color: #86efac !important; }
+.dark .tn-company-panel .text-red-400 { color: #fca5a5 !important; }
+.dark .tn-company-panel .text-amber-400 { color: #fde68a !important; }
+
+.tn-information-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.tn-information-grid > div,
+.tn-audit-panel {
+    border: 1px solid var(--tn-admin-line) !important;
+    border-radius: var(--tn-admin-radius) !important;
+    background: var(--tn-admin-surface) !important;
+    box-shadow: var(--tn-admin-shadow);
+}
+
+.tn-information-grid h3,
+.tn-audit-panel h3 {
+    color: var(--tn-admin-text) !important;
+    font-size: .8rem !important;
+    font-weight: 800 !important;
+    letter-spacing: .01em;
+}
+
+.tn-information-grid .text-gray-400,
+.tn-information-grid .text-gray-500,
+.tn-audit-panel .text-gray-400,
+.tn-audit-panel .text-gray-500,
+.tn-audit-panel .text-gray-600 { color: var(--tn-admin-muted) !important; }
+.tn-information-grid .text-white,
+.tn-information-grid .text-gray-300,
+.tn-audit-panel .text-white,
+.tn-audit-panel .text-gray-300 { color: var(--tn-admin-text) !important; }
+.tn-audit-panel .border-gray-800 { border-color: var(--tn-admin-line) !important; }
+
+html.dark body.admin-themed.tn-premium-shell,
+.dark body.admin-themed.tn-premium-shell {
+    --tn-admin-canvas: var(--admin-body, #091a20);
+    --tn-admin-surface: #10252d;
+    --tn-admin-text: #edf3ed;
+    --tn-admin-muted: #a8bbb9;
+    --tn-admin-line: rgba(202, 222, 216, .14);
+}
+
+.dark .tn-company-panel .text-white,
+.dark .tn-company-panel .text-gray-300,
+.dark .tn-information-grid .text-white,
+.dark .tn-information-grid .text-gray-300,
+.dark .tn-audit-panel .text-white,
+.dark .tn-audit-panel .text-gray-300 { color: var(--tn-admin-text) !important; }
+
+@media (max-width: 1023px) {
+    .tn-admin-sidebar { width: 17.25rem; }
+}
+
+@media (max-width: 767px) {
+    .tn-admin-main { padding: 1rem; }
+    .tn-dashboard-head { display: block; margin-bottom: 1.25rem; }
+    .tn-dashboard-note { margin-top: .75rem; text-align: left; }
+    .tn-metric-ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tn-metric-ledger > div:nth-child(4n) { border-right: 1px solid var(--tn-admin-line); }
+    .tn-metric-ledger > div:nth-child(2n) { border-right: 0; }
+    .tn-metric-ledger > div:nth-last-child(-n+4) { border-bottom: 1px solid var(--tn-admin-line); }
+    .tn-metric-ledger > div:nth-last-child(-n+2) { border-bottom: 0; }
+    .tn-channel-ledger { grid-template-columns: 1fr 1fr; }
+    .tn-channel-ledger > div { border-bottom: 1px solid var(--tn-admin-line); }
+    .tn-channel-ledger > div:nth-child(2n) { border-right: 0; }
+    .tn-channel-ledger > div:last-child { border-bottom: 0; }
+    .tn-information-grid { grid-template-columns: 1fr; gap: 1rem; }
+    .tn-company-panel .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+    .tn-company-panel table { min-width: 42rem; }
+    .tn-company-tabs button { padding-inline: .85rem !important; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .tn-dashboard-head,
+    .tn-metric-ledger,
+    .tn-channel-ledger,
+    .tn-company-workspace,
+    .tn-information-grid,
+    .tn-audit-panel {
+        animation: tn-admin-reveal .38s ease-out both;
+    }
+    .tn-channel-ledger { animation-delay: .04s; }
+    .tn-company-workspace { animation-delay: .08s; }
+}
+
+@keyframes tn-admin-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}

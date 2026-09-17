@@ -4,8 +4,8 @@
     $dashboardKhataRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'khata_enabled');
 @endphp
 
-<div class="w-full overflow-x-hidden">
-    <div class="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
+<div class="tn-dashboard tn-retail-dashboard w-full overflow-x-hidden">
+    <div class="tn-page px-4 sm:px-6 py-5 max-w-7xl mx-auto">
         <x-pwa-banner color="purple" appName="Nest Pra Pos" />
         <x-pwa-push scope="pos" />
 

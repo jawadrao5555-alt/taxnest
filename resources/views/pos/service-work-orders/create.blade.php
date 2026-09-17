@@ -1,10 +1,10 @@
 <x-pos-layout>
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-w-0" data-service-create="{{ $profile['category'] }}">
+<div class="tn-page tn-services-page max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-w-0" data-service-create="{{ $profile['category'] }}">
     <a href="{{ route('pos.service-work-orders.index') }}" class="text-sm text-purple-600">← {{ $profile['noun'] }} Board</a>
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mt-3 mb-1">New {{ $profile['noun'] }}</h1>
     <p class="text-sm text-gray-500 mb-6">Starts at “{{ ucwords(str_replace('_', ' ', $profile['stages'][0])) }}” and moves through the {{ ucfirst(str_replace('_', ' ', $profile['category'])) }} workflow.</p>
     @if($errors->any())<div class="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
-    <form method="POST" action="{{ route('pos.service-work-orders.store') }}" class="bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-xl shadow-sm p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">@csrf
+    <form method="POST" action="{{ route('pos.service-work-orders.store') }}" class="tn-panel bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-xl shadow-sm p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">@csrf
         <div class="min-w-0"><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Customer *</label><input required name="customer_name" value="{{ old('customer_name') }}" autocomplete="name" class="w-full min-w-0 rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
         <div class="min-w-0"><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Phone</label><input type="tel" inputmode="tel" name="customer_phone" value="{{ old('customer_phone') }}" autocomplete="tel" class="w-full min-w-0 rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"></div>
         <div class="min-w-0"><label class="block text-xs font-semibold mb-1 dark:text-gray-200">Service</label><select name="service_id" class="w-full min-w-0 rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white"><option value="">Custom work</option>@foreach($services as $service)<option value="{{ $service->id }}" @selected(old('service_id') == $service->id)>{{ $service->name }} · Rs {{ number_format((float)$service->price, 2) }}</option>@endforeach</select></div>

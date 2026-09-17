@@ -1,0 +1,2036 @@
+{
+  "capturedAt": "2026-09-17T13:29:01.791Z",
+  "failure": {
+    "name": "Error",
+    "message": "Premium cart state failed (2): first-row-clipped-at-scroll-top-zero, first-name-not-intersecting-list-clip"
+  },
+  "cartViewGeometry": {
+    "url": "http://127.0.0.1:5911/fbr-pos/create",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "theme": {
+      "htmlClass": "",
+      "colorScheme": "light",
+      "prefersDark": false
+    },
+    "alpine": {
+      "mobileView": "cart",
+      "cart": [
+        {
+          "item_name": "Synthetic Retail Ceramic Mug",
+          "quantity": 1
+        },
+        {
+          "item_name": "Synthetic Retail Notebook",
+          "quantity": 1
+        },
+        {
+          "item_name": "Synthetic Retail Gel Pen",
+          "quantity": 1
+        }
+      ]
+    },
+    "list": {
+      "x": 15,
+      "y": 301.78125,
+      "width": 361,
+      "height": 6.59375,
+      "top": 301.78125,
+      "bottom": 308.375,
+      "left": 15,
+      "right": 376,
+      "display": "block",
+      "visibility": "visible",
+      "overflow": "hidden auto",
+      "position": "static"
+    },
+    "scroll": {
+      "scrollTop": 0,
+      "clientHeight": 7,
+      "scrollHeight": 472
+    },
+    "rows": [
+      {
+        "index": 0,
+        "row": {
+          "x": 19,
+          "y": 301.78125,
+          "width": 338,
+          "height": 156.5,
+          "top": 301.78125,
+          "bottom": 458.28125,
+          "left": 19,
+          "right": 357,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "visible",
+          "position": "relative"
+        },
+        "nameTarget": {
+          "tag": "SPAN",
+          "text": "Synthetic Retail Ceramic Mug",
+          "rect": {
+            "x": 31,
+            "y": 311.78125,
+            "width": 198.0625,
+            "height": 20,
+            "top": 311.78125,
+            "bottom": 331.78125,
+            "left": 31,
+            "right": 229.0625,
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden",
+            "position": "static"
+          },
+          "computed": {
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden"
+          },
+          "ancestors": [
+            {
+              "tag": "SPAN",
+              "id": "",
+              "cls": "truncate",
+              "xText": "item.item_name",
+              "rect": {
+                "x": 31,
+                "y": 311.78125,
+                "width": 198.0625,
+                "height": 20,
+                "top": 311.78125,
+                "bottom": 331.78125,
+                "left": 31,
+                "right": 229.0625,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "P",
+              "id": "",
+              "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 311.78125,
+                "width": 314,
+                "height": 20,
+                "top": 311.78125,
+                "bottom": 331.78125,
+                "left": 31,
+                "right": 345,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex-1 min-w-0",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 311.78125,
+                "width": 314,
+                "height": 38.5,
+                "top": 311.78125,
+                "bottom": 350.28125,
+                "left": 31,
+                "right": 345,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex items-center gap-2.5",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 311.78125,
+                "width": 314,
+                "height": 86.5,
+                "top": 311.78125,
+                "bottom": 398.28125,
+                "left": 31,
+                "right": 345,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative",
+              "xText": null,
+              "rect": {
+                "x": 19,
+                "y": 301.78125,
+                "width": 338,
+                "height": 156.5,
+                "top": 301.78125,
+                "bottom": 458.28125,
+                "left": 19,
+                "right": 357,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "relative"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+              "xText": null,
+              "rect": {
+                "x": 15,
+                "y": 301.78125,
+                "width": 361,
+                "height": 6.59375,
+                "top": 301.78125,
+                "bottom": 308.375,
+                "left": 15,
+                "right": 376,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-main",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "left": 0,
+                "right": 0,
+                "display": "contents",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 76,
+                "width": 362,
+                "height": 772,
+                "top": 76,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "MAIN",
+              "id": "",
+              "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 48,
+                "width": 390,
+                "height": 796,
+                "top": 48,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex flex-col h-full",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "BODY",
+              "id": "",
+              "cls": "tn-premium-shell h-screen overflow-hidden antialiased",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "HTML",
+              "id": "",
+              "cls": "",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            }
+          ]
+        },
+        "allMatching": [
+          {
+            "tag": "SPAN",
+            "text": "Synthetic Retail Ceramic Mug",
+            "rect": {
+              "x": 31,
+              "y": 311.78125,
+              "width": 198.0625,
+              "height": 20,
+              "top": 311.78125,
+              "bottom": 331.78125,
+              "left": 31,
+              "right": 229.0625,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            },
+            "display": "block"
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "row": {
+          "x": 19,
+          "y": 458.28125,
+          "width": 338,
+          "height": 157.5,
+          "top": 458.28125,
+          "bottom": 615.78125,
+          "left": 19,
+          "right": 357,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "visible",
+          "position": "relative"
+        },
+        "nameTarget": {
+          "tag": "SPAN",
+          "text": "Synthetic Retail Notebook",
+          "rect": {
+            "x": 31,
+            "y": 469.28125,
+            "width": 173.796875,
+            "height": 20,
+            "top": 469.28125,
+            "bottom": 489.28125,
+            "left": 31,
+            "right": 204.796875,
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden",
+            "position": "static"
+          },
+          "computed": {
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden"
+          },
+          "ancestors": [
+            {
+              "tag": "SPAN",
+              "id": "",
+              "cls": "truncate",
+              "xText": "item.item_name",
+              "rect": {
+                "x": 31,
+                "y": 469.28125,
+                "width": 173.796875,
+                "height": 20,
+                "top": 469.28125,
+                "bottom": 489.28125,
+                "left": 31,
+                "right": 204.796875,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "P",
+              "id": "",
+              "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 469.28125,
+                "width": 314,
+                "height": 20,
+                "top": 469.28125,
+                "bottom": 489.28125,
+                "left": 31,
+                "right": 345,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex-1 min-w-0",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 469.28125,
+                "width": 314,
+                "height": 38.5,
+                "top": 469.28125,
+                "bottom": 507.78125,
+                "left": 31,
+                "right": 345,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex items-center gap-2.5",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 469.28125,
+                "width": 314,
+                "height": 86.5,
+                "top": 469.28125,
+                "bottom": 555.78125,
+                "left": 31,
+                "right": 345,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative",
+              "xText": null,
+              "rect": {
+                "x": 19,
+                "y": 458.28125,
+                "width": 338,
+                "height": 157.5,
+                "top": 458.28125,
+                "bottom": 615.78125,
+                "left": 19,
+                "right": 357,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "relative"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+              "xText": null,
+              "rect": {
+                "x": 15,
+                "y": 301.78125,
+                "width": 361,
+                "height": 6.59375,
+                "top": 301.78125,
+                "bottom": 308.375,
+                "left": 15,
+                "right": 376,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-main",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "left": 0,
+                "right": 0,
+                "display": "contents",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 76,
+                "width": 362,
+                "height": 772,
+                "top": 76,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "MAIN",
+              "id": "",
+              "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 48,
+                "width": 390,
+                "height": 796,
+                "top": 48,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex flex-col h-full",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "BODY",
+              "id": "",
+              "cls": "tn-premium-shell h-screen overflow-hidden antialiased",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "HTML",
+              "id": "",
+              "cls": "",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            }
+          ]
+        },
+        "allMatching": [
+          {
+            "tag": "SPAN",
+            "text": "Synthetic Retail Notebook",
+            "rect": {
+              "x": 31,
+              "y": 469.28125,
+              "width": 173.796875,
+              "height": 20,
+              "top": 469.28125,
+              "bottom": 489.28125,
+              "left": 31,
+              "right": 204.796875,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            },
+            "display": "block"
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "row": {
+          "x": 19,
+          "y": 615.78125,
+          "width": 338,
+          "height": 157.5,
+          "top": 615.78125,
+          "bottom": 773.28125,
+          "left": 19,
+          "right": 357,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "visible",
+          "position": "relative"
+        },
+        "nameTarget": {
+          "tag": "SPAN",
+          "text": "Synthetic Retail Gel Pen",
+          "rect": {
+            "x": 31,
+            "y": 626.78125,
+            "width": 159.671875,
+            "height": 20,
+            "top": 626.78125,
+            "bottom": 646.78125,
+            "left": 31,
+            "right": 190.671875,
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden",
+            "position": "static"
+          },
+          "computed": {
+            "display": "block",
+            "visibility": "visible",
+            "overflow": "hidden"
+          },
+          "ancestors": [
+            {
+              "tag": "SPAN",
+              "id": "",
+              "cls": "truncate",
+              "xText": "item.item_name",
+              "rect": {
+                "x": 31,
+                "y": 626.78125,
+                "width": 159.671875,
+                "height": 20,
+                "top": 626.78125,
+                "bottom": 646.78125,
+                "left": 31,
+                "right": 190.671875,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "P",
+              "id": "",
+              "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 626.78125,
+                "width": 314,
+                "height": 20,
+                "top": 626.78125,
+                "bottom": 646.78125,
+                "left": 31,
+                "right": 345,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex-1 min-w-0",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 626.78125,
+                "width": 314,
+                "height": 38.5,
+                "top": 626.78125,
+                "bottom": 665.28125,
+                "left": 31,
+                "right": 345,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex items-center gap-2.5",
+              "xText": null,
+              "rect": {
+                "x": 31,
+                "y": 626.78125,
+                "width": 314,
+                "height": 86.5,
+                "top": 626.78125,
+                "bottom": 713.28125,
+                "left": 31,
+                "right": 345,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative cart-row-active",
+              "xText": null,
+              "rect": {
+                "x": 19,
+                "y": 615.78125,
+                "width": 338,
+                "height": 157.5,
+                "top": 615.78125,
+                "bottom": 773.28125,
+                "left": 19,
+                "right": 357,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "relative"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+              "xText": null,
+              "rect": {
+                "x": 15,
+                "y": 301.78125,
+                "width": 361,
+                "height": 6.59375,
+                "top": 301.78125,
+                "bottom": 308.375,
+                "left": 15,
+                "right": 376,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-main",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "bottom": 0,
+                "left": 0,
+                "right": 0,
+                "display": "contents",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 236.78125,
+                "width": 362,
+                "height": 611.21875,
+                "top": 236.78125,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+              "xText": null,
+              "rect": {
+                "x": 14,
+                "y": 76,
+                "width": 362,
+                "height": 772,
+                "top": 76,
+                "bottom": 848,
+                "left": 14,
+                "right": 376,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "MAIN",
+              "id": "",
+              "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 48,
+                "width": 390,
+                "height": 796,
+                "top": 48,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex flex-col h-full",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "flex",
+                "visibility": "visible",
+                "overflow": "visible",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "BODY",
+              "id": "",
+              "cls": "tn-premium-shell h-screen overflow-hidden antialiased",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden",
+                "position": "static"
+              }
+            },
+            {
+              "tag": "HTML",
+              "id": "",
+              "cls": "",
+              "xText": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 390,
+                "height": 844,
+                "top": 0,
+                "bottom": 844,
+                "left": 0,
+                "right": 390,
+                "display": "block",
+                "visibility": "visible",
+                "overflow": "hidden auto",
+                "position": "static"
+              }
+            }
+          ]
+        },
+        "allMatching": [
+          {
+            "tag": "SPAN",
+            "text": "Synthetic Retail Gel Pen",
+            "rect": {
+              "x": 31,
+              "y": 626.78125,
+              "width": 159.671875,
+              "height": 20,
+              "top": 626.78125,
+              "bottom": 646.78125,
+              "left": 31,
+              "right": 190.671875,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            },
+            "display": "block"
+          }
+        ]
+      }
+    ],
+    "ancestors": {
+      "cartMain": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0,
+        "display": "contents",
+        "visibility": "visible",
+        "overflow": "visible",
+        "position": "static"
+      },
+      "cartCol": {
+        "x": 14,
+        "y": 236.78125,
+        "width": 362,
+        "height": 611.21875,
+        "top": 236.78125,
+        "bottom": 848,
+        "left": 14,
+        "right": 376,
+        "display": "flex",
+        "visibility": "visible",
+        "overflow": "hidden",
+        "position": "static"
+      },
+      "workspace": null,
+      "main": {
+        "x": 0,
+        "y": 48,
+        "width": 390,
+        "height": 796,
+        "top": 48,
+        "bottom": 844,
+        "left": 0,
+        "right": 390,
+        "display": "block",
+        "visibility": "visible",
+        "overflow": "hidden",
+        "position": "static"
+      }
+    },
+    "allNameTargets": [
+      {
+        "tag": "SPAN",
+        "text": "Synthetic Retail Ceramic Mug",
+        "rect": {
+          "x": 31,
+          "y": 311.78125,
+          "width": 198.0625,
+          "height": 20,
+          "top": 311.78125,
+          "bottom": 331.78125,
+          "left": 31,
+          "right": 229.0625,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "hidden",
+          "position": "static"
+        },
+        "display": "block",
+        "ancestors": [
+          {
+            "tag": "SPAN",
+            "id": "",
+            "cls": "truncate",
+            "xText": "item.item_name",
+            "rect": {
+              "x": 31,
+              "y": 311.78125,
+              "width": 198.0625,
+              "height": 20,
+              "top": 311.78125,
+              "bottom": 331.78125,
+              "left": 31,
+              "right": 229.0625,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "P",
+            "id": "",
+            "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 311.78125,
+              "width": 314,
+              "height": 20,
+              "top": 311.78125,
+              "bottom": 331.78125,
+              "left": 31,
+              "right": 345,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex-1 min-w-0",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 311.78125,
+              "width": 314,
+              "height": 38.5,
+              "top": 311.78125,
+              "bottom": 350.28125,
+              "left": 31,
+              "right": 345,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex items-center gap-2.5",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 311.78125,
+              "width": 314,
+              "height": 86.5,
+              "top": 311.78125,
+              "bottom": 398.28125,
+              "left": 31,
+              "right": 345,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative",
+            "xText": null,
+            "rect": {
+              "x": 19,
+              "y": 301.78125,
+              "width": 338,
+              "height": 156.5,
+              "top": 301.78125,
+              "bottom": 458.28125,
+              "left": 19,
+              "right": 357,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "relative"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+            "xText": null,
+            "rect": {
+              "x": 15,
+              "y": 301.78125,
+              "width": 361,
+              "height": 6.59375,
+              "top": 301.78125,
+              "bottom": 308.375,
+              "left": 15,
+              "right": 376,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden auto",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-main",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0,
+              "display": "contents",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 236.78125,
+              "width": 362,
+              "height": 611.21875,
+              "top": 236.78125,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 236.78125,
+              "width": 362,
+              "height": 611.21875,
+              "top": 236.78125,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 76,
+              "width": 362,
+              "height": 772,
+              "top": 76,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "MAIN",
+            "id": "",
+            "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 48,
+              "width": 390,
+              "height": 796,
+              "top": 48,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex flex-col h-full",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "BODY",
+            "id": "",
+            "cls": "tn-premium-shell h-screen overflow-hidden antialiased",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "HTML",
+            "id": "",
+            "cls": "",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden auto",
+              "position": "static"
+            }
+          }
+        ]
+      },
+      {
+        "tag": "SPAN",
+        "text": "Synthetic Retail Notebook",
+        "rect": {
+          "x": 31,
+          "y": 469.28125,
+          "width": 173.796875,
+          "height": 20,
+          "top": 469.28125,
+          "bottom": 489.28125,
+          "left": 31,
+          "right": 204.796875,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "hidden",
+          "position": "static"
+        },
+        "display": "block",
+        "ancestors": [
+          {
+            "tag": "SPAN",
+            "id": "",
+            "cls": "truncate",
+            "xText": "item.item_name",
+            "rect": {
+              "x": 31,
+              "y": 469.28125,
+              "width": 173.796875,
+              "height": 20,
+              "top": 469.28125,
+              "bottom": 489.28125,
+              "left": 31,
+              "right": 204.796875,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "P",
+            "id": "",
+            "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 469.28125,
+              "width": 314,
+              "height": 20,
+              "top": 469.28125,
+              "bottom": 489.28125,
+              "left": 31,
+              "right": 345,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex-1 min-w-0",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 469.28125,
+              "width": 314,
+              "height": 38.5,
+              "top": 469.28125,
+              "bottom": 507.78125,
+              "left": 31,
+              "right": 345,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex items-center gap-2.5",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 469.28125,
+              "width": 314,
+              "height": 86.5,
+              "top": 469.28125,
+              "bottom": 555.78125,
+              "left": 31,
+              "right": 345,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative",
+            "xText": null,
+            "rect": {
+              "x": 19,
+              "y": 458.28125,
+              "width": 338,
+              "height": 157.5,
+              "top": 458.28125,
+              "bottom": 615.78125,
+              "left": 19,
+              "right": 357,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "relative"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+            "xText": null,
+            "rect": {
+              "x": 15,
+              "y": 301.78125,
+              "width": 361,
+              "height": 6.59375,
+              "top": 301.78125,
+              "bottom": 308.375,
+              "left": 15,
+              "right": 376,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden auto",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-main",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0,
+              "display": "contents",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 236.78125,
+              "width": 362,
+              "height": 611.21875,
+              "top": 236.78125,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 236.78125,
+              "width": 362,
+              "height": 611.21875,
+              "top": 236.78125,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 76,
+              "width": 362,
+              "height": 772,
+              "top": 76,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "MAIN",
+            "id": "",
+            "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 48,
+              "width": 390,
+              "height": 796,
+              "top": 48,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex flex-col h-full",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "BODY",
+            "id": "",
+            "cls": "tn-premium-shell h-screen overflow-hidden antialiased",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "HTML",
+            "id": "",
+            "cls": "",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden auto",
+              "position": "static"
+            }
+          }
+        ]
+      },
+      {
+        "tag": "SPAN",
+        "text": "Synthetic Retail Gel Pen",
+        "rect": {
+          "x": 31,
+          "y": 626.78125,
+          "width": 159.671875,
+          "height": 20,
+          "top": 626.78125,
+          "bottom": 646.78125,
+          "left": 31,
+          "right": 190.671875,
+          "display": "block",
+          "visibility": "visible",
+          "overflow": "hidden",
+          "position": "static"
+        },
+        "display": "block",
+        "ancestors": [
+          {
+            "tag": "SPAN",
+            "id": "",
+            "cls": "truncate",
+            "xText": "item.item_name",
+            "rect": {
+              "x": 31,
+              "y": 626.78125,
+              "width": 159.671875,
+              "height": 20,
+              "top": 626.78125,
+              "bottom": 646.78125,
+              "left": 31,
+              "right": 190.671875,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "P",
+            "id": "",
+            "cls": "text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 626.78125,
+              "width": 314,
+              "height": 20,
+              "top": 626.78125,
+              "bottom": 646.78125,
+              "left": 31,
+              "right": 345,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex-1 min-w-0",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 626.78125,
+              "width": 314,
+              "height": 38.5,
+              "top": 626.78125,
+              "bottom": 665.28125,
+              "left": 31,
+              "right": 345,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex items-center gap-2.5",
+            "xText": null,
+            "rect": {
+              "x": 31,
+              "y": 626.78125,
+              "width": 314,
+              "height": 86.5,
+              "top": 626.78125,
+              "bottom": 713.28125,
+              "left": 31,
+              "right": 345,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-line cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative cart-row-active",
+            "xText": null,
+            "rect": {
+              "x": 19,
+              "y": 615.78125,
+              "width": 338,
+              "height": 157.5,
+              "top": 615.78125,
+              "bottom": 773.28125,
+              "left": 19,
+              "right": 357,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "relative"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-list flex-1 min-h-0 overflow-y-auto",
+            "xText": null,
+            "rect": {
+              "x": 15,
+              "y": 301.78125,
+              "width": 361,
+              "height": 6.59375,
+              "top": 301.78125,
+              "bottom": 308.375,
+              "left": 15,
+              "right": 376,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden auto",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-main",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0,
+              "display": "contents",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 236.78125,
+              "width": 362,
+              "height": 611.21875,
+              "top": 236.78125,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-body-row tn-sale-workspace flex flex-1 overflow-hidden",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 236.78125,
+              "width": 362,
+              "height": 611.21875,
+              "top": 236.78125,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950",
+            "xText": null,
+            "rect": {
+              "x": 14,
+              "y": 76,
+              "width": 362,
+              "height": 772,
+              "top": 76,
+              "bottom": 848,
+              "left": 14,
+              "right": 376,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "MAIN",
+            "id": "",
+            "cls": "flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg  tn-fab-pad ",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 48,
+              "width": 390,
+              "height": 796,
+              "top": 48,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "DIV",
+            "id": "",
+            "cls": "flex flex-col h-full",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "flex",
+              "visibility": "visible",
+              "overflow": "visible",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "BODY",
+            "id": "",
+            "cls": "tn-premium-shell h-screen overflow-hidden antialiased",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden",
+              "position": "static"
+            }
+          },
+          {
+            "tag": "HTML",
+            "id": "",
+            "cls": "",
+            "xText": null,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844,
+              "top": 0,
+              "bottom": 844,
+              "left": 0,
+              "right": 390,
+              "display": "block",
+              "visibility": "visible",
+              "overflow": "hidden auto",
+              "position": "static"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -948,15 +948,8 @@
                                     @endif
                                     @if($invoice->status === 'locked' && $invoice->fbr_invoice_number)
                                     <p class="text-[10px] text-emerald-600 mt-0.5 max-w-[150px] truncate" title="{{ $invoice->fbr_invoice_number }}">FBR: {{ $invoice->fbr_invoice_number }}</p>
-                                    @elseif(in_array($invoice->status, ['locked', 'pending_verification']) && !$invoice->fbr_invoice_number && in_array(auth()->user()->role, ['company_admin', 'super_admin']))
-                                    <div x-data="{ showInput: false }" class="mt-1">
-                                        <button x-show="!showInput" @click.stop="showInput = true" class="text-xs text-blue-600 hover:text-blue-800 underline">+ FBR #</button>
-                                        <form x-show="showInput" x-cloak method="POST" action="/invoice/{{ $invoice->id }}/update-fbr-number" class="flex items-center gap-1 mt-1" @click.stop>
-                                            @csrf
-                                            <input type="text" name="fbr_invoice_number" placeholder="FBR #" class="px-1.5 py-0.5 text-xs border border-gray-300 rounded w-36">
-                                            <button type="submit" class="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-xs">Save</button>
-                                        </form>
-                                    </div>
+                                    @elseif($invoice->status === 'pending_verification')
+                                    <a href="/invoice/{{ $invoice->id }}" class="text-[10px] text-amber-700 hover:text-amber-900 underline">Verify in portal</a>
                                     @endif
                                 </td>
                                 <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ $invoice->invoice_date ? \Carbon\Carbon::parse($invoice->invoice_date)->format('d M y') : $invoice->created_at->format('d M y') }}</td>

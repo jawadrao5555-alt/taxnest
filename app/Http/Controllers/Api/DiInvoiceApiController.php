@@ -9,6 +9,7 @@ use App\Models\FbrLog;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Services\AuditLogService;
+use App\Services\DiFiscalSubmissionState;
 use App\Services\GlobalHsService;
 use App\Services\InvoiceActivityService;
 use App\Services\InvoiceNumberingService;
@@ -251,7 +252,6 @@ class DiInvoiceApiController extends Controller
         }
 
         InvoiceActivityService::log($invoice->id, $companyId, 'created', [
-            'buyer_name' => $invoice->buyer_name,
             'total_amount' => $invoice->total_amount,
             'items_count' => count($request->input('items')),
             'document_type' => $documentType,
@@ -260,7 +260,6 @@ class DiInvoiceApiController extends Controller
         ]);
         AuditLogService::log('invoice_created', 'Invoice', $invoice->id, null, [
             'invoice_number' => $invoice->invoice_number,
-            'buyer_name' => $invoice->buyer_name,
             'total_amount' => $invoice->total_amount,
             'document_type' => $documentType,
             'via' => 'api',
@@ -279,17 +278,13 @@ class DiInvoiceApiController extends Controller
         }
 
         // ── Create-and-submit: same lock discipline as the panel submit ────
-        $locked = DB::transaction(function () use ($invoice) {
-            $lockedInvoice = Invoice::withoutGlobalScopes()->where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing) {
-                return false;
-            }
-            $lockedInvoice->is_fbr_processing = true;
-            $lockedInvoice->submitted_at = now();
-            $lockedInvoice->submission_mode = 'api';
-            $lockedInvoice->save();
-            return true;
-        });
+        $locked = DiFiscalSubmissionState::reserve(
+            $invoice->id,
+            'api',
+            in_array($invoice->company?->fbr_environment, ['sandbox', 'production'], true)
+                ? $invoice->company->fbr_environment
+                : 'sandbox'
+        );
 
         if (!$locked) {
             // Extremely unlikely straight after create — report the current state.
@@ -301,11 +296,19 @@ class DiInvoiceApiController extends Controller
             'client_reference' => $clientReference,
         ]);
 
-        $invoice = $invoice->fresh();
+        $invoice = $locked;
         $result = app(InvoiceController::class)->submitToFbrSync($invoice);
 
         $payload = $this->serialize($invoice->fresh());
-        if ($result['status'] === 'success' || !empty($result['fbr_invoice_number'])) {
+        if (($result['status'] ?? null) === 'simulated') {
+            // Sandbox/demo fixtures are explicitly non-fiscal outcomes. API
+            // consumers must not infer acceptance from a generated reference.
+            $payload['status'] = 'simulated';
+            $payload['message'] = 'Demo response recorded. No regulator acceptance was requested or recorded.';
+        } elseif (($result['status'] ?? null) === 'pending_verification') {
+            $payload['status'] = 'pending_verification';
+            $payload['message'] = 'The regulator outcome is unknown. Verify on the FBR portal before any retry.';
+        } elseif ($result['status'] === 'success' || !empty($result['fbr_invoice_number'])) {
             // covered by serialize() — fbr_invoice_number comes from the row
         } else {
             $errors = !empty($result['errors'])
@@ -384,6 +387,9 @@ class DiInvoiceApiController extends Controller
                 'fbr_status' => $invoice->fbr_status,
                 'fbr_invoice_number' => $invoice->fbr_invoice_number,
                 'fbr_submission_date' => optional($invoice->fbr_submission_date)->toIso8601String(),
+                'fiscal_submission_state' => $invoice->fiscal_submission_state,
+                'fiscal_submission_environment' => $invoice->fiscal_submission_environment,
+                'fiscal_submission_provenance' => $invoice->fiscal_submission_provenance,
                 'source' => $invoice->source,
             ],
         ];

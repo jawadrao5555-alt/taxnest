@@ -1,0 +1,93 @@
+{
+  "assertions": 39281,
+  "errors": 0,
+  "errors_names": [],
+  "failures": 0,
+  "failures_names": [],
+  "generated_utc": "2026-09-16T13:30:37.151627Z",
+  "junit": {
+    "path": ".local/recertification/full-phpunit-reports/full-phpunit-2b500f6a67320a1138cc555df342b5f29bdb2377.junit.xml",
+    "sha256": "dd2e9e216b80fe45ce01d8dd2b10400818c02297129e35d58154e284c9b5f197"
+  },
+  "listed_tests": 5018,
+  "partition_results": [
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "83215f57d5547967923e8c5b59e3181075e7143125e6f5a237401300a3f1e1e6",
+      "name": "full-batch-01.junit.xml",
+      "skipped": 0,
+      "tests": 628
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "a93240ba606b22a54c830b8a607458af0fa1731159f6a7b8644eac596abaebc2",
+      "name": "full-batch-02.junit.xml",
+      "skipped": 0,
+      "tests": 628
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "319d3737150ade79ffc713ca46b64e55fbb6a14ad91616f49640db7eb91f86ad",
+      "name": "full-batch-03.junit.xml",
+      "skipped": 1,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "c4062ca82096cd08037d72d49a7c52b208b51229ddc87ec26ae1e8c9e24a1d2a",
+      "name": "full-batch-04.junit.xml",
+      "skipped": 6,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "703b384c7bd81ba8cb298806028c898c367c63fcb73fb1dd17e9ce459eed841a",
+      "name": "full-batch-05.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "c8d17b3ada069337ca65f2ddd4360fad180319a24226d9896ef27e94842af2d3",
+      "name": "full-batch-06.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "1b38a4b86902a58faf61de906238bda6a9bd6020c799bdb978ee8f74bc400cdb",
+      "name": "full-batch-07.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "log_sha256": "31b6cb439605fea21e10eda4680df1db627d83c57acff438cf487cef6f109784",
+      "name": "full-batch-08.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    }
+  ],
+  "partitions": 8,
+  "schema_version": 1,
+  "skipped": 7,
+  "source_mode": "committed-checkout",
+  "source_sha": "2b500f6a67320a1138cc555df342b5f29bdb2377",
+  "tests": 5018
+}

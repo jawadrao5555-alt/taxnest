@@ -11,6 +11,7 @@ bad() { echo "FAIL: $*" >&2; FAILS=$((FAILS+1)); }
 
 LIB="$ROOT/scripts/lib/local-browser.mjs"
 SMOKE="$ROOT/scripts/cloud-local-ui-smoke.mjs"
+DISCOVERY="$ROOT/scripts/tests/local-browser-discovery-check.mjs"
 SEED="$ROOT/scripts/cloud-local-qa-seed.sh"
 DOC="$ROOT/docs/ops/cloud-agent-local-browser-qa.md"
 GUARD="$ROOT/app/Support/DevStagingGuard.php"
@@ -19,7 +20,7 @@ DEVDOC="$ROOT/docs/ops/cloud-agent-development.md"
 LIVE="$ROOT/scripts/live-screen-smoke.sh"
 UNIT="$ROOT/tests/Unit/DevStagingGuardTest.php"
 
-for f in "$LIB" "$SMOKE" "$SEED" "$DOC" "$GUARD" "$UNIT"; do
+for f in "$LIB" "$SMOKE" "$DISCOVERY" "$SEED" "$DOC" "$GUARD" "$UNIT"; do
   [ -f "$f" ] && ok "present $(basename "$f")" || bad "missing $f"
 done
 
@@ -84,6 +85,8 @@ fi
 if command -v node >/dev/null 2>&1; then
   node --check "$LIB" && ok "node --check local-browser.mjs" || bad "node --check local-browser.mjs"
   node --check "$SMOKE" && ok "node --check cloud-local-ui-smoke.mjs" || bad "node --check cloud-local-ui-smoke.mjs"
+  node --check "$DISCOVERY" && ok "node --check local-browser discovery check" || bad "node --check local-browser discovery check"
+  node "$DISCOVERY" && ok "local-browser discovery/missing/nonexec/unsafe matrix" || bad "local-browser discovery/missing/nonexec/unsafe matrix"
 
   # Unit-test the fail-closed URL helper without Chrome
   node --input-type=module <<'EOF' && ok "assertLocalOnlyBaseUrl allow/refuse matrix" || bad "assertLocalOnlyBaseUrl allow/refuse matrix"

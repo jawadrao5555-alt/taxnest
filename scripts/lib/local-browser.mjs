@@ -8,12 +8,14 @@
  *   - Prefer google-chrome / CHROMIUM_BIN already on the VM
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import pw from 'playwright-core';
 
 const { chromium } = pw;
+const require = createRequire(import.meta.url);
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -73,24 +75,305 @@ export function assertLocalOnlyBaseUrl(rawUrl) {
     return u.href.replace(/\/+$/, '');
 }
 
+const CHROMIUM_EXECUTABLE_NAMES = new Set([
+    'chrome',
+    'chrome-headless-shell',
+    'chromium',
+    'chromium-browser',
+    'google-chrome',
+    'headless_shell',
+]);
+
+function hasParentPathEscape(filePath) {
+    return String(filePath).split(/[\\/]+/).includes('..');
+}
+
+function isPathInside(root, filePath) {
+    const relative = path.relative(root, filePath);
+    return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function isRegularExecutable(filePath, trustedRoots, allowSymlink = false) {
+    if (!filePath || !path.isAbsolute(filePath) || hasParentPathEscape(filePath)) return false;
+    if (!CHROMIUM_EXECUTABLE_NAMES.has(path.basename(filePath))) return false;
+    const roots = trustedRoots.filter((root) => root && path.isAbsolute(root) && !hasParentPathEscape(root));
+    if (!roots.some((root) => isPathInside(root, filePath))) return false;
+    try {
+        const stat = lstatSync(filePath);
+        let target = filePath;
+        if (!stat.isFile() && !stat.isSymbolicLink()) return false;
+        if (stat.isSymbolicLink()) {
+            if (!allowSymlink) return false;
+            target = realpathSync(filePath);
+        }
+        const targetStat = stat.isSymbolicLink() ? lstatSync(target) : stat;
+        if (!targetStat.isFile()) return false;
+        if (process.platform !== 'win32' && (targetStat.mode & 0o111) === 0) return false;
+        accessSync(target, constants.X_OK);
+        const descriptor = playwrightInstallDescriptor(filePath);
+        if (descriptor && descriptor.revision !== expectedChromiumPackageRevision()) return false;
+        // Also reject a parent/executable symlink escaping the allowlisted install root.
+        const actual = realpathSync(filePath);
+        return roots.some((root) => {
+            try { return isPathInside(realpathSync(root), actual); } catch { return false; }
+        });
+    } catch {
+        return false;
+    }
+}
+
+function playwrightInstallDescriptor(executablePath) {
+    if (!executablePath || !path.isAbsolute(executablePath) || hasParentPathEscape(executablePath)) return null;
+    let dir = path.dirname(executablePath);
+    for (let i = 0; i < 4; i++) {
+        const match = path.basename(dir).match(/^(chromium|chromium_headless_shell|chromium-tip-of-tree|chromium-tip-of-tree-headless-shell)-(\d+)$/);
+        if (match) return { root: path.dirname(dir), name: match[1], revision: match[2] };
+        dir = path.dirname(dir);
+    }
+    return null;
+}
+
+/**
+ * Add the Chrome Headless Shell installed by Playwright. In the official
+ * MariaDB Playwright image its x64 executable is:
+ *   chromium_headless_shell-<revision>/chrome-headless-shell-linux64/chrome-headless-shell
+ * (older/arm64 bundles use chrome-linux/headless_shell).
+ */
+function playwrightHeadlessShellCandidates(executablePath) {
+    const descriptor = playwrightInstallDescriptor(executablePath);
+    const root = descriptor?.root;
+    if (!root || !existsSync(root)) return { root: null, paths: [] };
+    try {
+        const shellName = descriptor.name === 'chromium-tip-of-tree'
+            ? 'chromium-tip-of-tree-headless-shell'
+            : 'chromium_headless_shell';
+        const base = path.join(root, `${shellName}-${descriptor.revision}`);
+        const paths = [
+            path.join(base, 'chrome-headless-shell-linux64', 'chrome-headless-shell'),
+            path.join(base, 'chrome-linux64', 'chrome-headless-shell'),
+            path.join(base, 'chrome-linux', 'headless_shell'),
+        ];
+        return { root, paths };
+    } catch {
+        return { root, paths: [] };
+    }
+}
+
+const DIAGNOSTIC_CANDIDATE_LIMIT = 64;
+const DIAGNOSTIC_REVISION_LIMIT = 64;
+
+function safeChromiumExecutablePath() {
+    try { return chromium.executablePath(); } catch { return null; }
+}
+
+function expectedChromiumPackageRevision() {
+    try {
+        let packageRoot = path.dirname(require.resolve('playwright-core'));
+        for (let i = 0; i < 4 && !existsSync(path.join(packageRoot, 'browsers.json')); i++) {
+            packageRoot = path.dirname(packageRoot);
+        }
+        const browsers = JSON.parse(readFileSync(path.join(packageRoot, 'browsers.json'), 'utf8'));
+        return String(browsers.browsers.find((browser) => browser.name === 'chromium')?.revision || 'unknown');
+    } catch {
+        return 'unknown';
+    }
+}
+
+/**
+ * Keep diagnostics useful for identifying an isolated HOME mismatch without
+ * printing arbitrary environment values or unbounded paths.
+ */
+function sanitizeDiagnosticPath(value) {
+    if (value == null || value === '') return '<unset>';
+    const text = String(value).replace(/[\u0000-\u001f\u007f]/g, '?');
+    if (text.length <= 240) return text;
+    return `${text.slice(0, 96)}.../${path.basename(text).slice(-96)}`;
+}
+
+function diagnosticRelativePath(filePath, roots) {
+    const value = String(filePath || '');
+    if (!path.isAbsolute(value)) return sanitizeDiagnosticPath(value);
+    for (const root of roots) {
+        if (!root || !path.isAbsolute(root)) continue;
+        const relative = path.relative(root, value);
+        if (relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))) {
+            return sanitizeDiagnosticPath(relative || '.');
+        }
+    }
+    // A candidate outside every trust root is represented by its basename only.
+    return sanitizeDiagnosticPath(path.basename(value));
+}
+
+function diagnosticCandidate(candidate, trustedRoots) {
+    const value = String(candidate || '');
+    const record = {
+        path: diagnosticRelativePath(value, trustedRoots),
+        exists: false,
+        regular: false,
+        executable: false,
+        symlink: false,
+        trustedRoot: false,
+        allowedName: CHROMIUM_EXECUTABLE_NAMES.has(path.basename(value)),
+    };
+    if (!path.isAbsolute(value) || hasParentPathEscape(value)) return record;
+
+    let stat;
+    try {
+        stat = lstatSync(value);
+        record.exists = true;
+        record.regular = stat.isFile();
+        record.symlink = stat.isSymbolicLink();
+        try {
+            accessSync(value, constants.X_OK);
+            record.executable = true;
+        } catch { /* not executable */ }
+    } catch {
+        return record;
+    }
+
+    if (!trustedRoots.some((root) => root && path.isAbsolute(root) && isPathInside(root, value))) return record;
+    try {
+        const actual = realpathSync(value);
+        record.trustedRoot = trustedRoots.some((root) => {
+            try { return isPathInside(realpathSync(root), actual); } catch { return false; }
+        });
+    } catch { /* missing target or inaccessible root */ }
+    return record;
+}
+
+function revisionDirectoryNames(root) {
+    if (!root || !path.isAbsolute(root)) return [];
+    try {
+        return readdirSync(root)
+            .filter((name) => /^(?:chromium|chromium_headless_shell|chromium-tip-of-tree|chromium-tip-of-tree-headless-shell)-\d+$/.test(name))
+            .sort()
+            .slice(0, DIAGNOSTIC_REVISION_LIMIT);
+    } catch {
+        return [];
+    }
+}
+
+function diagnosticTrustedRoots(options, playwrightPath) {
+    const headless = playwrightHeadlessShellCandidates(playwrightPath);
+    const descriptor = playwrightInstallDescriptor(playwrightPath);
+    return [
+        ...(options.allowSystemRoots === false ? [] : ['/usr/local/bin', '/usr/bin', '/nix/store', '/tmp/cursor-sandbox-cache']),
+        process.env.PLAYWRIGHT_BROWSERS_PATH,
+        headless.root,
+        descriptor?.root,
+        ...(options.trustedRoots || []),
+    ].filter(Boolean).slice(0, DIAGNOSTIC_REVISION_LIMIT);
+}
+
+/**
+ * Collect bounded, redacted state for a failed Chromium resolution. Candidate
+ * paths are relative/basename-only; only HOME and PLAYWRIGHT_BROWSERS_PATH
+ * are included from the process environment.
+ */
+export function chromiumResolutionDiagnostics(options = {}) {
+    const playwrightPath = options.playwrightExecutablePath === undefined
+        ? safeChromiumExecutablePath()
+        : options.playwrightExecutablePath;
+    const trustedRoots = diagnosticTrustedRoots(options, playwrightPath);
+    const tries = options.candidates ? [...options.candidates] : [];
+    if (!options.candidates) {
+        if (process.env.CHROMIUM_BIN) tries.push(process.env.CHROMIUM_BIN);
+        if (process.env.GOOGLE_CHROME_BIN) tries.push(process.env.GOOGLE_CHROME_BIN);
+        tries.push('/usr/local/bin/google-chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
+    }
+    if (playwrightPath) tries.push(playwrightPath);
+    const headless = playwrightHeadlessShellCandidates(playwrightPath);
+    tries.push(...headless.paths);
+    const candidates = [];
+    const seen = new Set();
+    for (const candidate of tries) {
+        const key = String(candidate);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        candidates.push(diagnosticCandidate(candidate, trustedRoots));
+        if (candidates.length >= DIAGNOSTIC_CANDIDATE_LIMIT) break;
+    }
+    const roots = new Set(trustedRoots);
+    if (headless.root) roots.add(headless.root);
+    const descriptor = playwrightInstallDescriptor(playwrightPath);
+    if (descriptor?.root) roots.add(descriptor.root);
+    return {
+        executablePath: sanitizeDiagnosticPath(playwrightPath),
+        expectedPackageRevision: expectedChromiumPackageRevision(),
+        env: {
+            HOME: sanitizeDiagnosticPath(process.env.HOME),
+            PLAYWRIGHT_BROWSERS_PATH: sanitizeDiagnosticPath(process.env.PLAYWRIGHT_BROWSERS_PATH),
+        },
+        revisionDirectories: [...roots].flatMap((root) => revisionDirectoryNames(root)).filter((name, index, all) => all.indexOf(name) === index).sort().slice(0, DIAGNOSTIC_REVISION_LIMIT),
+        candidates,
+    };
+}
+
+export function formatChromiumResolutionDiagnostics(diagnostics) {
+    const d = diagnostics || {};
+    const lines = [
+        'CHROMIUM RESOLUTION DIAGNOSTICS (bounded)',
+        `chromium.executablePath=${d.executablePath || '<unset>'}`,
+        `expected_package_revision=${d.expectedPackageRevision || 'unknown'}`,
+        `HOME=${d.env?.HOME || '<unset>'}`,
+        `PLAYWRIGHT_BROWSERS_PATH=${d.env?.PLAYWRIGHT_BROWSERS_PATH || '<unset>'}`,
+        `revision_directories=${(d.revisionDirectories || []).join(',') || '<none>'}`,
+    ];
+    for (const [index, candidate] of (d.candidates || []).entries()) {
+        lines.push(
+            `candidate[${index}] path=${candidate.path} exists=${Boolean(candidate.exists)} ` +
+            `regular=${Boolean(candidate.regular)} executable=${Boolean(candidate.executable)} ` +
+            `symlink=${Boolean(candidate.symlink)} trusted_root=${Boolean(candidate.trustedRoot)} ` +
+            `allowed_name=${Boolean(candidate.allowedName)}`
+        );
+    }
+    return lines.join('\n');
+}
+
 /**
  * Resolve Chrome/Chromium binary for Playwright connect.
+ * @param {{ candidates?: string[], playwrightExecutablePath?: string, trustedRoots?: string[], allowSystemRoots?: boolean }} [options]
  * @returns {string|null}
  */
-export function resolveChromiumPath() {
-    const tries = [];
-    if (process.env.CHROMIUM_BIN) tries.push(process.env.CHROMIUM_BIN);
-    if (process.env.GOOGLE_CHROME_BIN) tries.push(process.env.GOOGLE_CHROME_BIN);
-    tries.push('/usr/local/bin/google-chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
-    try { tries.push(chromium.executablePath()); } catch { /* browsers not downloaded */ }
-    for (const p of tries) {
-        if (p && existsSync(p)) return p;
+export function resolveChromiumPath(options = {}) {
+    const env = process.env;
+    const dedicatedCache = options.playwrightBrowsersPath || env.PLAYWRIGHT_BROWSERS_PATH || '';
+    const dedicatedOnly = Boolean(dedicatedCache);
+    const tries = options.candidates ? [...options.candidates] : [];
+    if (!options.candidates && !dedicatedOnly) {
+        if (env.CHROMIUM_BIN) tries.push(env.CHROMIUM_BIN);
+        if (env.GOOGLE_CHROME_BIN) tries.push(env.GOOGLE_CHROME_BIN);
+        tries.push('/usr/local/bin/google-chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser');
+    }
+
+    let playwrightPath = options.playwrightExecutablePath;
+    if (playwrightPath === undefined) {
+        try { playwrightPath = chromium.executablePath(); } catch { /* browsers not downloaded */ }
+    }
+    if (playwrightPath) tries.push(playwrightPath);
+
+    const headless = playwrightHeadlessShellCandidates(playwrightPath);
+    tries.push(...headless.paths);
+    const trustedRoots = [
+        ...(dedicatedOnly ? [dedicatedCache] : (options.allowSystemRoots === false ? [] : ['/usr/local/bin', '/usr/bin', '/nix/store', '/tmp/cursor-sandbox-cache'])),
+        headless.root,
+        ...(options.trustedRoots || []),
+    ].filter(Boolean);
+
+    for (const candidate of tries) {
+        if (isRegularExecutable(candidate, trustedRoots, dedicatedOnly)) return candidate;
+    }
+    if (options.allowSystemRoots === false || dedicatedOnly) {
+        if (options.diagnostics !== false) {
+            console.error(formatChromiumResolutionDiagnostics(chromiumResolutionDiagnostics(options)));
+        }
+        return null;
     }
     try {
         const hits = readdirSync('/nix/store')
             .filter((d) => /-chromium-\d/.test(d))
             .map((d) => `/nix/store/${d}/bin/chromium`)
-            .filter((p) => existsSync(p))
+            .filter((candidate) => isRegularExecutable(candidate, trustedRoots))
             .sort();
         if (hits.length) return hits[hits.length - 1];
     } catch { /* ignore */ }
@@ -104,16 +387,18 @@ export function resolveChromiumPath() {
                 if (!existsSync(base)) continue;
                 for (const dir of readdirSync(base)) {
                     if (!dir.startsWith('chromium-')) continue;
-                    const bin = path.join(base, dir, 'chrome-linux64', 'chrome');
-                    if (existsSync(bin)) found.push(bin);
+                    found.push(path.join(base, dir, 'chrome-linux64', 'chrome'));
                 }
             }
-            if (found.length) {
-                found.sort();
-                return found[found.length - 1];
+            found.sort();
+            for (const candidate of found) {
+                if (isRegularExecutable(candidate, trustedRoots)) return candidate;
             }
         }
     } catch { /* ignore */ }
+    if (options.diagnostics !== false) {
+        console.error(formatChromiumResolutionDiagnostics(chromiumResolutionDiagnostics(options)));
+    }
     return null;
 }
 

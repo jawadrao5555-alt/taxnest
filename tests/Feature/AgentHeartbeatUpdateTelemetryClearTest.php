@@ -42,6 +42,7 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
             $table->timestamp('agent_update_at')->nullable();
             $table->boolean('fbr_pos_enabled')->default(false);
             $table->string('fbr_connection_mode')->nullable();
+            $table->text('pos_printer_settings')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -56,7 +57,7 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
 
         // agentUpdateInfo reads the cached GitHub latest-release info —
         // pre-seed the cache so no real HTTP call happens in tests.
-        Cache::put('taxnest_agent_latest_release', ['tag' => null, 'assets' => []], 600);
+        Cache::put('taxnest_agent_latest_release', ['tag' => null, 'assets' => [], 'available' => false, 'reason' => 'release_unavailable'], 600);
     }
 
     private function makeCompany(array $attrs = []): Company
@@ -175,5 +176,44 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
 
         $company->refresh();
         $this->assertGreaterThan($oldTimestamp, $company->agent_last_seen->timestamp);
+    }
+
+    public function test_heartbeat_stores_bounded_diagnostics_without_overwriting_printer_configuration(): void
+    {
+        $company = $this->makeCompany([
+            'pos_printer_settings' => [
+                'receipt_printer' => 'Counter thermal',
+                'silent_print_enabled' => true,
+            ],
+        ]);
+
+        $this->postJson('/api/agent/heartbeat', [
+            'version' => '1.9.0',
+            'agent_diagnostics' => [
+                'process_online' => false,
+                'printer' => ['printing_enabled' => true, 'printers_reported' => 999, 'healthy' => false],
+                'fiscal_connectivity' => ['state' => 'reachable', 'checked_at' => '2026-08-01T11:58:00Z'],
+                'queue' => ['pending_callbacks' => 100001, 'last_sync_at' => '2026-08-01T11:57:00Z'],
+            ],
+        ], ['Authorization' => 'Bearer test-agent-key-1209'])->assertOk();
+
+        $settings = (array) $company->fresh()->pos_printer_settings;
+        $this->assertSame('Counter thermal', $settings['receipt_printer']);
+        $this->assertTrue($settings['silent_print_enabled']);
+        $this->assertTrue($settings['agent_diagnostics']['process_online'], 'an authenticated heartbeat proves process liveness');
+        $this->assertSame(100, $settings['agent_diagnostics']['printer']['printers_reported']);
+        $this->assertSame(100000, $settings['agent_diagnostics']['queue']['pending_callbacks']);
+        $this->assertSame('reachable', $settings['agent_diagnostics']['fiscal_connectivity']['state']);
+    }
+
+    public function test_old_agent_heartbeat_does_not_create_or_rewrite_diagnostics(): void
+    {
+        $company = $this->makeCompany([
+            'pos_printer_settings' => ['receipt_printer' => 'Existing thermal'],
+        ]);
+        $this->beat('1.9.0');
+
+        $settings = (array) $company->fresh()->pos_printer_settings;
+        $this->assertSame(['receipt_printer' => 'Existing thermal'], $settings);
     }
 }

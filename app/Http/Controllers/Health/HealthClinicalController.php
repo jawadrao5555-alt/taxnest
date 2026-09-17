@@ -285,9 +285,7 @@ class HealthClinicalController extends HealthPanelController
         if (!$visit || (int) $visit->company_id !== (int) $this->company()?->id) {
             abort(404);
         }
-        if (!HealthScopeService::canAccessBranch($this->user(), $visit->branch_id)) {
-            abort(403, __('health.denied_no_permission'));
-        }
+        $this->requireBranch($visit->branch_id);
         $this->guardClinicalRead($visit);
 
         if (!Storage::disk('local')->exists($attachment->path)) {
@@ -305,6 +303,7 @@ class HealthClinicalController extends HealthPanelController
         if (!$visit || (int) $visit->company_id !== (int) $this->company()?->id) {
             abort(404);
         }
+        $this->requireBranch($visit->branch_id);
         $this->guardClinicalWrite($visit);
 
         try {

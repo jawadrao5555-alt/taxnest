@@ -1,0 +1,86 @@
+{
+  "format": "Sanitized source-controlled audit evidence: package names, public advisory references, versions, commands, and hashes only.",
+  "captured_at_utc": "2026-09-16T10:13:54Z",
+  "commands": {
+    "composer_before": "git show HEAD:composer.lock > /tmp/composer-before/composer.lock; (cd /tmp/composer-before && composer audit --locked --format=json)",
+    "composer_after": "composer audit --locked --format=json",
+    "npm_root_before": "npm audit --json --package-lock-only",
+    "npm_root_after": "npm ci --ignore-scripts && npm audit --json --package-lock-only && npm run build",
+    "npm_pra_agent_after": "(cd pra-agent && npm ci --ignore-scripts && npm audit --json --package-lock-only)",
+    "archive_hashes": "date -u '+%Y-%m-%dT%H:%M:%SZ'; sha256sum <artifact> (performed before removal)"
+  },
+  "composer": {
+    "before": {
+      "advisory_count": 25,
+      "packages": [
+        {
+          "package": "dompdf/dompdf",
+          "before": "v3.1.4",
+          "after": "v3.1.6",
+          "advisory_refs": ["GHSA-j8qw-6jw8-r297", "GHSA-f5gf-2cj8-52g2", "GHSA-8hg6-c449-896m", "GHSA-cx96-42px-69fm", "GHSA-7x2p-4jvh-6384", "GHSA-wvh6-f5jh-8gw4"]
+        },
+        {
+          "package": "guzzlehttp/guzzle",
+          "before": "7.13.2",
+          "after": "7.15.5",
+          "advisory_refs": ["GHSA-v5mv-p594-2x33", "GHSA-f7vp-7xgx-4w4r", "GHSA-h95v-h523-3mw8", "GHSA-wm3w-8rrp-j577", "GHSA-f283-ghqc-fg79", "GHSA-94pj-82f3-465w"]
+        },
+        {
+          "package": "league/commonmark",
+          "before": "2.8.2",
+          "after": "2.10.1",
+          "advisory_refs": ["GHSA-8rr7-cvq3-gmfh", "GHSA-jjv6-8j6v-6j52", "GHSA-f8fg-pg57-v4j8", "GHSA-j8pm-gj4c-rq4x", "GHSA-mj63-m3rc-8ppr", "GHSA-mh25-x5hq-wrqp", "GHSA-jfm3-95jq-q3rf", "GHSA-g2gp-3wwq-f4ph", "GHSA-2q4p-g7hv-5rgv", "GHSA-29pj-957v-52mc"]
+        },
+        {
+          "package": "phpoffice/phpspreadsheet",
+          "before": "5.8.0",
+          "after": "5.9.0",
+          "advisory_refs": ["GHSA-xh5m-36r6-47m3", "GHSA-2mrg-gjxq-2gvr", "GHSA-6hq5-7373-42rg"]
+        }
+      ]
+    },
+    "after": {
+      "advisory_count": 0,
+      "abandoned": []
+    }
+  },
+  "npm": {
+    "root": {
+      "before": {
+        "vulnerabilities": {"critical": 0, "high": 5, "moderate": 1, "low": 1, "total": 7},
+        "packages": [
+          {"package": "baseline-browser-mapping", "before": "2.9.19", "after": "2.11.24", "advisory_refs": ["GHSA-w5vr-8v7q-w6rv"]},
+          {"package": "browserslist", "before": "4.28.1", "after": "4.29.0", "advisory_refs": ["GHSA-c83g-rgw3-j3cx", "GHSA-73wf-gq98-2v4g"]},
+          {"package": "concurrently", "before": "9.2.3", "after": "9.2.4", "advisory_refs": ["GHSA-395f-4hp3-45gv via shell-quote"]},
+          {"package": "nanoid", "before": "3.3.15", "after": "3.3.19", "advisory_refs": ["GHSA-28wg-ghj8-5hjv", "GHSA-2v37-7h3g-55p8"]},
+          {"package": "postcss", "before": "8.5.16", "after": "8.5.28", "advisory_refs": ["GHSA-fxqj-rqcc-2cmp", "GHSA-r28c-9q8g-f849"]},
+          {"package": "postcss-selector-parser", "before": "6.1.2", "after": "6.1.4", "advisory_refs": ["GHSA-w9m9-85wc-3x92"]},
+          {"package": "shell-quote", "before": "1.8.4", "after": "1.9.0", "advisory_refs": ["GHSA-395f-4hp3-45gv"]}
+        ]
+      },
+      "after": {"vulnerabilities": {"critical": 0, "high": 0, "moderate": 0, "low": 0, "total": 0}}
+    },
+    "pra_agent": {
+      "before": {
+        "vulnerabilities": {"critical": 0, "high": 6, "moderate": 1, "low": 0, "total": 7},
+        "packages": [
+          {"package": "@xmldom/xmldom", "before": "0.8.13", "after": "0.8.15", "advisory_refs": ["GHSA-6gmq-8vp8-gcm6", "GHSA-w2rr-34g9-rvrj", "GHSA-4w3w-2rp5-g8jm", "GHSA-c7q8-3ch8-vqpv", "GHSA-27p8-2357-5qqv", "GHSA-6h8r-x4r2-gp59", "GHSA-8344-3jmq-59r6", "GHSA-x4fp-j954-r2f4", "GHSA-965w-775f-mr7g", "GHSA-93r5-fhx6-vmg9"]},
+          {"package": "brace-expansion", "before": "5.0.7", "after": "5.0.12", "advisory_refs": ["GHSA-mh99-v99m-4gvg", "GHSA-rgw5-rvv9-x895"]},
+          {"package": "electron", "before": "41.7.1", "after": "41.10.7", "advisory_refs": ["GHSA-r4w5-6pfg-jxp5", "GHSA-9f4c-93c8-jc8g"]},
+          {"package": "extract-zip", "before": "2.0.1", "after": "removed", "advisory_refs": ["GHSA-jmr9-qjv8-65gv", "GHSA-7pqw-9j4j-h8q3"]},
+          {"package": "js-yaml", "before": "4.3.0", "after": "4.3.2", "advisory_refs": ["GHSA-5p4m-2wfm-xmqj", "GHSA-2883-xcg3-v3hh"]},
+          {"package": "tar", "before": "7.5.19", "after": "7.5.22", "advisory_refs": ["GHSA-r292-9mhp-454m"]},
+          {"package": "undici", "before": "6.27.0", "after": "6.28.1", "advisory_refs": ["GHSA-8xcm-r25x-g524", "GHSA-m8rv-5g2x-5cg5", "GHSA-v3r7-h72x-cjcm"]}
+        ]
+      },
+      "after": {"vulnerabilities": {"critical": 0, "high": 0, "moderate": 0, "low": 0, "total": 0}}
+    }
+  },
+  "artifact_hashes_sha256_before_removal": [
+    {"path": "routes-update.zip", "sha256": "2d858dcd622369d0b1f83f63ea7acfa912b5dfca7a3944fb227c9239c5608fc8"},
+    {"path": "caller-app/TaxNest-PRA-Agent-Windows.zip", "sha256": "660362fc32eae8b60ae8178d8ccdadf6c11fb58b9c7e38c165c96face429a376", "storage": "Git LFS object; SHA-256 captured from the hydrated archive before removal"},
+    {"path": "cookies.txt", "sha256": "cd40b9ce24c60119d219ee746b7bdacb636ea370c0b61dcc2d7ffe8b49e7b803"},
+    {"path": "fbr_retry_log.txt", "sha256": "755f9149d3903b3860e99e0d27207f94a1a1308fc5f98d3d1e401ffeca9fc4ca"},
+    {"path": "database/production_data_export.sql", "sha256": "e3565f31ed76ef4d27f368f95d2bb101659c2e6a8dbe7e894d4a1efc3da06de7"}
+  ]
+}

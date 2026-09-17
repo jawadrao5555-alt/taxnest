@@ -36,6 +36,7 @@ fbr-pos-app/app/google-services.json
 tools/video-pipeline/out/
 .env.*
 !.env.example
+!.env.testing
 attached_assets/
 pra-agent-*.zip
 
@@ -44,3 +45,15 @@ backup.sql
 *.sql.gz
 /storage/backups/
 /storage/app/owner-approval/
+
+# Sensitive local diagnostics and generated customer/fiscal material must never
+# return to the repository. The repository-artifact guard enforces these paths
+# for already-tracked files as well.
+/cookies*.txt
+/fbr_retry*
+/generate-*-invoices.php
+/routes-update.zip
+/database/production_data_export.sql
+/database/deploy/*-production-sync/
+/caller-app/TaxNest-PRA-Agent-Windows.zip
+/public/downloads/TaxNest-PRA-Agent-Windows.zip

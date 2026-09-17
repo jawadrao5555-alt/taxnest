@@ -43,6 +43,21 @@ return [
         // Shared secret for the nestpay PRA relay (X-Relay-Token header).
         // Actual value lives ONLY in live .env / relay host env — never in the repo.
         'relay_token' => env('PRA_RELAY_TOKEN', ''),
+        // Exact HTTPS relay hostnames approved by operations. A company setting
+        // is never an authority to forward a production PRA token to an
+        // arbitrary URL (including a LAN/metadata address). Comma-separated
+        // PRA_RELAY_TRUSTED_HOSTS; deliberately empty until configured.
+        'relay_trusted_hosts' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('PRA_RELAY_TRUSTED_HOSTS', ''))
+        ))),
+        // Optional host:443:IP cURL resolver pins for approved relay hosts.
+        // This is operations configuration (never tenant data); it permits a
+        // fixed relay DNS answer without widening the URL host allowlist.
+        'relay_resolve' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('PRA_RELAY_RESOLVE', ''))
+        ))),
     ],
 
     'cloudflare' => [

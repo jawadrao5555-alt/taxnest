@@ -18,6 +18,7 @@ use App\Services\SroSuggestionService;
 use App\Services\ScheduleEngine;
 use App\Services\GlobalHsService;
 use App\Services\FbrService;
+use App\Services\DiFiscalSubmissionState;
 use App\Services\ComplianceScoreService;
 use App\Services\HsUsagePatternService;
 use App\Models\FbrLog;
@@ -534,8 +535,8 @@ class InvoiceController extends Controller
         if ($invoice->company_id !== $companyId) {
             abort(403);
         }
-        if ($invoice->isLocked()) {
-            return redirect('/invoices')->with('error', 'Locked invoices cannot be edited.');
+        if ($invoice->isLocked() || $invoice->status === 'pending_verification' || $invoice->is_fbr_processing) {
+            return redirect('/invoices')->with('error', 'This invoice cannot be edited after fiscal submission has started.');
         }
         $invoice->load('items');
         $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
@@ -550,8 +551,11 @@ class InvoiceController extends Controller
     public function update(Request $request, Invoice $invoice)
     {
         $companyId = app('currentCompanyId');
-        if ($invoice->isLocked()) {
-            return redirect('/invoices')->with('error', 'Locked invoices cannot be edited.');
+        if ($invoice->company_id !== $companyId) {
+            abort(403);
+        }
+        if ($invoice->isLocked() || $invoice->status === 'pending_verification' || $invoice->is_fbr_processing) {
+            return redirect('/invoices')->with('error', 'Only an unclaimed draft or explicitly rejected invoice can be edited.');
         }
 
         $buyerRegTypeInput = $request->input('buyer_registration_type');
@@ -627,6 +631,14 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
+            // An FBR submit can claim the record after the edit form renders.
+            // Re-check under the same row lock used for the item replacement.
+            $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
+            if (!in_array($lockedInvoice->status, ['draft', 'failed'], true) || $lockedInvoice->is_fbr_processing) {
+                throw new \RuntimeException('Invoice is no longer editable because fiscal submission has started.');
+            }
+            $invoice = $lockedInvoice;
+
             $totalValueExcludingST = 0;
             $totalSalesTax = 0;
             foreach ($request->items as $item) {
@@ -669,7 +681,13 @@ class InvoiceController extends Controller
 
             if ($invoice->status === 'failed') {
                 $updateData['status'] = 'draft';
-                $updateData['fbr_status'] = 'pending';
+                $updateData['fbr_status'] = null;
+                $updateData['fbr_submission_hash'] = null;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('invoices', 'fiscal_submission_state')) {
+                    $updateData['fiscal_submission_state'] = DiFiscalSubmissionState::DRAFT;
+                    $updateData['fiscal_submission_provenance'] = 'edited_after_explicit_rejection';
+                    $updateData['fiscal_lease_expires_at'] = null;
+                }
             }
 
             $invoice->update($updateData);
@@ -988,6 +1006,17 @@ class InvoiceController extends Controller
         $mode = $request->input('mode', 'smart');
         $fbrEnvironment = $request->input('fbr_environment');
         $invoice->load('items', 'company');
+        // Only an administrator may choose an endpoint; employees always use
+        // the company's configured environment. The chosen value is frozen by
+        // the canonical reservation and reused for payload, POST and portal
+        // confirmation.
+        if (!in_array(auth()->user()->role, ['company_admin', 'super_admin'], true)
+            || !in_array($fbrEnvironment, ['sandbox', 'production'], true)) {
+            $fbrEnvironment = $invoice->company?->fbr_environment;
+        }
+        $fbrEnvironment = in_array($fbrEnvironment, ['sandbox', 'production'], true)
+            ? $fbrEnvironment
+            : 'sandbox';
 
         if (!empty($invoice->fbr_invoice_number)) {
             $msg = 'Invoice already has FBR number: ' . $invoice->fbr_invoice_number . '. Cannot resubmit.';
@@ -1059,15 +1088,12 @@ class InvoiceController extends Controller
 
             $request->validate(['override_reason' => 'required|string|min:10|max:500']);
 
-            $locked = DB::transaction(function () use ($invoice, $request) {
-                $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-                if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing) {
+            $claimed = DiFiscalSubmissionState::reserve($invoice->id, 'direct_mis', $fbrEnvironment);
+            $locked = $claimed && DB::transaction(function () use ($claimed, $request) {
+                $lockedInvoice = Invoice::whereKey($claimed->id)->lockForUpdate()->first();
+                if (!$lockedInvoice || !$lockedInvoice->is_fbr_processing) {
                     return false;
                 }
-                $lockedInvoice->status = 'draft';
-                $lockedInvoice->is_fbr_processing = true;
-                $lockedInvoice->submitted_at = now();
-                $lockedInvoice->submission_mode = 'direct_mis';
                 $lockedInvoice->override_reason = $request->override_reason;
                 $lockedInvoice->override_by = auth()->id();
                 $lockedInvoice->save();
@@ -1108,7 +1134,7 @@ class InvoiceController extends Controller
                 VendorRiskEngine::persistVendorProfile($invoice->company_id, $invoice->buyer_ntn, $invoice->buyer_name, $vendorResult);
             }
 
-            $invoice->refresh();
+            $invoice = $claimed->fresh();
             $result = $this->submitToFbrSync($invoice, $fbrEnvironment);
 
             if ($result['status'] === 'success') {
@@ -1163,18 +1189,8 @@ class InvoiceController extends Controller
             ]);
         }
 
-        $locked = DB::transaction(function () use ($invoice, $scoreResult) {
-            $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing) {
-                return false;
-            }
-            $lockedInvoice->status = 'draft';
-            $lockedInvoice->is_fbr_processing = true;
-            $lockedInvoice->submitted_at = now();
-            $lockedInvoice->submission_mode = 'smart';
-            $lockedInvoice->save();
-            return true;
-        });
+        $claimed = DiFiscalSubmissionState::reserve($invoice->id, 'smart', $fbrEnvironment);
+        $locked = $claimed !== null;
 
         if (!$locked) {
             $lockMsg = 'Invoice is no longer in a submittable state. It may have been submitted by another request.';
@@ -1184,7 +1200,7 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', $lockMsg);
         }
 
-        $invoice->refresh();
+        $invoice = $claimed;
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', [
             'mode' => 'smart',
@@ -1254,6 +1270,10 @@ class InvoiceController extends Controller
 
     public function retry(Request $request, Invoice $invoice)
     {
+        // Historical route alias. Keep all retry/endpoint selection and
+        // ambiguous-outcome handling in one canonical controller path.
+        return $this->resubmitToFbr($request, $invoice);
+
         $companyId = app('currentCompanyId');
         if ($invoice->company_id !== $companyId) {
             abort(403);
@@ -1393,17 +1413,11 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
-        $locked = DB::transaction(function () use ($invoice) {
-            $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing) {
-                return false;
-            }
-            $lockedInvoice->status = 'draft';
-            $lockedInvoice->is_fbr_processing = true;
-            $lockedInvoice->submitted_at = now();
-            $lockedInvoice->save();
-            return true;
-        });
+        $environment = in_array($invoice->company?->fbr_environment, ['sandbox', 'production'], true)
+            ? $invoice->company->fbr_environment
+            : 'sandbox';
+        $claimed = DiFiscalSubmissionState::reserve($invoice->id, 'resubmit', $environment);
+        $locked = $claimed !== null;
 
         if (!$locked) {
             $msg = 'Invoice is no longer in a submittable state.';
@@ -1411,54 +1425,38 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
-        $invoice->refresh();
-        $invoice->load('items', 'company');
-        $company = $invoice->company;
-
-        $fbrService = new \App\Services\FbrService();
+        $invoice = $claimed;
         try {
-            $response = $fbrService->submitInvoice($invoice, 0);
+            // Keep the legacy resubmit endpoint on the same canonical state
+            // machine as panel/API/bulk submissions.  It must not have a
+            // second success/pending implementation with different evidence
+            // or provenance semantics.
+            $response = $this->submitToFbrSync($invoice);
         } catch (\Exception $e) {
-            \Log::error("FBR Resubmit: Invoice #{$invoice->id} blocked: " . $e->getMessage());
-            $invoice->status = 'draft';
-            $invoice->is_fbr_processing = false;
+            DiFiscalSubmissionState::verificationRequired(
+                $invoice,
+                $invoice->company?->fbr_environment ?? 'sandbox',
+                'legacy_resubmit_callback_loss'
+            );
             $invoice->save();
-            $msg = 'FBR submission blocked: ' . $e->getMessage();
+            Log::error('FBR resubmit outcome unknown', ['invoice_id' => $invoice->id, 'exception_class' => get_class($e)]);
+            $msg = 'FBR submission outcome is unknown. Verify it on the FBR portal before retrying.';
             if ($jsonResponse) return response()->json(['status' => 'error', 'message' => $msg, 'error_details' => $msg], 422);
             return redirect('/invoice/' . $invoice->id)->with('error', $msg);
         }
 
         if ($response['status'] === 'success') {
-            $fbrNum = $response['fbr_invoice_number'] ?? null;
-            if ($fbrNum) {
-                $invoice->fbr_invoice_number = $fbrNum;
-                $invoice->fbr_invoice_id = $fbrNum;
-                $invoice->fbr_submission_date = now();
-            }
-            $invoice->status = 'locked';
-            $invoice->fbr_status = 'production';
-            $invoice->is_fbr_processing = false;
-            $invoice->integrity_hash = \App\Services\IntegrityHashService::generate($invoice);
-            $invoice->qr_data = json_encode([
-                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
-                'fbr_invoice_number' => $fbrNum ?? $invoice->invoice_number,
-                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                'totalValues' => $invoice->total_amount,
-            ]);
-            $invoice->save();
-
-            $company->update(['last_successful_submission' => now()]);
-            $this->createLedgerEntry($invoice);
+            $invoice = $invoice->fresh();
+            $fbrNum = $invoice->fbr_invoice_number;
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'resubmitted_success', [
                 'fbr_invoice_number' => $fbrNum,
-                'environment' => $company->fbr_environment,
-                'resubmitted_by' => $user->name,
+                'environment' => $invoice->fbr_status,
             ], request()->ip());
 
             AuditLogService::log('invoice_resubmitted', 'Invoice', $invoice->id, null, [
                 'fbr_invoice_number' => $fbrNum,
-                'environment' => $company->fbr_environment,
+                'environment' => $invoice->fbr_status,
             ]);
 
             \App\Services\ComplianceScoreService::recalculate($invoice->company_id);
@@ -1476,11 +1474,6 @@ class InvoiceController extends Controller
         }
 
         if ($response['status'] === 'pending_verification') {
-            $invoice->status = 'pending_verification';
-            $invoice->fbr_status = 'pending_verification';
-            $invoice->is_fbr_processing = false;
-            $invoice->save();
-
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
                     'status' => 'pending_verification',
@@ -1491,10 +1484,11 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('warning', 'FBR response was ambiguous. Invoice marked for manual verification. Check FBR portal.');
         }
 
-        $invoice->status = 'failed';
-        $invoice->fbr_status = 'failed';
-        $invoice->is_fbr_processing = false;
-        $invoice->save();
+        if ($response['status'] === 'simulated') {
+            $msg = 'Demo response recorded. No regulator acceptance was requested or recorded.';
+            if ($jsonResponse) return response()->json(['status' => 'simulated', 'invoice_id' => $invoice->id, 'message' => $msg], 200);
+            return redirect('/invoice/' . $invoice->id)->with('warning', $msg);
+        }
 
         $errors = $response['errors'] ?? [];
         $failureType = $response['failure_type'] ?? 'unknown';
@@ -1506,7 +1500,7 @@ class InvoiceController extends Controller
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'resubmit_failed', [
             'failure_type' => $failureType,
             'errors' => $errors,
-            'environment' => $company->fbr_environment,
+            'environment' => $invoice->fbr_status,
         ], request()->ip());
 
         if ($request->expectsJson() || $request->ajax()) {
@@ -1541,38 +1535,62 @@ class InvoiceController extends Controller
         $action = $request->input('action');
 
         if ($action === 'confirm') {
-            $fbrInvoiceNumber = $request->input('fbr_invoice_number');
-
-            $invoice->status = 'locked';
-            $invoice->fbr_status = 'production';
-            $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
-
-            if ($fbrInvoiceNumber) {
-                $invoice->fbr_invoice_number = $fbrInvoiceNumber;
-                $invoice->fbr_invoice_id = $fbrInvoiceNumber;
-                $invoice->qr_data = json_encode([
-                    'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->fbr_registration_no ?: ($invoice->company->ntn ?? '')),
+            // A manual portal check is privileged fiscal evidence. A bare
+            // click, or a claim without the regulator-issued reference, must
+            // never convert an unknown transport result into a locked invoice.
+            $request->validate([
+                'fbr_invoice_number' => 'required|string|min:5|max:100',
+                'verification_reason' => 'required|string|min:10|max:500',
+            ]);
+            $fbrInvoiceNumber = trim((string) $request->input('fbr_invoice_number'));
+            $confirmed = DB::transaction(function () use ($invoice, $fbrInvoiceNumber, $request, $user) {
+                $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->first();
+                if (!$locked || $locked->status !== 'pending_verification') {
+                    return null;
+                }
+                // Confirmation must preserve the environment selected for the
+                // attempted endpoint. Do not relabel an old sandbox attempt as
+                // production merely because the company setting changed later.
+                $environment = $locked->fiscal_submission_environment;
+                if (!in_array($environment, ['sandbox', 'production'], true)) {
+                    return null;
+                }
+                $company = $locked->company;
+                DiFiscalSubmissionState::accepted($locked, $fbrInvoiceNumber, $environment, 'manual_portal_confirmation');
+                $locked->qr_data = json_encode([
+                    'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
                     'fbr_invoice_number' => $fbrInvoiceNumber,
-                    'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                    'totalValues' => $invoice->total_amount,
+                    'invoiceDate' => $locked->invoice_date ?? $locked->created_at->format('Y-m-d'),
+                    'totalValues' => $locked->total_amount,
                 ]);
+                $locked->integrity_hash = IntegrityHashService::generate($locked);
+                $locked->save();
+                $this->createLedgerEntry($locked);
+                \App\Models\OverrideLog::create([
+                    'invoice_id' => $locked->id,
+                    'company_id' => $locked->company_id,
+                    'user_id' => $user->id,
+                    'action' => 'manual_fiscal_acceptance_confirmation',
+                    'reason' => $request->input('verification_reason'),
+                    'metadata' => ['environment' => $environment, 'reference_sha256' => hash('sha256', $fbrInvoiceNumber)],
+                    'ip_address' => $request->ip(),
+                ]);
+                AuditLogService::log('invoice_manually_confirmed', 'Invoice', $locked->id, null, [
+                    'fbr_invoice_number' => $fbrInvoiceNumber,
+                    'environment' => $environment,
+                ]);
+                return [$locked, $environment];
+            });
+            if (!$confirmed) {
+                return redirect('/invoice/' . $invoice->id)->with('error', 'This pending attempt has no recorded sandbox/production endpoint. Do not confirm it; reconcile it with FBR support.');
             }
-
-            $invoice->integrity_hash = IntegrityHashService::generate($invoice);
-            $invoice->save();
-
-            $this->createLedgerEntry($invoice);
+            [$invoice, $environment] = $confirmed;
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'manually_confirmed', [
-                'confirmed_by' => $user->name,
                 'action' => 'confirmed_on_fbr_portal',
                 'fbr_invoice_number' => $fbrInvoiceNumber,
+                'verification_reason' => $request->input('verification_reason'),
             ], request()->ip());
-
-            AuditLogService::log('invoice_manually_confirmed', 'Invoice', $invoice->id, null, [
-                'confirmed_by' => $user->name,
-                'fbr_invoice_number' => $fbrInvoiceNumber,
-            ]);
 
             $msg = 'Invoice confirmed as submitted to FBR. Status updated to Locked.';
             if ($fbrInvoiceNumber) {
@@ -1582,19 +1600,38 @@ class InvoiceController extends Controller
         }
 
         if ($action === 'reject') {
-            $invoice->status = 'draft';
-            $invoice->fbr_status = null;
-            $invoice->fbr_invoice_number = null;
-            $invoice->submitted_at = null;
-            $invoice->save();
+            $request->validate(['verification_reason' => 'required|string|min:10|max:500']);
+            $rejected = DB::transaction(function () use ($invoice) {
+                $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->first();
+                if (!$locked || $locked->status !== 'pending_verification') {
+                    return null;
+                }
+                $locked->status = 'draft';
+                $locked->fbr_status = null;
+                $locked->fbr_invoice_number = null;
+                $locked->fbr_invoice_id = null;
+                $locked->fbr_submission_hash = null;
+                $locked->submitted_at = null;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('invoices', 'fiscal_submission_state')) {
+                    $locked->fiscal_submission_state = DiFiscalSubmissionState::DRAFT;
+                    $locked->fiscal_submission_provenance = 'manual_portal_not_found';
+                    $locked->fiscal_lease_expires_at = null;
+                }
+                $locked->save();
+                return $locked;
+            });
+            if (!$rejected) {
+                return redirect('/invoice/' . $invoice->id)->with('error', 'The invoice changed before rejection. Reload and verify it again.');
+            }
+            $invoice = $rejected;
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'verification_rejected', [
-                'rejected_by' => $user->name,
                 'action' => 'not_found_on_fbr_portal',
+                'verification_reason' => $request->input('verification_reason'),
             ], request()->ip());
 
             AuditLogService::log('invoice_verification_rejected', 'Invoice', $invoice->id, null, [
-                'rejected_by' => $user->name,
+                'reason_recorded' => true,
             ]);
 
             return redirect('/invoice/' . $invoice->id)->with('success', 'Invoice reset to Draft. You can edit and resubmit.');
@@ -1617,14 +1654,15 @@ class InvoiceController extends Controller
             }
         }
 
-        if (!in_array($invoice->status, ['locked', 'pending_verification', 'draft'])) {
-            return redirect('/invoice/' . $invoice->id)->with('error', 'FBR number can only be updated on draft, locked or pending invoices.');
+        if ($invoice->status !== 'pending_verification' && $user->role !== 'super_admin') {
+            return redirect('/invoice/' . $invoice->id)->with('error', 'Only a pending-verification invoice can receive a manual FBR reference.');
         }
 
-        $request->validate(['fbr_invoice_number' => 'required|string|min:5|max:100']);
+        $request->validate([
+            'fbr_invoice_number' => 'required|string|min:5|max:100',
+            'override_reason' => 'required|string|min:10|max:500',
+        ]);
 
-        $oldNumber = $invoice->fbr_invoice_number;
-        $oldStatus = $invoice->status;
         $newNumber = $request->input('fbr_invoice_number');
 
         $existingInvoice = Invoice::where('fbr_invoice_number', $newNumber)
@@ -1635,25 +1673,52 @@ class InvoiceController extends Controller
             return redirect('/invoice/' . $invoice->id)->with('error', 'This FBR Invoice Number is already assigned to Invoice #' . $existingInvoice->internal_invoice_number . '. Each invoice must have a unique FBR number.');
         }
 
-        $invoice->fbr_invoice_number = $newNumber;
-        $invoice->fbr_invoice_id = $newNumber;
-
-        $company = $invoice->company;
-        $invoice->qr_data = json_encode([
-            'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
-            'fbr_invoice_number' => $newNumber,
-            'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-            'totalValues' => $invoice->total_amount,
-        ]);
-
-        $invoice->status = 'locked';
-        $invoice->fbr_status = 'production';
-        $invoice->fbr_submission_date = $invoice->fbr_submission_date ?? now();
-
-        $invoice->integrity_hash = IntegrityHashService::generate($invoice);
-
         try {
-            $invoice->save();
+            $overrideEvidence = null;
+            $invoice = DB::transaction(function () use ($invoice, $newNumber, $user, $request, &$overrideEvidence) {
+                $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+                $isPending = $locked->status === 'pending_verification';
+                $isLockedCorrection = $user->role === 'super_admin' && $locked->status === 'locked';
+                if (!$isPending && !$isLockedCorrection) {
+                    throw new \RuntimeException('Only a pending attempt or an existing locked fiscal record can be corrected.');
+                }
+                $oldNumber = $locked->fbr_invoice_number;
+                $company = $locked->company;
+                $environment = $locked->fiscal_submission_environment;
+                if (!in_array($environment, ['sandbox', 'production'], true)) {
+                    throw new \RuntimeException('The fiscal attempt has no frozen endpoint environment.');
+                }
+                DiFiscalSubmissionState::accepted($locked, $newNumber, $environment, 'privileged_manual_reference_override');
+                $locked->qr_data = json_encode([
+                    'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
+                    'fbr_invoice_number' => $newNumber,
+                    'invoiceDate' => $locked->invoice_date ?? $locked->created_at->format('Y-m-d'),
+                    'totalValues' => $locked->total_amount,
+                ]);
+                $locked->integrity_hash = IntegrityHashService::generate($locked);
+                $locked->save();
+                $this->createLedgerEntry($locked);
+                $overrideEvidence = [
+                    'old_reference_sha256' => hash('sha256', (string) $oldNumber),
+                    'new_reference_sha256' => hash('sha256', $newNumber),
+                ];
+                \App\Models\OverrideLog::create([
+                    'invoice_id' => $locked->id,
+                    'company_id' => $locked->company_id,
+                    'user_id' => $user->id,
+                    'action' => 'privileged_fiscal_reference_override',
+                    'reason' => $request->input('override_reason'),
+                    'metadata' => $overrideEvidence,
+                    'ip_address' => $request->ip(),
+                ]);
+                AuditLogService::log('fbr_number_updated', 'Invoice', $locked->id, null, [
+                    'old_reference_sha256' => $overrideEvidence['old_reference_sha256'],
+                    'new_reference_sha256' => $overrideEvidence['new_reference_sha256'],
+                    'updated_by_user_id' => $user->id,
+                    'environment' => $environment,
+                ]);
+                return $locked;
+            });
         } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
             return redirect('/invoice/' . $invoice->id)->with('error', 'This FBR Invoice Number is already in use. Please enter a unique number.');
         } catch (\Exception $e) {
@@ -1662,16 +1727,10 @@ class InvoiceController extends Controller
         }
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_number_updated', [
-            'old_number' => $oldNumber,
-            'new_number' => $newNumber,
-            'updated_by' => $user->name,
+            'old_reference_sha256' => $overrideEvidence['old_reference_sha256'],
+            'new_reference_sha256' => $overrideEvidence['new_reference_sha256'],
+            'reason_recorded' => true,
         ], request()->ip());
-
-        AuditLogService::log('fbr_number_updated', 'Invoice', $invoice->id, null, [
-            'old_number' => $oldNumber,
-            'new_number' => $newNumber,
-            'updated_by' => $user->name,
-        ]);
 
         return redirect('/invoice/' . $invoice->id)->with('success', 'FBR Invoice Number updated: ' . $newNumber);
     }
@@ -2264,6 +2323,9 @@ class InvoiceController extends Controller
             'status' => $invoice->status,
             'fbr_status' => $invoice->fbr_status,
             'fbr_invoice_number' => $invoice->fbr_invoice_number,
+            'fiscal_submission_state' => $invoice->fiscal_submission_state,
+            'fiscal_submission_environment' => $invoice->fiscal_submission_environment,
+            'fiscal_submission_provenance' => $invoice->fiscal_submission_provenance,
             'share_uuid' => $invoice->share_uuid,
             'display_invoice_number' => $invoice->display_invoice_number,
             'wht_rate' => $invoice->wht_rate ?? 0,
@@ -2390,12 +2452,18 @@ class InvoiceController extends Controller
             abort(403);
         }
 
-        if (!in_array($invoice->status, ['draft', 'failed'])) {
-            return back()->with('error', 'Only draft or failed invoices can be deleted.');
+        if (!in_array($invoice->status, ['draft', 'failed'], true) || $invoice->is_fbr_processing) {
+            return back()->with('error', 'Only an unclaimed draft or explicitly rejected invoice can be deleted.');
         }
 
         DB::beginTransaction();
         try {
+            $lockedInvoice = Invoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
+            if (!in_array($lockedInvoice->status, ['draft', 'failed'], true) || $lockedInvoice->is_fbr_processing) {
+                throw new \RuntimeException('Invoice cannot be deleted after fiscal submission has started.');
+            }
+            $invoice = $lockedInvoice;
+
             AuditLogService::log('invoice_deleted', 'Invoice', $invoice->id, null, [
                 'invoice_number' => $invoice->internal_invoice_number,
                 'buyer_name' => $invoice->buyer_name,
@@ -2446,11 +2514,12 @@ class InvoiceController extends Controller
             return ['status' => 'failed', 'errors' => ['Invoice is not in processing state'], 'execution_ms' => 0];
         }
 
-        if ($fbrEnvironment && in_array($fbrEnvironment, ['sandbox', 'production'])) {
-            $company->fbr_environment = $fbrEnvironment;
-        }
-
-        $environment = $company->fbr_environment ?? 'sandbox';
+        // The reservation chose the endpoint. Never let a later caller or a
+        // changed company setting alter a pending attempt's target.
+        $environment = in_array($invoice->fiscal_submission_environment, ['sandbox', 'production'], true)
+            ? $invoice->fiscal_submission_environment
+            : (in_array($company->fbr_environment, ['sandbox', 'production'], true) ? $company->fbr_environment : 'sandbox');
+        $company->setAttribute('fbr_environment', $environment);
         $startTime = microtime(true);
 
         try {
@@ -2463,9 +2532,8 @@ class InvoiceController extends Controller
                 $errorMessages = array_map(fn($e) => "[{$e['code']}] {$e['message']}", $preErrors);
                 Log::warning("FBR Pre-Validation Failed: Invoice #{$invoice->id}", $preErrors);
 
-                $invoice->status = 'failed';
+                DiFiscalSubmissionState::rejected($invoice);
                 $invoice->fbr_status = 'validation_failed';
-                $invoice->is_fbr_processing = false;
                 $invoice->save();
 
                 return ['status' => 'failed', 'errors' => $errorMessages, 'execution_ms' => $executionMs, 'failure_type' => 'pre_validation'];
@@ -2494,19 +2562,32 @@ class InvoiceController extends Controller
                         }
                     }
 
-                    Log::info("Auto-recovering Invoice #{$invoice->id} from success log #{$successLog->id}, FBR number: {$fbrNum}");
+                    Log::info('Recovering DI invoice from prior FBR acknowledgement log', [
+                        'invoice_id' => $invoice->id,
+                        'fbr_log_id' => $successLog->id,
+                    ]);
 
-                    $invoice->status = 'locked';
-                    $invoice->fbr_status = 'production';
-                    $invoice->is_fbr_processing = false;
-                    if ($fbrNum) {
-                        $invoice->fbr_invoice_number = $fbrNum;
-                        $invoice->fbr_invoice_id = $fbrNum;
-                        $invoice->fbr_submission_date = $successLog->created_at;
+                    if (!DiFiscalSubmissionState::isAuthoritativeAcknowledgement($fbrNum, $environment)) {
+                        DiFiscalSubmissionState::verificationRequired($invoice, $environment, 'success_log_missing_acknowledgement');
+                        $invoice->save();
+                        return [
+                            'status' => 'pending_verification',
+                            'execution_ms' => $executionMs,
+                            'errors' => ['A historic success log has no authoritative reference. Verify on the FBR portal before retrying.'],
+                        ];
                     }
-                    $invoice->save();
-
-                    $this->createLedgerEntry($invoice);
+                    $invoice = DB::transaction(function () use ($invoice, $fbrNum, $environment, $successLog) {
+                        $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+                        DiFiscalSubmissionState::accepted($locked, $fbrNum, $environment, 'recovered_authoritative_fbr_log');
+                        $locked->fbr_submission_date = $successLog->created_at;
+                        $locked->save();
+                        $this->createLedgerEntry($locked);
+                        AuditLogService::log('invoice_fbr_success_recovered', 'Invoice', $locked->id, null, [
+                            'environment' => $environment,
+                            'fbr_log_id' => $successLog->id,
+                        ]);
+                        return $locked;
+                    });
 
                     InvoiceActivityService::log($invoice->id, $invoice->company_id, 'auto_recovered', [
                         'fbr_invoice_number' => $fbrNum,
@@ -2520,9 +2601,9 @@ class InvoiceController extends Controller
                 }
             }
 
-            $invoice->status = 'failed';
-            $invoice->fbr_status = 'failed';
-            $invoice->is_fbr_processing = false;
+            // An exception after the submit boundary is not an authoritative
+            // rejection. Seal it for portal verification, never for replay.
+            DiFiscalSubmissionState::verificationRequired($invoice, $environment, 'sync_submission_exception');
             $invoice->save();
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_failed', [
@@ -2538,7 +2619,7 @@ class InvoiceController extends Controller
 
             ComplianceScoreService::recalculate($invoice->company_id);
 
-            return ['status' => 'failed', 'errors' => [$e->getMessage()], 'execution_ms' => $executionMs];
+            return ['status' => 'pending_verification', 'errors' => ['Submission outcome is unknown; verify on the FBR portal.'], 'execution_ms' => $executionMs];
         }
 
         $executionMs = round((microtime(true) - $startTime) * 1000);
@@ -2570,38 +2651,68 @@ class InvoiceController extends Controller
             Log::warning("Failed to update FBR log for invoice #{$invoice->id}: " . $e->getMessage());
         }
 
+        if ($response['status'] === 'simulated') {
+            DiFiscalSubmissionState::simulated($invoice);
+            $invoice->save();
+
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_simulated', [
+                'mode' => 'sync',
+                'provenance' => 'synthetic_demo_response',
+            ]);
+
+            return [
+                'status' => 'simulated',
+                'message' => 'Demo response recorded. No regulator acceptance was requested or recorded.',
+                'execution_ms' => $executionMs,
+            ];
+        }
+
         if ($response['status'] === 'success') {
             $fbrNum = $response['fbr_invoice_number'] ?? null;
-            if ($fbrNum) {
-                $invoice->fbr_invoice_number = $fbrNum;
-                $invoice->fbr_invoice_id = $fbrNum;
-                $invoice->fbr_submission_date = now();
+            if (!DiFiscalSubmissionState::isAuthoritativeAcknowledgement($fbrNum, $environment)) {
+                DiFiscalSubmissionState::verificationRequired($invoice, $environment, 'missing_authoritative_acknowledgement');
+                $invoice->save();
+                return [
+                    'status' => 'pending_verification',
+                    'errors' => ['FBR did not return an authoritative invoice reference. Verify on the FBR portal before retrying.'],
+                    'execution_ms' => $executionMs,
+                ];
             }
-            $invoice->status = 'locked';
-            $invoice->fbr_status = 'production';
-            $invoice->is_fbr_processing = false;
-            $invoice->integrity_hash = IntegrityHashService::generate($invoice);
-            $invoice->qr_data = json_encode([
-                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $company->fbr_registration_no ?: ($company->ntn ?? '')),
-                'fbr_invoice_number' => $fbrNum ?? $invoice->invoice_number,
-                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                'totalValues' => $invoice->total_amount,
-            ]);
-            $invoice->save();
+
+            // Fiscal acceptance, immutable audit evidence and ledger creation
+            // are one commit. A crash may leave verification-required before
+            // this point, but can never leave a locked invoice without ledger
+            // and required audit evidence.
+            $invoice = DB::transaction(function () use ($invoice, $fbrNum, $environment, $response, $executionMs) {
+                $locked = Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+                DiFiscalSubmissionState::accepted(
+                    $locked,
+                    $fbrNum,
+                    $environment,
+                    (string) ($response['provenance'] ?? 'fbr_authoritative_acknowledgement')
+                );
+                $locked->integrity_hash = IntegrityHashService::generate($locked);
+                $locked->qr_data = json_encode([
+                    'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $locked->company->fbr_registration_no ?: ($locked->company->ntn ?? '')),
+                    'fbr_invoice_number' => $fbrNum,
+                    'invoiceDate' => $locked->invoice_date ?? $locked->created_at->format('Y-m-d'),
+                    'totalValues' => $locked->total_amount,
+                ]);
+                $locked->save();
+                $this->createLedgerEntry($locked);
+                AuditLogService::log('invoice_fbr_success', 'Invoice', $locked->id, null, [
+                    'fbr_invoice_number' => $fbrNum,
+                    'environment' => $environment,
+                    'mode' => 'sync',
+                ]);
+                return $locked;
+            });
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'locked', [
                 'fbr_invoice_number' => $fbrNum,
                 'execution_ms' => $executionMs,
                 'mode' => 'sync',
             ]);
-
-            AuditLogService::log('invoice_fbr_success', 'Invoice', $invoice->id, null, [
-                'fbr_invoice_number' => $fbrNum,
-                'environment' => $environment,
-                'mode' => 'sync',
-            ]);
-
-            $this->createLedgerEntry($invoice);
 
             $company->update(['last_successful_submission' => now()]);
             HsUsagePatternService::recordSuccess($invoice);
@@ -2612,9 +2723,11 @@ class InvoiceController extends Controller
         }
 
         if ($response['status'] === 'pending_verification') {
-            $invoice->status = 'pending_verification';
-            $invoice->fbr_status = 'pending_verification';
-            $invoice->is_fbr_processing = false;
+            DiFiscalSubmissionState::verificationRequired(
+                $invoice,
+                $environment,
+                (string) ($response['failure_type'] ?? 'ambiguous_regulator_response')
+            );
             $invoice->save();
 
             InvoiceActivityService::log($invoice->id, $invoice->company_id, 'pending_verification', [
@@ -2626,9 +2739,7 @@ class InvoiceController extends Controller
             return ['status' => 'pending_verification', 'execution_ms' => $executionMs];
         }
 
-        $invoice->status = 'failed';
-        $invoice->fbr_status = 'failed';
-        $invoice->is_fbr_processing = false;
+        DiFiscalSubmissionState::rejected($invoice);
         $invoice->save();
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'fbr_failed', [
@@ -2671,32 +2782,28 @@ class InvoiceController extends Controller
 
     private function createLedgerEntry(Invoice $invoice): void
     {
-        try {
-            $ledgerNtn = $invoice->buyer_ntn ?: ('WALK-IN-' . strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $invoice->buyer_name)));
-            $exists = CustomerLedger::where('company_id', $invoice->company_id)
-                ->where('invoice_id', $invoice->id)
-                ->where('type', 'invoice')
-                ->exists();
-            if ($exists) return;
+        $ledgerNtn = $invoice->buyer_ntn ?: ('WALK-IN-' . strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $invoice->buyer_name)));
+        $exists = CustomerLedger::where('company_id', $invoice->company_id)
+            ->where('invoice_id', $invoice->id)
+            ->where('type', 'invoice')
+            ->exists();
+        if ($exists) return;
 
-            $lastEntry = CustomerLedger::where('company_id', $invoice->company_id)
-                ->where('customer_ntn', $ledgerNtn)
-                ->orderBy('id', 'desc')->first();
-            $lastBalance = $lastEntry ? $lastEntry->balance_after : 0;
-            CustomerLedger::create([
-                'company_id' => $invoice->company_id,
-                'customer_name' => $invoice->buyer_name,
-                'customer_ntn' => $ledgerNtn,
-                'invoice_id' => $invoice->id,
-                'debit' => $invoice->total_amount,
-                'credit' => 0,
-                'balance_after' => $lastBalance + $invoice->total_amount,
-                'type' => 'invoice',
-                'notes' => 'Invoice ' . ($invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id) . ' locked',
-            ]);
-        } catch (\Exception $e) {
-            \Log::warning("Ledger entry failed for invoice #{$invoice->id}: " . $e->getMessage());
-        }
+        $lastEntry = CustomerLedger::where('company_id', $invoice->company_id)
+            ->where('customer_ntn', $ledgerNtn)
+            ->orderBy('id', 'desc')->first();
+        $lastBalance = $lastEntry ? $lastEntry->balance_after : 0;
+        CustomerLedger::create([
+            'company_id' => $invoice->company_id,
+            'customer_name' => $invoice->buyer_name,
+            'customer_ntn' => $ledgerNtn,
+            'invoice_id' => $invoice->id,
+            'debit' => $invoice->total_amount,
+            'credit' => 0,
+            'balance_after' => $lastBalance + $invoice->total_amount,
+            'type' => 'invoice',
+            'notes' => 'Invoice ' . ($invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id) . ' locked',
+        ]);
     }
 
 }

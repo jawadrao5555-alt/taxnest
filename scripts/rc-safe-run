@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+# Fail-closed disposable application runner.
+#
+# This runner is intentionally separate from dependency installation. The
+# bootstrap may reach package registries, while an application command passed
+# here can only resolve/connect to loopback. env -i also makes an inherited
+# database URL, cloud credential, proxy, or .env lookup impossible.
+set -euo pipefail
+umask 077
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+run_root="$ROOT"
+browser=0
+runtime_root=""
+browser_mariadb_root=""
+playwright_browsers_path=""
+browser_tmpdir=""
+
+usage() {
+    echo "usage: $0 [--browser] [--root DIR] [--runtime DIR] [--mariadb-root DIR] [--playwright-browsers-path DIR] [--browser-tmpdir DIR] -- command [args...]" >&2
+    exit 2
+}
+
+while (($#)); do
+    case "$1" in
+        --browser) browser=1; shift ;;
+        --root)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            run_root="$2"
+            shift 2
+            ;;
+        --runtime)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            runtime_root="$2"
+            shift 2
+            ;;
+        --mariadb-root)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            browser_mariadb_root="$2"
+            shift 2
+            ;;
+        --playwright-browsers-path)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            playwright_browsers_path="$2"
+            shift 2
+            ;;
+        --browser-tmpdir)
+            [[ $# -ge 2 && -n "$2" ]] || usage
+            browser_tmpdir="$2"
+            shift 2
+            ;;
+        --) shift; break ;;
+        *) usage ;;
+    esac
+done
+[[ $# -gt 0 ]] || usage
+run_root="$(cd "$run_root" && pwd)"
+
+for forbidden in \
+    "$run_root/.env" \
+    "$run_root/.env.local" \
+    "$run_root/.env.production" \
+    "$run_root/.env.backup"; do
+    [[ ! -e "$forbidden" ]] || {
+        echo "rc-safe-run: BLOCKED secret environment file: ${forbidden#"$ROOT"/}" >&2
+        exit 2
+    }
+done
+
+# Laravel's application caches make a clean-checkout result depend on a previous
+# process. Composer's packages.php/services.php are dependency metadata created
+# during the approved install step, so they remain permitted.
+shopt -s nullglob
+cache_files=()
+for cache_file in "$run_root"/bootstrap/cache/config.php "$run_root"/bootstrap/cache/routes*.php "$run_root"/bootstrap/cache/events.php "$run_root"/storage/framework/cache/data/*; do
+    [[ -e "$cache_file" ]] && cache_files+=("$cache_file")
+done
+if ((${#cache_files[@]})); then
+    echo "rc-safe-run: BLOCKED generated application cache; remove it before testing" >&2
+    printf '  %s\n' "${cache_files[@]#"$ROOT"/}" >&2
+    exit 2
+fi
+shopt -u nullglob
+
+if [[ -z "$runtime_root" ]]; then
+    runtime_root="$(mktemp -d "${TMPDIR:-/tmp}/taxnest-rc-safe.XXXXXX")"
+    cleanup_runtime=1
+else
+    mkdir -p "$runtime_root"
+    cleanup_runtime=0
+fi
+runtime_root="$(cd "$runtime_root" && pwd)"
+home="$runtime_root/home"
+mkdir -p "$home"/{tmp,cache,composer,npm,guard}
+chmod 700 "$runtime_root" "$home"
+
+cleanup() {
+    if ((cleanup_runtime)); then
+        rm -rf -- "$runtime_root"
+    fi
+}
+trap cleanup EXIT
+
+guard="$(
+    RC_NETWORK_GUARD_BUILD_DIR="$home/guard" \
+        bash "$ROOT/scripts/rc-network-build.sh"
+)"
+[[ -r "$guard" ]] || {
+    echo "rc-safe-run: BLOCKED egress guard unavailable" >&2
+    exit 2
+}
+
+# Keep this list deliberately explicit. In particular, no token-, proxy-, or
+# service-related variable can leak through from the invoking shell.
+envs=(
+    "HOME=$home"
+    "TMPDIR=$home/tmp"
+    "XDG_CACHE_HOME=$home/cache"
+    "COMPOSER_HOME=$home/composer"
+    "COMPOSER_CACHE_DIR=$home/composer/cache"
+    "NPM_CONFIG_CACHE=$home/npm"
+    "npm_config_cache=$home/npm"
+    "NPM_CONFIG_USERCONFIG=$home/npmrc"
+    "PATH=${PATH:-/usr/bin:/bin}"
+    "LANG=C"
+    "LC_ALL=C"
+    "TZ=UTC"
+    "CI=1"
+    "APP_ENV=testing"
+    "APP_KEY=base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE="
+    "APP_URL=http://127.0.0.1"
+    "APP_CONFIG_CACHE=$home/cache/config.php"
+    "APP_ROUTES_CACHE=$home/cache/routes.php"
+    "APP_EVENTS_CACHE=$home/cache/events.php"
+    "CACHE_STORE=array"
+    "DB_CONNECTION=sqlite"
+    "DB_DATABASE=:memory:"
+    "SESSION_DRIVER=array"
+    "QUEUE_CONNECTION=sync"
+    "MAIL_MAILER=array"
+    "BROADCAST_CONNECTION=null"
+    "NO_PROXY=*"
+    "no_proxy=*"
+    "RC_SAFE_RUN=1"
+    "LD_PRELOAD=$guard"
+)
+if ((browser)); then
+    browser_state="$runtime_root/browser-state"
+    mariadb_root="${browser_mariadb_root:-$runtime_root/mariadb}"
+    mariadb_root="$(realpath -m "$mariadb_root")"
+    [[ "$mariadb_root" == /tmp/taxnest-rc-mariadb-browser-[0-9]* ]] || {
+        echo "rc-safe-run: BLOCKED non-browser MariaDB root" >&2
+        exit 2
+    }
+    [[ -n "$playwright_browsers_path" ]] || {
+        echo "rc-safe-run: BLOCKED browser run without explicit Playwright cache" >&2
+        exit 2
+    }
+    [[ -n "$browser_tmpdir" ]] || {
+        echo "rc-safe-run: BLOCKED browser run without explicit short Chromium TMPDIR" >&2
+        exit 2
+    }
+    [[ "$browser_tmpdir" =~ ^/tmp/rcpw\.[A-Za-z0-9]+$ && -d "$browser_tmpdir" && ! -L "$browser_tmpdir" ]] || {
+        echo "rc-safe-run: BLOCKED invalid Chromium TMPDIR" >&2
+        exit 2
+    }
+    browser_tmpdir_real="$(realpath -- "$browser_tmpdir")"
+    [[ "$browser_tmpdir_real" == "$browser_tmpdir" ]] || {
+        echo "rc-safe-run: BLOCKED non-canonical Chromium TMPDIR" >&2
+        exit 2
+    }
+    browser_tmpdir_stat="$(stat -c '%u %a %F' -- "$browser_tmpdir" 2>/dev/null || true)"
+    [[ "$browser_tmpdir_stat" == "$(id -u) 700 directory" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR owner/mode" >&2
+        exit 2
+    }
+    browser_tmpdir_marker="$browser_tmpdir/.taxnest-rc-browser-tmpdir"
+    [[ -f "$browser_tmpdir_marker" && ! -L "$browser_tmpdir_marker" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR association marker" >&2
+        exit 2
+    }
+    browser_tmpdir_marker_stat="$(stat -c '%u %a %F' -- "$browser_tmpdir_marker" 2>/dev/null || true)"
+    [[ "$browser_tmpdir_marker_stat" == "$(id -u) 600 regular file" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR marker owner/mode" >&2
+        exit 2
+    }
+    expected_browser_tmpdir_marker=$'version=1\nstate_base='"$(dirname "$runtime_root")"$'\nbrowser_tmpdir='"$browser_tmpdir"
+    [[ "$(cat -- "$browser_tmpdir_marker")" == "$expected_browser_tmpdir_marker" ]] || {
+        echo "rc-safe-run: BLOCKED Chromium TMPDIR association marker contents" >&2
+        exit 2
+    }
+    playwright_browsers_path_raw="$playwright_browsers_path"
+    expected_playwright_cache="$(dirname "$runtime_root")/playwright-cache"
+    [[ "$playwright_browsers_path_raw" == "$expected_playwright_cache" ]] || {
+        echo "rc-safe-run: BLOCKED Playwright cache is not associated with this runtime" >&2
+        exit 2
+    }
+    [[ ! -L "$playwright_browsers_path_raw" ]] || {
+        echo "rc-safe-run: BLOCKED symlinked Playwright cache" >&2
+        exit 2
+    }
+    playwright_browsers_path="$(realpath -m -- "$playwright_browsers_path_raw")"
+    [[ "$playwright_browsers_path" == "$playwright_browsers_path_raw" ]] || {
+        echo "rc-safe-run: BLOCKED non-canonical Playwright cache" >&2
+        exit 2
+    }
+    if ! node "$ROOT/scripts/lib/playwright-cache.mjs" "$playwright_browsers_path" >/dev/null; then
+        echo "rc-safe-run: BLOCKED Playwright cache failed exact revision/executable validation" >&2
+        exit 2
+    fi
+    mkdir -p "$browser_state" "$mariadb_root"
+    envs+=(
+        "APP_ENV=rc-browser"
+        "TMPDIR=$browser_tmpdir"
+        "RC_BROWSER_DB=taxnest_rc_browser"
+        "RC_BROWSER_PORT=${RC_BROWSER_PORT:-5911}"
+        "RC_BROWSER_SESSION_DRIVER=file"
+        "SESSION_DRIVER=file"
+        "RC_BROWSER_ONLY=${RC_BROWSER_ONLY:-}"
+        "RC_BROWSER_STATE_ROOT=$browser_state"
+        "PLAYWRIGHT_BROWSERS_PATH=$playwright_browsers_path"
+        "RC_MARIADB_ROOT=$mariadb_root"
+        "RC_MARIADB_PORT=${RC_MARIADB_PORT:-33117}"
+        "DB_CONNECTION=mysql"
+        "DB_HOST=127.0.0.1"
+        "DB_PORT=${RC_MARIADB_PORT:-33117}"
+        "DB_SOCKET=$mariadb_root/run/mariadb.sock"
+        "DB_DATABASE=taxnest_rc_browser"
+        "DB_USERNAME=root"
+        "DB_PASSWORD="
+        "DB_CONNECT_TIMEOUT=3"
+        "HONOR_DATABASE_URL=0"
+        "RC_BROWSER_FIXTURE_OUT=$browser_state/fixture.json"
+        "TAXNEST_RC_NO_EXTERNAL_FISCAL=1"
+        "FBR_API_URL="
+        "FBR_SANDBOX_URL="
+        "FBR_PRODUCTION_URL="
+        "FBR_TOKEN="
+        "PRA_API_URL="
+        "PRA_SANDBOX_URL="
+        "PRA_PRODUCTION_URL="
+        "PRA_TOKEN="
+    )
+fi
+
+cd "$run_root"
+exec env -i "${envs[@]}" "$@"

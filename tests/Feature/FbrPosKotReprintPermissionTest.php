@@ -269,26 +269,17 @@ class FbrPosKotReprintPermissionTest extends TestCase
         Schema::clearResolvedInstances();
     }
 
-    /** Raw .env values — the test run forces sqlite into env(), .env still names the dev MySQL. */
-    protected function dotenvValues(): array
+    /** Explicit disposable probe values; never read workspace .env credentials. */
+    protected function mariadbProbeValues(): array
     {
-        $path = base_path('.env');
-        if (!is_file($path)) {
-            return [];
-        }
-        $out = [];
-        foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-            if (!preg_match('/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/', $line, $m)) {
-                continue;
-            }
-            $value = trim($m[2]);
-            if (strlen($value) > 1 && in_array($value[0], ['"', "'"], true) && substr($value, -1) === $value[0]) {
-                $value = substr($value, 1, -1);
-            }
-            $out[$m[1]] = $value;
-        }
-
-        return $out;
+        return [
+            'DB_HOST' => getenv('TAXNEST_MARIADB_TEST_HOST') ?: '',
+            'DB_PORT' => getenv('TAXNEST_MARIADB_TEST_PORT') ?: '',
+            'DB_DATABASE' => getenv('TAXNEST_MARIADB_TEST_DATABASE') ?: '',
+            'DB_USERNAME' => getenv('TAXNEST_MARIADB_TEST_USERNAME') ?: '',
+            'DB_PASSWORD' => getenv('TAXNEST_MARIADB_TEST_PASSWORD') ?: '',
+            'DB_SOCKET' => getenv('TAXNEST_MARIADB_TEST_SOCKET') ?: '',
+        ];
     }
 
     // ── 1. server block: permission withheld ─────────────────────────────────
@@ -577,9 +568,14 @@ class FbrPosKotReprintPermissionTest extends TestCase
      */
     public function test_the_claim_token_round_trips_through_a_mysql_timestamp_column(): void
     {
-        $env = $this->dotenvValues();
-        if (empty($env['DB_DATABASE']) || $env['DB_DATABASE'] === ':memory:') {
-            $this->markTestSkipped('no MySQL database configured in .env');
+        $env = $this->mariadbProbeValues();
+        if (empty($env['DB_DATABASE']) || $env['DB_DATABASE'] === ':memory:'
+            || !in_array($env['DB_HOST'], ['127.0.0.1', 'localhost'], true)
+            || !preg_match('/^taxnest_(rc|odar)_/', $env['DB_DATABASE'])) {
+            if (getenv('TAXNEST_REQUIRE_MARIADB_KOT_TIMESTAMP') === '1') {
+                $this->fail('explicit loopback disposable MariaDB probe values are required');
+            }
+            $this->markTestSkipped('no explicit disposable MariaDB probe configuration');
         }
 
         config(['database.connections.t1389_mysql' => array_merge(
@@ -598,7 +594,7 @@ class FbrPosKotReprintPermissionTest extends TestCase
         try {
             DB::connection('t1389_mysql')->getPdo();
         } catch (\Throwable $e) {
-            $this->markTestSkipped('dev MySQL is not reachable');
+            $this->markTestSkipped('explicit disposable MariaDB is not reachable');
         }
 
         $probe   = 't1389_claim_probe';

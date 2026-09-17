@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="native-mariadb-final-23bb5252" tests="4" failures="0" errors="0" skipped="0" time="0">
+  <properties>
+    <property name="source_sha" value="23bb5252291f6f5afd5a7f83a70a0b002ae34fc1"/>
+    <property name="engine" value="MariaDB 10.6.22"/>
+    <property name="command" value="scripts/rc-mariadb-migration-lab.sh --all"/>
+    <property name="endpoint_calls" value="0"/>
+  </properties>
+  <testcase name="fresh_migration_schema_and_reentry" classname="native-mariadb"/>
+  <testcase name="data_bearing_upgrade_preservation" classname="native-mariadb"/>
+  <testcase name="innodb_lock_and_fiscal_claim_concurrency" classname="native-mariadb"/>
+  <testcase name="di_outbox_durable_delayed_recovery" classname="native-mariadb"/>
+</testsuite>

@@ -1,9 +1,13 @@
 @php
-    // Agent release info (cached 10 min; safe fallback when GitHub unreachable).
+    // A release listing without a canonical manifest is deliberately not a
+    // downloadable release. Do not recreate the old "largest asset" fallback:
+    // customers need an honest unavailable message, not unverified Windows
+    // bytes or a silent self-update outage.
     $release = \App\Http\Controllers\AgentManagementController::latestReleaseInfo();
-    $agentTag = $release['tag'] ?? null;
-    $exeAsset = collect($release['assets'] ?? [])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.exe'))->sortByDesc('size')->first();
-    $zipAsset = collect($release['assets'] ?? [])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))->sortByDesc('size')->first();
+    $agentAvailable = (bool) ($release['available'] ?? false);
+    $agentTag = $agentAvailable ? ($release['tag'] ?? null) : null;
+    $exeAsset = $agentAvailable ? ($release['exe'] ?? null) : null;
+    $zipAsset = $agentAvailable ? ($release['zip'] ?? null) : null;
     $fmtMb = fn($bytes) => $bytes ? number_format($bytes / 1048576, 1) . ' MB' : null;
 
     $posApkPath = public_path('downloads/taxnest-pos.apk');
@@ -120,9 +124,15 @@
                     <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Windows 10 / 11{{ $agentTag ? ' · ' . $agentTag : '' }}</p>
                     <p class="text-sm text-gray-500 leading-relaxed flex-1">Silent thermal receipt &amp; KOT printing, offline billing, PRA fiscal-device support and the full-screen NestPOS desktop shell — install once on your counter PC.</p>
                     <div class="mt-5 space-y-2">
+                        @if($agentAvailable && $exeAsset)
                         <a href="{{ route('public.agent.download', ['type' => 'exe']) }}" class="block text-center bg-[#0A4D5C] hover:bg-[#083D49] text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">
                             Download for Windows{{ $exeAsset ? ' (' . $fmtMb($exeAsset['size']) . ')' : '' }}
                         </a>
+                        @else
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" data-agent-release-unavailable>
+                            Windows download is temporarily unavailable because its release authenticity information could not be verified. Existing agents remain supported and will not self-update until a verified release is available.
+                        </div>
+                        @endif
                         @if($zipAsset)
                         <a href="{{ route('public.agent.download', ['type' => 'zip']) }}" class="block text-center text-xs text-gray-500 hover:text-[#0A4D5C] transition-colors">ZIP version ({{ $fmtMb($zipAsset['size']) }})</a>
                         @endif

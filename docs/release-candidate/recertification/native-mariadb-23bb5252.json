@@ -1,0 +1,56 @@
+{
+  "kind": "native_mariadb_final_proof",
+  "source_sha": "23bb5252291f6f5afd5a7f83a70a0b002ae34fc1",
+  "source_clone": "independent shallow non-shared clone",
+  "command": "scripts/rc-mariadb-migration-lab.sh --all",
+  "exit": 0,
+  "runtime": {
+    "engine": "MariaDB",
+    "version": "10.6.22",
+    "port": 33116,
+    "guarded_clean_environment": true,
+    "endpoint_calls": 0
+  },
+  "counts": {
+    "migration_files": 542,
+    "timestamp_ties": 53,
+    "tables": 291,
+    "migration_ledger": 542,
+    "manifest_tables": 111,
+    "integrity_indexes": 7,
+    "foreign_key_orphan_checks": 119,
+    "fiscal_claim_workers": 10,
+    "duplicate_result_workers": 10,
+    "terminal_result_workers": 2,
+    "outbox_workers": 3,
+    "delayed_seed_recovery": 1
+  },
+  "upgrade": {
+    "before_sha256": "676dc7257c3a4fbd3816b830944e9c853d8e46abac6dba329ff2237fb5471059",
+    "after_sha256": "0e33f5801e59c6e2e910397148117959e25ad3f861efd6cbf33bd3c3c8d5b771",
+    "preserved_each": 2,
+    "expected_backfill": "Business->Kaarobar",
+    "metadata_uninferred": 2
+  },
+  "outbox": {
+    "post_enqueue_pre_mark_crash": "passed",
+    "live_lease_not_stolen": "passed",
+    "durable_delayed_seed_queue_row": "passed",
+    "eligible_delayed_seed_handle_recovery": "passed",
+    "downstream_single_fiscal_result": "passed"
+  },
+  "unchanged_source_native_phpunit": {
+    "source_sha": "903bf6d2ec215f3b983479a39c99ebe44d4e8fd4",
+    "owner_deployment_approval_mariadb_schema": {
+      "tests": 6,
+      "assertions": 23,
+      "status": "passed"
+    },
+    "fbr_kot_mysql_timestamp_probe": {
+      "tests": 1,
+      "assertions": 4,
+      "status": "passed"
+    }
+  },
+  "log_sha256": "e473ca7aaa4f9e33517dd5a989b9270a22ae79c6d9d7b66d58cf72ce4ff48998"
+}

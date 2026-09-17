@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceBulkSubmission;
 use App\Models\Subscription;
 use App\Services\AuditLogService;
+use App\Services\DiFiscalSubmissionState;
 use App\Services\HybridComplianceScorer;
 use App\Services\InvoiceActivityService;
 use App\Services\RiskIntelligenceEngine;
@@ -16,6 +17,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Task 1245: bulk-submit one draft invoice to FBR as part of a batch.
@@ -54,14 +56,25 @@ class BulkSubmitInvoiceJob implements ShouldQueue
         try {
             $this->process();
         } catch (\Throwable $e) {
-            Log::error("BulkSubmitInvoiceJob: invoice #{$this->invoiceId} exception: " . $e->getMessage());
-            self::recordResult($this->batchId, $this->invoiceId, 'failed', 'Unexpected error: ' . $e->getMessage());
+            Log::error('Bulk DI submission job failed', [
+                'invoice_id' => $this->invoiceId,
+                'batch_id' => $this->batchId,
+                'exception_class' => get_class($e),
+            ]);
+            self::recordResult($this->batchId, $this->invoiceId, 'failed', 'Unexpected submission error. Review the fiscal audit record.');
         }
     }
 
     public function failed(?\Throwable $e = null): void
     {
-        self::recordResult($this->batchId, $this->invoiceId, 'failed', 'Job failed: ' . ($e ? $e->getMessage() : 'unknown error'));
+        // Exception messages can contain SQL fragments, upstream response
+        // bodies or payload values. Preserve a safe classification only.
+        self::recordResult(
+            $this->batchId,
+            $this->invoiceId,
+            'failed',
+            $e ? 'Bulk fiscal worker failed (' . class_basename($e) . '). Review the fiscal audit record.' : 'Bulk fiscal worker failed before reporting an outcome. Review the fiscal audit record.'
+        );
     }
 
     protected function process(): void
@@ -79,7 +92,20 @@ class BulkSubmitInvoiceJob implements ShouldQueue
         }
 
         // Same early rejects as the single-invoice submit path.
-        if (in_array($invoice->status, ['locked', 'pending_verification']) || $invoice->is_fbr_processing) {
+        if ($invoice->is_fbr_processing) {
+            // A duplicate at-least-once delivery must not record a terminal
+            // batch outcome while the canonical claim owner may still POST.
+            return;
+        }
+        if (in_array($invoice->status, ['locked', 'pending_verification'])) {
+            if ($invoice->status === 'locked'
+                && (int) $invoice->fiscal_submission_batch_id === $this->batchId
+                && $invoice->fiscal_submission_state === DiFiscalSubmissionState::ACCEPTED) {
+                // Owner committed fiscal acceptance then died before its batch
+                // result. This same-batch redelivery is recovery, not a skip.
+                self::recordResult($this->batchId, $this->invoiceId, 'success', 'Recovered accepted fiscal submission.', $invoice);
+                return;
+            }
             $msg = match (true) {
                 $invoice->status === 'locked' => 'Already submitted to FBR.',
                 $invoice->status === 'pending_verification' => 'Pending FBR verification.',
@@ -154,25 +180,25 @@ class BulkSubmitInvoiceJob implements ShouldQueue
 
         // Compare-and-swap under row lock — the hard guarantee against a
         // double submit (bulk clicked twice, or bulk racing a manual submit).
-        $locked = DB::transaction(function () use ($invoice) {
-            $lockedInvoice = Invoice::withoutGlobalScopes()->where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$lockedInvoice || !in_array($lockedInvoice->status, ['draft', 'failed']) || $lockedInvoice->is_fbr_processing || !empty($lockedInvoice->fbr_invoice_number)) {
-                return false;
-            }
-            $lockedInvoice->status = 'draft';
-            $lockedInvoice->is_fbr_processing = true;
-            $lockedInvoice->submitted_at = now();
-            $lockedInvoice->submission_mode = 'bulk';
-            $lockedInvoice->save();
-            return true;
-        });
+        $claimed = DiFiscalSubmissionState::reserve(
+            $invoice->id,
+            'bulk',
+            in_array($invoice->company?->fbr_environment, ['sandbox', 'production'], true)
+                ? $invoice->company->fbr_environment
+                : 'sandbox',
+            $this->batchId
+        );
+        $locked = $claimed !== null;
 
         if (!$locked) {
+            if (Invoice::withoutGlobalScopes()->whereKey($this->invoiceId)->value('is_fbr_processing')) {
+                return; // competing delivery owns the in-flight claim
+            }
             self::recordResult($this->batchId, $this->invoiceId, 'skipped', 'No longer in a submittable state (submitted by another request).', $invoice->fresh());
             return;
         }
 
-        $invoice->refresh();
+        $invoice = $claimed;
 
         InvoiceActivityService::log($invoice->id, $invoice->company_id, 'submitted', [
             'mode' => 'bulk',
@@ -294,18 +320,14 @@ class BulkSubmitInvoiceJob implements ShouldQueue
      */
     protected function reclaimForRetry(Invoice $invoice): bool
     {
-        $ok = DB::transaction(function () use ($invoice) {
-            $row = Invoice::withoutGlobalScopes()->where('id', $invoice->id)->lockForUpdate()->first();
-            if (!$row || !in_array($row->status, ['draft', 'failed']) || $row->is_fbr_processing || !empty($row->fbr_invoice_number)) {
-                return false;
-            }
-            $row->status = 'draft';
-            $row->fbr_status = null;
-            $row->is_fbr_processing = true;
-            $row->fbr_submission_hash = null; // else the duplicate guard blocks the re-post
-            $row->save();
-            return true;
-        });
+        $ok = DiFiscalSubmissionState::reserve(
+            $invoice->id,
+            'bulk_retry',
+            in_array($invoice->company?->fbr_environment, ['sandbox', 'production'], true)
+                ? $invoice->company->fbr_environment
+                : 'sandbox',
+            $this->batchId
+        ) !== null;
 
         if ($ok) {
             $invoice->refresh();
@@ -332,34 +354,63 @@ class BulkSubmitInvoiceJob implements ShouldQueue
         return (bool) DB::table('invoice_bulk_submissions')->where('id', $batchId)->value('cancel_requested');
     }
 
-    /**
-     * Record one invoice's outcome against the batch row.
-     *
-     * One UPDATE, so parallel workers can never lose an increment and there is
-     * no lock that can time out. A worker killed mid-job may be retried by the
-     * queue and counted twice; display clamps to the total and completion is a
-     * >= test, so an overcount can never strand a run as "unfinished".
-     */
+    /** Record one invoice outcome exactly once, even after queue redelivery. */
     public static function recordResult(int $batchId, int $invoiceId, string $status, string $message, ?Invoice $invoice = null): void
     {
         $bucket = in_array($status, self::RESULT_BUCKETS, true) ? $status : 'skipped';
 
-        $updated = DB::table('invoice_bulk_submissions')
-            ->where('id', $batchId)
-            ->update([
-                'done' => DB::raw('done + 1'),
-                $bucket => DB::raw($bucket . ' + 1'),
-                'last_progress_at' => now(),
-                'updated_at' => now(),
-            ]);
+        // The RC table turns the invoice result into an idempotency key. The
+        // fallback is only for an installation still waiting on this additive
+        // migration; production must apply it before treating a batch as RC-safe.
+        if (Schema::hasTable('invoice_bulk_submission_results')) {
+            $recorded = DB::transaction(function () use ($batchId, $invoiceId, $bucket, $message) {
+                $batch = InvoiceBulkSubmission::withoutGlobalScopes()->whereKey($batchId)->lockForUpdate()->first();
+                if (!$batch) {
+                    return false;
+                }
 
-        if (!$updated) {
-            Log::warning("BulkSubmitInvoiceJob: batch #{$batchId} row missing while recording invoice #{$invoiceId}.");
-            return;
+                $inserted = DB::table('invoice_bulk_submission_results')->insertOrIgnore([
+                    'batch_id' => $batchId,
+                    'invoice_id' => $invoiceId,
+                    'outcome' => $bucket,
+                    'message' => mb_substr($message, 0, 300),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                if ($inserted !== 1) {
+                    return false;
+                }
+
+                $batch->increment('done');
+                $batch->increment($bucket);
+                $batch->last_progress_at = now();
+                $batch->save();
+                return true;
+            });
+            if (!$recorded) {
+                // A redelivery can be the final event after the original
+                // worker committed its result but died before settlement.
+                // Re-run the idempotent terminal transition before returning.
+                self::settleIfComplete($batchId);
+                return;
+            }
+        } else {
+            $updated = DB::table('invoice_bulk_submissions')
+                ->where('id', $batchId)
+                ->update([
+                    'done' => DB::raw('done + 1'),
+                    $bucket => DB::raw($bucket . ' + 1'),
+                    'last_progress_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            if (!$updated) {
+                Log::warning("BulkSubmitInvoiceJob: batch #{$batchId} row missing while recording invoice #{$invoiceId}.");
+                return;
+            }
         }
 
-        // Only problems are kept — nobody reads 6,000 success lines, and the
-        // row has to stay small enough to poll every few seconds.
+        // Only problems are exposed to the browser.  The durable result table
+        // retains the idempotency marker for every outcome.
         if ($bucket !== 'success') {
             self::appendFailure($batchId, $invoiceId, $bucket, $message, $invoice);
         }

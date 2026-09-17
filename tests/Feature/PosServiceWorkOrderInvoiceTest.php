@@ -8,9 +8,11 @@ use App\Models\PosTransaction;
 use App\Models\User;
 use App\Services\PosServiceWorkOrderInvoiceService;
 use App\Services\PosServiceWorkOrderService;
+use App\Services\PosServiceWorkflowProfiles;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class PosServiceWorkOrderInvoiceTest extends TestCase
@@ -102,6 +104,79 @@ class PosServiceWorkOrderInvoiceTest extends TestCase
 
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
         app(PosServiceWorkOrderInvoiceService::class)->issue($b, $order->id, 'cash', $ub->id);
+    }
+
+    public function test_branch_isolation_blocks_cross_branch_billing(): void
+    {
+        $company = $this->company('event_management', 'Events A');
+        $user = User::create(['name' => 'A', 'email' => 'branch@example.test', 'password' => bcrypt('x'), 'company_id' => $company->id]);
+        $profile = PosServiceWorkflowProfiles::forCompany($company);
+        $jobs = app(PosServiceWorkOrderService::class);
+        $order = $jobs->create($company, [
+            'customer_name' => 'Guest', 'quantity' => 1, 'unit_price' => 500,
+            'scheduled_at' => '2030-01-01 10:00:00',
+            'details' => ['event' => 'Fictional event', 'venue' => 'Fictional venue'],
+        ], 11, $user->id);
+        while (!in_array($order->status, $profile['terminal'], true)) {
+            $next = PosServiceWorkflowProfiles::nextStatuses($profile, $order->status);
+            $order = $jobs->transition($company, $order->id, $next[0], null, $user->id, 11);
+        }
+
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        app(PosServiceWorkOrderInvoiceService::class)->issue($company, $order->id, 'cash', $user->id, 12);
+    }
+
+    #[DataProvider('remainingServiceProfileProvider')]
+    public function test_remaining_service_profile_completes_and_bills_with_its_own_reference(string $category): void
+    {
+        $company = $this->company($category, $category.' Billing');
+        $user = User::create([
+            'name' => 'Cashier', 'email' => $category.'@example.test', 'password' => bcrypt('x'), 'company_id' => $company->id,
+        ]);
+        $profile = PosServiceWorkflowProfiles::forCompany($company);
+        $details = [];
+        foreach (PosServiceWorkflowProfiles::requiredFields($profile) as $field) {
+            $details[$field] = 'Required fictional detail';
+        }
+        $input = [
+            'customer_name' => 'Fictional Customer', 'quantity' => 1, 'unit_price' => 500,
+            'title' => $profile['noun'], 'details' => $details,
+        ];
+        if ($profile['schedule']) {
+            $input['scheduled_at'] = '2030-01-01 10:00:00';
+        }
+
+        $jobs = app(PosServiceWorkOrderService::class);
+        $order = $jobs->create($company, $input, 77, $user->id);
+        while (! in_array($order->status, $profile['terminal'], true)) {
+            $next = PosServiceWorkflowProfiles::nextStatuses($profile, $order->status);
+            $this->assertNotEmpty($next, "{$category} must lead to a terminal state");
+            $order = $jobs->transition($company, $order->id, $next[0], null, $user->id, 77);
+        }
+
+        $txn = app(PosServiceWorkOrderInvoiceService::class)->issue($company, $order->id, 'cash', $user->id, 77);
+        $order->refresh();
+
+        $this->assertSame($profile['terminal'][0], $order->status);
+        $this->assertSame($txn->id, $order->pos_transaction_id);
+        $this->assertTrue(str_starts_with($order->job_number, $profile['prefix'].'-'));
+        $this->assertNotSame($order->job_number, $txn->invoice_number);
+        $this->assertDatabaseHas('pos_transaction_items', [
+            'transaction_id' => $txn->id,
+            'item_name' => $profile['noun'].' ('.$order->job_number.')',
+        ]);
+    }
+
+    public static function remainingServiceProfileProvider(): array
+    {
+        return array_map(
+            fn (string $category) => [$category],
+            [
+                'gym', 'event_management', 'travel_agent', 'property_dealer', 'advertising', 'it_services',
+                'security_services', 'clinic', 'education', 'consultant', 'architect', 'construction',
+                'manpower', 'warehouse', 'media_production', 'entertainment', 'financial_services', 'other_service',
+            ]
+        );
     }
 
     private function company(string $category, string $name): Company

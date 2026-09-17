@@ -363,6 +363,37 @@ class HealthOpdCoreTest extends TestCase
         $this->assertTrue(HealthRecordAccessService::canOpenClinical($this->owner, $patient, $this->company));
     }
 
+    /**
+     * Clinical capability alone does not turn every doctor into this patient's
+     * clinician. A second doctor must not use a known visit id to read or alter
+     * a confidential patient's notes.
+     */
+    public function test_a_non_treating_doctor_cannot_open_or_write_another_patients_confidential_visit(): void
+    {
+        [$patient, $visit] = $this->seedVisit(['is_confidential' => true]);
+        $otherDoctorUser = $this->makeUser('opd.other.doctor@example.test', 'health_doctor');
+        HealthDoctor::create([
+            'company_id' => $this->company->id,
+            'user_id' => $otherDoctorUser->id,
+            'name' => 'Dr Other',
+            'consultation_fee' => 1200,
+            'is_active' => true,
+        ]);
+        HealthRecordAccessService::forget();
+
+        $this->actingAs($otherDoctorUser, HealthPanel::GUARD);
+
+        $this->get('/health/clinical')
+            ->assertOk()
+            ->assertDontSee($patient->name);
+        $this->get("/health/clinical/visits/{$visit->id}")->assertForbidden();
+        $this->post("/health/clinical/visits/{$visit->id}/notes", [
+            'diagnosis' => 'Unauthorised amendment',
+        ])->assertForbidden();
+
+        $this->assertNull($visit->fresh()->diagnosis);
+    }
+
     /* ───────────────── 5. Erasure ───────────────── */
 
     public function test_permanently_deleting_the_organisation_removes_its_medical_documents_from_disk(): void

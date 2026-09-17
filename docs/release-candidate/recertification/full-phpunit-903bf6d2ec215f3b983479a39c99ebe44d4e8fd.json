@@ -1,0 +1,139 @@
+{
+  "assertions": 39251,
+  "composer": "2.9.2",
+  "coverage_proof": {
+    "exact_filter_class_batches": 8,
+    "junit_testcases": 5018,
+    "listed_tests": 5018
+  },
+  "error_names": [
+    "Tests\\Feature\\PosPendingBillsTileTest::test_pra_admin_sees_tile_with_triple_filtered_count_and_local_portal_link",
+    "Tests\\Feature\\PosPendingBillsTileTest::test_pra_cashier_never_sees_tile_even_with_pending_bills",
+    "Tests\\Feature\\PosPendingBillsTileTest::test_non_restaurant_admin_with_zero_count_sees_no_tile"
+  ],
+  "errors": 3,
+  "failure_names": [
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_hazri_page_renders_payroll_summary_section",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_print_css_uses_visibility_strategy_not_display_none_on_ancestors",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_range_query_renders_staff_totals_with_open_span_asterisk",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_range_query_empty_range_shows_no_data_gracefully",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_range_exceeding_62_days_shows_error_not_500",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_inverted_range_shows_error_not_500",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_cashier_cannot_access_hazri_report",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_payroll_pdf_route_returns_pdf",
+    "Tests\\Feature\\PosPayrollHazriPrintTest::test_cashier_cannot_access_payroll_pdf"
+  ],
+  "failures": 9,
+  "generated_utc": "2026-09-16T12:57:15.609324Z",
+  "junit": {
+    "path": "docs/release-candidate/recertification/full-phpunit-903bf6d2ec215f3b983479a39c99ebe44d4e8fd.junit.xml",
+    "sha256": "1fa5a1a3ba7e4ec1cb0675afe816545d716dc41c1973b663006ac2de61c16470"
+  },
+  "lock_hashes": {
+    "agent-realtime-gateway/package-lock.json": "3c96680d9ce8a9d0c6085fafc250a3b3de4a8df3f099d40b441d4e76f54b461a",
+    "artifacts/mockup-sandbox/package-lock.json": "aecf45ae4de09b7b7bdbe65fe0c21e88504a1ae01704ea6fdb42c2fd9cff861a",
+    "composer.lock": "f77aae4ea1f5d8b5427132fb76e2ca017b7917ebdece26036715055a5fc141e4",
+    "package-lock.json": "ee6faa95cd57839884299d07e871ae9593029be42bd363f523d1b13caac8ff10",
+    "pra-agent/package-lock.json": "288f23ac9c63ec72a2318895ebb582f0cb85b31f07aeefcffc60800d22a74472",
+    "tools/video-pipeline/package-lock.json": "1ea36c806550b001e4b9cf14d35160432094bf0a2e6facd73f8c93a087f7acf8"
+  },
+  "node22": "v22.15.1",
+  "partition_deprecations_per_run": 28,
+  "partitions": [
+    {
+      "errors": 3,
+      "exit": 2,
+      "failures": 0,
+      "junit_sha256": "f0e3d271957a608278dab0f9db534362795f310f1c8886835a109f42ba63b7f1",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-01.log",
+      "log_sha256": "c4b5fa4b60099f6d8b42e213ab7a44dea93bfe660e926c488570d095a55c37c5",
+      "name": "full-batch-01.junit.xml",
+      "skipped": 0,
+      "tests": 628
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "junit_sha256": "cea2f3ef98c15775466b451e259da91d52d8b3d6a9371f5f66f28b4d15d00ce1",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-02.log",
+      "log_sha256": "03b710d8b122ad3f42037b38466db2e7c5ab718f41503d239253a027be4699db",
+      "name": "full-batch-02.junit.xml",
+      "skipped": 0,
+      "tests": 628
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "junit_sha256": "664cec724e044119391f076f9ae5b19e61790c722c67ac141890d3025d36fbd4",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-03.log",
+      "log_sha256": "bf8e428a16a9a6c0729d78c672dba979c1f84245ba3106ab3c1e3c8011a94434",
+      "name": "full-batch-03.junit.xml",
+      "skipped": 1,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 1,
+      "failures": 9,
+      "junit_sha256": "c3ef3fe79ded0d12318d2a9aa0188d43fe02ab83a0a90bc2aedd9ef8d193cecd",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-04.log",
+      "log_sha256": "fb378091647a2f28b491924a4887c3042bf7f34af26aa67953469bea347c3e16",
+      "name": "full-batch-04.junit.xml",
+      "skipped": 6,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "junit_sha256": "79a318c3d8f2504da8eb39a819c42619809dc277095c0cd83e6fcb0bd26c42c5",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-05.log",
+      "log_sha256": "a0fed8608585a9678ed5390a79cf358d1292798174db7a99b961c8c2a97062b0",
+      "name": "full-batch-05.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "junit_sha256": "a2297ea5ec87cb727a94a737514640bd1998d91d90e2443e958bb3e0cf43398a",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-06.log",
+      "log_sha256": "02f6232a9712d31204035f741c8c1e8ea720f360ed6a5d3a286f69b705b5f0ac",
+      "name": "full-batch-06.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "junit_sha256": "5d9ab34df3b9aa5ff75a3386e941dee89131b409696178b8278fec88cb52f134",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-07.log",
+      "log_sha256": "773bb66bef771e58999a27e6d30f5aa66fdac83a79813e206216277f821a7cd4",
+      "name": "full-batch-07.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    },
+    {
+      "errors": 0,
+      "exit": 0,
+      "failures": 0,
+      "junit_sha256": "5bc7360deeee30107676d9dd66e8d3fd18436fecadebdd333d1f42b2aa3d11fc",
+      "log": ".local/recertification/fullphpunit2-903bf6d2ec215f3b983479a39c99ebe44d4e8fd/full-batch-08.log",
+      "log_sha256": "74c76f1c01a1be469eaa0c967b75d4e2ba3700ac6fb7617b1e3017af49b178fa",
+      "name": "full-batch-08.junit.xml",
+      "skipped": 0,
+      "tests": 627
+    }
+  ],
+  "php": "8.4.16",
+  "phpunit_deprecations": 28,
+  "schema_version": 1,
+  "skipped": 7,
+  "source_mode": "independent-local-clone",
+  "source_sha": "903bf6d2ec215f3b983479a39c99ebe44d4e8fd4",
+  "tests": 5018
+}

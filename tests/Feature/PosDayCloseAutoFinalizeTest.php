@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\Company;
+use App\Models\User;
+use App\Http\Controllers\PosController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -65,6 +68,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $table->text('pra_production_token')->nullable();
             $table->string('pra_proxy_url')->nullable();
             $table->string('pra_pos_id')->nullable();
+            $table->string('receipt_printer_size')->nullable();
             $table->decimal('pos_tax_rate_cash', 8, 2)->nullable();
             $table->decimal('pos_tax_rate_card', 8, 2)->nullable();
             $table->softDeletes();
@@ -277,6 +281,57 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         return DB::table('pos_transactions')->where('id', $id)->first();
     }
 
+    private function savePraSettings(int $companyId, array $data): mixed
+    {
+        $admin = User::create([
+            'name' => 'PRA settings admin',
+            'email' => 'pra-settings-' . $companyId . '-' . uniqid() . '@example.test',
+            'password' => 'not-used-in-this-direct-controller-test',
+            'company_id' => $companyId,
+            'role' => 'company_admin',
+            'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'pos');
+        app()->instance('currentCompanyId', $companyId);
+
+        $request = Request::create('/pos/pra-settings', 'POST', $data);
+        $request->setLaravelSession(app('session.store'));
+
+        return app(PosController::class)->praSettings($request);
+    }
+
+    public function test_fiscal_device_settings_preserve_inactive_legacy_relay_but_cloud_activation_rejects_it(): void
+    {
+        $companyId = $this->makeCompany([
+            'pra_connection_mode' => 'fiscal_device',
+            'pra_proxy_url' => 'http://127.0.0.1:8524/legacy-relay',
+            'receipt_printer_size' => '80mm',
+        ]);
+
+        $this->savePraSettings($companyId, [
+            'pra_environment' => 'sandbox',
+            'pra_proxy_url' => 'http://127.0.0.1:8524/legacy-relay',
+            'receipt_printer_size' => '58mm',
+        ]);
+
+        $saved = Company::findOrFail($companyId);
+        $this->assertSame('fiscal_device', $saved->pra_connection_mode);
+        $this->assertSame('http://127.0.0.1:8524/legacy-relay', $saved->pra_proxy_url);
+        $this->assertSame('58mm', $saved->receipt_printer_size);
+
+        $this->savePraSettings($companyId, [
+            'pra_environment' => 'sandbox',
+            'pra_connection_mode' => 'cloud',
+            'pra_proxy_url' => 'http://127.0.0.1:8524/legacy-relay',
+            'receipt_printer_size' => '80mm',
+        ]);
+
+        $rejected = Company::findOrFail($companyId);
+        $this->assertSame('fiscal_device', $rejected->pra_connection_mode);
+        $this->assertSame('http://127.0.0.1:8524/legacy-relay', $rejected->pra_proxy_url);
+        $this->assertSame('58mm', $rejected->receipt_printer_size);
+    }
+
     // ── 1. reporting-OFF finalize ───────────────────────────────────────────
 
     public function test_reporting_off_finalize_is_pra_mode_null_status_whole_rupee(): void
@@ -401,11 +456,17 @@ class PosDayCloseAutoFinalizeTest extends TestCase
 
     public function test_pra_connection_failure_finalizes_bill_as_offline_never_lost(): void
     {
-        // Reporting ON, cloud mode, relay pointed at a dead local port →
-        // instant connection refused, no external network in tests.
+        // Reporting ON, cloud mode. The relay hostname is explicitly trusted
+        // and cURL-pinned by test-only operations config to a dead loopback
+        // socket: connection refusal proves the normal offline transport path
+        // without treating a tenant-provided LAN URL as legitimate.
+        config([
+            'services.pra.relay_trusted_hosts' => ['relay.invalid'],
+            'services.pra.relay_resolve' => ['relay.invalid:443:127.0.0.1'],
+        ]);
         $companyId = $this->makeCompany([
             'pra_reporting_enabled' => true,
-            'pra_proxy_url' => 'http://127.0.0.1:9',
+            'pra_proxy_url' => 'https://relay.invalid',
         ]);
 
         $bill = $this->makeProvisional($companyId, 'L0001', ['subtotal' => 200.00, 'total_amount' => 200.00]);

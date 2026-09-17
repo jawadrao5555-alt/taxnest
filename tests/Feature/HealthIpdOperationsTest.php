@@ -15,6 +15,8 @@ use App\Models\HealthPatient;
 use App\Models\HealthProcedure;
 use App\Models\HealthOperationTheatre;
 use App\Models\HealthRoom;
+use App\Models\HealthVisit;
+use App\Models\HealthVisitAttachment;
 use App\Models\HealthWard;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
@@ -1014,6 +1016,99 @@ class HealthIpdOperationsTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame(HealthBed::STATUS_AVAILABLE, $farBed->fresh()->status);
+    }
+
+    /**
+     * A theatre id is posted from a picker, but a picker is not an
+     * authorization boundary. A theatre from another hospital must never become
+     * the foreign key on this hospital's operation.
+     */
+    public function test_an_operation_cannot_be_scheduled_into_another_hospitals_theatre(): void
+    {
+        $otherCompany = Company::create([
+            'name' => 'Other Hospital',
+            'ntn' => 'IPD-OTHER-1',
+            'product_type' => HealthPanel::PRODUCT_TYPE,
+            'status' => 'approved',
+            'company_status' => 'active',
+            'health_org_type' => 'hospital',
+            'health_modules' => json_encode(['opd', 'ipd']),
+        ]);
+        $foreignTheatre = HealthOperationTheatre::withoutGlobalScopes()->create([
+            'company_id' => $otherCompany->id,
+            'name' => 'Foreign OT',
+            'code' => 'FOREIGN-OT',
+            'is_active' => true,
+        ]);
+        $patient = $this->makePatient();
+
+        $this->actingAs($this->doctorUser, 'health')
+            ->post('/health/operations', [
+                'health_patient_id' => $patient->id,
+                'health_operation_theatre_id' => $foreignTheatre->id,
+                'title' => 'Must not be scheduled',
+                'urgency' => 'elective',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(0, HealthOperation::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)
+            ->count());
+    }
+
+    /**
+     * Attachment deletion is a write, not merely storage housekeeping. A doctor
+     * posted to Main Site must not be able to remove City Site's clinical file
+     * by guessing an attachment id.
+     */
+    public function test_a_branch_confined_doctor_cannot_delete_another_sites_attachment(): void
+    {
+        $main = Branch::create([
+            'company_id' => $this->company->id,
+            'name' => 'Main Site',
+            'is_head_office' => true,
+            'is_active' => true,
+        ]);
+        $city = Branch::create([
+            'company_id' => $this->company->id,
+            'name' => 'City Site',
+            'is_active' => true,
+        ]);
+        DB::table('branch_user')->insert([
+            'branch_id' => $main->id,
+            'user_id' => $this->doctorUser->id,
+        ]);
+        \App\Services\HealthScopeService::forget();
+
+        $patient = $this->makePatient(['branch_id' => $city->id]);
+        $visit = HealthVisit::create([
+            'company_id' => $this->company->id,
+            'branch_id' => $city->id,
+            'health_patient_id' => $patient->id,
+            'health_doctor_id' => $this->doctor->id,
+            'visit_no' => 'V-BRANCH-ATTACHMENT',
+            'visit_date' => now()->toDateString(),
+            'visit_type' => HealthVisit::TYPE_NEW,
+            'status' => HealthVisit::STATUS_IN_CONSULTATION,
+            'fee_status' => HealthVisit::FEE_PENDING,
+        ]);
+        $attachment = HealthVisitAttachment::create([
+            'company_id' => $this->company->id,
+            'health_visit_id' => $visit->id,
+            'health_patient_id' => $patient->id,
+            'path' => 'health/' . $this->company->id . '/visits/city-report.pdf',
+            'original_name' => 'city-report.pdf',
+            'mime' => 'application/pdf',
+            'size_bytes' => 100,
+            'kind' => 'report',
+            'uploaded_by' => $this->doctorUser->id,
+        ]);
+
+        $this->actingAs($this->doctorUser->fresh(), 'health')
+            ->delete('/health/clinical/attachments/' . $attachment->id)
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('health_visit_attachments', ['id' => $attachment->id]);
     }
 
     /**

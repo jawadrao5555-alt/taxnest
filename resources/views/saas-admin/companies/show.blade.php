@@ -98,18 +98,52 @@
                     // Canonical liveness check (Task 1062) — one verdict everywhere.
                     $praAgentOnline = $company->agentOnline();
                     // Version vs latest release (cached 10 min) + last self-update attempt.
-                    $__latestAgentTag = \App\Http\Controllers\AgentManagementController::latestReleaseInfo()['tag'] ?? null;
+                    $__agentRelease = \App\Http\Controllers\AgentManagementController::latestReleaseInfo();
+                    $__agentReleaseAvailable = (bool) ($__agentRelease['available'] ?? false);
+                    $__latestAgentTag = $__agentReleaseAvailable ? ($__agentRelease['tag'] ?? null) : null;
                     $__latestAgentVer = ($__latestAgentTag && preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $__latestAgentTag, $__lm))
                         ? "{$__lm[1]}.{$__lm[2]}.{$__lm[3]}" : null;
                     $__agentOutdated = $__latestAgentVer && $company->agent_version
                         && version_compare($company->agent_version, $__latestAgentVer, '<');
                     $__updateStuck = $__agentOutdated && !empty($company->agent_update_error ?? null);
+                    $__agentDiagnostics = is_array($company->pos_printer_settings ?? null)
+                        ? ($company->pos_printer_settings['agent_diagnostics'] ?? null) : null;
                 @endphp
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Desktop Agent</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words {{ $praAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
                         {{ $praAgentOnline ? 'Online' : ($company->agent_last_seen ? 'Offline' : 'Never connected') }}{{ $company->agent_version ? ' · v' . $company->agent_version : '' }}
                     </span>
                 </div>
+                @if(!$__agentReleaseAvailable)
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Agent Release</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words bg-amber-900/30 text-amber-400" data-agent-release-unavailable>
+                        Verification unavailable · self-update safely paused
+                    </span>
+                </div>
+                @endif
+                @if(is_array($__agentDiagnostics))
+                @php
+                    $__printerDiag = is_array($__agentDiagnostics['printer'] ?? null) ? $__agentDiagnostics['printer'] : [];
+                    $__fiscalDiag = is_array($__agentDiagnostics['fiscal_connectivity'] ?? null) ? $__agentDiagnostics['fiscal_connectivity'] : [];
+                    $__queueDiag = is_array($__agentDiagnostics['queue'] ?? null) ? $__agentDiagnostics['queue'] : [];
+                    $__fiscalState = $__fiscalDiag['state'] ?? 'unknown';
+                @endphp
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Printer Health</span>
+                    <span class="text-white text-right text-xs min-w-0 break-words">
+                        {{ !empty($__printerDiag['healthy']) ? 'Healthy' : 'Needs attention' }} · {{ (int) ($__printerDiag['printers_reported'] ?? 0) }} discovered
+                    </span>
+                </div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Fiscal Connectivity</span>
+                    <span class="text-right text-xs min-w-0 break-words {{ $__fiscalState === 'reachable' ? 'text-emerald-400' : ($__fiscalState === 'unreachable' ? 'text-red-400' : 'text-gray-300') }}">
+                        {{ $__fiscalState === 'reachable' ? 'Reachable' : ($__fiscalState === 'unreachable' ? 'Unreachable' : 'Not checked') }}
+                    </span>
+                </div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Callback Queue</span>
+                    <span class="text-white text-right text-xs min-w-0 break-words">
+                        {{ (int) ($__queueDiag['pending_callbacks'] ?? 0) }} waiting{{ !empty($__queueDiag['last_sync_at']) ? ' · last sync ' . \Carbon\Carbon::parse($__queueDiag['last_sync_at'])->diffForHumans() : '' }}
+                    </span>
+                </div>
+                @endif
                 @if($company->agent_version && $__latestAgentVer)
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Agent Version</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words {{ $__agentOutdated ? ($__updateStuck ? 'bg-red-900/30 text-red-400' : 'bg-amber-900/30 text-amber-400') : 'bg-emerald-900/30 text-emerald-400' }}">

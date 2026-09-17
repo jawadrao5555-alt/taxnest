@@ -50,6 +50,7 @@ use Tests\TestCase;
 class PraSubmitIdempotencyTest extends TestCase
 {
     protected int $companyId;
+    private mixed $cacheRoot;
 
     protected function setUp(): void
     {
@@ -137,6 +138,7 @@ class PraSubmitIdempotencyTest extends TestCase
         app()->bind('currentCompanyId', fn () => $this->companyId);
 
         Cache::flush();
+        $this->cacheRoot = Cache::getFacadeRoot();
     }
 
     protected function tearDown(): void
@@ -217,6 +219,29 @@ class PraSubmitIdempotencyTest extends TestCase
         $this->assertNull($row->pra_error_message);
 
         $other->release();
+    }
+
+    public function test_lock_backend_failure_defers_without_contacting_pra(): void
+    {
+        $txn = $this->makeBill(['pra_status' => 'failed']);
+
+        Cache::shouldReceive('lock')
+            ->once()
+            ->with(PraIntegrationService::submitLockKey($txn), 90)
+            ->andThrow(new \RuntimeException('cache credentials must not reach fiscal logs'));
+
+        $result = $this->service()->sendInvoice($txn);
+        Cache::swap($this->cacheRoot);
+
+        $this->assertFalse($result['success']);
+        $this->assertTrue($result['retryable'] ?? false);
+        $this->assertSame('LOCK_UNAVAILABLE', $result['response_code']);
+        $this->assertSame(0, PraLog::count(), 'a failed duplicate guard must fail closed before the HTTP leg');
+
+        $row = $this->fresh($txn);
+        $this->assertSame('pending', $row->pra_status, 'lock failure must enter the retryable pending lane');
+        $this->assertNull($row->pra_invoice_number);
+        $this->assertStringContainsString('duplicate protection', $row->pra_error_message);
     }
 
     public function test_the_lock_is_released_after_a_refused_call(): void
@@ -392,6 +417,41 @@ class PraSubmitIdempotencyTest extends TestCase
         $this->assertSame('QUEUED', $result['response_code']);
         $this->assertSame(0, PraLog::count(), 'fiscal device mode must never reach the PRA HTTP leg');
         $this->assertSame('pending', $this->fresh($txn)->pra_status);
+    }
+
+    public function test_untrusted_relay_ssrf_target_is_blocked_before_any_log_or_http_attempt(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'pra_proxy_url' => 'http://127.0.0.1:8524/steal-token',
+        ]);
+        $txn = $this->makeBill(['pra_status' => 'failed']);
+
+        $result = $this->service()->sendInvoice($txn);
+
+        $this->assertFalse($result['success']);
+        $this->assertFalse($result['retryable']);
+        $this->assertSame('UNTRUSTED_TRANSPORT', $result['response_code']);
+        $this->assertSame(0, PraLog::count(), 'untrusted relay must not receive a token or create an HTTP attempt');
+        $this->assertSame('failed', $this->fresh($txn)->pra_status, 'configuration rejection must not pretend the bill was sent');
+    }
+
+    public function test_only_configured_https_relay_hosts_are_accepted_and_redirects_are_disabled(): void
+    {
+        config(['services.pra.relay_trusted_hosts' => ['relay.taxnest.example']]);
+
+        $this->assertSame('https://relay.taxnest.example/pra', PraIntegrationService::trustedRelayUrl('https://relay.taxnest.example/pra'));
+        $this->assertNull(PraIntegrationService::trustedRelayUrl('https://relay.taxnest.example.evil.test/pra'));
+        $this->assertNull(PraIntegrationService::trustedRelayUrl('https://127.0.0.1/pra'));
+        $this->assertNull(PraIntegrationService::trustedRelayUrl('https://localhost/pra'));
+        $this->assertNull(PraIntegrationService::trustedRelayUrl('http://relay.taxnest.example/pra'));
+        $this->assertTrue(PraIntegrationService::trustedCloudApiUrl('https://ims.pral.com.pk/ims/production/api/Live/PostData'));
+        $this->assertFalse(PraIntegrationService::trustedCloudApiUrl('https://ims.pral.com.pk.evil.test/collect'));
+        $this->assertFalse(PraIntegrationService::trustedCloudApiUrl('http://ims.pral.com.pk/ims/production/api/Live/PostData'));
+
+        $source = (string) file_get_contents(app_path('Services/PraIntegrationService.php'));
+        $this->assertStringContainsString('CURLOPT_FOLLOWLOCATION => false', $source);
+        $this->assertStringContainsString('CURLOPT_SSL_VERIFYPEER => true', $source);
+        $this->assertStringContainsString('CURLOPT_SSL_VERIFYHOST => 2', $source);
     }
 
     public function test_fiscal_device_queueing_is_not_blocked_by_a_held_submit_lock(): void

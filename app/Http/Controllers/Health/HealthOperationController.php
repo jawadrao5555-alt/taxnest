@@ -95,6 +95,9 @@ class HealthOperationController extends HealthPanelController
     public function show($id)
     {
         $operation = $this->findOperation($id);
+        $theatres = HealthOperationTheatre::query()->where('is_active', true)->orderBy('name');
+        HealthScopeService::applyBranchScope($theatres, $this->user());
+
         $operation->load([
             'patient', 'procedure', 'theatre', 'surgeon:id,name', 'anaesthetist:id,name',
             'admission:id,admission_no,status', 'team', 'consumables',
@@ -103,7 +106,7 @@ class HealthOperationController extends HealthPanelController
         return view('health.operations.show', [
             'operation' => $operation,
             'procedures' => $this->activeProcedures(),
-            'theatres' => HealthOperationTheatre::query()->where('is_active', true)->orderBy('name')->get(),
+            'theatres' => $theatres->get(),
             'doctors' => $this->selectableDoctors(),
             'teamRoles' => HealthOperationTeamMember::ROLES,
             'outcomes' => HealthOperation::OUTCOMES,
@@ -120,15 +123,6 @@ class HealthOperationController extends HealthPanelController
 
         $data = $this->validateSchedule($request);
 
-        $patient = HealthPatient::query()->find($data['health_patient_id']);
-        if (!$patient || !HealthRecordAccessService::canOpenClinical($this->user(), $patient, $this->company())) {
-            return back()->withInput()->with('error', __('health.denied_no_permission'));
-        }
-
-        if (!HealthScopeService::canAccessBranch($this->user(), $data['branch_id'] ?? null)) {
-            return back()->withInput()->with('error', __('health.dept_branch_not_yours'));
-        }
-
         // A stay named on the booking must be one this person can already
         // reach, or the theatre desk becomes a way around the ward's scope.
         if (!empty($data['health_admission_id'])) {
@@ -139,6 +133,15 @@ class HealthOperationController extends HealthPanelController
             $data['health_patient_id'] = $admission->health_patient_id;
         }
 
+        $companyId = (int) $this->company()->id;
+        $patient = HealthPatient::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->find($data['health_patient_id']);
+        if (!$patient || !HealthRecordAccessService::canOpenClinical($this->user(), $patient, $this->company())) {
+            return back()->withInput()->with('error', __('health.denied_no_permission'));
+        }
+
+        $this->requireScheduleReferences($data, $companyId);
         $data['company_id'] = $this->company()->id;
 
         try {
@@ -167,6 +170,8 @@ class HealthOperationController extends HealthPanelController
             'consent_reference' => ['nullable', 'string', 'max:120'],
             'reschedule_reason' => ['nullable', 'string', 'max:300'],
         ]);
+
+        $this->requireScheduleReferences($data, (int) $this->company()->id);
 
         try {
             HealthOperationService::reschedule($operation, $data, $this->user());
@@ -283,7 +288,12 @@ class HealthOperationController extends HealthPanelController
             'team.*.note' => ['nullable', 'string', 'max:300'],
         ]);
 
-        HealthOperationService::saveTeam($operation, (array) $request->input('team', []), $this->user());
+        $team = (array) $request->input('team', []);
+        foreach ($team as $member) {
+            $this->requireDoctor((int) $this->company()->id, $member['health_doctor_id'] ?? null);
+        }
+
+        HealthOperationService::saveTeam($operation, $team, $this->user());
 
         return back()->with('success', __('health.op_team_saved'));
     }
@@ -315,8 +325,8 @@ class HealthOperationController extends HealthPanelController
         $this->require('operations.view');
 
         return view('health.operations.catalogue', [
-            'procedures' => HealthProcedure::query()->with('department:id,name')->orderBy('name')->get(),
-            'theatres' => HealthOperationTheatre::query()->with('branch:id,name')->orderBy('name')->get(),
+            'procedures' => $this->scopedProcedures()->with('department:id,name')->orderBy('name')->get(),
+            'theatres' => $this->scopedTheatres()->with('branch:id,name')->orderBy('name')->get(),
             'departments' => HealthScopeService::selectableDepartments($this->user()),
             'branches' => $this->branches(),
             'anaesthesiaTypes' => HealthProcedure::ANAESTHESIA_TYPES,
@@ -328,6 +338,7 @@ class HealthOperationController extends HealthPanelController
     {
         $this->require('operations.manage');
         $data = $this->validateProcedure($request);
+        $this->requireDepartment($data['health_department_id'] ?? null);
 
         $data['company_id'] = $this->company()->id;
         $data['is_active'] = true;
@@ -340,7 +351,10 @@ class HealthOperationController extends HealthPanelController
     {
         $this->require('operations.manage');
         $procedure = HealthProcedure::query()->findOrFail($id);
-        $procedure->fill($this->validateProcedure($request, $procedure->id))->save();
+        $this->requireDepartment($procedure->health_department_id);
+        $data = $this->validateProcedure($request, $procedure->id);
+        $this->requireDepartment($data['health_department_id'] ?? null);
+        $procedure->fill($data)->save();
 
         return redirect()->route('health.operations.catalogue')->with('success', __('health.procedure_updated'));
     }
@@ -349,6 +363,7 @@ class HealthOperationController extends HealthPanelController
     {
         $this->require('operations.manage');
         $procedure = HealthProcedure::query()->findOrFail($id);
+        $this->requireDepartment($procedure->health_department_id);
         $procedure->is_active = !$procedure->is_active;
         $procedure->save();
 
@@ -360,9 +375,7 @@ class HealthOperationController extends HealthPanelController
         $this->require('operations.manage');
         $data = $this->validateTheatre($request);
 
-        if (!HealthScopeService::canAccessBranch($this->user(), $data['branch_id'] ?? null)) {
-            return back()->withInput()->with('error', __('health.dept_branch_not_yours'));
-        }
+        $this->requireBranch($data['branch_id'] ?? null);
 
         $data['company_id'] = $this->company()->id;
         $data['is_active'] = true;
@@ -377,9 +390,7 @@ class HealthOperationController extends HealthPanelController
         $theatre = $this->findTheatre($id);
         $data = $this->validateTheatre($request, $theatre->id);
 
-        if (!HealthScopeService::canAccessBranch($this->user(), $data['branch_id'] ?? null)) {
-            return back()->withInput()->with('error', __('health.dept_branch_not_yours'));
-        }
+        $this->requireBranch($data['branch_id'] ?? null);
 
         $theatre->fill($data)->save();
 
@@ -421,9 +432,7 @@ class HealthOperationController extends HealthPanelController
     {
         $theatre = HealthOperationTheatre::query()->findOrFail($id);
 
-        if (!HealthScopeService::canAccessBranch($this->user(), $theatre->branch_id)) {
-            abort(403, __('health.denied_no_permission'));
-        }
+        $this->requireBranch($theatre->branch_id);
 
         return $theatre;
     }
@@ -439,10 +448,56 @@ class HealthOperationController extends HealthPanelController
 
     private function activeProcedures()
     {
-        return HealthProcedure::query()
+        return $this->scopedProcedures()
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'base_price', 'is_package', 'package_price', 'default_anaesthesia', 'estimated_minutes', 'health_department_id']);
+    }
+
+    private function scopedProcedures()
+    {
+        $query = HealthProcedure::query();
+        HealthScopeService::applyDepartmentScope($query, $this->user());
+
+        return $query;
+    }
+
+    private function scopedTheatres()
+    {
+        $query = HealthOperationTheatre::query();
+        HealthScopeService::applyBranchScope($query, $this->user());
+
+        return $query;
+    }
+
+    /**
+     * Resolve ids posted to the scheduling form against this hospital and the
+     * actor's branch/department boundary. Validation's bare `exists` rules only
+     * establish that a row exists; they never establish that it is this user's
+     * row to use.
+     */
+    private function requireScheduleReferences(array $data, int $companyId): void
+    {
+        $this->requireBranch($data['branch_id'] ?? null);
+        $this->requireDepartment($data['health_department_id'] ?? null);
+        $this->requireDoctor($companyId, $data['primary_surgeon_id'] ?? null);
+        $this->requireDoctor($companyId, $data['anaesthetist_id'] ?? null);
+
+        if (!empty($data['health_procedure_id'])) {
+            $procedure = HealthProcedure::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->find($data['health_procedure_id']);
+            abort_unless($procedure, 403, __('health.denied_no_permission'));
+            $this->requireDepartment($procedure->health_department_id);
+        }
+
+        if (!empty($data['health_operation_theatre_id'])) {
+            $theatre = HealthOperationTheatre::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->find($data['health_operation_theatre_id']);
+            abort_unless($theatre, 403, __('health.denied_no_permission'));
+            $this->requireBranch($theatre->branch_id);
+        }
     }
 
     private function openAdmissions()

@@ -350,6 +350,45 @@ class HealthAccountsSettlementsTest extends TestCase
         $this->assertSame('unknown_account', $result['reason']);
     }
 
+    /**
+     * The ledger service refuses a foreign account, but the detail page is a
+     * separate door. A known journal id from another hospital must not disclose
+     * its lines through the accountant's browser workspace.
+     */
+    public function test_an_accountant_cannot_open_another_hospitals_journal_by_id(): void
+    {
+        $other = Company::create([
+            'name' => 'Other Journal Hospital',
+            'ntn' => 'ACC-TEST-HTTP-2',
+            'product_type' => HealthPanel::PRODUCT_TYPE,
+            'status' => 'approved',
+            'company_status' => 'active',
+            'health_org_type' => 'hospital',
+            'health_modules' => json_encode(['opd', 'billing', 'accounts']),
+        ]);
+        Chart::flush();
+        Chart::seed((int) $other->id, null);
+        Periods::settings((int) $other->id);
+
+        $posted = Ledger::post((int) $other->id, [
+            'date' => now()->toDateString(),
+            'lines' => [
+                ['account' => Chart::CASH, 'debit' => 100],
+                ['account' => Chart::INCOME_OPD, 'credit' => 100],
+            ],
+            'memo' => 'Other hospital journal',
+        ], $this->owner);
+        $this->assertTrue($posted['ok']);
+
+        $foreignJournal = HealthJournal::withoutGlobalScopes()
+            ->where('company_id', $other->id)
+            ->sole();
+
+        $this->actingAs($this->owner->fresh(), HealthPanel::GUARD)
+            ->get('/health/accounts/journals/' . $foreignJournal->id)
+            ->assertRedirect('/health/dashboard');
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // SOURCE POSTING
     // ═══════════════════════════════════════════════════════════════════
@@ -1220,6 +1259,34 @@ class HealthAccountsSettlementsTest extends TestCase
      * from a list while the id still opens it is not a boundary, it is a
      * decoration.
      */
+    public function test_a_branch_confined_accountants_omitted_day_close_filter_defaults_to_their_only_branch(): void
+    {
+        [$branchA, $branchB, $accountant] = $this->branchConfinedAccountant();
+
+        $mine = $this->makeBill(gross: 1100);
+        $mine->update(['branch_id' => $branchA->id]);
+        $otherBranch = $this->makeBill(gross: 2200);
+        $otherBranch->update(['branch_id' => $branchB->id]);
+        $legacyUnbranched = $this->makeBill(gross: 3300);
+
+        $response = $this->actingAs($accountant->fresh(), HealthPanel::GUARD)
+            ->get('/health/billing/day-close?date=' . now()->toDateString());
+
+        $response->assertOk();
+        $this->assertSame((int) $branchA->id, $response->viewData('branchId'));
+        $this->assertSame(1, $response->viewData('summary')['bill_count']);
+        $this->assertEqualsWithDelta(1100, (float) $response->viewData('summary')['billed'], 0.005);
+
+        // Supplying the other site's id must be refused; the company-wide
+        // legacy row must not reappear merely because the picker was omitted.
+        $this->actingAs($accountant->fresh(), HealthPanel::GUARD)
+            ->get('/health/billing/day-close?date=' . now()->toDateString() . '&branch_id=' . $branchB->id)
+            ->assertForbidden();
+
+        $this->assertNull($legacyUnbranched->fresh()->branch_id);
+        $this->assertEqualsWithDelta(2200, (float) $otherBranch->fresh()->total_amount, 0.005);
+    }
+
     public function test_a_branch_confined_accountant_cannot_reach_another_branch(): void
     {
         $branchA = \App\Models\Branch::create([

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
+use App\Http\Middleware\HealthSubscriptionLock;
 use App\Models\HealthCharge;
 use App\Models\HealthPatient;
 use App\Models\HealthPayment;
@@ -18,6 +19,7 @@ use App\Services\HealthPatientService;
 use App\Support\HealthPanel;
 use App\Support\NestErps;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -275,5 +277,41 @@ class HealthSubscriptionLockTest extends TestCase
             ->assertSessionMissing('error');
 
         $this->assertSame(1, HealthCharge::where('company_id', $this->company->id)->count());
+    }
+
+    public function test_a_money_write_is_denied_when_company_context_is_unavailable(): void
+    {
+        app()->forgetInstance('currentCompanyId');
+
+        $response = app(HealthSubscriptionLock::class)->handle(
+            Request::create('/health/billing/patient/1/charges', 'POST', [], [], [], [
+                'HTTP_ACCEPT' => 'application/json',
+            ]),
+            fn () => response()->json(['unexpected' => true])
+        );
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame(
+            'Subscription verification is unavailable. Please contact support.',
+            $response->getData(true)['error']
+        );
+    }
+
+    public function test_a_money_write_is_denied_when_the_company_cannot_be_resolved(): void
+    {
+        app()->instance('currentCompanyId', 999999);
+
+        $response = app(HealthSubscriptionLock::class)->handle(
+            Request::create('/health/billing/patient/1/charges', 'POST', [], [], [], [
+                'HTTP_ACCEPT' => 'application/json',
+            ]),
+            fn () => response()->json(['unexpected' => true])
+        );
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame(
+            'Subscription verification is unavailable. Please contact support.',
+            $response->getData(true)['error']
+        );
     }
 }

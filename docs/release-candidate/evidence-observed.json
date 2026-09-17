@@ -1,0 +1,71 @@
+{
+  "provenance": "Retained tool observations, not recovered raw logs",
+  "temporary_worktree_disappearance_observed_utc": "2026-09-16T11:06:41Z",
+  "last_pushed_checkpoint_before_loss": "93de2ccfbc0ab7d88a14f87ee0b967cb75b19842",
+  "full_phpunit": {
+    "observed_utc": "2026-09-16T10:56:17Z",
+    "tests": 5014,
+    "passed": 5007,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "assertions": 39265,
+    "deprecations": 28,
+    "exit_code": 0,
+    "junit_sha256": "cc045d97d8501c054820fda8c7ec8f8380c34c591d57642600d7541df415a5bb",
+    "raw_junit_available": false,
+    "raw_log_available": false,
+    "reconstructed_harness_recertified": false
+  },
+  "subsequent_pra_settings_regression": {
+    "observed_utc": "2026-09-16T10:58:17Z",
+    "tests": 22,
+    "assertions": 168,
+    "exit_code": 0,
+    "note": "Overlaps the full suite; includes one later-added test. Do not sum counts."
+  },
+  "native_mariadb_worker_observations": {
+    "fresh_migrations": 541,
+    "fresh_exit_code": 0,
+    "schema_upgrade_prefix": 482,
+    "schema_upgrade_final": 541,
+    "upgrade_exit_code": 0,
+    "generic_concurrency_exit_code": 0,
+    "category_native_lab_exit_code": 0,
+    "previously_skipped_owner_schema_tests": 6,
+    "owner_schema_assertions": 23,
+    "previously_skipped_timestamp_tests": 1,
+    "timestamp_assertions": 4,
+    "di_assertions_reported": 12,
+    "di_failures_reported": 0,
+    "di_outer_exit_code": null,
+    "di_outer_exit_reason": "Outer shell timed out after the PASS output.",
+    "di_bulk_result_race_executed": false,
+    "raw_logs_available": false
+  },
+  "browser": {
+    "initial_failed_assertions": 9,
+    "corrected_complete_rerun_confirmed": false,
+    "raw_logs_available": false
+  },
+  "source_control_authorization": {
+    "workflow_tree_write_status": 404,
+    "workflow_tree_write_observed_utc": "2026-09-16T10:31:07Z",
+    "active_oauth_missing_scope": "workflow",
+    "separate_existing_credential_status": 401,
+    "credential_status_observed_utc": "2026-09-16T10:38:33Z",
+    "credential_value_exposed": false
+  },
+  "post_recovery_checks": {
+    "locked_root_dependencies_installed": 173,
+    "semantic_proposed_ci_dag": "passed",
+    "build_agent_yaml_parse": "passed for active file and proposal",
+    "network_guard_tcp_udp_dns": "passed",
+    "network_guard_loopback_resolution_control": "passed",
+    "network_guard_observed_utc": "2026-09-16T11:17:38Z",
+    "repository_artifact_guard": "passed",
+    "repository_artifact_guard_observed_utc": "2026-09-16T11:21:00Z",
+    "full_native_browser_recertification": false
+  },
+  "production_actions_executed": false
+}

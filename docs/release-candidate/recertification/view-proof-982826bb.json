@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-09-16T13:53:41Z",
+  "source_sha": "982826bbcc0e97ea5a96c308c76224082ff035c4",
+  "checkout": ".local/recertification/view-proof-58d0c164/source",
+  "checkout_state": "detached HEAD frozen at source_sha after focused verification",
+  "parent_full_proof": {
+    "source_sha": "2b500f6a67320a1138cc555df342b5f29bdb2377",
+    "tests": 5018,
+    "assertions": 39281,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "junit_sha256": "dd2e9e216b80fe45ce01d8dd2b10400818c02297129e35d58154e284c9b5f197",
+    "classification": "parent-source full-suite PASS; not rerun for this view proof"
+  },
+  "source_delta_from_58d0": {
+    "base_source_sha": "58d0c164f5920a567d3a817e1c210c3b56e24c00",
+    "invoice_view_sha256": "48eacdcd02b64bee7c8245f21e57aa9b6a852397b19f30eec8f7d3ecc10cfdc1",
+    "harness_sha256": "092167829994836262e86ca57b759898c893e4254766295f07c110d503478a02",
+    "invoice_view_change": "exactly 7 existing dark:text-white classes on buyer/invoice detail values",
+    "harness_change": "one specific form[action$=\"/confirm-fbr\"] button[type=\"submit\"] usable selector",
+    "normal_flow_logic": "unchanged from 58d0",
+    "semantic_invoice_heading_logic": "unchanged from 58d0"
+  },
+  "focused_phpunit": {
+    "command": "scripts/rc-safe-run --root .local/recertification/view-proof-58d0c164/source --runtime .local/recertification/view-proof-982826bb/runtime-focused -- php vendor/bin/phpunit --configuration phpunit.xml tests/Feature/FbrLogTenantIsolationTest.php tests/Feature/Security/SuperAdminDualPathTest.php --filter '/(invoice_page|company_admin_cannot_read_another_companys_invoice)/' --testdox --log-junit .local/recertification/view-proof-982826bb/focused.junit.xml",
+    "classes": [
+      "Tests\\Feature\\FbrLogTenantIsolationTest",
+      "Tests\\Feature\\Security\\SuperAdminDualPathTest"
+    ],
+    "methods": [
+      "Tests\\Feature\\FbrLogTenantIsolationTest::test_company_b_user_cannot_read_company_a_fbr_log_through_the_invoice_page",
+      "Tests\\Feature\\FbrLogTenantIsolationTest::test_company_a_user_sees_its_own_fbr_log_on_the_invoice_page",
+      "Tests\\Feature\\Security\\SuperAdminDualPathTest::test_company_admin_cannot_read_another_companys_invoice"
+    ],
+    "tests": 3,
+    "assertions": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit": 0,
+    "log": {
+      "path": ".local/recertification/view-proof-982826bb/focused.log",
+      "sha256": "440d5414b8fa6fade61f0705734f994487764ecdd0fed5526d2b2d929b6d0049"
+    },
+    "junit": {
+      "path": ".local/recertification/view-proof-982826bb/focused.junit.xml",
+      "sha256": "fa2c629700ddce0726923febc0f54688c7985f77e9c5093ffb6d4d124feee12a"
+    },
+    "classification": "focused direct-view methods only; no full-suite repeat"
+  },
+  "blade_compile": {
+    "command": "scripts/rc-safe-run --root .local/recertification/view-proof-58d0c164/source --runtime .local/recertification/view-proof-982826bb/runtime-view-cache -- php artisan view:cache",
+    "exit": 0,
+    "log": {
+      "path": ".local/recertification/view-proof-982826bb/view-cache.log",
+      "sha256": "85a82bdfc232f9930e8f1f874928e30a7f5f19dcece0d408b75a537e61bf4af1"
+    },
+    "compiled_views": [
+      {
+        "source": "resources/views/invoice/show.blade.php",
+        "compiled": "storage/framework/views/cc21074574fefa97eea155bee4faff06.php",
+        "sha256": "345203463e1bdcad67e26c0aa7b4bbea7f727dfcf37ee6fd64bfbc3382945948"
+      },
+      {
+        "source": "resources/views/layouts/app.blade.php",
+        "compiled": "storage/framework/views/3d67571234b45fc80f873f472f1824b7.php",
+        "sha256": "9ff5b63c9d4bd5eb642037523d2f6a64a2462847522f0cefe50dcd33e89c0569"
+      }
+    ],
+    "classification": "cheap Blade compile only; no build or audit rerun"
+  },
+  "classification": "final-source focused changed-view proof; supplements and does not replace the parent-source 5018-test PASS"
+}

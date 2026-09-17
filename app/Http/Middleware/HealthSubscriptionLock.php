@@ -39,18 +39,19 @@ class HealthSubscriptionLock
 
         $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
         if (!$companyId) {
-            return $next($request);
+            return $this->deny($request, 'Subscription verification is unavailable. Please contact support.');
         }
 
-        // FAIL CLOSED — the only pass-through is the schema-compat guard shared
-        // with the other in-controller access gates.
+        // A missing subscription schema means the access decision cannot be
+        // made. This middleware protects money writes, so uncertainty must not
+        // become permission to post a charge or payment.
         if (!Schema::hasTable('subscriptions')) {
-            return $next($request);
+            return $this->deny($request, 'Subscription verification is unavailable. Please contact support.');
         }
 
         $company = Company::find($companyId);
         if (!$company) {
-            return $next($request);
+            return $this->deny($request, 'Subscription verification is unavailable. Please contact support.');
         }
 
         $access = SubscriptionAccessService::hasAccess($company);
@@ -58,8 +59,14 @@ class HealthSubscriptionLock
             return $next($request);
         }
 
-        $reason = SubscriptionAccessService::localizedLockReason((string) ($access['reason'] ?? ''));
+        return $this->deny(
+            $request,
+            SubscriptionAccessService::localizedLockReason((string) ($access['reason'] ?? ''))
+        );
+    }
 
+    private function deny(Request $request, string $reason)
+    {
         if ($request->expectsJson()) {
             return response()->json(['error' => $reason, 'message' => $reason], 403);
         }

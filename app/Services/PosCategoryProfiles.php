@@ -37,6 +37,39 @@ class PosCategoryProfiles
     public const AUDIENCE_FAMILIES = ['all', 'food_service', 'goods_retail', 'pharmacy', 'services', 'accommodation'];
 
     /**
+     * Release-candidate coverage contract. These are semantic surfaces rather
+     * than hard-coded URLs because PRA and FBR expose their sale engines under
+     * different route prefixes. The generated category test asserts every
+     * marketed profile declares all four dimensions below.
+     */
+    public const LANDING_SURFACES = [
+        'food_service' => 'sale_engine',
+        'goods_retail' => 'sale_engine',
+        'pharmacy' => 'sale_engine',
+        'services' => 'service_work_orders',
+        'accommodation' => 'hotel_front_desk',
+        'general' => 'catalogue_billing',
+    ];
+
+    public const WORKFLOW_CLASSIFICATIONS = [
+        'food_service' => 'food_pos',
+        'goods_retail' => 'goods_pos',
+        'pharmacy' => 'pharmacy_pos',
+        'services' => 'typed_work_order',
+        'accommodation' => 'hotel_stay_folio',
+        'general' => 'catalogue_billing_fallback',
+    ];
+
+    public const REGRESSION_FIXTURES = [
+        'food_service' => 'tests/Feature/PraServiceCategoriesTest.php',
+        'goods_retail' => 'tests/Feature/CategoryModuleUrlGateTest.php',
+        'pharmacy' => 'tests/Feature/CategoryModuleUrlGateTest.php',
+        'services' => 'tests/Feature/PosServiceWorkOrderTest.php',
+        'accommodation' => 'tests/Feature/HotelCategoryNativeUiTest.php',
+        'general' => 'tests/Unit/PosCategoryProfilesTest.php',
+    ];
+
+    /**
      * Modules EVERY shop gets, whatever it sells: billing, customers,
      * reports, day-close, team, receipts and the switches that ride on them.
      * Plan/add-on gates still apply on top — relevance never grants a plan.
@@ -286,6 +319,12 @@ class PosCategoryProfiles
         return array_values(array_unique($all));
     }
 
+    /** Every advertised vertical; general is deliberately only the fallback. */
+    public static function marketedCategories(): array
+    {
+        return array_values(array_diff(array_keys(self::PROFILES), ['general']));
+    }
+
     public static function has(?string $category): bool
     {
         return $category !== null && array_key_exists($category, self::PROFILES);
@@ -342,6 +381,9 @@ class PosCategoryProfiles
             'category' => $category ?? 'general',
             'family' => $family,
             'audiences' => self::audiences($category),
+            'landing' => self::LANDING_SURFACES[$family],
+            'workflow' => self::WORKFLOW_CLASSIFICATIONS[$family],
+            'regression_fixture' => self::REGRESSION_FIXTURES[$family],
             'modules' => self::modules($category, $panel),
             'examples' => $examples,
             'unit' => $own['unit'] ?? ($isFbr ? $fam['fbr_unit'] : $fam['unit']),

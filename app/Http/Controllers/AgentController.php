@@ -242,7 +242,7 @@ class AgentController extends Controller
         try {
             $info = AgentManagementController::latestReleaseInfo();
             $tag = $info['tag'] ?? null;
-            if (!$tag || !preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $tag, $m)) {
+            if (!($info['available'] ?? false) || !$tag || !preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $tag, $m)) {
                 return null;
             }
 
@@ -263,10 +263,7 @@ class AgentController extends Controller
                 return null;
             }
 
-            $zip = collect($info['assets'] ?? [])
-                ->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))
-                ->sortByDesc('size')
-                ->first();
+            $zip = $info['zip'] ?? null;
             if (!$zip) {
                 return null;
             }
@@ -291,14 +288,31 @@ class AgentController extends Controller
             $newPrefix = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/download/';
             $oldPrefix = 'https://github.com/jawadrao5555-alt/taxnest/releases/download/';
             if ($legacy && str_starts_with($zipUrl, $newPrefix)) {
-                $zipUrl = $oldPrefix . substr($zipUrl, strlen($newPrefix));
+                $legacyZip = $info['legacy_zip'] ?? null;
+                if (!is_array($legacyZip)
+                    || ($legacyZip['sha256'] ?? null) !== ($zip['sha256'] ?? null)
+                    || ($legacyZip['size'] ?? null) !== ($zip['size'] ?? null)
+                    || !str_starts_with((string) ($legacyZip['url'] ?? ''), $oldPrefix)) {
+                    // Preserve legacy clients by withholding an unverifiable
+                    // update, not by quietly pointing them at a possibly
+                    // different mirror asset.
+                    return null;
+                }
+                $zipUrl = $legacyZip['url'];
             }
 
             return [
+                'product' => $info['product'],
                 'version' => $m[1] . '.' . $m[2] . '.' . $m[3],
                 'tag' => $tag,
+                'asset_name' => $zip['name'],
                 'zip_url' => $zipUrl,
-                'zip_size' => $zip['size'] ?? 0,
+                'zip_size' => (int) ($zip['size'] ?? 0),
+                'zip_sha256' => $zip['sha256'],
+                'source_sha' => $info['source_sha'],
+                'build_sha' => $info['build_sha'],
+                'min_agent_version' => $info['compatibility']['min_agent_version'],
+                'max_agent_version' => $info['compatibility']['max_agent_version'],
             ];
         } catch (\Throwable $e) {
             return null;
@@ -390,6 +404,8 @@ class AgentController extends Controller
             $update['agent_update_at'] = null;
         }
 
+        $this->syncHeartbeatDiagnostics($company, $request);
+
         $this->telemetryUpdate($company, $update);
 
         // Task 1166: multi-counter registry — agents v1.9.0+ identify their
@@ -467,6 +483,69 @@ class AgentController extends Controller
             // Additive discovery for Local TaxNest Core-aware agents. Legacy
             // agents ignore unknown response keys; the database flag defaults off.
         ] + $this->localCoreHeartbeat($company, $request) + $liveOpsExtras);
+    }
+
+    /**
+     * Store only bounded, non-sensitive operational diagnostics under the
+     * telemetry-owned key. Existing printer routing/settings are merged from a
+     * locked fresh row and old agents that omit the additive object remain
+     * unchanged.
+     */
+    private function syncHeartbeatDiagnostics(Company $company, Request $request): void
+    {
+        $raw = $request->input('agent_diagnostics');
+        if (!is_array($raw)) {
+            return;
+        }
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_printer_settings')) {
+                return;
+            }
+            $allowedStates = ['unknown', 'reachable', 'unreachable'];
+            $printer = is_array($raw['printer'] ?? null) ? $raw['printer'] : [];
+            $fiscal = is_array($raw['fiscal_connectivity'] ?? null) ? $raw['fiscal_connectivity'] : [];
+            $queue = is_array($raw['queue'] ?? null) ? $raw['queue'] : [];
+            $state = in_array($fiscal['state'] ?? null, $allowedStates, true) ? $fiscal['state'] : 'unknown';
+            $diagnostics = [
+                'process_online' => true,
+                'reported_at' => now()->toIso8601String(),
+                'printer' => [
+                    'printing_enabled' => (bool) ($printer['printing_enabled'] ?? false),
+                    'printers_reported' => min(100, max(0, (int) ($printer['printers_reported'] ?? 0))),
+                    'healthy' => (bool) ($printer['healthy'] ?? false),
+                ],
+                'fiscal_connectivity' => [
+                    'state' => $state,
+                    'checked_at' => $this->safeAgentDiagnosticTime($fiscal['checked_at'] ?? null),
+                ],
+                'queue' => [
+                    'pending_callbacks' => min(100000, max(0, (int) ($queue['pending_callbacks'] ?? 0))),
+                    'last_sync_at' => $this->safeAgentDiagnosticTime($queue['last_sync_at'] ?? null),
+                ],
+            ];
+            $this->telemetryMergeJson($company, 'pos_printer_settings', function (array $settings) use ($diagnostics) {
+                $settings['agent_diagnostics'] = $diagnostics;
+                return $settings;
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Agent heartbeat diagnostics not persisted', [
+                'company_id' => $company->id,
+                'error_class' => get_class($e),
+            ]);
+        }
+    }
+
+    private function safeAgentDiagnosticTime(mixed $value): ?string
+    {
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+        try {
+            $at = \Carbon\CarbonImmutable::parse($value);
+            return $at->gt(now()->addMinutes(5)) ? null : $at->toIso8601String();
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**

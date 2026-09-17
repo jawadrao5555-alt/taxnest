@@ -17,7 +17,7 @@
 @if(is_array($__imp))
     @php($__full = empty($__imp['readonly']))
     @php($__onDark = ($onDark ?? false))
-    <div class="flex flex-shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 max-w-[45vw] {{ $__full ? 'bg-red-600 text-white border-red-700' : 'bg-amber-400 text-black border-amber-500' }}">
+    <div class="tn-impersonation-chip flex flex-shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 max-w-[45vw] {{ $__full ? 'bg-red-600 text-white border-red-700' : 'bg-amber-400 text-black border-amber-500' }}">
         @if($__full)
             <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>

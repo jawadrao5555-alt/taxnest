@@ -2113,8 +2113,14 @@ class PosController extends Controller
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         // The PRA dashboard is also used by restaurant-shaped companies. Use
         // the canonical plan/override gate (not restaurant_mode) so its pending
-        // tile can warn about the same held orders that block day close.
-        $isRestaurant = \App\Services\PosFeatureService::restaurantAllowed($company);
+        // tile can warn about the same held orders that block day close. A
+        // pre-migration/minimal test schema has no subscriptions table yet;
+        // querying the plan there would turn a dashboard drift guard into a
+        // SQL error, so retain the legacy restaurant-mode signal until the
+        // entitlement table exists.
+        $isRestaurant = \Illuminate\Support\Facades\Schema::hasTable('subscriptions')
+            ? \App\Services\PosFeatureService::restaurantAllowed($company)
+            : (bool) ($company->restaurant_mode ?? false);
         [$openOrdersCount, $counterOrdersCount, $heldNoTableCount] = $this->pendingRestaurantOrderCounts(
             $companyId,
             $isRestaurant
@@ -9371,6 +9377,21 @@ class PosController extends Controller
                 'pra_proxy_url' => 'nullable|url',
                 'receipt_printer_size' => 'nullable|in:80mm,58mm',
             ]);
+
+            // `pra_proxy_url` was historically a free-form ngrok relay box.
+            // In cloud mode it carries the production PRA token, so it must be
+            // an operations-approved HTTPS host; fiscal-device/LAN work is
+            // performed by the desktop agent. Retain an inactive saved relay
+            // when that mode is selected; it is never used there and will be
+            // validated again before cloud mode can be enabled.
+            $requestedMode = $request->input('pra_connection_mode', $company->pra_connection_mode ?? 'cloud');
+            if ($request->filled('pra_proxy_url')
+                && $requestedMode === 'cloud'
+                && !\App\Services\PraIntegrationService::trustedRelayUrl($request->pra_proxy_url)) {
+                return back()->withInput()->withErrors([
+                    'pra_proxy_url' => 'PRA cloud relay must be an approved HTTPS relay host. Fiscal Device mode uses the local desktop agent and does not use a relay URL.',
+                ]);
+            }
 
             $updateData = [
                 'pra_environment' => $request->pra_environment,

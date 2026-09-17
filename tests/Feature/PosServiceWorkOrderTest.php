@@ -10,6 +10,7 @@ use App\Services\PosServiceWorkOrderService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ class PosServiceWorkOrderTest extends TestCase
 
     public function test_lab1_profiles_are_real_distinct_and_category_relevant(): void
     {
-        $this->assertGreaterThanOrEqual(10, count(PosServiceWorkflowProfiles::PROFILES));
+        $this->assertCount(30, PosServiceWorkflowProfiles::PROFILES);
         $nouns = [];
         foreach (PosServiceWorkflowProfiles::PROFILES as $category => $profile) {
             $this->assertTrue(PosCategoryProfiles::has($category), "{$category} must be a registered category");
@@ -38,6 +39,16 @@ class PosServiceWorkOrderTest extends TestCase
                 $this->assertFalse(PosServiceWorkflowProfiles::canTransition($profile, $terminal, 'cancelled'));
             }
             $this->assertNotEmpty($profile['fields']);
+            $permissions = PosServiceWorkflowProfiles::permissions($profile);
+            $this->assertSame(
+                ['create', 'transition', 'invoice', 'report'],
+                array_keys($permissions),
+                "{$category} must declare every work-order action permission"
+            );
+            foreach ($permissions as $action => $roles) {
+                $this->assertContains('pos_manager', $roles, "{$category}: {$action} must preserve manager access");
+                $this->assertContains('pos_cashier', $roles, "{$category}: {$action} must preserve cashier access");
+            }
             $nouns[] = $profile['noun'];
         }
         $this->assertGreaterThanOrEqual(8, count(array_unique($nouns)), 'Profiles must not be renamed copies of one generic workflow.');
@@ -47,6 +58,21 @@ class PosServiceWorkOrderTest extends TestCase
     {
         $this->assertArrayNotHasKey('hotel', PosServiceWorkflowProfiles::PROFILES);
         $this->assertFalse(PosServiceWorkflowProfiles::supports($this->company('hotel', 'Hotel Lab')));
+    }
+
+    public function test_audited_twelve_typed_workflows_remain_present_and_executable(): void
+    {
+        $audited = [
+            'salon', 'laundry', 'workshop', 'courier', 'photography', 'rent_a_car',
+            'cargo', 'cleaning', 'repair_service', 'printing', 'equipment_rental', 'tailoring',
+        ];
+        $this->assertCount(12, $audited);
+        foreach ($audited as $category) {
+            $profile = PosServiceWorkflowProfiles::PROFILES[$category] ?? null;
+            $this->assertNotNull($profile, "{$category} must retain its typed workflow");
+            $this->assertNotEmpty($profile['fields']);
+            $this->assertNotEmpty($profile['terminal']);
+        }
     }
 
     #[DataProvider('operationalProfileProvider')]
@@ -64,6 +90,9 @@ class PosServiceWorkOrderTest extends TestCase
             'unit_price' => 250,
             'details' => [$detailKey => 'Fictional detail', 'foreign' => 'drop'],
         ];
+        foreach (PosServiceWorkflowProfiles::requiredFields($profile) as $required) {
+            $input['details'][$required] = 'Required fictional detail';
+        }
         if ($profile['schedule']) {
             $input['scheduled_at'] = now()->addHour();
         }
@@ -72,7 +101,11 @@ class PosServiceWorkOrderTest extends TestCase
 
         $this->assertSame($prefix.'-000001', $job->job_number);
         $this->assertSame($firstStage, $job->status);
-        $this->assertSame([$detailKey => 'Fictional detail'], $job->details);
+        $expectedDetails = [$detailKey => 'Fictional detail'];
+        foreach (PosServiceWorkflowProfiles::requiredFields($profile) as $required) {
+            $expectedDetails[$required] = 'Required fictional detail';
+        }
+        $this->assertSame($expectedDetails, $job->details);
         $this->assertSame(1, $job->events()->count());
     }
 
@@ -84,6 +117,79 @@ class PosServiceWorkOrderTest extends TestCase
         }
 
         return $cases;
+    }
+
+    #[DataProvider('operationalProfileProvider')]
+    public function test_every_typed_profile_completes_its_declared_lifecycle(
+        string $category,
+        string $prefix,
+        string $firstStage
+    ): void {
+        $company = $this->company($category, ucfirst(str_replace('_', ' ', $category)).' Lifecycle Lab');
+        $profile = PosServiceWorkflowProfiles::forCompany($company);
+        $details = [];
+        foreach (PosServiceWorkflowProfiles::requiredFields($profile) as $field) {
+            $details[$field] = 'Required fictional detail';
+        }
+        $input = [
+            'customer_name' => 'Fictional Customer',
+            'quantity' => 1,
+            'unit_price' => 250,
+            'details' => $details,
+        ];
+        if ($profile['schedule']) {
+            $input['scheduled_at'] = now()->addHour();
+        }
+
+        $jobs = app(PosServiceWorkOrderService::class);
+        $job = $jobs->create($company, $input, 9, null);
+        while (! in_array($job->status, $profile['terminal'], true)) {
+            $next = PosServiceWorkflowProfiles::nextStatuses($profile, $job->status);
+            $this->assertNotEmpty($next, "{$category} must lead to a terminal state");
+            $job = $jobs->transition($company, $job->id, $next[0], null, null, 9);
+        }
+
+        $this->assertSame($profile['terminal'][0], $job->status);
+        $this->assertNotNull($job->completed_at);
+        $this->assertFalse(PosServiceWorkflowProfiles::canTransition($profile, $job->status, 'cancelled'));
+    }
+
+    public function test_remaining_service_categories_require_their_declared_operational_fields(): void
+    {
+        foreach ([
+            'gym', 'event_management', 'travel_agent', 'property_dealer', 'advertising', 'it_services',
+            'security_services', 'clinic', 'education', 'consultant', 'architect', 'construction',
+            'manpower', 'warehouse', 'media_production', 'entertainment', 'financial_services', 'other_service',
+        ] as $category) {
+            $company = $this->company($category, $category.' Required Field Lab');
+            $profile = PosServiceWorkflowProfiles::forCompany($company);
+            $this->assertNotEmpty(PosServiceWorkflowProfiles::requiredFields($profile), "{$category} needs operational fields");
+
+            try {
+                app(PosServiceWorkOrderService::class)->create($company, [
+                    'customer_name' => 'Fictional Customer', 'quantity' => 1, 'unit_price' => 1,
+                ], null, null);
+                $this->fail("{$category} accepted a record without its required workflow fields.");
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('required', strtolower($e->getMessage()));
+            }
+        }
+    }
+
+    public function test_workflow_role_policy_allows_standard_operational_roles_but_not_confined_roles(): void
+    {
+        $profile = PosServiceWorkflowProfiles::PROFILES['event_management'];
+        $cashier = new \App\Models\User(['role' => 'staff', 'pos_role' => 'pos_cashier']);
+        $manager = new \App\Models\User(['role' => 'staff', 'pos_role' => 'pos_manager']);
+        $waiter = new \App\Models\User(['role' => 'staff', 'pos_role' => 'pos_waiter']);
+        $owner = new \App\Models\User(['role' => 'company_admin', 'pos_role' => 'pos_admin']);
+
+        foreach (['create', 'transition', 'invoice', 'report'] as $action) {
+            $this->assertTrue(PosServiceWorkflowProfiles::allows($profile, $cashier, $action));
+            $this->assertTrue(PosServiceWorkflowProfiles::allows($profile, $manager, $action));
+            $this->assertTrue(PosServiceWorkflowProfiles::allows($profile, $owner, $action));
+            $this->assertFalse(PosServiceWorkflowProfiles::allows($profile, $waiter, $action));
+        }
     }
 
     public function test_lab2_laundry_job_uses_native_lifecycle_safe_details_and_immutable_timeline(): void

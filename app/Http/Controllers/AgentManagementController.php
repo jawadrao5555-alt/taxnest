@@ -262,39 +262,87 @@ class AgentManagementController extends Controller
     public static function latestReleaseInfo(): array
     {
         return \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
-            $latest = ['tag' => null, 'assets' => []];
+            $candidates = [];
 
             // Release assets historically lived in both the public
-            // releases-only repository and this repository. Query both and
-            // choose the newest valid Agent semver so an out-of-date mirror
-            // can never pin every shop to an older polling build.
+            // releases-only repository and this repository. A release API
+            // listing is only an inventory, not integrity provenance: every
+            // candidate must carry a validated canonical manifest. Do not
+            // fall back to a smaller/older release if the newest is malformed;
+            // a shop needs an explicit unavailable result, not a fake update.
             foreach (array_unique([self::releaseRepo(), 'jawadrao5555-alt/taxnest']) as $repo) {
                 try {
                     $resp = \Illuminate\Support\Facades\Http::timeout(6)
                         ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
                         ->get('https://api.github.com/repos/' . $repo . '/releases/latest');
                     $tag = (string) $resp->json('tag_name', '');
-                    if (!$resp->successful() || !preg_match('/^v?(\d{1,2}\.\d+\.\d+)$/', $tag, $m)) {
+                    $version = \App\Services\AgentReleaseManifest::versionFromTag($tag);
+                    if (!$resp->successful() || $version === null) {
                         continue;
                     }
-                    $current = ltrim((string) ($latest['tag'] ?? ''), 'vV');
-                    if ($current !== '' && version_compare($m[1], $current, '<=')) {
-                        continue;
+                    $assets = collect($resp->json('assets', []))->map(fn($a) => [
+                        'name' => $a['name'] ?? null,
+                        'url' => $a['browser_download_url'] ?? null,
+                        'size' => isset($a['size']) ? (int) $a['size'] : -1,
+                        'digest' => $a['digest'] ?? null,
+                    ])->values()->all();
+                    $manifestAssets = array_values(array_filter($assets, fn ($asset) => ($asset['name'] ?? null) === \App\Services\AgentReleaseManifest::ASSET_NAME));
+                    $manifest = null;
+                    $reason = count($manifestAssets) === 1 ? 'manifest_invalid' : 'manifest_missing_or_ambiguous';
+                    if (count($manifestAssets) === 1) {
+                        $manifestResponse = \Illuminate\Support\Facades\Http::timeout(6)
+                            ->withHeaders(['Accept' => 'application/json', 'User-Agent' => 'TaxNest'])
+                            ->get($manifestAssets[0]['url']);
+                        if ($manifestResponse->successful() && is_array($manifestResponse->json())) {
+                            $manifest = $manifestResponse->json();
+                        } else {
+                            $reason = 'manifest_unreadable';
+                        }
                     }
-                    $latest = [
+                    $validated = is_array($manifest)
+                        ? \App\Services\AgentReleaseManifest::validate($manifest, $tag, $repo, $assets)
+                        : null;
+                    $candidates[] = [
+                        'repo' => $repo,
                         'tag' => $tag,
-                        'assets' => collect($resp->json('assets', []))->map(fn($a) => [
-                            'name' => $a['name'],
-                            'url' => $a['browser_download_url'],
-                            'size' => $a['size'] ?? 0,
-                        ])->values()->all(),
+                        'version' => $version,
+                        'validated' => $validated,
+                        'reason' => $validated ? null : $reason,
                     ];
                 } catch (\Throwable $e) {
-                    // One release host failing must not hide a healthy mirror.
+                    // Never advertise an unchecked mirror when the release
+                    // host/API is unavailable.
                 }
             }
 
-            return $latest;
+            if ($candidates === []) {
+                return ['tag' => null, 'assets' => [], 'available' => false, 'reason' => 'release_unavailable'];
+            }
+            usort($candidates, fn ($a, $b) => version_compare($b['version'], $a['version']));
+            $newestVersion = $candidates[0]['version'];
+            $newest = array_values(array_filter($candidates, fn ($candidate) => $candidate['version'] === $newestVersion));
+            $valid = array_values(array_filter($newest, fn ($candidate) => is_array($candidate['validated'])));
+            if ($valid === []) {
+                return [
+                    'tag' => $newest[0]['tag'],
+                    'assets' => [],
+                    'available' => false,
+                    'reason' => $newest[0]['reason'] ?? 'manifest_invalid',
+                ];
+            }
+
+            $release = $valid[0]['validated'];
+            // Retain a validated matching legacy mirror only. Agent <1.7.0
+            // pins this hostname, so an unchecked URL rewrite would bypass
+            // the manifest control exactly where backward compatibility is
+            // most fragile.
+            $legacy = collect($valid)->first(fn ($candidate) => $candidate['repo'] === 'jawadrao5555-alt/taxnest');
+            if ($legacy) {
+                $release['legacy_zip'] = $legacy['validated']['zip'];
+            }
+            $release['available'] = true;
+            $release['reason'] = null;
+            return $release;
         });
     }
 
@@ -322,48 +370,33 @@ class AgentManagementController extends Controller
      */
     public function serveAgentAsset(?string $type = 'exe')
     {
-        $assets = self::latestReleaseInfo();
-
-        $needle = $type === 'zip' ? '.zip' : '.exe';
-        // Prefer the LARGEST matching asset — the real full installer, not a stale 0.2 MB stub.
-        $asset = collect($assets['assets'])
-            ->filter(fn($a) => str_ends_with(strtolower($a['name']), $needle))
-            ->sortByDesc('size')
-            ->first();
-
-        // Requested type missing on the latest release (e.g. zip-only release,
-        // exe requested)? Serve the OTHER GitHub asset rather than the local
-        // fallback file — the local copy goes stale the moment a new release
-        // ships (it served an old build after v1.6.2, which had no exe).
-        if (!$asset) {
-            $other = $needle === '.exe' ? '.zip' : '.exe';
-            $asset = collect($assets['assets'])
-                ->filter(fn($a) => str_ends_with(strtolower($a['name']), $other))
-                ->sortByDesc('size')
-                ->first();
+        $release = self::latestReleaseInfo();
+        if (!($release['available'] ?? false)) {
+            return response()->json([
+                'error' => 'Agent release is temporarily unavailable because its canonical manifest could not be verified.',
+                'reason' => $release['reason'] ?? 'manifest_invalid',
+            ], 503);
         }
+        $asset = $type === 'zip' ? ($release['zip'] ?? null) : ($release['exe'] ?? null);
 
         if ($asset) {
             return redirect()->away($asset['url']);
         }
 
-        $localPath = public_path('downloads/TaxNest-PRA-Agent-Windows.zip');
-        if (file_exists($localPath)) {
-            return response()->download($localPath, 'TaxNest-PRA-Agent-Windows.zip');
-        }
-
-        return redirect()->away('https://github.com/' . self::releaseRepo() . '/releases/latest');
+        return response()->json(['error' => 'Requested canonical Agent asset is unavailable.'], 503);
     }
 
     public function latestVersionInfo()
     {
         $info = self::latestReleaseInfo();
 
-        $exe = collect($info['assets'])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.exe'))->sortByDesc('size')->first();
-        $zip = collect($info['assets'])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))->sortByDesc('size')->first();
+        $exe = $info['exe'] ?? null;
+        $zip = $info['zip'] ?? null;
 
         return [
             'tag' => $info['tag'],
+            'available' => (bool) ($info['available'] ?? false),
+            'reason' => $info['reason'] ?? null,
             'has_exe' => (bool) $exe,
             'has_zip' => (bool) $zip,
             'exe_size_mb' => $exe ? round($exe['size'] / 1024 / 1024, 1) : null,

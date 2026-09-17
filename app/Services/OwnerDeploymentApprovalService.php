@@ -13,6 +13,18 @@ use Illuminate\Support\Str;
 class OwnerDeploymentApprovalService
 {
     public const REPOSITORY = 'jawadrao5555-alt/taxnest';
+    public const TRUSTED_HEAD_BRANCH_PREFIXES = ['cursor/', 'replit/'];
+
+    public static function isTrustedHeadBranch(?string $ref): bool
+    {
+        foreach (self::TRUSTED_HEAD_BRANCH_PREFIXES as $prefix) {
+            if (str_starts_with((string) $ref, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public function validatePullRequest(int $number, string $sha, ?string $expectedMergeSha = null): array
     {
@@ -39,6 +51,7 @@ class OwnerDeploymentApprovalService
             || ($data['base']['ref'] ?? null) !== 'main'
             || ($data['base']['repo']['full_name'] ?? null) !== self::REPOSITORY
             || ($data['head']['repo']['full_name'] ?? null) !== self::REPOSITORY
+            || !self::isTrustedHeadBranch($data['head']['ref'] ?? null)
             || !hash_equals(strtolower($sha), strtolower((string) ($data['head']['sha'] ?? '')));
         $stateInvalid = $expectedMergeSha
             ? (($data['state'] ?? null) !== 'closed'
@@ -390,6 +403,7 @@ class OwnerDeploymentApprovalService
             && ($pr['base']['ref'] ?? null) === 'main'
             && ($pr['base']['repo']['full_name'] ?? null) === self::REPOSITORY
             && ($pr['head']['repo']['full_name'] ?? null) === self::REPOSITORY
+            && self::isTrustedHeadBranch($pr['head']['ref'] ?? null)
             && hash_equals(strtolower($row->head_sha), strtolower((string) ($pr['head']['sha'] ?? '')));
 
         if (!$bindingMatches) {

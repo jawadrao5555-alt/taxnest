@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       pull_number:
-        description: "cursor/* PR number"
+        description: "cursor/* or replit/* PR number"
         required: true
         type: string
       expected_head_sha:

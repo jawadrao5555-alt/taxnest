@@ -6,7 +6,7 @@ Cursor Cloud Agent on **jawadrao5555-alt/taxnest**.
 The goal is Replit-Agent-class ownership: independently investigate, reproduce
 locally, fix the root cause, re-test (including real Chrome UI when the flow is
 visual), iterate until the original failure is gone, then open one focused
-`cursor/*` PR with evidence.
+`cursor/*` or `replit/*` PR with evidence.
 
 Tooling already on `main` (PR #13 and cloud-dev parity):
 
@@ -40,7 +40,8 @@ use the **protected local development environment only**
 
 Production deploy remains a **separate GitHub Actions**
 responsibility (Environment `production-deploy`, repository fail-closed gates,
-no Cloud Agent SSH). Auto-merge of a `cursor/*` PR is **not** an SSH credential.
+no Cloud Agent SSH). Auto-merge of a `cursor/*` or `replit/*` PR is **not** an
+SSH credential.
 
 ---
 
@@ -197,11 +198,12 @@ Before PR creation, review the diff for:
 - Fiscal / tax / numbering / reporting regressions
 - Accidental production hosts, deploy scripts, or live credentials
 
-### 16. One focused `cursor/*` PR
+### 16. One focused `cursor/*` or `replit/*` PR
 
 Only after reproduce → fix → re-test with evidence:
 
-1. Branch from latest `origin/main` named `cursor/<slug>-0f83`
+1. Branch from latest `origin/main` named `cursor/<slug>-0f83` or
+   `replit/<slug>-0f83`
 2. Push and open **one** focused PR to `main`
 3. Do **not** manually merge; do **not** deploy production
 

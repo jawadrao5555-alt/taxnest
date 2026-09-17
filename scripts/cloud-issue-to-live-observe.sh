@@ -1,5 +1,5 @@
 #!/bin/bash
-# Secret-free observation helper for Cloud Agents after a cursor/* PR merges.
+# Secret-free observation helper for Cloud Agents after a cursor/* or replit/* PR merges.
 #
 # WHAT THIS DOES:
 #   - Reads GitHub Actions "Deploy Production" run status for a main SHA (gh CLI)

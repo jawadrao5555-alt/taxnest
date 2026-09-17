@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prove Cursor automatic merge is disabled and owner-triggered merge+deploy
+# Prove Cursor/Replit automatic merge is disabled and owner-triggered merge+deploy
 # is gated. Does NOT SSH, merge, deploy, or call GitHub.
 # Usage: bash scripts/tests/owner-merge-and-deploy-check.sh
 set -uo pipefail
@@ -145,7 +145,7 @@ bash -n "$SH" && ok "owner-merge-and-deploy.sh bash -n" || bad "bash -n owner-me
 
 # --------------------------------------------------------------------------- Decision library (fixture matrix)
 python3 "$LIB" --self-test \
-  && ok "owner-merge decision self-test (phrase, cursor/, draft, main, checks, SHA, idempotent, stale)" \
+  && ok "owner-merge decision self-test (both trusted prefixes, draft, main, checks, SHA, idempotent, stale)" \
   || bad "owner-merge-and-deploy.py self-test failed"
 
 # --------------------------------------------------------------------------- Deploy Production invariants remain

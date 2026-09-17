@@ -15,6 +15,8 @@ import sys
 
 VALIDATE_CHECK_NAME = "validate"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+TRUSTED_HEAD_BRANCH_PREFIXES = ("cursor/", "replit/")
+TRUSTED_REPOSITORY = "jawadrao5555-alt/taxnest"
 
 
 def _norm_sha(value: str | None) -> str:
@@ -65,10 +67,22 @@ def decide(payload: dict) -> dict:
         _norm_sha(s) for s in (payload.get("successful_deploy_shas") or []) if _is_sha(_norm_sha(s))
     }
 
+    if full_name != TRUSTED_REPOSITORY:
+        return {
+            "action": "reject",
+            "reason": "repository must be jawadrao5555-alt/taxnest",
+            "dispatch_sha": None,
+        }
     if pr.get("base", {}).get("ref") != "main":
         return {
             "action": "reject",
             "reason": "PR must target main",
+            "dispatch_sha": None,
+        }
+    if pr.get("base", {}).get("repo", {}).get("full_name") != full_name:
+        return {
+            "action": "reject",
+            "reason": "base repository must be jawadrao5555-alt/taxnest",
             "dispatch_sha": None,
         }
     if pr.get("draft") is True:
@@ -78,10 +92,10 @@ def decide(payload: dict) -> dict:
             "dispatch_sha": None,
         }
     head_ref = (pr.get("head") or {}).get("ref") or ""
-    if not head_ref.startswith("cursor/"):
+    if not head_ref.startswith(TRUSTED_HEAD_BRANCH_PREFIXES):
         return {
             "action": "reject",
-            "reason": "non-cursor/ branch rejected",
+            "reason": "branch must use cursor/* or replit/*",
             "dispatch_sha": None,
         }
     head_repo = ((pr.get("head") or {}).get("repo") or {}).get("full_name") or ""
@@ -133,7 +147,13 @@ def decide(payload: dict) -> dict:
             "reason": f"PR head SHA changed (pr={head_sha} expected={expected})",
             "dispatch_sha": None,
         }
-    if pr.get("mergeable") is False or pr.get("mergeable_state") == "dirty":
+    if pr.get("mergeable") is not True:
+        return {
+            "action": "reject",
+            "reason": "PR mergeability is not explicitly confirmed",
+            "dispatch_sha": None,
+        }
+    if pr.get("mergeable_state") == "dirty":
         return {
             "action": "reject",
             "reason": "PR is not mergeable (conflicts)",
@@ -219,19 +239,19 @@ def _self_test() -> int:
         "merged": False,
         "mergeable": True,
         "mergeable_state": "clean",
-        "base": {"ref": "main"},
+        "base": {"ref": "main", "repo": {"full_name": "jawadrao5555-alt/taxnest"}},
         "head": {
             "ref": "cursor/example-0f83",
             "sha": sha,
-            "repo": {"full_name": "o/r"},
+            "repo": {"full_name": "jawadrao5555-alt/taxnest"},
         },
     }
     good = {
         "approval_request_id": "approval-123",
         "provenance_receipt": "receipt-from-relay",
         "expected_head_sha": sha,
-        "owner": "o",
-        "repo": "r",
+        "owner": "jawadrao5555-alt",
+        "repo": "taxnest",
         "origin_main_sha": main,
         "check_runs": [{"name": "validate", "conclusion": "success", "status": "completed"}],
         "pr": dict(base_pr),
@@ -252,14 +272,26 @@ def _self_test() -> int:
     draft = dict(good, pr={**base_pr, "draft": True})
     check("draft rejected", draft, "reject")
 
-    non_cursor = dict(
+    non_trusted = dict(
         good,
         pr={**base_pr, "head": {**base_pr["head"], "ref": "feature/x"}},
     )
-    check("non-cursor rejected", non_cursor, "reject")
+    check("non-cursor/replit rejected", non_trusted, "reject")
+
+    replit = dict(
+        good,
+        pr={**base_pr, "head": {**base_pr["head"], "ref": "replit/bootstrap-0f83"}},
+    )
+    check("replit branch accepted", replit, "merge_and_dispatch")
 
     non_main = dict(good, pr={**base_pr, "base": {"ref": "develop"}})
     check("non-main rejected", non_main, "reject")
+
+    foreign_repository = dict(good, owner="other", repo="taxnest")
+    check("foreign repository rejected", foreign_repository, "reject")
+
+    foreign_base = dict(good, pr={**base_pr, "base": {"ref": "main", "repo": {"full_name": "other/r"}}})
+    check("foreign base repository rejected", foreign_base, "reject")
 
     fork = dict(
         good,
@@ -291,6 +323,12 @@ def _self_test() -> int:
 
     blocked = dict(good, pr={**base_pr, "mergeable_state": "blocked"})
     check("blocked mergeable_state rejected", blocked, "reject")
+
+    null_mergeable = dict(good, pr={**base_pr, "mergeable": None})
+    check("null mergeable rejected", null_mergeable, "reject")
+
+    unknown_mergeable = dict(good, pr={**base_pr, "mergeable_state": "unknown", "mergeable": None})
+    check("unknown mergeability rejected", unknown_mergeable, "reject")
 
     missing_validate = dict(good, check_runs=[])
     check("missing validate rejected", missing_validate, "reject")

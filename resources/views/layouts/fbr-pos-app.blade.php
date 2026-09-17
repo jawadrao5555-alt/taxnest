@@ -374,8 +374,9 @@
                 });
             }
         </script>
+        @include('partials.premium-ui')
     </head>
-    <body class="h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
+    <body class="tn-premium-shell h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}', {{ $isDarkMode ? 'true' : 'false' }})" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
 

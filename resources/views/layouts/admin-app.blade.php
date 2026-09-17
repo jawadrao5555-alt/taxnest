@@ -63,15 +63,22 @@
     </style>
     {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur'. --}}
     @include('partials.urdu-font')
+    @include('partials.premium-ui')
+    <link rel="stylesheet" href="{{ asset('css/premium-admin.css?v=1') }}">
 </head>
-<body class="h-full bg-gray-950 text-gray-100 admin-themed" x-data="{ sidebarOpen: false, themeOpen: false }">
-    <div class="flex h-full">
+<body class="h-full bg-gray-950 text-gray-100 admin-themed tn-premium-shell" x-data="{ sidebarOpen: false, themeOpen: false }">
+    <div class="flex h-full tn-admin-shell">
         <div x-show="sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 bg-black/50 z-30 lg:hidden" x-transition.opacity></div>
 
-        <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed lg:static lg:translate-x-0 z-40 w-64 h-full admin-sidebar flex flex-col transition-transform duration-200">
-            <div class="px-5 py-5 admin-sidebar-border border-b">
-                <h1 class="text-lg font-bold admin-accent-text">TaxNest Admin</h1>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">SaaS Management Panel</p>
+        <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed lg:static lg:translate-x-0 z-40 h-full admin-sidebar tn-admin-sidebar flex flex-col transition-transform duration-200">
+            <div class="px-5 py-5 admin-sidebar-border tn-admin-brand border-b">
+                <div class="flex items-center gap-3">
+                    <div class="tn-admin-brand-mark" aria-hidden="true">TN</div>
+                    <div>
+                        <h1 class="tn-admin-brand-title">TaxNest Admin</h1>
+                        <p class="tn-admin-brand-subtitle text-xs mt-0.5">SaaS Management Panel</p>
+                    </div>
+                </div>
             </div>
 
             <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
@@ -400,17 +407,20 @@
             </div>
         </aside>
 
-        <div class="flex-1 flex flex-col min-h-0">
-            <header class="admin-header-border border-b px-4 py-3 lg:hidden flex items-center gap-3">
-                <button @click="sidebarOpen = !sidebarOpen" class="text-gray-400 hover:text-white">
+        <div class="flex-1 flex flex-col min-h-0 tn-admin-workspace">
+            <header class="admin-header-border tn-admin-workspace-header border-b px-4 py-3 lg:hidden flex items-center gap-3">
+                <button @click="sidebarOpen = !sidebarOpen" class="text-gray-400 hover:text-white" type="button" aria-label="Open navigation">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
-                <h1 class="text-sm font-bold admin-accent-text">TaxNest Admin</h1>
+                <div>
+                    <p class="text-[10px] uppercase tracking-widest text-gray-500">TaxNest</p>
+                    <h1 class="text-sm font-bold admin-accent-text">Administration</h1>
+                </div>
             </header>
 
             <main class="flex-1 overflow-y-auto overflow-x-hidden tn-fab-pad">
                 @if(isset($header))
-                <div class="bg-gray-900 border-b border-gray-800 px-6 py-4 hidden lg:block">
+                <div class="tn-admin-workspace-header border-b px-6 py-4 hidden lg:block">
                     {{ $header }}
                 </div>
                 @endif

@@ -1,5 +1,5 @@
 <x-pos-layout>
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="tn-page tn-hotel-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('pos.hotel._nav')
     <a href="{{ route('pos.hotel.stays.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-teal-700 mb-3">{{ __('pos.hotel_back_stays') }}</a>
     @if(session('success'))
@@ -148,7 +148,7 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border overflow-x-auto">
+    <div class="tn-table-shell bg-white dark:bg-gray-900 rounded-xl border overflow-x-auto">
         <table class="min-w-[40rem] w-full text-sm">
             <thead>
                 <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 uppercase">

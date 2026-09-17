@@ -1,12 +1,18 @@
 <x-admin-layout>
-<div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ activeTab: 'di' }">
-    <h1 class="text-2xl font-bold text-white mb-6">Admin Dashboard</h1>
+<div class="tn-admin-main" x-data="{ activeTab: 'di' }">
+    <div class="tn-dashboard-head">
+        <div>
+            <p class="tn-eyebrow">Platform overview</p>
+            <h1 class="tn-dashboard-title">Admin Dashboard</h1>
+        </div>
+        <p class="tn-dashboard-note">Company operations, payment review, and system visibility in one workspace.</p>
+    </div>
 
     {{-- Agent Health (Task 635): same rule as /admin/companies (Task 629) —
          silent-print shops whose Desktop Agent is offline > 2 hours. Shown only
          when there is a problem so the dashboard stays clean on good days. --}}
     @if(($offlineAgentCount ?? 0) > 0)
-    <a href="{{ route('saas.admin.companies') }}" class="block bg-red-900/20 border border-red-800/60 rounded-xl p-4 mb-6 hover:bg-red-900/30 transition">
+    <a href="{{ route('saas.admin.companies') }}" class="tn-alert block bg-red-900/20 border border-red-800/60 rounded-xl p-4 mb-6 hover:bg-red-900/30 transition">
         <div class="flex items-center gap-3">
             <svg class="w-6 h-6 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
             <div class="min-w-0">
@@ -20,7 +26,7 @@
     </a>
     @endif
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
+    <div class="tn-metric-ledger">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Companies</p>
             <p class="text-xl font-bold text-white">{{ $stats['total_companies'] }}</p>
@@ -63,7 +69,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
+    <div class="tn-channel-ledger">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">DI Invoices</p>
             <p class="text-xl font-bold text-emerald-400">{{ number_format($stats['di_invoices']) }}</p>
@@ -89,8 +95,8 @@
         </div>
     </div>
 
-    <div class="mb-8">
-        <div class="flex border-b border-gray-800 mb-0 overflow-x-auto">
+    <div class="tn-company-workspace">
+        <div class="tn-company-tabs flex border-b border-gray-800 mb-0 overflow-x-auto">
             <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Digital Invoice ({{ $stats['di_companies'] }})
@@ -105,7 +111,7 @@
             </button>
         </div>
 
-        <div x-show="activeTab === 'di'" class="bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div x-show="activeTab === 'di'" class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -153,7 +159,7 @@
             @endif
         </div>
 
-        <div x-show="activeTab === 'pos'" x-cloak class="bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div x-show="activeTab === 'pos'" x-cloak class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -201,7 +207,7 @@
             @endif
         </div>
 
-        <div x-show="activeTab === 'fbrpos'" x-cloak class="bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div x-show="activeTab === 'fbrpos'" x-cloak class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -250,7 +256,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="tn-information-grid">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Platform Stats</h3>
             <div class="space-y-3">
@@ -274,7 +280,7 @@
         </div>
     </div>
 
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <div class="tn-audit-panel bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Recent Audit Activity</h3>
         <div class="space-y-2">
             @forelse($recentAuditLogs as $log)

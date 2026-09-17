@@ -1,0 +1,171 @@
+/*
+ * TaxNest Premium — category-native refinements.
+ * Applied through semantic tn-* hooks added only to permitted native views.
+ */
+
+.tn-premium-shell .tn-hotel-occupancy {
+    position: relative;
+    overflow: hidden;
+    background: var(--tn-brand-deep);
+    border: 1px solid var(--tn-brand-deep);
+    border-radius: var(--tn-radius);
+    color: var(--tn-on-brand);
+    box-shadow: var(--tn-shadow);
+}
+
+.tn-premium-shell .tn-hotel-occupancy::after {
+    position: absolute;
+    top: -4rem;
+    right: -2rem;
+    width: 12rem;
+    height: 12rem;
+    content: "";
+    border: 1px solid rgba(231, 191, 59, .42);
+    border-radius: 999px;
+    opacity: .8;
+}
+
+.tn-premium-shell .tn-hotel-room-board {
+    background: var(--tn-surface);
+    border: 1px solid var(--tn-line);
+    border-radius: var(--tn-radius);
+    box-shadow: var(--tn-shadow);
+}
+
+.tn-premium-shell .tn-restaurant-command {
+    position: relative;
+    overflow: hidden;
+    background: var(--tn-surface);
+    border: 1px solid var(--tn-line);
+    border-radius: var(--tn-radius);
+    box-shadow: var(--tn-shadow);
+}
+
+.tn-premium-shell .tn-restaurant-command::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+    content: "";
+    background: var(--tn-accent);
+}
+
+.tn-premium-shell .tn-kitchen-status {
+    border-radius: 999px;
+    font-size: .67rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.tn-premium-shell .tn-service-queue {
+    background: var(--tn-surface);
+    border: 1px solid var(--tn-line);
+    border-radius: var(--tn-radius);
+    box-shadow: var(--tn-shadow);
+}
+
+.tn-premium-shell .tn-service-queue tr td:first-child {
+    border-left: 3px solid transparent;
+}
+
+.tn-premium-shell .tn-service-queue tr:hover td:first-child {
+    border-left-color: var(--tn-accent);
+}
+
+.tn-premium-shell .tn-inventory-ledger {
+    background: var(--tn-surface);
+    border: 1px solid var(--tn-line);
+    border-radius: var(--tn-radius);
+    box-shadow: var(--tn-shadow);
+}
+
+.tn-premium-shell .tn-inventory-ledger .tn-stock-value {
+    color: var(--tn-brand-deep);
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+}
+
+.tn-premium-shell .tn-health-briefing {
+    position: relative;
+    overflow: hidden;
+    background: var(--tn-surface);
+    border: 1px solid var(--tn-line);
+    border-radius: var(--tn-radius);
+    box-shadow: var(--tn-shadow);
+}
+
+.tn-premium-shell .tn-health-briefing::after {
+    position: absolute;
+    top: 0;
+    right: 1.35rem;
+    width: 3.25rem;
+    height: 3px;
+    content: "";
+    background: var(--tn-accent);
+}
+
+.tn-premium-shell .tn-health-module {
+    background: var(--tn-surface-raised);
+    border-color: var(--tn-line) !important;
+    border-radius: var(--tn-radius-sm) !important;
+    transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.tn-premium-shell .tn-health-module:hover {
+    border-color: color-mix(in srgb, var(--tn-brand) 34%, var(--tn-line)) !important;
+    box-shadow: 0 8px 20px rgba(17, 59, 67, .08);
+    transform: translateY(-2px);
+}
+
+.tn-premium-shell .tn-section-divider {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    color: var(--tn-muted);
+    font-size: .67rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.tn-premium-shell .tn-section-divider::after {
+    height: 1px;
+    flex: 1;
+    content: "";
+    background: var(--tn-line);
+}
+
+.tn-premium-shell .tn-hotel-dashboard .tn-stat-card,
+.tn-premium-shell .tn-retail-dashboard [class*="stat"],
+.tn-premium-shell .tn-restaurant-dashboard [class*="stat"] {
+    font-variant-numeric: tabular-nums;
+}
+
+.tn-premium-shell .tn-services-page input:not([type="checkbox"]):not([type="radio"]),
+.tn-premium-shell .tn-services-page select,
+.tn-premium-shell .tn-hotel-page input:not([type="checkbox"]):not([type="radio"]),
+.tn-premium-shell .tn-hotel-page select {
+    border-color: var(--tn-line-strong);
+    border-radius: 9px;
+}
+
+.tn-premium-shell .tn-services-page input:not([type="checkbox"]):not([type="radio"]):focus,
+.tn-premium-shell .tn-hotel-page input:not([type="checkbox"]):not([type="radio"]):focus,
+.tn-premium-shell .tn-services-page select:focus,
+.tn-premium-shell .tn-hotel-page select:focus {
+    border-color: var(--tn-brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tn-brand) 15%, transparent);
+    outline: none;
+}
+
+@media (max-width: 767px) {
+    .tn-premium-shell .tn-hotel-occupancy,
+    .tn-premium-shell .tn-restaurant-command,
+    .tn-premium-shell .tn-service-queue,
+    .tn-premium-shell .tn-inventory-ledger,
+    .tn-premium-shell .tn-health-briefing {
+        border-radius: var(--tn-radius-sm);
+    }
+}

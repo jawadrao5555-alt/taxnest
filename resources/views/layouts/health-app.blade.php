@@ -113,8 +113,9 @@
         .health-link-active { background: rgba(13, 148, 136, 0.12); color: #0f766e; }
         .dark .health-link-active { background: rgba(13, 148, 136, 0.22); color: #5eead4; }
     </style>
+    @include('partials.premium-ui')
 </head>
-<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased font-sans">
+<body class="tn-premium-shell min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased font-sans">
 <div x-data="healthShell({{ $hDark ? 'true' : 'false' }})" @keydown.escape.window="drawer = false; profile = false">
 
     {{-- ══════════════ Top bar ══════════════ --}}

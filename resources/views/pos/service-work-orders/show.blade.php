@@ -1,9 +1,9 @@
 <x-pos-layout>
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-w-0" data-service-order="{{ $order->job_number }}">
+<div class="tn-page tn-services-page max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-w-0" data-service-order="{{ $order->job_number }}">
     <a href="{{ route('pos.service-work-orders.index') }}" class="text-sm text-purple-600">← {{ $profile['noun'] }} Board</a>
     @if(session('success'))<div class="mt-4 p-3 rounded-lg bg-emerald-50 text-emerald-800 text-sm">{{ session('success') }}</div>@endif
     @if(session('error'))<div class="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm">{{ session('error') }}</div>@endif
-    <div class="mt-4 bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-xl shadow-sm p-5">
+    <div class="tn-panel mt-4 bg-white dark:bg-gray-900 border dark:border-gray-800 rounded-xl shadow-sm p-5">
         <div class="flex flex-wrap justify-between gap-3"><div><div class="text-xs text-gray-500">{{ $profile['noun'] }}</div><h1 class="text-2xl font-bold dark:text-white">{{ $order->job_number }} · {{ $order->customer_name }}</h1><p class="text-sm text-gray-500">{{ $order->title }}</p></div><span class="h-fit px-3 py-1.5 rounded-full bg-purple-100 text-purple-800 font-bold text-sm">{{ ucwords(str_replace('_', ' ', $order->status)) }}</span></div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6 text-sm"><div><span class="block text-xs text-gray-500">Phone</span>{{ $order->customer_phone ?: '—' }}</div><div><span class="block text-xs text-gray-500">Scheduled</span>{{ $order->scheduled_at?->format('d M Y H:i') ?? 'Walk-in' }}</div><div><span class="block text-xs text-gray-500">Due</span>{{ $order->due_at?->format('d M Y H:i') ?? '—' }}</div><div><span class="block text-xs text-gray-500">Amount</span><strong>Rs {{ number_format((float)$order->total_amount, 2) }}</strong></div></div>
         @if($order->details)<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-800">@foreach($order->details as $key => $value)<div><span class="block text-xs text-gray-500">{{ $profile['fields'][$key] ?? ucwords($key) }}</span><span class="dark:text-white">{{ $value }}</span></div>@endforeach</div>@endif

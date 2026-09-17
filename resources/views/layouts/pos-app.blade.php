@@ -553,8 +553,9 @@
                 });
             }
         </script>
+        @include('partials.premium-ui')
     </head>
-    <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}"@if($posEffStyleLayout === 'saaf') data-saaf="1"@endif>
+    <body class="tn-premium-shell pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}"@if($posEffStyleLayout === 'saaf') data-saaf="1"@endif>
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 

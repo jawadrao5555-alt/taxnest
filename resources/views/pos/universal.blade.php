@@ -568,6 +568,7 @@ window.addEventListener('popstate', function() {
          link to billing; confined cashiers get "ask your admin" text instead.
          Uses amber (warning) tones — not red — since nothing is broken. --}}
     <div x-cloak x-show="syncStatus === 'offline' && !offlineAllowed && !offlineLockDismissed"
+         data-pos-free-access-notice
          class="flex items-start gap-3 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-300 dark:border-amber-700 flex-shrink-0">
         <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
         <div class="flex-1 min-w-0">
@@ -1408,12 +1409,12 @@ window.addEventListener('popstate', function() {
                 <button type="button" @click="openReprint()" class="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-800 flex-shrink-0 px-1.5" title="{{ __('pos.ti_all_todays_bills') }}">{{ __('pos.all_arrow') }}</button>
             </div>
 
-            <div class="md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
-                <button @click="mobileView = 'cart'" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-sm">
+            <div class="tn-mobile-cart-bar md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+                <button @click="mobileView = 'cart'" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-sm" aria-label="{{ __('pos.cart') }}">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                     {{ __('pos.cart') }}
-                    <span x-show="cart.length > 0" class="bg-white/20 px-1.5 rounded-full text-xs" x-text="cart.length"></span>
-                    <span x-show="cart.length > 0" class="text-xs opacity-80" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></span>
+                    <span class="bg-white/20 px-1.5 rounded-full text-xs" x-text="Number(cartQtyCount.toFixed(2)).toLocaleString()"></span>
+                    <span class="text-xs opacity-80" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></span>
                 </button>
             </div>
 
@@ -1854,6 +1855,17 @@ window.addEventListener('popstate', function() {
                          tax module (taxRules/pricing mode), no second 8%/16% choice popup.
                          The PAY (F8) button below keeps the Pay modal (method choice + note).
                          Failures surface via showToast (modal-independent). --}}
+                    <div x-show="incomingOrderId" x-cloak class="grid grid-cols-2 gap-2 mb-2">
+                        <button type="button" @click="saveIncomingOrder()" :disabled="submitting || incomingEditBusy"
+                            class="py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold disabled:opacity-40">
+                            <span x-show="!incomingEditBusy">{{ __('pos.waiter_edit_save_kitchen') }}</span>
+                            <span x-show="incomingEditBusy">{{ __('pos.waiter_edit_saving') }}</span>
+                        </button>
+                        <button type="button" @click="preparePayment()" :disabled="submitting || incomingEditBusy"
+                            class="py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold disabled:opacity-40">
+                            {{ __('pos.waiter_edit_take_payment') }}
+                        </button>
+                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <button @click="quickCashPay()" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
@@ -1899,7 +1911,7 @@ window.addEventListener('popstate', function() {
                             <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">F9</kbd>
                         </button>
                         @endif
-                        <button data-video="open-payment" @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple {{ $uBillScope !== 'pra' ? 'col-span-3' : 'col-span-5' }} min-w-0 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
+                        <button data-video="open-payment" @click="preparePayment()" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple {{ $uBillScope !== 'pra' ? 'col-span-3' : 'col-span-5' }} min-w-0 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
                             <span class="flex items-center justify-center gap-1.5">
                                 <svg x-show="submitting" class="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 <svg x-show="!submitting" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -2384,7 +2396,7 @@ window.addEventListener('popstate', function() {
                     <button @click="confirmTableSwitch('discard')" class="w-full py-3 rounded-xl text-sm font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 hover:bg-red-100 hover:border-red-400 transition ring-offset-2 dark:ring-offset-gray-900" :class="(tableSwitchPrompt?.canSave ? tableSwitchIndex === 1 : tableSwitchIndex === 0) ? 'ring-2 ring-red-500' : ''"><span x-text="tableSwitchPrompt?.canSave ? '2' : '1'"></span> · {{ __('pos.recall_discard_switch_btn') }}</button>
                 </div>
                 <div class="px-4 pb-4">
-                    <button @click="tableSwitchPrompt = null" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_esc') }}</button>
+                    <button @click="tableSwitchPrompt = null" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.recall_stay_btn') }}</button>
                 </div>
             </div>
         </template>
@@ -4358,7 +4370,7 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
                 <p x-show="callerPopup && !callerPopup.match" class="mt-1 text-[11px] text-gray-400">{{ __('pos.caller_new_customer') }}</p>
-                <div class="mt-3 flex flex-wrap gap-2">
+                <div class="tn-caller-actions mt-3 flex flex-wrap gap-2">
                     <button type="button" @click="callerStartBill()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_make_bill') }}</button>
                     {{-- Task 1381: "Call back" — counter ke paired phone par tap-to-dial
                          request. Customer bill par attach bhi ho jata hai (Bill button
@@ -5216,6 +5228,9 @@ function restaurantPos() {
         showIncoming: false,
         incomingLoading: false,
         incomingOrderId: null,
+        incomingEditRevision: 0,
+        incomingEditBusy: false,
+        incomingEditUuid: null,
         // Task #643: FULL claim snapshot of the loaded waiter order (waiter name,
         // order_number, kot_sent_at, items) — drives the cart-header badge and
         // the claimed-cart Cancel modal. Cleared with incomingOrderId.
@@ -8373,7 +8388,7 @@ function restaurantPos() {
         // se jata hai jo recalled restaurant order ko settle NAHI karta — parked
         // order latak kar roz day-close block karega. Pehle wo settlement banao.
         canSaveRecalledEdits() {
-            return !!this.recalledOrderId && !this.incomingOrderId && !this.editingBillId
+            return !!(this.recalledOrderId || this.incomingOrderId) && !this.editingBillId
                 && !this.holdBlockedByManual() && !this.hasDealItems()
                 && !(this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable);
         },
@@ -8843,7 +8858,7 @@ function restaurantPos() {
                 // pattern). Bina tabdeeli wala recall pichhle task jaisa seedha
                 // reset+switch hi rehta hai (koi extra prompt nahi).
                 if (!(opts && opts.skipSwitchPrompt) && this.recalledCartDirty()) {
-                    this.openTableSwitchPrompt({ kind: 'recall', table, canSave: this.canSaveRecalledEdits() });
+                    this.openTableSwitchPrompt({ kind: 'recall', table, canSave: this.canSaveRecalledEdits(), incoming: !!this.incomingOrderId });
                     return;
                 }
                 this.clearCart(); // order DB/table par jyon-ka-tyon; sirf screen reset
@@ -10905,8 +10920,17 @@ function restaurantPos() {
         //     cashier confirms there. processPayment stays untouched.
         //   • cashReceivedEnabled OFF → preserve today's direct one-tap finalize.
         // Guards mirror the CASH button's :disabled (empty cart / submitting).
-        quickCashPay() {
+        async preparePayment() {
+            if (this.incomingOrderId && this.recalledCartDirty()) {
+                if (!await this.saveIncomingOrder()) return false;
+            }
+            this.showPayModal = true;
+            return true;
+        },
+
+        async quickCashPay() {
             if (this.cart.length === 0 || this.submitting) return;
+            if (this.incomingOrderId && this.recalledCartDirty() && !await this.saveIncomingOrder()) return;
             // Fresh normal checkout — clear any stale held/provisional routing so
             // processPayment (which checks payingHeldOrderId first) can never
             // divert this cart to a held-order pay.
@@ -10929,6 +10953,7 @@ function restaurantPos() {
 
         async processPayment(method) {
             if (this.submitting) return;
+            if (this.incomingOrderId && this.recalledCartDirty() && !await this.saveIncomingOrder()) return;
             // A recalled/held online-marked order has already chosen its payment
             // state. Cash/Card shortcuts from an older tab must not recollect it.
             if (this.payingOrderAwaitingOnline()) method = 'qr_payment';
@@ -11173,6 +11198,7 @@ function restaurantPos() {
                     // BEFORE responding: the very first receipt print can then show
                     // the "Waiter:" line. Provisionals never consume the order.
                     incoming_order_id: (!provisional && this.incomingOrderId) ? this.incomingOrderId : null,
+                    expected_incoming_revision: (!provisional && this.incomingOrderId) ? this.incomingEditRevision : null,
                     // Parked (recalled) restaurant order — ab delivery order bhi
                     // hold ho sakta hai, aur delivery fee ki wajah se uski adaigi
                     // ISI manual raste se aati hai. Bina is id ke woh parked order
@@ -11842,6 +11868,60 @@ function restaurantPos() {
             fallback();
         },
 
+        async saveIncomingOrder(opts = {}) {
+            if (!this.incomingOrderId || this.incomingEditBusy) return false;
+            this.incomingEditBusy = true;
+            const editUuid = this.incomingEditUuid || (crypto.randomUUID ? crypto.randomUUID() : ('edit-' + Date.now()));
+            this.incomingEditUuid = editUuid;
+            try {
+                const res = await this._fetchWithTimeout('/pos/restaurant/orders/' + this.incomingOrderId + '/edit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''},
+                    body: JSON.stringify({
+                        revision: this.incomingEditRevision,
+                        edit_uuid: editUuid,
+                        items: this.cart.map(i => ({
+                            item_id: i.item_id, item_type: i.item_type, line_id: i.line_id || null, name: i.item_name,
+                            quantity: i.quantity, unit_price: i.unit_price, special_notes: i.special_notes || ''
+                        }))
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    if (data.conflict) this.showToast(data.message || @json(__('pos.waiter_edit_conflict')), 'error');
+                    else this.showToast(data.message || @json(__('pos.waiter_edit_error')), 'error');
+                    return false;
+                }
+                if (data.order && Array.isArray(data.order.items)) {
+                    const old = this.cart;
+                    this.cart = data.order.items.map((it, idx) => ({
+                        ...(old[idx] || {}),
+                        cart_uid: old[idx]?.cart_uid || ('inc' + data.order.id + '_' + idx),
+                        item_id: it.item_id || null, item_type: it.item_type || (it.item_id ? 'product' : 'manual'), line_id: it.line_id || it.id || null,
+                        item_name: it.name, quantity: Number(it.quantity) || 1,
+                        unit_price: Number(it.unit_price) || 0, special_notes: it.special_notes || '',
+                        is_tax_exempt: !!it.is_tax_exempt,
+                    }));
+                    this.incomingOrderInfo = data.order;
+                }
+                this.incomingEditRevision = Number(data.revision || this.incomingEditRevision + 1);
+                this.incomingEditUuid = null;
+                this._recallCartBaseline = this.cartEditFingerprint();
+                this.showToast(['error', 'action_required'].includes(data.kot_status)
+                    ? (data.message || @json(__('pos.waiter_edit_error')))
+                    : @json(__('pos.waiter_edit_saved')),
+                    data.kot_status === 'action_required' ? 'warning' : 'success');
+                this.loadIncoming();
+                return true;
+            } catch (e) {
+                this.showToast(@json(__('pos.waiter_edit_error')), 'error');
+                return false;
+            } finally {
+                this.incomingEditBusy = false;
+            }
+        },
+
         // ── P7 (F6): INCOMING WAITER ORDERS ───────────────────────────
         // Task 1097: If-None-Match ETag fast-path — 304 means list unchanged;
         // still read X-KDS-Alive from the 304 so the KDS flag stays fresh.
@@ -11939,6 +12019,7 @@ function restaurantPos() {
             if (this.cart.length && !confirm(window.TXT.replace_cart_with_waiter + o.order_number + '?')) return;
             this.cart = (o.items || []).map(it => ({
                 cart_uid: 'inc' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+                line_id: it.line_id || it.id || null,
                 item_id: it.item_id || null,
                 item_type: it.item_id ? (it.item_type || 'product') : 'manual',
                 item_name: it.name,
@@ -11950,6 +12031,8 @@ function restaurantPos() {
                 item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
             }));
             this.incomingOrderId = o.id;
+            this.incomingEditRevision = Number(o.edit_revision || o.revision || 0);
+            this.incomingEditUuid = null;
             this.incomingOrderInfo = o; // Task #643: waiter/order badge + cart-cancel modal data
             // Table stays attached to the RESTAURANT order — settlement frees it.
             // Carry the same table snapshot onto the billing cart as well. The

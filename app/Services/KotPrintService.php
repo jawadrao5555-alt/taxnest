@@ -760,14 +760,14 @@ class KotPrintService
     /**
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
-    public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false): array
+    public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false, bool $queueWhileOffline = false, ?string $dedupeKey = null): array
     {
         try {
             $settings = $company->printerSettings();
             if (!$settings['silent_print_enabled']) {
                 return ['printed' => false, 'reason' => 'disabled'];
             }
-            if (!$company->agentOnline()) {
+            if (!$company->agentOnline() && !$queueWhileOffline) {
                 return ['printed' => false, 'reason' => 'agent_offline'];
             }
 
@@ -800,7 +800,7 @@ class KotPrintService
             if ($delta && empty($deltaIds)) {
                 return ['printed' => true, 'job_ids' => [], 'reason' => $handoffIds ? 'local_handoff' : 'nothing_unprinted'];
             }
-            $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($company, $order, $userId, $delta, $deltaIds) {
+            $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($company, $order, $userId, $delta, $deltaIds, $dedupeKey) {
                 // Task 753: in-flight dedupe + merge — mirrors apiCreatePrintJob's
                 // rule so the hold-time server enqueue, the KDS auto-print fire and
                 // the cashier fallback all collapse into ONE physical slip. A
@@ -812,6 +812,7 @@ class KotPrintService
                     ->where('target_printer', $printer)
                     ->where(fn ($q) => $renderQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $renderQuery))
                     ->whereIn('status', ['pending', 'printing'])
+                    ->when($dedupeKey, fn ($q) => $q->where('dedupe_key', $dedupeKey . ':' . ($printer ?: 'default')))
                     ->where('created_at', '>=', now()->subMinutes(2))
                     ->orderByDesc('id')->first();
                 if ($inFlight) {
@@ -834,6 +835,9 @@ class KotPrintService
                     'status' => 'pending',
                     'created_by' => $userId,
                 ];
+                if ($dedupeKey && \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'dedupe_key')) {
+                    $attrs['dedupe_key'] = $dedupeKey . ':' . ($printer ?: 'default');
+                }
                 // Task 1194: key only added when a stamp resolves — pre-migration
                 // prod (no device_uid column) never sees it in the INSERT.
                 if ($stamp = self::deviceStampFor($company->id, $ownerDeviceUid)) {
@@ -912,7 +916,7 @@ class KotPrintService
      * @param array<int, array{item_type: string, item_id: mixed, item_name: string, notes: string, qty: float}> $voidItems
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
-    public static function enqueueVoid(Company $company, RestaurantOrder $order, array $voidItems, ?int $userId): array
+    public static function enqueueVoid(Company $company, RestaurantOrder $order, array $voidItems, ?int $userId, bool $queueWhileOffline = false, ?string $dedupeKey = null): array
     {
         try {
             if (empty($voidItems)) {
@@ -922,11 +926,11 @@ class KotPrintService
             if (!$settings['silent_print_enabled']) {
                 return ['printed' => false, 'reason' => 'disabled'];
             }
-            if (!$company->agentOnline()) {
+            if (!$company->agentOnline() && !$queueWhileOffline) {
                 return ['printed' => false, 'reason' => 'agent_offline'];
             }
 
-            $makeVoidJob = function (?string $printer, array $items, ?string $ownerDeviceUid = null) use ($company, $order, $userId) {
+            $makeVoidJob = function (?string $printer, array $items, ?string $ownerDeviceUid = null) use ($company, $order, $userId, $dedupeKey) {
                 $renderQuery = json_encode(array_values($items));
 
                 // Task 951: lock this order while finding or creating the
@@ -934,7 +938,7 @@ class KotPrintService
                 // both observe an empty queue and create duplicate jobs. The
                 // exact payload is part of the identity so a later, different
                 // cancellation for the same station still reaches the kitchen.
-                return DB::transaction(function () use ($company, $order, $userId, $printer, $ownerDeviceUid, $renderQuery) {
+                return DB::transaction(function () use ($company, $order, $userId, $printer, $ownerDeviceUid, $renderQuery, $dedupeKey) {
                     RestaurantOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
 
                     $inFlight = PosPrintJob::where('company_id', $company->id)
@@ -942,6 +946,8 @@ class KotPrintService
                         ->where('restaurant_order_id', $order->id)
                         ->where('target_printer', $printer)
                         ->where('render_query', $renderQuery)
+                        ->when($dedupeKey, fn ($q) => $q->where('dedupe_key', $dedupeKey . ':' . ($printer ?: 'default'))
+                        )
                         ->whereIn('status', ['pending', 'printing'])
                         ->where('created_at', '>=', now()->subMinutes(2))
                         ->orderByDesc('id')
@@ -959,6 +965,9 @@ class KotPrintService
                         'status'              => 'pending',
                         'created_by'          => $userId,
                     ];
+                    if ($dedupeKey && \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'dedupe_key')) {
+                        $attrs['dedupe_key'] = $dedupeKey . ':' . ($printer ?: 'default');
+                    }
                     // Task 1194: void slips route to the owning counter too — key
                     // only added when a stamp resolves (pre-migration prod safe).
                     if ($stamp = self::deviceStampFor($company->id, $ownerDeviceUid)) {

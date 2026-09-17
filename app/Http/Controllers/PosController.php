@@ -3394,6 +3394,7 @@ class PosController extends Controller
             // it server-side BEFORE the response so the receipt can print the
             // waiter's name on the very first (auto-)print.
             'incoming_order_id' => 'nullable|integer',
+            'expected_incoming_revision' => 'nullable|integer|min:0',
             // ZFC (1 Sep 2026): ab delivery order bhi park (hold) ho sakta hai, aur
             // delivery fee ek manual line hone ki wajah se uski adaigi ISI raste se
             // aati hai. Parked order ki id sath aati hai taake bill ke saath hi
@@ -4038,7 +4039,8 @@ class PosController extends Controller
             if (!$saveAsProvisional && $request->filled('incoming_order_id')) {
                 $waiterOrderSettled = RestaurantWaiterController::settleWaiterOrder(
                     $companyId, (int) $request->input('incoming_order_id'), $transaction, auth('pos')->user(),
-                    $request->boolean('online_payment_confirmed')
+                    $request->boolean('online_payment_confirmed'),
+                    $request->filled('expected_incoming_revision') ? (int) $request->input('expected_incoming_revision') : null
                 );
                 if (!$waiterOrderSettled) {
                     throw new \RuntimeException(__('pos.waiter_order_already_settled'));

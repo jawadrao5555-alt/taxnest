@@ -21,6 +21,58 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Midnight is a real POS skin selected with body[data-theme], not Tailwind's
+   `.dark` class. Keep the sale surface dark when the cashier changes theme
+   from the compact mobile settings menu (the utility dark variants do not
+   activate for this skin). */
+body[data-theme="midnight"] .tn-premium-sale {
+    --tn-premium-canvas: #16191b;
+    --tn-premium-surface: #202426;
+    --tn-premium-ink: #f1f3f2;
+    --tn-premium-muted: #aab4b4;
+    --tn-premium-line: rgba(214, 224, 222, .16);
+    --tn-premium-brand: #b8c1c0;
+    --tn-premium-accent: #d1d5d4;
+    --tn-premium-soft: #293033;
+    background: var(--tn-premium-canvas);
+    color: var(--tn-premium-ink);
+}
+body[data-theme="midnight"] .tn-premium-sale .tn-action-bar,
+body[data-theme="midnight"] .tn-premium-sale .tn-cat-strip,
+body[data-theme="midnight"] .tn-premium-sale .tn-mobile-cart-bar,
+body[data-theme="midnight"] .tn-premium-sale .tn-cart-rail,
+body[data-theme="midnight"] .tn-premium-sale .tn-product-panel {
+    background: var(--tn-premium-surface) !important;
+    color: var(--tn-premium-ink);
+    border-color: var(--tn-premium-line) !important;
+}
+body[data-theme="midnight"] .tn-premium-sale .tn-product-card,
+body[data-theme="midnight"] .tn-premium-sale .prod-card,
+body[data-theme="midnight"] .tn-premium-sale input,
+body[data-theme="midnight"] .tn-premium-sale select {
+    background: #24292b !important;
+    color: var(--tn-premium-ink) !important;
+    border-color: var(--tn-premium-line) !important;
+}
+body[data-theme="midnight"] .tn-premium-sale .tn-product-grid,
+body[data-theme="midnight"] .tn-premium-sale .tn-sale-toolbar {
+    background: var(--tn-premium-canvas);
+}
+body[data-theme="midnight"] .tn-premium-sale .text-gray-900,
+body[data-theme="midnight"] .tn-premium-sale .text-gray-800,
+body[data-theme="midnight"] .tn-premium-sale .text-gray-700,
+body[data-theme="midnight"] .tn-premium-sale .text-gray-600 {
+    color: #edf2f1 !important;
+}
+body[data-theme="midnight"] .tn-premium-sale .text-gray-500,
+body[data-theme="midnight"] .tn-premium-sale .text-gray-400 {
+    color: #aab4b4 !important;
+}
+body[data-theme="midnight"] .tn-premium-sale .bg-white,
+body[data-theme="midnight"] .tn-premium-sale .bg-gray-50 {
+    background-color: var(--tn-premium-surface) !important;
+}
+
 .tn-premium-sale :is(button, input, select, textarea) { font: inherit; }
 .tn-premium-sale button,
 .tn-premium-sale [role="button"] { -webkit-tap-highlight-color: transparent; }

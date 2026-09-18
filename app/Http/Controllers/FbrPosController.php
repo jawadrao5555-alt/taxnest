@@ -4283,7 +4283,18 @@ class FbrPosController extends Controller
                 'rp_align_center'        => 'nullable|in:0,1',
                 'rp_left_margin_mm'      => 'nullable|integer|min:0|max:30',
                 'rp_delivery_receipt_present' => 'nullable|in:1',
-                'rp_delivery_receipt_on_assign' => 'nullable|in:1',
+                'rp_delivery_receipt_on_assign' => [
+                    'sometimes',
+                    'required',
+                    function (string $attribute, mixed $value, \Closure $fail): void {
+                        if ((!is_string($value) && !is_int($value))
+                            || !in_array((string) $value, ['0', '1'], true)) {
+                            $fail(__('pos.delivery_receipt_default_invalid'));
+                        }
+                    },
+                ],
+            ], [
+                'rp_delivery_receipt_on_assign.required' => __('pos.delivery_receipt_default_invalid'),
             ]);
 
             // Lost-update guard (Sep 2026): merged onto the FRESH row under a lock

@@ -1434,6 +1434,7 @@ return [
     'delivery_print_receipt' => 'فائنل کرنے یا رائیڈر لگانے پر رسید بھی پرنٹ کریں (ڈیفالٹ: نہیں — کسٹمر کاؤنٹر پر نہیں)',
     'delivery_receipt_default_label' => 'ڈیلیوری رسید کا ڈیفالٹ',
     'delivery_receipt_default_hint' => 'ڈیلیوری فائنل کرنے یا رائیڈر کو دینے پر لاگو ہوگا۔ کیشیئر ایک بل کے لیے اسے بدل سکتا ہے۔',
+    'delivery_receipt_default_invalid' => 'ڈیلیوری رسید کے لیے درست ڈیفالٹ منتخب کریں۔',
     'final_print_receipt' => 'رسید پرنٹ کریں (نشان ہٹائیں = کاغذ بچائیں، صرف اس بل کے لیے)',
     'delivery_riders' => 'ڈیلیوری رائیڈرز',
     'delivery_riders_day_summary' => 'ڈیلیوری رائیڈرز — دن کا خلاصہ',

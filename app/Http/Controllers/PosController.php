@@ -355,7 +355,20 @@ class PosController extends Controller
                 // "L" wala number chhapna galat-fehmi paida karta.
                 'rp_local_number_style' => 'nullable|in:serial,token,daily',
                 'rp_delivery_receipt_present' => 'nullable|in:1',
-                'rp_delivery_receipt_on_assign' => 'nullable|in:1',
+                'rp_delivery_receipt_on_assign' => [
+                    'sometimes',
+                    'required',
+                    function (string $attribute, mixed $value, \Closure $fail): void {
+                        if ((!is_string($value) && !is_int($value))
+                            || !in_array((string) $value, ['0', '1'], true)) {
+                            $fail(__('pos.delivery_receipt_default_invalid'));
+                        }
+                    },
+                ],
+                'rp_align_center' => 'nullable|in:0,1',
+                'rp_left_margin_mm' => 'nullable|integer|min:0|max:30',
+            ], [
+                'rp_delivery_receipt_on_assign.required' => __('pos.delivery_receipt_default_invalid'),
             ]);
             // Stale-form guard, per display set (Task 1377 — owner 21 Aug 2026).
             // Each block below is a WHOLESALE rewrite driven by checkbox presence,

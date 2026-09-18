@@ -1434,6 +1434,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'delivery_print_receipt' => 'Final karte ya rider assign karte waqt receipt bhi print karein (Default: Nahi — customer counter par nahi)',
     'delivery_receipt_default_label' => 'Delivery receipt ka default',
     'delivery_receipt_default_hint' => 'Delivery final karte ya rider ko dete waqt yeh choice lagegi. Cashier ek bill ke liye isay badal sakta hai.',
+    'delivery_receipt_default_invalid' => 'Delivery receipt ka durust default choose karein.',
     'final_print_receipt' => 'Receipt print karein (untick = kaghaz bachayen, sirf is bill ke liye)',
     'delivery_riders' => 'Delivery Riders',
     'delivery_riders_day_summary' => 'Delivery Riders — din ka summary',

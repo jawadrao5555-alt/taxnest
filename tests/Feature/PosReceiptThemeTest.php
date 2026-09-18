@@ -73,6 +73,8 @@ class PosReceiptThemeTest extends TestCase
             $t->string('print_paper_size')->nullable();
             $t->string('receipt_footer_note')->nullable();
             $t->string('order_match_style')->default('off');
+            $t->boolean('receipt_align_center')->nullable();
+            $t->integer('receipt_left_margin_mm')->nullable();
             $t->boolean('kot_align_center')->default(false);
             $t->integer('kot_left_margin_mm')->default(0);
             $t->boolean('agent_enabled')->default(false);
@@ -90,6 +92,7 @@ class PosReceiptThemeTest extends TestCase
             $t->unsignedBigInteger('company_id')->nullable();
             $t->string('role')->nullable();
             $t->string('pos_role')->nullable();
+            $t->string('language')->nullable();
             $t->text('pos_custom_access')->nullable();
             $t->boolean('is_active')->default(true);
             $t->rememberToken();
@@ -290,6 +293,118 @@ class PosReceiptThemeTest extends TestCase
         $this->assertFalse((bool) Company::findOrFail($this->posCompanyId)->delivery_receipt_print_on_assign);
     }
 
+    public function test_pra_real_browser_delivery_off_payload_saves_other_receipt_fields(): void
+    {
+        Company::whereKey($this->posCompanyId)->update(['delivery_receipt_print_on_assign' => true]);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->from('/pos/receipt-settings')
+            ->post('/pos/receipt-settings', [
+                'rp_delivery_receipt_present' => '1',
+                'rp_delivery_receipt_on_assign' => '0',
+                'rp_present' => '1',
+                'rp_show_ntn' => '1',
+                'rp_show_tax' => '1',
+                'rp_footer_text' => 'Browser OFF saved',
+                'rp_receipt_theme' => 'bold_side',
+                'rp_printer_size' => '58mm',
+                'rp_order_match' => 'code',
+            ])
+            ->assertRedirect('/pos/receipt-settings')
+            ->assertSessionHasNoErrors();
+
+        $company = Company::findOrFail($this->posCompanyId);
+        $prefs = json_decode($company->getRawOriginal('invoice_display_prefs'), true);
+        $this->assertFalse((bool) $company->delivery_receipt_print_on_assign);
+        $this->assertTrue($prefs['pos']['show_ntn']);
+        $this->assertSame('Browser OFF saved', $prefs['pos']['footer_text']);
+        $this->assertSame('side', $prefs['pos_style']['logo']);
+        $this->assertSame('58mm', $company->receipt_printer_size);
+        $this->assertSame('code', $company->order_match_style);
+    }
+
+    public function test_pra_delivery_toggle_rejects_malformed_value_with_localized_message(): void
+    {
+        foreach ([
+            'en' => 'Choose a valid delivery receipt default.',
+            'rur' => 'Delivery receipt ka durust default choose karein.',
+            'ur' => 'ڈیلیوری رسید کے لیے درست ڈیفالٹ منتخب کریں۔',
+        ] as $locale => $message) {
+            User::whereKey($this->posAdminId)->update(['language' => $locale]);
+
+            $this->actingAs(User::find($this->posAdminId), 'pos')
+                ->from('/pos/receipt-settings')
+                ->post('/pos/receipt-settings', [
+                    'rp_delivery_receipt_present' => '1',
+                    'rp_delivery_receipt_on_assign' => 'invalid',
+                ])
+                ->assertSessionHasErrors([
+                    'rp_delivery_receipt_on_assign' => $message,
+                ]);
+        }
+    }
+
+    public function test_pra_delivery_toggle_strictly_rejects_non_browser_values_without_changing_state(): void
+    {
+        Company::whereKey($this->posCompanyId)->update([
+            'delivery_receipt_print_on_assign' => true,
+            'receipt_printer_size' => '80mm',
+        ]);
+
+        foreach ([null, '', true, false, 0.0, 1.0, [], ['0']] as $malformed) {
+            $this->actingAs(User::find($this->posAdminId), 'pos')
+                ->from('/pos/receipt-settings')
+                ->post('/pos/receipt-settings', [
+                    'rp_delivery_receipt_present' => '1',
+                    'rp_delivery_receipt_on_assign' => $malformed,
+                    'rp_printer_size' => '58mm',
+                ])
+                ->assertSessionHasErrors('rp_delivery_receipt_on_assign');
+
+            $company = Company::findOrFail($this->posCompanyId);
+            $this->assertTrue((bool) $company->delivery_receipt_print_on_assign);
+            $this->assertSame('80mm', $company->receipt_printer_size);
+        }
+    }
+
+    public function test_pra_receipt_alignment_and_margin_accept_only_safe_contract(): void
+    {
+        foreach ([
+            ['rp_align_center' => '0', 'rp_left_margin_mm' => '0'],
+            ['rp_align_center' => '1', 'rp_left_margin_mm' => '30'],
+        ] as $payload) {
+            $this->actingAs(User::find($this->posAdminId), 'pos')
+                ->post('/pos/receipt-settings', $payload)
+                ->assertSessionHasNoErrors();
+        }
+
+        $company = Company::findOrFail($this->posCompanyId);
+        $this->assertTrue((bool) $company->receipt_align_center);
+        $this->assertSame(30, (int) $company->receipt_left_margin_mm);
+
+        foreach ([
+            ['rp_align_center' => 'center'],
+            ['rp_align_center' => '2'],
+            ['rp_left_margin_mm' => '-1'],
+            ['rp_left_margin_mm' => '31'],
+            ['rp_left_margin_mm' => '1.5'],
+            ['rp_left_margin_mm' => 'left'],
+        ] as $payload) {
+            $response = $this->actingAs(User::find($this->posAdminId), 'pos')
+                ->from('/pos/receipt-settings')
+                ->post('/pos/receipt-settings', $payload);
+            $response->assertSessionHasErrors(array_key_first($payload));
+        }
+    }
+
+    public function test_pra_footer_over_limit_is_still_rejected(): void
+    {
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->from('/pos/receipt-settings')
+            ->post('/pos/receipt-settings', ['rp_footer_text' => str_repeat('x', 151)])
+            ->assertSessionHasErrors('rp_footer_text');
+    }
+
     // ── 4. FBR receipt-settings POST ──────────────────────────────────────
 
     public function test_fbr_post_theme_switch_writes_pair_and_preserves_untouched_keys(): void
@@ -360,6 +475,90 @@ class PosReceiptThemeTest extends TestCase
             ->assertRedirect();
 
         $this->assertTrue((bool) Company::findOrFail($this->fbrCompanyId)->delivery_receipt_print_on_assign);
+    }
+
+    public function test_fbr_real_browser_delivery_off_and_missing_toggle_payloads_save_safely(): void
+    {
+        $this->seedStyle($this->fbrCompanyId, [
+            'bold' => true,
+            'logo' => 'center',
+            'pdf_paper' => 'a4',
+            'show_menu_qr' => false,
+        ]);
+        Company::whereKey($this->fbrCompanyId)->update(['delivery_receipt_print_on_assign' => true]);
+
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->from('/fbr-pos/receipt-settings')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_delivery_receipt_present' => '1',
+                'rp_delivery_receipt_on_assign' => '0',
+                'rp_fbr_display_present' => '1',
+                'rp_show_address' => '1',
+                'rp_footer_text' => 'FBR browser OFF saved',
+                'rp_receipt_theme' => 'bold_side',
+                'rp_printer_size' => '58mm',
+                'rp_order_match' => 'token',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $company = Company::findOrFail($this->fbrCompanyId);
+        $prefs = json_decode($company->getRawOriginal('invoice_display_prefs'), true);
+        $this->assertFalse((bool) $company->delivery_receipt_print_on_assign);
+        $this->assertTrue($prefs['fbrpos']['show_address']);
+        $this->assertSame('FBR browser OFF saved', $prefs['fbrpos']['footer_text']);
+        $this->assertSame('side', $prefs['pos_style']['logo']);
+        $this->assertSame('a4', $prefs['pos_style']['pdf_paper']);
+        $this->assertFalse($prefs['pos_style']['show_menu_qr']);
+        $this->assertSame('thermal58', $company->print_paper_size);
+        $this->assertSame('token', $company->order_match_style);
+
+        Company::whereKey($this->fbrCompanyId)->update(['delivery_receipt_print_on_assign' => true]);
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', ['rp_delivery_receipt_present' => '1'])
+            ->assertSessionHasNoErrors();
+        $this->assertFalse((bool) Company::findOrFail($this->fbrCompanyId)->delivery_receipt_print_on_assign);
+    }
+
+    public function test_fbr_delivery_toggle_rejects_malformed_value_and_footer_limit_is_unchanged(): void
+    {
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->from('/fbr-pos/receipt-settings')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_delivery_receipt_present' => '1',
+                'rp_delivery_receipt_on_assign' => 'invalid',
+            ])
+            ->assertSessionHasErrors([
+                'rp_delivery_receipt_on_assign' => 'Delivery receipt ka durust default choose karein.',
+            ]);
+
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->from('/fbr-pos/receipt-settings')
+            ->post('/fbr-pos/receipt-settings', ['rp_footer_text' => str_repeat('x', 151)])
+            ->assertSessionHasErrors('rp_footer_text');
+    }
+
+    public function test_fbr_delivery_toggle_strictly_rejects_non_browser_values_without_changing_state(): void
+    {
+        Company::whereKey($this->fbrCompanyId)->update([
+            'delivery_receipt_print_on_assign' => true,
+            'print_paper_size' => 'thermal',
+        ]);
+
+        foreach ([null, '', true, false, 0.0, 1.0, [], ['1']] as $malformed) {
+            $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+                ->from('/fbr-pos/receipt-settings')
+                ->post('/fbr-pos/receipt-settings', [
+                    'rp_delivery_receipt_present' => '1',
+                    'rp_delivery_receipt_on_assign' => $malformed,
+                    'rp_printer_size' => '58mm',
+                ])
+                ->assertSessionHasErrors('rp_delivery_receipt_on_assign');
+
+            $company = Company::findOrFail($this->fbrCompanyId);
+            $this->assertTrue((bool) $company->delivery_receipt_print_on_assign);
+            $this->assertSame('thermal', $company->print_paper_size);
+        }
     }
 
     // ── 5. Blade renders the theme picker on BOTH screens ─────────────────

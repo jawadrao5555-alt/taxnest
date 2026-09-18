@@ -597,27 +597,32 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
     const root = document.documentElement;
     const body = document.body;
     const main = firstMatching(['main', '[role="main"]']);
-    const isIntentionalScrollable = element => {
+    const isHorizontalScrollable = element => {
         if (!element) return false;
         const style = getComputedStyle(element);
-        return style.overflow === 'auto' || style.overflow === 'scroll'
-            || style.overflowX === 'auto' || style.overflowX === 'scroll'
-            || style.overflowY === 'auto' || style.overflowY === 'scroll'
-            || element.matches('[data-scrollable], [data-scroll-container], .overflow-auto, .overflow-x-auto, .overflow-y-auto, [role="table"]');
+        return style.overflowX === 'auto' || style.overflowX === 'scroll'
+            || element.matches('.overflow-auto, .overflow-x-auto');
+    };
+    const insideHorizontalScroll = element => {
+        for (let current = element.parentElement; current; current = current.parentElement) {
+            if (isHorizontalScrollable(current)) return true;
+        }
+        return false;
     };
     const overflowRecord = (element, name) => {
         if (!element) return { name, present: false, checked: false, intentionalScrollable: false };
         const scrollWidth = Math.max(element.scrollWidth || 0, element.clientWidth || 0);
         const scrollHeight = Math.max(element.scrollHeight || 0, element.clientHeight || 0);
         const widthLimit = name === 'document' ? viewport.width : element.clientWidth;
+        const horizontalScrollable = isHorizontalScrollable(element);
         return {
             name,
             present: true,
-            checked: !isIntentionalScrollable(element),
-            intentionalScrollable: isIntentionalScrollable(element),
+            checked: !horizontalScrollable,
+            intentionalScrollable: horizontalScrollable,
             scrollWidth,
             clientWidth: element.clientWidth,
-            horizontalOverflow: scrollWidth > widthLimit + 2 && !isIntentionalScrollable(element),
+            horizontalOverflow: scrollWidth > widthLimit + 2 && !horizontalScrollable,
             scrollHeight,
             clientHeight: element.clientHeight,
             verticalOverflow: name === 'document' ? scrollHeight > viewport.height + 2 : scrollHeight > element.clientHeight + 2,
@@ -628,6 +633,43 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
         body: overflowRecord(body, 'body'),
         main: overflowRecord(main, 'main'),
         intentionallyScrollableContainers: [...document.querySelectorAll('[data-scrollable], [data-scroll-container], .overflow-auto, .overflow-x-auto, .overflow-y-auto, [role="table"]')].length,
+        offenders: [...document.body.querySelectorAll('*')]
+            .filter(element => isVisible(element) && !insideHorizontalScroll(element))
+            .map(element => {
+                const rect = element.getBoundingClientRect();
+                const style = getComputedStyle(element);
+                const ancestors = [];
+                for (let current = element.parentElement; current && ancestors.length < 4; current = current.parentElement) {
+                    const ancestorRect = current.getBoundingClientRect();
+                    const ancestorStyle = getComputedStyle(current);
+                    ancestors.push({
+                        selector: describe(current).selector,
+                        left: round(ancestorRect.left),
+                        right: round(ancestorRect.right),
+                        width: round(ancestorRect.width),
+                        display: ancestorStyle.display,
+                        flexWrap: ancestorStyle.flexWrap,
+                        overflowX: ancestorStyle.overflowX,
+                    });
+                }
+                return {
+                    selector: describe(element).selector,
+                    text: (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80),
+                    left: round(rect.left),
+                    right: round(rect.right),
+                    width: round(rect.width),
+                    excess: round(Math.max(0, rect.right - viewport.width, -rect.left)),
+                    display: style.display,
+                    flexShrink: style.flexShrink,
+                    flexBasis: style.flexBasis,
+                    flexWrap: style.flexWrap,
+                    overflowX: style.overflowX,
+                    ancestors,
+                };
+            })
+            .filter(item => item.excess > 2)
+            .sort((a, b) => b.excess - a.excess)
+            .slice(0, 20),
     };
     const headerRect = header?.getBoundingClientRect();
     const headerStyle = header ? getComputedStyle(header) : null;
@@ -744,6 +786,9 @@ export const auditPremiumVisualPage = function auditPremiumVisualPage(options = 
         if (overflow[key].horizontalOverflow) report.findings.push({ type: 'horizontal-overflow', target: key });
     }
     if (overflow.body.horizontalOverflow) report.findings.push({ type: 'horizontal-overflow', target: 'body' });
+    if (overflow.offenders.length > 0) {
+        report.findings.push({ type: 'off-viewport-content', offenders: overflow.offenders });
+    }
     if (mobilePayOutsideViewport) {
         report.findings.push({
             type: 'mobile-pay-outside-viewport',

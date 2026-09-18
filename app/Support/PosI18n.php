@@ -44,9 +44,9 @@ final class PosI18n
         $src = (string) @file_get_contents($bladePath);
         $keys = [];
 
-        // window.TXT.key / TXT.key  and  TXT['key'] / TXT["key"]
+        // window.TXT.key / TXT?.key and whitespace/optional bracket variants.
         if (preg_match_all(
-            '/(?<![A-Za-z0-9_$.])(?:window\.)?TXT(?:\.([A-Za-z_][A-Za-z0-9_]*)|\[\s*[\'"]([A-Za-z0-9_.]+)[\'"]\s*\])/',
+            '/(?<![A-Za-z0-9_$.])(?:window\s*\.\s*)?TXT\s*(?:(?:\?\.|\.)\s*([A-Za-z_][A-Za-z0-9_]*)|(?:\?\.)?\s*\[\s*[\'"]([A-Za-z0-9_.]+)[\'"]\s*\])/',
             $src,
             $m
         )) {
@@ -84,7 +84,7 @@ final class PosI18n
     {
         $src = (string) @file_get_contents($bladePath);
         $problems = [];
-        if (preg_match_all('/(?<![A-Za-z0-9_$.])(?:window\.)?TXT\[\s*(?![\'"])/', $src, $m, PREG_OFFSET_CAPTURE)) {
+        if (preg_match_all('/(?<![A-Za-z0-9_$.])(?:window\s*\.\s*)?TXT\s*(?:\?\.)?\s*\[\s*(?![\'"])/', $src, $m, PREG_OFFSET_CAPTURE)) {
             foreach ($m[0] as [$txt, $off]) {
                 $line = substr_count($src, "\n", 0, $off) + 1;
                 $snippet = trim(substr($src, $off, 60));
@@ -92,6 +92,133 @@ final class PosI18n
             }
         }
         return $problems;
+    }
+
+    /**
+     * Find likely user-facing English literals in a covered Blade view.
+     * Translation expressions and technical tokens are intentionally ignored.
+     * This is a regression guard, not a language detector: a visible phrase
+     * containing two or more ordinary English words is actionable, while
+     * product/catalog data and FBR/PRA/POS/KOT/keyboard labels are not.
+     *
+     * @return string[] "line: snippet" findings
+     */
+    public static function scanVisibleText(string $source): array
+    {
+        $source = preg_replace('/\{\{--.*?--\}\}/s', ' ', $source) ?? $source;
+        $source = preg_replace('/\/\*.*?\*\//s', ' ', $source) ?? $source;
+        $source = preg_replace('/(^|[\r\n])\s*\/\/.*?(?=[\r\n]|$)/', '$1', $source) ?? $source;
+        $source = preg_replace('/^[ \t]*@[^\r\n]*/m', ' ', $source) ?? $source;
+        $candidates = [];
+        if (preg_match_all('/>([^<>{}]{3,})</', $source, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[1] as [$text, $offset]) {
+                $candidates[] = [$text, $offset];
+            }
+        }
+        if (preg_match_all('/(?<![:\w-])(?:title|placeholder|aria-label|alt|value)\s*=\s*(["\'])(.*?)\1/is', $source, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[2] as $i => [$text, $offset]) {
+                $candidates[] = [$text, $offset];
+            }
+        }
+        // JS UI calls and generated receipt HTML are covered by the text-node
+        // pass where they contain tags; this catches plain alert/toast strings.
+        if (preg_match_all('/\b(?:alert|confirm|showToast|tnNotify)\s*\(\s*(["\'])(.*?)\1/is', $source, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[2] as $i => [$text, $offset]) {
+                $candidates[] = [$text, $offset];
+            }
+        }
+        if (preg_match_all('/\b(?:alert|confirm|showToast|tnNotify)\s*\(\s*(`)(.*?)\1/is', $source, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[2] as [$text, $offset]) {
+                $candidates[] = [$text, $offset];
+            }
+        }
+        if (preg_match_all('/\b(?:textContent|innerHTML)\s*=\s*(["\'`])(.*?)\1/is', $source, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[2] as [$text, $offset]) {
+                $candidates[] = [$text, $offset];
+            }
+        }
+        if (preg_match_all('/\b(?:x-text|x-html)\s*=\s*(["\'])(.*?)\1/is', $source, $attrs, PREG_OFFSET_CAPTURE)) {
+            foreach ($attrs[2] as [$expression, $attributeOffset]) {
+                if (!preg_match_all('/([\'"`])(.*?)\1/s', $expression, $literals, PREG_OFFSET_CAPTURE)) {
+                    continue;
+                }
+                foreach ($literals[2] as [$text, $literalOffset]) {
+                    $candidates[] = [$text, $attributeOffset + $literalOffset];
+                }
+            }
+        }
+        $findings = [];
+        foreach ($candidates as [$raw, $offset]) {
+            $text = self::stripTemplateExpressions(
+                trim(html_entity_decode(strip_tags((string) $raw)))
+            );
+            if ($text === '' || str_contains($text, '{{') || str_contains($text, '}}')
+                || !preg_match('/[A-Za-z]/', $text)
+                // A > operator in Alpine/JS is not an HTML text node.
+                || preg_match('/(?:window\.|[(){}=]|=>|\|\||&&|\?\s*|^[\w$]+\.[\w$]+$)/', $text)) {
+                continue;
+            }
+            preg_match_all('/\b[A-Za-z][A-Za-z-]*\b/', $text, $words);
+            $ordinary = array_values(array_filter($words[0], static function (string $word): bool {
+                return !in_array(strtoupper($word), [
+                    'FBR', 'PRA', 'POS', 'KOT', 'F10', 'F11', 'F12', 'ALT', 'CTRL',
+                    'ESC', 'ENTER', 'SHIFT', 'SKU', 'RS', 'VIP', 'API', 'URL',
+                ], true);
+            }));
+            // Require a phrase, which avoids catalog names and normal keyboard
+            // labels while catching "Print customer copy" and "Settings Error".
+            if (count($ordinary) < 2) {
+                continue;
+            }
+            $line = substr_count($source, "\n", 0, (int) $offset) + 1;
+            $findings[] = "line {$line}: " . preg_replace('/\s+/', ' ', $text);
+        }
+        return array_values(array_unique($findings));
+    }
+
+    /**
+     * Remove ${...} expressions while preserving a template literal's static
+     * text. Braces inside nested expressions and quoted strings are balanced,
+     * so "Payment failed for ${userLabel({ id })}" still scans the phrase.
+     */
+    private static function stripTemplateExpressions(string $text): string
+    {
+        $out = '';
+        $length = strlen($text);
+        for ($i = 0; $i < $length; $i++) {
+            if ($text[$i] !== '$' || ($text[$i + 1] ?? '') !== '{') {
+                $out .= $text[$i];
+                continue;
+            }
+
+            $depth = 1;
+            $quote = null;
+            $escaped = false;
+            $i++;
+            while (++$i < $length && $depth > 0) {
+                $char = $text[$i];
+                if ($quote !== null) {
+                    if ($escaped) {
+                        $escaped = false;
+                    } elseif ($char === '\\') {
+                        $escaped = true;
+                    } elseif ($char === $quote) {
+                        $quote = null;
+                    }
+                    continue;
+                }
+                if ($char === "'" || $char === '"' || $char === '`') {
+                    $quote = $char;
+                } elseif ($char === '{') {
+                    $depth++;
+                } elseif ($char === '}') {
+                    $depth--;
+                }
+            }
+            $out .= ' ';
+            $i--;
+        }
+        return trim($out);
     }
 
     /**

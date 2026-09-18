@@ -818,8 +818,36 @@ pre, code { max-width: 100%; overflow-x: auto; word-break: break-word; }
     .topnav-bar .tn-impersonation-header-left { gap: .4rem !important; min-width: 0; }
     /* Row 1 is customer-first, row 2 is search-first. Prevent long customer
        values and utility controls from forcing the workspace wider. */
-    .tn-action-row1, .tn-action-row2 { min-width: 0; padding-inline: .5rem !important; column-gap: .35rem !important; }
-    .tn-action-row1 > div:first-child { flex-basis: 100% !important; width: 100% !important; }
+    .tn-action-row1, .tn-action-row2 {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        padding-inline: .5rem !important;
+        column-gap: .35rem !important;
+    }
+    .tn-action-row2 {
+        overflow-x: auto !important;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .tn-action-row2::-webkit-scrollbar { display: none; }
+    .tn-action-row1 > div:first-child { flex-basis: 100% !important; width: 100% !important; min-width: 0 !important; }
+    .tn-fbr-header-actions,
+    .tn-fbr-mobile-switches {
+        max-width: 100%;
+        min-width: 0 !important;
+        overflow-x: auto !important;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .tn-fbr-header-actions::-webkit-scrollbar,
+    .tn-fbr-mobile-switches::-webkit-scrollbar { display: none; }
+    .tn-fbr-mobile-switches {
+        justify-content: flex-start !important;
+        gap: .4rem !important;
+        padding-inline: .5rem !important;
+    }
     .tn-action-row1 > div:first-child input,
     .tn-action-row2 input[type="search"] { min-width: 0 !important; width: 100% !important; }
     .tn-action-row2 > .relative:first-child select { max-width: 112px !important; }

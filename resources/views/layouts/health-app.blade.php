@@ -101,6 +101,7 @@
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
     @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
     {{-- Urdu-script UI font: own <html> head, so it needs its own include. --}}
     @include('partials.urdu-font')
     <style>

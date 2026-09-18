@@ -1,0 +1,392 @@
+{
+  "ok": true,
+  "generatedAt": "2026-09-18T07:07:40.155Z",
+  "durationMs": 46,
+  "viewport": {
+    "width": 1440,
+    "height": 960,
+    "devicePixelRatio": 1
+  },
+  "viewportClass": "desktop",
+  "responsive": {
+    "current": "desktop",
+    "metrics": {
+      "viewportWidth": 1440,
+      "viewportHeight": 960,
+      "headerWidth": null,
+      "headerHeight": null,
+      "headerVisible": false,
+      "headerStickyOrFixed": false,
+      "paymentVisible": true,
+      "paymentIntersecting": true
+    },
+    "breakpoints": {
+      "mobile": {
+        "maxWidth": 600
+      },
+      "tablet": {
+        "minWidth": 601,
+        "maxWidth": 1024
+      },
+      "desktop": {
+        "minWidth": 1025
+      }
+    }
+  },
+  "theme": {
+    "darkClass": false,
+    "colorScheme": "normal",
+    "dataTheme": null,
+    "prefersDark": false,
+    "expectedTheme": null,
+    "shellSelector": "body.h-full.bg-gray-950",
+    "shellBackgroundLuminance": 0.916,
+    "shellBackgroundLuminances": [
+      0.916
+    ],
+    "failures": []
+  },
+  "darkMode": {
+    "darkClass": false,
+    "colorScheme": "normal",
+    "dataTheme": null,
+    "prefersDark": false,
+    "expectedTheme": null,
+    "shellSelector": "body.h-full.bg-gray-950",
+    "shellBackgroundLuminance": 0.916,
+    "shellBackgroundLuminances": [
+      0.916
+    ],
+    "failures": []
+  },
+  "header": {
+    "found": false,
+    "visible": false,
+    "dimensions": null
+  },
+  "categories": {
+    "headerLabels": {
+      "category": "header-labels",
+      "candidateCount": 1,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "headerIcons": {
+      "category": "header-icons",
+      "candidateCount": 1,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "grandTotal": {
+      "category": "grand-total",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "productNames": {
+      "category": "product-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "quantityControls": {
+      "category": "quantity-controls",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "paymentControls": {
+      "category": "payment-controls",
+      "candidateCount": 13,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "button",
+          "selector": "button.text-gray-500.dark\\:text-gray-400",
+          "text": "",
+          "ariaLabel": "",
+          "category": "payment-controls",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 5.891,
+          "contrastRatios": [
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.547,
+            0.591,
+            0.605
+          ],
+          "background": [
+            0.067,
+            0.094,
+            0.153
+          ],
+          "sourceForeground": [
+            0.867,
+            0.922,
+            0.906,
+            0.6
+          ],
+          "transparentAncestors": 5,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": true,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "cartNames": {
+      "category": "cart-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartQuantities": {
+      "category": "cart-quantities",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartLineTotals": {
+      "category": "cart-line-totals",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    }
+  },
+  "contrast": {
+    "headerLabels": {
+      "category": "header-labels",
+      "candidateCount": 1,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "headerIcons": {
+      "category": "header-icons",
+      "candidateCount": 1,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "grandTotal": {
+      "category": "grand-total",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "productNames": {
+      "category": "product-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "quantityControls": {
+      "category": "quantity-controls",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "paymentControls": {
+      "category": "payment-controls",
+      "candidateCount": 13,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "button",
+          "selector": "button.text-gray-500.dark\\:text-gray-400",
+          "text": "",
+          "ariaLabel": "",
+          "category": "payment-controls",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 5.891,
+          "contrastRatios": [
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891,
+            5.891
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.547,
+            0.591,
+            0.605
+          ],
+          "background": [
+            0.067,
+            0.094,
+            0.153
+          ],
+          "sourceForeground": [
+            0.867,
+            0.922,
+            0.906,
+            0.6
+          ],
+          "transparentAncestors": 5,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": true,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "cartNames": {
+      "category": "cart-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartQuantities": {
+      "category": "cart-quantities",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartLineTotals": {
+      "category": "cart-line-totals",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    }
+  },
+  "overflow": {
+    "document": {
+      "name": "document",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "horizontalOverflow": false,
+      "scrollHeight": 960,
+      "clientHeight": 960,
+      "verticalOverflow": false
+    },
+    "body": {
+      "name": "body",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "horizontalOverflow": false,
+      "scrollHeight": 960,
+      "clientHeight": 960,
+      "verticalOverflow": false
+    },
+    "main": {
+      "name": "main",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 1164,
+      "clientWidth": 1164,
+      "horizontalOverflow": false,
+      "scrollHeight": 3332,
+      "clientHeight": 960,
+      "verticalOverflow": true
+    },
+    "intentionallyScrollableContainers": 6,
+    "offenders": []
+  },
+  "stickyPayment": {
+    "candidateCount": 1,
+    "visibleCount": 1,
+    "intersectingCount": 1,
+    "stickyOrFixedCount": 0,
+    "controls": [
+      {
+        "tag": "button",
+        "selector": "button.text-gray-500.dark\\:text-gray-400",
+        "text": "",
+        "ariaLabel": "",
+        "visible": true,
+        "styleVisible": true,
+        "intersectingViewport": true,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 240,
+          "top": 899.063,
+          "width": 20,
+          "height": 20
+        },
+        "disabled": false
+      }
+    ]
+  },
+  "primaryPay": {
+    "candidateCount": 0,
+    "styleVisibleCount": 0,
+    "cartVisible": false,
+    "paymentDialogOpen": false,
+    "mobileCheckApplies": false,
+    "mobilePayOutsideViewport": false,
+    "controls": []
+  },
+  "requiredCategoryFailures": [],
+  "findings": []
+}

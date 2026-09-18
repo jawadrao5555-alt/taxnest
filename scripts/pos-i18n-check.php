@@ -22,6 +22,7 @@ $views = [
 $locales = ['en', 'rur', 'ur'];
 
 $lang = [];
+$fail = false;
 foreach ($locales as $loc) {
     $file = $root . '/lang/' . $loc . '/pos.php';
     if (!is_file($file)) {
@@ -31,12 +32,36 @@ foreach ($locales as $loc) {
     $lang[$loc] = require $file;
 }
 
-$fail = false;
+// Key parity is checked here as well as by PHPUnit so deploy preflight cannot
+// bake a key that one of the three supported POS locales cannot render.
+$canonicalKeys = array_keys($lang['en']);
+foreach (['rur', 'ur'] as $loc) {
+    $missing = array_diff($canonicalKeys, array_keys($lang[$loc]));
+    $extra = array_diff(array_keys($lang[$loc]), $canonicalKeys);
+    if ($missing || $extra) {
+        fwrite(STDERR, "FAIL: lang/en/pos.php and lang/{$loc}/pos.php key parity mismatch\n");
+        if ($missing) fwrite(STDERR, "      missing: " . implode(', ', array_slice($missing, 0, 20)) . "\n");
+        if ($extra) fwrite(STDERR, "      extra: " . implode(', ', array_slice($extra, 0, 20)) . "\n");
+        $fail = true;
+    }
+}
+
 foreach ($views as $label => $blade) {
     if (!is_file($blade)) {
         fwrite(STDERR, "FAIL: blade missing: $blade\n");
         $fail = true;
         continue;
+    }
+
+    // Remove Blade/PHP/JS comments before checking literals; comments are
+    // allowed to document implementation details and must not create noise.
+    $source = (string) file_get_contents($blade);
+    $scan = preg_replace('/\{\{--.*?--\}\}/s', ' ', $source);
+    $scan = preg_replace('/\/\*.*?\*\//s', ' ', $scan);
+    $scan = preg_replace('/(^|[\r\n])\s*\/\/.*?(?=[\r\n]|$)/', '$1', $scan);
+    foreach (\App\Support\PosI18n::scanVisibleText($source) as $problem) {
+        fwrite(STDERR, "FAIL [$label] likely hardcoded visible English: {$problem}\n");
+        $fail = true;
     }
 
     $problems = \App\Support\PosI18n::scanProblems($blade);

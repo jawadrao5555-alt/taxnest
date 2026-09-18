@@ -306,7 +306,9 @@ body[data-theme="midnight"] .tn-premium-sale .bg-gray-50 {
     font-weight: 800;
 }
 .tn-premium-sale .tn-widecart .tn-grand-total {
-    color: var(--tn-premium-brand) !important;
+    /* Wide-cart places the total on a light summary surface even while the
+       surrounding shell is dark. Keep the amount readable in both themes. */
+    color: #0A4D5C !important;
 }
 .tn-premium-sale .tn-payment-actions button {
     min-height: 46px;

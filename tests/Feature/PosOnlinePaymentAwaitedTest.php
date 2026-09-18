@@ -825,7 +825,7 @@ class PosOnlinePaymentAwaitedTest extends TestCase
 
         $this->assertStringContainsString("'/payment-quote?payment_method=qr_payment'", $saleScreen);
         $this->assertStringContainsString("cache: 'no-store'", $saleScreen);
-        $this->assertStringContainsString("x-text=\"'Online Payment — ' + boardOnlineQuoteText()\"", $saleScreen);
+        $this->assertStringContainsString('x-text="window.TXT.online_payment_prefix + boardOnlineQuoteText()"', $saleScreen);
         $this->assertStringContainsString('x-text="boardOnlineQuoteText()"', $saleScreen);
         $this->assertStringContainsString(':disabled="boardBusy || !boardOnlineQuoteReady()"', $saleScreen);
         $this->assertStringContainsString('{{ __(\'pos.online_quote_retry\') }}', $saleScreen);

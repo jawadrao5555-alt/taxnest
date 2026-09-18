@@ -302,6 +302,7 @@
         <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
         <noscript><link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" /></noscript>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
         <script src="{{ asset('js/nestpos-local-core.js') }}?v=10" defer></script>
         <script>
             // Alpine CDN fallback (only if the Vite bundle failed). MUST arm AFTER
@@ -529,9 +530,18 @@
                 -ms-overflow-style: none;
             }
             .tn-impersonated-header .tn-impersonation-header-nav::-webkit-scrollbar { display: none; }
+            .topnav-bar .tn-impersonation-header-actions {
+                min-width: 0;
+                max-width: 100%;
+                flex-shrink: 1 !important;
+                overflow-x: auto !important;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .topnav-bar .tn-impersonation-header-actions::-webkit-scrollbar { display: none; }
             @media (max-width: 639px) {
                 .tn-impersonated-header .tn-impersonation-header-row {
-                    height: auto;
+                    height: auto !important;
                     min-height: 3rem;
                     flex-wrap: wrap;
                     row-gap: .25rem;
@@ -539,7 +549,31 @@
                     padding-bottom: .25rem;
                 }
                 .tn-impersonated-header .tn-impersonation-header-left { flex-basis: 100%; }
-                .tn-impersonated-header .tn-impersonation-header-actions { margin-left: auto; }
+                .tn-impersonated-header .tn-impersonation-header-actions {
+                    flex: 1 1 100% !important;
+                    flex-wrap: wrap !important;
+                    justify-content: flex-end !important;
+                    min-width: 0;
+                    max-width: 100%;
+                    margin-left: auto;
+                }
+            }
+            @media (min-width: 640px) and (max-width: 767px) {
+                .topnav-bar .tn-impersonation-header-row {
+                    height: auto !important;
+                    min-height: 3rem;
+                    flex-wrap: wrap;
+                    row-gap: .25rem;
+                    padding-top: .25rem;
+                    padding-bottom: .25rem;
+                }
+                .topnav-bar .tn-impersonation-header-left { flex-basis: 100%; }
+                .topnav-bar .tn-impersonation-header-actions {
+                    flex: 1 1 100% !important;
+                    flex-wrap: wrap !important;
+                    justify-content: flex-end !important;
+                    margin-left: auto;
+                }
             }
         </style>
         {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur';

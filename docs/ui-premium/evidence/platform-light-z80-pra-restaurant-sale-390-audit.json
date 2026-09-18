@@ -1,0 +1,1403 @@
+{
+  "ok": true,
+  "generatedAt": "2026-09-18T07:07:11.603Z",
+  "durationMs": 148,
+  "viewport": {
+    "width": 488,
+    "height": 1055,
+    "devicePixelRatio": 0.800000011920929
+  },
+  "viewportClass": "mobile",
+  "responsive": {
+    "current": "mobile",
+    "metrics": {
+      "viewportWidth": 488,
+      "viewportHeight": 1055,
+      "headerWidth": 488,
+      "headerHeight": 48,
+      "headerVisible": true,
+      "headerStickyOrFixed": false,
+      "paymentVisible": false,
+      "paymentIntersecting": false
+    },
+    "breakpoints": {
+      "mobile": {
+        "maxWidth": 600
+      },
+      "tablet": {
+        "minWidth": 601,
+        "maxWidth": 1024
+      },
+      "desktop": {
+        "minWidth": 1025
+      }
+    }
+  },
+  "theme": {
+    "darkClass": false,
+    "colorScheme": "light",
+    "dataTheme": "purple",
+    "prefersDark": false,
+    "expectedTheme": "light",
+    "shellSelector": "div.tn-premium-sale.tn-sale-root",
+    "shellBackgroundLuminance": 0.916,
+    "shellBackgroundLuminances": [
+      0.916
+    ],
+    "failures": []
+  },
+  "darkMode": {
+    "darkClass": false,
+    "colorScheme": "light",
+    "dataTheme": "purple",
+    "prefersDark": false,
+    "expectedTheme": "light",
+    "shellSelector": "div.tn-premium-sale.tn-sale-root",
+    "shellBackgroundLuminance": 0.916,
+    "shellBackgroundLuminances": [
+      0.916
+    ],
+    "failures": []
+  },
+  "header": {
+    "found": true,
+    "visible": true,
+    "dimensions": {
+      "left": 0,
+      "top": 0,
+      "width": 488,
+      "height": 48
+    }
+  },
+  "categories": {
+    "headerLabels": {
+      "category": "header-labels",
+      "candidateCount": 1,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "div",
+          "selector": "div.w-7.h-7",
+          "text": "S",
+          "ariaLabel": "",
+          "category": "header-labels",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 8.824,
+          "contrastRatios": [
+            8.824
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.063,
+            0.153,
+            0.176
+          ],
+          "background": [
+            0.906,
+            0.749,
+            0.231
+          ],
+          "sourceForeground": [
+            0.063,
+            0.153,
+            0.176,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "headerIcons": {
+      "category": "header-icons",
+      "candidateCount": 91,
+      "visibleCount": 7,
+      "records": [
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 7.992,
+          "contrastRatios": [
+            7.992
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.173,
+            0.34,
+            0.373
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 7,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg#tnPwaRefreshSvg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 9.331,
+          "contrastRatios": [
+            9.331
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.125,
+            0.301,
+            0.336
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 7,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 7,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "grandTotal": {
+      "category": "grand-total",
+      "candidateCount": 1,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "productNames": {
+      "category": "product-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "quantityControls": {
+      "category": "quantity-controls",
+      "candidateCount": 3,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "paymentControls": {
+      "category": "payment-controls",
+      "candidateCount": 246,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "button",
+          "selector": "button.relative.flex",
+          "text": "Local",
+          "ariaLabel": "Provisional bills (local — not submitted to PRA). Press F10.",
+          "category": "payment-controls",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 6.508,
+          "contrastRatios": [
+            6.508
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.494,
+            0.133,
+            0.808
+          ],
+          "background": [
+            0.98,
+            0.961,
+            1
+          ],
+          "sourceForeground": [
+            0.494,
+            0.133,
+            0.808,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "cartNames": {
+      "category": "cart-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartQuantities": {
+      "category": "cart-quantities",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartLineTotals": {
+      "category": "cart-line-totals",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    }
+  },
+  "contrast": {
+    "headerLabels": {
+      "category": "header-labels",
+      "candidateCount": 1,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "div",
+          "selector": "div.w-7.h-7",
+          "text": "S",
+          "ariaLabel": "",
+          "category": "header-labels",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 8.824,
+          "contrastRatios": [
+            8.824
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.063,
+            0.153,
+            0.176
+          ],
+          "background": [
+            0.906,
+            0.749,
+            0.231
+          ],
+          "sourceForeground": [
+            0.063,
+            0.153,
+            0.176,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "headerIcons": {
+      "category": "header-icons",
+      "candidateCount": 91,
+      "visibleCount": 7,
+      "records": [
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 7.992,
+          "contrastRatios": [
+            7.992
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.173,
+            0.34,
+            0.373
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 7,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg#tnPwaRefreshSvg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 9.331,
+          "contrastRatios": [
+            9.331
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.125,
+            0.301,
+            0.336
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 7,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 6,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 12.535,
+          "contrastRatios": [
+            12.535
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            1,
+            1,
+            1
+          ],
+          "background": [
+            0.027,
+            0.224,
+            0.263
+          ],
+          "sourceForeground": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "transparentAncestors": 7,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "grandTotal": {
+      "category": "grand-total",
+      "candidateCount": 1,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "productNames": {
+      "category": "product-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "quantityControls": {
+      "category": "quantity-controls",
+      "candidateCount": 3,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-visible"
+    },
+    "paymentControls": {
+      "category": "payment-controls",
+      "candidateCount": 246,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "button",
+          "selector": "button.relative.flex",
+          "text": "Local",
+          "ariaLabel": "Provisional bills (local — not submitted to PRA). Press F10.",
+          "category": "payment-controls",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 6.508,
+          "contrastRatios": [
+            6.508
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.494,
+            0.133,
+            0.808
+          ],
+          "background": [
+            0.98,
+            0.961,
+            1
+          ],
+          "sourceForeground": [
+            0.494,
+            0.133,
+            0.808,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "cartNames": {
+      "category": "cart-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartQuantities": {
+      "category": "cart-quantities",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartLineTotals": {
+      "category": "cart-line-totals",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    }
+  },
+  "overflow": {
+    "document": {
+      "name": "document",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 488,
+      "clientWidth": 488,
+      "horizontalOverflow": false,
+      "scrollHeight": 1055,
+      "clientHeight": 1055,
+      "verticalOverflow": false
+    },
+    "body": {
+      "name": "body",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 488,
+      "clientWidth": 488,
+      "horizontalOverflow": false,
+      "scrollHeight": 1055,
+      "clientHeight": 1055,
+      "verticalOverflow": false
+    },
+    "main": {
+      "name": "main",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 488,
+      "clientWidth": 488,
+      "horizontalOverflow": false,
+      "scrollHeight": 1047,
+      "clientHeight": 1007,
+      "verticalOverflow": true
+    },
+    "intentionallyScrollableContainers": 39,
+    "offenders": []
+  },
+  "stickyPayment": {
+    "candidateCount": 20,
+    "visibleCount": 0,
+    "intersectingCount": 0,
+    "stickyOrFixedCount": 0,
+    "visible": false,
+    "intersecting": false,
+    "controls": [
+      {
+        "tag": "button",
+        "selector": "button.w-full.px-2",
+        "text": "Roman Urdu",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.w-full.px-2",
+        "text": "English",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.w-full.px-2",
+        "text": "Urdu Script",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.w-full.flex",
+        "text": "Sign Out",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.flex-1.px-4",
+        "text": "Add to Cart",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": true
+      },
+      {
+        "tag": "button",
+        "selector": "button.w-10.h-10",
+        "text": "",
+        "ariaLabel": "Send",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": true
+      },
+      {
+        "tag": "button",
+        "selector": "button.block.w-full",
+        "text": "Naya: Bill final ho to kitchen parchi khud chali jayegi Improvement New 18 Sep 2026 Agar cashier \"Send to Kitchen\" dabaye baghair hi bill CASH/CARD se final kar",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.block.w-full",
+        "text": "Reports, deals aur table payment ab zyada asaan New Feature New 18 Sep 2026 Dashboard ke Top Selling Items se ab complete item-wise report khulti hai. Date, bra",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.block.w-full",
+        "text": "Naya: Multi-Counter Printing — har cashier ka apna printer Improvement New 18 Sep 2026 Ek se zyada billing counters wali dukanein: ab har counter ke PC par Desk",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.block.w-full",
+        "text": "Naya: Har cashier sirf apni sale dekhega Improvement New 18 Sep 2026 Ab har cashier ko har jagah sirf APNI sales nazar aati hain — Transactions list, Reprint li",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.py-2.rounded-xl",
+        "text": "Take Payment",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.py-1\\.5.rounded-xl",
+        "text": "Cash Alt+1",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": true
+      },
+      {
+        "tag": "button",
+        "selector": "button.py-1\\.5.rounded-xl",
+        "text": "Card Alt+2",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": true
+      },
+      {
+        "tag": "button",
+        "selector": "button.pay-btn-premium.btn-ripple",
+        "text": "PAY Rs. 0 F8",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "relative",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": true
+      },
+      {
+        "tag": "button",
+        "selector": "button.py-4.rounded-xl",
+        "text": "Cash Tax: 16% Press 1",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.py-4.rounded-xl",
+        "text": "Card Tax: 8% Press 2",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.w-full.py-4",
+        "text": "Confirm online payment received",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.px-4.py-2",
+        "text": "Confirm Settlement",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": true
+      },
+      {
+        "tag": "button",
+        "selector": "button.py-4.rounded-xl",
+        "text": "Cash Tax: 16%",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      },
+      {
+        "tag": "button",
+        "selector": "button.py-4.rounded-xl",
+        "text": "Card Tax: 8%",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": false,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 0,
+          "height": 0
+        },
+        "disabled": false
+      }
+    ]
+  },
+  "primaryPay": {
+    "candidateCount": 1,
+    "styleVisibleCount": 0,
+    "cartVisible": false,
+    "paymentDialogOpen": false,
+    "mobileCheckApplies": false,
+    "mobilePayOutsideViewport": false,
+    "controls": [
+      {
+        "tag": "button",
+        "selector": "button.pay-btn-premium.btn-ripple",
+        "text": "PAY Rs. 0 F8",
+        "ariaLabel": "",
+        "styleVisible": false,
+        "visible": false,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0
+        },
+        "fullyInsideViewport": false
+      }
+    ]
+  },
+  "requiredCategoryFailures": [],
+  "findings": []
+}

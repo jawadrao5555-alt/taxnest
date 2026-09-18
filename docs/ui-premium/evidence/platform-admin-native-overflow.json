@@ -1,0 +1,36 @@
+{
+  "phase": "platform-admin-native",
+  "generatedAt": "2026-09-18T07:07:44.655Z",
+  "surfaces": [
+    {
+      "phase": "platform-admin-native",
+      "surface": "admin-dashboard",
+      "viewport": 1440,
+      "scrollWidth": 1440,
+      "layoutWidth": 1440,
+      "zoom": 100,
+      "overflow": false,
+      "path": "/admin/dashboard"
+    },
+    {
+      "phase": "platform-admin-native",
+      "surface": "admin-dashboard",
+      "viewport": 834,
+      "scrollWidth": 834,
+      "layoutWidth": 834,
+      "zoom": 100,
+      "overflow": false,
+      "path": "/admin/dashboard"
+    },
+    {
+      "phase": "platform-admin-native",
+      "surface": "admin-dashboard",
+      "viewport": 390,
+      "scrollWidth": 390,
+      "layoutWidth": 390,
+      "zoom": 100,
+      "overflow": false,
+      "path": "/admin/dashboard"
+    }
+  ]
+}

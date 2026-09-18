@@ -155,6 +155,7 @@
         {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
         @include('partials.font-css', ['fontFamilies' => 'inter:300,400,500,600,700,800,900'])
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
         {{-- Alpine CDN fallback — arm only AFTER DOMContentLoaded. A blind timer can
              start Alpine while a large cached sale document is still parsing, before
              restaurantPos() is defined, which leaves the product grid loading forever. --}}
@@ -444,7 +445,7 @@
                          Empty and harmless on every other FBR POS page. --}}
                     <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="tn-fbr-header-actions flex items-center gap-2 min-w-0 max-w-full overflow-x-auto">
                         {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
                         <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="blue" />

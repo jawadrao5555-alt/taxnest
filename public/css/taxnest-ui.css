@@ -1,0 +1,130 @@
+/*
+ * TaxNest shared surface contract
+ * Loaded after utility CSS in every product shell. Keep this file additive:
+ * company/POS theme variables remain authoritative; these rules only improve
+ * hierarchy, contrast, focus, density and responsive containment.
+ */
+:root {
+    --tn-ink: #18212f;
+    --tn-muted: #536174;
+    --tn-subtle: #6b7788;
+    --tn-line: #d7dee8;
+    --tn-surface: #ffffff;
+    --tn-canvas: #f3f6fa;
+    --tn-focus: #0f766e;
+    --tn-radius: 10px;
+    --tn-content-max: 96rem;
+}
+
+html.dark {
+    --tn-ink: #eef3f8;
+    --tn-muted: #c2cedb;
+    --tn-subtle: #a4b2c2;
+    --tn-line: #334155;
+    --tn-surface: #172131;
+    --tn-canvas: #0d1520;
+    --tn-focus: #5eead4;
+}
+
+html, body {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+    color: var(--tn-ink);
+    background-color: var(--tn-canvas);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+/* Shared content rail: wider than the old SaaS detail rail without making
+   POS workspaces inherit a marketing-style max width. */
+.tn-content-rail,
+main > .max-w-5xl,
+main > .max-w-6xl,
+main > .max-w-7xl {
+    width: min(100%, var(--tn-content-max));
+    margin-inline: auto;
+}
+
+/* Recover readable text where old utility classes were too faint. Scoped away
+   from intentional theme/header and POS display surfaces. */
+main .text-gray-400:not(svg),
+main .text-slate-400:not(svg) { color: var(--tn-muted); }
+main .text-gray-500:not(svg),
+main .text-slate-500:not(svg) { color: var(--tn-subtle); }
+html.dark main .text-gray-400:not(svg),
+html.dark main .text-slate-400:not(svg) { color: var(--tn-muted) !important; }
+html.dark main .text-gray-500:not(svg),
+html.dark main .text-slate-500:not(svg) { color: var(--tn-subtle) !important; }
+main .text-\[10px\], main .text-\[11px\] { line-height: 1.35; }
+
+/* Forms: explicit borders and a single accessible focus language. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select, textarea, .premium-input {
+    border-color: var(--tn-line);
+    color: var(--tn-ink);
+    background-color: var(--tn-surface);
+}
+input::placeholder, textarea::placeholder { color: var(--tn-subtle); opacity: 1; }
+input:focus-visible, select:focus-visible, textarea:focus-visible,
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+    outline: 2px solid var(--tn-focus);
+    outline-offset: 2px;
+}
+button:disabled, input:disabled, select:disabled, textarea:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+}
+
+/* Common cards/tables/modals stay solid enough for long shifts and scanning. */
+main .bg-white.rounded-xl,
+main .bg-white.rounded-2xl,
+main .dark\:bg-gray-900,
+main .premium-card {
+    border-color: var(--tn-line);
+}
+main table thead th, main .premium-table th {
+    color: var(--tn-muted);
+    font-size: 0.7rem;
+    font-weight: 750;
+    letter-spacing: 0.055em;
+}
+main table tbody tr { border-color: var(--tn-line); }
+main table tbody tr:hover { background-color: color-mix(in srgb, var(--tn-focus) 6%, transparent); }
+
+.tn-badge, .premium-badge {
+    min-height: 1.5rem;
+    align-items: center;
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Alerts are notices, not decoration: preserve status hues but improve
+   separation from dense content. */
+main [role="alert"], main .tn-alert {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: var(--tn-radius);
+}
+
+@media (min-width: 1024px) {
+    main.p-4, main.p-6 { padding-inline: clamp(1.25rem, 2.4vw, 2.5rem); }
+    main > .max-w-5xl { max-width: 96rem; }
+}
+
+@media (max-width: 767px) {
+    .tn-content-rail, main > .max-w-5xl, main > .max-w-6xl,
+    main > .max-w-7xl { max-width: 100%; }
+    main .overflow-x-auto { scrollbar-width: thin; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}

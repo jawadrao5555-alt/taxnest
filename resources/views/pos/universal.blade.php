@@ -611,7 +611,7 @@ window.addEventListener('popstate', function() {
             @if($uBillScope !== 'pra')
             <button @click="openLocalBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition flex-shrink-0" title="Provisional bills (local — not submitted to PRA). Press F10.">
                 <span class="tn-key-chip text-[9px] bg-purple-400/30 px-1 rounded">F10</span>
-                <span class="hidden lg:inline">Local</span>
+                <span class="hidden lg:inline">{{ __('pos.local_word') }}</span>
                 <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-purple-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
             </button>
             @endif
@@ -929,7 +929,7 @@ window.addEventListener('popstate', function() {
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-100 dark:border-gray-800">
             <div class="text-center mb-5">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.order_type') }}</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">&uarr; &darr; select &middot; Enter confirm &middot; Esc back</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">&uarr; &darr; {{ __('pos.select') }} &middot; Enter {{ __('pos.confirm') }} &middot; Esc {{ __('pos.back_word') }}</p>
             </div>
             <div class="space-y-2">
                 <template x-for="(k, i) in guidedOrderTypes()" :key="k">
@@ -1048,7 +1048,7 @@ window.addEventListener('popstate', function() {
         @if($company->pos_quick_type_enabled ?? false)
         <button @if($isSaaf) data-saaf-secondary="1" @endif @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="{{ \App\Support\PosVocabulary::t('ti_quick_type_f7') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            <span class="hidden lg:inline">Quick</span>
+            <span class="hidden lg:inline">{{ __('pos.quick_type') }}</span>
             <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F7</span>
         </button>
         @endif
@@ -1192,7 +1192,7 @@ window.addEventListener('popstate', function() {
         <button @click="openLocalBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             <span class="tn-key-chip text-[10px] bg-purple-400/30 px-1 rounded">F10</span>
-            <span class="hidden sm:inline">Local</span>
+            <span class="hidden sm:inline">{{ __('pos.local_word') }}</span>
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
         @endif
@@ -1344,7 +1344,7 @@ window.addEventListener('popstate', function() {
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">OUT</span></template>
                                         <template x-if="item.hasRecipe"><span class="text-[10px] flex-shrink-0" title="Recipe">&#x1F373;</span></template>
                                         @endif
-                                        <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
+                                        <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.no_tax_t') }}</span></template>
                                         <template x-if="item.is_third_schedule"><span class="px-1.5 py-0.5 bg-blue-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">3rd Sch</span></template>
                                          <template x-if="item.type === 'deal' && item.deal_type === 'special'"><span class="px-1.5 py-0.5 bg-amber-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.special_deal') }}</span></template>
                                          <template x-if="item.type === 'deal' && item.deal_type !== 'special'"><span class="px-1.5 py-0.5 bg-sky-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.regular_deal') }}</span></template>
@@ -1695,7 +1695,7 @@ window.addEventListener('popstate', function() {
                              T/Alt+T tax shortcut (no per-item editors any more, but the cashier must
                              still SEE the state — NO TAX chip is the only exempt indicator now). --}}
                         <div x-show="item.is_tax_exempt || item.is_third_schedule || (item.item_discount_value || 0) > 0 || (item.special_notes || '').length > 0" class="mt-0.5 flex items-center gap-1 flex-wrap">
-                            <span x-show="item.is_tax_exempt && !item.is_third_schedule" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">NO TAX</span>
+                            <span x-show="item.is_tax_exempt && !item.is_third_schedule" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">{{ __('pos.no_tax_t') }}</span>
                             <span x-show="item.is_third_schedule" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500 text-white">3rd Sch</span>
                             <span x-show="(item.item_discount_value || 0) > 0" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-600" x-text="(item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value"></span>
                             <span x-show="(item.special_notes || '').length > 0 && !item._showNote" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 truncate max-w-[180px]" x-text="item.special_notes"></span>
@@ -1868,11 +1868,11 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <button @click="quickCashPay()" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
-                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
+                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>{{ __('pos.cash_word') }}</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('cash')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
                         </button>
                         <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; payPrintReceipt = billPrintDefault(orderType); processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
-                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
+                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>{{ __('pos.card_word') }}</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('card')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
                     </div>
@@ -1936,7 +1936,7 @@ window.addEventListener('popstate', function() {
             <div class="border-t-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex-shrink-0">
                 <button type="button" @click="tableBoardOpen = true" class="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900 transition" title="{{ __('pos.ti_open_table_board') }}">
                     <svg class="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
-                    <span class="text-[11px] font-black text-gray-700 dark:text-gray-300 tracking-wide">TABLE</span>
+                    <span class="text-[11px] font-black text-gray-700 dark:text-gray-300 tracking-wide">{{ __('pos.kot_table_label') }}</span>
                     <span x-show="boardCounts().occupied > 0" class="min-w-[16px] px-1 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[9px] rounded-full font-black" x-text="boardCounts().occupied"></span>
                     <span x-show="boardCounts().reserved > 0" class="min-w-[16px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[9px] rounded-full font-black" x-text="boardCounts().reserved"></span>
                     <span x-show="boardCounts().waiter > 0" class="min-w-[16px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] rounded-full font-black animate-pulse" x-text="boardCounts().waiter"></span>
@@ -2114,7 +2114,7 @@ window.addEventListener('popstate', function() {
                 </label>
             </div>
             <div class="px-4 pb-0.5">
-                <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
+                <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> {{ __('pos.choose_to_confirm') }}</p>
             </div>
             <div class="p-4 pt-2">
                 <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">{{ __('pos.cancel') }} <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
@@ -2130,7 +2130,7 @@ window.addEventListener('popstate', function() {
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div>
                     <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.select_table') }}</h3>
-                    <p class="text-[10px] text-gray-400 mt-0.5">&uarr; &darr; &larr; &rarr; select &middot; Enter reserve &middot; Esc close</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.order_type_keyboard_hint') }}</p>
                 </div>
                 <button @click="closeTablePicker()" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
@@ -2284,7 +2284,7 @@ window.addEventListener('popstate', function() {
                                  same server-gated finalisation path as Final: it receives the
                                  422 gate, then reuses onlineConfirm to post the confirmation. --}}
                             <template x-if="boardMenuTable.order.online_payment_awaited_at">
-                                <button @click="boardOnlinePayment()" :disabled="boardBusy || !boardOnlineQuoteReady()" class="w-full py-3 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 transition shadow-sm" x-text="'Online Payment — ' + boardOnlineQuoteText()"></button>
+                                <button @click="boardOnlinePayment()" :disabled="boardBusy || !boardOnlineQuoteReady()" class="w-full py-3 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 transition shadow-sm" x-text="window.TXT.online_payment_prefix + boardOnlineQuoteText()"></button>
                             </template>
                             <template x-if="!boardMenuTable.order.online_payment_awaited_at">
                                 <button @click="toggleOnlinePayment(boardMenuTable.order, true)" :disabled="boardBusy || onlineMarkBusy === boardMenuTable.order.id || !boardOnlineQuoteReady()"
@@ -2691,7 +2691,7 @@ window.addEventListener('popstate', function() {
                                     :class="'text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'">&#128179;</button>
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white rounded-xl transition"
                                     :class="order.online_payment_awaited_at ? 'bg-indigo-600 hover:bg-indigo-700 font-black' : 'bg-green-600 hover:bg-green-700'"
-                                    x-text="order.online_payment_awaited_at ? 'Online Payment — Rs ' + Math.round(order.total_amount || 0).toLocaleString() : {{ Js::from(__('pos.pay')) }}"></button>
+                                    x-text="order.online_payment_awaited_at ? window.TXT.online_payment_prefix + 'Rs ' + Math.round(order.total_amount || 0).toLocaleString() : {{ Js::from(__('pos.pay')) }}"></button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
                         </div>
                     </div>
@@ -2850,7 +2850,7 @@ window.addEventListener('popstate', function() {
                                 <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
                                 <span x-show="bill.bill_token" class="text-sm font-black text-gray-900 dark:text-white" x-text="window.TXT.daily_token + ': ' + bill.bill_token"></span>
                                 <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400" x-text="window.TXT.bill_serial + ': ' + bill.invoice_number"></span>
-                                <span class="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Local</span>
+                                <span class="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.local_word') }}</span>
                                 <template x-if="bill.order_type">
                                     <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
                                           :class="bill.order_type === 'delivery' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : (bill.order_type === 'dine_in' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300')"
@@ -3859,13 +3859,13 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="flex items-center justify-between mt-2 px-1">
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">
-                            {{ __('pos.format_label') }} <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">name qty</code> &middot; <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">qty name</code>
+                            {{ __('pos.format_label') }} <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">{{ __('pos.quick_format_name_qty') }}</code> &middot; <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">{{ __('pos.quick_format_qty_name') }}</code>
                         </p>
                         <p class="text-[10px] text-gray-500 dark:text-gray-400 hidden sm:block">
                             <kbd class="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-300 dark:border-gray-600 shadow-sm">Ctrl</kbd>
                             +
                             <kbd class="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-300 dark:border-gray-600 shadow-sm">Enter</kbd>
-                            to add
+                            {{ __('pos.shortcut_to_add') }}
                         </p>
                     </div>
                 </div>
@@ -3900,7 +3900,7 @@ window.addEventListener('popstate', function() {
                                 <template x-if="quickTypeParsed.filter(p => !p.match).length > 0 && isInventoryEnabled()">
                                     <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
                                         <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> not found
+                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> {{ __('pos.not_found') }}
                                     </span>
                                 </template>
                                 {{-- Inventory OFF → unmatched becomes amber "manual entry" — cashier fills price inline. --}}
@@ -3948,7 +3948,7 @@ window.addEventListener('popstate', function() {
                                         </div>
                                     </template>
                                     <template x-if="!p.match && isInventoryEnabled()">
-                                        <span class="text-[10px] italic text-red-500 dark:text-red-400 flex-shrink-0">not found</span>
+                                        <span class="text-[10px] italic text-red-500 dark:text-red-400 flex-shrink-0">{{ __('pos.not_found') }}</span>
                                     </template>
                                 </div>
                             </template>
@@ -4090,7 +4090,7 @@ window.addEventListener('popstate', function() {
                           :class="lastIsOffline ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : (lastPraStatus === 'submitted' ? 'bg-emerald-600 text-white' : (lastPraStatus === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300')))">
                         <svg x-show="!lastIsOffline && lastPraStatus === 'submitted'" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42l2.79 2.8 6.79-6.8a1 1 0 011.42 0z" clip-rule="evenodd"/></svg>
                         <svg x-show="!lastIsOffline && lastPraStatus === 'pending'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="lastPraStatus === 'local_core_pending' ? 'LOCAL / PRA PENDING' : (lastIsOffline ? window.TXT.saved_offline_autosync : (lastPraStatus === 'submitted' ? window.TXT.pra_verified : (lastPraStatus === 'pending' ? window.TXT.reporting_to_pra : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? window.TXT.saved_will_sync_pra : window.TXT.local_bill))))"></span>
+                        <span x-text="lastPraStatus === 'local_core_pending' ? window.TXT.offline_local_pending : (lastIsOffline ? window.TXT.saved_offline_autosync : (lastPraStatus === 'submitted' ? window.TXT.pra_verified : (lastPraStatus === 'pending' ? window.TXT.reporting_to_pra : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? window.TXT.saved_will_sync_pra : window.TXT.local_bill))))"></span>
                     </span>
                 </div>
                 {{-- Big total --}}
@@ -4151,12 +4151,12 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                         <div class="flex justify-between mt-2 pt-2 border-t-2 border-gray-800 dark:border-gray-200 font-black text-sm">
-                            <span>TOTAL</span>
+                            <span>{{ __('pos.total') }}</span>
                             <span x-text="'Rs. ' + Number(lastTotal).toLocaleString()"></span>
                         </div>
                         <p class="mt-3 text-center text-[10px] font-bold text-amber-700 dark:text-amber-400 border border-dashed border-amber-400 rounded-lg p-2 leading-relaxed">
                             {{ __('pos.offline_bill_saved_device') }}<br>
-                            It will auto-sync and get its invoice number when internet returns.
+                            {{ __('pos.offline_bill_sync_on_return') }}
                         </p>
                     </div>
                 </div>
@@ -6416,7 +6416,7 @@ function restaurantPos() {
             this.setWaBill(null);
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
-            this.showToast('LOCAL sale accepted — PRA pending sync', 'success');
+            this.showToast(window.TXT.local_sale_accepted_pending, 'success');
             if (!skipReceipt && this.autoPrintEnabled) setTimeout(() => this.printOfflineReceipt(), 400);
             this.clearCart();
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
@@ -6539,7 +6539,7 @@ function restaurantPos() {
                 '<tr><td>' + esc(i.name) + '<br><span class="m">' + esc(i.qty) + ' x ' + Number(i.price).toLocaleString() + '</span></td>' +
                 '<td class="r">' + Number(this.r2(i.qty * i.price)).toLocaleString() + '</td></tr>'
             ).join('');
-            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline Receipt</title><style>' +
+            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(window.TXT.offline_provisional_receipt) + '</title><style>' +
                 '@page{margin:2mm;}body{font-family:"Courier New",monospace;font-size:12px;color:#000;margin:0;padding:4px;}' +
                 'h1{font-size:14px;text-align:center;margin:0 0 2px;}p{margin:2px 0;text-align:center;}' +
                 'table{width:100%;border-collapse:collapse;margin-top:4px;}td{padding:2px 0;vertical-align:top;}' +
@@ -6554,11 +6554,11 @@ function restaurantPos() {
                 '</style></head><body>' +
                 '<h1>' + esc(@json($company->name ?? 'NestPOS')) + '</h1>' +
                 '<p>' + new Date(r.queued_at).toLocaleString() + '</p>' +
-                (r.customer ? '<p>Customer: ' + esc(r.customer) + '</p>' : '') +
+                (r.customer ? '<p>' + esc(window.TXT.customer_name) + ': ' + esc(r.customer) + '</p>' : '') +
                 '<p>Ref: ' + esc(r.local_ref || ('OFFLINE-' + r.uuid.slice(0, 8).toUpperCase())) + ' · ' + esc(r.method) + '</p>' +
                 '<table>' + rows +
-                '<tr class="tot"><td>TOTAL</td><td class="r">Rs. ' + Number(r.total).toLocaleString() + '</td></tr></table>' +
-                '<div class="note">' + (r.local_core ? 'LOCAL / PRA PENDING<br>This is not a PRA invoice number' : 'OFFLINE PROVISIONAL RECEIPT<br>Final invoice number issues after sync') + '</div>' +
+                '<tr class="tot"><td>' + esc(window.TXT.total_word) + '</td><td class="r">Rs. ' + Number(r.total).toLocaleString() + '</td></tr></table>' +
+                '<div class="note">' + (r.local_core ? esc(window.TXT.offline_local_pending) + '<br>' + esc(window.TXT.offline_local_pending_hint) : esc(window.TXT.offline_provisional_receipt) + '<br>' + esc(window.TXT.offline_final_number_pending)) + '</div>' +
                 '</body></html>';
             const fr = document.createElement('iframe');
             fr.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;';
@@ -9462,7 +9462,7 @@ function restaurantPos() {
                     if (this.selectedTable && Number(this.selectedTable.id) === Number(fromT.id)) {
                         this.selectedTable = { id: target.id, table_number: target.table_number, seats: target.seats };
                     }
-                    this.showToast('Table shifted locally — sync pending', 'success');
+                    this.showToast(window.TXT.table_shifted_pending, 'success');
                 } else this.showToast((local && (local.message || local.error)) || window.TXT.shift_failed_conn, 'error');
             } finally {
                 this.boardBusy = false;
@@ -12984,7 +12984,7 @@ function restaurantPos() {
                 if (local && local.success) {
                     if (ord && ord.table_id) await window.NestPosLocal.table.release(String(ord.table_id), { order_id: String(orderId) });
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
-                    this.showToast('Order cancelled locally — sync pending', 'success');
+                    this.showToast(window.TXT.order_cancelled_pending, 'success');
                 } else this.showToast((local && (local.message || local.error)) || window.TXT.error_deleting_order, 'error');
             }
         },
@@ -13360,7 +13360,7 @@ function restaurantPos() {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     delete this._payUuidByOrder[orderId];
                     delete this._onlineOkByOrder[orderId];
-                    this.showToast('Payment saved locally — sync pending', 'success');
+                    this.showToast(window.TXT.payment_saved_pending, 'success');
                     return true;
                 }
                 this.showToast((local && (local.message || local.error)) ||

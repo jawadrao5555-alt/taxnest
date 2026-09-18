@@ -1,0 +1,66 @@
+{
+  "phase": "platform-light-z125",
+  "generatedAt": "2026-09-18T07:07:36.580Z",
+  "surfaces": [
+    {
+      "phase": "platform-light-z125",
+      "surface": "pra-restaurant-sale",
+      "viewport": 1440,
+      "scrollWidth": 1152,
+      "layoutWidth": 1152,
+      "zoom": 125,
+      "overflow": false,
+      "path": "/pos/invoice/create"
+    },
+    {
+      "phase": "platform-light-z125",
+      "surface": "retail-sale",
+      "viewport": 1440,
+      "scrollWidth": 1152,
+      "layoutWidth": 1152,
+      "zoom": 125,
+      "overflow": false,
+      "path": "/fbr-pos/create"
+    },
+    {
+      "phase": "platform-light-z125",
+      "surface": "pra-restaurant-sale",
+      "viewport": 834,
+      "scrollWidth": 667,
+      "layoutWidth": 667,
+      "zoom": 125,
+      "overflow": false,
+      "path": "/pos/invoice/create"
+    },
+    {
+      "phase": "platform-light-z125",
+      "surface": "retail-sale",
+      "viewport": 834,
+      "scrollWidth": 667,
+      "layoutWidth": 667,
+      "zoom": 125,
+      "overflow": false,
+      "path": "/fbr-pos/create"
+    },
+    {
+      "phase": "platform-light-z125",
+      "surface": "pra-restaurant-sale",
+      "viewport": 390,
+      "scrollWidth": 312,
+      "layoutWidth": 312,
+      "zoom": 125,
+      "overflow": false,
+      "path": "/pos/invoice/create"
+    },
+    {
+      "phase": "platform-light-z125",
+      "surface": "retail-sale",
+      "viewport": 390,
+      "scrollWidth": 312,
+      "layoutWidth": 312,
+      "zoom": 125,
+      "overflow": false,
+      "path": "/fbr-pos/create"
+    }
+  ]
+}

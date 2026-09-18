@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="p-4 sm:p-6 max-w-5xl mx-auto" x-data="{ showDeleteModal: false }">
+<div class="tn-content-rail p-4 sm:p-6" x-data="{ showDeleteModal: false }">
     <div class="flex flex-wrap items-center gap-3 mb-6">
         <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
         <h1 class="text-2xl font-bold text-white min-w-0 break-words">{{ $company->name }}</h1>

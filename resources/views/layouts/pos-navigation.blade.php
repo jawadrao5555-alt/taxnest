@@ -50,7 +50,7 @@
     @if(!$isCashierNav && $inventoryEnabled)
     <div class="pt-4 pb-1 px-4">
         <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Inventory
-            @if(!$inventoryEnabled)<span class="ml-1 normal-case font-medium text-[9px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">OFF</span>@endif
+            @if(!$inventoryEnabled)<span class="ml-1 normal-case font-medium text-[9px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{{ __('pos.off_word') }}</span>@endif
         </p>
     </div>
 
@@ -113,7 +113,7 @@
 
     @if(!$isCashierNav && $isRestaurantNav)
     <div class="pt-4 pb-1 px-4">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Restaurant</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.nav_restaurant') }}</p>
     </div>
 
     <a href="{{ route('pos.invoice.create') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.invoice.create') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
@@ -163,7 +163,7 @@
     @endif
 
     <div class="pt-4 pb-1 px-4">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Manage</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.nav_manage') }}</p>
     </div>
 
     @if(\App\Services\PosServiceWorkflowProfiles::supports($companyNav) && $posUserNav?->posCustomAllows('service_jobs') !== false)
@@ -204,7 +204,7 @@
     @endif
 
     <div class="pt-4 pb-1 px-4">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Settings</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.nav_settings') }}</p>
     </div>
 
     @if(!$isCashier)
@@ -233,7 +233,7 @@
     <a href="{{ route('pos.agent') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.agent*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
         PRA Sync Agent
-        <span class="ml-auto px-1.5 py-0.5 text-[9px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded">NEW</span>
+        <span class="ml-auto px-1.5 py-0.5 text-[9px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded">{{ __('pos.new_word') }}</span>
     </a>
     @endif
 </div>

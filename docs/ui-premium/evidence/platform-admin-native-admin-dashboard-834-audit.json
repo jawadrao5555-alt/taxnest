@@ -1,0 +1,595 @@
+{
+  "ok": true,
+  "generatedAt": "2026-09-18T07:07:42.360Z",
+  "durationMs": 56,
+  "viewport": {
+    "width": 834,
+    "height": 960,
+    "devicePixelRatio": 1
+  },
+  "viewportClass": "tablet",
+  "responsive": {
+    "current": "tablet",
+    "metrics": {
+      "viewportWidth": 834,
+      "viewportHeight": 960,
+      "headerWidth": 834,
+      "headerHeight": 73.594,
+      "headerVisible": true,
+      "headerStickyOrFixed": false,
+      "paymentVisible": false,
+      "paymentIntersecting": false
+    },
+    "breakpoints": {
+      "mobile": {
+        "maxWidth": 600
+      },
+      "tablet": {
+        "minWidth": 601,
+        "maxWidth": 1024
+      },
+      "desktop": {
+        "minWidth": 1025
+      }
+    }
+  },
+  "theme": {
+    "darkClass": false,
+    "colorScheme": "normal",
+    "dataTheme": null,
+    "prefersDark": false,
+    "expectedTheme": null,
+    "shellSelector": "body.h-full.bg-gray-950",
+    "shellBackgroundLuminance": 0.916,
+    "shellBackgroundLuminances": [
+      0.916
+    ],
+    "failures": []
+  },
+  "darkMode": {
+    "darkClass": false,
+    "colorScheme": "normal",
+    "dataTheme": null,
+    "prefersDark": false,
+    "expectedTheme": null,
+    "shellSelector": "body.h-full.bg-gray-950",
+    "shellBackgroundLuminance": 0.916,
+    "shellBackgroundLuminances": [
+      0.916
+    ],
+    "failures": []
+  },
+  "header": {
+    "found": true,
+    "visible": true,
+    "dimensions": {
+      "left": 0,
+      "top": 0,
+      "width": 834,
+      "height": 73.594
+    }
+  },
+  "categories": {
+    "headerLabels": {
+      "category": "header-labels",
+      "candidateCount": 1,
+      "visibleCount": 2,
+      "records": [
+        {
+          "tag": "p",
+          "selector": "p.text-\\[10px\\].uppercase",
+          "text": "TAXNEST",
+          "ariaLabel": "",
+          "category": "header-labels",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 13.255,
+          "contrastRatios": [
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.09,
+            0.196,
+            0.227
+          ],
+          "background": [
+            0.988,
+            0.992,
+            0.988
+          ],
+          "sourceForeground": [
+            0.09,
+            0.196,
+            0.227,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "h1",
+          "selector": "h1.text-sm.font-bold",
+          "text": "Administration",
+          "ariaLabel": "",
+          "category": "header-labels",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 13.255,
+          "contrastRatios": [
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.09,
+            0.196,
+            0.227
+          ],
+          "background": [
+            0.988,
+            0.992,
+            0.988
+          ],
+          "sourceForeground": [
+            0.09,
+            0.196,
+            0.227,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "headerIcons": {
+      "category": "header-icons",
+      "candidateCount": 1,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 13.255,
+          "contrastRatios": [
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            0.09,
+            0.196,
+            0.227
+          ],
+          "background": [
+            0.988,
+            0.992,
+            0.988
+          ],
+          "sourceForeground": [
+            0.09,
+            0.196,
+            0.227,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "grandTotal": {
+      "category": "grand-total",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "productNames": {
+      "category": "product-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "quantityControls": {
+      "category": "quantity-controls",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "paymentControls": {
+      "category": "payment-controls",
+      "candidateCount": 13,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-payment-looking"
+    },
+    "cartNames": {
+      "category": "cart-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartQuantities": {
+      "category": "cart-quantities",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartLineTotals": {
+      "category": "cart-line-totals",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    }
+  },
+  "contrast": {
+    "headerLabels": {
+      "category": "header-labels",
+      "candidateCount": 1,
+      "visibleCount": 2,
+      "records": [
+        {
+          "tag": "p",
+          "selector": "p.text-\\[10px\\].uppercase",
+          "text": "TAXNEST",
+          "ariaLabel": "",
+          "category": "header-labels",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 13.255,
+          "contrastRatios": [
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.09,
+            0.196,
+            0.227
+          ],
+          "background": [
+            0.988,
+            0.992,
+            0.988
+          ],
+          "sourceForeground": [
+            0.09,
+            0.196,
+            0.227,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        },
+        {
+          "tag": "h1",
+          "selector": "h1.text-sm.font-bold",
+          "text": "Administration",
+          "ariaLabel": "",
+          "category": "header-labels",
+          "kind": "text",
+          "visible": true,
+          "contrastRatio": 13.255,
+          "contrastRatios": [
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255
+          ],
+          "requiredContrastRatio": 4.5,
+          "foreground": [
+            0.09,
+            0.196,
+            0.227
+          ],
+          "background": [
+            0.988,
+            0.992,
+            0.988
+          ],
+          "sourceForeground": [
+            0.09,
+            0.196,
+            0.227,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "headerIcons": {
+      "category": "header-icons",
+      "candidateCount": 1,
+      "visibleCount": 1,
+      "records": [
+        {
+          "tag": "svg",
+          "selector": "svg",
+          "text": "",
+          "ariaLabel": "",
+          "category": "header-icons",
+          "kind": "icon",
+          "visible": true,
+          "contrastRatio": 13.255,
+          "contrastRatios": [
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255,
+            13.255
+          ],
+          "requiredContrastRatio": 3,
+          "foreground": [
+            0.09,
+            0.196,
+            0.227
+          ],
+          "background": [
+            0.988,
+            0.992,
+            0.988
+          ],
+          "sourceForeground": [
+            0.09,
+            0.196,
+            0.227,
+            1
+          ],
+          "transparentAncestors": 4,
+          "opacityAncestors": 0,
+          "explicitPaymentControl": false,
+          "unresolved": [],
+          "unsupportedBackgroundImage": false,
+          "disabled": false,
+          "nativeDisabledAttribute": false,
+          "deliberateDisabledState": false,
+          "pass": true,
+          "failures": [],
+          "failure": null
+        }
+      ],
+      "pass": true,
+      "status": "checked"
+    },
+    "grandTotal": {
+      "category": "grand-total",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "productNames": {
+      "category": "product-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "quantityControls": {
+      "category": "quantity-controls",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "paymentControls": {
+      "category": "payment-controls",
+      "candidateCount": 13,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-payment-looking"
+    },
+    "cartNames": {
+      "category": "cart-names",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartQuantities": {
+      "category": "cart-quantities",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    },
+    "cartLineTotals": {
+      "category": "cart-line-totals",
+      "candidateCount": 0,
+      "visibleCount": 0,
+      "records": [],
+      "pass": true,
+      "status": "not-found"
+    }
+  },
+  "overflow": {
+    "document": {
+      "name": "document",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 834,
+      "clientWidth": 834,
+      "horizontalOverflow": false,
+      "scrollHeight": 960,
+      "clientHeight": 960,
+      "verticalOverflow": false
+    },
+    "body": {
+      "name": "body",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 834,
+      "clientWidth": 834,
+      "horizontalOverflow": false,
+      "scrollHeight": 960,
+      "clientHeight": 960,
+      "verticalOverflow": false
+    },
+    "main": {
+      "name": "main",
+      "present": true,
+      "checked": true,
+      "intentionalScrollable": false,
+      "scrollWidth": 834,
+      "clientWidth": 834,
+      "horizontalOverflow": false,
+      "scrollHeight": 3526,
+      "clientHeight": 886,
+      "verticalOverflow": true
+    },
+    "intentionallyScrollableContainers": 6,
+    "offenders": []
+  },
+  "stickyPayment": {
+    "candidateCount": 1,
+    "visibleCount": 0,
+    "intersectingCount": 0,
+    "stickyOrFixedCount": 0,
+    "controls": [
+      {
+        "tag": "button",
+        "selector": "button.text-gray-500.dark\\:text-gray-400",
+        "text": "",
+        "ariaLabel": "",
+        "visible": false,
+        "styleVisible": true,
+        "intersectingViewport": false,
+        "position": "static",
+        "stickyOrFixed": false,
+        "rect": {
+          "left": -36,
+          "top": 899.063,
+          "width": 20,
+          "height": 20
+        },
+        "disabled": false
+      }
+    ]
+  },
+  "primaryPay": {
+    "candidateCount": 0,
+    "styleVisibleCount": 0,
+    "cartVisible": false,
+    "paymentDialogOpen": false,
+    "mobileCheckApplies": false,
+    "mobilePayOutsideViewport": false,
+    "controls": []
+  },
+  "requiredCategoryFailures": [],
+  "findings": []
+}

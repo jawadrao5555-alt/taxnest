@@ -15,6 +15,7 @@
         @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700'])
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
         <style>
             @keyframes float {
                 0%, 100% { transform: translateY(0px); }

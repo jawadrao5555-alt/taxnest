@@ -483,7 +483,7 @@ window.addEventListener('popstate', function() {
             {{-- Reprint last bill — Alt+R. Hidden until a bill exists this session. --}}
             <button x-show="recentBills.length > 0 || lastTransactionId" x-cloak
                     @click="const last = recentBills[0]; if(last) { _printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast('Reprinting #' + last.invoice_number, 'info'); } else if(lastTransactionId) { printReceipt(); }"
-                    class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition flex-shrink-0" title="Reprint last bill (Alt+R)">
+                    class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition flex-shrink-0" title="{{ __('pos.reprint_click_hint') }}">
                 <span class="text-[9px] bg-teal-400/30 px-1 rounded">Alt+R</span>
                 <span class="hidden lg:inline">{{ __('pos.reprint') }}</span>
             </button>
@@ -546,7 +546,7 @@ window.addEventListener('popstate', function() {
             {{-- Quick F7 (moved from toolbar Row 2, owner 6 Aug 2026) --}}
             <button @click="openQuickType()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-500/70 hover:bg-sky-500/90 ring-1 ring-sky-300/40 transition flex-shrink-0" title="{{ \App\Support\PosVocabulary::t('ti_quick_type_f7') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                <span class="hidden lg:inline">Quick</span>
+                <span class="hidden lg:inline">{{ __('pos.quick_type') }}</span>
                 <span class="text-[9px] font-mono bg-white/20 px-1 rounded">F7</span>
             </button>
 
@@ -650,7 +650,7 @@ window.addEventListener('popstate', function() {
         </button>
     </div>
 
-    <div class="flex md:hidden items-center justify-end gap-4 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30 flex-shrink-0"
+    <div class="tn-fbr-mobile-switches flex md:hidden items-center justify-end gap-4 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30 flex-shrink-0 overflow-x-auto"
          x-data="{
             autoPrintLoading: false,
             autoKotLoading: false
@@ -731,7 +731,7 @@ window.addEventListener('popstate', function() {
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-100 dark:border-gray-800">
             <div class="text-center mb-5">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.order_type') }}</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">&uarr; &darr; select &middot; Enter confirm &middot; Esc back</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">&uarr; &darr; {{ __('pos.select') }} &middot; Enter {{ __('pos.confirm') }} &middot; Esc {{ __('pos.back_word') }}</p>
             </div>
             <div class="space-y-2">
                 <template x-for="(k, i) in guidedOrderTypes()" :key="k">
@@ -753,7 +753,7 @@ window.addEventListener('popstate', function() {
          Row 2: Category dropdown + WIDE barcode/scan search + Hold F5 --}}
     <div class="flex flex-col bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
     {{-- ── ROW 1 ── --}}
-    <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+    <div class="tn-action-row1 flex flex-wrap items-center gap-2 px-3 py-2">
 
         <div class="relative flex-1" style="min-width:300px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -814,12 +814,12 @@ window.addEventListener('popstate', function() {
                 <input type="text" x-ref="newCustomerNameInput" x-model="newCustomerName"
                     autocomplete="one-time-code" name="pos_newcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     @keydown.enter.prevent="$refs.newCustomerAddressInput?.focus()"
-                    placeholder="Customer name *"
+                    placeholder="{{ __('pos.customer_name_required') }}"
                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
                 <input type="text" x-ref="newCustomerAddressInput" x-model="newCustomerAddress"
                     autocomplete="one-time-code" name="pos_newcust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     @keydown.enter.prevent="saveNewCustomer()"
-                    placeholder="Address (optional)"
+                    placeholder="{{ __('pos.full_address') }}"
                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
                 <button type="button" @click="saveNewCustomer()" :disabled="savingCustomer" class="w-full py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition">
                     <span x-show="!savingCustomer">{{ __('pos.save_select_enter') }}</span>
@@ -847,7 +847,7 @@ window.addEventListener('popstate', function() {
     </div>{{-- /ROW 1 --}}
 
     {{-- ── ROW 2: Category + WIDE scan search + Hold ── --}}
-    <div class="flex items-center gap-2 px-3 pb-2 pt-0">
+    <div class="tn-action-row2 flex items-center gap-2 px-3 pb-2 pt-0 overflow-x-auto">
 
         {{-- CATEGORY DROPDOWN (optional filter) — same activeCategory as the grid pills, so the two
              stay in sync. Default "All Categories" = old behavior, byte-identical. Unlike the pills
@@ -998,7 +998,7 @@ window.addEventListener('popstate', function() {
                         </p>
                         <template x-if="phAltLoose"><p class="text-[10px] text-amber-700 dark:text-amber-300">{{ __('pos.ph_alt_strength_relaxed') }}</p></template>
                     </div>
-                    <button type="button" @click="phAltClose()" class="text-gray-400 hover:text-gray-600 p-0.5" aria-label="Close">
+                    <button type="button" @click="phAltClose()" class="text-gray-400 hover:text-gray-600 p-0.5" aria-label="{{ __('pos.close') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -1054,9 +1054,9 @@ window.addEventListener('popstate', function() {
         <button x-show="recentBills.length > 0 || lastTransactionId" x-cloak
                 @click="const last = recentBills[0]; if(last) { _printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast('Reprinting #' + last.invoice_number, 'info'); } else if(lastTransactionId) { printReceipt(); }"
                 class="flex md:hidden items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition flex-shrink-0"
-                title="Reprint last bill (Alt+R)">
+             title="{{ __('pos.reprint_click_hint') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-            <span class="hidden lg:inline">Reprint</span>
+            <span class="hidden lg:inline">{{ __('pos.reprint') }}</span>
             <kbd class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">Alt+R</kbd>
         </button>
 
@@ -1077,7 +1077,7 @@ window.addEventListener('popstate', function() {
         <button @click="openLocalBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition" title="{{ __('pos.ti_provisional_f10_fbr') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             <span class="text-[10px] bg-blue-400/30 px-1 rounded">F10</span>
-            <span class="hidden sm:inline">Local</span>
+            <span class="hidden sm:inline">{{ __('pos.local_word') }}</span>
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
 
@@ -1226,7 +1226,7 @@ window.addEventListener('popstate', function() {
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">OUT</span></template>
                                         <template x-if="item.hasRecipe"><span class="text-[10px] flex-shrink-0" title="Recipe">&#x1F373;</span></template>
                                         @endif
-                                        <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
+                                        <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.no_tax_t') }}</span></template>
                                         <template x-if="item.is_third_schedule"><span class="px-1.5 py-0.5 bg-blue-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">3rd Sch</span></template>
                                         <template x-if="item.type === 'deal'"><span class="px-1.5 py-0.5 bg-amber-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.deal_badge') }}</span></template>
                                          <template x-if="item.type === 'deal' && item.deal_type === 'special'"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.special_deal') }}</span></template>
@@ -1279,10 +1279,10 @@ window.addEventListener('popstate', function() {
                  One-click reprint chips for the last 5 finalized bills in this session.
                  Hidden until at least one bill is done. Alt+R always reprints recentBills[0]. --}}
             <div x-show="recentBills.length > 0" x-cloak class="hidden md:flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-                <span class="text-[9px] font-black uppercase tracking-wider text-gray-300 dark:text-gray-600 whitespace-nowrap flex-shrink-0">AKHRI BILLS</span>
+                <span class="text-[9px] font-black uppercase tracking-wider text-gray-300 dark:text-gray-600 whitespace-nowrap flex-shrink-0">{{ __('pos.last_bills') }}</span>
                 <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
                     <template x-for="(b, bi) in recentBills" :key="b.id">
-                        <button @click="_printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + b.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast('Reprinting #' + b.invoice_number, 'info')"
+                        <button @click="_printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + b.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast(window.TXT.reprinting_bill.replace(':number', b.invoice_number), 'info')"
                                 class="flex-shrink-0 flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 transition"
                                 :title="'Reprint ' + b.invoice_number + ' — Rs. ' + Number(b.total).toLocaleString()">
                             <svg class="w-3 h-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -1708,7 +1708,7 @@ window.addEventListener('popstate', function() {
                                 <span x-text="'-Rs. ' + Number(itemDiscountsTotal).toLocaleString()"></span>
                             </div>
                             <div x-show="discountAmount > 0" class="flex gap-2 text-orange-300">
-                                <span x-text="discountType === 'percentage' ? window.TXT.order_discount_paren + discountValue + '%)' : 'Order Discount'"></span>
+                                <span x-text="discountType === 'percentage' ? window.TXT.order_discount_paren + discountValue + '%)' : window.TXT.order_discount_label"></span>
                                 <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
                             </div>
                             <div x-show="exemptAmount > 0" class="flex gap-2 text-green-300"><span>{{ __('pos.tax_exempt') }}</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
@@ -1881,7 +1881,7 @@ window.addEventListener('popstate', function() {
                 </label>
             </div>
             <div class="px-4 pb-0.5">
-                <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
+                <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> {{ __('pos.choose_to_confirm') }}</p>
             </div>
             <div class="p-4 pt-2">
                 <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">{{ __('pos.cancel') }} <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
@@ -2258,7 +2258,7 @@ window.addEventListener('popstate', function() {
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
                                 <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
-                                <span class="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Local</span>
+                                <span class="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.local_word') }}</span>
                                 <template x-if="bill.customer_name">
                                     <span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium" x-text="bill.customer_name"></span>
                                 </template>
@@ -2380,7 +2380,7 @@ window.addEventListener('popstate', function() {
                             <div>
                                 <span class="text-xs font-bold text-gray-800 dark:text-gray-200" x-text="bill.invoice_number"></span>
                                 <span class="ml-1 text-[10px] text-gray-500" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
-                                <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold">Settings Error</span>
+                                <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold">{{ __('pos.fbr_settings_error') }}</span>
                                 {{-- Task 627: asal wajah (kaun si setting missing hai) --}}
                                 <template x-if="bill.error_message">
                                     <p class="text-[10px] text-orange-600 dark:text-orange-400 leading-snug" x-text="'⚠ ' + bill.error_message"></p>
@@ -2721,7 +2721,7 @@ window.addEventListener('popstate', function() {
                     <button @click="showQuickAdd = true" class="w-full py-2.5 text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-xl hover:bg-blue-100 transition">{{ __('pos.add_new_customer_btn') }}</button>
                 </div>
                 <div x-show="showQuickAdd" class="space-y-2">
-                    <input type="text" x-model="quickCustomerName" placeholder="Customer name *" autocomplete="one-time-code" name="pos_quickcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-blue-500">
+                    <input type="text" x-model="quickCustomerName" placeholder="{{ __('pos.customer_name_required') }}" autocomplete="one-time-code" name="pos_quickcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-blue-500">
                     <input type="text" x-model="quickCustomerPhone" placeholder="{{ __('pos.ph_phone_req') }}" autocomplete="one-time-code" name="pos_quickcust_phone_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-blue-500">
                     @if($features->delivery)
                     <input type="text" x-model="quickCustomerAddress" placeholder="{{ __('pos.ph_address_delivery') }}" autocomplete="one-time-code" name="pos_quickcust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-blue-500">
@@ -2918,13 +2918,13 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="flex items-center justify-between mt-2 px-1">
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">
-                            {{ __('pos.format_label') }} <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">name qty</code> &middot; <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">qty name</code>
+                            {{ __('pos.format_label') }} <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">{{ __('pos.quick_format_name_qty') }}</code> &middot; <code class="bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded font-semibold">{{ __('pos.quick_format_qty_name') }}</code>
                         </p>
                         <p class="text-[10px] text-gray-500 dark:text-gray-400 hidden sm:block">
                             <kbd class="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-300 dark:border-gray-600 shadow-sm">Ctrl</kbd>
                             +
                             <kbd class="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-300 dark:border-gray-600 shadow-sm">Enter</kbd>
-                            to add
+                            {{ __('pos.shortcut_to_add') }}
                         </p>
                     </div>
                 </div>
@@ -2959,7 +2959,7 @@ window.addEventListener('popstate', function() {
                                 <template x-if="quickTypeParsed.filter(p => !p.match).length > 0 && isInventoryEnabled()">
                                     <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
                                         <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> not found
+                                        <span x-text="quickTypeParsed.filter(p => !p.match).length"></span> {{ __('pos.not_found') }}
                                     </span>
                                 </template>
                                 {{-- Inventory OFF → unmatched becomes amber "manual entry" — cashier fills price inline. --}}
@@ -3007,7 +3007,7 @@ window.addEventListener('popstate', function() {
                                         </div>
                                     </template>
                                     <template x-if="!p.match && isInventoryEnabled()">
-                                        <span class="text-[10px] italic text-red-500 dark:text-red-400 flex-shrink-0">not found</span>
+                                        <span class="text-[10px] italic text-red-500 dark:text-red-400 flex-shrink-0">{{ __('pos.not_found') }}</span>
                                     </template>
                                 </div>
                             </template>
@@ -3195,12 +3195,12 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                         <div class="flex justify-between mt-2 pt-2 border-t-2 border-gray-800 dark:border-gray-200 font-black text-sm">
-                            <span>TOTAL</span>
+                            <span>{{ __('pos.total') }}</span>
                             <span x-text="'Rs. ' + Number(lastTotal).toLocaleString()"></span>
                         </div>
                         <p class="mt-3 text-center text-[10px] font-bold text-amber-700 dark:text-amber-400 border border-dashed border-amber-400 rounded-lg p-2 leading-relaxed">
                             {{ __('pos.offline_bill_saved_device') }}<br>
-                            It will auto-sync and get its invoice number when internet returns.
+                            {{ __('pos.offline_bill_sync_on_return') }}
                         </p>
                     </div>
                 </div>
@@ -4997,7 +4997,7 @@ function restaurantPos() {
                 '<tr><td>' + esc(i.name) + '<br><span class="m">' + esc(i.qty) + ' x ' + Number(i.price).toLocaleString() + '</span></td>' +
                 '<td class="r">' + Number(this.r2(i.qty * i.price)).toLocaleString() + '</td></tr>'
             ).join('');
-            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline Receipt</title><style>' +
+            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(window.TXT.offline_provisional_receipt) + '</title><style>' +
                 '@page{margin:2mm;}body{font-family:"Courier New",monospace;font-size:12px;color:#000;margin:0;padding:4px;}' +
                 'h1{font-size:14px;text-align:center;margin:0 0 2px;}p{margin:2px 0;text-align:center;}' +
                 'table{width:100%;border-collapse:collapse;margin-top:4px;}td{padding:2px 0;vertical-align:top;}' +
@@ -5012,11 +5012,11 @@ function restaurantPos() {
                 '</style></head><body>' +
                 '<h1>' + esc(@json($company->name ?? 'NestPOS')) + '</h1>' +
                 '<p>' + new Date(r.queued_at).toLocaleString() + '</p>' +
-                (r.customer ? '<p>Customer: ' + esc(r.customer) + '</p>' : '') +
+                (r.customer ? '<p>' + esc(window.TXT.customer_name) + ': ' + esc(r.customer) + '</p>' : '') +
                 '<p>Ref: ' + esc('OFFLINE-' + r.uuid.slice(0, 8).toUpperCase()) + ' · ' + esc(r.method) + '</p>' +
                 '<table>' + rows +
-                '<tr class="tot"><td>TOTAL</td><td class="r">Rs. ' + Number(r.total).toLocaleString() + '</td></tr></table>' +
-                '<div class="note">OFFLINE PROVISIONAL RECEIPT<br>Final invoice number issues after sync</div>' +
+                '<tr class="tot"><td>' + esc(window.TXT.total_word) + '</td><td class="r">Rs. ' + Number(r.total).toLocaleString() + '</td></tr></table>' +
+                '<div class="note">' + esc(window.TXT.offline_provisional_receipt) + '<br>' + esc(window.TXT.offline_final_number_pending) + '</div>' +
                 '</body></html>';
             const fr = document.createElement('iframe');
             fr.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;';
@@ -7083,7 +7083,7 @@ function restaurantPos() {
             }
             @endif
             // Alt+R — Reprint last bill (Akhri Bills top entry).
-            if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast('Reprinting #' + last.invoice_number, 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast('Reprinting last bill...', 'info'); } else { this.showToast(window.TXT.no_bill_reprint, 'warning'); } return; }
+            if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast(window.TXT.reprinting_bill.replace(':number', last.invoice_number), 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast(window.TXT.reprinting_bill.replace(':number', this.lastTransactionId), 'info'); } else { this.showToast(window.TXT.no_bill_reprint, 'warning'); } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
             // ═══════════════════════════════════════════════════════════════

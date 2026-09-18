@@ -34,6 +34,10 @@ const expectedTheme = process.env.RC_PREMIUM_EXPECTED_THEME === 'dark'
     ? process.env.RC_PREMIUM_EXPECTED_THEME
     : null;
 const runMobileRegression = process.env.RC_PREMIUM_MOBILE_REGRESSION === '1';
+const requestedZoom = Number(process.env.RC_PREMIUM_ZOOM || 100);
+if (![80, 100, 125].includes(requestedZoom)) {
+    throw new Error('RC_PREMIUM_ZOOM must be 80, 100 or 125');
+}
 const views = [
     ['desktop', { width: 1440, height: 960 }],
     ['tablet', { width: 834, height: 960 }],
@@ -178,6 +182,30 @@ async function activateExpectedTheme(page, theme) {
     if (!matchesExpectedTheme(state)) throw new Error(`expected ${theme} mode did not activate`);
 }
 
+async function activateBrowserZoom(page, percent, physicalViewport) {
+    const scale = percent / 100;
+    const session = await page.context().newCDPSession(page);
+    await session.send('Emulation.setDeviceMetricsOverride', {
+        width: Math.round(physicalViewport.width / scale),
+        height: Math.round(physicalViewport.height / scale),
+        screenWidth: physicalViewport.width,
+        screenHeight: physicalViewport.height,
+        deviceScaleFactor: scale,
+        mobile: false,
+    });
+    await page.waitForTimeout(150);
+    const zoom = await page.evaluate(() => ({
+        devicePixelRatio: window.devicePixelRatio,
+        layoutWidth: document.documentElement.clientWidth,
+        visualScale: window.visualViewport?.scale || 1,
+    }));
+    const expectedRatio = percent / 100;
+    if (Math.abs(zoom.devicePixelRatio - expectedRatio) > 0.06) {
+        throw new Error(`browser zoom ${percent}% did not activate (devicePixelRatio=${zoom.devicePixelRatio})`);
+    }
+    return zoom;
+}
+
 let mobileRegressionCompleted = false;
 
 async function capture(browser, label, journey, pathName, viewport) {
@@ -229,8 +257,10 @@ async function capture(browser, label, journey, pathName, viewport) {
             }
         });
         await activateExpectedTheme(page, expectedTheme);
+        const zoom = await activateBrowserZoom(page, requestedZoom, viewport);
+        let audit = null;
         if (phase !== 'before') {
-            const audit = await page.evaluate(auditPremiumVisualPage, expectedTheme ? {
+            audit = await page.evaluate(auditPremiumVisualPage, expectedTheme ? {
                 expectedTheme,
             } : {});
             writeFileSync(
@@ -238,6 +268,20 @@ async function capture(browser, label, journey, pathName, viewport) {
                 JSON.stringify(audit, null, 2) + '\n',
             );
             assertPremiumVisualAudit(audit);
+        }
+        const layoutMetrics = audit ? {
+            viewportWidth: audit.viewport.width,
+            scrollWidth: Math.max(audit.overflow.document.scrollWidth, audit.overflow.body.scrollWidth),
+            overflow: audit.overflow.document.horizontalOverflow
+                || audit.overflow.body.horizontalOverflow
+                || audit.overflow.offenders.length > 0,
+        } : await page.evaluate(() => ({
+            viewportWidth: window.innerWidth,
+            scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+            overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > window.innerWidth + 2,
+        }));
+        if (Math.abs(layoutMetrics.viewportWidth - zoom.layoutWidth) > 2) {
+            throw new Error(`${label}: zoom layout width changed before capture (${layoutMetrics.viewportWidth} vs ${zoom.layoutWidth})`);
         }
         if (runMobileRegression && label === 'retail-sale' && viewport.width === 390) {
             const regression = await runPremiumUiMobileRegression(page, {
@@ -252,18 +296,19 @@ async function capture(browser, label, journey, pathName, viewport) {
             console.log(`MOBILE_REGRESSION ${regressionPath}`);
             mobileRegressionCompleted = true;
         }
-        const screenshot = path.join(evidenceDir, `${phase}-${label}-${viewport.width}.png`);
+        const screenshot = path.join(evidenceDir, `${phase}-${label}-${viewport.width}-z${requestedZoom}.png`);
         await page.screenshot({ path: screenshot, fullPage: false });
         console.log(`SCREENSHOT ${screenshot}`);
         const text = await bodyText(page);
         console.log(`SURFACE ${label}/${viewport.width}: ${new URL(page.url()).pathname} ${text.slice(0, 90).replace(/\s+/g, ' ')}`);
-        const scrollWidth = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
         overflow.push({
             phase,
             surface: label,
             viewport: viewport.width,
-            scrollWidth,
-            overflow: scrollWidth > viewport.width + 2,
+            scrollWidth: layoutMetrics.scrollWidth,
+            layoutWidth: layoutMetrics.viewportWidth,
+            zoom: requestedZoom,
+            overflow: layoutMetrics.overflow,
             path: new URL(page.url()).pathname,
         });
         const browserErrors = [
@@ -278,7 +323,7 @@ async function capture(browser, label, journey, pathName, viewport) {
     }
 }
 
-const browser = await launchLocalBrowser();
+const { browser } = await launchLocalBrowser();
 const overflow = [];
 try {
     for (const [viewportName, viewport] of views) {

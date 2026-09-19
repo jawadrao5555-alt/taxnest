@@ -28,8 +28,12 @@ return new class extends Migration
             $table->text('error_message')->nullable();
             $table->timestamps();
 
-            $table->index(['company_id', 'callback_received_at']);
-            $table->index(['transaction_id', 'callback_received_at']);
+            // Keep explicit names below MySQL/MariaDB's 64-character
+            // identifier limit. Laravel's generated name for the company
+            // lookup is 66 characters and makes a fresh MariaDB migration
+            // fail after the table definition has been assembled.
+            $table->index(['company_id', 'callback_received_at'], 'fbr_cbdiag_company_received_idx');
+            $table->index(['transaction_id', 'callback_received_at'], 'fbr_cbdiag_tx_received_idx');
         });
     }
 

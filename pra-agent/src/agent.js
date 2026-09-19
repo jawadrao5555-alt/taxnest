@@ -4,7 +4,6 @@ const path = require('path');
 const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
-const { replayCallbacks } = require('./callback-retry-policy');
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -132,8 +131,6 @@ const status = {
   failedCount: 0,
   pendingCallbacks: 0,
   serverInfo: null,
-  fiscalConnectivity: 'unknown',
-  lastFiscalCheck: null,
 };
 
 const failedTxnIds = new Set();
@@ -188,9 +185,16 @@ async function flushCallbackQueueInner() {
     return;
   }
   log(`Flushing ${q.length} pending callback(s)…`);
-  const remaining = await replayCallbacks(q, {
-    canContinue: () => !!currentConfig,
-    post: async (item) => {
+  const remaining = [];
+  for (let i = 0; i < q.length; i++) {
+    const item = q[i];
+    if (!currentConfig) {
+      // Agent stopped mid-flush — keep every unprocessed item as-is so a
+      // restart replays them (already-replayed ones are NOT re-queued).
+      remaining.push(...q.slice(i));
+      break;
+    }
+    try {
       await axios.post(
         `${currentConfig.serverUrl}/submit-result`,
         {
@@ -200,13 +204,24 @@ async function flushCallbackQueueInner() {
           response: item.response,
           error: item.error,
           offline: item.offline || false,
-          agent_version: item.agent_version || currentConfig.appVersion || '1.0.0',
+          version: item.version || null,
+          ims_version: item.ims_version || null,
+          requested_environment: item.requested_environment || null,
+          client_environment: item.client_environment || null,
         },
         { headers: { Authorization: `Bearer ${currentConfig.apiKey}` }, timeout: 10000 }
       );
-    },
-    log,
-  });
+      log(`✅ Replayed callback for txn ${item.transaction_id}`);
+    } catch (e) {
+      const attempts = (item._attempts || 0) + 1;
+      // Drop after 50 attempts to avoid unbounded growth
+      if (attempts < 50) {
+        remaining.push({ ...item, _attempts: attempts });
+      } else {
+        log(`⚠️ Dropping callback for txn ${item.transaction_id} after 50 failed attempts`);
+      }
+    }
+  }
   saveQueue(remaining);
   status.pendingCallbacks = remaining.length;
 }
@@ -409,18 +424,10 @@ async function syncOnceInner() {
   try {
     const res = await axios.get(`${currentConfig.serverUrl}/pending-invoices`, {
       headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
-      params: {
-        // Additive evidence only. Older servers ignore these query values and
-        // older agents remain supported when they omit them.
-        version: currentConfig.appVersion || '1.0.0',
-        device_uid: currentConfig.deviceUid || null,
-      },
       timeout: 15000,
     });
 
-    const { invoices, pra_endpoint, pra_token, pra_mode, count } = res.data;
-    status.fiscalConnectivity = 'reachable';
-    status.lastFiscalCheck = new Date().toISOString();
+    const { invoices, pra_endpoint, pra_token, pra_mode, pra_environment, count } = res.data;
     status.pendingCount = count;
     status.connected = true;
     notify();
@@ -435,14 +442,12 @@ async function syncOnceInner() {
     log(`Found ${count} pending invoices`);
 
     for (const inv of invoices) {
-      await submitToPra(inv, pra_endpoint, pra_token, pra_mode);
+      await submitToPra(inv, pra_endpoint, pra_token, pra_mode, pra_environment);
     }
 
     status.lastSync = new Date().toISOString();
     notify();
   } catch (e) {
-    status.fiscalConnectivity = 'unreachable';
-    status.lastFiscalCheck = new Date().toISOString();
     status.connected = false;
     status.lastError = `Sync failed: ${e.message}`;
     log('Sync failed:', e.message);
@@ -450,7 +455,40 @@ async function syncOnceInner() {
   }
 }
 
-async function submitToPra(invoice, praEndpoint, praToken, praMode) {
+function diagnosticScalar(data, keys, depth = 0) {
+  if (!data || typeof data !== 'object' || depth > 3) return null;
+  for (const [key, value] of Object.entries(data)) {
+    if (keys.includes(String(key).toLowerCase()) && ['string', 'number'].includes(typeof value)) {
+      const scalar = String(value).trim();
+      if (scalar) return scalar.slice(0, 64);
+    }
+    const nested = diagnosticScalar(value, keys, depth + 1);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+function normaliseDiagnosticEnvironment(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (['production', 'prod', 'live'].includes(normalized)) return 'production';
+  if (['test', 'testing', 'sandbox'].includes(normalized)) return 'test';
+  return null;
+}
+
+function callbackDiagnostics(data, requestedEnvironment) {
+  return {
+    version: currentConfig?.appVersion || null,
+    ims_version: diagnosticScalar(data, ['imsversion', 'ims_version', 'componentversion', 'component_version']),
+    requested_environment: normaliseDiagnosticEnvironment(requestedEnvironment),
+    // Only a value explicitly returned by the local component counts as
+    // client-reported. The requested server setting is stored separately.
+    client_environment: normaliseDiagnosticEnvironment(
+      diagnosticScalar(data, ['environment', 'environmentname', 'environment_name', 'mode'])
+    ),
+  };
+}
+
+async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironment = null) {
   const isFiscalDevice = praMode === 'fiscal_device';
   log(`Submitting txn ${invoice.transaction_id} to PRA${isFiscalDevice ? ' (Fiscal Device — localhost:8524)' : ''}`);
 
@@ -464,6 +502,7 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode) {
     });
 
     const data = praRes.data;
+    const diagnostics = isFiscalDevice ? callbackDiagnostics(data, praEnvironment) : {};
     // Tolerant comparison — the local IMS Fiscal Device service may return Code as a NUMBER (100),
     // while the cloud API returns a string ('100'). A strict === would misreport success as failure.
     const success = data != null && String(data.Code ?? data.code ?? '') === '100';
@@ -471,7 +510,7 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode) {
 
     if (success && praInvoiceNumber) {
       log(`✅ PRA accepted txn ${invoice.transaction_id}: ${praInvoiceNumber}`);
-      await reportResult(invoice.transaction_id, true, praInvoiceNumber, data, null);
+      await reportResult(invoice.transaction_id, true, praInvoiceNumber, data, null, false, diagnostics);
       if (failedTxnIds.has(invoice.transaction_id)) {
         failedTxnIds.delete(invoice.transaction_id);
         status.failedCount = failedTxnIds.size;
@@ -486,7 +525,7 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode) {
       // Pass any invoice number we DID receive — the server has a regex rescue
       // (fiscal-number pattern) that flips the row to 'submitted' if PRA actually issued one,
       // preventing a duplicate re-submission of an already-fiscalized bill.
-      await reportResult(invoice.transaction_id, false, praInvoiceNumber || null, data, err);
+      await reportResult(invoice.transaction_id, false, praInvoiceNumber || null, data, err, false, diagnostics);
       failedTxnIds.add(invoice.transaction_id);
       status.failedCount = failedTxnIds.size;
     }
@@ -502,7 +541,15 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode) {
     }
     if (transportError) {
       log(`📡 Offline/unreachable for txn ${invoice.transaction_id} — queued, will retry automatically: ${errMsg}`);
-      await reportResult(invoice.transaction_id, false, null, e.response?.data, errMsg, true);
+      await reportResult(
+        invoice.transaction_id,
+        false,
+        null,
+        e.response?.data,
+        errMsg,
+        true,
+        isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}
+      );
       // Not counted as "failed" — this is a connectivity wait, not a rejection.
       if (failedTxnIds.has(invoice.transaction_id)) {
         failedTxnIds.delete(invoice.transaction_id);
@@ -510,14 +557,22 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode) {
       }
     } else {
       log(`❌ PRA error txn ${invoice.transaction_id}: ${errMsg}`);
-      await reportResult(invoice.transaction_id, false, null, e.response?.data, errMsg);
+      await reportResult(
+        invoice.transaction_id,
+        false,
+        null,
+        e.response?.data,
+        errMsg,
+        false,
+        isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}
+      );
       failedTxnIds.add(invoice.transaction_id);
       status.failedCount = failedTxnIds.size;
     }
   }
 }
 
-async function reportResult(txnId, success, praInvoiceNumber, response, error, offline = false) {
+async function reportResult(txnId, success, praInvoiceNumber, response, error, offline = false, diagnostics = {}) {
   const payload = {
     transaction_id: txnId,
     success,
@@ -525,7 +580,7 @@ async function reportResult(txnId, success, praInvoiceNumber, response, error, o
     response,
     error,
     offline,
-    agent_version: currentConfig?.appVersion || '1.0.0',
+    ...diagnostics,
   };
   try {
     await axios.post(

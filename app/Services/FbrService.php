@@ -1093,9 +1093,8 @@ class FbrService
             \Log::error("FBR token decrypt FAILED — APP_KEY mismatch or corrupted token. Refusing to send raw encrypted blob to FBR.", [
                 'company_id' => $company->id ?? null,
                 'env' => $env,
-                'token_prefix' => substr($encryptedToken, 0, 12),
                 'token_length' => strlen($encryptedToken),
-                'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
             ]);
             try {
                 \DB::table('companies')->where('id', $company->id)->update(['fbr_connection_status' => 'red']);
@@ -1132,7 +1131,11 @@ class FbrService
         $cookieFile = storage_path('app/fbr_cookies_' . md5($token) . '.txt');
 
         $attempt = 0;
-        $maxAttempts = 5;
+        // A POST whose response is lost may already have been accepted.  FBR
+        // does not provide a transport-level idempotency key, so retries here
+        // would be blind duplicate submissions.  Reconciliation, not replay,
+        // is the safe recovery path.
+        $maxAttempts = 1;
         $responseBody = '';
         $httpCode = 0;
         $curlError = '';
@@ -1180,30 +1183,15 @@ class FbrService
             $curlInfo     = curl_getinfo($ch);
             curl_close($ch);
 
-            \Log::info("FBR Direct Attempt {$attempt}/{$maxAttempts}", [
+            \Log::info("FBR DI transport attempt completed", [
                 'invoice_id' => $invoiceId,
                 'http_code' => $httpCode,
                 'body_length' => strlen($responseBody ?: ''),
-                'response_preview' => substr($responseBody ?: '(empty)', 0, 500),
                 'time_sec' => $curlInfo['total_time'] ?? null,
-                'has_cookie' => file_exists($cookieFile),
             ]);
 
             if ($httpCode === 200 && strlen(trim($responseBody ?: '')) > 0) {
                 break;
-            }
-
-            if ($httpCode === 200 && strlen(trim($responseBody ?: '')) === 0 && $attempt < $maxAttempts) {
-                $delay = $attempt * 1000000;
-                \Log::info("FBR WAF challenge detected, retry #{$attempt} with {$delay}us delay for invoice #{$invoiceId}");
-                usleep($delay);
-                continue;
-            }
-
-            if ($httpCode === 0 && $attempt < $maxAttempts) {
-                \Log::info("FBR connection failed, retry #{$attempt} for invoice #{$invoiceId}");
-                usleep(2000000);
-                continue;
             }
 
             break;
@@ -1231,56 +1219,85 @@ class FbrService
         return $result;
     }
 
+    /** Keep fiscal audit records useful without retaining buyer or line payloads. */
+    private function redactedPayloadRecord(array $payload): string
+    {
+        return json_encode([
+            'redacted' => true,
+            'payload_sha256' => hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
+            'item_count' => count($payload['items'] ?? []),
+            'invoice_reference_sha256' => hash('sha256', (string) ($payload['invoiceRefNo'] ?? '')),
+        ]);
+    }
+
+    /** Retain only acknowledgement/error shape, never a regulator response body. */
+    private function redactedResponseRecord(string $body): string
+    {
+        $decoded = json_decode($body, true);
+        if (!is_array($decoded)) {
+            return json_encode([
+                'redacted' => true,
+                'response_sha256' => hash('sha256', $body),
+                'response_bytes' => strlen($body),
+                'json' => false,
+            ]);
+        }
+
+        $validation = is_array($decoded['validationResponse'] ?? null) ? $decoded['validationResponse'] : [];
+        $itemAcknowledgement = is_array($validation['invoiceStatuses'][0] ?? null)
+            ? ($validation['invoiceStatuses'][0]['invoiceNumber'] ?? $validation['invoiceStatuses'][0]['invoiceNo'] ?? null)
+            : null;
+        return json_encode([
+            'redacted' => true,
+            'response_sha256' => hash('sha256', $body),
+            'invoiceNumber' => $decoded['invoiceNumber'] ?? $decoded['InvoiceNumber'] ?? $itemAcknowledgement,
+            'validation_status' => $validation['status'] ?? null,
+            'validation_status_code' => $validation['statusCode'] ?? null,
+            'validation_error_code' => $validation['errorCode'] ?? null,
+        ]);
+    }
+
     public function submitInvoice($invoice, int $retryCount = 0)
     {
-        if (
-            $invoice->fbr_invoice_number ||
-            $invoice->status === 'locked' ||
-            $invoice->status === 'pending_verification' ||
-            $invoice->fbr_status === 'pending_verification' ||
-            FbrLog::where('invoice_id', $invoice->id)->where('status', 'success')->exists()
-        ) {
-            $reason = $invoice->fbr_invoice_number
-                ? "already has FBR number {$invoice->fbr_invoice_number}"
-                : ($invoice->status === 'locked' ? 'invoice is locked'
-                : ($invoice->status === 'pending_verification' || $invoice->fbr_status === 'pending_verification'
-                    ? 'pending FBR verification' : 'previous success in fbr_logs'));
-
-            \Log::critical("IDEMPOTENCY BLOCKED: Invoice #{$invoice->id} — {$reason}");
-            throw new \Exception("FBR submission blocked: {$reason}. Invoice #{$invoice->id}");
-        }
-
-        if (!empty($invoice->fbr_submission_hash)) {
-            \Log::critical("IDEMPOTENCY BLOCKED: Invoice #{$invoice->id} — submission hash already set: {$invoice->fbr_submission_hash}");
-            throw new \Exception("FBR submission blocked: submission hash lock exists. Invoice #{$invoice->id}");
-        }
-
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($invoice, $retryCount) {
-            $invoice = \App\Models\Invoice::where('id', $invoice->id)->lockForUpdate()->first();
-
-            if (!$invoice) {
-                throw new \Exception("FBR submission blocked: invoice not found during lock.");
+        // Consume the single immutable claim made by
+        // DiFiscalSubmissionState::reserve(). The regulator request remains
+        // outside this short lock. A second claim here used to reject valid
+        // callers and left demo outcomes with a permanent hash.
+        $invoice = \Illuminate\Support\Facades\DB::transaction(function () use ($invoice) {
+            $locked = \App\Models\Invoice::withoutGlobalScopes()->whereKey($invoice->id)->lockForUpdate()->first();
+            if (!$locked) {
+                throw new \Exception('FBR submission blocked: invoice not found.');
             }
-
-            if (
-                $invoice->fbr_invoice_number ||
-                $invoice->status === 'locked' ||
-                $invoice->status === 'pending_verification' ||
-                $invoice->fbr_submission_hash ||
-                FbrLog::where('invoice_id', $invoice->id)->where('status', 'success')->exists()
-            ) {
-                \Log::critical("IDEMPOTENCY BLOCKED (inside transaction): Invoice #{$invoice->id}");
-                throw new \Exception("FBR submission blocked: race condition guard triggered. Invoice #{$invoice->id}");
+            if (!$locked->is_fbr_processing
+                || empty($locked->fbr_submission_hash)
+                || $locked->fbr_invoice_number
+                || $locked->status === 'locked'
+                || $locked->status === 'pending_verification'
+                || $locked->fbr_status === 'pending_verification') {
+                \Log::critical('IDEMPOTENCY BLOCKED: DI fiscal claim unavailable', ['invoice_id' => $locked->id]);
+                throw new \Exception('FBR submission blocked: canonical fiscal claim unavailable.');
             }
+            return $locked;
+        });
 
-            $invoiceRefNo = $this->resolveInvoiceRefNo($invoice);
-            $submissionHash = hash('sha256', $invoice->id . '|' . $invoiceRefNo);
-
-            $invoice->fbr_submission_hash = $submissionHash;
-            $invoice->save();
-
+        return (function () use ($invoice, $retryCount) {
+            $frozenEnvironment = $invoice->fiscal_submission_environment;
+            if (!in_array($frozenEnvironment, ['sandbox', 'production'], true)) {
+                throw new \Exception('FBR submission blocked: no frozen endpoint environment on canonical claim.');
+            }
+            $invoice->load('company');
+            // A fresh relationship reload reads mutable company configuration.
+            // Pin every payload/token/URL resolver to the reservation snapshot.
+            $invoice->company->setAttribute('fbr_environment', $frozenEnvironment);
             $payload = $this->buildPayload($invoice);
             $company = $invoice->company;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('invoices', 'fiscal_payload_hash')) {
+                $invoice->fiscal_payload_hash = hash('sha256', json_encode(
+                    $payload,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION
+                ));
+                $invoice->save();
+            }
 
         $clearHashOnFailure = function () use ($invoice) {
             $invoice->fbr_submission_hash = null;
@@ -1292,7 +1309,7 @@ class FbrService
             $clearHashOnFailure();
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
-                'request_payload' => json_encode($payload),
+                'request_payload' => $this->redactedPayloadRecord($payload),
                 'status' => 'failed',
                 'response_payload' => json_encode(['errors' => $payloadErrors]),
                 'response_time_ms' => 0,
@@ -1318,7 +1335,7 @@ class FbrService
             );
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
-                'request_payload' => json_encode($payload),
+                'request_payload' => $this->redactedPayloadRecord($payload),
                 'status' => 'failed',
                 'response_payload' => json_encode(['errors' => $errorMessages]),
                 'response_time_ms' => 0,
@@ -1361,7 +1378,7 @@ class FbrService
             $clearHashOnFailure();
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
-                'request_payload' => json_encode($payload),
+                'request_payload' => $this->redactedPayloadRecord($payload),
                 'status' => 'failed',
                 'response_payload' => json_encode(['schema_errors' => $schemaErrors]),
                 'response_time_ms' => 0,
@@ -1385,16 +1402,16 @@ class FbrService
 
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
-                'request_payload' => json_encode(array_merge($payload, ['demo_mode' => true])),
-                'status' => 'success',
-                'response_payload' => json_encode(['status' => 'success', 'fbr_invoice_number' => $mockFbrNumber, 'mock' => true]),
+                'request_payload' => $this->redactedPayloadRecord($payload),
+                'status' => 'simulated',
+                'response_payload' => json_encode(['redacted' => true, 'simulated' => true]),
                 'response_time_ms' => rand(500, 1500),
                 'retry_count' => 0,
             ]);
 
             return [
-                'status' => 'success',
-                'fbr_invoice_number' => $mockFbrNumber,
+                'status' => 'simulated',
+                'provenance' => 'synthetic_demo_response',
                 'response_time_ms' => $log->response_time_ms,
             ];
         }
@@ -1406,7 +1423,7 @@ class FbrService
             $clearHashOnFailure();
             $log = FbrLog::create([
                 'invoice_id' => $invoice->id,
-                'request_payload' => json_encode($payload),
+                'request_payload' => $this->redactedPayloadRecord($payload),
                 'status' => 'failed',
                 'response_payload' => json_encode(['error' => 'FBR token not configured']),
                 'response_time_ms' => 0,
@@ -1424,7 +1441,7 @@ class FbrService
 
         $log = FbrLog::create([
             'invoice_id' => $invoice->id,
-            'request_payload' => json_encode($payload),
+            'request_payload' => $this->redactedPayloadRecord($payload),
             'status' => 'pending',
             'retry_count' => $retryCount,
         ]);
@@ -1434,9 +1451,11 @@ class FbrService
         try {
             $jsonBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
 
-            \Log::info("FBR Payload for Invoice #{$invoice->id}", [
-                'payload_json' => $jsonBody,
-                'url' => $url,
+            \Log::info('FBR DI submission prepared', [
+                'invoice_id' => $invoice->id,
+                'environment' => $company->fbr_environment ?? 'sandbox',
+                'payload_sha256' => hash('sha256', $jsonBody),
+                'payload_bytes' => strlen($jsonBody),
             ]);
 
             $result = $this->sendToFbr($url, $token, $jsonBody, $invoice->id);
@@ -1448,17 +1467,21 @@ class FbrService
 
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
             $log->response_time_ms = $responseTimeMs;
-            $log->response_payload = $responseBody ?: '';
+            $log->response_payload = $this->redactedResponseRecord($responseBody ?: '');
 
             if ($curlError) {
-                $clearHashOnFailure();
-                $log->status = 'failed';
-                $log->failure_type = 'connection_error';
+                // The request may have crossed the network boundary before
+                // cURL reported failure. Preserve the claim and require an
+                // authoritative reconciliation instead of clearing it for a
+                // retry.
+                $log->status = 'pending_verification';
+                $log->failure_type = 'ambiguous_transport';
+                $log->response_payload = json_encode(['transport' => 'curl_error', 'message_length' => strlen($curlError)]);
                 $log->save();
                 return [
-                    "status" => "failed",
-                    "failure_type" => "connection_error",
-                    "errors" => ["FBR connection failed: " . $curlError],
+                    "status" => "pending_verification",
+                    "failure_type" => "ambiguous_transport",
+                    "errors" => ["FBR transport outcome is unknown. Verify the invoice on the FBR portal before retrying."],
                     "response_time_ms" => $responseTimeMs,
                 ];
             }
@@ -1476,8 +1499,24 @@ class FbrService
             $responseData = $response->json();
 
             if (!$response->successful()) {
-                $clearHashOnFailure();
                 $failureType = $this->classifyFailure($response->status(), $response->body());
+                if ($response->status() >= 500) {
+                    // A regulator-side 5xx has no delivery guarantee. It may
+                    // be a callback loss after persistence, so do not release
+                    // the fingerprint for a blind replay.
+                    $log->status = 'pending_verification';
+                    $log->failure_type = 'ambiguous_server_error';
+                    $log->response_payload = $this->redactedResponseRecord($response->body());
+                    $log->save();
+                    return [
+                        'status' => 'pending_verification',
+                        'failure_type' => 'ambiguous_server_error',
+                        'errors' => ['FBR returned a server error after submission started. Verify on the FBR portal before retrying.'],
+                        'response_time_ms' => $responseTimeMs,
+                        'http_status' => $response->status(),
+                    ];
+                }
+                $clearHashOnFailure();
                 $log->status = 'failed';
                 $log->failure_type = $failureType;
                 $log->save();
@@ -1516,15 +1555,13 @@ class FbrService
                     ];
                 }
 
-                $clearHashOnFailure();
-                $log->status = 'failed';
-                $log->failure_type = 'invalid_response';
+                $log->status = 'pending_verification';
+                $log->failure_type = 'ambiguous_response';
                 $log->save();
-                $errorMsg = 'FBR returned unexpected response: ' . substr($bodyStr, 0, 500);
                 return [
-                    "status" => "failed",
+                    "status" => "pending_verification",
                     "failure_type" => $log->failure_type,
-                    "errors" => [$errorMsg],
+                    "errors" => ['FBR returned a malformed success response. Verify the invoice on the FBR portal before retrying.'],
                     "response_time_ms" => $responseTimeMs,
                 ];
             }
@@ -1538,8 +1575,28 @@ class FbrService
                 return [
                     "status" => "success",
                     "fbr_invoice_number" => $fbrResult['invoiceNumber'],
+                    "provenance" => 'fbr_authoritative_acknowledgement',
                     "response_time_ms" => $responseTimeMs,
                     "fbr_response" => $responseData,
+                ];
+            }
+
+            // A 2xx JSON body that is neither an explicit validation rejection
+            // nor an acknowledgement is not evidence of a rejection.  Treat it
+            // like callback loss and preserve the submission fingerprint.
+            if (!isset($responseData['validationResponse']) && !isset($responseData['fault'])) {
+                $log->status = 'pending_verification';
+                $log->failure_type = 'malformed_success_response';
+                $log->response_payload = json_encode([
+                    'response_shape' => 'unrecognised_2xx_json',
+                    'response_sha256' => hash('sha256', $responseBody),
+                ]);
+                $log->save();
+                return [
+                    'status' => 'pending_verification',
+                    'failure_type' => 'malformed_success_response',
+                    'errors' => ['FBR returned a response without an authoritative acknowledgement. Verify on the FBR portal before retrying.'],
+                    'response_time_ms' => $responseTimeMs,
                 ];
             }
 
@@ -1584,34 +1641,32 @@ class FbrService
             ];
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            $clearHashOnFailure();
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
-            $log->status = 'failed';
-            $log->failure_type = 'network_error';
+            $log->status = 'pending_verification';
+            $log->failure_type = 'ambiguous_transport';
             $log->response_time_ms = $responseTimeMs;
-            $log->response_payload = $e->getMessage();
+            $log->response_payload = json_encode(['transport' => 'connection_exception']);
             $log->save();
 
             return [
-                "status" => "failed",
-                "failure_type" => "network_error",
-                "errors" => [$e->getMessage()],
+                "status" => "pending_verification",
+                "failure_type" => "ambiguous_transport",
+                "errors" => ['FBR transport outcome is unknown. Verify the invoice on the FBR portal before retrying.'],
                 "response_time_ms" => $responseTimeMs,
             ];
 
         } catch (\Exception $e) {
-            $clearHashOnFailure();
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
-            $log->status = 'failed';
-            $log->failure_type = 'network_error';
+            $log->status = 'pending_verification';
+            $log->failure_type = 'ambiguous_transport';
             $log->response_time_ms = $responseTimeMs;
-            $log->response_payload = $e->getMessage();
+            $log->response_payload = json_encode(['transport' => 'exception', 'exception_class' => get_class($e)]);
             $log->save();
 
             return [
-                "status" => "failed",
-                "failure_type" => "network_error",
-                "errors" => [$e->getMessage()],
+                "status" => "pending_verification",
+                "failure_type" => "ambiguous_transport",
+                "errors" => ['FBR transport outcome is unknown. Verify the invoice on the FBR portal before retrying.'],
                 "response_time_ms" => $responseTimeMs,
             ];
         }
@@ -1647,7 +1702,7 @@ class FbrService
                 }
             }
 
-            if ($statusCode === '00' && $status === 'valid' && $allItemsValid) {
+            if ($statusCode === '00' && $status === 'valid' && $allItemsValid && !empty($invoiceNumber ?? ($itemInvoiceNumbers[0] ?? null))) {
                 return [
                     'valid' => true,
                     'invoiceNumber' => $invoiceNumber ?? ($itemInvoiceNumbers[0] ?? null),
@@ -1672,7 +1727,7 @@ class FbrService
             ];
         }
 
-        if ($invoiceNumber) {
+        if (is_string($invoiceNumber) && trim($invoiceNumber) !== '') {
             return [
                 'valid' => true,
                 'invoiceNumber' => $invoiceNumber,

@@ -57,6 +57,7 @@ use App\Http\Controllers\PosInventoryController;
 use App\Http\Controllers\PosInventoryMasterController;
 use App\Http\Controllers\PosStockCheckController;
 use App\Http\Controllers\PosStockInController;
+use App\Http\Controllers\HotelController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
@@ -1094,6 +1095,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // cause next time. sendBeacon-compatible (pos/* is CSRF-exempt).
     Route::post('/api/print-telemetry', [PosController::class, 'apiPrintTelemetry'])
         ->middleware('throttle:30,1')->name('pos.api.print-telemetry');
+    Route::get('/api/kot-print-attention', [PosController::class, 'apiKotPrintAttention'])
+        ->middleware('throttle:60,1')->name('pos.api.kot-print-attention');
+    Route::post('/api/kot-print-attention/local-core-down', [PosController::class, 'apiKotLocalCoreDown'])
+        ->middleware('throttle:30,1')->name('pos.api.kot-local-core-down');
     // One-click silent-print prompt (sale-screen banner) — controller enforces
     // a strict admin/manager gate (isPosCashier → 403), same pattern as bulk-sale.
     Route::post('/api/printer-prompt', [PosController::class, 'apiPrinterPrompt'])->name('pos.api.printer-prompt');
@@ -1112,11 +1117,53 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/products/search-mode', [PosController::class, 'productSearchMode'])->name('pos.products.search-mode');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
     Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
+
+    Route::middleware(['feature:rooms'])->prefix('hotel')->group(function () {
+        Route::get('/', [HotelController::class, 'dashboard'])->name('pos.hotel.dashboard');
+        Route::get('/reservations', [HotelController::class, 'reservations'])->name('pos.hotel.reservations');
+        Route::get('/housekeeping', [HotelController::class, 'housekeepingBoard'])->name('pos.hotel.housekeeping');
+        Route::get('/guests', [HotelController::class, 'guests'])->name('pos.hotel.guests');
+        Route::get('/folios', [HotelController::class, 'folios'])->name('pos.hotel.folios');
+        Route::get('/reports', [HotelController::class, 'reports'])->name('pos.hotel.reports');
+        // Separated Restaurant Outlet (saved restaurant_mode ON only).
+        Route::get('/restaurant', [HotelController::class, 'restaurantOutlet'])->name('pos.hotel.restaurant-outlet');
+        Route::get('/restaurant/exit', [HotelController::class, 'leaveRestaurantOutlet'])->name('pos.hotel.restaurant-outlet.exit');
+        Route::get('/rooms', [HotelController::class, 'rooms'])->name('pos.hotel.rooms');
+        Route::post('/rooms/{id}/housekeeping', [HotelController::class, 'housekeeping'])->whereNumber('id')->name('pos.hotel.rooms.housekeeping');
+        Route::post('/rooms/{id}/service', [HotelController::class, 'serviceState'])->whereNumber('id')->name('pos.hotel.rooms.service');
+        Route::get('/stays', [HotelController::class, 'staysIndex'])->name('pos.hotel.stays.index');
+        Route::get('/stays/create', [HotelController::class, 'createStay'])->name('pos.hotel.stays.create');
+        Route::post('/stays', [HotelController::class, 'storeStay'])->name('pos.hotel.stays.store');
+        Route::get('/stays/{id}', [HotelController::class, 'showStay'])->whereNumber('id')->name('pos.hotel.stays.show');
+        Route::post('/stays/{id}/check-in', [HotelController::class, 'checkIn'])->whereNumber('id')->name('pos.hotel.stays.check-in');
+        Route::post('/stays/{id}/check-out', [HotelController::class, 'checkOut'])->whereNumber('id')->name('pos.hotel.stays.check-out');
+        Route::post('/stays/{id}/extend', [HotelController::class, 'extend'])->whereNumber('id')->name('pos.hotel.stays.extend');
+        Route::post('/stays/{id}/move', [HotelController::class, 'move'])->whereNumber('id')->name('pos.hotel.stays.move');
+        Route::post('/stays/{id}/cancel', [HotelController::class, 'cancel'])->whereNumber('id')->name('pos.hotel.stays.cancel');
+        Route::post('/stays/{id}/no-show', [HotelController::class, 'noShow'])->whereNumber('id')->name('pos.hotel.stays.no-show');
+        Route::post('/stays/{id}/folio/charge', [HotelController::class, 'folioCharge'])->whereNumber('id')->name('pos.hotel.folio.charge');
+        Route::post('/stays/{id}/folio/payment', [HotelController::class, 'folioPayment'])->whereNumber('id')->name('pos.hotel.folio.payment');
+        Route::post('/stays/{id}/folio/refund', [HotelController::class, 'folioRefund'])->whereNumber('id')->name('pos.hotel.folio.refund');
+        Route::post('/stays/{id}/folio/reverse', [HotelController::class, 'folioReverse'])->whereNumber('id')->name('pos.hotel.folio.reverse');
+        Route::post('/stays/{id}/folio/settle', [HotelController::class, 'folioSettle'])->whereNumber('id')->name('pos.hotel.folio.settle');
+    });
     // Dashboard "gone quiet" card: mark one customer as handled. Same pattern
     // as bulk-sale above — OUTSIDE PosAdminOnly (that middleware redirects),
     // controller enforces the admin/manager allowlist with a true 403 so the
     // card can roll the row back instead of silently "succeeding".
     Route::post('/customers/alert-dismiss', [PosController::class, 'dismissInactiveRegular'])->name('pos.customers.alert-dismiss');
+
+    // Category-native service operations. Hotel is deliberately excluded by
+    // PosServiceWorkflowProfiles; its stays/folio workflow remains canonical.
+    Route::middleware(['feature:service_jobs,relevant'])->prefix('work-orders')->group(function () {
+        Route::get('/', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'index'])->name('pos.service-work-orders.index');
+        Route::get('/create', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'create'])->name('pos.service-work-orders.create');
+        Route::post('/', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'store'])->name('pos.service-work-orders.store');
+        Route::get('/report.csv', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'report'])->name('pos.service-work-orders.report');
+        Route::get('/{id}', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'show'])->whereNumber('id')->name('pos.service-work-orders.show');
+        Route::post('/{id}/transition', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'transition'])->whereNumber('id')->name('pos.service-work-orders.transition');
+        Route::post('/{id}/invoice', [\App\Http\Controllers\PosServiceWorkOrderController::class, 'invoice'])->whereNumber('id')->name('pos.service-work-orders.invoice');
+    });
 
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
         // Category profile (Task 1582): Services belong to the services family
@@ -1152,6 +1199,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
         Route::post('/rider-bill-preview/settings', [\App\Http\Controllers\RiderBillPreviewController::class, 'update'])->name('rider.preview.settings');
         Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
+        Route::post('/hotel/rooms', [HotelController::class, 'storeRoom'])->name('pos.hotel.rooms.store')->middleware('feature:rooms');
+        Route::post('/hotel/checkout-policy', [HotelController::class, 'updateCheckoutPolicy'])->name('pos.hotel.checkout-policy')->middleware('feature:rooms');
+        Route::put('/hotel/rooms/{id}', [HotelController::class, 'updateRoom'])->whereNumber('id')->name('pos.hotel.rooms.update')->middleware('feature:rooms');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         // NO plan.limit middleware here on purpose: at-cap shops must still be
@@ -1290,6 +1340,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // restaurant companies (defence-in-depth). Same fix pattern as customer-search above.
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
+    Route::post('/restaurant/orders/{id}/edit', [\App\Http\Controllers\RestaurantWaiterController::class, 'updateIncomingOrder'])->name('pos.restaurant.orders.edit');
     Route::get('/restaurant/orders/{id}/payment-quote', [RestaurantPosController::class, 'paymentQuote'])->name('pos.restaurant.orders.payment-quote');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
 
@@ -2919,6 +2970,8 @@ require __DIR__.'/auth.php';
 Route::prefix('admin/deployment-approval')->middleware(['admin.auth'])->group(function () {
     Route::get('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'index'])->name('saas.admin.deployment-approval');
     Route::post('/', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'store'])->name('saas.admin.deployment-approval.store');
+    Route::get('/{requestId}/review', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'review'])
+        ->middleware(['signed', 'throttle:10,1'])->name('saas.admin.deployment-approval.review');
     Route::post('/{requestId}/approve', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'approve'])->name('saas.admin.deployment-approval.approve');
 });
 Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->group(function () {
@@ -2930,8 +2983,5 @@ Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withou
     Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
     Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
 });
-
-
-
 
 

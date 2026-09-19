@@ -11,6 +11,8 @@ use App\Models\FbrPosTransaction;
 use App\Models\FbrPosCallbackDiagnostic;
 use App\Services\PraIntegrationService;
 use App\Services\FbrService;
+use App\Services\FbrPosSubmissionEvidenceService;
+use App\Support\PrinterIdentity;
 
 class AgentController extends Controller
 {
@@ -241,7 +243,7 @@ class AgentController extends Controller
         try {
             $info = AgentManagementController::latestReleaseInfo();
             $tag = $info['tag'] ?? null;
-            if (!$tag || !preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $tag, $m)) {
+            if (!($info['available'] ?? false) || !$tag || !preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $tag, $m)) {
                 return null;
             }
 
@@ -262,10 +264,7 @@ class AgentController extends Controller
                 return null;
             }
 
-            $zip = collect($info['assets'] ?? [])
-                ->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))
-                ->sortByDesc('size')
-                ->first();
+            $zip = $info['zip'] ?? null;
             if (!$zip) {
                 return null;
             }
@@ -290,14 +289,31 @@ class AgentController extends Controller
             $newPrefix = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/download/';
             $oldPrefix = 'https://github.com/jawadrao5555-alt/taxnest/releases/download/';
             if ($legacy && str_starts_with($zipUrl, $newPrefix)) {
-                $zipUrl = $oldPrefix . substr($zipUrl, strlen($newPrefix));
+                $legacyZip = $info['legacy_zip'] ?? null;
+                if (!is_array($legacyZip)
+                    || ($legacyZip['sha256'] ?? null) !== ($zip['sha256'] ?? null)
+                    || ($legacyZip['size'] ?? null) !== ($zip['size'] ?? null)
+                    || !str_starts_with((string) ($legacyZip['url'] ?? ''), $oldPrefix)) {
+                    // Preserve legacy clients by withholding an unverifiable
+                    // update, not by quietly pointing them at a possibly
+                    // different mirror asset.
+                    return null;
+                }
+                $zipUrl = $legacyZip['url'];
             }
 
             return [
+                'product' => $info['product'],
                 'version' => $m[1] . '.' . $m[2] . '.' . $m[3],
                 'tag' => $tag,
+                'asset_name' => $zip['name'],
                 'zip_url' => $zipUrl,
-                'zip_size' => $zip['size'] ?? 0,
+                'zip_size' => (int) ($zip['size'] ?? 0),
+                'zip_sha256' => $zip['sha256'],
+                'source_sha' => $info['source_sha'],
+                'build_sha' => $info['build_sha'],
+                'min_agent_version' => $info['compatibility']['min_agent_version'],
+                'max_agent_version' => $info['compatibility']['max_agent_version'],
             ];
         } catch (\Throwable $e) {
             return null;
@@ -389,6 +405,8 @@ class AgentController extends Controller
             $update['agent_update_at'] = null;
         }
 
+        $this->syncHeartbeatDiagnostics($company, $request);
+
         $this->telemetryUpdate($company, $update);
 
         // Task 1166: multi-counter registry — agents v1.9.0+ identify their
@@ -469,6 +487,69 @@ class AgentController extends Controller
     }
 
     /**
+     * Store only bounded, non-sensitive operational diagnostics under the
+     * telemetry-owned key. Existing printer routing/settings are merged from a
+     * locked fresh row and old agents that omit the additive object remain
+     * unchanged.
+     */
+    private function syncHeartbeatDiagnostics(Company $company, Request $request): void
+    {
+        $raw = $request->input('agent_diagnostics');
+        if (!is_array($raw)) {
+            return;
+        }
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_printer_settings')) {
+                return;
+            }
+            $allowedStates = ['unknown', 'reachable', 'unreachable'];
+            $printer = is_array($raw['printer'] ?? null) ? $raw['printer'] : [];
+            $fiscal = is_array($raw['fiscal_connectivity'] ?? null) ? $raw['fiscal_connectivity'] : [];
+            $queue = is_array($raw['queue'] ?? null) ? $raw['queue'] : [];
+            $state = in_array($fiscal['state'] ?? null, $allowedStates, true) ? $fiscal['state'] : 'unknown';
+            $diagnostics = [
+                'process_online' => true,
+                'reported_at' => now()->toIso8601String(),
+                'printer' => [
+                    'printing_enabled' => (bool) ($printer['printing_enabled'] ?? false),
+                    'printers_reported' => min(100, max(0, (int) ($printer['printers_reported'] ?? 0))),
+                    'healthy' => (bool) ($printer['healthy'] ?? false),
+                ],
+                'fiscal_connectivity' => [
+                    'state' => $state,
+                    'checked_at' => $this->safeAgentDiagnosticTime($fiscal['checked_at'] ?? null),
+                ],
+                'queue' => [
+                    'pending_callbacks' => min(100000, max(0, (int) ($queue['pending_callbacks'] ?? 0))),
+                    'last_sync_at' => $this->safeAgentDiagnosticTime($queue['last_sync_at'] ?? null),
+                ],
+            ];
+            $this->telemetryMergeJson($company, 'pos_printer_settings', function (array $settings) use ($diagnostics) {
+                $settings['agent_diagnostics'] = $diagnostics;
+                return $settings;
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Agent heartbeat diagnostics not persisted', [
+                'company_id' => $company->id,
+                'error_class' => get_class($e),
+            ]);
+        }
+    }
+
+    private function safeAgentDiagnosticTime(mixed $value): ?string
+    {
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+        try {
+            $at = \Carbon\CarbonImmutable::parse($value);
+            return $at->gt(now()->addMinutes(5)) ? null : $at->toIso8601String();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * Live Ops pending-command channel + optional force_update advertise.
      * Additive keys only — older agents ignore them safely.
      */
@@ -539,13 +620,36 @@ class AgentController extends Controller
     /** FBR POS equivalent of the PRA self-heal sweep, operating on fbr_pos_transactions. */
     private function fbrHeartbeat(Company $company, Request $request)
     {
-        // Self-heal: rows with a fiscal invoice # but a stale status.
-        $healed = DB::table('fbr_pos_transactions')
+        // Self-heal only a historically explicit Code 100 acceptance. A fiscal
+        // number by itself is not proof: a malformed/missing-code callback is
+        // deliberately held at verification_pending so heartbeat can never
+        // turn that ambiguous state into "submitted".
+        $healQuery = DB::table('fbr_pos_transactions')
             ->where('company_id', $company->id)
             ->whereNotNull('fbr_invoice_number')
-            ->where('fbr_invoice_number', '!=', '')
-            ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
-            ->update([
+            ->whereRaw("TRIM(fbr_invoice_number) <> ''")
+            ->where('fbr_response_code', '100')
+            ->whereIn('fbr_status', ['offline', 'pending', 'failed']);
+
+        // New callbacks carry a safe evidence row. Historical Code-100 rows
+        // predate the table, so "no evidence row" remains backward compatible;
+        // an existing non-accepted evidence row always blocks self-heal.
+        if (app(FbrPosSubmissionEvidenceService::class)->available()) {
+            $healQuery->where(function ($query) {
+                $query->whereExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from(FbrPosSubmissionEvidenceService::TABLE . ' as fse')
+                        ->whereColumn('fse.transaction_id', 'fbr_pos_transactions.id')
+                        ->where('fse.result_state', 'local_accepted');
+                })->orWhereNotExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from(FbrPosSubmissionEvidenceService::TABLE . ' as fse_any')
+                        ->whereColumn('fse_any.transaction_id', 'fbr_pos_transactions.id');
+                });
+            });
+        }
+
+        $healed = $healQuery->update([
                 'fbr_status' => 'submitted',
                 'updated_at' => now(),
             ]);
@@ -612,7 +716,7 @@ class AgentController extends Controller
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {
-            return $this->fbrPendingInvoices($company);
+            return $this->fbrPendingInvoices($company, $request);
         }
 
         // ===== PRA POS company (default) =====
@@ -717,7 +821,7 @@ class AgentController extends Controller
      * path so the agent needs zero changes: it POSTs each `payload` to `pra_endpoint`
      * (the local FBR IMS component on localhost:8524) and reports back via /submit-result.
      */
-    private function fbrPendingInvoices(Company $company)
+    private function fbrPendingInvoices(Company $company, Request $request)
     {
         $pending = FbrPosTransaction::where('company_id', $company->id)
             ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
@@ -737,6 +841,11 @@ class AgentController extends Controller
             try {
                 $txn->loadMissing(['items', 'company']);
                 $payload = $fbrService->buildFbrPosPayload($txn);
+                app(FbrPosSubmissionEvidenceService::class)->recordDispatch(
+                    $company,
+                    $txn,
+                    $request->input('version')
+                );
                 $invoices[] = [
                     'transaction_id' => $txn->id,
                     'invoice_number' => $txn->invoice_number,
@@ -761,9 +870,12 @@ class AgentController extends Controller
             'pra_mode' => 'fiscal_device',
             'pra_token' => '',
             'pra_pos_id' => $company->fbr_pos_id,
-            // Server-requested environment only. The local FBRIMS component's
-            // self-reported environment is sent back separately by new agents.
-            'pra_environment' => $company->fbr_pos_environment,
+            // Requested by TaxNest; never presented as proof of the installed
+            // shop-PC IMS environment or central FBR receipt.
+            'pra_environment' => $company->fbr_pos_environment ?? 'sandbox',
+            'requested_environment' => $company->fbr_pos_environment ?? 'sandbox',
+            'local_ims_environment_proof' => 'unknown',
+            'central_verification' => 'unknown',
         ]);
     }
 
@@ -775,15 +887,19 @@ class AgentController extends Controller
             'transaction_id' => 'required|integer',
             'success' => 'required|boolean',
             'pra_invoice_number' => 'nullable|string',
-            'response' => 'nullable|array',
+            // FBR must be able to receive and quarantine malformed legacy-agent
+            // callbacks instead of Laravel rejecting them before evidence is
+            // recorded. Both result writers already treat non-arrays as unsafe.
+            'response' => 'nullable',
             'error' => 'nullable|string',
             // Agent >= Jul 2026: true when the failure was transport-level (IMS service
             // down / no internet / timeout) — the bill stays QUEUED, never 'failed'.
             'offline' => 'nullable|boolean',
-            // Additive callback evidence from newer fiscal-device agents. These fields
-            // are diagnostics only and never authorize a submission.
+            // Additive Agent telemetry. Older agents omit it and remain valid.
+            'agent_version' => 'nullable|string|max:40',
+            // Additive fiscal-device evidence. These fields are diagnostic only
+            // and never authorize or retry an FBR submission.
             'version' => 'nullable|string|max:32',
-            'agent_version' => 'nullable|string|max:32',
             'ims_version' => 'nullable|string|max:64',
             'requested_environment' => 'nullable|string|max:20',
             'environment' => 'nullable|string|max:20',
@@ -919,13 +1035,11 @@ class AgentController extends Controller
         );
     }
 
-    /**
-     * FBR POS submit-result callback. Writes to fbr_pos_transactions. Success requires the
-     * agent to report success=true WITH a non-empty invoice number — the PRA-specific
-     * fiscal-number regex is deliberately NOT applied (FBR IMS invoice formats differ).
-     */
-    private function recordFbrCallbackDiagnostic(Request $request, Company $company, FbrPosTransaction $txn): void
-    {
+    private function recordFbrCallbackDiagnostic(
+        Request $request,
+        Company $company,
+        FbrPosTransaction $txn
+    ): void {
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('fbr_pos_callback_diagnostics')) {
                 return;
@@ -936,10 +1050,13 @@ class AgentController extends Controller
             $reportedFiscalNumber = trim((string) $request->input('pra_invoice_number', ''));
             $safeResponse = FbrService::sanitizeAgentCallbackResponse($response, $reportedFiscalNumber);
             $central = FbrService::callbackCentralFields($response);
-            $environment = strtolower(trim((string) ($request->input('client_environment')
-                ?: $request->input('environment', ''))));
-            if (!in_array($environment, ['test', 'production'], true)) {
-                $environment = null;
+
+            $clientEnvironment = strtolower(trim((string) (
+                $request->input('client_environment')
+                ?: $request->input('environment', '')
+            )));
+            if (!in_array($clientEnvironment, ['test', 'production'], true)) {
+                $clientEnvironment = null;
             }
             $requestedEnvironment = strtolower(trim((string) $request->input('requested_environment', '')));
             if (!in_array($requestedEnvironment, ['test', 'production'], true)) {
@@ -954,14 +1071,22 @@ class AgentController extends Controller
                 'company_id' => $company->id,
                 'transaction_id' => $txn->id,
                 'source' => 'fiscal_device_agent',
-                'agent_version' => mb_substr((string) ($request->input('agent_version') ?: $request->input('version', '')), 0, 32) ?: null,
+                'agent_version' => mb_substr((string) (
+                    $request->input('agent_version')
+                    ?: $request->input('version', '')
+                ), 0, 32) ?: null,
                 'ims_version' => mb_substr(trim((string) $request->input('ims_version', '')), 0, 64) ?: null,
                 'requested_environment' => $requestedEnvironment,
-                'client_environment' => $environment,
+                'client_environment' => $clientEnvironment,
                 'callback_received_at' => now(),
                 'success' => $request->boolean('success'),
                 'offline' => $request->has('offline') ? $request->boolean('offline') : null,
-                'response_code' => mb_substr((string) ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? ''), 0, 64) ?: null,
+                'response_code' => mb_substr((string) (
+                    $response['Code']
+                    ?? $response['response_code']
+                    ?? $response['code']
+                    ?? ''
+                ), 0, 64) ?: null,
                 'invoice_number_field' => FbrService::callbackInvoiceNumberField($response),
                 'central_sync_status' => $central['central_sync_status'],
                 'central_reference' => $central['central_reference'],
@@ -969,7 +1094,7 @@ class AgentController extends Controller
                 'error_message' => $safeError ? mb_substr($safeError, 0, 1000) : null,
             ]);
         } catch (\Throwable $e) {
-            // Callback diagnostics must never make an otherwise valid agent result fail.
+            // Diagnostics must never make an otherwise valid agent result fail.
             Log::warning('Agent: FBR callback diagnostic could not be persisted', [
                 'company_id' => $company->id,
                 'transaction_id' => $txn->id,
@@ -978,6 +1103,11 @@ class AgentController extends Controller
         }
     }
 
+    /**
+     * FBR POS submit-result callback. Writes to fbr_pos_transactions. Success requires the
+     * agent to report success=true WITH a non-empty invoice number — the PRA-specific
+     * fiscal-number regex is deliberately NOT applied (FBR IMS invoice formats differ).
+     */
     private function fbrSubmitResult(Request $request, Company $company)
     {
         return DB::transaction(function () use ($request, $company) {
@@ -985,8 +1115,8 @@ class AgentController extends Controller
 
         $txn = FbrPosTransaction::where('id', $txnId)
             ->where('company_id', $company->id)
-            // Fiscal identity is immutable. Serialise competing callbacks so two
-            // workers cannot both observe an empty number and overwrite each other.
+            // Serialize competing callbacks so an already-issued fiscal
+            // identity can never be observed as empty by two workers.
             ->lockForUpdate()
             ->first();
 
@@ -996,12 +1126,40 @@ class AgentController extends Controller
 
         $fbrInvoiceNumber = trim((string) $request->input('pra_invoice_number', ''));
         $this->recordFbrCallbackDiagnostic($request, $company, $txn);
+        $response = $request->input('response');
+        $code = null;
+        if (is_array($response)) {
+            foreach (['Code', 'response_code', 'code'] as $key) {
+                if (array_key_exists($key, $response) && $response[$key] !== null) {
+                    $candidate = trim((string) $response[$key]);
+                    if ($candidate !== '') {
+                        $code = $candidate;
+                        break;
+                    }
+                }
+            }
+        }
+        $explicitCode100 = $code === '100';
+        $treatAsSuccess = $request->boolean('success')
+            && $explicitCode100
+            && $fbrInvoiceNumber !== '';
+        $evidence = app(FbrPosSubmissionEvidenceService::class);
 
-        // A fiscal number is final identity. A duplicate callback after a lost ACK,
-        // or a conflicting callback from a stale queue item, must never replace it
-        // or demote the transaction. This guard intentionally runs before all writes.
+        // Idempotent callback: once an explicit Code-100 result stamped this
+        // row, a late/stale callback must not replace its fiscal number or
+        // demote it. The agent receives an ack and drops the queued callback.
         $storedNumber = trim((string) ($txn->fbr_invoice_number ?? ''));
         if ($storedNumber !== '') {
+            $storedWasAccepted = (string) $txn->fbr_response_code === '100';
+            $evidence->recordResult(
+                $company,
+                $txn,
+                $storedWasAccepted ? ($txn->fbr_response ?? $response) : $response,
+                $storedWasAccepted ? '100' : $code,
+                $storedNumber,
+                $storedWasAccepted ? 'local_accepted' : 'verification_pending',
+                $request->input('agent_version')
+            );
             $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
 
             return response()->json([
@@ -1011,11 +1169,7 @@ class AgentController extends Controller
             ]);
         }
 
-        $treatAsSuccess = $request->boolean('success') && $fbrInvoiceNumber !== '';
-
         if ($treatAsSuccess) {
-            $response = $request->input('response');
-            $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
             $safeResponse = is_array($response)
                 ? FbrService::sanitizeAgentCallbackResponse($response, $fbrInvoiceNumber)
                 : null;
@@ -1023,10 +1177,20 @@ class AgentController extends Controller
             $txn->update(array_merge([
                 'fbr_status' => 'submitted',
                 'fbr_invoice_number' => $fbrInvoiceNumber,
-                'fbr_response_code' => substr((string) $code, 0, 250),
+                'fbr_response_code' => '100',
                 'fbr_response' => $safeResponse,
                 'fbr_submission_hash' => null,
             ], \App\Services\FbrService::fbrErrorPatch(null)));
+
+            $evidence->recordResult(
+                $company,
+                $txn,
+                $response,
+                '100',
+                $fbrInvoiceNumber,
+                'local_accepted',
+                $request->input('agent_version')
+            );
 
             Log::info('Agent: FBR submission success', [
                 'company_id' => $company->id,
@@ -1035,7 +1199,39 @@ class AgentController extends Controller
             ]);
         } else {
             $errMsg = (string) $request->input('error', 'FBR submission failed');
-            $safeError = FbrService::sanitizeAgentCallbackResponse(['error' => $errMsg])['error'] ?? '[redacted]';
+
+            // A success claim with a number but no explicit Code 100 is not a
+            // rejection and is not safe to retry automatically: local IMS may
+            // have allocated a number. Hold it for reconciliation without
+            // stamping the transaction's fiscal-number field.
+            $ambiguousSuccess = $request->boolean('success')
+                && $fbrInvoiceNumber !== ''
+                && (!$explicitCode100 || !is_array($response));
+
+            if ($ambiguousSuccess) {
+                $reason = !is_array($response)
+                    ? 'Agent success callback had a malformed response; explicit FBR IMS Code 100 was not proven.'
+                    : ($code === null
+                        ? 'Agent success callback omitted the FBR IMS response code; explicit Code 100 was not proven.'
+                        : 'Agent success callback carried FBR IMS code ' . mb_substr($code, 0, 40) . ', not Code 100.');
+                $txn->update(array_merge([
+                    'fbr_status' => 'verification_pending',
+                    'fbr_response_code' => $code === null ? null : mb_substr($code, 0, 250),
+                    'fbr_submission_hash' => null,
+                ], \App\Services\FbrService::fbrErrorPatch($reason)));
+                $evidence->recordResult(
+                    $company,
+                    $txn,
+                    $response,
+                    $code,
+                    $fbrInvoiceNumber,
+                    'verification_pending',
+                    $request->input('agent_version')
+                );
+                $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+
+                return response()->json(['ok' => true, 'verification_pending' => true]);
+            }
 
             // Same IMS-contact-optional rule as PRA: transport failures stay QUEUED
             // ('offline') and auto-retry; only real FBR rejections become 'failed'.
@@ -1047,19 +1243,27 @@ class AgentController extends Controller
             // short Roman-Urdu reason, real FBR rejections keep the raw message.
             $txn->update(array_merge([
                 'fbr_status' => $newStatus,
-                'fbr_response_code' => substr($safeError, 0, 250),
+                'fbr_response_code' => substr($errMsg, 0, 250),
                 'fbr_submission_hash' => null,
             ], \App\Services\FbrService::fbrErrorPatch(
-                $transportError ? \App\Services\FbrService::shortFbrTransportError($safeError) : $safeError
+                $transportError ? \App\Services\FbrService::shortFbrTransportError($errMsg) : $errMsg
             )));
+
+            $evidence->recordResult(
+                $company,
+                $txn,
+                $response,
+                $code,
+                $fbrInvoiceNumber ?: null,
+                $transportError ? 'transport_deferred' : 'rejected',
+                $request->input('agent_version')
+            );
 
             Log::log($transportError ? 'info' : 'warning', 'Agent: FBR submission ' . ($transportError ? 'deferred (offline/IMS unreachable — queued)' : 'failed'), [
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,
-                'error' => $safeError,
-                'response' => FbrService::sanitizeAgentCallbackResponse(
-                    is_array($request->input('response')) ? $request->input('response') : []
-                ),
+                'error' => $errMsg,
+                'response' => $request->input('response'),
             ]);
         }
 
@@ -1300,18 +1504,37 @@ class AgentController extends Controller
             // the Printer Settings page and enqueue-time routing see it online.
             $this->syncAgentDevice($company, $request);
         }
-        $deviceScope = function ($q) use ($deviceAware, $deviceUid) {
-            if (!$deviceAware) {
-                return; // column not migrated yet — legacy behavior
+
+        // An unstamped job is company-wide, but it is not printer-agnostic.
+        // Once this device has reported an authoritative printer list, let it
+        // compete only for unstamped jobs whose target queue it actually has.
+        // This preserves shared-printer failover between capable counters while
+        // preventing an unrelated company Agent from winning the claim and then
+        // failing with "Invalid deviceName provided". Devices that have never
+        // reported printers retain the legacy scope until their first report.
+        $reportedPrinterNames = null;
+        if ($deviceAware && $deviceUid) {
+            try {
+                $device = \App\Models\PosAgentDevice::query()
+                    ->where('company_id', $company->id)
+                    ->where('device_uid', $deviceUid)
+                    ->first(['printers', 'printers_reported_at']);
+                if ($device?->printers_reported_at) {
+                    $reportedPrinterNames = collect($device->printers ?? [])
+                        ->pluck('name')
+                        ->filter(fn ($name) => is_string($name) && trim($name) !== '')
+                        ->map(fn ($name) => trim($name))
+                        ->unique()
+                        ->values()
+                        ->all();
+                }
+            } catch (\Throwable $e) {
+                // Registry reads are best-effort. A schema/transient failure
+                // keeps the established claim behavior rather than stopping
+                // all company printing.
+                $reportedPrinterNames = null;
             }
-            if ($deviceUid) {
-                $q->where(function ($w) use ($deviceUid) {
-                    $w->whereNull('device_uid')->orWhere('device_uid', $deviceUid);
-                });
-            } else {
-                $q->whereNull('device_uid');
-            }
-        };
+        }
 
         // Housekeeping (stale requeue + purge) is throttled to once per 30s per
         // company — with long-polling agents this endpoint runs far more often
@@ -1336,11 +1559,13 @@ class AgentController extends Controller
             $wait = min($wait, 2);
         }
         $held = false;
-        $pendingExists = fn () => DB::table('pos_print_jobs')
-            ->where('company_id', $company->id)
-            ->where('status', 'pending')
-            ->where($deviceScope)
-            ->exists();
+        $pendingExists = fn () => $this->eligiblePendingPrintJobIds(
+            $company,
+            $deviceAware,
+            $deviceUid,
+            $reportedPrinterNames,
+            1
+        ) !== [];
         $hasPending = $pendingExists();
 
         // Activity gate (Aug 2026 — "server bohat slow" incident). A held poll
@@ -1404,12 +1629,20 @@ class AgentController extends Controller
         }
 
         $token = (string) \Illuminate\Support\Str::uuid();
+        $claimIds = $this->eligiblePendingPrintJobIds(
+            $company,
+            $deviceAware,
+            $deviceUid,
+            $reportedPrinterNames,
+            10
+        );
+        if ($claimIds === []) {
+            return response()->json(['ok' => true, 'jobs' => [], 'count' => 0, 'held' => $held]);
+        }
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
-            ->where($deviceScope)
-            ->orderBy('id')
-            ->limit(10)
+            ->whereIn('id', $claimIds)
             ->update([
                 'status' => 'printing',
                 'claim_token' => $token,
@@ -1502,6 +1735,54 @@ class AgentController extends Controller
     }
 
     /**
+     * Pending jobs this agent may claim. Stamped jobs stay owner-only.
+     * Unstamped jobs match reported printer names after case/space fold so
+     * a rename-spacing mismatch cannot hide a valid kitchen queue. The
+     * stored target_printer snapshot is not rewritten.
+     *
+     * @param  list<string>|null  $reportedPrinterNames
+     * @return list<int>
+     */
+    private function eligiblePendingPrintJobIds($company, bool $deviceAware, ?string $deviceUid, ?array $reportedPrinterNames, int $limit): array
+    {
+        $q = DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->orderBy('id');
+        $columns = ['id', 'target_printer'];
+        if ($deviceAware) {
+            $columns[] = 'device_uid';
+            if ($deviceUid) {
+                $q->where(function ($w) use ($deviceUid) {
+                    $w->where('device_uid', $deviceUid)->orWhereNull('device_uid');
+                });
+            } else {
+                $q->whereNull('device_uid');
+            }
+        }
+        $rows = $q->limit(max(40, $limit * 4))->get($columns);
+        $ids = [];
+        foreach ($rows as $row) {
+            if (!$deviceAware) {
+                $ids[] = (int) $row->id;
+            } else {
+                $own = $deviceUid && (string) ($row->device_uid ?? '') === (string) $deviceUid;
+                $unstamped = ($row->device_uid ?? null) === null || $row->device_uid === '';
+                if ($own) {
+                    $ids[] = (int) $row->id;
+                } elseif ($unstamped && (!is_array($reportedPrinterNames) || PrinterIdentity::reportedHas($reportedPrinterNames, $row->target_printer))) {
+                    $ids[] = (int) $row->id;
+                }
+            }
+            if (count($ids) >= $limit) {
+                break;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Print-job table maintenance — stale-claim requeue + old-row purge.
      * Called from claimPrintJobs, throttled to once per 30s per company.
      */
@@ -1566,7 +1847,7 @@ class AgentController extends Controller
                     if (in_array($row->type, ['kot', 'kot_void', 'fbr_kot'], true)) {
                         $carrier = $onlineDevices->first(function ($d) use ($row) {
                             return $d->device_uid !== $row->device_uid
-                                && collect($d->printers ?? [])->pluck('name')->contains($row->target_printer);
+                                && PrinterIdentity::reportedHas($d->printers ?? [], $row->target_printer);
                         });
                         if ($carrier) {
                             DB::table('pos_print_jobs')->where('id', $row->id)
@@ -2056,6 +2337,49 @@ class AgentController extends Controller
     }
 
     /**
+     * Only failures that prove the OS rejected the queue before spooling are
+     * safe to hand to another counter automatically. Everything else is
+     * ambiguous: paper may already have come out and retrying would duplicate
+     * a bill/KOT.
+     */
+    private function isDefinitelyBeforeSpoolFailure(string $error): bool
+    {
+        return (bool) preg_match(
+            '/Invalid deviceName(?: provided)?|printer (?:queue )?(?:not found|does not exist)|unknown printer|no such printer/i',
+            $error
+        );
+    }
+
+    /**
+     * Pick another ONLINE device that authoritatively reports the exact same
+     * queue. This is topology-agnostic: USB, Windows-shared and LAN printers all
+     * work, with any number of counters. Exact queue-name matching prevents a
+     * job being redirected to an unrelated receipt printer.
+     */
+    private function safePrintFailoverDevice($company, $job, ?string $failedDeviceUid): ?string
+    {
+        if (!self::deviceRoutingReady() || !$failedDeviceUid || (int) $job->attempts >= 3) {
+            return null;
+        }
+
+        try {
+            return \App\Models\PosAgentDevice::query()
+                ->where('company_id', $company->id)
+                ->where('device_uid', '!=', $failedDeviceUid)
+                ->where('last_seen_at', '>=', now()->subSeconds(120))
+                ->orderByDesc('last_seen_at')
+                ->get(['device_uid', 'printers'])
+                ->first(function ($device) use ($job) {
+                    return PrinterIdentity::reportedHas($device->printers ?? [], $job->target_printer);
+                })?->device_uid;
+        } catch (\Throwable $e) {
+            // Registry trouble must never turn an uncertain result into an
+            // automatic reprint. The ordinary failed state remains visible.
+            return null;
+        }
+    }
+
+    /**
      * Agent reports the outcome of a claimed print job.
      */
     public function printJobResult(Request $request, $id)
@@ -2076,9 +2400,45 @@ class AgentController extends Controller
             return response()->json(['error' => 'Job not found'], 404);
         }
 
+        $error = $validated['error'] ?? 'Print failed';
+        $failoverDevice = !$validated['success'] && $this->isDefinitelyBeforeSpoolFailure($error)
+            ? $this->safePrintFailoverDevice($company, $job, $this->requestDeviceUid($request))
+            : null;
+
+        if ($failoverDevice) {
+            $retry = [
+                'status' => 'pending',
+                'device_uid' => $failoverDevice,
+                'error' => 'safe_failover_scheduled: ' . $error,
+                'claim_token' => null,
+            ];
+            // The previous content fetch is safe to clear only because this
+            // classified failure proves the OS never accepted the print.
+            if (self::contentFetchTrackingReady()) {
+                $retry['content_fetched_at'] = null;
+            }
+            $job->update($retry);
+
+            Log::info('PRINT_ROUTING safe pre-spool failover scheduled', [
+                'company_id' => $company->id,
+                'job_id' => $job->id,
+                'type' => $job->type,
+                'target_printer' => $job->target_printer,
+                'failed_device_uid' => $this->requestDeviceUid($request),
+                'failover_device_uid' => $failoverDevice,
+                'attempts' => $job->attempts,
+            ]);
+
+            return response()->json([
+                'ok' => true,
+                'retry_scheduled' => true,
+                'device_uid' => $failoverDevice,
+            ]);
+        }
+
         $job->update([
             'status' => $validated['success'] ? 'done' : 'failed',
-            'error' => $validated['success'] ? null : ($validated['error'] ?? 'Print failed'),
+            'error' => $validated['success'] ? null : $error,
             'claim_token' => null,
         ]);
 

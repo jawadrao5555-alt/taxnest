@@ -4,6 +4,7 @@ const path = require('path');
 const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
+const { replayCallbacks } = require('./callback-retry-policy');
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -131,6 +132,8 @@ const status = {
   failedCount: 0,
   pendingCallbacks: 0,
   serverInfo: null,
+  fiscalConnectivity: 'unknown',
+  lastFiscalCheck: null,
 };
 
 const failedTxnIds = new Set();
@@ -185,16 +188,9 @@ async function flushCallbackQueueInner() {
     return;
   }
   log(`Flushing ${q.length} pending callback(s)…`);
-  const remaining = [];
-  for (let i = 0; i < q.length; i++) {
-    const item = q[i];
-    if (!currentConfig) {
-      // Agent stopped mid-flush — keep every unprocessed item as-is so a
-      // restart replays them (already-replayed ones are NOT re-queued).
-      remaining.push(...q.slice(i));
-      break;
-    }
-    try {
+  const remaining = await replayCallbacks(q, {
+    canContinue: () => !!currentConfig,
+    post: async (item) => {
       await axios.post(
         `${currentConfig.serverUrl}/submit-result`,
         {
@@ -204,6 +200,7 @@ async function flushCallbackQueueInner() {
           response: item.response,
           error: item.error,
           offline: item.offline || false,
+          agent_version: item.agent_version || currentConfig.appVersion || '1.0.0',
           version: item.version || null,
           ims_version: item.ims_version || null,
           requested_environment: item.requested_environment || null,
@@ -211,17 +208,9 @@ async function flushCallbackQueueInner() {
         },
         { headers: { Authorization: `Bearer ${currentConfig.apiKey}` }, timeout: 10000 }
       );
-      log(`✅ Replayed callback for txn ${item.transaction_id}`);
-    } catch (e) {
-      const attempts = (item._attempts || 0) + 1;
-      // Drop after 50 attempts to avoid unbounded growth
-      if (attempts < 50) {
-        remaining.push({ ...item, _attempts: attempts });
-      } else {
-        log(`⚠️ Dropping callback for txn ${item.transaction_id} after 50 failed attempts`);
-      }
-    }
-  }
+    },
+    log,
+  });
   saveQueue(remaining);
   status.pendingCallbacks = remaining.length;
 }
@@ -424,10 +413,18 @@ async function syncOnceInner() {
   try {
     const res = await axios.get(`${currentConfig.serverUrl}/pending-invoices`, {
       headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
+      params: {
+        // Additive evidence only. Older servers ignore these query values and
+        // older agents remain supported when they omit them.
+        version: currentConfig.appVersion || '1.0.0',
+        device_uid: currentConfig.deviceUid || null,
+      },
       timeout: 15000,
     });
 
     const { invoices, pra_endpoint, pra_token, pra_mode, pra_environment, count } = res.data;
+    status.fiscalConnectivity = 'reachable';
+    status.lastFiscalCheck = new Date().toISOString();
     status.pendingCount = count;
     status.connected = true;
     notify();
@@ -448,6 +445,8 @@ async function syncOnceInner() {
     status.lastSync = new Date().toISOString();
     notify();
   } catch (e) {
+    status.fiscalConnectivity = 'unreachable';
+    status.lastFiscalCheck = new Date().toISOString();
     status.connected = false;
     status.lastError = `Sync failed: ${e.message}`;
     log('Sync failed:', e.message);
@@ -580,6 +579,7 @@ async function reportResult(txnId, success, praInvoiceNumber, response, error, o
     response,
     error,
     offline,
+    agent_version: currentConfig?.appVersion || '1.0.0',
     ...diagnostics,
   };
   try {

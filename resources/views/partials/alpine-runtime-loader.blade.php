@@ -9,6 +9,12 @@
             starts: 0,
             fallbackTimer: null
         };
+        var loadFallback = window.__tnLoadAlpineFallback || function () {
+            return Promise.all([
+                import('https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/module.esm.js'),
+                import('https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/module.esm.js')
+            ]);
+        };
 
         window.__tnStartAlpine = window.__tnStartAlpine || function (Alpine, plugins, source) {
             if (!Alpine || boot.status === 'started' || boot.status === 'starting') {
@@ -57,10 +63,7 @@
                 boot.status = 'fallback-loading';
                 boot.source = 'cdn-esm';
                 try {
-                    var modules = await Promise.all([
-                        import('https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/module.esm.js'),
-                        import('https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/module.esm.js')
-                    ]);
+                    var modules = await loadFallback();
                     // A late Vite bundle may have completed while imports were
                     // in flight. In that case the fallback must be a strict no-op.
                     if (boot.status === 'started' || boot.status === 'starting') return;

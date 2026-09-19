@@ -2,11 +2,13 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const packageJson = require('../package.json');
+const packageLock = require('../package-lock.json');
 const { validateUpdateInfo } = require('../src/release-manifest');
 
 const good = {
   product: 'taxnest-pra-agent',
-  version: '1.13.6',
+  version: packageJson.version,
   asset_name: 'TaxNest-PRA-Agent-Windows.zip',
   zip_size: 1024,
   zip_sha256: 'a'.repeat(64),
@@ -15,6 +17,13 @@ const good = {
   min_agent_version: '1.3.0',
   max_agent_version: '2.99.99',
 };
+
+test('package and lock release identity stay aligned beyond immutable v1.13.6', () => {
+  assert.equal(packageJson.version, '1.13.7');
+  assert.equal(packageLock.version, packageJson.version);
+  assert.equal(packageLock.packages[''].version, packageJson.version);
+  assert.notEqual(packageJson.version, '1.13.6');
+});
 
 test('accepts a complete compatible canonical release manifest', () => {
   assert.deepEqual(validateUpdateInfo(good, '1.13.5'), { ok: true });

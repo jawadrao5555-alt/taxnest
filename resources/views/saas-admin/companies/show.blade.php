@@ -85,6 +85,14 @@
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR POS Module</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->fbr_pos_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->fbr_pos_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </div>
+                <a href="{{ route('saas.admin.live-ops.fbr-reconciliation', $company->id) }}"
+                   class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-indigo-800/70 bg-indigo-900/20 px-3 py-2 text-xs text-indigo-300 hover:bg-indigo-900/40">
+                    <span>
+                        <span class="block font-semibold text-indigo-200">FBR reconciliation</span>
+                        <span class="block text-indigo-300/70">Read-only local IMS vs central evidence</span>
+                    </span>
+                    <span aria-hidden="true">→</span>
+                </a>
                 @else
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">PRA Environment</span><span class="text-white text-right min-w-0 break-words">{{ ucfirst($company->pra_environment ?? 'N/A') }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">POS ID</span><span class="text-white text-right min-w-0 break-all">{{ $company->pra_pos_id ?? '—' }}</span></div>

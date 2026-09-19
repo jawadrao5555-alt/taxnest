@@ -8,7 +8,7 @@ class FbrPosLog extends Model
 {
     protected $fillable = [
         'company_id', 'transaction_id', 'request_payload',
-        'response_payload', 'response_code', 'status', 'error_message',
+        'response_payload', 'response_code', 'status', 'error_message', 'environment',
     ];
 
     protected $casts = [

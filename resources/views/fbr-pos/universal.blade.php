@@ -3142,6 +3142,10 @@ window.addEventListener('popstate', function() {
                         <span x-text="lastIsOffline ? window.TXT.saved_offline_autosync : (lastFbrStatus === 'submitted' ? window.TXT.fbr_verified : (lastFbrStatus === 'pending' ? window.TXT.reporting_to_fbr : ((lastFbrStatus === 'offline' || lastFbrStatus === 'failed') ? window.TXT.saved_will_sync_fbr : window.TXT.local_bill)))"></span>
                     </span>
                 </div>
+                <p x-show="!lastIsOffline && lastFbrStatus === 'submitted'"
+                   class="relative mt-1.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                    {{ __('pos.fbr_central_verification_unknown') }}
+                </p>
                 {{-- Big total --}}
                 <p class="relative mt-3 text-4xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight" x-text="'Rs. ' + Number(lastTotal).toLocaleString()" style="font-variant-numeric: tabular-nums;"></p>
                 {{-- Cash Received / Wapsi — big green change-due line for the cashier. --}}

@@ -123,6 +123,11 @@ class FbrPosTransaction extends Model
         return $this->hasMany(FbrPosLog::class, 'transaction_id');
     }
 
+    public function fbrCallbackDiagnostics()
+    {
+        return $this->hasMany(FbrPosCallbackDiagnostic::class, 'transaction_id');
+    }
+
     /** Assigned rider (shared pos_riders table, company-scoped). */
     public function rider()
     {

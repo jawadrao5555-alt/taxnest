@@ -10,6 +10,7 @@ use App\Models\LiveOpsDiagnosticReport;
 use App\Models\LiveOpsRemediationRequest;
 use App\Services\LiveOps\LiveOpsDiagnosticsService;
 use App\Services\LiveOps\LiveOpsRemediationService;
+use App\Services\FbrPosReconciliationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
@@ -142,6 +143,19 @@ class AdminLiveOpsController extends Controller
         }
 
         return view('saas-admin.live-ops.report', ['report' => $report]);
+    }
+
+    public function fbrReconciliation(int $id, FbrPosReconciliationService $reconciliation)
+    {
+        $this->gate();
+
+        try {
+            $diagnostic = $reconciliation->diagnose($id);
+        } catch (\InvalidArgumentException $e) {
+            abort(404, $e->getMessage());
+        }
+
+        return view('saas-admin.live-ops.fbr-reconciliation', compact('diagnostic'));
     }
 
     public function propose(Request $request, LiveOpsRemediationService $remediation)

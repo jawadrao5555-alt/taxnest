@@ -1501,6 +1501,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/live-ops', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'index'])->name('saas.admin.live-ops');
     Route::post('/live-ops/diagnose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'diagnose'])->name('saas.admin.live-ops.diagnose');
     Route::get('/live-ops/company/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showCompany'])->name('saas.admin.live-ops.company');
+    Route::get('/live-ops/fbr-reconciliation/{id}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'fbrReconciliation'])
+        ->whereNumber('id')->name('saas.admin.live-ops.fbr-reconciliation');
     Route::post('/live-ops/propose', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'propose'])->name('saas.admin.live-ops.propose');
     Route::get('/live-ops/remediation/{actionId}', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'showRemediation'])->name('saas.admin.live-ops.remediation');
     Route::post('/live-ops/remediation/{actionId}/approve', [\App\Http\Controllers\SaasAdmin\AdminLiveOpsController::class, 'approve'])->name('saas.admin.live-ops.approve');

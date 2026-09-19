@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Models\FbrLog;
 
 class FbrService
@@ -2202,9 +2203,122 @@ class FbrService
         return ['fbr_error_message' => $reason === null ? null : mb_substr($reason, 0, 1000)];
     }
 
+    /**
+     * Keep agent callback evidence useful without persisting the callback payload.
+     * Only regulator/result metadata is retained; customer, invoice-line, token,
+     * authorization and URL-like values are deliberately excluded.
+     */
+    public static function sanitizeAgentCallbackResponse(?array $response, ?string $fiscalNumber = null): array
+    {
+        if (!is_array($response)) {
+            return [];
+        }
+
+        $allowed = [
+            'code', 'responsecode', 'status', 'message', 'error', 'errors',
+            'response', 'data', 'result', 'details',
+            'centralsyncstatus', 'centralstatus', 'verificationstatus',
+            'centralreference', 'fbrreference',
+        ];
+
+        $fiscalNumber = trim((string) $fiscalNumber);
+        $sanitize = function ($value, int $depth = 0) use (&$sanitize, $allowed, $fiscalNumber) {
+            if ($depth > 3) {
+                return null;
+            }
+            if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
+                return $value;
+            }
+            if (is_string($value)) {
+                $value = trim($value);
+                if ($fiscalNumber !== '' && hash_equals($fiscalNumber, $value)) {
+                    return '[redacted-fiscal-number]';
+                }
+                if ($value === '' || preg_match('/(?:bearer|token|secret|password|authorization|api[_ -]?key|https?:\/\/|www\.)/i', $value)) {
+                    return $value === '' ? null : '[redacted]';
+                }
+                return mb_substr(preg_replace('/[\r\n\t]+/', ' ', $value), 0, 500);
+            }
+            if (!is_array($value)) {
+                return null;
+            }
+
+            $out = [];
+            foreach ($value as $key => $child) {
+                $normalized = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $key));
+                if (!in_array($normalized, $allowed, true)) {
+                    continue;
+                }
+                $clean = $sanitize($child, $depth + 1);
+                if ($clean !== null) {
+                    $out[mb_substr((string) $key, 0, 64)] = $clean;
+                }
+            }
+            return $out;
+        };
+
+        $clean = $sanitize($response);
+        return is_array($clean) ? $clean : [];
+    }
+
+    public static function callbackInvoiceNumberField(?array $response): ?string
+    {
+        $keys = ['InvoiceNumber', 'invoiceNumber', 'invoice_number', 'InvoiceNo', 'invoiceNo'];
+        $walk = function ($value) use (&$walk, $keys): ?string {
+            if (!is_array($value)) {
+                return null;
+            }
+            foreach ($value as $key => $child) {
+                if (in_array((string) $key, $keys, true)) {
+                    return (string) $key;
+                }
+                $found = $walk($child);
+                if ($found !== null) {
+                    return $found;
+                }
+            }
+            return null;
+        };
+
+        return $walk($response);
+    }
+
+    public static function callbackCentralFields(?array $response): array
+    {
+        $clean = self::sanitizeAgentCallbackResponse($response);
+        $status = null;
+        $reference = null;
+        $walk = function ($value) use (&$walk, &$status, &$reference): void {
+            if (!is_array($value)) {
+                return;
+            }
+            foreach ($value as $key => $child) {
+                $normalized = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $key));
+                if (is_scalar($child)) {
+                    if ($status === null && in_array($normalized, ['centralsyncstatus', 'centralstatus', 'verificationstatus'], true)) {
+                        $status = mb_substr((string) $child, 0, 80);
+                    }
+                    if ($reference === null && in_array($normalized, ['centralreference', 'fbrreference'], true)) {
+                        $reference = mb_substr((string) $child, 0, 160);
+                    }
+                }
+                $walk($child);
+            }
+        };
+        $walk($clean);
+
+        return ['central_sync_status' => $status, 'central_reference' => $reference];
+    }
+
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
         $company = $transaction->company;
+        $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
+        // Keep code backward-compatible during rolling deploys where the new
+        // nullable evidence column may not have migrated yet.
+        $logEnvironment = Schema::hasColumn('fbr_pos_logs', 'environment')
+            ? ['environment' => $posEnv]
+            : [];
 
         if ($transaction->fbr_invoice_number || $transaction->fbr_status === 'submitted') {
             return [
@@ -2251,13 +2365,13 @@ class FbrService
         // fixes the settings.
         if (empty($payload['POSID'])) {
             $clearHashOnFailure();
-            \App\Models\FbrPosLog::create([
+            \App\Models\FbrPosLog::create(array_merge([
                 'company_id' => $company->id,
                 'transaction_id' => $transaction->id,
                 'request_payload' => $payload,
                 'status' => 'failed',
                 'error_message' => 'FBR POS Registration ID (POSID) not configured. Set it in FBR Settings.',
-            ]);
+            ], $logEnvironment));
             $transaction->update(array_merge(
                 ['fbr_status' => 'config_error'],
                 self::fbrErrorPatch('FBR POS Registration ID (POSID) set nahi hai — FBR Settings mein add karein.')
@@ -2272,7 +2386,6 @@ class FbrService
         // unlike Digital Invoicing where hsCode is mandatory. Retail POS items often have no
         // HS code, so we send PCTCode when available and blank otherwise — never block the bill.
 
-        $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         $token = $this->getFbrPosToken($company);
         $url = $this->getFbrPosUrl($company);
         $tokenSource = !empty($company->fbr_pos_token) ? 'dedicated_ims_pos_token' : 'none';
@@ -2287,13 +2400,13 @@ class FbrService
 
         if (empty($token)) {
             $clearHashOnFailure();
-            \App\Models\FbrPosLog::create([
+            \App\Models\FbrPosLog::create(array_merge([
                 'company_id' => $company->id,
                 'transaction_id' => $transaction->id,
                 'request_payload' => $payload,
                 'status' => 'failed',
                 'error_message' => 'FBR token not configured. Set up FBR credentials in company settings.',
-            ]);
+            ], $logEnvironment));
             // Permanent config error — same terminal-state logic as POSID missing above.
             $transaction->update(array_merge(
                 ['fbr_status' => 'config_error'],
@@ -2305,12 +2418,12 @@ class FbrService
             ];
         }
 
-        $log = \App\Models\FbrPosLog::create([
+        $log = \App\Models\FbrPosLog::create(array_merge([
             'company_id' => $company->id,
             'transaction_id' => $transaction->id,
             'request_payload' => $payload,
             'status' => 'pending',
-        ]);
+        ], $logEnvironment));
 
         $startTime = microtime(true);
 

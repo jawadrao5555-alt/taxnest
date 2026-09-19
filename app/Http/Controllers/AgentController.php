@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Company;
 use App\Models\PosTransaction;
 use App\Models\FbrPosTransaction;
+use App\Models\FbrPosCallbackDiagnostic;
 use App\Services\PraIntegrationService;
 use App\Services\FbrService;
 use App\Services\FbrPosSubmissionEvidenceService;
@@ -871,6 +872,7 @@ class AgentController extends Controller
             'pra_pos_id' => $company->fbr_pos_id,
             // Requested by TaxNest; never presented as proof of the installed
             // shop-PC IMS environment or central FBR receipt.
+            'pra_environment' => $company->fbr_pos_environment ?? 'sandbox',
             'requested_environment' => $company->fbr_pos_environment ?? 'sandbox',
             'local_ims_environment_proof' => 'unknown',
             'central_verification' => 'unknown',
@@ -895,6 +897,13 @@ class AgentController extends Controller
             'offline' => 'nullable|boolean',
             // Additive Agent telemetry. Older agents omit it and remain valid.
             'agent_version' => 'nullable|string|max:40',
+            // Additive fiscal-device evidence. These fields are diagnostic only
+            // and never authorize or retry an FBR submission.
+            'version' => 'nullable|string|max:32',
+            'ims_version' => 'nullable|string|max:64',
+            'requested_environment' => 'nullable|string|max:20',
+            'environment' => 'nullable|string|max:20',
+            'client_environment' => 'nullable|string|max:20',
         ]);
 
         // ===== FBR POS Fiscal Device company =====
@@ -1026,6 +1035,74 @@ class AgentController extends Controller
         );
     }
 
+    private function recordFbrCallbackDiagnostic(
+        Request $request,
+        Company $company,
+        FbrPosTransaction $txn
+    ): void {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('fbr_pos_callback_diagnostics')) {
+                return;
+            }
+
+            $response = $request->input('response');
+            $response = is_array($response) ? $response : [];
+            $reportedFiscalNumber = trim((string) $request->input('pra_invoice_number', ''));
+            $safeResponse = FbrService::sanitizeAgentCallbackResponse($response, $reportedFiscalNumber);
+            $central = FbrService::callbackCentralFields($response);
+
+            $clientEnvironment = strtolower(trim((string) (
+                $request->input('client_environment')
+                ?: $request->input('environment', '')
+            )));
+            if (!in_array($clientEnvironment, ['test', 'production'], true)) {
+                $clientEnvironment = null;
+            }
+            $requestedEnvironment = strtolower(trim((string) $request->input('requested_environment', '')));
+            if (!in_array($requestedEnvironment, ['test', 'production'], true)) {
+                $requestedEnvironment = null;
+            }
+            $error = trim((string) $request->input('error', 'FBR submission failed'));
+            $safeError = $error === ''
+                ? null
+                : (FbrService::sanitizeAgentCallbackResponse(['error' => $error])['error'] ?? '[redacted]');
+
+            FbrPosCallbackDiagnostic::create([
+                'company_id' => $company->id,
+                'transaction_id' => $txn->id,
+                'source' => 'fiscal_device_agent',
+                'agent_version' => mb_substr((string) (
+                    $request->input('agent_version')
+                    ?: $request->input('version', '')
+                ), 0, 32) ?: null,
+                'ims_version' => mb_substr(trim((string) $request->input('ims_version', '')), 0, 64) ?: null,
+                'requested_environment' => $requestedEnvironment,
+                'client_environment' => $clientEnvironment,
+                'callback_received_at' => now(),
+                'success' => $request->boolean('success'),
+                'offline' => $request->has('offline') ? $request->boolean('offline') : null,
+                'response_code' => mb_substr((string) (
+                    $response['Code']
+                    ?? $response['response_code']
+                    ?? $response['code']
+                    ?? ''
+                ), 0, 64) ?: null,
+                'invoice_number_field' => FbrService::callbackInvoiceNumberField($response),
+                'central_sync_status' => $central['central_sync_status'],
+                'central_reference' => $central['central_reference'],
+                'response_diagnostics' => $safeResponse ?: null,
+                'error_message' => $safeError ? mb_substr($safeError, 0, 1000) : null,
+            ]);
+        } catch (\Throwable $e) {
+            // Diagnostics must never make an otherwise valid agent result fail.
+            Log::warning('Agent: FBR callback diagnostic could not be persisted', [
+                'company_id' => $company->id,
+                'transaction_id' => $txn->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * FBR POS submit-result callback. Writes to fbr_pos_transactions. Success requires the
      * agent to report success=true WITH a non-empty invoice number — the PRA-specific
@@ -1033,10 +1110,14 @@ class AgentController extends Controller
      */
     private function fbrSubmitResult(Request $request, Company $company)
     {
+        return DB::transaction(function () use ($request, $company) {
         $txnId = $request->input('transaction_id');
 
         $txn = FbrPosTransaction::where('id', $txnId)
             ->where('company_id', $company->id)
+            // Serialize competing callbacks so an already-issued fiscal
+            // identity can never be observed as empty by two workers.
+            ->lockForUpdate()
             ->first();
 
         if (!$txn) {
@@ -1044,6 +1125,7 @@ class AgentController extends Controller
         }
 
         $fbrInvoiceNumber = trim((string) $request->input('pra_invoice_number', ''));
+        $this->recordFbrCallbackDiagnostic($request, $company, $txn);
         $response = $request->input('response');
         $code = null;
         if (is_array($response)) {
@@ -1088,11 +1170,15 @@ class AgentController extends Controller
         }
 
         if ($treatAsSuccess) {
+            $safeResponse = is_array($response)
+                ? FbrService::sanitizeAgentCallbackResponse($response, $fbrInvoiceNumber)
+                : null;
+
             $txn->update(array_merge([
                 'fbr_status' => 'submitted',
                 'fbr_invoice_number' => $fbrInvoiceNumber,
                 'fbr_response_code' => '100',
-                'fbr_response' => $response,
+                'fbr_response' => $safeResponse,
                 'fbr_submission_hash' => null,
             ], \App\Services\FbrService::fbrErrorPatch(null)));
 
@@ -1184,6 +1270,7 @@ class AgentController extends Controller
         $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
 
         return response()->json(['ok' => true]);
+        });
     }
 
     // =====================================================

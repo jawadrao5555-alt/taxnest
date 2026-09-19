@@ -1433,7 +1433,7 @@ window.addEventListener('popstate', function() {
             </div>
 
             <div class="tn-mobile-cart-bar md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
-                <button x-show="cart.length > 0" x-cloak @click="mobileView = 'cart'" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-sm" aria-label="{{ __('pos.cart') }}">
+                <button @click="mobileView = 'cart'" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-sm" aria-label="{{ __('pos.cart') }}">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                     {{ __('pos.cart') }}
                     <span class="bg-white/20 px-1.5 rounded-full text-xs" x-text="Number(cartQtyCount.toFixed(2)).toLocaleString()"></span>
@@ -1456,7 +1456,7 @@ window.addEventListener('popstate', function() {
                  zero layout change. In .tn-widecart desktop mode this becomes the LEFT
                  (wide) pane: header + banners + cart list. --}}
             <div class="tn-cart-main">
-            <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
+            <div class="tn-cart-header flex flex-shrink-0 items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>

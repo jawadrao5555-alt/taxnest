@@ -42,13 +42,14 @@ class SaleResponsiveLayoutContractTest extends TestCase
         );
     }
 
-    public function test_empty_cart_does_not_render_a_zero_value_mobile_launcher(): void
+    public function test_empty_cart_keeps_the_mobile_cart_reachable(): void
     {
         foreach (['pos/universal.blade.php', 'fbr-pos/universal.blade.php'] as $file) {
             $view = file_get_contents(resource_path('views/' . $file));
 
             $this->assertNotFalse($view);
-            $this->assertMatchesRegularExpression(
+            $this->assertStringContainsString('<button @click="mobileView = \'cart\'"', $view);
+            $this->assertDoesNotMatchRegularExpression(
                 '/<button[^>]+x-show="cart\.length > 0"[^>]+x-cloak[^>]+@click="mobileView = \'cart\'"/',
                 $view
             );

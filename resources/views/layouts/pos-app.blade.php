@@ -304,34 +304,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
         <script src="{{ asset('js/nestpos-local-core.js') }}?v=10" defer></script>
-        <script>
-            // Alpine CDN fallback (only if the Vite bundle failed). MUST arm AFTER
-            // DOMContentLoaded: module scripts always run before DCL, so post-DCL
-            // "no Alpine" is definitive. The old blind 1.5s timer fired MID-PARSE on
-            // slow POS PCs (big sale-screen HTML still streaming) — CDN Alpine then
-            // started before restaurantPos() was even defined → whole screen error
-            // flood + stuck splash + a SECOND Alpine boot when the bundle arrived.
-            (function(){
-                function tnAlpineFallback(){
-                    setTimeout(function(){
-                        if(!window.Alpine && !window.__alpineStarted && !window.__alpineFallbackLoading){
-                            window.__alpineFallbackLoading=true;
-                            window.__alpineStarted=true; // block a late bundle from double-starting
-                            var c=document.createElement('script');
-                            c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
-                            document.head.appendChild(c);
-                            c.onload=function(){
-                                var s=document.createElement('script');
-                                s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
-                                document.head.appendChild(s);
-                            };
-                        }
-                    }, 500);
-                }
-                if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', tnAlpineFallback); }
-                else { tnAlpineFallback(); }
-            })();
-        </script>
+        @include('partials.alpine-runtime-loader')
         {{-- Self-hosted Chart.js (perf, Jul 2026): third-party CDN cost an extra
              DNS+TLS connection on every fresh load; .htaccess caches /vendor 30d. --}}
         <script defer src="/vendor/chart.umd.min.js?v=4.4.0"></script>

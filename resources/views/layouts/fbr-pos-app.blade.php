@@ -156,31 +156,7 @@
         @include('partials.font-css', ['fontFamilies' => 'inter:300,400,500,600,700,800,900'])
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
-        {{-- Alpine CDN fallback — arm only AFTER DOMContentLoaded. A blind timer can
-             start Alpine while a large cached sale document is still parsing, before
-             restaurantPos() is defined, which leaves the product grid loading forever. --}}
-        <script>
-            (function(){
-                function tnAlpineFallback(){
-                    setTimeout(function(){
-                        if(!window.Alpine && !window.__alpineStarted && !window.__alpineFallbackLoading){
-                            window.__alpineFallbackLoading=true;
-                            window.__alpineStarted=true;
-                            var c=document.createElement('script');
-                            c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
-                            document.head.appendChild(c);
-                            c.onload=function(){
-                                var s=document.createElement('script');
-                                s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
-                                document.head.appendChild(s);
-                            };
-                        }
-                    }, 500);
-                }
-                if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', tnAlpineFallback); }
-                else { tnAlpineFallback(); }
-            })();
-        </script>
+        @include('partials.alpine-runtime-loader')
         <script src="/vendor/chart.umd.min.js?v=4.4.0" defer></script>
         <script>document.documentElement.style.colorScheme=document.documentElement.classList.contains('dark')?'dark':'light';</script>
         <style>
@@ -379,7 +355,40 @@
     </head>
     <body class="tn-premium-shell h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
         <x-pwa-init />
-        <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}', {{ $isDarkMode ? 'true' : 'false' }})" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
+        <script>
+            // Header controls must remain usable even if an optional FBR modal
+            // factory is lost to a malformed page-local script. In the normal
+            // path the full factory below has parsed before Alpine starts.
+            window.tnSafeFbrPosHeader = function (theme, dark) {
+                if (typeof window.fbrPosHeader === 'function') {
+                    return window.fbrPosHeader(theme, dark);
+                }
+                return {
+                    profileOpen: false,
+                    mobileMenuOpen: false,
+                    themeOpen: false,
+                    sidebarOpen: false,
+                    currentTheme: theme || 'blue',
+                    darkMode: dark === true,
+                    darkSaving: false,
+                    localOpen: false,
+                    failedOpen: false,
+                    localBills: [],
+                    failedBills: [],
+                    localCount: 0,
+                    failedCount: 0,
+                    init: function () {},
+                    toggleDarkMode: function () {
+                        this.darkMode = !this.darkMode;
+                        document.documentElement.classList.toggle('dark', this.darkMode);
+                        document.documentElement.style.colorScheme = this.darkMode ? 'dark' : 'light';
+                    },
+                    openLocal: function () { this.localOpen = true; },
+                    openFailed: function () { this.failedOpen = true; }
+                };
+            };
+        </script>
+        <div class="flex flex-col h-full" x-data="tnSafeFbrPosHeader('{{ $fbrTheme }}', {{ $isDarkMode ? 'true' : 'false' }})" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">

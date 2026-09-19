@@ -13,52 +13,83 @@
             && \App\Models\FbrPosTransaction::where('company_id', $fbrCompany->id)
                 ->whereIn('fbr_status', ['failed', 'config_error'])->exists();
     } catch (\Throwable $e) {}
+    // Default is the current safe, session-only "later" action. A future legal
+    // flow may render the same component as mandatory without changing JS.
+    $fdcDismissible = (bool) ($fbrDecisionDismissible ?? true);
 @endphp
 <div x-data="{ fdOpen: true, fdBusy: false,
         fdChoose(choice) {
             if (this.fdBusy) return;
             this.fdBusy = true;
             const dialog = this.$refs.fdDialog;
+            if (choice === 'later') {
+                this.fdOpen = false;
+                this.$nextTick(() => window.TnModalA11y.close(dialog));
+            }
             fetch('{{ route('fbrpos.integration.decision', [], false) }}', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' },
                 body: JSON.stringify({ choice: choice })
             }).then(r => r.json().then(d => ({ ok: r.ok, d })))
               .then(({ ok, d }) => {
-                  if (!ok || !d.success) { this.fdBusy = false; alert((d && d.message) || @js(__('pos.network_error'))); return; }
-                   this.fdOpen = false;
-                   this.$nextTick(() => window.TnModalA11y.close(dialog));
+                  if (!ok || !d.success) {
+                      this.fdBusy = false;
+                      if (choice === 'later') {
+                          this.fdOpen = true;
+                          this.$nextTick(() => window.TnModalA11y.open(dialog));
+                      }
+                      alert((d && d.message) || @js(__('pos.network_error')));
+                      return;
+                  }
+                  if (choice !== 'later') {
+                      this.fdOpen = false;
+                      this.$nextTick(() => window.TnModalA11y.close(dialog));
+                  }
                   if (choice === 'later') { this.fdBusy = false; return; }
                   if (choice === 'connect' && d.redirect) { window.location.href = d.redirect; return; }
                   // without_fbr: the failed pill / counters / cached sale screen must
                   // re-read server truth — one reload does it.
                   window.location.reload();
               })
-              .catch(() => { this.fdBusy = false; alert(@js(__('pos.network_error'))); });
+              .catch(() => {
+                  this.fdBusy = false;
+                  if (choice === 'later') {
+                      this.fdOpen = true;
+                      this.$nextTick(() => window.TnModalA11y.open(dialog));
+                  }
+                  alert(@js(__('pos.network_error')));
+              });
         } }"
      x-show="fdOpen" x-cloak data-fbr-decision-card="1" x-ref="fdDialog"
+     data-tn-dismissible="{{ $fdcDismissible ? 'true' : 'false' }}"
      x-init="$nextTick(() => window.TnModalA11y.open($refs.fdDialog))"
      @keydown.tab="window.TnModalA11y.trap($event, $refs.fdDialog)"
-     @keydown.escape.stop.prevent="fdChoose('later')"
+     @keydown.escape="window.TnModalA11y.escape($event, $refs.fdDialog, () => fdChoose('later'))"
      class="fixed inset-0 flex items-center justify-center p-4"
      style="z-index: 131; background: rgba(5, 15, 40, 0.55); backdrop-filter: blur(4px);">
     <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
          role="dialog" aria-modal="true" aria-labelledby="fbrDecisionTitle"
+         aria-describedby="fbrDecisionBody{{ $fdcDismissible ? '' : ' fbrDecisionRequired' }}"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-90"
          x-transition:enter-end="opacity-100 scale-100">
         <div class="relative px-6 py-5" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
+            @if($fdcDismissible)
             <button type="button" @click="fdChoose('later')" :disabled="fdBusy"
                     class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition"
                     title="{{ __('pos.fbr_decision_later') }}" aria-label="{{ __('pos.fbr_decision_later') }}">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
+            @endif
             <div class="text-3xl mb-1">🧾</div>
             <h2 id="fbrDecisionTitle" class="text-xl font-extrabold text-white">{{ __('pos.fbr_decision_title') }}</h2>
             <p class="text-[12px] text-white/85 mt-1">{{ __('pos.fbr_decision_subtitle') }}</p>
         </div>
         <div class="px-6 py-5 space-y-3">
-            <p class="text-sm text-gray-700 dark:text-gray-200">{{ __('pos.fbr_decision_body') }}</p>
+            <p id="fbrDecisionBody" class="text-sm text-gray-700 dark:text-gray-200">{{ __('pos.fbr_decision_body') }}</p>
+            @unless($fdcDismissible)
+            <p id="fbrDecisionRequired" class="text-xs font-semibold text-amber-700 dark:text-amber-300">{{ __('pos.fbr_decision_required_hint') }}</p>
+            @endunless
             @if($fdcHadFailures)
             <p class="text-xs rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-2.5 text-slate-700 dark:text-slate-200">{{ __('pos.fbr_decision_failures_note') }}</p>
             @endif

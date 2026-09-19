@@ -6519,6 +6519,7 @@ return [
     'fbr_decision_no' => 'ابھی نہیں — بل FBR کے بغیر چلائیں',
     'fbr_decision_no_hint' => 'عام بل سادہ QR کے ساتھ۔ نہ FBR غلطی، نہ کچھ لال۔ بعد میں جب چاہیں FBR Settings سے جوڑیں۔',
     'fbr_decision_later' => 'بعد میں فیصلہ',
+    'fbr_decision_required_hint' => 'سیل اسکرین پر واپس جانے سے پہلے دستیاب اختیارات میں سے ایک منتخب کریں۔',
     'fbr_decision_footer' => 'یہ فیصلہ FBR Settings ← FBR انضمام میں موجود رہتا ہے۔',
     'fbr_decision_connect_next' => 'اپنا FBR POS ID اور Token درج کریں (یا Desktop Agent جوڑیں) — سیٹ اپ مکمل ہوتے ہی رپورٹنگ خود آن ہو جائے گی۔',
     'fbr_decision_without_done' => 'ہو گیا — دکان اب FBR کے بغیر چل رہی ہے۔ بل عام سیل رسید کی طرح پرنٹ ہوں گے۔',

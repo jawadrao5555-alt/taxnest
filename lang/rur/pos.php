@@ -6523,6 +6523,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'fbr_decision_no' => 'Abhi nahi — bills FBR ke baghair chalayein',
     'fbr_decision_no_hint' => 'Normal bills simple QR ke saath. Na FBR error, na kuch laal. Baad mein jab chahein FBR Settings se jorein.',
     'fbr_decision_later' => 'Baad mein faisla',
+    'fbr_decision_required_hint' => 'Sale screen par wapas jane se pehle neeche se ek option select karein.',
     'fbr_decision_footer' => 'Yeh faisla FBR Settings → FBR Integration mein maujood rehta hai.',
     'fbr_decision_connect_next' => 'Apna FBR POS ID aur token darj karein (ya Desktop Agent pair karein) — setup mukammal hote hi reporting khud ON ho jayegi.',
     'fbr_decision_without_done' => 'Ho gaya — dukan ab FBR ke baghair chal rahi hai. Bills normal Sale Receipt ki tarah print honge.',

@@ -15,7 +15,9 @@
     --tn-surface: #FCFDFC;
     --tn-surface-raised: #FFFFFF;
     --tn-text: #17323A;
-    --tn-muted: #66777B;
+    /* Functional metadata on the light canvas needs AA contrast.  Keep the
+       dark token separate so muted text does not inherit a light-mode value. */
+    --tn-muted: #526267;
     --tn-line: #D8E1DF;
     --tn-line-strong: #C4D1CF;
     --tn-danger: #B6473B;

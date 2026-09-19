@@ -7,8 +7,8 @@
     @if($errors->any())<div class="mb-4 bg-red-900/30 text-red-300 rounded-lg p-3 text-sm">{{ $errors->first() }}</div>@endif
     @if(session('error'))<div class="mb-4 bg-red-900/30 text-red-300 rounded-lg p-3 text-sm">{{ session('error') }}</div>@endif
     <form method="POST" action="{{ route('agent.login.submit') }}" class="space-y-5">@csrf
-        <div><label class="text-sm text-gray-300">Email</label><input type="email" name="email" value="{{ old('email') }}" required autofocus class="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg text-white px-4 py-2.5"></div>
-        <div><label class="text-sm text-gray-300">Password</label><input type="password" name="password" required class="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg text-white px-4 py-2.5"></div>
+        <div><label class="text-sm text-gray-300">Email</label><input type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="email" class="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg text-white px-4 py-2.5"></div>
+        <div><label class="text-sm text-gray-300">Password</label><input type="password" name="password" required autocomplete="current-password" class="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg text-white px-4 py-2.5"></div>
         <label class="flex gap-2 text-sm text-gray-400"><input type="checkbox" name="remember"> Remember me</label>
         <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg py-2.5">Sign In</button>
     </form>

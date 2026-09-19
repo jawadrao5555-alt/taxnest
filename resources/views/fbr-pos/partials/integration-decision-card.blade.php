@@ -18,6 +18,7 @@
         fdChoose(choice) {
             if (this.fdBusy) return;
             this.fdBusy = true;
+            const dialog = this.$refs.fdDialog;
             fetch('{{ route('fbrpos.integration.decision', [], false) }}', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -25,7 +26,8 @@
             }).then(r => r.json().then(d => ({ ok: r.ok, d })))
               .then(({ ok, d }) => {
                   if (!ok || !d.success) { this.fdBusy = false; alert((d && d.message) || @js(__('pos.network_error'))); return; }
-                  this.fdOpen = false;
+                   this.fdOpen = false;
+                   this.$nextTick(() => window.TnModalA11y.close(dialog));
                   if (choice === 'later') { this.fdBusy = false; return; }
                   if (choice === 'connect' && d.redirect) { window.location.href = d.redirect; return; }
                   // without_fbr: the failed pill / counters / cached sale screen must
@@ -34,7 +36,10 @@
               })
               .catch(() => { this.fdBusy = false; alert(@js(__('pos.network_error'))); });
         } }"
-     x-show="fdOpen" x-cloak data-fbr-decision-card="1"
+     x-show="fdOpen" x-cloak data-fbr-decision-card="1" x-ref="fdDialog"
+     x-init="$nextTick(() => window.TnModalA11y.open($refs.fdDialog))"
+     @keydown.tab="window.TnModalA11y.trap($event, $refs.fdDialog)"
+     @keydown.escape.stop.prevent="fdChoose('later')"
      class="fixed inset-0 flex items-center justify-center p-4"
      style="z-index: 131; background: rgba(5, 15, 40, 0.55); backdrop-filter: blur(4px);">
     <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"

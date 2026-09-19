@@ -309,6 +309,7 @@
    utilities) so no rebuild-dependency for the responsive flip. */
 .tn-body-row { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; overflow: hidden; }
 .tn-left-col { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.tn-sale-root { height: calc(100vh - 48px); height: calc(100dvh - 48px); max-height: calc(100dvh - 48px); }
 @media (min-width: 768px) {
     .tn-body-row { flex-direction: row; }
     .tn-left-col { flex: 1 1 0%; }
@@ -316,6 +317,21 @@
 @media (max-width: 767px) {
     /* Mobile: bars stack ABOVE the cart exactly like before — cart fills the rest */
     .tn-body-row > .tn-cart-col { flex: 1 1 0%; min-height: 0; }
+}
+@media (min-width: 768px) and (max-height: 760px) {
+    /* Browser zoom reduces the CSS viewport height. Keep the complete cart,
+       totals and final actions reachable instead of clipping them at the root. */
+    .tn-cart-col { min-height: 0; overflow-y: auto; }
+    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .mobile-sticky-pay {
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        background: #f9fafb;
+        border-top: 1px solid rgba(148,163,184,.28);
+    }
+    .dark .mobile-sticky-pay { background: #111827; }
 }
 
 /* ── WIDE-CART layout (owner-approved "Variant A" mockup, 28 Jul 2026) ──
@@ -559,7 +575,7 @@ window.addEventListener('popstate', function() {
      so the sale screen renders correctly on ANY display (small shop laptops, low-res
      terminals, big TVs). Auto mode picks the zoom from viewport size; manual % is
      per-device via localStorage 'tn_screen_fit'. Empty string = normal 100% layout. --}}
-<div data-tn-sale-document="pra" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale tn-sale-root flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
+<div data-tn-sale-document="pra" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale tn-sale-root flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
     @include('pos.partials.kot-action-required-banner')
 
     {{-- Task 127: Starter offline-locked notice — persistent (while offline), dismissible.

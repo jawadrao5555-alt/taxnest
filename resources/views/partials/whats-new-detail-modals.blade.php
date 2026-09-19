@@ -6,8 +6,14 @@
         x-data="{
             open: false,
             wasSeen: {{ in_array($detailUpdate->id, $seenIds) ? 'true' : 'false' }},
+            openDetail() {
+                this.open = true;
+                this.$nextTick(() => window.TnModalA11y.open(this.$refs.detailDialog));
+            },
             async dismissDetail() {
+                const dialog = this.$refs.detailDialog;
                 this.open = false;
+                this.$nextTick(() => window.TnModalA11y.close(dialog));
                 if (this.wasSeen) return;
                 try {
                     const response = await fetch('{{ $seenEndpoint }}', {
@@ -28,11 +34,16 @@
                 } catch (_) {}
             }
         }"
-        @open-whats-new-detail.window="if (Number($event.detail.id) === {{ (int) $detailUpdate->id }}) open = true"
+        @open-whats-new-detail.window="if (Number($event.detail.id) === {{ (int) $detailUpdate->id }}) openDetail()"
         @keydown.escape.window="if (open) dismissDetail()"
+        @keydown.tab="window.TnModalA11y.trap($event, $refs.detailDialog)"
         @click.self="dismissDetail()"
         x-show="open"
         x-cloak
+        x-ref="detailDialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="whatsNewDetailTitle{{ (int) $detailUpdate->id }}"
         data-whats-new-detail-id="{{ $detailUpdate->id }}"
         class="fixed inset-0 flex items-center justify-center p-3 sm:p-6"
         style="z-index: 145; background: rgba(15, 10, 40, 0.62); backdrop-filter: blur(5px);"
@@ -45,7 +56,7 @@
                         class="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-xl cursor-pointer"
                         aria-label="Close">×</button>
                 <div class="text-3xl mb-2">🎉</div>
-                <h2 class="text-xl sm:text-2xl font-extrabold leading-snug pr-8">{{ $detailUpdate->customerTitle() }}</h2>
+                <h2 id="whatsNewDetailTitle{{ (int) $detailUpdate->id }}" class="text-xl sm:text-2xl font-extrabold leading-snug pr-8">{{ $detailUpdate->customerTitle() }}</h2>
                 <p class="text-[12px] text-white/80 mt-2">
                     <x-wn-type-badge :update="$detailUpdate" :light="true" />
                     · {{ $detailUpdate->created_at->format('d M Y') }}

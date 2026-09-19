@@ -84,21 +84,60 @@ async function isValidSaleDocument(response, variant) {
     }
 }
 
+async function saleDocumentBuildAssetsReady(response, allowNetwork = true) {
+    if (!response || !response.ok) return false;
+    try {
+        const html = await response.clone().text();
+        const paths = [...new Set(
+            [...html.matchAll(/(?:src|href)=["']([^"']*\/build\/[^"'?#]+(?:\?[^"']*)?)["']/gi)]
+                .map(match => new URL(match[1], location.origin))
+                .filter(url => url.origin === location.origin)
+                .map(url => url.href)
+        )];
+        // Every current authenticated shell is emitted by @vite. No build
+        // references means this is not a production-compatible sale document.
+        if (!paths.length) return false;
+
+        const staticCache = await caches.open(STATIC_CACHE);
+        for (const path of paths) {
+            const cached = await staticCache.match(path) || await caches.match(path);
+            if (cached && cached.ok) continue;
+            if (!allowNetwork) return false;
+
+            let asset;
+            try {
+                asset = await fetch(path, { cache: 'no-store', credentials: 'same-origin' });
+            } catch (_) {
+                return false;
+            }
+            if (!asset || !asset.ok) return false;
+            await staticCache.put(path, asset.clone());
+        }
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
 async function isValidCachedSaleDocument(response, variant) {
     if (!response || !response.ok || response.redirected) return false;
     // Current server responses are stamped after Laravel has rendered the full
     // universal view. Network writes still undergo the body-marker validation
     // below before cache.put(), so this fast header check is safe and avoids
     // decoding a multi-megabyte catalogue twice on every cache-first open.
-    if ((response.headers.get(SALE_DOCUMENT_HEADER) || '') === variant) return true;
+    if ((response.headers.get(SALE_DOCUMENT_HEADER) || '') === variant) {
+        return saleDocumentBuildAssetsReady(response);
+    }
     // One-time upgrade path for a cache written by an older worker: accept it
     // only if the new structural markers are really present.
-    return isValidSaleDocument(response, variant);
+    return (await isValidSaleDocument(response, variant))
+        && saleDocumentBuildAssetsReady(response);
 }
 
 async function fetchSaleDocument(request, cache, variant) {
     const response = await fetch(request);
-    const valid = await isValidSaleDocument(response, variant);
+    const valid = await isValidSaleDocument(response, variant)
+        && await saleDocumentBuildAssetsReady(response);
     if (valid) await cache.put(request, response.clone());
     return { response, valid };
 }

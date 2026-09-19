@@ -104,7 +104,10 @@ assert(typeof listeners.fetch === 'function', 'no fetch listener registered');
 assert(typeof listeners.message === 'function', 'no message listener registered');
 
 const validHtml = (variant, label = 'valid') =>
-  '<!doctype html><html><body>' +
+  '<!doctype html><html><head>' +
+  `<link rel="stylesheet" href="/build/assets/app-${label}.css">` +
+  `<script type="module" src="/build/assets/app-${label}.js"></script>` +
+  '</head><body>' +
   `<div data-tn-sale-document="${variant}" data-tn-sale-root>${label}</div>` +
   '<script>window.tnBootFp={}; function restaurantPos(){ return {}; }</script>' +
   'x'.repeat(5000) + '</body></html>';
@@ -122,6 +125,11 @@ const htmlResponse = (body, {
     'content-type': 'text/html; charset=UTF-8',
     ...(variant ? { 'x-taxnest-sale-document': variant } : {}),
   },
+});
+
+const assetResponse = (body = '/* built asset */', status = 200) => new MockResponse(body, {
+  status,
+  headers: { 'content-type': 'text/javascript; charset=UTF-8' },
 });
 
 const request = (path, {
@@ -176,6 +184,7 @@ for (const req of [
 // Locate the versioned sale cache after the first intercepted sale navigation.
 networkHandler = async (input) => {
   const path = new URL(typeof input === 'string' ? input : input.url, ORIGIN).pathname;
+  if (path.startsWith('/build/')) return assetResponse();
   const variant = path.startsWith('/fbr-pos') ? 'fbr' : 'pra';
   return htmlResponse(validHtml(variant, 'network-first'), { variant, url: new URL(path, ORIGIN).href });
 };
@@ -234,6 +243,7 @@ assert(!(await saleCache.match('/pos/invoice/create')), 'personal sale cache sur
 await saleCache.put('/fbr-pos/create', htmlResponse(validHtml('pra', 'wrong-variant'), { variant: 'pra' }));
 networkHandler = async (input) => {
   const path = new URL(typeof input === 'string' ? input : input.url, ORIGIN).pathname;
+  if (path.startsWith('/build/')) return assetResponse();
   const variant = path.startsWith('/fbr-pos') ? 'fbr' : 'pra';
   return htmlResponse(validHtml(variant, 'prime-' + variant), { variant, url: ORIGIN + path });
 };
@@ -246,7 +256,30 @@ const primed = getStore(saleName);
 assert(await primed.match('/pos/invoice/create'), 'prime message did not cache PRA document');
 assert(await primed.match('/fbr-pos/create'), 'prime message did not cache FBR document');
 
-// 7. Waiter tablet page (Sep 2026): NETWORK-FIRST with an offline fallback to
+// 7. A structurally valid cached document whose old hashed Vite entry was
+// removed must never be replayed. With the network available it is replaced by
+// current HTML and current assets; offline it produces the recovery screen.
+const activeSaleCache = getStore(saleName);
+await activeSaleCache.put('/pos/invoice/create', htmlResponse(validHtml('pra', 'removed-hash'), { variant: 'pra' }));
+networkHandler = async (input) => {
+  const path = new URL(typeof input === 'string' ? input : input.url, ORIGIN).pathname;
+  if (path.includes('removed-hash')) return assetResponse('', 404);
+  if (path.startsWith('/build/')) return assetResponse();
+  return htmlResponse(validHtml('pra', 'compatible-fresh'), {
+    variant: 'pra', url: ORIGIN + '/pos/invoice/create',
+  });
+};
+served = await dispatchFetch(request('/pos/invoice/create'));
+assert((await served.text()).includes('compatible-fresh'), 'stale sale HTML with a removed Vite hash was replayed');
+assert((await (await activeSaleCache.match('/pos/invoice/create')).text()).includes('compatible-fresh'), 'compatible network HTML did not replace stale Vite HTML');
+
+await activeSaleCache.put('/pos/invoice/create', htmlResponse(validHtml('pra', 'offline-missing-hash'), { variant: 'pra' }));
+networkHandler = async () => { throw new Error('offline with uncached build'); };
+served = await dispatchFetch(request('/pos/invoice/create'));
+assert(served.status === 503, 'offline stale HTML with a missing build asset did not return recovery');
+assert(!(await activeSaleCache.match('/pos/invoice/create')), 'stale HTML with a missing build asset was not evicted');
+
+// 8. Waiter tablet page (Sep 2026): NETWORK-FIRST with an offline fallback to
 // the last validated copy; login redirects pass through and evict; query
 // variants and the waiter API stay network-only (never runtime-cached).
 const waiterHtml = (tag) => '<!doctype html><html><body><div x-data="waiterApp()" data-tn-waiter-document="1">' + tag + '</div>'
@@ -293,4 +326,4 @@ assert(!cacheStores.has(waiterName) || !(await getStore(waiterName).match('/pos/
 await dispatchMessage({ type: 'SKIP_WAITING' });
 await dispatchMessage(undefined);
 
-console.log('SW SMOKE OK: validated PRA/FBR sale documents, waiter offline cold-start, hard-refresh network preference, offline fallback, invalid-cache eviction, auth cleanup, recovery UI, prime-cache and ordinary events.');
+console.log('SW SMOKE OK: validated PRA/FBR sale documents and their Vite assets, stale-hash replacement, waiter offline cold-start, hard-refresh network preference, offline fallback, invalid-cache eviction, auth cleanup, recovery UI, prime-cache and ordinary events.');

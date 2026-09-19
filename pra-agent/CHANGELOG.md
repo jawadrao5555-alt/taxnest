@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.7 (2026-09-19)
+**FBR callback diagnostics — local acceptance evidence ab release ke sath package hoti hai**
+
+- FBR fiscal-device callback ab Agent version, requested environment, client environment, IMS endpoint version aur bounded diagnostic evidence server ko bhejta hai.
+- Queue replay bhi yehi bounded evidence preserve karti hai; raw token, full response ya sensitive printer/config detail release payload ka hissa nahi banti.
+- `v1.13.6` immutable rehta hai; PR #90 ke changed Agent inputs ke liye naya patch release `v1.13.7` use hota hai.
+
 ## v1.13.5 (2026-09-15)
 **Release-chain safety update — existing tag kabhi overwrite nahi hoga**
 

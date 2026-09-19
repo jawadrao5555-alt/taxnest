@@ -1470,6 +1470,7 @@
             'seenIds' => $whatsNewSeenIds,
             'seenEndpoint' => '/pos/whats-new/seen',
         ])
+        @include('partials.modal-a11y-support')
 
         @if($whatsNewPopup)
         @if($whatsNewFeatured)
@@ -1490,12 +1491,18 @@
         </style>
         <div x-data="{ wnOpen: true,
                 wnDismiss() {
+                    const dialog = this.$refs.wnDialog;
                     this.wnOpen = false;
+                    this.$nextTick(() => window.TnModalA11y.close(dialog));
                     fetch('/pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) }).catch(() => {});
                     @if($surveyPopup && !$surveyDismissedSession) window.dispatchEvent(new CustomEvent('open-pos-survey')); @endif
                 },
                 wnTry(url) { this.wnDismiss(); window.location.href = url; } }"
-             x-show="wnOpen" x-cloak data-wn-featured="1"
+             x-show="wnOpen" x-cloak data-wn-featured="1" x-ref="wnDialog"
+             x-init="$nextTick(() => window.TnModalA11y.open($refs.wnDialog))"
+             @keydown.tab="window.TnModalA11y.trap($event, $refs.wnDialog)"
+             @keydown.escape.stop.prevent="wnDismiss()"
+             role="dialog" aria-modal="true" aria-labelledby="posFeaturedUpdateTitle"
              class="fixed inset-0 flex items-center justify-center p-4"
              style="z-index: 130; background: rgba(15, 10, 40, 0.62); backdrop-filter: blur(5px);">
             <div class="wnf-card w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl overflow-hidden"
@@ -1510,7 +1517,7 @@
                          style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #451a03; box-shadow: 0 6px 18px -6px rgba(245,158,11,0.7);">
                         🎉 {{ __('pos.wn_featured_badge') }}
                     </div>
-                    <h2 class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->customerTitle() }}</h2>
+                    <h2 id="posFeaturedUpdateTitle" class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->customerTitle() }}</h2>
                     <p class="text-[12px] text-white/75 mt-1.5"><x-wn-type-badge :update="$whatsNewFeatured" :light="true" /> · {{ $whatsNewFeatured->created_at->format('d M Y') }}</p>
                 </div>
                 <div class="px-6 py-5 overflow-y-auto" style="max-height: 52vh;">
@@ -1567,11 +1574,17 @@
         {{-- One-time "What's New" popup — dismiss marks ALL current updates seen (per user) --}}
         <div x-data="{ wnOpen: true,
                 wnDismiss() {
+                    const dialog = this.$refs.wnDialog;
                     this.wnOpen = false;
+                    this.$nextTick(() => window.TnModalA11y.close(dialog));
                     fetch('/pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) }).catch(() => {});
                     @if($surveyPopup && !$surveyDismissedSession) window.dispatchEvent(new CustomEvent('open-pos-survey')); @endif
                 } }"
-             x-show="wnOpen" x-cloak
+             x-show="wnOpen" x-cloak x-ref="wnDialog"
+             x-init="$nextTick(() => window.TnModalA11y.open($refs.wnDialog))"
+             @keydown.tab="window.TnModalA11y.trap($event, $refs.wnDialog)"
+             @keydown.escape.stop.prevent="wnDismiss()"
+             role="dialog" aria-modal="true" aria-labelledby="posUpdateTitle"
              class="fixed inset-0 flex items-center justify-center p-4"
              style="z-index: 130; background: rgba(15, 10, 40, 0.55); backdrop-filter: blur(4px);">
             <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
@@ -1580,7 +1593,7 @@
                  x-transition:enter-end="opacity-100 scale-100">
                 <div class="px-6 py-5 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
                     <div class="text-4xl mb-1">🎉</div>
-                    <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
+                    <h2 id="posUpdateTitle" class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
                     @if($whatsNewUnseenCount === 1)
                         <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->customerTitle() }} <x-wn-type-badge :update="$whatsNewPopup" :light="true" /> · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
                     @else
@@ -1646,7 +1659,9 @@
                 svPick(qk, ok) { this.svAnswers[qk] = ok; },
                 svComplete() { return this.svQuestions.every(q => !!this.svAnswers[q.key]); },
                 svDismiss() {
+                    const dialog = this.$refs.svDialog;
                     this.svOpen = false;
+                    this.$nextTick(() => window.TnModalA11y.close(dialog));
                     fetch('/pos/survey/{{ $surveyPopup->id }}/dismiss', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
                 },
                 async svSubmit() {
@@ -1661,12 +1676,21 @@
                         const j = await r.json().catch(() => ({}));
                         if (r.ok && j.ok) {
                             this.svDone = true;
-                            setTimeout(() => { this.svOpen = false; }, 1800);
+                            setTimeout(() => {
+                                const dialog = this.$refs.svDialog;
+                                this.svOpen = false;
+                                this.$nextTick(() => window.TnModalA11y.close(dialog));
+                            }, 1800);
                         } else { this.svBusy = false; }
                     } catch (e) { this.svBusy = false; }
                 } }"
              x-show="svOpen" x-cloak data-pos-survey="{{ $surveyPopup->id }}"
-             @open-pos-survey.window="svOpen = true"
+             @open-pos-survey.window="svOpen = true; $nextTick(() => window.TnModalA11y.open($refs.svDialog))"
+             x-ref="svDialog"
+             x-init="if (svOpen) $nextTick(() => window.TnModalA11y.open($refs.svDialog))"
+             @keydown.tab="window.TnModalA11y.trap($event, $refs.svDialog)"
+             @keydown.escape.stop.prevent="svDismiss()"
+             role="dialog" aria-modal="true" aria-labelledby="posSurveyTitle"
              class="fixed inset-0 flex items-center justify-center p-4"
              style="z-index: 125; background: rgba(15, 10, 40, 0.55); backdrop-filter: blur(4px);">
             <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
@@ -1676,7 +1700,7 @@
                 <div class="px-6 py-4 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
                     <div class="text-3xl mb-1">📞</div>
                     <p class="text-[11px] font-bold uppercase tracking-wide text-white/80">{{ __('pos.survey_badge') }}</p>
-                    <h2 class="text-lg font-extrabold text-white leading-snug">{{ $surveyPopup->title }}</h2>
+                    <h2 id="posSurveyTitle" class="text-lg font-extrabold text-white leading-snug">{{ $surveyPopup->title }}</h2>
                 </div>
                 <div x-show="svDone" x-cloak class="px-6 py-10 text-center">
                     <div class="text-4xl mb-2">🙏</div>
@@ -1736,7 +1760,9 @@
              loop). Responses go to feature-suggestions with source='pra_elaan'. --}}
         <div x-data="{ peOpen: true, peChoice: '', peComment: '', peDone: false, peBusy: false,
                 peDismiss() {
+                    const dialog = this.$refs.peDialog;
                     this.peOpen = false;
+                    this.$nextTick(() => window.TnModalA11y.close(dialog));
                     fetch('/pos/pra-elaan/dismiss', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
                 },
                 async peSubmit() {
@@ -1751,11 +1777,19 @@
                         const j = await r.json().catch(() => ({}));
                         if (r.ok && j.ok) {
                             this.peDone = true;
-                            setTimeout(() => { this.peOpen = false; }, 1800);
+                            setTimeout(() => {
+                                const dialog = this.$refs.peDialog;
+                                this.peOpen = false;
+                                this.$nextTick(() => window.TnModalA11y.close(dialog));
+                            }, 1800);
                         } else { this.peBusy = false; }
                     } catch (e) { this.peBusy = false; }
                 } }"
-             x-show="peOpen" x-cloak data-pra-elaan-popup="1"
+             x-show="peOpen" x-cloak data-pra-elaan-popup="1" x-ref="peDialog"
+             x-init="$nextTick(() => window.TnModalA11y.open($refs.peDialog))"
+             @keydown.tab="window.TnModalA11y.trap($event, $refs.peDialog)"
+             @keydown.escape.stop.prevent="peDismiss()"
+             role="dialog" aria-modal="true" aria-labelledby="praElaanTitle"
              class="fixed inset-0 flex items-center justify-center p-4"
              style="z-index: 120; background: rgba(15, 10, 40, 0.55); backdrop-filter: blur(4px);">
             <div class="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
@@ -1765,7 +1799,7 @@
                 <div class="px-6 py-4 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
                     <div class="text-3xl mb-1">📢</div>
                     <p class="text-[11px] font-bold uppercase tracking-wide text-white/80">{{ __('pos.pra_elaan_badge') }}</p>
-                    <h2 class="text-lg font-extrabold text-white leading-snug">{{ __('pos.pra_elaan_title') }}</h2>
+                    <h2 id="praElaanTitle" class="text-lg font-extrabold text-white leading-snug">{{ __('pos.pra_elaan_title') }}</h2>
                 </div>
                 <div x-show="peDone" x-cloak class="px-6 py-10 text-center">
                     <div class="text-4xl mb-2">🙏</div>

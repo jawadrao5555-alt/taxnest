@@ -143,9 +143,11 @@
                         @endif
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    @forelse($customers as $customer)
-                    <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="custRow({{ (int) $customer->id }})"
+                @forelse($customers as $customer)
+                {{-- Keep the display row and its edit/address row in one valid table
+                     section so both inherit the same Alpine custRow instance. --}}
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800" x-data="custRow({{ (int) $customer->id }})">
+                    <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}"
                         data-search="{{ Str::lower(trim(($customer->name ?? '') . ' ' . ($customer->phone ?? '') . ' ' . ($customer->email ?? '') . ' ' . ($customer->address ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->cnic ?? '') . ' ' . ($customer->ntn ?? ''))) }}">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $customer->name }}</td>
                         <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ $customer->phone ?? '—' }}</td>
@@ -243,10 +245,12 @@
                         </td>
                     </tr>
                     @endif
-                    @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">{{ __('pos.no_customers_yet') }}</td></tr>
-                    @endforelse
                 </tbody>
+                @empty
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">{{ __('pos.no_customers_yet') }}</td></tr>
+                </tbody>
+                @endforelse
             </table>
         </div>
     </div>

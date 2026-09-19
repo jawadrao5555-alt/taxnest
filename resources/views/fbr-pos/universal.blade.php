@@ -266,8 +266,12 @@
 .toast-exit { animation: toastSlideOut 0.3s ease forwards; }
 .price-badge { background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(37,99,235,0.15)); border: 1px solid rgba(37,99,235,0.15); border-radius: 8px; padding: 2px 8px; }
 .dark .price-badge { background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(167,139,250,0.2)); border-color: rgba(167,139,250,0.2); }
+.tn-sale-root { height: calc(100vh - 48px); height: calc(100dvh - 48px); max-height: calc(100dvh - 48px); }
 @media (max-width: 767px) {
-    .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: inherit; padding-bottom: env(safe-area-inset-bottom, 0); }
+    .tn-cart-col { overflow-y: auto; }
+    .tn-cart-col [x-ref="cartList"] { flex: none; overflow: visible; }
+    .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); box-shadow: 0 -10px 24px rgba(0,0,0,.10); padding-bottom: env(safe-area-inset-bottom, 0); }
+    .dark .mobile-sticky-pay { background: #111827; }
     .mobile-collapse-header { cursor: pointer; user-select: none; }
     .mobile-collapse-header::after { content: '▾'; float: right; transition: transform 0.2s; font-size: 10px; color: #9ca3af; }
     .mobile-collapse-header.collapsed::after { transform: rotate(-90deg); }
@@ -276,6 +280,19 @@
     .prod-card:active { transform: scale(0.96); }
     .cart-item { padding: 10px 12px !important; }
     .cart-item .qty-btn-mobile { min-width: 44px; min-height: 44px; }
+}
+@media (min-width: 768px) and (max-height: 760px) {
+    .tn-cart-col { min-height: 0; overflow-y: auto; }
+    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .mobile-sticky-pay {
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        background: #f9fafb;
+        border-top: 1px solid rgba(148,163,184,.28);
+    }
+    .dark .mobile-sticky-pay { background: #111827; }
 }
 .priority-badge { position: relative; }
 .priority-badge::after { content: ''; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
@@ -433,7 +450,7 @@ window.addEventListener('popstate', function() {
 {{-- Screen Fit (Jul 2026, ported from PRA universal): fitStyleStr applies CSS zoom +
      a /zoom-compensated px height so the sale screen renders correctly on ANY display.
      Auto mode picks the zoom from viewport size; manual % saved per device. --}}
-<div data-tn-sale-document="fbr" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
+<div data-tn-sale-document="fbr" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale tn-sale-root flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
     {{-- ═══════════ NAV SWITCHES (Aug 2026, PRA parity — owner request) ═══════════
          Desktop (md+): FBR Reporting / Auto-Print / Auto-KOT live INSIDE the blue top-nav
          as a "Switches" dropdown — teleported into #tn-nav-sale-tools (fbr-pos-app.blade.php)
@@ -3866,7 +3883,7 @@ function restaurantPos() {
         customersBakedPartial: {{ !empty($customersTruncated) ? 'true' : 'false' }},
         pickerServerResults: null,
         pickerSearchTimer: null,
-        kitchenSettings: @json($kitchenSettings),
+        kitchenSettings: {!! $jsEnc($kitchenSettings, '{}') !!},
         // Inventory master switch — single source of truth.
         // When false, ALL stock UI/logic is suppressed (badges, popup, blocking).
         // Use isInventoryEnabled() helper everywhere — never reference this directly.
@@ -6463,7 +6480,7 @@ function restaurantPos() {
         // - Session memory: dismissed pairs don't re-show until page reload
         // - Enter = accept, Esc = dismiss (handled in keyboard router)
         // ──────────────────────────────────────────────────────────────
-        upsellRules: @json($fbrUpsellRules),
+        upsellRules: {!! $jsEnc($fbrUpsellRules, '{}') !!},
         currentUpsell: null,           // { trigger:{id,name}, suggest:{id,name,price,...} }
         dismissedUpsells: [],          // ['triggerId:suggestId', ...] — session-only
         triggerUpsell(triggerItem) {

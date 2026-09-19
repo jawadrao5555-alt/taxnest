@@ -1462,6 +1462,7 @@
             'seenIds' => $whatsNewSeenIds,
             'seenEndpoint' => '/fbr-pos/whats-new/seen',
         ])
+        @include('partials.modal-a11y-support')
 
         @if($fbrDecisionCard)
         @include('fbr-pos.partials.integration-decision-card')
@@ -1486,11 +1487,17 @@
         </style>
         <div x-data="{ wnOpen: true,
                 wnDismiss() {
+                    const dialog = this.$refs.wnDialog;
                     this.wnOpen = false;
+                    this.$nextTick(() => window.TnModalA11y.close(dialog));
                     fetch('/fbr-pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) }).catch(() => {});
                 },
                 wnTry(url) { this.wnDismiss(); window.location.href = url; } }"
-             x-show="wnOpen" x-cloak data-wn-featured="1"
+             x-show="wnOpen" x-cloak data-wn-featured="1" x-ref="wnDialog"
+             x-init="$nextTick(() => window.TnModalA11y.open($refs.wnDialog))"
+             @keydown.tab="window.TnModalA11y.trap($event, $refs.wnDialog)"
+             @keydown.escape.stop.prevent="wnDismiss()"
+             role="dialog" aria-modal="true" aria-labelledby="fbrFeaturedUpdateTitle"
              class="fixed inset-0 flex items-center justify-center p-4"
              style="z-index: 130; background: rgba(5, 15, 40, 0.62); backdrop-filter: blur(5px);">
             <div class="wnf-card w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl overflow-hidden"
@@ -1505,7 +1512,7 @@
                          style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #451a03; box-shadow: 0 6px 18px -6px rgba(245,158,11,0.7);">
                         🎉 {{ __('pos.wn_featured_badge') }}
                     </div>
-                    <h2 class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->customerTitle() }}</h2>
+                    <h2 id="fbrFeaturedUpdateTitle" class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->customerTitle() }}</h2>
                     <p class="text-[12px] text-white/75 mt-1.5"><x-wn-type-badge :update="$whatsNewFeatured" :light="true" /> · {{ $whatsNewFeatured->created_at->format('d M Y') }}</p>
                 </div>
                 <div class="px-6 py-5 overflow-y-auto" style="max-height: 52vh;">
@@ -1562,10 +1569,16 @@
         {{-- One-time "What's New" popup — dismiss marks ALL current updates seen (per user) --}}
         <div x-data="{ wnOpen: true,
                 wnDismiss() {
+                    const dialog = this.$refs.wnDialog;
                     this.wnOpen = false;
+                    this.$nextTick(() => window.TnModalA11y.close(dialog));
                     fetch('/fbr-pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) }).catch(() => {});
                 } }"
-             x-show="wnOpen" x-cloak
+             x-show="wnOpen" x-cloak x-ref="wnDialog"
+             x-init="$nextTick(() => window.TnModalA11y.open($refs.wnDialog))"
+             @keydown.tab="window.TnModalA11y.trap($event, $refs.wnDialog)"
+             @keydown.escape.stop.prevent="wnDismiss()"
+             role="dialog" aria-modal="true" aria-labelledby="fbrUpdateTitle"
              class="fixed inset-0 flex items-center justify-center p-4"
              style="z-index: 130; background: rgba(5, 15, 40, 0.55); backdrop-filter: blur(4px);">
             <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
@@ -1574,7 +1587,7 @@
                  x-transition:enter-end="opacity-100 scale-100">
                 <div class="px-6 py-5 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
                     <div class="text-4xl mb-1">🎉</div>
-                    <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
+                    <h2 id="fbrUpdateTitle" class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
                     @if($whatsNewUnseenCount === 1)
                         <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->customerTitle() }} <x-wn-type-badge :update="$whatsNewPopup" :light="true" /> · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
                     @else

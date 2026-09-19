@@ -52,13 +52,10 @@
         .admin-btn { background-color: var(--admin-accent) !important; }
         .admin-btn:hover { background-color: var(--admin-accent-hover) !important; }
 
-        /* 🎯 GLOBAL FADED-TEXT CONTRAST BOOST — kills the "ghost text" look in dark mode
-           caused by Tailwind's text-gray-400/500 being too low-contrast on dark surfaces.
-           Mirrors the boost in layouts/app.blade.php (DI). Applies app-wide. */
-        .dark .text-gray-400 { color: #cbd5e1 !important; }
-        .dark .text-gray-500 { color: #94a3b8 !important; }
-        .dark .text-slate-400 { color: #cbd5e1 !important; }
-        .dark .text-slate-500 { color: #94a3b8 !important; }
+        /* Functional metadata needs a deliberate AA-safe token; decorative muted
+           text should keep its component-level treatment instead of being brightened globally. */
+        :root { --admin-text-muted-functional: #9ca3af; }
+        .admin-text-muted-functional { color: var(--admin-text-muted-functional) !important; }
         /* Light-mode safety: opacity-50/60 on body text inside content cards reads as faded ghost */
         .premium-card .opacity-50, .stat-card .opacity-50 { opacity: 0.7; }
     </style>
@@ -396,11 +393,11 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-300">{{ auth('admin')->user()->name ?? auth()->user()->name ?? 'Admin' }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ auth('admin')->user()->email ?? auth()->user()->email ?? '' }}</p>
+                        <p class="text-xs admin-text-muted-functional">{{ auth('admin')->user()->email ?? auth()->user()->email ?? '' }}</p>
                     </div>
                     <form method="POST" action="{{ route('admin.logout') }}">
                         @csrf
-                        <button type="submit" class="text-gray-500 dark:text-gray-400 hover:text-red-400 transition">
+                        <button type="submit" class="text-gray-500 dark:text-gray-400 hover:text-red-400 transition" aria-label="Log out">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                         </button>
                     </form>

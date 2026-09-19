@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Create Product</h2>
-            <a href="/products" class="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-100">Back to Products</a>
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <h2 class="min-w-0 font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Create Product</h2>
+            <a href="/products" class="shrink-0 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-100">Back to Products</a>
         </div>
     </x-slot>
 

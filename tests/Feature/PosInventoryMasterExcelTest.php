@@ -489,7 +489,7 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertStringContainsString('Recipes module is OFF', $result['message']);
     }
 
-    public function test_template_download_has_master_sheet_text_codes_dropdown_and_required_samples(): void
+    public function test_template_download_has_exact_menu_workbook_and_deterministic_samples(): void
     {
         $response = (new PosInventoryMasterExcelService())->streamTemplate();
         ob_start();
@@ -499,32 +499,21 @@ class PosInventoryMasterExcelTest extends TestCase
         $tmp = tempnam(sys_get_temp_dir(), 'tpl') . '.xlsx';
         file_put_contents($tmp, $bytes);
         $ss = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp);
-        $this->assertSame('Master', $ss->getSheet(0)->getTitle());
-        $sheet = $ss->getSheetByName('Master');
-        $this->assertSame('Row Type', $sheet->getCell('A1')->getValue());
-        $this->assertSame('Quantity Needed', $sheet->getCell('P1')->getValue());
-        $this->assertTrue($sheet->getFreezePane() === 'A2' || $sheet->getFreezePane() === 'A2');
-        $this->assertSame(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT, $sheet->getStyle('C2')->getNumberFormat()->getFormatCode());
-        $this->assertSame(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT, $sheet->getStyle('L2')->getNumberFormat()->getFormatCode());
+        $this->assertSame(['Start Here', 'Products', 'Ingredients', 'Recipes', 'Lists'],
+            array_map(fn ($sheet) => $sheet->getTitle(), $ss->getAllSheets()));
+        $this->assertSame('Product Name', $ss->getSheetByName('Products')->getCell('A1')->getValue());
+        $this->assertSame('Ingredient Name', $ss->getSheetByName('Ingredients')->getCell('A1')->getValue());
+        $this->assertSame('Waste %', $ss->getSheetByName('Recipes')->getCell('E1')->getValue());
+        $this->assertSame('Beverages', $ss->getSheetByName('Products')->getCell('B2')->getValue());
+        $this->assertSame('Recipe', $ss->getSheetByName('Products')->getCell('C2')->getValue());
+        $this->assertSame('Misal: Milk', $ss->getSheetByName('Ingredients')->getCell('A3')->getValue());
+        $this->assertSame('Misal: Water', $ss->getSheetByName('Ingredients')->getCell('A5')->getValue());
+        $this->assertTrue($ss->getSheetByName('Lists')->getProtection()->getSheet());
 
-        $blob = '';
-        foreach ($sheet->toArray(null, true, false, false) as $row) {
-            $blob .= implode('|', array_map(fn ($c) => (string) $c, $row)) . "\n";
-        }
-        $this->assertStringContainsString('Misal: Coke 500ml', $blob);
-        $this->assertStringContainsString('Misal: Basmati Rice', $blob);
-        $this->assertStringContainsString('0.25', $blob);
-        $this->assertStringContainsString('Misal: Chicken Biryani', $blob);
-
-        $dv = $sheet->getCell('A2')->getDataValidation();
-        $this->assertSame(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST, $dv->getType());
-        $this->assertStringContainsString('PRODUCT', $dv->getFormula1());
-
-        $controller = new PosInventoryMasterController(new PosInventoryMasterExcelService());
-        $this->importViaController($tmp);
+        $preview = (new PosInventoryMasterExcelService())->preview($tmp, $this->companyId, 'create_only', 1);
+        $this->assertTrue($preview['ok'], json_encode($preview));
         $this->assertSame(0, PosProduct::count(), 'Untouched template samples must not become catalog rows');
         $this->assertSame(0, Ingredient::count());
-        $this->assertStringContainsString('sample', strtolower((string) session('success') . session('error')));
     }
 
     public function test_controller_import_path_writes_master_data_without_stock(): void
@@ -667,5 +656,32 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertEquals(0.25, (float) ProductRecipe::first()->quantity_needed);
         $this->assertSame(1, $result['counts']['rows_skipped']);
         $this->assertStringContainsString('row 4', strtolower(implode(' ', $result['errors'])));
+    }
+
+    public function test_menu_preview_is_zero_write_and_confirm_resolves_same_file_dependencies(): void
+    {
+        $spreadsheet = (new PosInventoryMasterExcelService())->buildWorkbook();
+        $spreadsheet->getSheetByName('Products')->fromArray([
+            ['Tea', 'Beverages', 'Recipe', 100, 40, 'TEA-1', 'BC-1', 'pcs', 0, 'Yes', 'No', '', '', ''],
+        ], null, 'A2');
+        $spreadsheet->getSheetByName('Ingredients')->fromArray([
+            ['Tea Leaves', 'Kitchen', 'kg', 'g', 1000, 500, '', 0, 'Supplier', 'Yes'],
+        ], null, 'A2');
+        $spreadsheet->getSheetByName('Recipes')->fromArray([
+            ['Tea', 'Tea Leaves', 2, 'g', 5, 'Brew loss'],
+        ], null, 'A2');
+        $path = tempnam(sys_get_temp_dir(), 'menu') . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $service = new PosInventoryMasterExcelService();
+        $preview = $service->preview($path, $this->companyId, 'create_only', 1);
+        $this->assertTrue($preview['ok'], json_encode($preview));
+        $this->assertSame(0, PosProduct::count());
+        $this->assertSame(0, Ingredient::count());
+        $result = $service->confirm($preview['token'], $this->companyId, true, 1);
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertSame(1, PosProduct::count());
+        $this->assertSame(1, Ingredient::count());
+        $this->assertSame(1, ProductRecipe::count());
     }
 }

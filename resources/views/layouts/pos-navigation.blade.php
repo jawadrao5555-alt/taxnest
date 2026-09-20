@@ -49,7 +49,7 @@
     @endphp
     @if(!$isCashierNav && $inventoryEnabled)
     <div class="pt-4 pb-1 px-4">
-        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Inventory
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.inventory_section') }}
             @if(!$inventoryEnabled)<span class="ml-1 normal-case font-medium text-[9px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{{ __('pos.off_word') }}</span>@endif
         </p>
     </div>
@@ -67,12 +67,12 @@
     @if($recipesNavInv)
     <a href="{{ route('pos.restaurant.ingredients') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.restaurant.ingredients') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-        Ingredients
+        {{ __('pos.ingredients') }}
     </a>
 
     <a href="{{ route('pos.restaurant.recipes') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.restaurant.recipes') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-        Recipes (BOM)
+        {{ __('pos.recipes_bom') }}
     </a>
     @endif
 
@@ -188,7 +188,7 @@
 
     <a href="{{ route('pos.products') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.products') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-        {{ \App\Support\PosVocabulary::for($companyNav)['items'] }}
+        {{ __('pos.products') }}
     </a>
 
     <a href="{{ route('pos.customers') }}" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->routeIs('pos.customers') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400' }}">

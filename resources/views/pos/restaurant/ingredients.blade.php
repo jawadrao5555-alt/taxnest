@@ -1,13 +1,14 @@
 <x-pos-layout>
-<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, code: '', name: '', unit: '', base_unit: '', conversion_factor: 1, cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true }, q: '', ingredientNames: {{ json_encode($ingredients->map(fn($i) => mb_strtolower($i->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex items-center justify-between mb-6">
+@include('pos.inventory.partials.family-styles')
+<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, code: '', name: '', unit: '', base_unit: '', conversion_factor: 1, cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true }, q: '', ingredientNames: {{ json_encode($ingredients->map(fn($i) => mb_strtolower($i->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }" class="tn-inventory-family max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="tn-family-header flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.ingredients') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.ingredients_subtitle') }}</p>
         </div>
         <div class="flex gap-2">
             <a href="{{ route('pos.inventory-master') }}" class="px-4 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-sm font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20">{{ __('pos.inventory_master') }}</a>
-            <a href="{{ route('pos.restaurant.kitchen-report') }}" class="px-4 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-sm font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20">Kitchen report</a>
+            <a href="{{ route('pos.restaurant.kitchen-report') }}" class="px-4 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-sm font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20">{{ __('pos.kitchen_report') }}</a>
             <button @click="showAddModal = true" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">{{ __('pos.add_ingredient_btn') }}</button>
         </div>
     </div>
@@ -103,7 +104,7 @@
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.name_label') }}</label>
-                    <input type="text" name="code" maxlength="50" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="Code (optional)">
+                    <input type="text" name="code" maxlength="50" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="{{ __('pos.code_optional') }}">
                     <input type="text" name="name" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="{{ __('pos.ph_eg_chicken_breast') }}">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -126,13 +127,13 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Base unit</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.base_unit') }}</label>
                         <select name="base_unit" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                             @foreach(\App\Services\RecipeInventoryService::UNITS as $unit)<option value="{{ $unit }}">{{ $unit }}</option>@endforeach
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conversion factor</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.conversion_factor') }}</label>
                         <input type="number" name="conversion_factor" step="0.0001" min="0.0001" value="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                     </div>
                 </div>
@@ -164,7 +165,7 @@
                 @csrf @method('PUT')
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.name_label') }}</label>
-                    <input type="text" name="code" x-model="edit.code" maxlength="50" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="Code (optional)">
+                    <input type="text" name="code" x-model="edit.code" maxlength="50" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="{{ __('pos.code_optional') }}">
                     <input type="text" name="name" x-model="edit.name" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -192,13 +193,13 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Base unit</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.base_unit') }}</label>
                         <select name="base_unit" x-model="edit.base_unit" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                             @foreach(\App\Services\RecipeInventoryService::UNITS as $unit)<option value="{{ $unit }}">{{ $unit }}</option>@endforeach
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conversion factor</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.conversion_factor') }}</label>
                         <input type="number" name="conversion_factor" x-model="edit.conversion_factor" step="0.0001" min="0.0001" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                     </div>
                 </div>

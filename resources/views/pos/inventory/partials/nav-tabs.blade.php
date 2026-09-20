@@ -1,4 +1,4 @@
-{{-- Shared NestPOS inventory tab strip. Pass $active: dashboard|stock|movements|low-stock|adjust|transfers|stock-check|stock-in|ingredients|recipes|master --}}
+{{-- Shared inventory family strip. Pass $active: products|ingredients|recipes|master plus stock tabs. --}}
 @php
     $invActive = $active ?? '';
     $tabOn = 'px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm';
@@ -7,7 +7,10 @@
     $recipesNav = \App\Services\PosFeatureService::moduleAvailable($navCompany, 'recipes');
     $lowStockCount = (int) ($lowStockCount ?? (($lowStockItems ?? collect())->count() ?? 0));
 @endphp
-<div class="flex flex-wrap gap-2 mb-6">
+<div class="tn-tab-strip" aria-label="{{ __('pos.inventory_navigation') }}">
+    @if(\Illuminate\Support\Facades\Route::has('pos.products'))
+    <a href="{{ route('pos.products') }}" class="{{ $invActive === 'products' ? $tabOn : $tabOff }}">{{ __('pos.products') }}</a>
+    @endif
     <a href="{{ route('pos.inventory.dashboard') }}" class="{{ $invActive === 'dashboard' ? $tabOn : $tabOff }}">{{ __('pos.dashboard') }}</a>
     <a href="{{ route('pos.inventory.stock') }}" class="{{ $invActive === 'stock' ? $tabOn : $tabOff }}">{{ __('pos.stock_levels') }}</a>
     @if($recipesNav)

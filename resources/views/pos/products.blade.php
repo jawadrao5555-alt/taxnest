@@ -1,12 +1,14 @@
 <x-pos-layout>
+@include('pos.inventory.partials.family-styles')
 @php
     $posVocab = \App\Support\PosVocabulary::for($company);
     $productsDealsAvailable = \App\Services\PosFeatureService::moduleAvailable($company, 'deals_enabled');
     $productsBarcodeRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'barcode');
     $productsInventoryRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'inventory');
 @endphp
-<div class="p-4 sm:p-6 max-w-7xl mx-auto">
+<div class="tn-inventory-family p-4 sm:p-6 max-w-7xl mx-auto">
     @include('pos.partials.back-link')
+    @include('pos.inventory.partials.nav-tabs', ['active' => 'products'])
     @php
         // One unit catalogue (PosUnitCatalog): this shop's business-category
         // units first, "Baqi units" second. Passed by products(); guard keeps

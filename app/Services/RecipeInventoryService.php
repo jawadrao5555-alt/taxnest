@@ -112,7 +112,9 @@ class RecipeInventoryService
                     continue;
                 }
                 $ingredientId = (int) $recipe->ingredient_id;
-                $needed = round((float) $recipe->quantity_needed * $saleQty, 4);
+                $waste = Schema::hasColumn('product_recipes', 'waste_percent')
+                    ? max(0.0, min(100.0, (float) ($recipe->waste_percent ?? 0))) : 0.0;
+                $needed = round((float) $recipe->quantity_needed * (1 + ($waste / 100)) * $saleQty, 4);
                 if ($needed <= 0) {
                     continue;
                 }
@@ -140,6 +142,8 @@ class RecipeInventoryService
                     'recipe_id' => (int) $recipe->id,
                     'recipe_version' => (int) ($recipe->recipe_version ?? 1),
                     'quantity_needed' => (float) $recipe->quantity_needed,
+                    'waste_percent' => $waste,
+                    'effective_quantity_needed' => round((float) $recipe->quantity_needed * (1 + ($waste / 100)), 4),
                     'ingredient_id' => $ingredientId,
                     'ingredient_unit' => (string) $recipe->ingredient->unit,
                 ];

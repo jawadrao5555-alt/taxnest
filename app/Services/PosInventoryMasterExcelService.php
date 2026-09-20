@@ -10,6 +10,7 @@ use App\Models\ProductRecipe;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -32,6 +33,8 @@ class PosInventoryMasterExcelService
     public const FILENAME = 'nestpos_inventory_master.xlsx';
     public const MAX_DATA_ROWS = 5000;
     public const MAX_RECIPE_ROWS = 2000;
+    public const WORKBOOK_FILENAME = 'TaxNest_Menu_Import.xlsx';
+    private const PREVIEW_TTL = 1800;
 
     public const HEADERS = [
         'Row Type',
@@ -136,16 +139,242 @@ class PosInventoryMasterExcelService
 
     public function streamTemplate()
     {
-        $spreadsheet = $this->buildTemplateSpreadsheet();
+        $spreadsheet = $this->buildWorkbook();
         $writer = new Xlsx($spreadsheet);
 
         return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');
-        }, self::FILENAME, [
+        }, self::WORKBOOK_FILENAME, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
             'Pragma' => 'no-cache',
         ]);
+    }
+
+    public function buildWorkbook(): Spreadsheet
+    {
+        $ss = new Spreadsheet();
+        $start = $ss->getActiveSheet();
+        $start->setTitle('Start Here');
+        $start->fromArray([
+            ['TaxNest menu and inventory import'],
+            ['Import order: Ingredients → Products → Recipes. Preview is zero-write; Confirm is required.'],
+            ['Create-only skips exact existing rows. Update existing changes only fields shown in the preview.'],
+            ['Opening Stock is read for warning only and is never posted to stock or ledgers.'],
+            ['Plain Tea sample is intentionally Beverages only. Sample rows are skipped by the Misal: marker.'],
+        ], null, 'A1');
+        $start->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $start->getStyle('A2:A5')->getAlignment()->setWrapText(true);
+        $start->getColumnDimension('A')->setWidth(105);
+        $definitions = [
+            'Products' => ['Product Name', 'Category', 'Product Type', 'Sale Price', 'Cost Price', 'SKU', 'Barcode', 'Unit', 'Tax Rate', 'Active', 'Track Stock', 'Opening Stock', 'Low Stock Alert', 'Description'],
+            'Ingredients' => ['Ingredient Name', 'Category', 'Purchase Unit', 'Usage Unit', 'Conversion Factor', 'Cost per Purchase Unit', 'Opening Stock', 'Low Stock Alert', 'Supplier', 'Active'],
+            'Recipes' => ['Product Name', 'Ingredient Name', 'Quantity Used', 'Usage Unit', 'Waste %', 'Notes'],
+            'Lists' => ['List', 'Allowed Value', 'Guidance'],
+        ];
+        foreach ($definitions as $title => $headers) {
+            $sheet = $ss->createSheet();
+            $sheet->setTitle($title);
+            $sheet->fromArray([$headers], null, 'A1');
+            $last = chr(ord('A') + count($headers) - 1);
+            $sheet->getStyle("A1:{$last}1")->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+            $sheet->getStyle("A1:{$last}1")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('7C3AED');
+            $sheet->freezePane('A2');
+            $sheet->getRowDimension(1)->setRowHeight(26);
+            for ($column = 1; $column <= count($headers); $column++) {
+                $sheet->getColumnDimensionByColumn($column)->setWidth(20);
+            }
+            $sheet->getStyle("A1:{$last}2000")->getAlignment()->setWrapText(true);
+        }
+        $lists = $ss->getSheetByName('Lists');
+        $lists->fromArray([
+            ['Unit', 'pcs', 'Use the same Usage Unit in Recipes.'],
+            ['Unit', 'kg', ''],
+            ['Unit', 'g', ''],
+            ['Unit', 'ltr', ''],
+            ['Unit', 'ml', ''],
+            ['Unit', 'dozen', ''],
+            ['Product Type', 'Recipe', 'Active recipe lines make this a Recipe item.'],
+            ['Product Type', 'Resale', 'Use for products without active recipe lines.'],
+            ['Yes/No', 'Yes', 'Enter Yes or No.'],
+            ['Yes/No', 'No', 'Enter Yes or No.'],
+            ['Tax', '0-100', 'Tax Rate is a percentage; confirm fiscal setup separately.'],
+        ], null, 'A2');
+        $lists->getProtection()->setSheet(true);
+        $lists->getProtection()->setPassword(Str::random(24));
+        $lists->getStyle('A2:C12')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('ECFDF5');
+        $this->addWorkbookValidation($ss->getSheetByName('Products'), 'J2:J2000', '"Yes,No"');
+        $this->addWorkbookValidation($ss->getSheetByName('Products'), 'K2:K2000', '"Yes,No"');
+        $this->addWorkbookValidation($ss->getSheetByName('Ingredients'), 'J2:J2000', '"Yes,No"');
+        $this->addWorkbookValidation($ss->getSheetByName('Recipes'), 'D2:D2000', '"pcs,kg,g,ltr,ml,dozen"');
+        $samples = [
+            ['Misal: Plain Tea', 'Beverages', 'Recipe', 100, 0, 'TEA-001', '', 'pcs', 0, 'Yes', 'No', '', '', 'Sample only'],
+        ];
+        $ss->getSheetByName('Products')->fromArray($samples, null, 'A2');
+        $ss->getSheetByName('Products')->getStyle('A2:N2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCFCE7');
+        $ingredientSamples = [
+            ['Misal: Tea Leaves', '', 'kg', 'g', 1000, 0.5, '', 0, '', 'Yes'],
+            ['Misal: Milk', '', 'ltr', 'ml', 1000, 180, '', 0, '', 'Yes'],
+            ['Misal: Sugar', '', 'kg', 'g', 1000, 0.2, '', 0, '', 'Yes'],
+            ['Misal: Water', '', 'ltr', 'ml', 1000, 0.02, '', 0, '', 'Yes'],
+        ];
+        $ss->getSheetByName('Ingredients')->fromArray($ingredientSamples, null, 'A2');
+        $ss->getSheetByName('Ingredients')->getStyle('A2:J5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEF3C7');
+        $ss->getSheetByName('Recipes')->fromArray([
+            ['Misal: Plain Tea', 'Misal: Tea Leaves', 2, 'g', 0, 'Sample only'],
+            ['Misal: Plain Tea', 'Misal: Milk', 100, 'ml', 0, 'Sample only'],
+            ['Misal: Plain Tea', 'Misal: Sugar', 8, 'g', 0, 'Sample only'],
+            ['Misal: Plain Tea', 'Misal: Water', 100, 'ml', 0, 'Sample only'],
+        ], null, 'A2');
+        $ss->getSheetByName('Recipes')->getStyle('A2:F5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEE2E2');
+        return $ss;
+    }
+
+    public function preview(string $path, int $companyId, string $mode='create_only', ?int $userId=null): array
+    {
+        if ($userId === null) {
+            return ['ok'=>false,'errors'=>[['sheet'=>'','row'=>0,'field'=>'user','message'=>'An authenticated user is required.']]];
+        }
+        if (!in_array($mode,['create_only','update_existing'],true)) {
+            return ['ok'=>false,'errors'=>[['sheet'=>'','row'=>0,'field'=>'mode','message'=>'Mode must be create_only or update_existing.']]];
+        }
+        try { $normalized=$this->readMenuWorkbook($path); } catch (\Throwable $e) {
+            Log::warning('Menu workbook preview rejected: '.$e->getMessage());
+            return ['ok'=>false,'errors'=>[['sheet'=>'','row'=>0,'field'=>'file','message'=>'Workbook could not be read or failed security validation.']]];
+        }
+        $plan = $this->planOperations($normalized, $companyId, $mode);
+        $checksum = hash_file('sha256', $path);
+        $payload = ['company_id'=>$companyId, 'user_id'=>$userId, 'mode'=>$mode, 'operations'=>$plan['operations'],
+            'warnings'=>$plan['warnings'], 'errors'=>$plan['errors'], 'checksum'=>$checksum,
+            'fingerprint'=>$this->catalogFingerprint($companyId), 'created_at'=>time()];
+        $dir=storage_path('app/pos-import-previews');
+        if (!is_dir($dir)) mkdir($dir,0700,true);
+        $token=Str::random(64);
+        $target=$dir.'/'.$token.'.json';
+        file_put_contents($target,json_encode($payload,JSON_THROW_ON_ERROR),LOCK_EX);
+        chmod($target,0600);
+        $summary = [
+            'rows' => count($plan['operations']),
+            'valid' => count(array_filter($plan['operations'], fn ($operation) => ($operation['action'] ?? '') !== 'skip')),
+            'issues' => count($plan['errors']) + count($plan['warnings']),
+            'updates' => count(array_filter($plan['operations'], fn ($operation) => ($operation['action'] ?? '') === 'update')),
+            'creates' => count(array_filter($plan['operations'], fn ($operation) => ($operation['action'] ?? '') === 'create')),
+        ];
+        return ['ok'=>!$plan['errors'],'token'=>$token,'mode'=>$mode,'warnings'=>$plan['warnings'],'errors'=>$plan['errors'],'categories'=>$plan['categories']]+$summary;
+    }
+
+    public function confirm(string $token,int $companyId,bool $confirmed=false, ?int $userId=null): array
+    {
+        if (!$confirmed) return ['ok'=>false,'errors'=>['Explicit confirmation is required.']];
+        if ($userId === null) return ['ok'=>false,'errors'=>['An authenticated user is required.']];
+        if (!preg_match('/^[A-Za-z0-9]+$/',$token)) return ['ok'=>false,'errors'=>['Preview token is invalid.']];
+        $file=storage_path('app/pos-import-previews/'.$token.'.json');
+        if (!is_file($file)||filemtime($file)<time()-self::PREVIEW_TTL) return ['ok'=>false,'errors'=>['Preview token is missing or expired.']];
+        $payload=json_decode((string)file_get_contents($file),true);
+        if (!is_array($payload)||(int)($payload['company_id']??0)!==$companyId) return ['ok'=>false,'errors'=>['Preview does not belong to this company.']];
+        if ((int)($payload['user_id'] ?? 0) !== $userId) return ['ok'=>false,'errors'=>['Preview does not belong to this user.']];
+        if (!empty($payload['errors'])) return ['ok'=>false,'errors'=>$payload['errors']];
+        $processing = $file.'.'.Str::random(16).'.processing';
+        if (!@rename($file, $processing)) {
+            return ['ok'=>false,'errors'=>['Preview is already being confirmed or has been consumed.']];
+        }
+        $claimedPayload = json_decode((string) file_get_contents($processing), true);
+        if (!is_array($claimedPayload)
+            || !hash_equals(hash('sha256', json_encode($payload)), hash('sha256', json_encode($claimedPayload)))) {
+            @rename($processing, $file);
+            return ['ok'=>false,'errors'=>['Preview changed while it was being confirmed.']];
+        }
+        DB::beginTransaction();
+        try {
+            Company::whereKey($companyId)->lockForUpdate()->first();
+            if (!hash_equals((string)$payload['fingerprint'], $this->catalogFingerprint($companyId))) {
+                throw new \RuntimeException('Catalog changed after preview; create a new preview.');
+            }
+            $createCount = count(array_filter(
+                $payload['operations'],
+                fn ($operation) => ($operation['entity'] ?? '') === 'product'
+                    && ($operation['action'] ?? '') === 'create'
+            ));
+            $remaining = PlanLimitService::remainingProductAllowance($companyId, 'pos');
+            if ($remaining !== null && $createCount > $remaining) {
+                throw new \RuntimeException(__('pos.product_limit_reached_error'));
+            }
+            $result=$this->applyOperations($payload['operations'], $companyId, $payload['mode']);
+            if (Schema::hasTable('audit_logs')) {
+                AuditLogService::log(
+                    'menu_inventory_import_confirmed',
+                    'menu_inventory_workbook',
+                    null,
+                    null,
+                    ['mode'=>$payload['mode'],'checksum'=>$payload['checksum'],'counts'=>$result['counts'] ?? []],
+                    $companyId,
+                    $userId
+                );
+            }
+            DB::commit();
+            @unlink($processing);
+            return $result+['checksum'=>$payload['checksum'],'mode'=>$payload['mode']];
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            if (is_file($processing) && !is_file($file)) {
+                @rename($processing, $file);
+            }
+            Log::warning('Menu import confirm rolled back: '.$e->getMessage());
+            return ['ok'=>false,'errors'=>[$e->getMessage()]];
+        }
+    }
+
+    public function errorReport(string $token, int $companyId, ?int $userId = null)
+    {
+        if (!preg_match('/^[A-Za-z0-9]+$/', $token)) abort(404);
+        $file = storage_path('app/pos-import-previews/'.$token.'.json');
+        if (!is_file($file) || filemtime($file) < time() - self::PREVIEW_TTL) abort(404);
+        $payload = json_decode((string) file_get_contents($file), true);
+        if (!is_array($payload) || (int) ($payload['company_id'] ?? 0) !== $companyId) abort(404);
+        if ($userId === null || (int) ($payload['user_id'] ?? 0) !== $userId) {
+            abort(404);
+        }
+        $lines = [];
+        foreach (array_merge($payload['errors'] ?? [], $payload['warnings'] ?? []) as $error) {
+            $lines[] = implode(',', [
+                $this->csvValue($error['sheet'] ?? ''),
+                $this->csvValue($error['row'] ?? ''),
+                $this->csvValue($error['field'] ?? ''),
+                $this->csvValue($error['message'] ?? ''),
+            ]);
+        }
+        return response("sheet,row,field,message\n".implode("\n", array_slice($lines, 0, 1000)), 200, [
+            'Content-Type'=>'text/csv; charset=UTF-8',
+            'Content-Disposition'=>'attachment; filename="TaxNest_Menu_Import_errors.csv"',
+        ]);
+    }
+
+    public function exportWorkbook(int $companyId)
+    {
+        $ss = $this->buildWorkbook();
+        $products = $ss->getSheetByName('Products');
+        foreach (PosProduct::where('company_id', $companyId)->orderBy('id')->get() as $row) {
+            $values = [$row->name, $row->category, $this->productHasRecipe($row->id, $companyId) ? 'Recipe' : 'Resale',
+                $row->price, $row->cost_price, $row->sku, $row->barcode, $row->uom, $row->tax_rate,
+                $row->is_active ? 'Yes' : 'No', '', '', $row->low_stock_threshold, $row->description];
+            $this->safeWriteRow($products, $products->getHighestRow() + 1, $values);
+        }
+        $ingredients = $ss->getSheetByName('Ingredients');
+        foreach (Ingredient::where('company_id', $companyId)->orderBy('id')->get() as $row) {
+            $this->safeWriteRow($ingredients, $ingredients->getHighestRow() + 1,
+                [$row->name, $row->category ?? '', $row->base_unit ?: $row->unit, $row->unit,
+                    $row->conversion_factor ?: 1, (float) $row->cost_per_unit * (float) ($row->conversion_factor ?: 1),
+                    '', $row->min_stock_level, $row->supplier ?? '', $row->is_active ? 'Yes' : 'No']);
+        }
+        $recipes = $ss->getSheetByName('Recipes');
+        foreach (ProductRecipe::where('company_id', $companyId)->with(['product', 'ingredient'])->orderBy('id')->get() as $row) {
+            $this->safeWriteRow($recipes, $recipes->getHighestRow() + 1,
+                [$row->product?->name, $row->ingredient?->name, $row->quantity_needed,
+                    $row->ingredient?->unit, $row->waste_percent ?? 0, $row->notes ?? '']);
+        }
+        $writer = new Xlsx($ss);
+        return response()->streamDownload(fn () => $writer->save('php://output'),
+            self::WORKBOOK_FILENAME, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
     /**
@@ -1370,5 +1599,513 @@ class PosInventoryMasterExcelService
             return false;
         }
         return null;
+    }
+
+    private function readMenuWorkbook(string $path): array
+    {
+        $this->preflightXlsx($path);
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(false);
+        $ss = null;
+        try {
+            $ss = $reader->load($path);
+            $expected = ['Start Here', 'Products', 'Ingredients', 'Recipes', 'Lists'];
+            $names = array_map(fn ($s) => (string) $s->getTitle(), $ss->getAllSheets());
+            if ($names !== $expected) {
+                throw new \RuntimeException('Workbook must contain exactly the five required sheets.');
+            }
+            foreach ($ss->getAllSheets() as $sheet) {
+                if ($sheet->getSheetState() !== \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_VISIBLE) {
+                    throw new \RuntimeException('Hidden sheets are not permitted.');
+                }
+                if ($sheet->getHighestDataRow() > self::MAX_DATA_ROWS + 1
+                    || \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($sheet->getHighestDataColumn()) > 20) {
+                    throw new \RuntimeException('Workbook row or column limit exceeded.');
+                }
+                foreach ($sheet->getCoordinates() as $coordinate) {
+                    $cell = $sheet->getCell($coordinate);
+                    if ($cell->isFormula() || preg_match('/^\s*=/', (string) $cell->getValue())) {
+                        throw new \RuntimeException('Formula cells are not permitted.');
+                    }
+                }
+            }
+            $requiredHeaders = [
+                'Products'=>['Product Name','Category','Product Type','Sale Price','Cost Price','SKU','Barcode','Unit','Tax Rate','Active','Track Stock','Opening Stock','Low Stock Alert','Description'],
+                'Ingredients'=>['Ingredient Name','Category','Purchase Unit','Usage Unit','Conversion Factor','Cost per Purchase Unit','Opening Stock','Low Stock Alert','Supplier','Active'],
+                'Recipes'=>['Product Name','Ingredient Name','Quantity Used','Usage Unit','Waste %','Notes'],
+                'Lists'=>['List','Allowed Value','Guidance'],
+            ];
+            foreach ($requiredHeaders as $name => $headers) {
+                $actual = array_map(fn ($value) => trim((string) $value), array_slice($ss->getSheetByName($name)->toArray(null, true, false, false)[0] ?? [], 0, count($headers)));
+                if ($actual !== $headers) throw new \RuntimeException("Unexpected {$name} headers.");
+            }
+            $rows = [];
+            $warnings = [];
+            $products = $ss->getSheetByName('Products')->toArray(null, true, false, false);
+            foreach (array_slice($products, 1) as $index => $values) {
+                if ($this->rowEmpty($values)) continue;
+                if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0) continue;
+                $rows[] = ['sheet'=>'Products', 'row'=>$index + 2, 'type'=>'product', 'values'=>$values];
+            }
+            $ingredients = $ss->getSheetByName('Ingredients')->toArray(null, true, false, false);
+            foreach (array_slice($ingredients, 1) as $index => $values) {
+                if ($this->rowEmpty($values)) continue;
+                if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0) continue;
+                if (trim((string) ($values[6] ?? '')) !== '') {
+                    $warnings[] = ['sheet'=>'Ingredients','row'=>$index + 2,'field'=>'Opening Stock','message'=>'Opening Stock is informational and will be skipped.'];
+                }
+                $rows[] = ['sheet'=>'Ingredients', 'row'=>$index + 2, 'type'=>'ingredient', 'values'=>$values];
+            }
+            $recipes = $ss->getSheetByName('Recipes')->toArray(null, true, false, false);
+            foreach (array_slice($recipes, 1) as $index => $values) {
+                if ($this->rowEmpty($values)) continue;
+                if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0
+                    || stripos(trim((string) ($values[1] ?? '')), self::SAMPLE_MARKER) === 0) continue;
+                $rows[] = ['sheet'=>'Recipes', 'row'=>$index + 2, 'type'=>'recipe', 'values'=>$values];
+            }
+            return ['rows'=>$rows, 'warnings'=>$warnings];
+        } finally {
+            if ($ss) $ss->disconnectWorksheets();
+        }
+    }
+
+    private function writeLegacyWorkbook(array $rows,string $path): void
+    {
+        $ss=new Spreadsheet(); $sheet=$ss->getActiveSheet(); $sheet->setTitle(self::SHEET_NAME);
+        $sheet->fromArray([self::HEADERS],null,'A1');
+        foreach ($rows as $n=>$row) $sheet->fromArray([$row],null,'A'.($n+2));
+        (new Xlsx($ss))->save($path); $ss->disconnectWorksheets();
+    }
+
+    private function preflightXlsx(string $path): void
+    {
+        if (!is_file($path)) {
+            throw new \RuntimeException('Only XLSX files are accepted.');
+        }
+        $handle = fopen($path, 'rb');
+        $signature = $handle ? fread($handle, 4) : '';
+        if ($handle) fclose($handle);
+        if ($signature !== "PK\x03\x04") throw new \RuntimeException('Invalid XLSX signature.');
+        $zip = new \ZipArchive();
+        if ($zip->open($path) !== true) throw new \RuntimeException('Invalid XLSX archive.');
+        if ($zip->numFiles > 300) { $zip->close(); throw new \RuntimeException('XLSX contains too many archive entries.'); }
+        $total = 0;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $stat = $zip->statIndex($i);
+            $name = (string) ($stat['name'] ?? '');
+            if ($name === '' || str_starts_with($name, '/') || str_contains($name, '\\')
+                || preg_match('~(^|/)\.\.?(/|$)~', $name)
+                || preg_match('~(vbaProject|externalLinks|embeddings|oleObject|activeX|customUI|connections)~i', $name)) {
+                $zip->close();
+                throw new \RuntimeException('Unsafe or prohibited XLSX archive member.');
+            }
+            $total += (int) ($stat['size'] ?? 0);
+            if ($total > 25 * 1024 * 1024) { $zip->close(); throw new \RuntimeException('XLSX is too large when expanded.'); }
+        }
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = (string) $zip->getNameIndex($i);
+            if (preg_match('~\.rels$~i', $name)) {
+                $contents = (string) $zip->getFromIndex($i);
+                if (preg_match('~TargetMode\s*=\s*["\']External~i', $contents)
+                    || preg_match('~Target\s*=\s*["\'](?:https?|file):~i', $contents)) {
+                    $zip->close();
+                    throw new \RuntimeException('External XLSX relationships are not permitted.');
+                }
+            }
+        }
+        $zip->close();
+    }
+
+    private function addWorkbookValidation($sheet, string $range, string $formula): void
+    {
+        $validation = $sheet->getCell(strtok($range, ':'))->getDataValidation();
+        $validation->setType(DataValidation::TYPE_LIST)->setErrorStyle(DataValidation::STYLE_STOP)
+            ->setAllowBlank(true)->setShowErrorMessage(true)->setShowDropDown(true)
+            ->setFormula1($formula)->setSqref($range);
+    }
+
+    private function safeWriteRow($sheet, int $row, array $values): void
+    {
+        foreach (array_values($values) as $column => $value) {
+            $coordinate = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($column + 1).$row;
+            if (is_string($value) && preg_match('/^[=+\-@]/', $value)) {
+                $sheet->setCellValueExplicit($coordinate, "'".$value, DataType::TYPE_STRING);
+            } else {
+                $sheet->setCellValue($coordinate, $value);
+            }
+        }
+    }
+
+    private function planOperations(array $normalized, int $companyId, string $mode): array
+    {
+        $operations = [];
+        $warnings = $normalized['warnings'];
+        $errors = [];
+        $categories = [];
+        $products = PosProduct::where('company_id', $companyId)->get();
+        $ingredients = Ingredient::where('company_id', $companyId)->get();
+        $plannedProducts = [];
+        $plannedIngredients = [];
+        $seenProductIdentities = [];
+        $seenIngredientIdentities = [];
+        foreach ($normalized['rows'] as $item) {
+            $v = $item['values'];
+            if ($item['type'] === 'product') {
+                [$match, $ambiguous] = $this->matchProductRow($products, $v);
+                if ($ambiguous) {
+                    $errors[] = $this->cellError($item, 'SKU/Barcode/Product Name', 'Ambiguous tenant-scoped product identity.');
+                    continue;
+                }
+                $activeValue = $this->parseYesNo((string)($v[9]??''));
+                $trackStockValue = $this->parseYesNo((string)($v[10]??''));
+                $fields = [
+                    'name'=>trim((string)($v[0]??'')), 'category'=>trim((string)($v[1]??'')),
+                    'price'=>$this->cleanImportNumber($v[3]??null), 'cost_price'=>$this->cleanImportNumber($v[4]??null),
+                    'sku'=>$this->cleanImportCode($v[5]??null), 'barcode'=>$this->cleanImportCode($v[6]??null),
+                    'uom'=>trim((string)($v[7]??'')), 'tax_rate'=>$this->cleanImportNumber($v[8]??null) ?? 0,
+                    'is_active'=>$activeValue ?? true,
+                    'low_stock_threshold'=>$this->cleanImportNumber($v[12]??null), 'description'=>trim((string)($v[13]??'')),
+                ];
+                if ($fields['name']==='' || $fields['price']===null) {
+                    $errors[]=$this->cellError($item,'Product Name/Sale Price','Product Name and Sale Price are required.'); continue;
+                }
+                if ($fields['price'] <= 0) {
+                    $errors[]=$this->cellError($item,'Sale Price','Sale Price must be greater than zero.'); continue;
+                }
+                if ($fields['tax_rate'] !== null && ($fields['tax_rate'] < 0 || $fields['tax_rate'] > 100)) {
+                    $errors[]=$this->cellError($item,'Tax Rate','Tax Rate must be between 0 and 100.'); continue;
+                }
+                if ($activeValue === null && trim((string)($v[9]??'')) !== '') {
+                    $errors[]=$this->cellError($item,'Active','Active must be Yes or No.'); continue;
+                }
+                if ($trackStockValue === null && trim((string)($v[10]??'')) !== '') {
+                    $errors[]=$this->cellError($item,'Track Stock','Track Stock must be Yes or No.'); continue;
+                }
+                if (!in_array(strtolower(trim((string)($v[2]??''))), ['recipe','resale'], true)) {
+                    $errors[]=$this->cellError($item,'Product Type','Product Type must be Recipe or Resale.'); continue;
+                }
+                $identityKeys = array_values(array_filter([
+                    $fields['sku'] ? 'code:'.strtolower($fields['sku']) : null,
+                    $fields['barcode'] ? 'code:'.strtolower($fields['barcode']) : null,
+                    'name:'.$this->normalizedName($fields['name']),
+                ]));
+                $duplicateKey = collect($identityKeys)->first(fn ($key) => isset($seenProductIdentities[$key]));
+                if ($duplicateKey !== null) {
+                    $errors[]=$this->cellError($item,'SKU/Barcode/Product Name','Duplicate product identity in this workbook.'); continue;
+                }
+                foreach ($identityKeys as $identityKey) $seenProductIdentities[$identityKey] = $item['row'];
+                if (trim((string)($v[11]??''))!=='') $warnings[]=$this->cellWarning($item,'Opening Stock','Opening Stock is informational and will be skipped.');
+                if (trim((string)($v[2]??''))!=='') $warnings[]=$this->cellWarning($item,'Product Type','Product Type is derived from active recipe lines.');
+                if (trim((string)($v[10]??''))!=='') $warnings[]=$this->cellWarning($item,'Track Stock','Track Stock is not changed by this import.');
+                $fields = array_filter($fields, fn ($value, $field) => Schema::hasColumn('pos_products', $field), ARRAY_FILTER_USE_BOTH);
+                if ($fields['category']!=='') $categories[$fields['category']] = true;
+                $operation = $this->operation('product',$item,$match,$fields,$mode);
+                $operations[]=$operation;
+                foreach ([$fields['sku'], $fields['barcode'], $fields['name']] as $reference) {
+                    $ref = $this->stableReference('', '', $reference);
+                    if ($ref !== '') $plannedProducts[$ref] = $operation;
+                }
+            } elseif ($item['type'] === 'ingredient') {
+                [$match, $ambiguous] = $this->matchIngredientRow($ingredients, $v);
+                if ($ambiguous) { $errors[]=$this->cellError($item,'Code/Ingredient Name','Ambiguous tenant-scoped ingredient identity.'); continue; }
+                $purchaseUnit=trim((string)($v[2]??'')); $usageUnit=trim((string)($v[3]??''));
+                $factor=$this->cleanImportNumber($v[4]??null);
+                if ($purchaseUnit===$usageUnit && $factor===null) $factor=1;
+                $purchaseCost=$this->cleanImportNumber($v[5]??null);
+                $fields=['name'=>trim((string)($v[0]??'')),'unit'=>$usageUnit,
+                    'base_unit'=>$purchaseUnit,'conversion_factor'=>$factor,
+                    'cost_per_unit'=>$factor && $purchaseCost !== null ? $purchaseCost / $factor : $purchaseCost,'min_stock_level'=>$this->cleanImportNumber($v[7]??null) ?: 0,
+                    'is_active'=>$this->parseYesNo((string)($v[9]??''))];
+                if (Schema::hasColumn('ingredients', 'category')) $fields['category'] = trim((string)($v[1]??''));
+                if (Schema::hasColumn('ingredients', 'supplier')) $fields['supplier'] = trim((string)($v[8]??''));
+                if ($fields['name']==='' || $fields['unit']==='') { $errors[]=$this->cellError($item,'Ingredient Name/Usage Unit','Ingredient Name and Usage Unit are required.'); continue; }
+                if (!in_array($purchaseUnit, RecipeInventoryService::UNITS, true) || !in_array($usageUnit, RecipeInventoryService::UNITS, true)
+                    || $factor === null || $factor <= 0) {
+                    $errors[]=$this->cellError($item,'Purchase Unit/Usage Unit/Conversion Factor','Units must be allowed and Conversion Factor must be positive when units differ.'); continue;
+                }
+                $ingredientIdentity = 'name:'.$this->normalizedName($fields['name']);
+                if (isset($seenIngredientIdentities[$ingredientIdentity])) {
+                    $errors[]=$this->cellError($item,'Ingredient Name','Duplicate ingredient identity in this workbook.'); continue;
+                }
+                $seenIngredientIdentities[$ingredientIdentity] = $item['row'];
+                if ($match) {
+                    $unitMeaningChanged = (string) $match->unit !== (string) $fields['unit']
+                        || (string) ($match->base_unit ?: $match->unit) !== (string) $fields['base_unit']
+                        || abs((float) ($match->conversion_factor ?: 1) - (float) $fields['conversion_factor']) > 0.000001;
+                    if ($unitMeaningChanged) {
+                        $hasStock = abs((float) $match->current_stock) > 0.000001;
+                        $hasRecipes = ProductRecipe::where('company_id', $companyId)
+                            ->where('ingredient_id', $match->id)
+                            ->exists();
+                        if ($hasStock || $hasRecipes) {
+                            $errors[]=$this->cellError(
+                                $item,
+                                'Purchase Unit/Usage Unit/Conversion Factor',
+                                'Unit meaning cannot change while stock or recipes exist; use the audited unit-conversion workflow.'
+                            );
+                            continue;
+                        }
+                    }
+                }
+                if (trim((string)($v[1]??'')) !== '' && !Schema::hasColumn('ingredients', 'category')) {
+                    $warnings[]=$this->cellWarning($item,'Category','Category is not stored until the menu import migration is applied.');
+                }
+                if (trim((string)($v[8]??'')) !== '' && !Schema::hasColumn('ingredients', 'supplier')) {
+                    $warnings[]=$this->cellWarning($item,'Supplier','Supplier is not stored until the menu import migration is applied.');
+                }
+                $operation = $this->operation('ingredient',$item,$match,$fields,$mode);
+                $operations[]=$operation;
+                foreach ([$fields['name']] as $reference) {
+                    $ref = $this->stableReference('', '', $reference);
+                    if ($ref !== '') $plannedIngredients[$ref] = $operation;
+                }
+            } else {
+                [$product, $productAmbiguous] = $this->matchProductRow($products, [$v[0]??'']);
+                [$ingredient, $ingredientAmbiguous] = $this->matchIngredientRow($ingredients, [$v[1]??'']);
+                $productRef = $this->stableReference('', '', $v[0] ?? '');
+                $ingredientRef = $this->stableReference('', '', $v[1] ?? '');
+                $productPlan = $plannedProducts[$productRef] ?? null;
+                $ingredientPlan = $plannedIngredients[$ingredientRef] ?? null;
+                if (!$product && $productPlan) $product = (object) ['id'=>0, 'name'=>$productPlan['fields']['name']];
+                if (!$ingredient && $ingredientPlan) $ingredient = (object) ['id'=>0, 'name'=>$ingredientPlan['fields']['name'], 'unit'=>$ingredientPlan['fields']['unit']];
+                $qty=$this->cleanImportNumber($v[2]??null);
+                if ($productAmbiguous || $ingredientAmbiguous || !$product || !$ingredient || $qty===null || $qty<=0) { $errors[]=$this->cellError($item,'Product/Ingredient/Quantity Used','Recipe references must be unique and Quantity Used must be positive.'); continue; }
+                if (trim((string)($v[3]??'')) === '' || strtolower(trim((string)($v[3]??''))) !== strtolower((string)($ingredient->unit))) {
+                    $errors[]=$this->cellError($item,'Usage Unit','Recipe Usage Unit must match the ingredient Usage Unit.'); continue;
+                }
+                $key=$productRef.'|'.$ingredientRef;
+                if (collect($operations)->contains(fn($op)=>$op['entity']==='recipe' && $op['key']===$key)) { $errors[]=$this->cellError($item,'Product Name/Ingredient Name','Duplicate recipe line; combine lines before uploading.'); continue; }
+                $existingRecipe = ($product->id && $ingredient->id)
+                    ? ProductRecipe::where('company_id',$companyId)->where('product_id',$product->id)->where('ingredient_id',$ingredient->id)->first() : null;
+                $waste=$this->cleanImportNumber($v[4]??null); $waste=$waste===null?0:$waste;
+                if ($waste<0 || $waste>100) { $errors[]=$this->cellError($item,'Waste %','Waste % must be between 0 and 100.'); continue; }
+                $recipeFields=['product_id'=>$product->id,'ingredient_id'=>$ingredient->id,'quantity_needed'=>$qty];
+                if (Schema::hasColumn('product_recipes','waste_percent')) $recipeFields['waste_percent']=$waste;
+                if (Schema::hasColumn('product_recipes','notes')) $recipeFields['notes']=trim((string)($v[5]??''));
+                $operations[]=['entity'=>'recipe','sheet'=>$item['sheet'],'row'=>$item['row'],'key'=>$key,'match_id'=>$existingRecipe?->id,'fingerprint'=>$existingRecipe ? $this->modelFingerprint($existingRecipe,array_keys($recipeFields)) : null,
+                    'product_ref'=>$productRef,'ingredient_ref'=>$ingredientRef,
+                    'fields'=>$recipeFields,
+                    'action'=>$existingRecipe ? ($mode==='create_only' ? 'skip' : 'update') : 'create',
+                    'existing_quantity'=>$existingRecipe?->quantity_needed];
+                if (trim((string)($v[3]??''))==='') $errors[]=$this->cellError($item,'Usage Unit','Usage Unit is required.');
+            }
+        }
+        return ['operations'=>$operations,'warnings'=>$warnings,'errors'=>$errors,'categories'=>array_keys($categories)];
+    }
+
+    private function validateNormalized(array $normalized,int $companyId,string $mode): array
+    {
+        $errors=[]; $seen=[];
+        foreach ($normalized['rows'] as $n=>$row) {
+            $type=$row[0]??''; $name=trim((string)($type==='PRODUCT'?$row[1]:($type==='INGREDIENT'?$row[10]:$row[1])));
+            if (!in_array($type,['PRODUCT','INGREDIENT','RECIPE'],true)) $errors[]='Row '.($n+2).': unsupported row type.';
+            if ($type==='PRODUCT' && $name==='' ) $errors[]='Products row '.($n+2).': Name is required.';
+            if ($type==='INGREDIENT' && $name==='') $errors[]='Ingredients row '.($n+2).': Name is required.';
+            if ($type==='RECIPE' && ((float)($row[15]??0)<=0)) $errors[]='Recipes row '.($n+2).': Quantity Needed must be positive.';
+            if ($mode==='create' && $type==='PRODUCT') {
+                $code=trim((string)($row[2]??'')); $q=PosProduct::where('company_id',$companyId);
+                if (($code!=='' && $q->where(fn($x)=>$x->where('sku',$code)->orWhere('barcode',$code))->exists()) || $q->whereRaw('LOWER(name)=?', [strtolower($name)])->exists()) $errors[]='Products row '.($n+2).': item already exists (create-only mode).';
+            }
+            if ($mode==='create' && $type==='INGREDIENT') {
+                $code=trim((string)($row[11]??'')); $q=Ingredient::where('company_id',$companyId);
+                if (($code!=='' && $q->where('code',$code)->exists()) || $q->whereRaw('LOWER(name)=?', [strtolower($name)])->exists()) $errors[]='Ingredients row '.($n+2).': item already exists (create-only mode).';
+            }
+            $key=$type.'|'.strtolower(implode('|',[$row[1]??'',$row[2]??'',$row[10]??'',$row[11]??'']));
+            if ($key!=='PRODUCT||||' && isset($seen[$key])) $errors[]='Row '.($n+2).' duplicates row '.$seen[$key].'.';
+            $seen[$key]=$n+2;
+        }
+        return array_slice($errors,0,1000);
+    }
+
+    private function operation(string $entity, array $item, $match, array $fields, string $mode): array
+    {
+        $action = !$match ? 'create' : ($mode === 'create_only' ? 'skip' : 'update');
+        $changed = [];
+        if ($match) {
+            foreach ($fields as $key => $value) {
+                if ($value !== null && (string) $match->{$key} !== (string) $value) $changed[$key] = ['from'=>$match->{$key},'to'=>$value];
+            }
+        }
+        if ($match && !$changed) {
+            $action = 'skip';
+        }
+        return ['entity'=>$entity,'sheet'=>$item['sheet'],'row'=>$item['row'],'match_id'=>$match?->id,
+            'fingerprint'=>$match ? $this->modelFingerprint($match, array_keys($fields)) : null,
+            'fields'=>$fields,'changed'=>$changed,'action'=>$action,
+            'references'=>array_values(array_filter([
+                $fields['sku'] ?? null, $fields['barcode'] ?? null, $fields['code'] ?? null, $fields['name'] ?? null,
+            ]))];
+    }
+
+    private function matchProductRow($products, array $values): array
+    {
+        $sku=trim((string)($values[5]??'')); $barcode=trim((string)($values[6]??'')); $name=$this->normalizedName($values[0]??'');
+        $hits=$products->filter(fn($p)=>($sku!=='' && (($p->sku??'')===$sku || ($p->barcode??'')===$sku))
+            || ($barcode!=='' && (($p->sku??'')===$barcode || ($p->barcode??'')===$barcode))
+            || ($name!=='' && $this->normalizedName($p->name)===$name))->values();
+        return [$hits->count()===1?$hits->first():null,$hits->count()>1];
+    }
+
+    private function matchIngredientRow($ingredients, array $values): array
+    {
+        $code=trim((string)($values[1]??'')); $name=$this->normalizedName($values[0]??'');
+        $hits=$ingredients->filter(fn($i)=>$name!=='' && $this->normalizedName($i->name)===$name)->values();
+        return [$hits->count()===1?$hits->first():null,$hits->count()>1];
+    }
+
+    private function normalizedName($value): string
+    {
+        return strtolower(trim((string) preg_replace('/\s+/u',' ',(string)$value)));
+    }
+
+    private function stableReference($first, $second, $name): string
+    {
+        foreach ([$first, $second] as $value) {
+            if (trim((string) $value) !== '') {
+                return strtolower(trim((string) $value));
+            }
+        }
+        return $this->normalizedName($name);
+    }
+
+    private function modelFingerprint($model, array $fields): string
+    {
+        $values=[]; foreach ($fields as $field) $values[$field]=$model->{$field};
+        return hash('sha256',json_encode($values));
+    }
+
+    private function catalogFingerprint(int $companyId): string
+    {
+        $products=PosProduct::where('company_id',$companyId)->orderBy('id')->get(['id','name','sku','barcode','price','cost_price','category','uom','tax_rate','is_active','description','low_stock_threshold']);
+        $ingredients=Ingredient::where('company_id',$companyId)->orderBy('id')->get(['id','name','code','unit','base_unit','conversion_factor','cost_per_unit','current_stock','min_stock_level','is_active']);
+        $recipes=ProductRecipe::where('company_id',$companyId)->orderBy('id')->get(['id','product_id','ingredient_id','quantity_needed','is_active']);
+        $branchStocks = Schema::hasTable('ingredient_stocks')
+            ? DB::table('ingredient_stocks')->where('company_id', $companyId)->orderBy('id')->get(['id','ingredient_id','branch_id','quantity'])
+            : collect();
+        return hash('sha256',json_encode([$products->toArray(),$ingredients->toArray(),$recipes->toArray(),$branchStocks->toArray()]));
+    }
+
+    private function applyOperations(array $operations,int $companyId,string $mode): array
+    {
+        $counts=['created'=>0,'updated'=>0,'skipped'=>0,'recipes_created'=>0,'recipes_updated'=>0];
+        $references = [];
+        foreach (['ingredient','product','recipe'] as $entity) {
+            foreach ($operations as $operation) {
+                if ($operation['entity']!==$entity) continue;
+                if ($operation['action']==='skip') { $counts['skipped']++; continue; }
+                if ($entity==='ingredient') {
+                    $model=$operation['match_id'] ? Ingredient::where('company_id',$companyId)->lockForUpdate()->find($operation['match_id']) : null;
+                    if ($operation['match_id'] && (!$model || $this->modelFingerprint($model,array_keys($operation['fields']))!==$operation['fingerprint'])) throw new \RuntimeException('Ingredient changed after preview.');
+                    if ($model) {
+                        $unitMeaningChanged = (string) $model->unit !== (string) ($operation['fields']['unit'] ?? $model->unit)
+                            || (string) ($model->base_unit ?: $model->unit) !== (string) ($operation['fields']['base_unit'] ?? ($model->base_unit ?: $model->unit))
+                            || abs((float) ($model->conversion_factor ?: 1) - (float) ($operation['fields']['conversion_factor'] ?? ($model->conversion_factor ?: 1))) > 0.000001;
+                        if ($unitMeaningChanged) {
+                            $branchStocks = Schema::hasTable('ingredient_stocks')
+                                ? DB::table('ingredient_stocks')->where('company_id',$companyId)
+                                    ->where('ingredient_id',$model->id)->lockForUpdate()->get()
+                                : collect();
+                            $hasRecipes = ProductRecipe::where('company_id',$companyId)
+                                ->where('ingredient_id',$model->id)->lockForUpdate()->exists();
+                            $hasStock = abs((float) $model->current_stock) > 0.000001
+                                || $branchStocks->contains(fn ($stock) => abs((float) $stock->quantity) > 0.000001);
+                            if ($hasStock || $hasRecipes) {
+                                throw new \RuntimeException('Ingredient unit meaning changed after preview or is already in use.');
+                            }
+                        }
+                        $model->update(array_filter($operation['fields'],fn($v)=>$v!==null));
+                        $created = $model;
+                        $counts['updated']++;
+                    }
+                    else {
+                        $name = $this->normalizedName($operation['fields']['name'] ?? '');
+                        if ($name !== '' && Ingredient::where('company_id',$companyId)
+                            ->whereRaw('LOWER(TRIM(name)) = ?', [$name])->exists()) {
+                            throw new \RuntimeException('Ingredient identity was created after preview.');
+                        }
+                        $created = Ingredient::create($operation['fields']+['company_id'=>$companyId,'current_stock'=>0]);
+                        $counts['created']++;
+                    }
+                    foreach ($operation['references'] ?? [$operation['fields']['name']] as $reference) {
+                        $references[$this->stableReference('', '', $reference)] = $created->id;
+                    }
+                } elseif ($entity==='product') {
+                    $model=$operation['match_id'] ? PosProduct::where('company_id',$companyId)->lockForUpdate()->find($operation['match_id']) : null;
+                    if ($operation['match_id'] && (!$model || $this->modelFingerprint($model,array_keys($operation['fields']))!==$operation['fingerprint'])) throw new \RuntimeException('Product changed after preview.');
+                    if ($model) { $model->update(array_filter($operation['fields'],fn($v)=>$v!==null)); $created = $model; $counts['updated']++; }
+                    else {
+                        $fields = $operation['fields'];
+                        $duplicate = PosProduct::where('company_id',$companyId)->where(function ($query) use ($fields) {
+                            if (!empty($fields['sku'])) $query->orWhere('sku',$fields['sku'])->orWhere('barcode',$fields['sku']);
+                            if (!empty($fields['barcode'])) $query->orWhere('sku',$fields['barcode'])->orWhere('barcode',$fields['barcode']);
+                            $query->orWhereRaw('LOWER(TRIM(name)) = ?', [$this->normalizedName($fields['name'] ?? '')]);
+                        })->exists();
+                        if ($duplicate) throw new \RuntimeException('Product identity was created after preview.');
+                        $created = PosProduct::create($fields+['company_id'=>$companyId,'show_on_sale'=>true]);
+                        $counts['created']++;
+                    }
+                    foreach ([$operation['fields']['sku'] ?? '', $operation['fields']['barcode'] ?? '', $operation['fields']['name'] ?? ''] as $reference) {
+                        $references[$this->stableReference('', '', $reference)] = $created->id;
+                    }
+                } else {
+                    if ($operation['action'] === 'skip' && $mode === 'create_only') { $counts['skipped']++; continue; }
+                    $operation['fields']['product_id'] = $references[$operation['product_ref']] ?? $operation['fields']['product_id'];
+                    $operation['fields']['ingredient_id'] = $references[$operation['ingredient_ref']] ?? $operation['fields']['ingredient_id'];
+                    $existing=ProductRecipe::where('company_id',$companyId)->where('product_id',$operation['fields']['product_id'])->where('ingredient_id',$operation['fields']['ingredient_id'])->lockForUpdate()->first();
+                    if ($operation['match_id'] && (!$existing || $this->modelFingerprint($existing, array_keys($operation['fields'])) !== $operation['fingerprint'])) {
+                        throw new \RuntimeException('Recipe changed after preview.');
+                    }
+                    if ($existing) {
+                        $changes = [];
+                        foreach (['quantity_needed', 'waste_percent', 'notes'] as $field) {
+                            if (array_key_exists($field, $operation['fields'])
+                                && (string) $existing->{$field} !== (string) $operation['fields'][$field]) {
+                                $changes[$field] = $operation['fields'][$field];
+                            }
+                        }
+                        if ($changes) {
+                            $changes['recipe_version'] = ((int) $existing->recipe_version) + 1;
+                            $existing->update($changes);
+                            $counts['recipes_updated']++;
+                        } else {
+                            $counts['skipped']++;
+                        }
+                    }
+                    else { ProductRecipe::create($operation['fields']+['company_id'=>$companyId,'recipe_version'=>1]); $counts['recipes_created']++; }
+                }
+            }
+        }
+        return ['ok'=>true,'message'=>'Menu import confirmed.','counts'=>$counts,'errors'=>[]];
+    }
+
+    private function cellError(array $item,string $field,string $message): array
+    {
+        return ['sheet'=>$item['sheet'],'row'=>$item['row'],'field'=>$field,'message'=>$message];
+    }
+
+    private function cellWarning(array $item,string $field,string $message): array
+    {
+        return $this->cellError($item,$field,$message);
+    }
+
+    private function productHasRecipe(int $productId, ?int $companyId = null): bool
+    {
+        $query = ProductRecipe::where('product_id',$productId);
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
+        return $query->where(function ($query) {
+            if (Schema::hasColumn('product_recipes','is_active')) $query->where('is_active',true);
+        })->exists();
+    }
+
+    private function previewCounts(array $rows): array
+    {
+        return ['products'=>count(array_filter($rows,fn($r)=>($r[0]??'')==='PRODUCT')),'ingredients'=>count(array_filter($rows,fn($r)=>($r[0]??'')==='INGREDIENT')),'recipes'=>count(array_filter($rows,fn($r)=>($r[0]??'')==='RECIPE'))];
+    }
+
+    private function csvValue($value): string
+    {
+        return '"'.str_replace('"', '""', (string) $value).'"';
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Ingredient extends Model
 {
     protected $fillable = [
-        'company_id', 'code', 'name', 'unit', 'base_unit', 'conversion_factor', 'cost_per_unit',
+        'company_id', 'code', 'name', 'category', 'supplier', 'unit', 'base_unit', 'conversion_factor', 'cost_per_unit',
         'current_stock', 'min_stock_level', 'is_active',
     ];
 
@@ -16,6 +16,8 @@ class Ingredient extends Model
         'current_stock' => 'decimal:4',
         'min_stock_level' => 'decimal:4',
         'conversion_factor' => 'decimal:4',
+        'category' => 'string',
+        'supplier' => 'string',
         'is_active' => 'boolean',
     ];
 

@@ -566,7 +566,7 @@
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
-            <header class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}">
+            <header data-tn-topnav="pra" class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}" style="z-index: 140;">
                 <div class="tn-impersonation-header-row flex items-center justify-between px-3 sm:px-5 h-12">
 
                     <div class="tn-impersonation-header-left flex items-center gap-3 flex-shrink-0">
@@ -677,7 +677,7 @@
                         </button>
 
                         <div class="relative">
-                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_change_theme') }}">
+                            <button data-tn-topnav-control="theme" @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_change_theme') }}">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                             </button>
                             <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
@@ -748,7 +748,7 @@
                         {{-- What's New bell — opening history does NOT mark anything seen. --}}
                         <div class="relative" x-data="{ bellOpen: false, unseen: {{ (int) $whatsNewUnseenCount }},
                                 }" @whats-new-seen.window="if (!$event.detail.wasSeen) unseen = Math.max(0, unseen - 1)">
-                            <button @click="bellOpen = !bellOpen" title="{{ __('pos.ti_app_updates') }}" class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
+                            <button data-tn-topnav-control="notification" @click="bellOpen = !bellOpen" title="{{ __('pos.ti_app_updates') }}" class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                 <span x-show="unseen > 0" x-cloak x-text="unseen"
                                       class="absolute rounded-full bg-red-500 text-white font-bold flex items-center justify-center"
@@ -800,7 +800,7 @@
                         @endif
 
                         <div class="relative">
-                            <button @click="profileOpen = !profileOpen; themeOpen = false"
+                            <button data-tn-topnav-control="profile" @click="profileOpen = !profileOpen; themeOpen = false"
                                     class="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-white/10 transition cursor-pointer">
                                 <div class="w-7 h-7 rounded-lg avatar-themed flex items-center justify-center text-[11px] font-bold text-white accent-glow">
                                     {{ $userInitial }}

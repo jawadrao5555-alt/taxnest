@@ -307,9 +307,9 @@
    cart column sat empty. The bars now live INSIDE the left (products) column
    and the cart column rises to the very top. Custom classes (not Tailwind
    utilities) so no rebuild-dependency for the responsive flip. */
-.tn-body-row { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; overflow: hidden; }
-.tn-left-col { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-.tn-sale-root { height: calc(100vh - 48px); height: calc(100dvh - 48px); max-height: calc(100dvh - 48px); }
+.tn-body-row { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; overflow: hidden; }
+.tn-left-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.tn-sale-root { height: calc(100vh - 60px); height: calc(100dvh - 60px); max-height: calc(100dvh - 60px); }
 @media (min-width: 768px) {
     .tn-body-row { flex-direction: row; }
     .tn-left-col { flex: 1 1 0%; }
@@ -327,10 +327,16 @@
         position: sticky;
         bottom: 0;
         z-index: 20;
-        padding-bottom: env(safe-area-inset-bottom, 0);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
         background: #f9fafb;
         border-top: 1px solid rgba(148,163,184,.28);
     }
+    .dark .mobile-sticky-pay { background: #111827; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+    .tn-cart-col { min-height: 0; overflow-y: auto; }
+    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
     .dark .mobile-sticky-pay { background: #111827; }
 }
 
@@ -341,12 +347,13 @@
    .tn-cart-main / .tn-cart-side wrappers are display:contents by DEFAULT, so the
    normal (grid-ON) layout and mobile are bit-for-bit unchanged. Mobile (<768px)
    kabhi widecart nahi hota. Custom classes — no Tailwind rebuild dependency. */
-.tn-cart-main, .tn-cart-side { display: contents; }
+.tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
+.tn-cart-side { display: contents; }
 /* Legacy fallback (no display:contents): wrappers become plain flex columns that
    reproduce the original stacking — cart list pane flexes, footer pane sizes to
    content — so old WebViews keep a working (normal) cart layout. */
 @supports not (display: contents) {
-    .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; }
+    .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
     .tn-cart-side { display: flex; flex-direction: column; flex-shrink: 0; }
 }
 @media (min-width: 768px) {
@@ -571,9 +578,9 @@ window.addEventListener('popstate', function() {
 });
 </script>
 
-{{-- Screen Fit (Jul 2026): fitStyleStr applies CSS zoom + a /zoom-compensated px height
-     so the sale screen renders correctly on ANY display (small shop laptops, low-res
-     terminals, big TVs). Auto mode picks the zoom from viewport size; manual % is
+{{-- Screen Fit: CSS zoom needs an inverse logical height so manual values above
+     100% cannot push the payment rail below the viewport. Offsets match the
+     rendered shell: 60px desktop/tablet, 64px PRA phone. Auto mode picks the zoom; manual % is
      per-device via localStorage 'tn_screen_fit'. Empty string = normal 100% layout. --}}
 <div data-tn-sale-document="pra" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale tn-sale-root flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
     @include('pos.partials.kot-action-required-banner')
@@ -1449,7 +1456,7 @@ window.addEventListener('popstate', function() {
                  zero layout change. In .tn-widecart desktop mode this becomes the LEFT
                  (wide) pane: header + banners + cart list. --}}
             <div class="tn-cart-main">
-            <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
+            <div class="tn-cart-header flex flex-shrink-0 items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
@@ -5576,11 +5583,14 @@ function restaurantPos() {
                 ? this.computeAutoFit()
                 : Math.min(1.5, Math.max(0.6, parseFloat(this.screenFit) || 1));
             this.fitZoom = f;
-            // Guard: if the browser lacks CSS zoom, applying only the px height would
-            // make the root taller than the viewport and clip the Pay button — worse
-            // than no scaling at all. In that case keep the plain 100% layout.
             const zoomOk = (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('zoom', '0.9'));
-            this.fitStyleStr = (f === 1 || !zoomOk) ? '' : ('zoom:' + f + ';height:' + Math.round((window.innerHeight - 48) / f) + 'px');
+            if (f === 1 || !zoomOk) {
+                this.fitStyleStr = '';
+                return;
+            }
+            const shellOffset = window.innerWidth < 768 ? 64 : 60;
+            const fittedHeight = Math.floor(Math.max(0, window.innerHeight - shellOffset) / f);
+            this.fitStyleStr = 'zoom:' + f + ';height:' + fittedHeight + 'px!important;max-height:' + fittedHeight + 'px!important';
         },
         setFit(v) {
             this.screenFit = v;

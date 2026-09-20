@@ -266,7 +266,8 @@
 .toast-exit { animation: toastSlideOut 0.3s ease forwards; }
 .price-badge { background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(37,99,235,0.15)); border: 1px solid rgba(37,99,235,0.15); border-radius: 8px; padding: 2px 8px; }
 .dark .price-badge { background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(167,139,250,0.2)); border-color: rgba(167,139,250,0.2); }
-.tn-sale-root { height: calc(100vh - 48px); height: calc(100dvh - 48px); max-height: calc(100dvh - 48px); }
+.tn-sale-root { height: calc(100vh - 60px); height: calc(100dvh - 60px); max-height: calc(100dvh - 60px); }
+ .tn-body-row { min-width: 0; min-height: 0; }
 @media (max-width: 767px) {
     .tn-cart-col { overflow-y: auto; }
     .tn-cart-col [x-ref="cartList"] { flex: none; overflow: visible; }
@@ -288,10 +289,16 @@
         position: sticky;
         bottom: 0;
         z-index: 20;
-        padding-bottom: env(safe-area-inset-bottom, 0);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
         background: #f9fafb;
         border-top: 1px solid rgba(148,163,184,.28);
     }
+    .dark .mobile-sticky-pay { background: #111827; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+    .tn-cart-col { min-height: 0; overflow-y: auto; }
+    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
     .dark .mobile-sticky-pay { background: #111827; }
 }
 .priority-badge { position: relative; }
@@ -316,9 +323,9 @@
 /* ── Wide-cart (Products OFF) — port from PRA universal (30 Jul 2026) ──
    .tn-cart-main is display:contents by DEFAULT so normal (grid-ON) layout is
    byte-identical; only .tn-widecart (desktop) activates the split. */
-.tn-cart-main { display: contents; }
+.tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
 @supports not (display: contents) {
-    .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; }
+    .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
 }
 @media (min-width: 768px) {
     .tn-widecart { flex-direction: column; }
@@ -447,9 +454,9 @@ window.addEventListener('popstate', function() {
 });
 </script>
 
-{{-- Screen Fit (Jul 2026, ported from PRA universal): fitStyleStr applies CSS zoom +
-     a /zoom-compensated px height so the sale screen renders correctly on ANY display.
-     Auto mode picks the zoom from viewport size; manual % saved per device. --}}
+{{-- Screen Fit: CSS zoom needs an inverse logical height so manual values above
+     100% cannot push the payment rail below the viewport. Offsets match the
+     rendered shell: 60px desktop/tablet, 76px FBR phone. --}}
 <div data-tn-sale-document="fbr" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-premium-sale tn-sale-root flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
     {{-- ═══════════ NAV SWITCHES (Aug 2026, PRA parity — owner request) ═══════════
          Desktop (md+): FBR Reporting / Auto-Print / Auto-KOT live INSIDE the blue top-nav
@@ -1342,7 +1349,7 @@ window.addEventListener('popstate', function() {
 
         <div class="tn-cart-rail tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
             <div class="tn-cart-main">
-            <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
+            <div class="tn-cart-header flex flex-shrink-0 items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
@@ -4485,11 +4492,14 @@ function restaurantPos() {
                 ? this.computeAutoFit()
                 : Math.min(1.5, Math.max(0.6, parseFloat(this.screenFit) || 1));
             this.fitZoom = f;
-            // Guard: if the browser lacks CSS zoom, applying only the px height would
-            // make the root taller than the viewport and clip the Pay button — worse
-            // than no scaling at all. In that case keep the plain 100% layout.
             const zoomOk = (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('zoom', '0.9'));
-            this.fitStyleStr = (f === 1 || !zoomOk) ? '' : ('zoom:' + f + ';height:' + Math.round((window.innerHeight - 48) / f) + 'px');
+            if (f === 1 || !zoomOk) {
+                this.fitStyleStr = '';
+                return;
+            }
+            const shellOffset = window.innerWidth < 768 ? 76 : 60;
+            const fittedHeight = Math.floor(Math.max(0, window.innerHeight - shellOffset) / f);
+            this.fitStyleStr = 'zoom:' + f + ';height:' + fittedHeight + 'px!important;max-height:' + fittedHeight + 'px!important';
         },
         setFit(v) {
             this.screenFit = v;

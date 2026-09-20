@@ -68,7 +68,7 @@
                     @csrf
                     <div>
                         <label class="block text-sm font-medium text-indigo-100/60 mb-1.5">Email</label>
-                        <input type="email" name="email" value="{{ old('email') }}" required autofocus placeholder="admin@taxnest.com" class="w-full rounded-xl text-sm text-white placeholder-indigo-300/20 transition" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(99,102,241,0.5)'; this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.boxShadow='none';">
+                        <input type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="email" placeholder="admin@taxnest.com" class="w-full rounded-xl text-sm text-white placeholder-indigo-300/20 transition" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(99,102,241,0.5)'; this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.boxShadow='none';">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-indigo-100/60 mb-1.5">Password</label>

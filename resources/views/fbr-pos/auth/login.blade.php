@@ -82,7 +82,7 @@
                         <p class="text-[13px] text-gray-500 mt-1">{{ __('pos.auth_fbr_sign_in_sub') }}</p>
                     </div>
 
-                    <form method="POST" action="/fbr-pos/login" class="px-7 pb-7 pt-4 space-y-4">
+                    <form id="fbrPosLoginForm" method="POST" action="/fbr-pos/login" class="px-7 pb-7 pt-4 space-y-4">
                         @csrf
                         <div>
                             <label for="login" class="block text-[12px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">{{ __('pos.auth_login_field') }}</label>
@@ -93,7 +93,7 @@
 
                         <div>
                             <label for="password" class="block text-[12px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">{{ __('pos.auth_password') }}</label>
-                            <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="{{ __('pos.auth_ph_password') }}" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 input-premium">
+                            <input id="password" type="password" name="password" form="fbrPosLoginForm" required autocomplete="current-password" placeholder="{{ __('pos.auth_ph_password') }}" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 input-premium">
                             @error('password')<p class="text-xs text-red-600 mt-1.5 font-medium">{{ $message }}</p>@enderror
                         </div>
 

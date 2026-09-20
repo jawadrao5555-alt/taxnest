@@ -409,8 +409,8 @@ body[data-theme="midnight"] .tn-premium-sale .bg-gray-50 {
 /*
  * Phone sale viewport containment.
  *
- * The universal screens live inside the app's 48px top-nav and, on PRA, a
- * 16px slot gutter.  Their old `calc(100vh - 48px)` height therefore made
+     * The universal screens start below the rendered app top-nav and, on PRA, a
+     * 16px slot gutter.  Their old 48px assumption therefore made
  * the page itself taller than the visible viewport.  PRA also leaves its
  * action-bar column mounted while `mobileView === 'cart'`; that column steals
  * the same vertical space from the cart that the payment dock needs.
@@ -441,10 +441,11 @@ body[data-theme="midnight"] .tn-premium-sale .bg-gray-50 {
         overflow: hidden !important;
     }
 
-    /* FBR's outer mobile gutter/borders need another 8px below the footer. */
+    /* FBR starts 76px below the viewport top once its outer mobile gutter is
+       included, so reserve that full rendered offset below the footer. */
     .tn-premium-sale:has(.tn-order-summary) {
-        height: calc(100dvh - 72px - env(safe-area-inset-bottom, 0px)) !important;
-        max-height: calc(100dvh - 72px - env(safe-area-inset-bottom, 0px)) !important;
+        height: calc(100dvh - 76px - env(safe-area-inset-bottom, 0px)) !important;
+        max-height: calc(100dvh - 76px - env(safe-area-inset-bottom, 0px)) !important;
     }
 
     /* PRA keeps this wrapper mounted in cart view; its flex-1 class is the

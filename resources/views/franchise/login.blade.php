@@ -22,11 +22,11 @@
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1.5">Email</label>
-                    <input type="email" name="email" value="{{ old('email') }}" required autofocus class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 transition">
+                    <input type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="email" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 transition">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1.5">Password</label>
-                    <input type="password" name="password" required class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 transition">
+                    <input type="password" name="password" required autocomplete="current-password" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 transition">
                 </div>
                 <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 rounded-lg transition text-sm">Sign In</button>
             </form>

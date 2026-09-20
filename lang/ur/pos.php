@@ -1958,6 +1958,8 @@ return [
     'inventory_master_upload' => 'اسٹاک ماسٹر اپ لوڈ کریں',
     'inventory_master_step1' => 'مرحلہ 1: سانچہ ڈاؤن لوڈ کریں',
     'inventory_master_step1_hint' => 'پیلی مثال کی قطاریں "Misal:" سے شروع ہوتی ہیں اور چھوڑ دی جاتی ہیں۔ اپنی قطاریں لکھیں۔ "Product Code" اور "Ingredient Code" متن رہتے ہیں۔',
+    'inventory_master_calculated_recipe_costs' => 'حساب شدہ ریسپی لاگت',
+    'inventory_master_per_sale_unit' => 'فی فروخت یونٹ',
     'inventory_master_step2' => 'مرحلہ 2: وہی فائل واپس بھیجیں',
     'inventory_master_step2_hint' => '".xlsx" فائل استعمال کریں۔ "Row Type" صرف "PRODUCT"، "INGREDIENT" یا "RECIPE" ہو۔',
     'inventory_master_steps' => 'درآمد کے مراحل',

@@ -1958,6 +1958,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'inventory_master_upload' => 'Inventory Master upload karein',
     'inventory_master_step1' => 'Step 1: Template download karein',
     'inventory_master_step1_hint' => 'Peeli sample rows "Misal:" se shuru hoti hain aur skip ho jati hain. Apni rows likhein. Product Code aur Ingredient Code text rehte hain.',
+    'inventory_master_calculated_recipe_costs' => 'Calculated recipe cost',
+    'inventory_master_per_sale_unit' => 'har sale unit',
     'inventory_master_step2' => 'Step 2: Wahi file wapas upload karein',
     'inventory_master_step2_hint' => '.xlsx file use karein. Row Type PRODUCT, INGREDIENT ya RECIPE hona chahiye.',
     'inventory_master_steps' => 'Import ke steps',

@@ -31,7 +31,7 @@ class RecipeInventoryService
     private const MOVEMENT_ADJUSTMENT = 'ingredient_adjustment';
 
     /** Units accepted by the UI/importer. Conversions are explicit, never guessed. */
-    public const UNITS = ['kg', 'g', 'ltr', 'ml', 'pcs', 'dozen', 'pack'];
+    public const UNITS = ['kg', 'g', 'ltr', 'ml', 'pcs', 'cup', 'dozen', 'pack'];
 
     /**
      * Return the recipe requirements for a cart.  The output is deterministic

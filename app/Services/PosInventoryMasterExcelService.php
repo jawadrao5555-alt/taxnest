@@ -161,7 +161,7 @@ class PosInventoryMasterExcelService
             ['Import order: Ingredients → Products → Recipes. Preview is zero-write; Confirm is required.'],
             ['Create-only skips exact existing rows. Update existing changes only fields shown in the preview.'],
             ['Opening Stock is read for warning only and is never posted to stock or ledgers.'],
-            ['Plain Tea sample is intentionally Beverages only. Sample rows are skipped by the Misal: marker.'],
+            ['Every row beginning with "Misal:" is sample-only and is never imported, even when the unchanged template is uploaded.'],
         ], null, 'A1');
         $start->getStyle('A1')->getFont()->setBold(true)->setSize(16);
         $start->getStyle('A2:A5')->getAlignment()->setWrapText(true);
@@ -189,6 +189,7 @@ class PosInventoryMasterExcelService
         $lists = $ss->getSheetByName('Lists');
         $lists->fromArray([
             ['Unit', 'pcs', 'Use the same Usage Unit in Recipes.'],
+            ['Unit', 'cup', ''],
             ['Unit', 'kg', ''],
             ['Unit', 'g', ''],
             ['Unit', 'ltr', ''],
@@ -202,21 +203,21 @@ class PosInventoryMasterExcelService
         ], null, 'A2');
         $lists->getProtection()->setSheet(true);
         $lists->getProtection()->setPassword(Str::random(24));
-        $lists->getStyle('A2:C12')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('ECFDF5');
+        $lists->getStyle('A2:C13')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('ECFDF5');
         $this->addWorkbookValidation($ss->getSheetByName('Products'), 'J2:J2000', '"Yes,No"');
         $this->addWorkbookValidation($ss->getSheetByName('Products'), 'K2:K2000', '"Yes,No"');
         $this->addWorkbookValidation($ss->getSheetByName('Ingredients'), 'J2:J2000', '"Yes,No"');
-        $this->addWorkbookValidation($ss->getSheetByName('Recipes'), 'D2:D2000', '"pcs,kg,g,ltr,ml,dozen"');
+        $this->addWorkbookValidation($ss->getSheetByName('Recipes'), 'D2:D2000', '"pcs,cup,kg,g,ltr,ml,dozen"');
         $samples = [
-            ['Misal: Plain Tea', 'Beverages', 'Recipe', 100, 0, 'TEA-001', '', 'pcs', 0, 'Yes', 'No', '', '', 'Sample only'],
+            ['Misal: Plain Tea', 'Beverages', 'Recipe', 100, '', 'TEA-001', '', 'cup', 0, 'Yes', 'No', '', '', 'Sample only'],
         ];
         $ss->getSheetByName('Products')->fromArray($samples, null, 'A2');
         $ss->getSheetByName('Products')->getStyle('A2:N2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCFCE7');
         $ingredientSamples = [
-            ['Misal: Tea Leaves', '', 'kg', 'g', 1000, 0.5, '', 0, '', 'Yes'],
+            ['Misal: Tea Leaves', '', 'kg', 'g', 1000, 1000, '', 0, '', 'Yes'],
             ['Misal: Milk', '', 'ltr', 'ml', 1000, 180, '', 0, '', 'Yes'],
-            ['Misal: Sugar', '', 'kg', 'g', 1000, 0.2, '', 0, '', 'Yes'],
-            ['Misal: Water', '', 'ltr', 'ml', 1000, 0.02, '', 0, '', 'Yes'],
+            ['Misal: Sugar', '', 'kg', 'g', 1000, 200, '', 0, '', 'Yes'],
+            ['Misal: Water', '', 'ltr', 'ml', 1000, 20, '', 0, '', 'Yes'],
         ];
         $ss->getSheetByName('Ingredients')->fromArray($ingredientSamples, null, 'A2');
         $ss->getSheetByName('Ingredients')->getStyle('A2:J5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEF3C7');
@@ -243,6 +244,7 @@ class PosInventoryMasterExcelService
             return ['ok'=>false,'errors'=>[['sheet'=>'','row'=>0,'field'=>'file','message'=>'Workbook could not be read or failed security validation.']]];
         }
         $plan = $this->planOperations($normalized, $companyId, $mode);
+        $recipeCosts = $this->calculatePreviewRecipeCosts($normalized);
         $checksum = hash_file('sha256', $path);
         $payload = ['company_id'=>$companyId, 'user_id'=>$userId, 'mode'=>$mode, 'operations'=>$plan['operations'],
             'warnings'=>$plan['warnings'], 'errors'=>$plan['errors'], 'checksum'=>$checksum,
@@ -260,7 +262,8 @@ class PosInventoryMasterExcelService
             'updates' => count(array_filter($plan['operations'], fn ($operation) => ($operation['action'] ?? '') === 'update')),
             'creates' => count(array_filter($plan['operations'], fn ($operation) => ($operation['action'] ?? '') === 'create')),
         ];
-        return ['ok'=>!$plan['errors'],'token'=>$token,'mode'=>$mode,'warnings'=>$plan['warnings'],'errors'=>$plan['errors'],'categories'=>$plan['categories']]+$summary;
+        return ['ok'=>!$plan['errors'],'token'=>$token,'mode'=>$mode,'warnings'=>$plan['warnings'],'errors'=>$plan['errors'],
+            'categories'=>$plan['categories'],'recipe_costs'=>$recipeCosts]+$summary;
     }
 
     public function confirm(string $token,int $companyId,bool $confirmed=false, ?int $userId=null): array
@@ -1640,17 +1643,24 @@ class PosInventoryMasterExcelService
                 if ($actual !== $headers) throw new \RuntimeException("Unexpected {$name} headers.");
             }
             $rows = [];
+            $sampleRows = [];
             $warnings = [];
             $products = $ss->getSheetByName('Products')->toArray(null, true, false, false);
             foreach (array_slice($products, 1) as $index => $values) {
                 if ($this->rowEmpty($values)) continue;
-                if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0) continue;
+                if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0) {
+                    $sampleRows[] = ['sheet'=>'Products', 'row'=>$index + 2, 'type'=>'product', 'values'=>$values];
+                    continue;
+                }
                 $rows[] = ['sheet'=>'Products', 'row'=>$index + 2, 'type'=>'product', 'values'=>$values];
             }
             $ingredients = $ss->getSheetByName('Ingredients')->toArray(null, true, false, false);
             foreach (array_slice($ingredients, 1) as $index => $values) {
                 if ($this->rowEmpty($values)) continue;
-                if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0) continue;
+                if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0) {
+                    $sampleRows[] = ['sheet'=>'Ingredients', 'row'=>$index + 2, 'type'=>'ingredient', 'values'=>$values];
+                    continue;
+                }
                 if (trim((string) ($values[6] ?? '')) !== '') {
                     $warnings[] = ['sheet'=>'Ingredients','row'=>$index + 2,'field'=>'Opening Stock','message'=>'Opening Stock is informational and will be skipped.'];
                 }
@@ -1660,10 +1670,13 @@ class PosInventoryMasterExcelService
             foreach (array_slice($recipes, 1) as $index => $values) {
                 if ($this->rowEmpty($values)) continue;
                 if (stripos(trim((string) ($values[0] ?? '')), self::SAMPLE_MARKER) === 0
-                    || stripos(trim((string) ($values[1] ?? '')), self::SAMPLE_MARKER) === 0) continue;
+                    || stripos(trim((string) ($values[1] ?? '')), self::SAMPLE_MARKER) === 0) {
+                    $sampleRows[] = ['sheet'=>'Recipes', 'row'=>$index + 2, 'type'=>'recipe', 'values'=>$values];
+                    continue;
+                }
                 $rows[] = ['sheet'=>'Recipes', 'row'=>$index + 2, 'type'=>'recipe', 'values'=>$values];
             }
-            return ['rows'=>$rows, 'warnings'=>$warnings];
+            return ['rows'=>$rows, 'sample_rows'=>$sampleRows, 'warnings'=>$warnings];
         } finally {
             if ($ss) $ss->disconnectWorksheets();
         }
@@ -1891,6 +1904,50 @@ class PosInventoryMasterExcelService
             }
         }
         return ['operations'=>$operations,'warnings'=>$warnings,'errors'=>$errors,'categories'=>array_keys($categories)];
+    }
+
+    private function calculatePreviewRecipeCosts(array $normalized): array
+    {
+        $costs = [];
+        foreach ([$normalized['sample_rows'] ?? [], $normalized['rows'] ?? []] as $rows) {
+            $ingredientCosts = [];
+            $datasetCosts = [];
+            foreach ($rows as $item) {
+                if (($item['type'] ?? '') !== 'ingredient') continue;
+                $values = $item['values'];
+                $factor = $this->cleanImportNumber($values[4] ?? null);
+                $purchaseCost = $this->cleanImportNumber($values[5] ?? null);
+                if ($factor === null || $factor <= 0 || $purchaseCost === null) continue;
+                $ingredientCosts[$this->sampleReference($values[0] ?? '')] = $purchaseCost / $factor;
+            }
+            foreach ($rows as $item) {
+                if (($item['type'] ?? '') !== 'recipe') continue;
+                $values = $item['values'];
+                $ingredientRef = $this->sampleReference($values[1] ?? '');
+                $quantity = $this->cleanImportNumber($values[2] ?? null);
+                $waste = $this->cleanImportNumber($values[4] ?? null) ?? 0;
+                if (!isset($ingredientCosts[$ingredientRef]) || $quantity === null || $quantity <= 0) continue;
+                $product = trim((string) preg_replace('/^'.preg_quote(self::SAMPLE_MARKER, '/').'\s*/i', '', (string) ($values[0] ?? '')));
+                if ($product === '') continue;
+                $key = $this->normalizedName($product);
+                $datasetCosts[$key] ??= ['product'=>$product, 'cost'=>0.0];
+                $datasetCosts[$key]['cost'] += $quantity * (1 + max(0, $waste) / 100) * $ingredientCosts[$ingredientRef];
+            }
+            $costs = array_replace($costs, $datasetCosts);
+        }
+        return array_values(array_map(
+            fn (array $cost): array => ['product'=>$cost['product'], 'cost'=>round($cost['cost'], 2)],
+            $costs
+        ));
+    }
+
+    private function sampleReference($value): string
+    {
+        return $this->normalizedName(preg_replace(
+            '/^'.preg_quote(self::SAMPLE_MARKER, '/').'\s*/i',
+            '',
+            (string) $value
+        ));
     }
 
     private function validateNormalized(array $normalized,int $companyId,string $mode): array

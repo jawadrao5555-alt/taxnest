@@ -99,6 +99,19 @@
                 <div class="tn-metric"><span class="block text-xs text-gray-500">{{ __("pos.$label") }}</span><strong class="text-lg">{{ data_get(session('inventory_master_preview'), $key, 0) }}</strong></div>
                 @endforeach
             </div>
+            @if(data_get(session('inventory_master_preview'), 'recipe_costs'))
+            <div class="mb-4 rounded-xl border border-teal-200 bg-teal-50 p-3 dark:border-teal-800 dark:bg-teal-900/20">
+                <p class="text-xs font-bold uppercase tracking-wide text-teal-800 dark:text-teal-200">{{ __('pos.inventory_master_calculated_recipe_costs') }}</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                    @foreach(data_get(session('inventory_master_preview'), 'recipe_costs', []) as $recipeCost)
+                    <span class="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white">
+                        {{ data_get($recipeCost, 'product') }}: Rs {{ number_format((float) data_get($recipeCost, 'cost'), 2) }}
+                        <small class="font-normal text-gray-500">{{ __('pos.inventory_master_per_sale_unit') }}</small>
+                    </span>
+                    @endforeach
+                </div>
+            </div>
+            @endif
             @php($previewIssues = array_merge(data_get(session('inventory_master_preview'), 'errors', []), data_get(session('inventory_master_preview'), 'warnings', [])))
             @if($previewIssues)
             <div class="max-h-56 overflow-y-auto rounded-lg border border-amber-200 dark:border-amber-800 p-3 text-xs space-y-1">

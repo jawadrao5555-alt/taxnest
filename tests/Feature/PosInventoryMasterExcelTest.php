@@ -506,12 +506,21 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertSame('Waste %', $ss->getSheetByName('Recipes')->getCell('E1')->getValue());
         $this->assertSame('Beverages', $ss->getSheetByName('Products')->getCell('B2')->getValue());
         $this->assertSame('Recipe', $ss->getSheetByName('Products')->getCell('C2')->getValue());
+        $this->assertNull($ss->getSheetByName('Products')->getCell('E2')->getValue());
+        $this->assertSame('cup', $ss->getSheetByName('Products')->getCell('H2')->getValue());
+        $this->assertSame('cup', $ss->getSheetByName('Lists')->getCell('B3')->getValue());
         $this->assertSame('Misal: Milk', $ss->getSheetByName('Ingredients')->getCell('A3')->getValue());
         $this->assertSame('Misal: Water', $ss->getSheetByName('Ingredients')->getCell('A5')->getValue());
+        $this->assertSame(1000, $ss->getSheetByName('Ingredients')->getCell('F2')->getValue());
+        $this->assertSame(180, $ss->getSheetByName('Ingredients')->getCell('F3')->getValue());
+        $this->assertSame(200, $ss->getSheetByName('Ingredients')->getCell('F4')->getValue());
+        $this->assertSame(20, $ss->getSheetByName('Ingredients')->getCell('F5')->getValue());
+        $this->assertStringContainsString('never imported', $ss->getSheetByName('Start Here')->getCell('A5')->getValue());
         $this->assertTrue($ss->getSheetByName('Lists')->getProtection()->getSheet());
 
         $preview = (new PosInventoryMasterExcelService())->preview($tmp, $this->companyId, 'create_only', 1);
         $this->assertTrue($preview['ok'], json_encode($preview));
+        $this->assertSame([['product'=>'Plain Tea', 'cost'=>23.6]], $preview['recipe_costs']);
         $this->assertSame(0, PosProduct::count(), 'Untouched template samples must not become catalog rows');
         $this->assertSame(0, Ingredient::count());
     }

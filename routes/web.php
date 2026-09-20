@@ -1215,7 +1215,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         // Never posts stock. Keep /products/template and /recipes/import.
         Route::get('/inventory-master', [PosInventoryMasterController::class, 'index'])->name('pos.inventory-master');
         Route::get('/inventory-master/template', [PosInventoryMasterController::class, 'downloadTemplate'])->name('pos.inventory-master.template');
-        Route::post('/inventory-master/import', [PosInventoryMasterController::class, 'import'])->name('pos.inventory-master.import');
+        Route::post('/inventory-master/preview', [PosInventoryMasterController::class, 'preview'])->name('pos.inventory-master.preview');
+        Route::post('/inventory-master/confirm', [PosInventoryMasterController::class, 'confirm'])->name('pos.inventory-master.confirm');
+        Route::get('/inventory-master/export', [PosInventoryMasterController::class, 'export'])->name('pos.inventory-master.export');
+        Route::post('/inventory-master/error-report', [PosInventoryMasterController::class, 'errorReport'])->name('pos.inventory-master.error-report');
         Route::post('/products/bulk', [PosController::class, 'bulkProductAction'])->name('pos.products.bulk');
         Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
         Route::delete('/products/{id}', [PosController::class, 'deleteProduct'])->name('pos.products.delete');

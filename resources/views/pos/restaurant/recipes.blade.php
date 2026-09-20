@@ -1,4 +1,5 @@
 <x-pos-layout>
+@include('pos.inventory.partials.family-styles')
 <div x-data="{
         showAddModal: false,
         showImport: false,
@@ -10,16 +11,16 @@
         addRow() { this.rows.push(this.newRow()) },
         removeRow(i) { this.rows.splice(i, 1); if (this.rows.length === 0) this.addRow() },
         openAdd(pid = '') { this.selectedProduct = String(pid); if (this.rows.length === 0) this.addRow(); this.showAddModal = true }
-    }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <div class="flex items-center justify-between mb-6">
+    }" class="tn-inventory-family max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="tn-family-header flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.recipes_bom') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.recipes_subtitle') }}</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap justify-end">
-            <a href="{{ route('pos.restaurant.kitchen-report') }}" class="px-4 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-sm font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20">Kitchen report</a>
+            <a href="{{ route('pos.restaurant.kitchen-report') }}" class="px-4 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-sm font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20">{{ __('pos.kitchen_report') }}</a>
             <a href="{{ route('pos.inventory-master') }}" class="px-4 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-sm font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20">{{ __('pos.inventory_master') }}</a>
-            <button @click="showImport = !showImport" class="px-4 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-sm font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20">📄 {{ __('pos.recipes_import_toggle') }}</button>
+            <button @click="showImport = !showImport" class="px-4 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-sm font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20">{{ __('pos.recipes_import_toggle') }}</button>
             <button @click="openAdd()" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">{{ __('pos.add_recipe_btn') }}</button>
         </div>
     </div>
@@ -76,7 +77,7 @@
              x-show="!q.trim() || $el.dataset.search.includes(q.trim().toLowerCase())">
             <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <span class="text-lg">🍳</span>
+                    <span class="tn-kicker" aria-hidden="true">BOM</span>
                     <div>
                         <h3 class="font-semibold text-gray-900 dark:text-white">{{ $product->name ?? __('pos.unknown_product') }}</h3>
                         <span class="text-xs text-gray-500">{{ $productRecipes->count() }}{{ __('pos.sfx_ingredients') }}</span>
@@ -179,7 +180,7 @@
                                 {{ __('pos.new_short') }}
                             </button>
                             <button type="button" @click="removeRow(i)" x-show="rows.length > 1"
-                                    class="px-2 py-1 text-xs rounded-md border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">✕</button>
+                                    class="px-2 py-1 text-xs rounded-md border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">{{ __('pos.remove_word') }}</button>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">

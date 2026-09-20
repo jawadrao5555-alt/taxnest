@@ -80,4 +80,73 @@ class PosInventoryMasterController extends Controller
 
         return back()->with('error', $result['message'])->with('inventory_master_errors', $flash);
     }
+
+    public function preview(Request $request)
+    {
+        $company = Company::find((int) app('currentCompanyId'));
+        if (!$this->hasImportAccess($company)) {
+            return back()->with('error', __('pos.plan_locked_feature'));
+        }
+        $request->validate(['excel_file'=>'required|file|mimes:xlsx|max:5120','mode'=>'nullable|in:create_only,update_existing']);
+        $actorId = $this->actorId();
+        abort_if($actorId === null, 403);
+        $result=$this->master->preview($request->file('excel_file')->getRealPath(),(int)app('currentCompanyId'),$request->input('mode','create_only'),$actorId);
+        $flashResult = $result;
+        $flashResult['errors'] = array_slice($result['errors'] ?? [], 0, 100);
+        $flashResult['warnings'] = array_slice($result['warnings'] ?? [], 0, 100);
+        return back()->with('inventory_master_preview', $flashResult)
+            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Preview ready. Confirm to apply.' : 'Preview contains blocking errors.');
+    }
+
+    public function confirm(Request $request)
+    {
+        $company = Company::find((int) app('currentCompanyId'));
+        if (!$this->hasImportAccess($company)) {
+            return back()->with('error', __('pos.plan_locked_feature'));
+        }
+        $request->validate(['token'=>'required|string','confirmed'=>'accepted']);
+        $actorId = $this->actorId();
+        abort_if($actorId === null, 403);
+        $result=$this->master->confirm($request->input('token'),(int)app('currentCompanyId'),true,$actorId);
+        return back()->with($result['ok'] ? 'success' : 'error', $result['ok'] ? $result['message'] : implode(' ', array_map('strval', $result['errors'] ?? [])))
+            ->with('inventory_master_errors', $result['errors'] ?? []);
+    }
+
+    public function export()
+    {
+        if (!$this->hasImportAccess(Company::find((int) app('currentCompanyId')))) {
+            return redirect()->route('pos.billing')->with('error', __('pos.plan_locked_feature'));
+        }
+        return $this->master->exportWorkbook((int)app('currentCompanyId'));
+    }
+
+    public function errorReport(Request $request)
+    {
+        if (!$this->hasImportAccess(Company::find((int) app('currentCompanyId')))) {
+            return redirect()->route('pos.billing')->with('error', __('pos.plan_locked_feature'));
+        }
+        return $this->master->errorReport((string)$request->input('token'), (int) app('currentCompanyId'), $this->actorId());
+    }
+
+    private function hasImportAccess(?Company $company): bool
+    {
+        if (auth('pos')->user()?->posCashierBlocked()) {
+            return false;
+        }
+        if (!$company || (!$this->master->excelAllowed($company) && !$this->master->recipesAllowed($company))) {
+            return false;
+        }
+        if (Schema::hasTable('subscriptions')) {
+            $access = SubscriptionAccessService::hasAccess($company);
+            return (bool) $access['allowed'];
+        }
+        return true;
+    }
+
+    private function actorId(): ?int
+    {
+        $id = auth('pos')->id() ?: auth()->id();
+
+        return $id ? (int) $id : null;
+    }
 }

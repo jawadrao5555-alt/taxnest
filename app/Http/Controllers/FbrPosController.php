@@ -1722,8 +1722,14 @@ class FbrPosController extends Controller
             'c' => (int) $companyId,
             // Task 658: baked i18n = used-keys subset — lang-file-only edits
             // must refresh cached copies (see PRA twin note).
-            's' => (is_file($screenPath) ? (string) @filemtime($screenPath) : '0')
-                . '-' . \App\Support\PosI18n::langRev(),
+            // Keep the shell hash inside the existing 's' key so legacy cached
+            // documents (whose JavaScript knows only the old key set) still see
+            // a mismatch after a layout/runtime-only deploy.
+            's' => \App\Support\PosSaleShellRevision::bootScreenRevision(
+                'fbr',
+                is_file($screenPath) ? (string) @filemtime($screenPath) : '0',
+                \App\Support\PosI18n::langRev()
+            ),
             'cat' => $catalogRev,
             'set' => $settingsRev,
         ];

@@ -2971,7 +2971,7 @@ class PosController extends Controller
      * fingerprint — baked into the rendered page AND served by bootCheck() —
      * lets a cached copy detect that it is stale (new deploy, catalog change,
      * settings change, user/company switch) and reload itself once.
-     * Keys are deliberately short: u=user, c=company, s=screen file mtime,
+     * Keys are deliberately short: u=user, c=company, s=sale-shell revision,
      * cat=catalog revision, set=settings revision.
      *
      * Task 1390: EVERY per-user permission verdict the screen bakes in must be
@@ -3075,8 +3075,14 @@ class PosController extends Controller
             // Task 658: baked i18n is now a USED-KEYS subset — a lang-file-only
             // edit (blade untouched) must still refresh cached copies, so the
             // 's' rev appends the active-locale pos.php mtimes (+ locale).
-            's' => (is_file($screenPath) ? (string) @filemtime($screenPath) : '0')
-                . '-' . \App\Support\PosI18n::langRev(),
+            // Keep the shell hash inside the existing 's' key: pre-fix cached
+            // documents only compare the legacy keys, so a new sibling key alone
+            // could never invalidate them.
+            's' => \App\Support\PosSaleShellRevision::bootScreenRevision(
+                'pra',
+                is_file($screenPath) ? (string) @filemtime($screenPath) : '0',
+                \App\Support\PosI18n::langRev()
+            ),
             'cat' => $catalogRev,
             'set' => $settingsRev,
         ];

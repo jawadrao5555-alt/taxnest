@@ -23,6 +23,7 @@ class PosTopNavigationRegressionTest extends TestCase
             $this->assertStringContainsString('data-tn-topnav-control="theme"', $layout);
             $this->assertStringContainsString('data-tn-topnav-control="profile"', $layout);
         }
+        $this->assertStringContainsString('data-tn-topnav-control="fullscreen"', $pra);
 
         $this->assertNotFalse($decision);
         $this->assertStringContainsString('style="z-index: 131;', $decision);
@@ -68,6 +69,29 @@ class PosTopNavigationRegressionTest extends TestCase
             $this->assertStringContainsString("'seenEndpoint' => \$whatsNewReadOnly ? null", $layout);
         }
         $this->assertStringContainsString('this.wasSeen || @json(empty($seenEndpoint))', $details);
+    }
+
+    public function test_cache_first_sale_boot_fingerprint_includes_the_deployed_shell(): void
+    {
+        $pra = file_get_contents(app_path('Http/Controllers/PosController.php'));
+        $fbr = file_get_contents(app_path('Http/Controllers/FbrPosController.php'));
+        $revision = file_get_contents(app_path('Support/PosSaleShellRevision.php'));
+
+        $this->assertStringContainsString("PosSaleShellRevision::bootScreenRevision(\n                'pra'", $pra);
+        $this->assertStringContainsString("PosSaleShellRevision::bootScreenRevision(\n                'fbr'", $fbr);
+        $this->assertStringContainsString("existing 's' key", $pra);
+        $this->assertStringContainsString("existing 's' key", $fbr);
+
+        foreach ([
+            'views/layouts/pos-app.blade.php',
+            'views/layouts/fbr-pos-app.blade.php',
+            'views/partials/alpine-runtime-loader.blade.php',
+            'views/partials/whats-new-detail-modals.blade.php',
+            "public_path('build/manifest.json')",
+            "public_path('sw.js')",
+        ] as $shellDependency) {
+            $this->assertStringContainsString($shellDependency, $revision);
+        }
     }
 
     private function topNavigationZIndex(string $layout): int

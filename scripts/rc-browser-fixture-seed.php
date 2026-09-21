@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use App\Models\AdminUser;
+use App\Models\AppUpdate;
 use App\Models\Company;
 use App\Models\HotelRoom;
 use App\Models\User;
@@ -129,6 +130,17 @@ $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid
 ]);
 $fiscalUser = $user($fiscal, 'Synthetic FBR Retail Owner', 'fiscal@rc-browser.invalid', 'company_admin', 'pos_admin');
 
+foreach (['pos', 'fbr_pos'] as $audience) {
+    AppUpdate::create([
+        'title' => "Synthetic {$audience} top navigation check",
+        'points' => ['Browser fixture notification'],
+        'audience' => $audience,
+        'audience_family' => 'all',
+        'type' => 'improvement',
+        'is_published' => true,
+    ]);
+}
+
 $health = $company('Synthetic Browser Health Clinic', 'health-company@rc-browser.invalid', 'RCBROWSER004', 'health', [
     'health_org_type' => 'clinic', 'health_modules' => HealthModuleService::MODULES,
     'health_setup_completed' => true,
@@ -213,13 +225,14 @@ $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
         ['name' => 'hotel-owner', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk']],
+        ['name' => 'pra-topnav', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'pra', 'topNavFactory' => 'restaurantPos'],
         ['name' => 'hotel-manager', 'login' => $hotelManager->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/rooms'], 'markers' => ['Rooms']],
         ['name' => 'hotel-housekeeping', 'login' => $hotelHousekeeping->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/housekeeping'], 'markers' => ['Housekeeping']],
         ['name' => 'hotel-outlet', 'login' => $hotelOutlet->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/restaurant'], 'markers' => ['Current Order'], 'allowRedirectTo' => '/pos/invoice/create'],
         ['name' => 'hotel-admin-manage-as', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$hotel->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="full"])', 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk']],
         ['name' => 'service-work-orders-manager', 'login' => $serviceManager->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'markers' => ['Event Plan Board'], 'usableSelectors' => ['a[href$="/pos/work-orders/create"]']],
         ['name' => 'health', 'login' => $healthUser->email, 'password' => $password, 'loginPath' => '/health/login', 'paths' => ['/health/dashboard'], 'markers' => ['Synthetic Browser Health Clinic']],
-        ['name' => 'fiscal', 'login' => $fiscalUser->email, 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'usableSelectors' => ['input[name="pos_product_search_nofill"]']],
+        ['name' => 'fiscal', 'login' => $fiscalUser->email, 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'usableSelectors' => ['input[name="pos_product_search_nofill"]'], 'topNavPanel' => 'fbr', 'topNavFactory' => 'restaurantPos'],
         ['name' => 'hotel-denied', 'login' => $hotelDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel', '/pos/hotel/restaurant'], 'denied' => true],
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),

@@ -56,6 +56,20 @@ class PosTopNavigationRegressionTest extends TestCase
         );
     }
 
+    public function test_read_only_diagnosis_keeps_bell_history_but_disables_writes(): void
+    {
+        $pra = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
+        $fbr = file_get_contents(resource_path('views/layouts/fbr-pos-app.blade.php'));
+        $details = file_get_contents(resource_path('views/partials/whats-new-detail-modals.blade.php'));
+
+        foreach ([$pra, $fbr] as $layout) {
+            $this->assertStringContainsString('$whatsNewReadOnly = $wnReadonlyImp;', $layout);
+            $this->assertStringNotContainsString('$wnAllowed && !$wnPending && !$wnReadonlyImp', $layout);
+            $this->assertStringContainsString("'seenEndpoint' => \$whatsNewReadOnly ? null", $layout);
+        }
+        $this->assertStringContainsString('this.wasSeen || @json(empty($seenEndpoint))', $details);
+    }
+
     private function topNavigationZIndex(string $layout): int
     {
         preg_match('/data-tn-topnav="fbr"[^>]+style="z-index:\\s*(\\d+);"/', $layout, $matches);

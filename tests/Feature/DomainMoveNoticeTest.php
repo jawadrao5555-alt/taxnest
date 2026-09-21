@@ -20,13 +20,23 @@ class DomainMoveNoticeTest extends TestCase
     public function test_pos_layouts_do_not_stack_whats_new_over_the_shared_notice_window(): void
     {
         foreach ([
-            resource_path('views/layouts/pos-app.blade.php'),
-            resource_path('views/layouts/fbr-pos-app.blade.php'),
-        ] as $layout) {
+            resource_path('views/layouts/pos-app.blade.php') => "::forCompany(\$companyLayout ?? null, 'pra')",
+            resource_path('views/layouts/fbr-pos-app.blade.php') => "::forCompany(\$fbrCompany ?? null, 'fbr')",
+        ] as $layout => $targetedHistoryQuery) {
             $markup = file_get_contents($layout);
 
             $this->assertStringContainsString('$sharedDomainAgentNoticeLive', $markup);
-            $this->assertStringContainsString('$sharedDomainAgentNoticeLive ? null : $whatsNewUnseen->first()', $markup);
+            $this->assertStringContainsString(
+                '$whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null : $whatsNewUnseen->first()',
+                $markup
+            );
+            $this->assertStringContainsString(
+                '$whatsNewPopupList = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? collect() : $whatsNewUnseen->take(1)->values()',
+                $markup
+            );
+            $this->assertStringContainsString($targetedHistoryQuery, $markup);
+            $this->assertStringContainsString("->where('is_published', true)", $markup);
+            $this->assertStringContainsString("'updates' => \$whatsNewList", $markup);
         }
 
         $posLayout = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));

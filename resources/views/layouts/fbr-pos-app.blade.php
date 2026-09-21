@@ -9,19 +9,21 @@
     $dashboardStyle = $fbrCompany->pos_dashboard_style ?? 'square-classic';
     $fbrTheme = $fbrCompany->pos_theme ?? 'blue';
     // "What's New" app updates (popup + bell) — same conventions as PRA POS layout:
-    // admin/manager only, skip pending companies + read-only impersonation, fail
-    // silent if table missing on prod, master switch pos_whats_new_enabled.
+    // admin/manager only, skip pending companies, fail silent if table missing
+    // on prod, master switch pos_whats_new_enabled. View-only admin sessions keep
+    // bell/history but never auto-open or write seen state.
     // The shared domain/Agent announcement is the single interruption during
     // its fixed service window; unread updates remain available from the bell.
     // Same single owner as the PRA layout — see App\Support\SharedServiceNotice.
     $sharedDomainAgentNoticeLive = \App\Support\SharedServiceNotice::isLive();
-    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null;
+    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null; $whatsNewReadOnly = false;
     try {
         $wnAllowed = $fbrUser && $fbrUser->isPosAdmin();
         $wnPending = ($fbrCompany->status ?? null) === 'pending';
         $wnImp = session('impersonation');
         $wnReadonlyImp = is_array($wnImp) && !empty($wnImp['readonly']);
-        if ($wnAllowed && !$wnPending && !$wnReadonlyImp
+        $whatsNewReadOnly = $wnReadonlyImp;
+        if ($wnAllowed && !$wnPending
             && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
             && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
             // Task 1286: 7-day live window — updates auto-disappear from the
@@ -36,8 +38,8 @@
                     ->whereIn('app_update_id', $whatsNewList->pluck('id'))->pluck('app_update_id')->all();
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
-                $whatsNewPopup = $sharedDomainAgentNoticeLive ? null : $whatsNewUnseen->first();
-                $whatsNewPopupList = $sharedDomainAgentNoticeLive ? collect() : $whatsNewUnseen->take(1)->values();
+                $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null : $whatsNewUnseen->first();
+                $whatsNewPopupList = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? collect() : $whatsNewUnseen->take(1)->values();
                 // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
                 // the popup renders in celebratory hero style with that update on top.
                 // ?? false: column may not exist yet mid-deploy (missing attr = null).
@@ -1460,7 +1462,7 @@
         @include('partials.whats-new-detail-modals', [
             'updates' => $whatsNewList,
             'seenIds' => $whatsNewSeenIds,
-            'seenEndpoint' => '/fbr-pos/whats-new/seen',
+            'seenEndpoint' => $whatsNewReadOnly ? null : '/fbr-pos/whats-new/seen',
         ])
         @include('partials.modal-a11y-support')
 

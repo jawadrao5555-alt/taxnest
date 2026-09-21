@@ -104,7 +104,7 @@
     // both POS panels and the notice component can never drift apart, and so a
     // future announcement is scheduled by editing a single file.
     $sharedDomainAgentNoticeLive = \App\Support\SharedServiceNotice::isLive();
-    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null;
+    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null; $whatsNewReadOnly = false;
     try {
         // ADMIN/MANAGER ONLY (owner rule, Jul 2026): "What's New" popup + bell must
         // NEVER show on cashier screens — updates are the admin/manager's job to
@@ -114,13 +114,13 @@
         // Pending companies: approval middleware blocks POSTs too — skip them as well.
         $wnAllowed = $posUserLayout && $posUserLayout->isPosAdmin();
         $wnPending = ($companyLayout->status ?? null) === 'pending';
-        // View-only impersonation (admin "View as Company"): ReadOnlyImpersonation
-        // blocks ALL POSTs incl. /pos/whats-new/seen — the popup would re-appear on
-        // EVERY page (dismiss loop) and its full-screen z-130 overlay sits on top of
-        // everything. Same convention as pending companies: skip it entirely.
+        // View-only impersonation keeps the read-only bell/history visible so an
+        // admin can diagnose the same header DOM as the shop. Only the auto-popup
+        // and mark-seen POST stay disabled (ReadOnlyImpersonation blocks writes).
         $wnImp = session('impersonation');
         $wnReadonlyImp = is_array($wnImp) && !empty($wnImp['readonly']);
-        if ($wnAllowed && !$wnPending && !$wnReadonlyImp
+        $whatsNewReadOnly = $wnReadonlyImp;
+        if ($wnAllowed && !$wnPending
             && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
             && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
             // Task 1286: 7-day live window — updates auto-disappear from the
@@ -135,10 +135,10 @@
                     ->whereIn('app_update_id', $whatsNewList->pluck('id'))->pluck('app_update_id')->all();
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
-                $whatsNewPopup = $sharedDomainAgentNoticeLive ? null : $whatsNewUnseen->first();
+                $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null : $whatsNewUnseen->first();
                 // Auto-popup only the latest unseen update. The remaining unread
                 // rows stay unread and can be opened individually from the bell.
-                $whatsNewPopupList = $sharedDomainAgentNoticeLive ? collect() : $whatsNewUnseen->take(1)->values();
+                $whatsNewPopupList = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? collect() : $whatsNewUnseen->take(1)->values();
                 // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
                 // the popup renders in celebratory hero style with that update on top.
                 // ?? false: column may not exist yet mid-deploy (missing attr = null).
@@ -1468,7 +1468,7 @@
         @include('partials.whats-new-detail-modals', [
             'updates' => $whatsNewList,
             'seenIds' => $whatsNewSeenIds,
-            'seenEndpoint' => '/pos/whats-new/seen',
+            'seenEndpoint' => $whatsNewReadOnly ? null : '/pos/whats-new/seen',
         ])
         @include('partials.modal-a11y-support')
 

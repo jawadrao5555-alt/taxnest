@@ -142,8 +142,9 @@ async function checkTopNavigation(page,t,v) {
   for(const name of ['notification','theme','profile']) {
     const button=header.locator(`[data-tn-topnav-control="${name}"]`).first();
     if(!await button.count()||!await button.isVisible()) { fail(`${t.name}/${v.width}: ${name} control missing`); continue; }
-    const hit=await button.evaluate(el=>{const r=el.getBoundingClientRect(),n=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!n&&(n===el||el.contains(n));});
-    if(!hit){fail(`${t.name}/${v.width}: physical hit-test did not reach ${name} button`);continue;}
+    const hit=await button.evaluate(el=>{const r=el.getBoundingClientRect(),n=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return{inside:r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,reached:!!n&&(n===el||el.contains(n)),rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},hit:n?.tagName||null};});
+    if(!hit.inside){fail(`${t.name}/${v.width}: ${name} control left the viewport (${JSON.stringify(hit.rect)})`);continue;}
+    if(!hit.reached){fail(`${t.name}/${v.width}: physical hit-test reached ${hit.hit||'nothing'} instead of ${name} button`);continue;}
     await button.click({timeout:5000});
     const panel=button.locator('xpath=..').locator(':scope > div[x-show]').first();
     if(!await panel.count())fail(`${t.name}/${v.width}: ${name} panel missing after click`);

@@ -245,6 +245,27 @@
             .menu-link { transition: all 0.12s ease; border-left: 2px solid transparent; }
             .menu-link:hover { background: linear-gradient(90deg, rgba(37,99,235,0.10), transparent 70%); border-left-color: #2563eb; padding-left: calc(1rem + 2px); }
             .dark .menu-link:hover { background: linear-gradient(90deg, rgba(59,130,246,0.18), transparent 70%); border-left-color: #60a5fa; }
+            /*
+             * Full-access impersonation adds the mandatory Lock + Exit chip to
+             * the left side of the header. At 390px the unmodified FBR row was
+             * wider than the viewport, so the profile button was painted past
+             * the action strip's clip edge and its physical centre hit the
+             * parent row instead of the button. Keep the identity controls in
+             * the hit-testable viewport by dropping only duplicate,
+             * lower-priority chrome while an admin is impersonating on mobile.
+             */
+            @media (max-width: 639px) {
+                .tn-impersonated-header .tn-fbr-header-brand,
+                .tn-impersonated-header [data-tn-fbr-secondary-action] {
+                    display: none !important;
+                }
+                .tn-impersonated-header .tn-fbr-header-start { gap: .5rem; }
+                .tn-impersonated-header .tn-fbr-header-actions {
+                    flex-shrink: 0;
+                    gap: .25rem;
+                    overflow: visible;
+                }
+            }
             /* Premium page background — clean flat navy/blue wash (no corner gradients) */
             .fbr-page-bg {
                 background: linear-gradient(180deg, #f5f8ff 0%, #f1f5fb 100%);
@@ -392,10 +413,10 @@
         </script>
         <div class="flex flex-col h-full" x-data="tnSafeFbrPosHeader('{{ $fbrTheme }}', {{ $isDarkMode ? 'true' : 'false' }})" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
 
-            <header data-tn-topnav="fbr" class="topnav-bar flex-shrink-0 relative z-50" style="z-index: 140;">
-                <div class="flex items-center justify-between px-3 sm:px-5 h-12">
+            <header data-tn-topnav="fbr" class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}" style="z-index: 140;">
+                <div class="tn-fbr-header-row flex items-center justify-between px-3 sm:px-5 h-12">
 
-                    <div class="flex items-center gap-3">
+                    <div class="tn-fbr-header-start flex items-center gap-3">
                         {{-- ☰ Sidebar Drawer Toggle (Ctrl+M) --}}
                         <button @click="sidebarOpen = !sidebarOpen" type="button" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_menu_ctrl_m') }}">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -405,7 +426,7 @@
                              as a floating pill it covered the nav underneath it. --}}
                         @include('partials.impersonation-banner')
 
-                        <a href="{{ route('fbrpos.dashboard') }}" class="flex items-center gap-2.5 group">
+                        <a href="{{ route('fbrpos.dashboard') }}" class="tn-fbr-header-brand flex items-center gap-2.5 group">
                             <div class="brand-tile-fbr w-8 h-8 rounded-xl flex items-center justify-center transition group-hover:scale-105">
                                 <svg class="w-4 h-4 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                             </div>
@@ -463,7 +484,7 @@
                         {{-- Personal display preference, intentionally visible at every
                              desktop width (including compact Desktop shell). The DOM is
                              painted only after its FBR JSON save contract succeeds. --}}
-                        <button type="button" @click="toggleDarkMode()" :disabled="darkSaving"
+                        <button type="button" data-tn-fbr-secondary-action @click="toggleDarkMode()" :disabled="darkSaving"
                                 aria-label="{{ __('pos.cmd_toggle_dark_mode') }}"
                                 class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition disabled:opacity-50"
                                 title="{{ __('pos.cmd_toggle_dark_mode') }}">

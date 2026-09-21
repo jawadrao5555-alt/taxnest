@@ -14,7 +14,7 @@
                 const dialog = this.$refs.detailDialog;
                 this.open = false;
                 this.$nextTick(() => window.TnModalA11y.close(dialog));
-                if (this.wasSeen) return;
+                if (this.wasSeen || @json(empty($seenEndpoint))) return;
                 try {
                     const response = await fetch('{{ $seenEndpoint }}', {
                         method: 'POST',

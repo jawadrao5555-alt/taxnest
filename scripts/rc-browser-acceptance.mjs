@@ -127,6 +127,33 @@ async function checkUsability(page,t,path,v) {
     }
   }
 }
+async function checkTopNavigation(page,t,v) {
+  if(!t.topNavPanel)return;
+  const runtime=await page.evaluate(factory=>({
+    alpine:!!window.Alpine,
+    started:window.__alpineStarted===true,
+    factory:typeof window[factory]==='function'
+  }),t.topNavFactory);
+  if(!runtime.alpine||!runtime.started||!runtime.factory)
+    return fail(`${t.name}/${v.width}: Alpine runtime or ${t.topNavFactory} factory did not start`);
+  const header=page.locator(`[data-tn-topnav="${t.topNavPanel}"]`).first();
+  if(!await header.count())return fail(`${t.name}/${v.width}: shared ${t.topNavPanel} top navigation missing`);
+  if(await page.locator('[role="dialog"][aria-modal="true"]:visible').count())return fail(`${t.name}/${v.width}: blocking overlay remained visible before top-navigation checks`);
+  for(const name of ['notification','theme','profile']) {
+    const button=header.locator(`[data-tn-topnav-control="${name}"]`).first();
+    if(!await button.count()||!await button.isVisible()) { fail(`${t.name}/${v.width}: ${name} control missing`); continue; }
+    const hit=await button.evaluate(el=>{const r=el.getBoundingClientRect(),n=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!n&&(n===el||el.contains(n));});
+    if(!hit){fail(`${t.name}/${v.width}: physical hit-test did not reach ${name} button`);continue;}
+    await button.click({timeout:5000});
+    const panel=button.locator('xpath=..').locator(':scope > div[x-show]').first();
+    if(!await panel.count())fail(`${t.name}/${v.width}: ${name} panel missing after click`);
+    else {
+      try { await panel.waitFor({state:'visible',timeout:3000}); pass(`${t.name}/${v.width}: ${name} physical click opened its panel`); }
+      catch { fail(`${t.name}/${v.width}: ${name} click did not open its panel`); }
+    }
+    await button.click({timeout:5000});
+  }
+}
 async function surface(page,t,path,v) {
   if (path.endsWith('.csv')) {
     if (t.denied) {
@@ -141,7 +168,7 @@ async function surface(page,t,path,v) {
     return;
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
-  await waitForOperationalSurface(page); await dismiss(page); await openMobileCart(page,v,t.markers||[]);
+  await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigation(page,t,v); await openMobileCart(page,v,t.markers||[]);
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
   if (t.denied) { if ([302,403].includes(status)||new URL(page.url()).pathname!==path) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);

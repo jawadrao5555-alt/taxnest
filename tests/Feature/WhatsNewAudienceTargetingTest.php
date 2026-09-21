@@ -420,36 +420,50 @@ class WhatsNewAudienceTargetingTest extends TestCase
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // 6. Read-only impersonation (View as Company) — ReadOnlyImpersonation
-    //    blocks ALL POSTs incl. /whats-new/seen → skip popup/bell entirely.
+    // 6. Read-only impersonation (View as Company) — history stays visible
+    //    for accurate diagnosis, while auto-popup and ALL seen writes stay off.
     // ════════════════════════════════════════════════════════════════════
 
-    public function test_readonly_impersonation_skips_popup_on_pra_layout(): void
+    public function test_readonly_impersonation_shows_targeted_pra_history_without_popup_or_writes(): void
     {
         // A real impersonation always has the admin's own login alive in the same
         // session — without it the flag is orphaned and gets cleared on sight.
         auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+        $this->assertSame(0, AppUpdateSeen::count());
 
         $resp = $this->actingAs(User::find($this->posAdminId), 'pos')
             ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->posCompanyId]])
             ->get('/pos/my-profile');
 
         $resp->assertStatus(200);
-        $resp->assertDontSee(self::T_POS);
-        $resp->assertDontSee(self::T_ALL);
+        $resp->assertSee(self::T_POS);
+        $resp->assertSee(self::T_ALL);
+        $resp->assertDontSee(self::T_FBR);
+        $resp->assertDontSee(self::T_HIDDEN);
+        $resp->assertSee('open-whats-new-detail', false);
+        $resp->assertDontSee('x-data="{ wnOpen: true,', false);
+        $resp->assertSee('if (this.wasSeen || true) return;', false);
+        $this->assertSame(0, AppUpdateSeen::count(), 'Read-only PRA View-as must perform zero seen writes.');
     }
 
-    public function test_readonly_impersonation_skips_popup_on_fbr_layout(): void
+    public function test_readonly_impersonation_shows_targeted_fbr_history_without_popup_or_writes(): void
     {
         auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+        $this->assertSame(0, AppUpdateSeen::count());
 
         $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
             ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->fbrCompanyId]])
             ->get('/fbr-pos/my-profile');
 
         $resp->assertStatus(200);
-        $resp->assertDontSee(self::T_FBR);
-        $resp->assertDontSee(self::T_ALL);
+        $resp->assertSee(self::T_FBR);
+        $resp->assertSee(self::T_ALL);
+        $resp->assertDontSee(self::T_POS);
+        $resp->assertDontSee(self::T_HIDDEN);
+        $resp->assertSee('open-whats-new-detail', false);
+        $resp->assertDontSee('x-data="{ wnOpen: true,', false);
+        $resp->assertSee('if (this.wasSeen || true) return;', false);
+        $this->assertSame(0, AppUpdateSeen::count(), 'Read-only FBR View-as must perform zero seen writes.');
     }
 
     public function test_full_access_impersonation_still_shows_popup(): void

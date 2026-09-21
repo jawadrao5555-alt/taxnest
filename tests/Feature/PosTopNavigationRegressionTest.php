@@ -57,6 +57,27 @@ class PosTopNavigationRegressionTest extends TestCase
         );
     }
 
+    public function test_fbr_mobile_impersonation_keeps_identity_controls_inside_the_hit_testable_header(): void
+    {
+        $fbr = file_get_contents(resource_path('views/layouts/fbr-pos-app.blade.php'));
+
+        $this->assertNotFalse($fbr);
+        $this->assertStringContainsString(
+            "{{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}",
+            $fbr
+        );
+        $this->assertStringContainsString('class="tn-fbr-header-brand ', $fbr);
+        $this->assertStringContainsString('data-tn-fbr-secondary-action', $fbr);
+        $this->assertMatchesRegularExpression(
+            '/@media \\(max-width: 639px\\)[\\s\\S]+\\.tn-impersonated-header \\.tn-fbr-header-brand,[\\s\\S]+\\.tn-impersonated-header \\[data-tn-fbr-secondary-action\\][\\s\\S]+display: none !important;/',
+            $fbr
+        );
+        $this->assertMatchesRegularExpression(
+            '/\\.tn-impersonated-header \\.tn-fbr-header-actions \\{[\\s\\S]+flex-shrink: 0;[\\s\\S]+overflow: visible;/',
+            $fbr
+        );
+    }
+
     public function test_read_only_diagnosis_keeps_bell_history_but_disables_writes(): void
     {
         $pra = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));

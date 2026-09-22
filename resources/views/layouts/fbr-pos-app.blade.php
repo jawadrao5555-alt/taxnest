@@ -242,6 +242,20 @@
                 animation: slideDown 0.18s cubic-bezier(.4,0,.2,1);
                 box-shadow: 0 25px 60px -15px rgba(15,23,42,0.55), 0 0 0 1px rgba(15,23,42,0.06);
             }
+            .tn-fbr-header-actions { overflow: visible !important; }
+            .tn-topnav-scroll-actions {
+                min-width: 0;
+                max-width: 100%;
+                overflow-x: auto;
+                overflow-y: hidden;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .tn-topnav-scroll-actions::-webkit-scrollbar { display: none; }
+            .tn-topnav-menu-cluster {
+                flex: 0 0 auto;
+                overflow: visible;
+            }
             .menu-link { transition: all 0.12s ease; border-left: 2px solid transparent; }
             .menu-link:hover { background: linear-gradient(90deg, rgba(37,99,235,0.10), transparent 70%); border-left-color: #2563eb; padding-left: calc(1rem + 2px); }
             .dark .menu-link:hover { background: linear-gradient(90deg, rgba(59,130,246,0.18), transparent 70%); border-left-color: #60a5fa; }
@@ -264,6 +278,9 @@
                     flex-shrink: 0;
                     gap: .25rem;
                     overflow: visible;
+                }
+                .tn-impersonated-header .tn-topnav-scroll-actions {
+                    flex: 1 1 auto;
                 }
             }
             /* Premium page background — clean flat navy/blue wash (no corner gradients) */
@@ -477,7 +494,8 @@
                          Empty and harmless on every other FBR POS page. --}}
                     <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
 
-                    <div class="tn-fbr-header-actions flex items-center gap-2 min-w-0 max-w-full overflow-x-auto">
+                    <div class="tn-fbr-header-actions flex items-center gap-2 min-w-0 max-w-full">
+                        <div data-tn-topnav-scroll-actions class="tn-topnav-scroll-actions flex items-center gap-2">
                         {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
                         <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="blue" />
@@ -513,7 +531,9 @@
                             <span class="hidden md:inline text-[9px] opacity-70 ml-1">⇧F11</span>
                         </button>
                         @endif
+                        </div>
 
+                        <div data-tn-topnav-menu-cluster class="tn-topnav-menu-cluster flex items-center gap-2">
                         @if($whatsNewList->isNotEmpty())
                         {{-- What's New bell — opening history does NOT mark anything seen. --}}
                         <div class="relative" x-data="{ bellOpen: false, unseen: {{ (int) $whatsNewUnseenCount }},
@@ -828,6 +848,7 @@
                             <svg x-show="!mobileMenuOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                             <svg x-show="mobileMenuOpen" x-cloak class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
+                        </div>
                     </div>
                 </div>
 

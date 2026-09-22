@@ -507,11 +507,21 @@
                 min-width: 0;
                 max-width: 100%;
                 flex-shrink: 1 !important;
-                overflow-x: auto !important;
+                overflow: visible;
+            }
+            .topnav-bar .tn-topnav-scroll-actions {
+                min-width: 0;
+                max-width: 100%;
+                overflow-x: auto;
+                overflow-y: hidden;
                 scrollbar-width: none;
                 -ms-overflow-style: none;
             }
-            .topnav-bar .tn-impersonation-header-actions::-webkit-scrollbar { display: none; }
+            .topnav-bar .tn-topnav-scroll-actions::-webkit-scrollbar { display: none; }
+            .topnav-bar .tn-topnav-menu-cluster {
+                flex: 0 0 auto;
+                overflow: visible;
+            }
             @media (max-width: 639px) {
                 .tn-impersonated-header .tn-impersonation-header-row {
                     height: auto !important;
@@ -524,11 +534,13 @@
                 .tn-impersonated-header .tn-impersonation-header-left { flex-basis: 100%; }
                 .tn-impersonated-header .tn-impersonation-header-actions {
                     flex: 1 1 100% !important;
-                    flex-wrap: wrap !important;
                     justify-content: flex-end !important;
                     min-width: 0;
                     max-width: 100%;
                     margin-left: auto;
+                }
+                .tn-impersonated-header .tn-topnav-scroll-actions {
+                    flex: 1 1 auto;
                 }
             }
             @media (min-width: 640px) and (max-width: 767px) {
@@ -543,9 +555,11 @@
                 .topnav-bar .tn-impersonation-header-left { flex-basis: 100%; }
                 .topnav-bar .tn-impersonation-header-actions {
                     flex: 1 1 100% !important;
-                    flex-wrap: wrap !important;
                     justify-content: flex-end !important;
                     margin-left: auto;
+                }
+                .topnav-bar .tn-topnav-scroll-actions {
+                    flex: 1 1 auto;
                 }
             }
         </style>
@@ -657,6 +671,7 @@
                             document.addEventListener('fullscreenchange', () => isFs = !!document.fullscreenElement);
                             isFs = !!document.fullscreenElement;
                          ">
+                        <div data-tn-topnav-scroll-actions class="tn-topnav-scroll-actions flex items-center gap-2">
                         {{-- Net/PRA/clock status cluster REMOVED (owner, 26 Jul 2026) — sale screen
                              already has its own Auto-Sync Online/Offline pill; do not re-add. --}}
 
@@ -675,26 +690,6 @@
                             <svg x-show="!isFs" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
                             <svg x-show="isFs" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V5m0 4H5m10 0V5m0 4h4M9 15v4m0-4H5m10 0v4m0-4h4"/></svg>
                         </button>
-
-                        <div class="relative">
-                            <button data-tn-topnav-control="theme" @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_change_theme') }}">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
-                            </button>
-                            <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">{{ __('pos.pos_theme_heading') }}</p>
-                                <div class="grid grid-cols-3 gap-2">
-                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="{{ __('pos.theme_royal_purple') }}"></button>
-                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="{{ __('pos.theme_ocean_blue') }}"></button>
-                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="{{ __('pos.theme_emerald_green') }}"></button>
-                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="{{ __('pos.theme_sunset_orange') }}"></button>
-                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="{{ __('pos.theme_midnight_dark') }}"></button>
-                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="{{ __('pos.theme_rose_pink') }}"></button>
-                                </div>
-                                <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                                    <p class="text-[9px] text-gray-400 text-center" x-text="currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1) + ' Theme'"></p>
-                                </div>
-                            </div>
-                        </div>
 
                         <button data-mobile-nav-toggle @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-2 rounded-lg text-white hover:bg-white/15 transition">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -743,6 +738,28 @@
                             <span class="absolute rounded-full bg-red-500" style="top: 3px; right: 3px; width: 9px; height: 9px;"></span>
                         </button>
                         @endif
+                        </div>
+
+                        <div data-tn-topnav-menu-cluster class="tn-topnav-menu-cluster flex items-center gap-2">
+                        <div class="relative">
+                            <button data-tn-topnav-control="theme" @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_change_theme') }}">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                            </button>
+                            <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">{{ __('pos.pos_theme_heading') }}</p>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="{{ __('pos.theme_royal_purple') }}"></button>
+                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="{{ __('pos.theme_ocean_blue') }}"></button>
+                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="{{ __('pos.theme_emerald_green') }}"></button>
+                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="{{ __('pos.theme_sunset_orange') }}"></button>
+                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="{{ __('pos.theme_midnight_dark') }}"></button>
+                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="{{ __('pos.theme_rose_pink') }}"></button>
+                                </div>
+                                <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                                    <p class="text-[9px] text-gray-400 text-center" x-text="currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1) + ' Theme'"></p>
+                                </div>
+                            </div>
+                        </div>
 
                         @if($whatsNewList->isNotEmpty())
                         {{-- What's New bell — opening history does NOT mark anything seen. --}}
@@ -1100,6 +1117,7 @@
                                     </form>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>

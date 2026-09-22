@@ -22,6 +22,8 @@ class PosTopNavigationRegressionTest extends TestCase
             $this->assertStringContainsString('data-tn-topnav-control="notification"', $layout);
             $this->assertStringContainsString('data-tn-topnav-control="theme"', $layout);
             $this->assertStringContainsString('data-tn-topnav-control="profile"', $layout);
+            $this->assertStringContainsString('data-tn-topnav-scroll-actions', $layout);
+            $this->assertStringContainsString('data-tn-topnav-menu-cluster', $layout);
         }
         $this->assertStringContainsString('data-tn-topnav-control="fullscreen"', $pra);
 
@@ -78,6 +80,25 @@ class PosTopNavigationRegressionTest extends TestCase
         );
     }
 
+    public function test_dropdown_hosts_are_outside_the_scrollable_action_strip(): void
+    {
+        foreach ([
+            resource_path('views/layouts/pos-app.blade.php'),
+            resource_path('views/layouts/fbr-pos-app.blade.php'),
+        ] as $layoutPath) {
+            $layout = file_get_contents($layoutPath);
+
+            $this->assertNotFalse($layout);
+            $this->assertStringContainsString('.tn-topnav-scroll-actions', $layout);
+            $this->assertStringContainsString('overflow-x: auto;', $layout);
+            $this->assertStringContainsString('.tn-topnav-menu-cluster', $layout);
+            $this->assertMatchesRegularExpression(
+                '/\\.tn-topnav-menu-cluster\\s*\\{[\\s\\S]*?overflow:\\s*visible;/',
+                $layout
+            );
+        }
+    }
+
     public function test_read_only_diagnosis_keeps_bell_history_but_disables_writes(): void
     {
         $pra = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
@@ -121,4 +142,5 @@ class PosTopNavigationRegressionTest extends TestCase
 
         return (int) ($matches[1] ?? 0);
     }
+
 }

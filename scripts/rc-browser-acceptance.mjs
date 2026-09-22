@@ -139,20 +139,78 @@ async function checkTopNavigation(page,t,v) {
   const header=page.locator(`[data-tn-topnav="${t.topNavPanel}"]`).first();
   if(!await header.count())return fail(`${t.name}/${v.width}: shared ${t.topNavPanel} top navigation missing`);
   if(await page.locator('[role="dialog"][aria-modal="true"]:visible').count())return fail(`${t.name}/${v.width}: blocking overlay remained visible before top-navigation checks`);
+  const scrollActions=header.locator('[data-tn-topnav-scroll-actions]').first();
+  const menuCluster=header.locator('[data-tn-topnav-menu-cluster]').first();
+  if(!await scrollActions.count())fail(`${t.name}/${v.width}: ordinary header-action scroller missing`);
+  if(!await menuCluster.count())return fail(`${t.name}/${v.width}: overflow-visible top-navigation menu cluster missing`);
   for(const name of ['notification','theme','profile']) {
     const button=header.locator(`[data-tn-topnav-control="${name}"]`).first();
     if(!await button.count()||!await button.isVisible()) { fail(`${t.name}/${v.width}: ${name} control missing`); continue; }
+    if(!await menuCluster.locator(`[data-tn-topnav-control="${name}"]`).count())fail(`${t.name}/${v.width}: ${name} control escaped the overflow-visible menu cluster`);
+    if(await scrollActions.locator(`[data-tn-topnav-control="${name}"]`).count())fail(`${t.name}/${v.width}: ${name} control remains inside the scrolling action strip`);
     const hit=await button.evaluate(el=>{const r=el.getBoundingClientRect(),n=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return{inside:r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,reached:!!n&&(n===el||el.contains(n)),rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},hit:n?.tagName||null};});
     if(!hit.inside){fail(`${t.name}/${v.width}: ${name} control left the viewport (${JSON.stringify(hit.rect)})`);continue;}
     if(!hit.reached){fail(`${t.name}/${v.width}: physical hit-test reached ${hit.hit||'nothing'} instead of ${name} button`);continue;}
+    const stateKey={notification:'bellOpen',theme:'themeOpen',profile:'profileOpen'}[name];
+    const stateBefore=await button.evaluate((el,key)=>Boolean(window.Alpine.$data(el)[key]),stateKey);
+    if(stateBefore)fail(`${t.name}/${v.width}: ${name} Alpine state was open before its physical click`);
     await button.click({timeout:5000});
     const panel=button.locator('xpath=..').locator(':scope > div[x-show]').first();
     if(!await panel.count())fail(`${t.name}/${v.width}: ${name} panel missing after click`);
     else {
-      try { await panel.waitFor({state:'visible',timeout:3000}); pass(`${t.name}/${v.width}: ${name} physical click opened its panel`); }
+      try {
+        await panel.waitFor({state:'visible',timeout:3000});
+        let panelOk=true;
+        const stateAfter=await button.evaluate((el,key)=>Boolean(window.Alpine.$data(el)[key]),stateKey);
+        if(!stateAfter){fail(`${t.name}/${v.width}: ${name} Alpine state did not change false→true`);panelOk=false;}
+        const geometry=await panel.evaluate(el=>{
+          const r=el.getBoundingClientRect();
+          const header=el.closest('[data-tn-topnav]');
+          const hr=header?.getBoundingClientRect();
+          const clipping=[];
+          for(let n=el.parentElement;n&&n!==document.documentElement;n=n.parentElement){
+            if(n===document.body)continue;
+            const s=getComputedStyle(n);
+            if(['auto','hidden','clip','scroll'].includes(s.overflowX)||['auto','hidden','clip','scroll'].includes(s.overflowY)){
+              clipping.push({tag:n.tagName,cls:n.className,overflowX:s.overflowX,overflowY:s.overflowY});
+            }
+          }
+          const x=Math.min(Math.max(r.left+8,1),innerWidth-2);
+          const y=Math.min(Math.max(r.top+8,1),innerHeight-2);
+          const hit=document.elementFromPoint(x,y);
+          return {
+            rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},
+            headerBottom:hr?.bottom??0,
+            extendsBelowHeader:r.bottom>(hr?.bottom??0)+1,
+            clipping,
+            innerHit:!!hit&&(hit===el||el.contains(hit)),
+            documentWidth:Math.max(document.documentElement.scrollWidth,document.body.scrollWidth),
+          };
+        });
+        if(geometry.rect.width<=0||geometry.rect.height<=0||!geometry.extendsBelowHeader){fail(`${t.name}/${v.width}: ${name} panel has no visible area below the header (${JSON.stringify(geometry.rect)})`);panelOk=false;}
+        if(geometry.clipping.length){fail(`${t.name}/${v.width}: ${name} panel has clipping overflow ancestor ${JSON.stringify(geometry.clipping[0])}`);panelOk=false;}
+        if(!geometry.innerHit){fail(`${t.name}/${v.width}: ${name} panel failed its inner physical hit-test`);panelOk=false;}
+        if(geometry.documentWidth>v.width+2){fail(`${t.name}/${v.width}: ${name} panel introduced horizontal document overflow (${geometry.documentWidth}px)`);panelOk=false;}
+        if(panelOk)pass(`${t.name}/${v.width}: ${name} physical click opened an unclipped panel`);
+      }
       catch { fail(`${t.name}/${v.width}: ${name} click did not open its panel`); }
     }
     await button.click({timeout:5000});
+    if(await panel.count()) {
+      try { await panel.waitFor({state:'hidden',timeout:3000}); }
+      catch { fail(`${t.name}/${v.width}: ${name} panel did not close normally`); }
+    }
+  }
+}
+async function checkTopNavigationWithReloadRetry(page,t,path,v) {
+  try {
+    await checkTopNavigation(page,t,v);
+  } catch (error) {
+    if (!/Execution context was destroyed|most likely because of a navigation/i.test(String(error?.message || error))) throw error;
+    await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
+    await waitForOperationalSurface(page);
+    await dismiss(page);
+    await checkTopNavigation(page,t,v);
   }
 }
 async function surface(page,t,path,v) {
@@ -169,7 +227,7 @@ async function surface(page,t,path,v) {
     return;
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
-  await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigation(page,t,v); await openMobileCart(page,v,t.markers||[]);
+  await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigationWithReloadRetry(page,t,path,v); await openMobileCart(page,v,t.markers||[]);
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
   if (t.denied) { if ([302,403].includes(status)||new URL(page.url()).pathname!==path) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);

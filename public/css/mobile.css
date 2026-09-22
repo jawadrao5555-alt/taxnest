@@ -833,7 +833,7 @@ pre, code { max-width: 100%; overflow-x: auto; word-break: break-word; }
     }
     .tn-action-row2::-webkit-scrollbar { display: none; }
     .tn-action-row1 > div:first-child { flex-basis: 100% !important; width: 100% !important; min-width: 0 !important; }
-    .tn-fbr-header-actions,
+    .tn-fbr-header-actions .tn-topnav-scroll-actions,
     .tn-fbr-mobile-switches {
         max-width: 100%;
         min-width: 0 !important;
@@ -841,7 +841,7 @@ pre, code { max-width: 100%; overflow-x: auto; word-break: break-word; }
         scrollbar-width: none;
         -ms-overflow-style: none;
     }
-    .tn-fbr-header-actions::-webkit-scrollbar,
+    .tn-fbr-header-actions .tn-topnav-scroll-actions::-webkit-scrollbar,
     .tn-fbr-mobile-switches::-webkit-scrollbar { display: none; }
     .tn-fbr-mobile-switches {
         justify-content: flex-start !important;

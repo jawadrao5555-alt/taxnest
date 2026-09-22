@@ -34,6 +34,7 @@ class PosInventoryMasterExcelService
     public const MAX_DATA_ROWS = 5000;
     public const MAX_RECIPE_ROWS = 2000;
     public const WORKBOOK_FILENAME = 'TaxNest_Menu_Import.xlsx';
+    public const EXPORT_FILENAME = 'TaxNest_Current_Menu_Export.xlsx';
     private const PREVIEW_TTL = 1800;
 
     public const HEADERS = [
@@ -167,9 +168,9 @@ class PosInventoryMasterExcelService
         $start->getStyle('A2:A5')->getAlignment()->setWrapText(true);
         $start->getColumnDimension('A')->setWidth(105);
         $definitions = [
-            'Products' => ['Product Name', 'Category', 'Product Type', 'Sale Price', 'Cost Price', 'SKU', 'Barcode', 'Unit', 'Tax Rate', 'Active', 'Track Stock', 'Opening Stock', 'Low Stock Alert', 'Description'],
-            'Ingredients' => ['Ingredient Name', 'Category', 'Purchase Unit', 'Usage Unit', 'Conversion Factor', 'Cost per Purchase Unit', 'Opening Stock', 'Low Stock Alert', 'Supplier', 'Active'],
-            'Recipes' => ['Product Name', 'Ingredient Name', 'Quantity Used', 'Usage Unit', 'Waste %', 'Notes'],
+            'Products' => ['Product Name', 'Category', 'Product Type', 'Sale Price', 'Cost Price', 'SKU', 'Barcode', 'Unit', 'Tax Rate', 'Active', 'Track Stock', 'Opening Stock', 'Low Stock Alert', 'Description', 'Product ID'],
+            'Ingredients' => ['Ingredient Name', 'Category', 'Purchase Unit', 'Usage Unit', 'Conversion Factor', 'Cost per Purchase Unit', 'Opening Stock', 'Low Stock Alert', 'Supplier', 'Active', 'Ingredient Code', 'Ingredient ID'],
+            'Recipes' => ['Product Name', 'Ingredient Name', 'Quantity Used', 'Usage Unit', 'Waste %', 'Notes', 'Product Code', 'Ingredient Code', 'Product ID', 'Ingredient ID'],
             'Lists' => ['List', 'Allowed Value', 'Guidance'],
         ];
         foreach ($definitions as $title => $headers) {
@@ -209,23 +210,23 @@ class PosInventoryMasterExcelService
         $this->addWorkbookValidation($ss->getSheetByName('Ingredients'), 'J2:J2000', '"Yes,No"');
         $this->addWorkbookValidation($ss->getSheetByName('Recipes'), 'D2:D2000', '"pcs,cup,kg,g,ltr,ml,dozen"');
         $samples = [
-            ['Misal: Plain Tea', 'Beverages', 'Recipe', 100, '', 'TEA-001', '', 'cup', 0, 'Yes', 'No', '', '', 'Sample only'],
+            ['Misal: Plain Tea', 'Beverages', 'Recipe', 100, '', 'TEA-001', '', 'cup', 0, 'Yes', 'No', '', '', 'Sample only', ''],
         ];
         $ss->getSheetByName('Products')->fromArray($samples, null, 'A2');
         $ss->getSheetByName('Products')->getStyle('A2:N2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCFCE7');
         $ingredientSamples = [
-            ['Misal: Tea Leaves', '', 'kg', 'g', 1000, 1000, '', 0, '', 'Yes'],
-            ['Misal: Milk', '', 'ltr', 'ml', 1000, 180, '', 0, '', 'Yes'],
-            ['Misal: Sugar', '', 'kg', 'g', 1000, 200, '', 0, '', 'Yes'],
-            ['Misal: Water', '', 'ltr', 'ml', 1000, 20, '', 0, '', 'Yes'],
+            ['Misal: Tea Leaves', '', 'kg', 'g', 1000, 1000, '', 0, '', 'Yes', 'TEA-LEAF', ''],
+            ['Misal: Milk', '', 'ltr', 'ml', 1000, 180, '', 0, '', 'Yes', 'MILK', ''],
+            ['Misal: Sugar', '', 'kg', 'g', 1000, 200, '', 0, '', 'Yes', 'SUGAR', ''],
+            ['Misal: Water', '', 'ltr', 'ml', 1000, 20, '', 0, '', 'Yes', 'WATER', ''],
         ];
         $ss->getSheetByName('Ingredients')->fromArray($ingredientSamples, null, 'A2');
         $ss->getSheetByName('Ingredients')->getStyle('A2:J5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEF3C7');
         $ss->getSheetByName('Recipes')->fromArray([
-            ['Misal: Plain Tea', 'Misal: Tea Leaves', 2, 'g', 0, 'Sample only'],
-            ['Misal: Plain Tea', 'Misal: Milk', 100, 'ml', 0, 'Sample only'],
-            ['Misal: Plain Tea', 'Misal: Sugar', 8, 'g', 0, 'Sample only'],
-            ['Misal: Plain Tea', 'Misal: Water', 100, 'ml', 0, 'Sample only'],
+            ['Misal: Plain Tea', 'Misal: Tea Leaves', 2, 'g', 0, 'Sample only', 'TEA-001', 'TEA-LEAF', '', ''],
+            ['Misal: Plain Tea', 'Misal: Milk', 100, 'ml', 0, 'Sample only', 'TEA-001', 'MILK', '', ''],
+            ['Misal: Plain Tea', 'Misal: Sugar', 8, 'g', 0, 'Sample only', 'TEA-001', 'SUGAR', '', ''],
+            ['Misal: Plain Tea', 'Misal: Water', 100, 'ml', 0, 'Sample only', 'TEA-001', 'WATER', '', ''],
         ], null, 'A2');
         $ss->getSheetByName('Recipes')->getStyle('A2:F5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEE2E2');
         return $ss;
@@ -354,30 +355,65 @@ class PosInventoryMasterExcelService
 
     public function exportWorkbook(int $companyId)
     {
+        $ss = $this->buildExportWorkbook($companyId);
+        $writer = new Xlsx($ss);
+
+        return response()->streamDownload(fn () => $writer->save('php://output'),
+            self::EXPORT_FILENAME, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate',
+                'Pragma' => 'no-cache',
+            ]);
+    }
+
+    public function buildExportWorkbook(int $companyId): Spreadsheet
+    {
         $ss = $this->buildWorkbook();
+        $this->clearTemplateExamples($ss);
+
         $products = $ss->getSheetByName('Products');
+        $productRow = 2;
         foreach (PosProduct::where('company_id', $companyId)->orderBy('id')->get() as $row) {
             $values = [$row->name, $row->category, $this->productHasRecipe($row->id, $companyId) ? 'Recipe' : 'Resale',
                 $row->price, $row->cost_price, $row->sku, $row->barcode, $row->uom, $row->tax_rate,
-                $row->is_active ? 'Yes' : 'No', '', '', $row->low_stock_threshold, $row->description];
-            $this->safeWriteRow($products, $products->getHighestRow() + 1, $values);
+                $row->is_active ? 'Yes' : 'No', '', '', $row->low_stock_threshold, $row->description, $row->id];
+            $this->safeWriteRow($products, $productRow++, $values, [6, 7, 15]);
         }
+
         $ingredients = $ss->getSheetByName('Ingredients');
+        $ingredientRow = 2;
         foreach (Ingredient::where('company_id', $companyId)->orderBy('id')->get() as $row) {
-            $this->safeWriteRow($ingredients, $ingredients->getHighestRow() + 1,
+            $this->safeWriteRow($ingredients, $ingredientRow++,
                 [$row->name, $row->category ?? '', $row->base_unit ?: $row->unit, $row->unit,
                     $row->conversion_factor ?: 1, (float) $row->cost_per_unit * (float) ($row->conversion_factor ?: 1),
-                    '', $row->min_stock_level, $row->supplier ?? '', $row->is_active ? 'Yes' : 'No']);
+                    '', $row->min_stock_level, $row->supplier ?? '', $row->is_active ? 'Yes' : 'No',
+                    $row->code, $row->id],
+                [11, 12]);
         }
+
         $recipes = $ss->getSheetByName('Recipes');
-        foreach (ProductRecipe::where('company_id', $companyId)->with(['product', 'ingredient'])->orderBy('id')->get() as $row) {
-            $this->safeWriteRow($recipes, $recipes->getHighestRow() + 1,
-                [$row->product?->name, $row->ingredient?->name, $row->quantity_needed,
-                    $row->ingredient?->unit, $row->waste_percent ?? 0, $row->notes ?? '']);
+        $recipeRow = 2;
+        $recipeQuery = ProductRecipe::where('company_id', $companyId)
+            ->with([
+                'product' => fn ($query) => $query->where('company_id', $companyId),
+                'ingredient' => fn ($query) => $query->where('company_id', $companyId),
+            ]);
+        if (Schema::hasColumn('product_recipes', 'is_active')) {
+            $recipeQuery->where('is_active', true);
         }
-        $writer = new Xlsx($ss);
-        return response()->streamDownload(fn () => $writer->save('php://output'),
-            self::WORKBOOK_FILENAME, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+        foreach ($recipeQuery->orderBy('id')->get() as $row) {
+            if (!$row->product || !$row->ingredient) {
+                continue;
+            }
+            $this->safeWriteRow($recipes, $recipeRow++,
+                [$row->product?->name, $row->ingredient?->name, $row->quantity_needed,
+                    $row->ingredient?->unit, $row->waste_percent ?? 0, $row->notes ?? '',
+                    $row->product?->sku ?: $row->product?->barcode, $row->ingredient?->code,
+                    $row->product_id, $row->ingredient_id],
+                [7, 8, 9, 10]);
+        }
+
+        return $ss;
     }
 
     /**
@@ -1627,20 +1663,29 @@ class PosInventoryMasterExcelService
                 }
                 foreach ($sheet->getCoordinates() as $coordinate) {
                     $cell = $sheet->getCell($coordinate);
-                    if ($cell->isFormula() || preg_match('/^\s*=/', (string) $cell->getValue())) {
+                    if ($cell->isFormula()) {
                         throw new \RuntimeException('Formula cells are not permitted.');
                     }
                 }
             }
             $requiredHeaders = [
-                'Products'=>['Product Name','Category','Product Type','Sale Price','Cost Price','SKU','Barcode','Unit','Tax Rate','Active','Track Stock','Opening Stock','Low Stock Alert','Description'],
-                'Ingredients'=>['Ingredient Name','Category','Purchase Unit','Usage Unit','Conversion Factor','Cost per Purchase Unit','Opening Stock','Low Stock Alert','Supplier','Active'],
-                'Recipes'=>['Product Name','Ingredient Name','Quantity Used','Usage Unit','Waste %','Notes'],
+                'Products'=>['Product Name','Category','Product Type','Sale Price','Cost Price','SKU','Barcode','Unit','Tax Rate','Active','Track Stock','Opening Stock','Low Stock Alert','Description','Product ID'],
+                'Ingredients'=>['Ingredient Name','Category','Purchase Unit','Usage Unit','Conversion Factor','Cost per Purchase Unit','Opening Stock','Low Stock Alert','Supplier','Active','Ingredient Code','Ingredient ID'],
+                'Recipes'=>['Product Name','Ingredient Name','Quantity Used','Usage Unit','Waste %','Notes','Product Code','Ingredient Code','Product ID','Ingredient ID'],
                 'Lists'=>['List','Allowed Value','Guidance'],
             ];
+            $legacyHeaders = [
+                'Products'=>array_slice($requiredHeaders['Products'], 0, 14),
+                'Ingredients'=>array_slice($requiredHeaders['Ingredients'], 0, 10),
+                'Recipes'=>array_slice($requiredHeaders['Recipes'], 0, 6),
+                'Lists'=>$requiredHeaders['Lists'],
+            ];
             foreach ($requiredHeaders as $name => $headers) {
-                $actual = array_map(fn ($value) => trim((string) $value), array_slice($ss->getSheetByName($name)->toArray(null, true, false, false)[0] ?? [], 0, count($headers)));
-                if ($actual !== $headers) throw new \RuntimeException("Unexpected {$name} headers.");
+                $actual = array_map(fn ($value) => trim((string) $value), $ss->getSheetByName($name)->toArray(null, true, false, false)[0] ?? []);
+                $actual = array_slice($actual, 0, count($headers));
+                if ($actual !== $headers && $actual !== $legacyHeaders[$name]) {
+                    throw new \RuntimeException("Unexpected {$name} headers.");
+                }
             }
             $rows = [];
             $sampleRows = [];
@@ -1737,12 +1782,32 @@ class PosInventoryMasterExcelService
             ->setFormula1($formula)->setSqref($range);
     }
 
-    private function safeWriteRow($sheet, int $row, array $values): void
+    private function clearTemplateExamples(Spreadsheet $spreadsheet): void
+    {
+        foreach ([
+            'Products' => ['O', 2],
+            'Ingredients' => ['L', 5],
+            'Recipes' => ['J', 5],
+        ] as $sheetName => [$lastColumn, $lastRow]) {
+            $sheet = $spreadsheet->getSheetByName($sheetName);
+            for ($row = 2; $row <= $lastRow; $row++) {
+                for ($column = 1; $column <= \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($lastColumn); $column++) {
+                    $sheet->setCellValue(
+                        \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($column).$row,
+                        null
+                    );
+                }
+            }
+        }
+    }
+
+    private function safeWriteRow($sheet, int $row, array $values, array $textColumns = []): void
     {
         foreach (array_values($values) as $column => $value) {
             $coordinate = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($column + 1).$row;
-            if (is_string($value) && preg_match('/^[=+\-@]/', $value)) {
-                $sheet->setCellValueExplicit($coordinate, "'".$value, DataType::TYPE_STRING);
+            if (in_array($column + 1, $textColumns, true)
+                || (is_string($value) && preg_match('/^[=+\-@]/', $value))) {
+                $sheet->setCellValueExplicit($coordinate, (string) $value, DataType::TYPE_STRING);
             } else {
                 $sheet->setCellValue($coordinate, $value);
             }
@@ -1782,8 +1847,8 @@ class PosInventoryMasterExcelService
                 if ($fields['name']==='' || $fields['price']===null) {
                     $errors[]=$this->cellError($item,'Product Name/Sale Price','Product Name and Sale Price are required.'); continue;
                 }
-                if ($fields['price'] <= 0) {
-                    $errors[]=$this->cellError($item,'Sale Price','Sale Price must be greater than zero.'); continue;
+                if ($fields['price'] < 0) {
+                    $errors[]=$this->cellError($item,'Sale Price','Sale Price must be zero or greater.'); continue;
                 }
                 if ($fields['tax_rate'] !== null && ($fields['tax_rate'] < 0 || $fields['tax_rate'] > 100)) {
                     $errors[]=$this->cellError($item,'Tax Rate','Tax Rate must be between 0 and 100.'); continue;
@@ -1797,11 +1862,16 @@ class PosInventoryMasterExcelService
                 if (!in_array(strtolower(trim((string)($v[2]??''))), ['recipe','resale'], true)) {
                     $errors[]=$this->cellError($item,'Product Type','Product Type must be Recipe or Resale.'); continue;
                 }
-                $identityKeys = array_values(array_filter([
-                    $fields['sku'] ? 'code:'.strtolower($fields['sku']) : null,
-                    $fields['barcode'] ? 'code:'.strtolower($fields['barcode']) : null,
-                    'name:'.$this->normalizedName($fields['name']),
-                ]));
+                $productId = trim((string) ($v[14] ?? ''));
+                $identityKeys = $productId !== ''
+                    ? ['id:'.$productId]
+                    : array_values(array_filter([
+                        $fields['sku'] ? 'code:'.strtolower($fields['sku']) : null,
+                        $fields['barcode'] ? 'code:'.strtolower($fields['barcode']) : null,
+                    ]));
+                if (!$identityKeys) {
+                    $identityKeys[] = 'name:'.$this->normalizedName($fields['name']);
+                }
                 $duplicateKey = collect($identityKeys)->first(fn ($key) => isset($seenProductIdentities[$key]));
                 if ($duplicateKey !== null) {
                     $errors[]=$this->cellError($item,'SKU/Barcode/Product Name','Duplicate product identity in this workbook.'); continue;
@@ -1814,6 +1884,9 @@ class PosInventoryMasterExcelService
                 if ($fields['category']!=='') $categories[$fields['category']] = true;
                 $operation = $this->operation('product',$item,$match,$fields,$mode);
                 $operations[]=$operation;
+                if ($productId !== '') {
+                    $plannedProducts['id:'.$productId] = $operation;
+                }
                 foreach ([$fields['sku'], $fields['barcode'], $fields['name']] as $reference) {
                     $ref = $this->stableReference('', '', $reference);
                     if ($ref !== '') $plannedProducts[$ref] = $operation;
@@ -1829,21 +1902,37 @@ class PosInventoryMasterExcelService
                     'base_unit'=>$purchaseUnit,'conversion_factor'=>$factor,
                     'cost_per_unit'=>$factor && $purchaseCost !== null ? $purchaseCost / $factor : $purchaseCost,'min_stock_level'=>$this->cleanImportNumber($v[7]??null) ?: 0,
                     'is_active'=>$this->parseYesNo((string)($v[9]??''))];
+                if ($match && $match->base_unit === null
+                    && strtolower($purchaseUnit) === strtolower($usageUnit)
+                    && abs((float) $factor - 1.0) < 0.000001) {
+                    $fields['base_unit'] = null;
+                }
+                if (Schema::hasColumn('ingredients', 'code')) $fields['code'] = $this->cleanImportCode($v[10] ?? null);
                 if (Schema::hasColumn('ingredients', 'category')) $fields['category'] = trim((string)($v[1]??''));
                 if (Schema::hasColumn('ingredients', 'supplier')) $fields['supplier'] = trim((string)($v[8]??''));
                 if ($fields['name']==='' || $fields['unit']==='') { $errors[]=$this->cellError($item,'Ingredient Name/Usage Unit','Ingredient Name and Usage Unit are required.'); continue; }
-                if (!in_array($purchaseUnit, RecipeInventoryService::UNITS, true) || !in_array($usageUnit, RecipeInventoryService::UNITS, true)
+                $purchaseUnitSupported = in_array($purchaseUnit, RecipeInventoryService::UNITS, true)
+                    || ($match && strtolower((string) ($match->base_unit ?: $match->unit)) === strtolower($purchaseUnit));
+                $usageUnitSupported = in_array($usageUnit, RecipeInventoryService::UNITS, true)
+                    || ($match && strtolower((string) $match->unit) === strtolower($usageUnit));
+                if (!$purchaseUnitSupported || !$usageUnitSupported
                     || $factor === null || $factor <= 0) {
                     $errors[]=$this->cellError($item,'Purchase Unit/Usage Unit/Conversion Factor','Units must be allowed and Conversion Factor must be positive when units differ.'); continue;
                 }
-                $ingredientIdentity = 'name:'.$this->normalizedName($fields['name']);
+                $ingredientId = trim((string) ($v[11] ?? ''));
+                $ingredientIdentity = $ingredientId !== ''
+                    ? 'id:'.$ingredientId
+                    : (($fields['code'] ?? null)
+                        ? 'code:'.strtolower($fields['code'])
+                        : 'name:'.$this->normalizedName($fields['name']));
                 if (isset($seenIngredientIdentities[$ingredientIdentity])) {
                     $errors[]=$this->cellError($item,'Ingredient Name','Duplicate ingredient identity in this workbook.'); continue;
                 }
                 $seenIngredientIdentities[$ingredientIdentity] = $item['row'];
                 if ($match) {
+                    $effectiveNewBaseUnit = $fields['base_unit'] ?: $fields['unit'];
                     $unitMeaningChanged = (string) $match->unit !== (string) $fields['unit']
-                        || (string) ($match->base_unit ?: $match->unit) !== (string) $fields['base_unit']
+                        || (string) ($match->base_unit ?: $match->unit) !== (string) $effectiveNewBaseUnit
                         || abs((float) ($match->conversion_factor ?: 1) - (float) $fields['conversion_factor']) > 0.000001;
                     if ($unitMeaningChanged) {
                         $hasStock = abs((float) $match->current_stock) > 0.000001;
@@ -1868,15 +1957,33 @@ class PosInventoryMasterExcelService
                 }
                 $operation = $this->operation('ingredient',$item,$match,$fields,$mode);
                 $operations[]=$operation;
-                foreach ([$fields['name']] as $reference) {
+                if ($ingredientId !== '') {
+                    $plannedIngredients['id:'.$ingredientId] = $operation;
+                }
+                foreach ([$fields['code'] ?? null, $fields['name']] as $reference) {
                     $ref = $this->stableReference('', '', $reference);
                     if ($ref !== '') $plannedIngredients[$ref] = $operation;
                 }
             } else {
-                [$product, $productAmbiguous] = $this->matchProductRow($products, [$v[0]??'']);
-                [$ingredient, $ingredientAmbiguous] = $this->matchIngredientRow($ingredients, [$v[1]??'']);
-                $productRef = $this->stableReference('', '', $v[0] ?? '');
-                $ingredientRef = $this->stableReference('', '', $v[1] ?? '');
+                [$product, $productAmbiguous] = $this->matchProductReference(
+                    $products,
+                    $v[0] ?? '',
+                    $v[6] ?? '',
+                    '',
+                    $v[8] ?? ''
+                );
+                [$ingredient, $ingredientAmbiguous] = $this->matchIngredientReference(
+                    $ingredients,
+                    $v[1] ?? '',
+                    $v[7] ?? '',
+                    $v[9] ?? ''
+                );
+                $productRef = trim((string) ($v[8] ?? '')) !== ''
+                    ? 'id:'.trim((string) $v[8])
+                    : $this->stableReference($v[6] ?? '', '', $v[0] ?? '');
+                $ingredientRef = trim((string) ($v[9] ?? '')) !== ''
+                    ? 'id:'.trim((string) $v[9])
+                    : $this->stableReference($v[7] ?? '', '', $v[1] ?? '');
                 $productPlan = $plannedProducts[$productRef] ?? null;
                 $ingredientPlan = $plannedIngredients[$ingredientRef] ?? null;
                 if (!$product && $productPlan) $product = (object) ['id'=>0, 'name'=>$productPlan['fields']['name']];
@@ -1895,10 +2002,18 @@ class PosInventoryMasterExcelService
                 $recipeFields=['product_id'=>$product->id,'ingredient_id'=>$ingredient->id,'quantity_needed'=>$qty];
                 if (Schema::hasColumn('product_recipes','waste_percent')) $recipeFields['waste_percent']=$waste;
                 if (Schema::hasColumn('product_recipes','notes')) $recipeFields['notes']=trim((string)($v[5]??''));
+                $changed = [];
+                if ($existingRecipe) {
+                    foreach ($recipeFields as $field => $value) {
+                        if ($value !== null && !$this->fieldValuesEquivalent($field, $existingRecipe->{$field}, $value)) {
+                            $changed[$field] = ['from'=>$existingRecipe->{$field}, 'to'=>$value];
+                        }
+                    }
+                }
                 $operations[]=['entity'=>'recipe','sheet'=>$item['sheet'],'row'=>$item['row'],'key'=>$key,'match_id'=>$existingRecipe?->id,'fingerprint'=>$existingRecipe ? $this->modelFingerprint($existingRecipe,array_keys($recipeFields)) : null,
                     'product_ref'=>$productRef,'ingredient_ref'=>$ingredientRef,
-                    'fields'=>$recipeFields,
-                    'action'=>$existingRecipe ? ($mode==='create_only' ? 'skip' : 'update') : 'create',
+                    'fields'=>$recipeFields,'changed'=>$changed,
+                    'action'=>$existingRecipe ? ($mode==='create_only' || !$changed ? 'skip' : 'update') : 'create',
                     'existing_quantity'=>$existingRecipe?->quantity_needed];
                 if (trim((string)($v[3]??''))==='') $errors[]=$this->cellError($item,'Usage Unit','Usage Unit is required.');
             }
@@ -1980,7 +2095,9 @@ class PosInventoryMasterExcelService
         $changed = [];
         if ($match) {
             foreach ($fields as $key => $value) {
-                if ($value !== null && (string) $match->{$key} !== (string) $value) $changed[$key] = ['from'=>$match->{$key},'to'=>$value];
+                if ($value !== null && !$this->fieldValuesEquivalent($key, $match->{$key}, $value)) {
+                    $changed[$key] = ['from'=>$match->{$key},'to'=>$value];
+                }
             }
         }
         if ($match && !$changed) {
@@ -1996,17 +2113,85 @@ class PosInventoryMasterExcelService
 
     private function matchProductRow($products, array $values): array
     {
-        $sku=trim((string)($values[5]??'')); $barcode=trim((string)($values[6]??'')); $name=$this->normalizedName($values[0]??'');
-        $hits=$products->filter(fn($p)=>($sku!=='' && (($p->sku??'')===$sku || ($p->barcode??'')===$sku))
-            || ($barcode!=='' && (($p->sku??'')===$barcode || ($p->barcode??'')===$barcode))
-            || ($name!=='' && $this->normalizedName($p->name)===$name))->values();
-        return [$hits->count()===1?$hits->first():null,$hits->count()>1];
+        return $this->matchProductReference(
+            $products,
+            $values[0] ?? '',
+            $values[5] ?? '',
+            $values[6] ?? '',
+            $values[14] ?? ''
+        );
+    }
+
+    private function fieldValuesEquivalent(string $field, $stored, $incoming): bool
+    {
+        $numericFields = [
+            'price', 'cost_price', 'tax_rate', 'is_active', 'low_stock_threshold',
+            'conversion_factor', 'cost_per_unit', 'min_stock_level',
+            'product_id', 'ingredient_id', 'quantity_needed', 'waste_percent',
+        ];
+
+        if (in_array($field, $numericFields, true)
+            && is_numeric($stored)
+            && is_numeric($incoming)) {
+            return abs((float) $stored - (float) $incoming) < 0.000001;
+        }
+
+        return (string) $stored === (string) $incoming;
     }
 
     private function matchIngredientRow($ingredients, array $values): array
     {
-        $code=trim((string)($values[1]??'')); $name=$this->normalizedName($values[0]??'');
-        $hits=$ingredients->filter(fn($i)=>$name!=='' && $this->normalizedName($i->name)===$name)->values();
+        return $this->matchIngredientReference(
+            $ingredients,
+            $values[0] ?? '',
+            $values[10] ?? '',
+            $values[11] ?? ''
+        );
+    }
+
+    private function matchProductReference($products, $nameValue, $skuValue = '', $barcodeValue = '', $idValue = ''): array
+    {
+        $id = trim((string) $idValue);
+        if ($id !== '') {
+            $hits = $products->filter(fn ($product) => (string) $product->id === $id)->values();
+            return [$hits->count() === 1 ? $hits->first() : null, $hits->count() > 1];
+        }
+
+        $sku = trim((string) $skuValue);
+        $barcode = trim((string) $barcodeValue);
+        if ($sku !== '' || $barcode !== '') {
+            $hits = $products->filter(fn ($product) =>
+                ($sku !== '' && (($product->sku ?? '') === $sku || ($product->barcode ?? '') === $sku))
+                || ($barcode !== '' && (($product->sku ?? '') === $barcode || ($product->barcode ?? '') === $barcode))
+            )->values();
+            return [$hits->count() === 1 ? $hits->first() : null, $hits->count() > 1];
+        }
+
+        $name = $this->normalizedName($nameValue);
+        $hits = $products->filter(fn ($product) =>
+            $name !== '' && $this->normalizedName($product->name) === $name
+        )->values();
+        return [$hits->count() === 1 ? $hits->first() : null, $hits->count() > 1];
+    }
+
+    private function matchIngredientReference($ingredients, $nameValue, $codeValue = '', $idValue = ''): array
+    {
+        $id = trim((string) $idValue);
+        if ($id !== '') {
+            $hits = $ingredients->filter(fn ($ingredient) => (string) $ingredient->id === $id)->values();
+            return [$hits->count() === 1 ? $hits->first() : null, $hits->count() > 1];
+        }
+
+        $code = trim((string) $codeValue);
+        if ($code !== '') {
+            $hits = $ingredients->filter(fn ($ingredient) => (string) ($ingredient->code ?? '') === $code)->values();
+            return [$hits->count() === 1 ? $hits->first() : null, $hits->count() > 1];
+        }
+
+        $name = $this->normalizedName($nameValue);
+        $hits = $ingredients->filter(fn ($ingredient) =>
+            $name !== '' && $this->normalizedName($ingredient->name) === $name
+        )->values();
         return [$hits->count()===1?$hits->first():null,$hits->count()>1];
     }
 
@@ -2150,6 +2335,8 @@ class PosInventoryMasterExcelService
         $query = ProductRecipe::where('product_id',$productId);
         if ($companyId !== null) {
             $query->where('company_id', $companyId);
+            $query->whereHas('product', fn ($product) => $product->where('company_id', $companyId));
+            $query->whereHas('ingredient', fn ($ingredient) => $ingredient->where('company_id', $companyId));
         }
         return $query->where(function ($query) {
             if (Schema::hasColumn('product_recipes','is_active')) $query->where('is_active',true);

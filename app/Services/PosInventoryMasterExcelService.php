@@ -143,8 +143,12 @@ class PosInventoryMasterExcelService
         $spreadsheet = $this->buildWorkbook();
         $writer = new Xlsx($spreadsheet);
 
-        return response()->streamDownload(function () use ($writer) {
-            $writer->save('php://output');
+        return response()->streamDownload(function () use ($writer, $spreadsheet) {
+            try {
+                $writer->save('php://output');
+            } finally {
+                $spreadsheet->disconnectWorksheets();
+            }
         }, self::WORKBOOK_FILENAME, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
@@ -185,7 +189,10 @@ class PosInventoryMasterExcelService
             for ($column = 1; $column <= count($headers); $column++) {
                 $sheet->getColumnDimensionByColumn($column)->setWidth(20);
             }
-            $sheet->getStyle("A1:{$last}2000")->getAlignment()->setWrapText(true);
+            // Styling thousands of empty cells makes PhpSpreadsheet materialize
+            // them and can exhaust the worker while the XLSX is written.
+            // Validations still cover all supported input rows without that cost.
+            $sheet->getStyle("A1:{$last}1")->getAlignment()->setWrapText(true);
         }
         $lists = $ss->getSheetByName('Lists');
         $lists->fromArray([
@@ -205,6 +212,7 @@ class PosInventoryMasterExcelService
         $lists->getProtection()->setSheet(true);
         $lists->getProtection()->setPassword(Str::random(24));
         $lists->getStyle('A2:C13')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('ECFDF5');
+        $lists->getStyle('A2:C13')->getAlignment()->setWrapText(true);
         $this->addWorkbookValidation($ss->getSheetByName('Products'), 'J2:J2000', '"Yes,No"');
         $this->addWorkbookValidation($ss->getSheetByName('Products'), 'K2:K2000', '"Yes,No"');
         $this->addWorkbookValidation($ss->getSheetByName('Ingredients'), 'J2:J2000', '"Yes,No"');
@@ -214,6 +222,7 @@ class PosInventoryMasterExcelService
         ];
         $ss->getSheetByName('Products')->fromArray($samples, null, 'A2');
         $ss->getSheetByName('Products')->getStyle('A2:N2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCFCE7');
+        $ss->getSheetByName('Products')->getStyle('A2:O2')->getAlignment()->setWrapText(true);
         $ingredientSamples = [
             ['Misal: Tea Leaves', '', 'kg', 'g', 1000, 1000, '', 0, '', 'Yes', 'TEA-LEAF', ''],
             ['Misal: Milk', '', 'ltr', 'ml', 1000, 180, '', 0, '', 'Yes', 'MILK', ''],
@@ -222,6 +231,7 @@ class PosInventoryMasterExcelService
         ];
         $ss->getSheetByName('Ingredients')->fromArray($ingredientSamples, null, 'A2');
         $ss->getSheetByName('Ingredients')->getStyle('A2:J5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEF3C7');
+        $ss->getSheetByName('Ingredients')->getStyle('A2:L5')->getAlignment()->setWrapText(true);
         $ss->getSheetByName('Recipes')->fromArray([
             ['Misal: Plain Tea', 'Misal: Tea Leaves', 2, 'g', 0, 'Sample only', 'TEA-001', 'TEA-LEAF', '', ''],
             ['Misal: Plain Tea', 'Misal: Milk', 100, 'ml', 0, 'Sample only', 'TEA-001', 'MILK', '', ''],
@@ -229,6 +239,7 @@ class PosInventoryMasterExcelService
             ['Misal: Plain Tea', 'Misal: Water', 100, 'ml', 0, 'Sample only', 'TEA-001', 'WATER', '', ''],
         ], null, 'A2');
         $ss->getSheetByName('Recipes')->getStyle('A2:F5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEE2E2');
+        $ss->getSheetByName('Recipes')->getStyle('A2:J5')->getAlignment()->setWrapText(true);
         return $ss;
     }
 
@@ -358,7 +369,13 @@ class PosInventoryMasterExcelService
         $ss = $this->buildExportWorkbook($companyId);
         $writer = new Xlsx($ss);
 
-        return response()->streamDownload(fn () => $writer->save('php://output'),
+        return response()->streamDownload(function () use ($writer, $ss) {
+            try {
+                $writer->save('php://output');
+            } finally {
+                $ss->disconnectWorksheets();
+            }
+        },
             self::EXPORT_FILENAME, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'Cache-Control' => 'no-store, no-cache, must-revalidate',

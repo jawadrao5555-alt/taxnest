@@ -527,6 +527,9 @@ class PosInventoryMasterExcelTest extends TestCase
         $this->assertSame(20, $ss->getSheetByName('Ingredients')->getCell('F5')->getValue());
         $this->assertStringContainsString('never imported', $ss->getSheetByName('Start Here')->getCell('A5')->getValue());
         $this->assertTrue($ss->getSheetByName('Lists')->getProtection()->getSheet());
+        $this->assertSame(2, $ss->getSheetByName('Products')->getHighestRow());
+        $this->assertSame(5, $ss->getSheetByName('Ingredients')->getHighestRow());
+        $this->assertSame(5, $ss->getSheetByName('Recipes')->getHighestRow());
 
         $preview = (new PosInventoryMasterExcelService())->preview($tmp, $this->companyId, 'create_only', 1);
         $this->assertTrue($preview['ok'], json_encode($preview));

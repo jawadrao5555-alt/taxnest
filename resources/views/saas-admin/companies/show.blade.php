@@ -4,7 +4,7 @@
         <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
         <h1 class="text-2xl font-bold text-white min-w-0 break-words">{{ $company->name }}</h1>
         @php
-            $sc = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'active' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400'];
+            $sc = ['approved' => 'bg-emerald-100 text-emerald-900', 'active' => 'bg-emerald-100 text-emerald-900', 'pending' => 'bg-amber-100 text-amber-900', 'suspended' => 'bg-red-100 text-red-900', 'rejected' => 'bg-gray-200 text-gray-900'];
             // Product label + colour come from the catalogue: a hand-written
             // map here used to leave a new product line grey and unnamed.
             $erpsVertical = \App\Support\NestErps::verticalOf($company);
@@ -17,7 +17,7 @@
             <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('Open this company in VIEW-ONLY mode? You will see their panel exactly as they do, but cannot make any changes.');">
                 @csrf
                 <input type="hidden" name="mode" value="view">
-                <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-400 text-xs font-medium rounded-lg transition border border-amber-700">
+                <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-semibold rounded-lg transition border border-amber-500">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     View as Company
                 </button>
@@ -25,13 +25,13 @@
             <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('FULL ACCESS: you will act AS this company and any change you make (invoices, settings, and live FBR/PRA submissions) is REAL. Continue?');">
                 @csrf
                 <input type="hidden" name="mode" value="full">
-                <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-medium rounded-lg transition border border-red-700">
+                <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-900 text-xs font-semibold rounded-lg transition border border-red-500">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                     Manage as Company
                 </button>
             </form>
             @endif
-            <a href="{{ route('saas.admin.companies.edit', $company->id) }}" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 text-xs font-medium rounded-lg transition border border-indigo-800">
+            <a href="{{ route('saas.admin.companies.edit', $company->id) }}" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 text-xs font-semibold rounded-lg transition border border-indigo-500">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 Edit Profile
             </a>

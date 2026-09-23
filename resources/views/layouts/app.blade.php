@@ -29,7 +29,7 @@
         @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700|inter:300,400,500,600,700,800,900'])
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
+        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.1') }}">
         <script>
             setTimeout(function(){
                 if(!window.__alpineStarted){

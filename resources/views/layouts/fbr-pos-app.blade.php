@@ -157,7 +157,7 @@
         {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
         @include('partials.font-css', ['fontFamilies' => 'inter:300,400,500,600,700,800,900'])
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
+        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.1') }}">
         @include('partials.alpine-runtime-loader')
         <script src="/vendor/chart.umd.min.js?v=4.4.0" defer></script>
         <script>document.documentElement.style.colorScheme=document.documentElement.classList.contains('dark')?'dark':'light';</script>

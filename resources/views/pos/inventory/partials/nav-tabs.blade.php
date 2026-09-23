@@ -7,7 +7,11 @@
     $recipesNav = \App\Services\PosFeatureService::moduleAvailable($navCompany, 'recipes');
     $lowStockCount = (int) ($lowStockCount ?? (($lowStockItems ?? collect())->count() ?? 0));
 @endphp
-<div class="tn-tab-strip" aria-label="{{ __('pos.inventory_navigation') }}">
+<style>
+    .tn-inventory-nav { display: flex; flex-wrap: nowrap; gap: .45rem; overflow-x: auto; padding: .35rem; margin: 1rem 0; scrollbar-width: thin; }
+    .tn-inventory-nav > a { flex: none; white-space: nowrap; }
+</style>
+<nav class="tn-tab-strip tn-inventory-nav" aria-label="{{ __('pos.inventory_navigation') }}">
     @if(\Illuminate\Support\Facades\Route::has('pos.products'))
     <a href="{{ route('pos.products') }}" class="{{ $invActive === 'products' ? $tabOn : $tabOff }}">{{ __('pos.products') }}</a>
     @endif
@@ -31,4 +35,4 @@
     <a href="{{ route('pos.inventory.stock-check.index') }}" class="{{ $invActive === 'stock-check' ? $tabOn : $tabOff }}">{{ __('pos.stock_check') }}<x-new-badge feature="stock_check" class="ml-1" /></a>
     <a href="{{ route('pos.inventory.stock-in.index') }}" class="{{ $invActive === 'stock-in' ? $tabOn : $tabOff }}">{{ __('pos.stock_in') }}</a>
     <a href="{{ route('pos.inventory-master') }}" class="{{ $invActive === 'master' ? $tabOn : $tabOff }}">{{ __('pos.inventory_master') }}</a>
-</div>
+</nav>

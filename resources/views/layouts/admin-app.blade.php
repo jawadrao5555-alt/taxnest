@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
     <title>{{ $title ?? 'Admin Panel' }} - TaxNest Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
+    <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.1') }}">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="/vendor/chart.umd.min.js?v=4.4.0"></script>
     <script>
@@ -423,10 +423,10 @@
                 </div>
                 @endif
                 @if(session('success'))
-                <div class="mx-4 mt-4 bg-emerald-900/30 border border-emerald-700 text-emerald-300 rounded-lg px-4 py-3 text-sm break-words">{{ session('success') }}</div>
+                <div role="status" class="mx-4 mt-4 bg-emerald-50 border border-emerald-600 text-emerald-900 rounded-lg px-4 py-3 text-sm font-medium break-words">{{ session('success') }}</div>
                 @endif
                 @if(session('error'))
-                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg px-4 py-3 text-sm break-words">{{ session('error') }}</div>
+                <div role="alert" class="mx-4 mt-4 bg-red-50 border border-red-600 text-red-900 rounded-lg px-4 py-3 text-sm font-medium break-words">{{ session('error') }}</div>
                 @endif
                 @if($errors->any())
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg px-4 py-3 text-sm">

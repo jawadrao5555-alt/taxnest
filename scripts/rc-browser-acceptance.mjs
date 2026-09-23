@@ -141,6 +141,17 @@ async function checkTopNavigation(page,t,v) {
   if(await page.locator('[role="dialog"][aria-modal="true"]:visible').count())return fail(`${t.name}/${v.width}: blocking overlay remained visible before top-navigation checks`);
   const scrollActions=header.locator('[data-tn-topnav-scroll-actions]').first();
   const menuCluster=header.locator('[data-tn-topnav-menu-cluster]').first();
+  if(v.width>=1024&&v.width<=2200&&await header.getAttribute('data-tn-sale-header')!==null){
+    const rows=await header.evaluate(el=>{
+      const left=el.querySelector('.tn-impersonation-header-left')?.getBoundingClientRect();
+      const tools=el.querySelector('#tn-nav-sale-tools')?.getBoundingClientRect();
+      const menu=el.querySelector('[data-tn-topnav-menu-cluster]')?.getBoundingClientRect();
+      return{leftBottom:left?.bottom,toolsTop:tools?.top,toolsRight:tools?.right,menuBottom:menu?.bottom,viewport:innerWidth};
+    });
+    if(rows.toolsTop===undefined||rows.toolsTop<Math.max(rows.leftBottom??0,rows.menuBottom??0)-1||rows.toolsRight>rows.viewport+1)
+      fail(`${t.name}/${v.width}: sale actions overlapped the primary navigation (${JSON.stringify(rows)})`);
+    else pass(`${t.name}/${v.width}: sale actions have a separate reachable row`);
+  }
   if(!await scrollActions.count())fail(`${t.name}/${v.width}: ordinary header-action scroller missing`);
   if(!await menuCluster.count())return fail(`${t.name}/${v.width}: overflow-visible top-navigation menu cluster missing`);
   for(const name of ['notification','theme','profile']) {
@@ -202,6 +213,24 @@ async function checkTopNavigation(page,t,v) {
     }
   }
 }
+async function checkAdminContrast(page,t,v) {
+  const result=await page.evaluate(()=>{
+    const rgb=s=>(s.match(/\d+(?:\.\d+)?/g)||[]).slice(0,3).map(Number);
+    const luminance=c=>{const x=rgb(c).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return x[0]*.2126+x[1]*.7152+x[2]*.0722;};
+    const ratio=(a,b)=>{const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+    const title=document.querySelector('main h1.text-white');
+    const cardLabel=document.querySelector('main .bg-gray-900 .text-gray-400');
+    const card=cardLabel?.closest('.bg-gray-900');
+    const viewButton=[...document.querySelectorAll('main button')].find(el=>el.textContent.includes('View as Company'));
+    return{title:title?ratio(getComputedStyle(title).color,getComputedStyle(document.body).backgroundColor):null,
+      label:cardLabel&&card?ratio(getComputedStyle(cardLabel).color,getComputedStyle(card).backgroundColor):null,
+      viewButton:viewButton?ratio(getComputedStyle(viewButton).color,getComputedStyle(viewButton).backgroundColor):null};
+  });
+  if(result.title!==null&&result.title<3)fail(`${t.name}/${v.width}: admin page title contrast ${result.title.toFixed(2)}:1`);
+  if(result.label!==null&&result.label<4.5)fail(`${t.name}/${v.width}: admin dark-card label contrast ${result.label.toFixed(2)}:1`);
+  if(result.viewButton!==null&&result.viewButton<4.5)fail(`${t.name}/${v.width}: admin action contrast ${result.viewButton.toFixed(2)}:1`);
+  if(result.title!==null&&result.label!==null&&result.title>=3&&result.label>=4.5&&result.viewButton>=4.5)pass(`${t.name}/${v.width}: admin title, dark-card label and action remain readable`);
+}
 async function checkTopNavigationWithReloadRetry(page,t,path,v) {
   try {
     await checkTopNavigation(page,t,v);
@@ -228,6 +257,20 @@ async function surface(page,t,path,v) {
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
   await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigationWithReloadRetry(page,t,path,v); await openMobileCart(page,v,t.markers||[]);
+  if(path==='/pos/inventory'){
+    const tabs=page.locator('.tn-inventory-nav').first();
+    if(!await tabs.count())fail(`${t.name}/${v.width}: inventory navigation missing`);
+    else {
+      const geometry=await tabs.evaluate(el=>{
+        const links=[...el.querySelectorAll('a')].map(a=>a.getBoundingClientRect());
+        return{rows:[...new Set(links.map(r=>Math.round(r.top)))],scrollable:el.scrollWidth>el.clientWidth,overflow:getComputedStyle(el).overflowX,
+          clipped:links.some(r=>r.height<=0),count:links.length};
+      });
+      if(geometry.count<4||geometry.rows.length!==1||geometry.clipped||geometry.overflow!=='auto')
+        fail(`${t.name}/${v.width}: inventory tabs wrapped or overlapped (${JSON.stringify(geometry)})`);
+      else pass(`${t.name}/${v.width}: inventory tabs form one reachable scrolling row`);
+    }
+  }
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
   if (t.denied) { if ([302,403].includes(status)||new URL(page.url()).pathname!==path) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);
@@ -288,7 +331,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t); await waitForOperationalSurface(p); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t); await waitForOperationalSurface(p); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

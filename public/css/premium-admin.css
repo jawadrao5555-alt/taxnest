@@ -26,6 +26,13 @@ body.admin-themed.tn-premium-shell {
     color: var(--tn-admin-text);
 }
 
+/* Legacy admin pages still use text-white for page titles. The workspace
+   canvas is light, while cards remain dark; respect each surface separately. */
+body.admin-themed main h1.text-white { color: #18212f !important; }
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-950) h1.text-white {
+    color: #ffffff !important;
+}
+
 .tn-admin-shell {
     min-height: 100dvh;
     background:

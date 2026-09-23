@@ -53,6 +53,12 @@ main .text-gray-400:not(svg),
 main .text-slate-400:not(svg) { color: var(--tn-muted); }
 main .text-gray-500:not(svg),
 main .text-slate-500:not(svg) { color: var(--tn-subtle); }
+/* Dark cards can sit inside a light shell (notably SaaS Admin). Their muted
+   labels must follow the card surface, not the page's light-mode ink token. */
+main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-950) {
+    --tn-muted: #c2cedb;
+    --tn-subtle: #a4b2c2;
+}
 html.dark main .text-gray-400:not(svg),
 html.dark main .text-slate-400:not(svg) { color: var(--tn-muted) !important; }
 html.dark main .text-gray-500:not(svg),

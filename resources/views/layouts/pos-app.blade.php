@@ -302,7 +302,7 @@
         <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
         <noscript><link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" /></noscript>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.0') }}">
+        <link rel="stylesheet" href="{{ asset('css/taxnest-ui.css?v=1.1') }}">
         <script src="{{ asset('js/nestpos-local-core.js') }}?v=10" defer></script>
         @include('partials.alpine-runtime-loader')
         {{-- Self-hosted Chart.js (perf, Jul 2026): third-party CDN cost an extra
@@ -488,6 +488,23 @@
                self-stretch — that utility isn't in the current Vite build.) */
             #tn-nav-sale-tools { scrollbar-width: none; -ms-overflow-style: none; align-self: stretch; }
             #tn-nav-sale-tools::-webkit-scrollbar { display: none; }
+            /* Give the sale actions their own row when the desktop header cannot
+               fit the primary links, sale actions and user menus side by side.
+               Keep the menu cluster outside every scrolling/clip container. */
+            @media (min-width: 1024px) and (max-width: 2200px) {
+                .topnav-bar[data-tn-sale-header] .tn-impersonation-header-row {
+                    height: auto;
+                    min-height: 3rem;
+                    flex-wrap: wrap;
+                }
+                .topnav-bar[data-tn-sale-header] #tn-nav-sale-tools {
+                    order: 3;
+                    flex: 0 0 100%;
+                    max-width: 100%;
+                    height: 2.75rem;
+                    padding-inline: .5rem;
+                }
+            }
 
             /*
              * Manage-as adds the non-removable Exit chip to the primary header.
@@ -580,7 +597,7 @@
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
-            <header data-tn-topnav="pra" class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}" style="z-index: 140;">
+            <header data-tn-topnav="pra" @if(request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create')) data-tn-sale-header @endif class="topnav-bar flex-shrink-0 relative z-50 {{ is_array(session('impersonation')) ? 'tn-impersonated-header' : '' }}" style="z-index: 140;">
                 <div class="tn-impersonation-header-row flex items-center justify-between px-3 sm:px-5 h-12">
 
                     <div class="tn-impersonation-header-left flex items-center gap-3 flex-shrink-0">

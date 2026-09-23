@@ -22,7 +22,7 @@ class SharedUiFoundationContractTest extends TestCase
         foreach ($layouts as $layout) {
             $html = file_get_contents(resource_path('views/layouts/'.$layout));
             $this->assertNotFalse($html);
-            $sharedPosition = strpos($html, 'css/taxnest-ui.css?v=1.0');
+            $sharedPosition = strpos($html, 'css/taxnest-ui.css?v=1.1');
             $utilityPosition = str_contains($html, '@vite(')
                 ? strpos($html, '@vite(')
                 : strpos($html, 'cdn.tailwindcss.com');

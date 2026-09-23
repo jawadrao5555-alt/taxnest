@@ -14,8 +14,8 @@ class PosTopNavigationRegressionTest extends TestCase
 
         foreach (['pra' => $pra, 'fbr' => $fbr] as $panel => $layout) {
             $this->assertNotFalse($layout);
-            $this->assertStringContainsString(
-                'data-tn-topnav="'.$panel.'" class="topnav-bar',
+            $this->assertMatchesRegularExpression(
+                '/data-tn-topnav="'.preg_quote($panel, '/').'"(?:\s+[^>]*?)?\s+class="topnav-bar/',
                 $layout
             );
             $this->assertStringContainsString('style="z-index: 140;"', $layout);

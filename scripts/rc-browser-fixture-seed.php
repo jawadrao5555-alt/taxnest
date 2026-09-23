@@ -193,10 +193,14 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
         $companyCategory = $company("Synthetic {$panel} {$category}", "category-{$panel}-{$category}@rc-browser.invalid", 'RCB'.str_pad((string) (600 + count($categoryJourneys)), 8, '0', STR_PAD_LEFT), $product, [
             'business_category' => $category, 'pos_type' => $category,
             'feature_flags' => PosFeatureService::defaultsForCategory($category),
+            'inventory_enabled' => $panel === 'pra' && $category === 'restaurant',
             'fbr_pos_enabled' => $panel === 'fbr', 'pos_module_extras' => [], 'pharmacy_mode' => $category === 'pharmacy', 'pos_setup_completed' => true,
             'pos_integration_mode' => $panel === 'fbr' ? 'fbr' : 'pra',
         ]);
         $categoryUser = $user($companyCategory, "Synthetic {$category} owner", "category-user-{$panel}-{$category}@rc-browser.invalid", 'company_admin', 'pos_admin');
+        if ($panel === 'pra' && $category === 'restaurant') {
+            $inventoryOwner = $categoryUser;
+        }
         $categoryJourneys[] = [
             'name' => "category-{$panel}-{$category}", 'login' => $categoryUser->email, 'password' => $password,
             'loginPath' => $panel === 'fbr' ? '/fbr-pos/login' : '/pos/login', 'paths' => [$path],
@@ -226,7 +230,7 @@ $fixture = [
     'readOnlyJourneys' => array_merge([
         ['name' => 'hotel-owner', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk']],
         ['name' => 'pra-topnav', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'pra', 'topNavFactory' => 'restaurantPos'],
-        ['name' => 'pra-inventory-navigation', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/inventory'], 'markers' => ['Inventory Dashboard']],
+        ['name' => 'pra-inventory-navigation', 'login' => $inventoryOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/inventory'], 'markers' => ['Inventory Dashboard']],
         ['name' => 'pra-admin-view-topnav', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$hotel->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="view"])', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'pra', 'topNavFactory' => 'restaurantPos'],
         ['name' => 'pra-admin-manage-topnav', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$hotel->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="full"])', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'pra', 'topNavFactory' => 'restaurantPos'],
         ['name' => 'hotel-manager', 'login' => $hotelManager->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/rooms'], 'markers' => ['Rooms']],

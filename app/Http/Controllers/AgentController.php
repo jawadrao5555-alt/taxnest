@@ -1760,9 +1760,12 @@ class AgentController extends Controller
                 $q->whereNull('device_uid');
             }
         }
-        $rows = $q->limit(max(40, $limit * 4))->get($columns);
         $ids = [];
-        foreach ($rows as $row) {
+        // A fixed first page can contain only other devices' printers. The
+        // kitchen job behind that backlog would then never be claimable by its
+        // agent, even though it is pending. Walk the queue in bounded pages
+        // until this device has a batch (or there are no more pending jobs).
+        foreach ($q->select($columns)->lazyById(max(40, $limit * 4), 'id') as $row) {
             if (!$deviceAware) {
                 $ids[] = (int) $row->id;
             } else {

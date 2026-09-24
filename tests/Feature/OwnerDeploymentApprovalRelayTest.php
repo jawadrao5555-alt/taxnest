@@ -196,6 +196,52 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         $this->assertSame(self::SHA, $retry[0]['expected_head_sha']);
     }
 
+    public function test_expiring_approval_is_not_leased_or_claimed_before_merge(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $row = $this->row(['expires_at' => now()->addMinutes(4)]);
+
+        $this->assertSame([], $service->leaseApprovedRequests());
+        $row->refresh()->update([
+            'status' => 'dispatching',
+            'dispatch_lease_expires_at' => now()->addMinute(),
+        ]);
+        $this->github();
+
+        try {
+            $service->claimForMerge([
+                'approval_request_id' => $row->request_id,
+                'repository' => $row->repository,
+                'pull_number' => 17,
+                'expected_head_sha' => self::SHA,
+            ], ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]);
+            $this->fail('A nearly expired approval must not permit a GitHub merge.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(409, $exception->getStatusCode());
+        }
+
+        $this->assertSame('dispatching', $row->fresh()->status);
+        $this->assertNull($row->fresh()->provenance_receipt_hash);
+    }
+
+    public function test_approval_with_handoff_time_remains_claimable(): void
+    {
+        $service = app(OwnerDeploymentApprovalService::class);
+        $row = $this->row(['expires_at' => now()->addMinutes(6)]);
+        $this->github();
+
+        $this->assertCount(1, $service->leaseApprovedRequests());
+        $claim = $service->claimForMerge([
+            'approval_request_id' => $row->request_id,
+            'repository' => $row->repository,
+            'pull_number' => 17,
+            'expected_head_sha' => self::SHA,
+        ], ['workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1]);
+
+        $this->assertSame(64, strlen($claim['provenance_receipt']));
+        $this->assertSame('claimed', $row->fresh()->status);
+    }
+
     public function test_empty_dispatch_claims_are_success_and_record_poller_heartbeat(): void
     {
         OwnerApprovalPollerHeartbeat::forget();

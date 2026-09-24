@@ -33,6 +33,37 @@ panel. Plain chat text is intent, not authentication.
 No GitHub PAT, owner credentials, VPS key, production secret, or shared relay
 secret is stored in the web application.
 
+## A PR was manually merged before the relay picked it up
+
+A merged PR disappears from the Admin release selector, which lists only open,
+validated PRs. A successful Approval Relay run with zero claims did **not**
+authorize a deploy. Do not rerun the relay until a fresh, eligible approval
+exists, and do not infer the earlier merge is live.
+
+To recover without bypassing approval or deploying an unreviewed SHA:
+
+1. Read-only verify the merged PR's squash SHA equals the current `main` tip,
+   its required checks passed, and no production deployment has succeeded for
+   that SHA. Stop and investigate if any identity or deployment status differs.
+2. Open a new, focused `cursor/*` or `replit/*` PR **from that exact main tip**
+   with a genuine reviewed change, such as documenting the recovery incident.
+   This new branch already includes the manually merged code. Never create an
+   empty commit or disguise a different code change as release recovery.
+3. Let the new PR's checks finish. The owner reviews its diff and the inherited
+   main changes, then approves **the new PR and its exact HEAD SHA** in Admin
+   using the current super-admin password. Old or expired approval records do
+   not authorize the new request.
+4. The normal relay merges the new PR and deploys its **new** squash SHA. Verify
+   the resulting workflow, deployed SHA, and live acceptance before saying the
+   earlier fix is in production. If Admin still shows no eligible PR, inspect
+   the new PR's branch, draft status, check result, and GitHub availability
+   before taking another action.
+
+This recovery deploys the entire then-current `main`, including the earlier
+merge. It does not retroactively deploy the old squash SHA or attribute a
+production run to the old approval record. If `main` advances before approval,
+reassess the full release scope and never silently substitute a different tip.
+
 ## Immediate-dispatch boundary
 
 Guaranteed immediate Admin → GitHub dispatch fundamentally requires a GitHub

@@ -793,6 +793,27 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame('Kitchen Printer', DB::table('pos_print_jobs')->where('id', $kot)->value('target_printer'));
     }
 
+    public function test_kitchen_job_beyond_unrelated_printer_backlog_is_still_claimed(): void
+    {
+        $this->seedDevice('dev-kitchen', [
+            'printers' => [['name' => 'Kitchen-LAN', 'displayName' => 'Kitchen', 'isDefault' => false]],
+            'printers_reported_at' => now(),
+        ]);
+
+        for ($i = 0; $i < 45; $i++) {
+            $this->seedJob(['target_printer' => 'Office-Laser']);
+        }
+        $kot = $this->seedJob(['type' => 'kot', 'target_printer' => 'Kitchen-LAN']);
+
+        $claimed = $this->agentGet('/api/agent/print-jobs?device_uid=dev-kitchen')->assertOk();
+        $this->assertSame([$kot], collect($claimed->json('jobs'))->pluck('id')->all());
+        $this->assertSame(45, DB::table('pos_print_jobs')
+            ->where('company_id', $this->companyId)
+            ->where('target_printer', 'Office-Laser')
+            ->where('status', 'pending')->count());
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('id', $kot)->value('attempts'));
+    }
+
     public function test_unstamped_shared_printer_job_is_claimed_only_by_a_device_that_reports_it(): void
     {
         $this->seedDevice('dev-counter-1', [

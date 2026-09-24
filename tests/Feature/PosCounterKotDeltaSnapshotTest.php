@@ -214,6 +214,9 @@ class PosCounterKotDeltaSnapshotTest extends TestCase
 
     private function agentGetContent(int $jobId): \Illuminate\Testing\TestResponse
     {
+        // Mirror the agent's pending -> printing claim before fetching content.
+        DB::table('pos_print_jobs')->where('id', $jobId)->where('status', 'pending')
+            ->update(['status' => 'printing', 'claim_token' => 'fixture-claim-' . $jobId, 'attempts' => 1]);
         return $this->get('/api/agent/print-jobs/' . $jobId . '/content', [
             'Authorization' => 'Bearer ' . $this->agentKey,
         ]);

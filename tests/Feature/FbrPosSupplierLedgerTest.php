@@ -479,6 +479,10 @@ class FbrPosSupplierLedgerTest extends TestCase
 
     public function test_return_against_bill_moves_stock_out_and_credits_the_ledger(): void
     {
+        // Keep purchase, paid-now payment, and return in the same second so
+        // this assertion exercises the statement's documented tie-breaker.
+        $this->travelTo(now()->startOfSecond());
+
         $companyId = $this->makeCompany();
         $user = $this->makeUser($companyId);
         $supplierId = $this->makeSupplier($companyId);

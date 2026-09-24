@@ -227,7 +227,7 @@ class OwnerDeploymentApprovalService
         return DB::transaction(function (): array {
             $now = now();
             $rows = OwnerDeploymentApprovalRequest::query()
-                ->where('expires_at', '>', $now)
+                ->where('expires_at', '>', $now->copy()->addMinutes((int) config('deployment_approval.handoff_min_remaining_minutes', 5)))
                 ->where(function ($query) use ($now) {
                     $query->where('status', 'approved')
                         ->orWhere(function ($retry) use ($now) {
@@ -278,7 +278,7 @@ class OwnerDeploymentApprovalService
 
             abort_unless(
                 $locked->status === 'dispatching'
-                && $locked->isUnexpired()
+                && $locked->expires_at->greaterThan(now()->addMinutes((int) config('deployment_approval.handoff_min_remaining_minutes', 5)))
                 && $locked->dispatch_lease_expires_at?->isFuture()
                 && !$locked->provenance_receipt_hash,
                 409,

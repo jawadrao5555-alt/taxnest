@@ -365,6 +365,28 @@ class KotZeroLossInstantPrintTest extends TestCase
         $this->assertLessThan(2000, $this->timings['dead_agent_failover_ms']);
     }
 
+    public function test_interrupted_transport_requires_operator_action_and_stays_tenant_and_device_scoped(): void
+    {
+        $order = $this->holdOrder($this->companyA, 'ZL-RESTART');
+        $lineIds = DB::table('restaurant_order_items')->where('order_id', $order->id)->pluck('id')->map(fn ($i) => (int) $i)->all();
+        $handoff = KotPrintService::openLocalHandoff($this->companyA(), $order, 'zl-restart', $lineIds, 'dev-kitchen', $this->waiterId, now());
+
+        $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints($this->companyB(), 'dev-kitchen', ['zl-restart']));
+        $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints($this->companyA(), 'dev-other', ['zl-restart']));
+        $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints($this->companyA(), null, ['zl-restart']));
+        $this->assertSame(KotPrintService::LOCAL_STATUS, $handoff->fresh()->status);
+        $this->assertSame(1, KotPrintService::reportInterruptedLocalPrints($this->companyA(), 'dev-kitchen', ['zl-restart']));
+        $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints($this->companyA(), 'dev-kitchen', ['zl-restart']));
+
+        $row = $handoff->fresh();
+        $this->assertSame('failed', $row->status);
+        $this->assertTrue(KotPrintState::isActionRequiredError((string) $row->error));
+        $this->assertSame(KotPrintState::ACTION_REQUIRED, KotPrintState::forJob($row)['key']);
+        $this->assertSame([$row->id], collect(KotPrintService::actionRequiredJobs($this->companyA()))->pluck('id')->all());
+        $this->assertSame(0, KotPrintService::expireLocalHandoffs($this->companyA())['queued']);
+        $this->assertSame(0, PosPrintJob::where('restaurant_order_id', $order->id)->where('status', 'pending')->count());
+    }
+
     public function test_local_core_down_report_is_instant_action_required_even_if_heartbeat_is_fresh(): void
     {
         $this->seedDevice('dev-kitchen', [['name' => 'Kitchen Printer']]);

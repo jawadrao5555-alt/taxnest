@@ -466,6 +466,17 @@ class AgentController extends Controller
         }
 
         $deviceUid = $this->requestDeviceUid($request);
+        if ($request->has('local_kot_interrupted_order_ids')) {
+            try {
+                \App\Services\KotPrintService::reportInterruptedLocalPrints(
+                    $company, $deviceUid, $request->input('local_kot_interrupted_order_ids')
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Agent interrupted KOT report failed', [
+                    'company_id' => $company->id, 'error_class' => get_class($e),
+                ]);
+            }
+        }
         $liveOpsExtras = $this->liveOpsHeartbeatExtras($company, $deviceUid, $request->input('version'));
 
         return response()->json([

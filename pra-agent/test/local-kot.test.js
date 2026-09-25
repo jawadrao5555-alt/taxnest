@@ -253,5 +253,32 @@ function hold(engine, orderId, orderType, withKot) {
     assert.deepStrictEqual([result.printed, result.acked, restartPrints], [1, 1, 1]);
     assert.strictEqual(kotEvents(second).length, 1);
     second.close();
+
+    // A restart before printer transport may retry. A restart after the
+    // transport marker must not print again: paper may already be in the tray.
+    const recoveryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-kot-interrupted-'));
+    const reopen = (processId) => new LocalCoreDomain({ dataDir: recoveryDir, encryptionKey: KEY,
+        authorityScope: scope, authority: ownerAuthority(), now: () => clock, printProcessId: processId });
+    first = reopen('before-restart');
+    first.importSnapshot({ schema: 'local-core.snapshot.v1', revision: 1, scope,
+        hash: crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex'), payload });
+    hold(first, 'o-before-transport', 'takeaway', true);
+    first.claimLocalPrint('kot:o-before-transport', 'dev-1');
+    first.close();
+    let recovered = reopen('after-restart');
+    assert.deepStrictEqual(recovered.interruptedLocalPrints(), []);
+    assert.strictEqual(recovered.snapshot().print_queue['kot:o-before-transport'].status, 'queued');
+    result = await drainLocalKotQueue(recovered, restartDeps);
+    assert.strictEqual(result.printed, 1);
+    hold(recovered, 'o-after-transport', 'takeaway', true);
+    const uncertainClaim = recovered.claimLocalPrint('kot:o-after-transport', 'dev-1');
+    recovered.markLocalPrintTransport('kot:o-after-transport', uncertainClaim.claim_token);
+    recovered.close();
+    recovered = reopen('second-restart');
+    assert.deepStrictEqual(recovered.interruptedLocalPrints(), [{ id: 'kot:o-after-transport', order_id: 'o-after-transport' }]);
+    assert.strictEqual(recovered.localPrintJobs().length, 0, 'unknown physical outcome is never automatically reprinted');
+    assert.deepStrictEqual(recovered.interruptedLocalPrints(), [{ id: 'kot:o-after-transport', order_id: 'o-after-transport' }],
+        'interrupted claim remains visible on repeated heartbeat inspection');
+    recovered.close();
     console.log('local-kot tests passed');
 })().catch((e) => { console.error(e); process.exit(1); });

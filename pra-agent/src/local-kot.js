@@ -233,6 +233,15 @@ async function drainLocalKotQueue(domain, deps) {
       out.failed += 1;
       continue;
     }
+    // Persist the uncertainty boundary before any printer transport. If this
+    // write fails, do not hand a slip to the printer without a recovery marker.
+    try { domain.markLocalPrintTransport(job.id, claimed.claim_token); }
+    catch (e) {
+      log(`[local-kot] ${job.id} transport marker failed: ${e && e.message}`);
+      try { domain.finishLocalPrint(job.id, claimed.claim_token, false, 'transport_marker_failed'); } catch (ignored) {}
+      out.failed += 1;
+      continue;
+    }
     let kitchenOk = false; let lastError = null;
     for (let i = 0; i < plan.length; i++) {
       const target = plan[i];

@@ -16,6 +16,7 @@ const FILE = 'domain-state.bin';
 // Local-only kitchen slips queued by order.hold (see KOT block in _project).
 const KOT_JOB_PREFIX = 'kot:';
 const KOT_RETRY_BACKOFF_MS = [5000, 15000, 30000, 60000, 120000];
+const PRINT_PROCESS_ID = crypto.randomBytes(16).toString('hex');
 const TXN_FILE = 'domain-transaction.bin';
 const MAX_BYTES = 128 * 1024 * 1024;
 
@@ -80,6 +81,7 @@ class LocalCoreDomain {
         this.permissionProvider = typeof opts.permissionProvider === 'function' ? opts.permissionProvider : null;
         this.allowAuthorityRotation = opts.allowAuthorityRotation === true;
         this.now = typeof opts.now === 'function' ? opts.now : Date.now;
+        this.printProcessId = opts.printProcessId || PRINT_PROCESS_ID;
         const explicitRoot = opts.rootIdentity || opts.eventIdPrefix;
         this.eventIdPrefix = typeof explicitRoot === 'string' &&
             /^[a-z0-9-]{1,48}$/.test(explicitRoot) ? explicitRoot :
@@ -1006,6 +1008,45 @@ class LocalCoreDomain {
         return { claim_token: job.claim_token, order_id: job.order_id,
             expected_revision: this.state.revisions[jobId] || 0 };
     }
+    // A claim alone never touched the printer. After a process restart it can
+    // safely return to the queue. Once transport began the outcome is unknown:
+    // preserve the claim and ask the cloud to show Action Required instead of
+    // silently reprinting a possible kitchen slip.
+    interruptedLocalPrints() {
+        return this._locked(() => {
+            const next = clone(this.state);
+            let changed = false;
+            const uncertain = [];
+            for (const [id, job] of Object.entries(next.print_queue || {})) {
+                if (!job || job.local_only !== true || job.status !== 'claimed' ||
+                    job.print_process_id === this.printProcessId) continue;
+                if (job.print_phase === 'claimed') {
+                    job.status = 'queued';
+                    job.next_attempt_at_ms = this.now();
+                    job.last_error = 'interrupted_before_printer_transport';
+                    delete job.claim_token; delete job.claimed_by;
+                    delete job.claimed_at_ms; delete job.print_phase; delete job.print_process_id;
+                    changed = true;
+                } else {
+                    uncertain.push({ id, order_id: job.order_id });
+                }
+            }
+            if (changed) { this._persist(next); this.state = next; }
+            return uncertain;
+        });
+    }
+    markLocalPrintTransport(jobId, claimToken) {
+        return this._locked(() => {
+            const next = clone(this.state);
+            const job = next.print_queue[jobId];
+            if (!job || job.local_only !== true || job.status !== 'claimed' ||
+                job.claim_token !== claimToken || job.print_process_id !== this.printProcessId) {
+                fail('claim_conflict', 'local print job claim does not match');
+            }
+            job.print_phase = 'transport_started';
+            this._persist(next); this.state = next;
+        });
+    }
     claimLocalPrint(jobId, deviceId) {
         if (typeof jobId !== 'string' || !jobId) fail('invalid_print_job', 'print job id is required');
         return this._locked(() => {
@@ -1016,6 +1057,7 @@ class LocalCoreDomain {
             job.status = 'claimed'; job.claimed_by = deviceId == null ? null : String(deviceId);
             job.claim_token = crypto.randomBytes(16).toString('hex');
             job.claimed_at_ms = this.now(); job.attempts = (job.attempts || 0) + 1;
+            job.print_phase = 'claimed'; job.print_process_id = this.printProcessId;
             this._persist(next); this.state = next;
             return Object.assign({ id: jobId }, clone(job));
         });
@@ -1029,6 +1071,7 @@ class LocalCoreDomain {
                 fail('claim_conflict', 'local print job claim does not match');
             }
             delete job.claim_token; delete job.claimed_by;
+            delete job.print_phase; delete job.print_process_id;
             if (ok) {
                 job.status = 'completed'; job.completed_at_ms = this.now(); job.last_error = null;
             } else {

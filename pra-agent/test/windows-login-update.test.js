@@ -13,6 +13,7 @@ test('Windows executable edits branded resources without requiring a signing cer
   assert.equal(pkg.build.win.signAndEditExecutable, true);
   assert.equal(pkg.build.win.signExecutable, false);
   assert.equal(pkg.build.nsis.shortcutName, 'TaxNest PRA Agent');
+  assert.equal(require('../package-lock.json').version, pkg.version);
   assert.equal(pkg.build.win.icon, 'assets/icon.ico');
   const icon = fs.readFileSync(path.join(__dirname, '..', pkg.build.win.icon));
   assert.equal(icon.readUInt16LE(2), 1); // Windows ICO container

@@ -1,5 +1,10 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.11 (2026-09-25)
+**Branded Windows Agent icon**
+
+- Embed the Agent's own TaxNest icon in the Windows executable and installer. Start Menu and desktop shortcuts that point to the Agent executable then use this icon; NestPOS keeps its separate icon.
+
 ## v1.13.10 (2026-09-25)
 **Branded startup identity, visible version, and scoped updater shutdown**
 

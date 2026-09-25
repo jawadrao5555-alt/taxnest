@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.10 (2026-09-25)
+**Branded startup identity, visible version, and scoped updater shutdown**
+
+- Windows startup registration uses the TaxNest PRA Agent name. A legacy Electron entry is removed only when it points to the exact running Agent executable; other installations and Electron apps are left alone.
+- The Agent settings header and tray menu show the actual packaged version.
+- Automatic ZIP update quits the current Agent gracefully instead of terminating every Agent executable on the computer. Other installations, printer assignments, and configuration are preserved; locked files trigger the existing rollback.
+
 ## v1.13.9 (2026-09-25)
 **Portable Agent appears in Windows Installed Apps for removal**
 

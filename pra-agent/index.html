@@ -136,7 +136,7 @@
     <h1>🛡️ TaxNest PRA Sync Agent</h1>
     <p>Auto-syncs your POS invoices to PRA via your local Pakistani IP</p>
     <p style="font-size:11px; color:#a78bfa; margin-top:4px;">
-      Build: <span id="buildVer">—</span>
+      Agent version: <strong id="agentVersion">—</strong> · Build: <span id="buildVer">—</span>
       <button id="checkUpdateBtn" title="Check for updates" style="background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.3); color:#c4b5fd; cursor:pointer; padding:3px 10px; border-radius:6px; margin-left:8px; font-size:11px; vertical-align:middle;">↻ Check Updates</button>
     </p>
   </div>
@@ -565,6 +565,7 @@
 
   (async () => {
     const v = await window.agentAPI.getVersion();
+    $('agentVersion').textContent = v.version ? `v${v.version}` : '—';
     $('buildVer').textContent = v.build;
     const u = await window.agentAPI.checkUpdate();
     showUpdateBanner(u);

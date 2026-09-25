@@ -1656,7 +1656,7 @@ class AgentController extends Controller
             ->orderBy('id')
             ->get([
                 'id', 'type', 'target_printer', 'transaction_id',
-                'restaurant_order_id', 'render_query', 'printed_item_ids', 'created_at',
+                'restaurant_order_id', 'render_query', 'printed_item_ids', 'created_at', 'claim_token',
             ]);
 
         return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count(), 'held' => $held]);
@@ -1995,6 +1995,15 @@ class AgentController extends Controller
         $job = \App\Models\PosPrintJob::where('company_id', $company->id)->find($id);
         if (!$job) {
             return response()->json(['error' => 'Job not found'], 404);
+        }
+
+        // Upgraded agents bind the content fetch to the claim returned by the
+        // poll. An old claim must not render after a safe pre-fetch requeue.
+        // Header-free requests retain the existing older-agent protocol.
+        $claimToken = (string) $request->header('X-Print-Claim-Token', '');
+        if ($claimToken !== '' && ($job->status !== 'printing'
+            || !hash_equals((string) $job->claim_token, $claimToken))) {
+            return response()->json(['error' => 'Stale print claim'], 409);
         }
 
         // Duplicate-print guard: from this point the agent may put paper out,
@@ -2406,6 +2415,12 @@ class AgentController extends Controller
             // A delayed callback must not revive a parked job or overwrite a
             // pre-spool failover that another counter is about to claim.
             if ($job->status !== 'printing') {
+                return response()->json(['ok' => true, 'ignored_stale_result' => true]);
+            }
+            // A fresh claim may already be printing when an older result
+            // arrives. Bind upgraded agents to their exact claim.
+            $claimToken = (string) $request->header('X-Print-Claim-Token', '');
+            if ($claimToken !== '' && !hash_equals((string) $job->claim_token, $claimToken)) {
                 return response()->json(['ok' => true, 'ignored_stale_result' => true]);
             }
 

@@ -203,21 +203,21 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
   });
 }
 
-async function reportJobResult(jobId, success, error, sessionCfg) {
+async function reportJobResult(job, success, error, sessionCfg) {
   try {
     await axios.post(
-      `${sessionCfg.serverUrl}/print-jobs/${jobId}/result`,
+      `${sessionCfg.serverUrl}/print-jobs/${job.id}/result`,
       {
         success,
         error: error ? String(error).slice(0, 500) : null,
         device_uid: sessionCfg.deviceUid || null,
       },
-      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}` }, timeout: 10000 }
+      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}`, ...(job.claim_token ? { 'X-Print-Claim-Token': job.claim_token } : {}) }, timeout: 10000 }
     );
   } catch (e) {
-    // Server-side stale-requeue (printing > 2 min) recovers the job if this
-    // result report is lost — no local retry queue needed.
-    plog(`Result report failed for job ${jobId}:`, e.message);
+    // If the result is lost after content fetch, the server parks this job
+    // as unconfirmed; it must not blindly retry a possibly printed slip.
+    plog(`Result report failed for job ${job.id}:`, e.message);
   }
 }
 
@@ -225,13 +225,13 @@ async function processPrintJob(job, sessionCfg) {
   try {
     const contentRes = await axios.get(
       `${sessionCfg.serverUrl}/print-jobs/${job.id}/content`,
-      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}` }, timeout: 15000, responseType: 'text' }
+      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}`, ...(job.claim_token ? { 'X-Print-Claim-Token': job.claim_token } : {}) }, timeout: 15000, responseType: 'text' }
     );
     // 204 = nothing left to print (e.g. delta items already covered by an
     // earlier ticket) — mark done WITHOUT feeding a blank page to the printer.
     if (contentRes.status === 204 || !contentRes.data) {
       plog(`Job ${job.id}: nothing to print (already covered) — marking done`);
-      await reportJobResult(job.id, true, null, sessionCfg);
+      await reportJobResult(job, true, null, sessionCfg);
       return;
     }
     const { success, error } = await printHtml(contentRes.data, job.target_printer, job.type);
@@ -244,12 +244,12 @@ async function processPrintJob(job, sessionCfg) {
       printStatus.lastPrintError = error;
       plog(`❌ Job ${job.id} failed: ${error}`);
     }
-    await reportJobResult(job.id, success, error, sessionCfg);
+    await reportJobResult(job, success, error, sessionCfg);
   } catch (e) {
     printStatus.jobsFailed += 1;
     printStatus.lastPrintError = e.message;
     plog(`❌ Job ${job.id} error:`, e.message);
-    await reportJobResult(job.id, false, e.message, sessionCfg);
+    await reportJobResult(job, false, e.message, sessionCfg);
   }
 }
 

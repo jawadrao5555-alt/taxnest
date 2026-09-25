@@ -4,6 +4,14 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { retireLegacyElectronLogin } = require('../src/windows-login-item');
 const { buildUpdateHandoffScript } = require('../src/update-handoff');
+const pkg = require('../package.json');
+
+test('Windows executable edits branded resources without requiring a signing certificate', () => {
+  assert.equal(pkg.build.productName, 'TaxNest PRA Agent');
+  assert.equal(pkg.build.win.signAndEditExecutable, true);
+  assert.equal(pkg.build.win.signExecutable, false);
+  assert.equal(pkg.build.nsis.shortcutName, 'TaxNest PRA Agent');
+});
 
 test('only retire an Electron startup entry bound to the same exact executable', async () => {
   const exePath = 'C:\\Users\\QA\\AppData\\Local\\TaxNest PRA Agent\\TaxNest PRA Agent.exe';

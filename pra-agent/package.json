@@ -71,7 +71,8 @@
         }
       ],
       "artifactName": "TaxNest-Agent-Setup-${version}.${ext}",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": true,
+      "signExecutable": false
     },
     "nsis": {
       "oneClick": false,

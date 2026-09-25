@@ -227,6 +227,29 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         ], $overrides));
     }
 
+    public function test_late_agent_result_does_not_revive_a_parked_job_or_overwrite_a_new_failover(): void
+    {
+        foreach (['failed', 'pending', 'done'] as $status) {
+            $jobId = $this->seedJob([
+                'status' => $status,
+                'type' => 'bill',
+                'claim_token' => null,
+                'error' => $status === 'failed' ? 'unconfirmed_after_fetch' : null,
+            ]);
+
+            $this->agentPost('/api/agent/print-jobs/' . $jobId . '/result', [
+                'success' => true,
+            ])->assertOk()->assertJsonPath('ignored_stale_result', true);
+
+            $job = DB::table('pos_print_jobs')->where('id', $jobId)->first();
+            $this->assertSame($status, $job->status);
+            $this->assertNull($job->claim_token);
+            if ($status === 'failed') {
+                $this->assertSame('unconfirmed_after_fetch', $job->error);
+            }
+        }
+    }
+
     private function seedTransaction(): int
     {
         return DB::table('pos_transactions')->insertGetId([

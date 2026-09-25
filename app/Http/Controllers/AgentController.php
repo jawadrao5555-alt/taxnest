@@ -2398,67 +2398,74 @@ class AgentController extends Controller
         // last-seen beat — keeps the counter visibly online while printing).
         $this->syncAgentDevice($company, $request);
 
-        $job = \App\Models\PosPrintJob::where('company_id', $company->id)->find($id);
-        if (!$job) {
-            return response()->json(['error' => 'Job not found'], 404);
-        }
-
-        $error = $validated['error'] ?? 'Print failed';
-        $failoverDevice = !$validated['success'] && $this->isDefinitelyBeforeSpoolFailure($error)
-            ? $this->safePrintFailoverDevice($company, $job, $this->requestDeviceUid($request))
-            : null;
-
-        if ($failoverDevice) {
-            $retry = [
-                'status' => 'pending',
-                'device_uid' => $failoverDevice,
-                'error' => 'safe_failover_scheduled: ' . $error,
-                'claim_token' => null,
-            ];
-            // The previous content fetch is safe to clear only because this
-            // classified failure proves the OS never accepted the print.
-            if (self::contentFetchTrackingReady()) {
-                $retry['content_fetched_at'] = null;
+        return DB::transaction(function () use ($company, $id, $validated, $request) {
+            $job = \App\Models\PosPrintJob::where('company_id', $company->id)->lockForUpdate()->find($id);
+            if (!$job) {
+                return response()->json(['error' => 'Job not found'], 404);
             }
-            $job->update($retry);
+            // A delayed callback must not revive a parked job or overwrite a
+            // pre-spool failover that another counter is about to claim.
+            if ($job->status !== 'printing') {
+                return response()->json(['ok' => true, 'ignored_stale_result' => true]);
+            }
 
-            Log::info('PRINT_ROUTING safe pre-spool failover scheduled', [
-                'company_id' => $company->id,
-                'job_id' => $job->id,
-                'type' => $job->type,
-                'target_printer' => $job->target_printer,
-                'failed_device_uid' => $this->requestDeviceUid($request),
-                'failover_device_uid' => $failoverDevice,
-                'attempts' => $job->attempts,
+            $error = $validated['error'] ?? 'Print failed';
+            $failoverDevice = !$validated['success'] && $this->isDefinitelyBeforeSpoolFailure($error)
+                ? $this->safePrintFailoverDevice($company, $job, $this->requestDeviceUid($request))
+                : null;
+
+            if ($failoverDevice) {
+                $retry = [
+                    'status' => 'pending',
+                    'device_uid' => $failoverDevice,
+                    'error' => 'safe_failover_scheduled: ' . $error,
+                    'claim_token' => null,
+                ];
+                // The previous content fetch is safe to clear only because this
+                // classified failure proves the OS never accepted the print.
+                if (self::contentFetchTrackingReady()) {
+                    $retry['content_fetched_at'] = null;
+                }
+                $job->update($retry);
+
+                Log::info('PRINT_ROUTING safe pre-spool failover scheduled', [
+                    'company_id' => $company->id,
+                    'job_id' => $job->id,
+                    'type' => $job->type,
+                    'target_printer' => $job->target_printer,
+                    'failed_device_uid' => $this->requestDeviceUid($request),
+                    'failover_device_uid' => $failoverDevice,
+                    'attempts' => $job->attempts,
+                ]);
+
+                return response()->json([
+                    'ok' => true,
+                    'retry_scheduled' => true,
+                    'device_uid' => $failoverDevice,
+                ]);
+            }
+
+            $job->update([
+                'status' => $validated['success'] ? 'done' : 'failed',
+                'error' => $validated['success'] ? null : $error,
+                'claim_token' => null,
             ]);
 
-            return response()->json([
-                'ok' => true,
-                'retry_scheduled' => true,
-                'device_uid' => $failoverDevice,
-            ]);
-        }
+            // KOT actually reached paper — NOW stamp the rendered items so delta
+            // tickets stay correct. Failed prints leave items NULL, so the KDS
+            // delta cycle (or a retry) naturally re-prints them. Stamp kot_batch_no
+            // in the SAME update (was missing — agent-printed rows showed batch NULL
+            // and reprint/"KOT #" headers lost their numbering).
+            if ($validated['success'] && $job->type === 'kot' && !empty($job->printed_item_ids)) {
+                $nextBatch = ((int) \App\Models\RestaurantOrderItem::where('order_id', $job->restaurant_order_id)->max('kot_batch_no')) + 1;
+                \App\Models\RestaurantOrderItem::whereIn('id', $job->printed_item_ids)
+                    ->where('order_id', $job->restaurant_order_id)
+                    ->whereNull('kot_printed_at')
+                    ->update(['kot_printed_at' => now(), 'kot_batch_no' => $nextBatch]);
+            }
 
-        $job->update([
-            'status' => $validated['success'] ? 'done' : 'failed',
-            'error' => $validated['success'] ? null : $error,
-            'claim_token' => null,
-        ]);
-
-        // KOT actually reached paper — NOW stamp the rendered items so delta
-        // tickets stay correct. Failed prints leave items NULL, so the KDS
-        // delta cycle (or a retry) naturally re-prints them. Stamp kot_batch_no
-        // in the SAME update (was missing — agent-printed rows showed batch NULL
-        // and reprint/"KOT #" headers lost their numbering).
-        if ($validated['success'] && $job->type === 'kot' && !empty($job->printed_item_ids)) {
-            $nextBatch = ((int) \App\Models\RestaurantOrderItem::where('order_id', $job->restaurant_order_id)->max('kot_batch_no')) + 1;
-            \App\Models\RestaurantOrderItem::whereIn('id', $job->printed_item_ids)
-                ->where('order_id', $job->restaurant_order_id)
-                ->whereNull('kot_printed_at')
-                ->update(['kot_printed_at' => now(), 'kot_batch_no' => $nextBatch]);
-        }
-
-        return response()->json(['ok' => true]);
+            return response()->json(['ok' => true]);
+        });
     }
 
     /**

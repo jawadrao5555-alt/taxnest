@@ -18,6 +18,7 @@ fs.rmSync(stage, { recursive: true, force: true });
 fs.rmSync(output, { force: true });
 fs.cpSync(unpacked, stage, { recursive: true });
 fs.copyFileSync(path.join(root, 'install.bat'), path.join(stage, 'install.bat'));
+fs.copyFileSync(path.join(root, 'uninstall.cmd'), path.join(stage, 'uninstall.cmd'));
 
 let result;
 if (process.platform === 'win32') {

@@ -16,6 +16,7 @@ const axios = require('axios');
 const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent, setSafeRestartHandler } = require('./src/agent');
 const { validateUpdateInfo } = require('./src/release-manifest');
+const { registerPortableUninstall } = require('./src/windows-uninstall');
 const { heartbeatDiagnostics } = require('./src/heartbeat-diagnostics');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { createLanServer } = require('./src/lan-server');
@@ -1138,6 +1139,13 @@ if (!gotInstanceLock) {
     // from (an older updater script used to start us inside its temp workDir),
     // move to the install dir so this process never holds a temp dir hostage.
     try { process.chdir(path.dirname(process.execPath)); } catch (e) {}
+
+    // Self-updating ZIP installs used to create uninstall.bat without a
+    // Windows Installed Apps entry. Repair them on startup; NSIS installs are
+    // ignored because their executable lives outside the portable directory.
+    if (process.platform === 'win32' && app.isPackaged) {
+      registerPortableUninstall({ version: app.getVersion() }).catch(() => {});
+    }
 
     // Offline Mode telemetry: every heartbeat reports whether NestPOS Desktop
     // Offline Mode is ON and when the sale-screen snapshot was last captured,

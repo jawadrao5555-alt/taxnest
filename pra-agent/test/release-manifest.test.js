@@ -19,7 +19,7 @@ const good = {
 };
 
 test('package and lock release identity stay aligned beyond immutable v1.13.6', () => {
-  assert.equal(packageJson.version, '1.13.10');
+  assert.equal(packageJson.version, '1.13.11');
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
   assert.notEqual(packageJson.version, '1.13.6');

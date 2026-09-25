@@ -296,6 +296,54 @@ class PrintJobDuplicateGuardTest extends TestCase
         $this->assertStringStartsWith('unconfirmed_after_print_content_fetched', (string) $row->error);
     }
 
+    public function test_old_claim_cannot_fetch_or_finalize_a_new_print_attempt(): void
+    {
+        $id = $this->seedJob();
+        $this->assertSame([$id], $this->claimIds());
+        $oldClaim = $this->job($id)->claim_token;
+        $this->assertNotEmpty($oldClaim);
+
+        // The first agent died before content fetch; housekeeping may safely
+        // requeue and a second poll obtains a fresh claim on the same job.
+        DB::table('pos_print_jobs')->where('id', $id)->update([
+            'updated_at' => now()->subMinutes(3),
+        ]);
+        $this->assertSame([$id], $this->claimIds());
+        $currentClaim = $this->job($id)->claim_token;
+        $this->assertNotSame($oldClaim, $currentClaim);
+        $this->assertSame(2, (int) $this->job($id)->attempts);
+
+        $headers = ['Authorization' => 'Bearer ' . $this->agentKey];
+        $this->getJson("/api/agent/print-jobs/{$id}/content", [
+            ...$headers, 'X-Print-Claim-Token' => $oldClaim,
+        ])->assertStatus(409);
+        $this->assertNull($this->job($id)->content_fetched_at);
+
+        $this->postJson("/api/agent/print-jobs/{$id}/result", [
+            'success' => true,
+        ], [...$headers, 'X-Print-Claim-Token' => $oldClaim])
+            ->assertOk()->assertJsonPath('ignored_stale_result', true);
+        $this->assertSame('printing', $this->job($id)->status);
+        $this->assertSame($currentClaim, $this->job($id)->claim_token);
+
+        $this->getJson("/api/agent/print-jobs/{$id}/content", [
+            ...$headers, 'X-Print-Claim-Token' => $currentClaim,
+        ])->assertOk();
+        $this->assertNotNull($this->job($id)->content_fetched_at);
+        $this->postJson("/api/agent/print-jobs/{$id}/result", [
+            'success' => true,
+        ], [...$headers, 'X-Print-Claim-Token' => $currentClaim])->assertOk();
+        $this->assertSame('done', $this->job($id)->status);
+    }
+
+    public function test_claim_poll_returns_token_for_agent_result_binding(): void
+    {
+        $id = $this->seedJob();
+        $response = $this->agentGet('/api/agent/print-jobs')->assertOk();
+        $this->assertSame($id, $response->json('jobs.0.id'));
+        $this->assertSame($this->job($id)->claim_token, $response->json('jobs.0.claim_token'));
+    }
+
     // ── d. unclaimed pending jobs expire (never deleted) ───────────────────
 
     public function test_pending_unstamped_job_older_than_expiry_horizon_becomes_failed_expired_unclaimed(): void

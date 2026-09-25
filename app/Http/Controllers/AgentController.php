@@ -1656,7 +1656,7 @@ class AgentController extends Controller
             ->orderBy('id')
             ->get([
                 'id', 'type', 'target_printer', 'transaction_id',
-                'restaurant_order_id', 'render_query', 'printed_item_ids', 'created_at',
+                'restaurant_order_id', 'render_query', 'printed_item_ids', 'created_at', 'claim_token',
             ]);
 
         return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count(), 'held' => $held]);
@@ -1997,11 +1997,34 @@ class AgentController extends Controller
             return response()->json(['error' => 'Job not found'], 404);
         }
 
+        // Bind upgraded agents' content fetch to the active claim. Lock the
+        // row while checking and stamping the hand-off: without that lock,
+        // housekeeping could requeue between the token check and the stamp.
+        // Header-free requests keep the older-agent protocol.
+        $claimToken = (string) $request->header('X-Print-Claim-Token', '');
+        if ($claimToken !== '') {
+            $activeClaim = DB::transaction(function () use ($company, $id, $claimToken) {
+                $claimed = \App\Models\PosPrintJob::where('company_id', $company->id)
+                    ->lockForUpdate()->find($id);
+                if (!$claimed || $claimed->status !== 'printing'
+                    || !hash_equals((string) $claimed->claim_token, $claimToken)) {
+                    return false;
+                }
+                if (self::contentFetchTrackingReady() && !$claimed->content_fetched_at) {
+                    $claimed->update(['content_fetched_at' => now()]);
+                }
+                return true;
+            });
+            if (!$activeClaim) {
+                return response()->json(['error' => 'Stale print claim'], 409);
+            }
+        }
+
         // Duplicate-print guard: from this point the agent may put paper out,
         // so record the hand-off BEFORE rendering (a render that then 404s or
         // 204s is still safer treated as "may have printed" than requeued).
         // Stamped once, only for a live claim — housekeeping keys on it.
-        if ($job->status === 'printing' && self::contentFetchTrackingReady()) {
+        if ($claimToken === '' && $job->status === 'printing' && self::contentFetchTrackingReady()) {
             try {
                 DB::table('pos_print_jobs')
                     ->where('id', $job->id)
@@ -2406,6 +2429,12 @@ class AgentController extends Controller
             // A delayed callback must not revive a parked job or overwrite a
             // pre-spool failover that another counter is about to claim.
             if ($job->status !== 'printing') {
+                return response()->json(['ok' => true, 'ignored_stale_result' => true]);
+            }
+            // A fresh claim may already be printing when an older result
+            // arrives. Bind upgraded agents to their exact claim.
+            $claimToken = (string) $request->header('X-Print-Claim-Token', '');
+            if ($claimToken !== '' && !hash_equals((string) $job->claim_token, $claimToken)) {
                 return response()->json(['ok' => true, 'ignored_stale_result' => true]);
             }
 

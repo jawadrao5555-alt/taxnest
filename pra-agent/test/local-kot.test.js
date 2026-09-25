@@ -59,6 +59,9 @@ function hold(engine, orderId, orderType, withKot) {
     // Routing plan: no printer → nothing; counter copy only for dine-in when enabled.
     assert.deepStrictEqual(planKotPrints({ document: { order_type: 'dine_in' } }, {}), []);
     assert.deepStrictEqual(planKotPrints({ document: { order_type: 'dine_in' } }, { kot_printer: 'K1', silent_print_enabled: false }), []);
+    assert.deepStrictEqual(planKotPrints({ document: { order_type: 'dine_in' } },
+        { counter_kot_enabled: true, counter_kot_printer: 'Counter-80' }), [],
+    'a counter copy cannot substitute for an unconfigured kitchen printer');
     assert.strictEqual(shouldHandBackToCloud({ hold_synced_at_ms: 1 }, [], false), true, 'synced + no plan → instant cloud failover');
     assert.strictEqual(shouldHandBackToCloud({ hold_synced_at_ms: 1 }, [{ printer: 'K1' }], true), true, 'synced + local print failed → instant cloud failover');
     assert.strictEqual(shouldHandBackToCloud({}, [], false), false, 'unsynced + no plan stays local');
@@ -185,6 +188,35 @@ function hold(engine, orderId, orderType, withKot) {
     assert.deepStrictEqual([result.handed_back, result.failed, silentPrints], [1, 0, 0]);
     assert.strictEqual(silentEng.snapshot().print_queue['kot:o-silent'].last_error, 'local_kot_printer_unavailable');
     silentEng.close();
+
+    // 2c) The counter-copy queue is configured but the kitchen queue is not.
+    // Never print the counter copy as the primary kitchen slip or acknowledge
+    // kitchen delivery. A synced hold hands back to the cloud immediately.
+    const counterOnly = engineWith({ print: { counter_kot_enabled: true, counter_kot_printer: 'Counter-80' } });
+    hold(counterOnly, 'o-counter-only', 'dine_in', true);
+    counterOnly.eventStore.now = () => clock;
+    counterOnly.eventStore.markSent([heldEvent(counterOnly, 'o-counter-only').id], {});
+    let counterOnlyPrints = 0;
+    result = await drainLocalKotQueue(counterOnly, {
+        printHtml: async () => { counterOnlyPrints++; return { success: true }; },
+        deviceId: 'dev-1', now: () => clock, log: () => {}, scope,
+    });
+    assert.deepStrictEqual([counterOnlyPrints, result.printed, result.handed_back], [0, 0, 1]);
+    assert.strictEqual(counterOnly.snapshot().print_queue['kot:o-counter-only'].status, 'failed');
+    assert.strictEqual(kotEvents(counterOnly).filter((e) => e.payload.command_type === 'print.fail').length, 1);
+    counterOnly.close();
+
+    // With no internet there is no cloud hand-back. Keep the same kitchen
+    // intent queued for recovery, and do not emit a misleading counter copy.
+    const offlineCounterOnly = engineWith({ print: { counter_kot_enabled: true, counter_kot_printer: 'Counter-80' } });
+    hold(offlineCounterOnly, 'o-counter-offline', 'dine_in', true);
+    result = await drainLocalKotQueue(offlineCounterOnly, {
+        printHtml: async () => { counterOnlyPrints++; return { success: true }; },
+        deviceId: 'dev-1', now: () => clock, log: () => {}, scope,
+    });
+    assert.deepStrictEqual([result.printed, result.failed, counterOnlyPrints], [0, 1, 0]);
+    assert.strictEqual(offlineCounterOnly.snapshot().print_queue['kot:o-counter-offline'].status, 'queued');
+    offlineCounterOnly.close();
 
     // 3) Internet still down (hold never accepted): no handoff clock runs —
     //    the shop PC is the only printer there is, so it keeps retrying.

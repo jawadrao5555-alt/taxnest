@@ -1,5 +1,11 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.8 (2026-09-25)
+**Print-job claim binding for the shared PRA/FBR desktop Agent**
+
+- The Agent sends the active claim token when fetching print content and reporting a print result. The server rejects stale content fetches and ignores old results after a job is re-claimed, without changing saved company, counter, or printer assignments.
+- This new immutable version packages the Agent change merged in PR #109. Previously installed Agents remain compatible but need to update before they send claim tokens; software acknowledgement alone does not confirm physical paper output.
+
 ## v1.13.7 (2026-09-19)
 **FBR callback diagnostics — local acceptance evidence ab release ke sath package hoti hai**
 

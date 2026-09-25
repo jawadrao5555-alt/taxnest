@@ -17,6 +17,8 @@ const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent, setSafeRestartHandler } = require('./src/agent');
 const { validateUpdateInfo } = require('./src/release-manifest');
 const { registerPortableUninstall } = require('./src/windows-uninstall');
+const { buildUpdateHandoffScript } = require('./src/update-handoff');
+const { retireLegacyElectronLogin } = require('./src/windows-login-item');
 const { heartbeatDiagnostics } = require('./src/heartbeat-diagnostics');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { createLanServer } = require('./src/lan-server');
@@ -247,39 +249,11 @@ async function handleAgentUpdate(info) {
     const backupDir = path.join(workDir, 'backup');
     const cmdPath = path.join(workDir, 'apply-update.cmd');
     const exePath = path.join(destDir, exeName);
-    // NOTE: no parenthesized if-blocks around %RETRIES% — plain %VAR% expansion
-    // inside ( ) reads the stale value (classic batch pitfall).
-    // Safe swap (Task 1062): back up the current install FIRST; if the copy
-    // still fails after 5 passes, RESTORE the backup — the shop is never left
-    // with a half-swapped dead agent (old version relaunches intact instead).
-    // If even the backup fails (disk full/locked), skip the swap entirely and
-    // just relaunch the current exe.
-    const script = [
-      '@echo off',
-      'timeout /t 3 /nobreak >nul',
-      `taskkill /F /IM "${exeName}" >nul 2>&1`,
-      'timeout /t 2 /nobreak >nul',
-      `robocopy "${destDir}" "${backupDir}" /E /R:2 /W:2 >nul`,
-      'if %ERRORLEVEL% GEQ 8 goto launch',
-      'set RETRIES=0',
-      ':copyloop',
-      `robocopy "${srcDir}" "${destDir}" /E /R:5 /W:2 >nul`,
-      'if %ERRORLEVEL% LSS 8 goto launch',
-      'set /a RETRIES+=1',
-      'if %RETRIES% GEQ 5 goto restore',
-      'timeout /t 3 /nobreak >nul',
-      'goto copyloop',
-      ':restore',
-      `robocopy "${backupDir}" "${destDir}" /E /R:5 /W:2 >nul`,
-      ':launch',
-      `if not exist "${exePath}" robocopy "${backupDir}" "${destDir}" /E /R:5 /W:2 >nul`,
-      // Leave the temp workDir BEFORE launching: `start` inherits this CWD, and
-      // an agent whose CWD sits inside the update dir locks it forever (the
-      // EPERM-on-next-update trap this v1.9.1 exists to fix).
-      `cd /d "${destDir}"`,
-      `start "" "${exePath}"`,
-      'exit',
-    ].join('\r\n');
+    // Shut down this instance via stopAgent()/app.quit() below. The
+    // single-instance lock prevents a twin on this profile.
+    // If files remain locked, robocopy restores the backup rather than
+    // uninstalling another installation or touching saved config.
+    const script = buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir });
     fs.writeFileSync(cmdPath, script);
 
     console.log('[self-update] handing off to updater script, quitting…');
@@ -1088,6 +1062,7 @@ function buildTrayMenu() {
       label: 'Agent Settings / Status',
       click: () => mainWindow && mainWindow.show(),
     },
+    { label: `TaxNest PRA Agent v${app.getVersion()}`, enabled: false },
     { type: 'separator' },
     {
       label: 'Quit Agent',
@@ -1228,10 +1203,17 @@ if (!gotInstanceLock) {
     createWindow(posLaunch);
     createTray();
 
+    // Windows Startup Apps previously used Electron's implicit registry name
+    // on some installs. Use a stable branded name for new registrations.
     app.setLoginItemSettings({
       openAtLogin: true,
       openAsHidden: true,
+      ...(process.platform === 'win32' && app.isPackaged
+        ? { name: 'TaxNest PRA Agent', path: process.execPath } : {}),
     });
+    if (process.platform === 'win32' && app.isPackaged) {
+      retireLegacyElectronLogin().catch(() => {});
+    }
 
     const config = getMigratedAgentConfig();
     if (config && config.serverUrl && config.apiKey && config.companyId) {

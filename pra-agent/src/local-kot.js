@@ -127,7 +127,10 @@ function planKotPrints(job, printSettings) {
   const doc = (job && job.document) || {};
   const plan = [];
   if (s.silent_print_enabled === false) return plan;
-  if (s.kot_printer) plan.push({ printer: String(s.kot_printer), copyLabel: null });
+  // The first target is the kitchen slip whose result completes the job.
+  // A counter-only copy must never stand in for a missing kitchen printer.
+  if (!s.kot_printer || !String(s.kot_printer).trim()) return plan;
+  plan.push({ printer: String(s.kot_printer), copyLabel: null });
   if (s.counter_kot_enabled === true && s.counter_kot_printer && String(doc.order_type) === 'dine_in') {
     plan.push({ printer: String(s.counter_kot_printer), copyLabel: 'COUNTER COPY' });
   }

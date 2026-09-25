@@ -113,6 +113,7 @@ echo echo Removing shortcuts...
 echo del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\TaxNest PRA Agent.lnk" 2^>nul
 echo del "%USERPROFILE%\Desktop\TaxNest PRA Agent.lnk" 2^>nul
 echo del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\TaxNest PRA Agent.lnk" 2^>nul
+echo reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\TaxNestPRAAgentPortable" /f ^>nul 2^>^&1
 echo echo Removing application files...
 echo cd /d "%TEMP%"
 echo rmdir /S /Q "%LOCALAPPDATA%\TaxNest PRA Agent" 2^>nul

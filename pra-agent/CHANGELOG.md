@@ -1,5 +1,11 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.9 (2026-09-25)
+**Portable Agent appears in Windows Installed Apps for removal**
+
+- The ZIP-installed Agent now registers its existing per-user uninstall flow on startup, including installs upgraded in place from earlier versions. NSIS installations retain their own separate uninstaller entry.
+- The portable uninstall command clears only its own Windows entry, shortcuts and application files; Agent configuration and Local Core data remain untouched. Printer assignments and print behavior do not change.
+
 ## v1.13.8 (2026-09-25)
 **Print-job claim binding for the shared PRA/FBR desktop Agent**
 

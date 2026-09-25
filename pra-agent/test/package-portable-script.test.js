@@ -12,6 +12,7 @@ assert(pkg.scripts['build:win'].includes('node scripts/package-portable.js'));
 assert(script.includes("path.join(dist, 'TaxNest-PRA-Agent')"));
 assert(script.includes("path.join(dist, 'TaxNest-PRA-Agent-Windows.zip')"));
 assert(script.includes("fs.copyFileSync(path.join(root, 'install.bat')"));
+assert(script.includes("fs.copyFileSync(path.join(root, 'uninstall.cmd')"));
 assert(script.includes("fs.rmSync(unpacked, { recursive: true, force: true })"));
 assert(script.includes("'$ErrorActionPreference = \"Stop\";'"));
 assert(script.includes("].join(' ')"));

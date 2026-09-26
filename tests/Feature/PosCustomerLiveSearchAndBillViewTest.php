@@ -265,8 +265,10 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
                 ->assertViewHas('totalSpent', fn ($spent) => abs((float) $spent - $payable) < 0.001)
                 ->assertSee('PKR '.number_format($payable));
             $this->actingAs($owner, 'pos')
-                ->get('/pos/transactions')
-                ->assertOk()->assertSee('PKR '.number_format($payable));
+                ->get('/pos/transactions?tab=local')
+                ->assertOk()
+                ->assertViewHas('transactions', fn ($rows) => abs((float) $rows->first()?->total_amount - $payable) < 0.001)
+                ->assertSee('PKR '.number_format($payable));
             $this->actingAs($owner, 'pos')
                 ->get('/pos/transaction/'.$bill->id.'/receipt')
                 ->assertOk()->assertSee('PKR '.number_format($payable, 2));

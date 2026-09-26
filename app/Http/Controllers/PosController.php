@@ -11931,6 +11931,22 @@ class PosController extends Controller
 
         abort_unless($this->billingScopeAllowsRow($transaction), 403);
 
+        // The header subtotal of an inclusive bill is stored ex-tax for reports.
+        // Show menu prices in this quick view just as the receipt does, while
+        // keeping the settled total and fiscal fields unchanged.
+        $inclusive = (bool) ($transaction->tax_inclusive ?? false);
+        $menuRate = $inclusive ? ($transaction->tax_menu_rate ?? null) : null;
+        $cardSave = $menuRate !== null && (float) $menuRate > 0
+            && abs((float) $menuRate - (float) $transaction->tax_rate) >= 0.005;
+        $displaySubtotal = $cardSave
+            ? (float) $transaction->items->sum('subtotal')
+            : ($inclusive
+                ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
+                : (float) $transaction->subtotal);
+        $cardSaving = $cardSave
+            ? max(0.0, round($displaySubtotal - (float) $transaction->discount_amount - (float) $transaction->total_amount, 2))
+            : 0.0;
+
         return response()->json([
             'success' => true,
             'invoice' => $transaction->pra_invoice_number ?: $transaction->invoice_number,
@@ -11948,6 +11964,10 @@ class PosController extends Controller
                 'notes' => (string) ($i->special_notes ?? ''),
             ])->values(),
             'subtotal' => (float) $transaction->subtotal,
+            'display_subtotal' => $displaySubtotal,
+            'card_saving' => $cardSaving,
+            'tax_inclusive' => $inclusive,
+            'card_save' => $cardSave,
             'discount' => (float) $transaction->discount_amount,
             'tax' => (float) $transaction->tax_amount,
             'total' => (float) $transaction->total_amount,

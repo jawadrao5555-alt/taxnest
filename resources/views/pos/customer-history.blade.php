@@ -141,12 +141,15 @@
                         </table>
 
                         <div class="mt-4 border-t border-gray-200 dark:border-gray-800 pt-3 space-y-1 text-sm">
-                            <div class="flex justify-between text-gray-500"><span>{{ __('pos.subtotal') }}</span><span x-text="fmt(bill.subtotal)"></span></div>
+                            <div class="flex justify-between text-gray-500"><span x-text="bill.card_save ? @js(__('pos.menu_total')) : @js(__('pos.subtotal'))"></span><span x-text="fmt(bill.display_subtotal ?? bill.subtotal)"></span></div>
                             <template x-if="bill.discount > 0">
                                 <div class="flex justify-between text-gray-500"><span>{{ __('pos.discount_word') }}</span><span x-text="'-' + fmt(bill.discount)"></span></div>
                             </template>
-                            <template x-if="bill.tax > 0">
-                                <div class="flex justify-between text-gray-500"><span>{{ __('pos.tax_word') }}</span><span x-text="fmt(bill.tax)"></span></div>
+                            <template x-if="bill.card_saving > 0">
+                                <div class="flex justify-between text-gray-500"><span>{{ __('pos.card_discount') }}</span><span x-text="'-' + fmt(bill.card_saving)"></span></div>
+                            </template>
+                            <template x-if="bill.tax > 0 || bill.tax_inclusive">
+                                <div class="flex justify-between text-gray-500"><span x-text="bill.tax_inclusive ? @js(__('pos.tax_word') . ' (' . __('pos.incl_suffix') . ')') : @js(__('pos.tax_word'))"></span><span x-text="fmt(bill.tax)"></span></div>
                             </template>
                             <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white pt-1"><span>{{ __('pos.total_word') }}</span><span x-text="'PKR ' + fmt(bill.total)"></span></div>
                         </div>

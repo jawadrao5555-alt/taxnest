@@ -233,9 +233,12 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
             $this->assertEquals($tax, (float) $bill->tax_amount, $mode.' '.$method.' post-discount tax');
             $this->assertEquals($payable, (float) $sale->json('total_amount'));
 
-            $this->actingAs($owner, 'pos')
+            $quickView = $this->actingAs($owner, 'pos')
                 ->getJson('/pos/customers/history/bill/'.$bill->id)
                 ->assertOk()->assertJsonPath('total', (float) $payable);
+            $this->assertEquals(330, (float) $quickView->json('display_subtotal'));
+            $this->assertEquals($mode === 'inclusive_card_save' ? 22 : 0, (float) $quickView->json('card_saving'));
+            $this->assertSame($mode !== 'exclusive', $quickView->json('tax_inclusive'));
             $this->actingAs($owner, 'pos')
                 ->get('/pos/customers/'.$customer->id.'/history')
                 ->assertOk()->assertSee('PKR '.number_format($payable));

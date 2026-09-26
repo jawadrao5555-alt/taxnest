@@ -111,6 +111,43 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringNotContainsString('>checked_in<', $html);
     }
 
+    public function test_reception_room_actions_preselect_only_a_room_from_its_own_company(): void
+    {
+        $company = $this->company();
+        $other = $this->company();
+        $owner = $this->owner($company);
+        $stays = app(HotelStayService::class);
+        $vacant = $stays->createRoom((int) $company->id, [
+            'room_number' => '101', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 4000,
+        ]);
+        $occupied = $stays->createRoom((int) $company->id, [
+            'room_number' => '102', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
+        ]);
+        $foreign = $stays->createRoom((int) $other->id, [
+            'room_number' => '201', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 6000,
+        ]);
+        $stay = $stays->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $occupied->id,
+            'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDays(2)->toDateString(),
+            'guest_name' => 'Reception Guest',
+            'walk_in' => true,
+        ]);
+
+        $dashboard = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
+        $this->assertStringContainsString('data-hotel-room-check-in="'.$vacant->id.'"', $dashboard);
+        $this->assertStringContainsString('room_id='.$vacant->id, $dashboard);
+        $this->assertStringContainsString('data-hotel-room-stay="'.$occupied->id.'"', $dashboard);
+        $this->assertStringContainsString('/pos/hotel/stays/'.$stay->id, $dashboard);
+        $this->assertStringNotContainsString('data-hotel-room-check-in="'.$occupied->id.'"', $dashboard);
+        $this->assertStringNotContainsString('data-hotel-room-check-in="'.$foreign->id.'"', $dashboard);
+
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create?walk_in=1&room_id='.$vacant->id)
+            ->assertOk()->assertSee('value="'.$vacant->id.'" selected', false);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create?walk_in=1&room_id='.$foreign->id)
+            ->assertOk()->assertDontSee('value="'.$foreign->id.'"', false);
+    }
+
     public function test_manage_as_hotel_header_keeps_exit_in_a_responsive_scoped_layout(): void
     {
         $company = $this->company();

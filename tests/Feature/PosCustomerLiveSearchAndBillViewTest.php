@@ -250,7 +250,9 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
             $this->assertSame($mode !== 'exclusive', $quickView->json('tax_inclusive'));
             $this->actingAs($owner, 'pos')
                 ->get('/pos/customers/'.$customer->id.'/history')
-                ->assertOk()->assertSee('PKR '.number_format($payable));
+                ->assertOk()
+                ->assertViewHas('totalSpent', fn ($spent) => abs((float) $spent - $payable) < 0.001)
+                ->assertSee('PKR '.number_format($payable));
             $this->actingAs($owner, 'pos')
                 ->get('/pos/transactions')
                 ->assertOk()->assertSee('PKR '.number_format($payable));

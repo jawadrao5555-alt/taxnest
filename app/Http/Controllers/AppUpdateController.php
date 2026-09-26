@@ -6,6 +6,7 @@ use App\Models\AppUpdate;
 use App\Models\AppUpdateSeen;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AppUpdateController extends Controller
 {
@@ -59,13 +60,15 @@ class AppUpdateController extends Controller
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             // Audience (Aug 2026): 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
             'audience' => 'nullable|in:pos,fbr_pos,all',
-            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services,accommodation',
+            'audience_scope' => 'required|in:all,cats',
             // Type (Task 1286): 'feature' = Naya Feature, 'improvement' = Behtari / Masla Hal.
             'type' => 'nullable|in:feature,improvement',
             // Task 1585: optional business-category targeting (empty = all shops).
             'target_categories' => 'nullable|array',
             'target_categories.*' => 'string|max:50',
         ]);
+        $categories = $this->validatedCategories($request);
 
         $points = $this->parsePoints($request->points_text);
         if (empty($points)) {
@@ -93,7 +96,7 @@ class AppUpdateController extends Controller
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')
             ? ['type' => $request->input('type') ?: 'improvement'] : [])
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')
-            ? ['target_categories' => AppUpdate::normalizeCategories($request->input('target_categories'))] : [])
+            ? ['target_categories' => $categories] : [])
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')
             ? ['audience_family' => $request->input('audience_family', 'all')] : []));
 
@@ -109,11 +112,13 @@ class AppUpdateController extends Controller
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'audience' => 'nullable|in:pos,fbr_pos,all',
-            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services,accommodation',
+            'audience_scope' => 'required|in:all,cats',
             'type' => 'nullable|in:feature,improvement',
             'target_categories' => 'nullable|array',
             'target_categories.*' => 'string|max:50',
         ]);
+        $categories = $this->validatedCategories($request);
 
         $points = $this->parsePoints($request->points_text);
         if (empty($points)) {
@@ -144,11 +149,8 @@ class AppUpdateController extends Controller
         if ($request->filled('type') && \Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')) {
             $data['type'] = $request->input('type');
         }
-        // Task 1585: the edit form always sends the control's state (a hidden
-        // empty marker when nothing is ticked), so an unticked list clears the
-        // targeting back to "all shops".
         if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')) {
-            $data['target_categories'] = AppUpdate::normalizeCategories($request->input('target_categories'));
+            $data['target_categories'] = $categories;
         }
 
         if ($request->boolean('remove_image')) {
@@ -182,6 +184,31 @@ class AppUpdateController extends Controller
         $appUpdate->update(['is_published' => $publishing]);
 
         return redirect('/admin/app-updates')->with('success', 'Update ' . ($appUpdate->is_published ? 'published' : 'unpublished') . '.');
+    }
+
+    /** An empty or off-panel selection must never become a universal announcement. */
+    private function validatedCategories(Request $request): ?array
+    {
+        if ($request->input('audience_scope') === 'all') {
+            return null;
+        }
+
+        $selected = $request->input('target_categories', []);
+        $categories = AppUpdate::normalizeCategories($selected);
+        $panels = $request->input('audience') === 'all' ? ['pra', 'fbr']
+            : [$request->input('audience') === 'fbr_pos' ? 'fbr' : 'pra'];
+        $allowed = [];
+        foreach ($panels as $panel) {
+            $allowed = array_merge($allowed, \App\Services\PosFeatureService::categories($panel));
+        }
+        if (!$categories || count($categories) !== count(array_unique($selected))
+            || array_diff($categories, $allowed)) {
+            throw ValidationException::withMessages([
+                'target_categories' => 'Select at least one valid category for the chosen POS panel, or explicitly choose all shops.',
+            ]);
+        }
+
+        return $categories;
     }
 
     /**

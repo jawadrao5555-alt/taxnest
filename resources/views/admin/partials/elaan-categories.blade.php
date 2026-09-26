@@ -1,7 +1,7 @@
 {{--
     Task 1585 — "Which shops" control for an elaan (What's New).
 
-    All shops (default) = no category stored. Specific categories = only shops
+    All shops = no category stored. Specific categories = only shops
     whose resolved business category is on the list. The lists come from
     PosFeatureService::categoryGroups(), so they can never drift away from the
     signup pickers, and the visible panel sections follow the chosen audience.
@@ -12,13 +12,13 @@
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Which shops</label>
     <div class="flex items-center gap-4 mb-2">
         <label class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-            <input type="radio" name="{{ $prefix }}_scope" value="all" checked class="text-emerald-600" data-elaan-scope="all"> All shops
+            <input type="radio" name="audience_scope" value="all" class="text-emerald-600" data-elaan-scope="all"> All shops
         </label>
         <label class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-            <input type="radio" name="{{ $prefix }}_scope" value="cats" class="text-emerald-600" data-elaan-scope="cats"> Only the selected business categories
+            <input type="radio" name="audience_scope" value="cats" checked class="text-emerald-600" data-elaan-scope="cats"> Only the selected business categories
         </label>
     </div>
-    <div data-elaan-catbox class="hidden space-y-3 max-h-64 overflow-y-auto pr-1">
+    <div data-elaan-catbox class="space-y-3 max-h-64 overflow-y-auto pr-1">
         @foreach($elaanGroups as $panel => $groups)
             <div data-elaan-panel="{{ $panel }}">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">{{ $panel === 'fbr' ? 'FBR POS categories' : 'PRA POS categories' }}</p>
@@ -41,5 +41,5 @@
             </div>
         @endforeach
     </div>
-    <p class="mt-1 text-[11px] text-gray-400">Tick nothing = every shop on that panel gets the elaan. Pick categories and only those business types will see it.</p>
+    <p class="mt-1 text-[11px] text-gray-500" data-elaan-preview aria-live="polite"></p>
 </div>

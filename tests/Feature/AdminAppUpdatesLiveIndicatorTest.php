@@ -75,6 +75,8 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
             $table->string('image_path')->nullable();
             $table->string('audience')->default('pos');
             $table->string('type', 20)->nullable();
+            $table->text('target_categories')->nullable();
+            $table->string('audience_family')->nullable();
             $table->boolean('is_featured')->default(false);
             $table->boolean('is_published')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
@@ -101,6 +103,46 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
     private function actingAsAdmin(): self
     {
         return $this->actingAs(AdminUser::first(), 'admin');
+    }
+
+    public function test_specific_guest_house_update_is_saved_and_empty_selection_is_rejected(): void
+    {
+        $payload = [
+            'title' => 'Guest house reception update', 'points_text' => 'Room board is ready',
+            'audience' => 'pos', 'audience_family' => 'accommodation',
+            'audience_scope' => 'cats', 'target_categories' => ['hotel'],
+            'is_published' => '1',
+        ];
+
+        $this->actingAsAdmin()->post('/admin/app-updates', $payload)->assertRedirect();
+        $update = AppUpdate::where('title', $payload['title'])->firstOrFail();
+        $this->assertSame(['hotel'], $update->target_categories);
+        $this->assertSame('accommodation', $update->audience_family);
+
+        $this->actingAsAdmin()->from('/admin/app-updates')->post('/admin/app-updates',
+            array_merge($payload, ['title' => 'Must not broadcast', 'target_categories' => []]))
+            ->assertRedirect('/admin/app-updates')->assertSessionHasErrors('target_categories');
+        $this->assertDatabaseMissing('app_updates', ['title' => 'Must not broadcast']);
+
+        $this->actingAsAdmin()->from('/admin/app-updates')->post('/admin/app-updates',
+            array_merge($payload, ['title' => 'Wrong panel', 'target_categories' => ['grocery']]))
+            ->assertSessionHasErrors('target_categories');
+        $this->assertDatabaseMissing('app_updates', ['title' => 'Wrong panel']);
+    }
+
+    public function test_universal_notice_requires_explicit_scope(): void
+    {
+        $payload = [
+            'title' => 'Universal announcement', 'points_text' => 'General notice',
+            'audience' => 'all', 'audience_family' => 'all',
+        ];
+        $this->actingAsAdmin()->from('/admin/app-updates')->post('/admin/app-updates', $payload)
+            ->assertSessionHasErrors('audience_scope');
+        $this->assertDatabaseMissing('app_updates', ['title' => $payload['title']]);
+
+        $this->actingAsAdmin()->post('/admin/app-updates', $payload + ['audience_scope' => 'all'])
+            ->assertRedirect();
+        $this->assertNull(AppUpdate::where('title', $payload['title'])->firstOrFail()->target_categories);
     }
 
     private function seedRows(): void

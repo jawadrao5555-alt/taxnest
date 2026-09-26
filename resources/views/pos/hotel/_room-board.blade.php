@@ -12,14 +12,22 @@
     $visible = collect($roomCards ?? [])->filter(function ($card) use ($filter) {
         return $filter === '' || ($card['state'] ?? '') === $filter;
     });
+    $roomGroups = $showReceptionActions && $filter === ''
+        ? ['vacant' => __('pos.hotel_available_rooms'), 'occupied' => __('pos.hotel_in_house'), 'reserved' => __('pos.hotel_status_reserved'), 'dirty' => __('pos.hotel_dirty_rooms'), 'oos' => __('pos.hotel_oos')]
+        : ['' => null];
 @endphp
 <div class="flex flex-wrap gap-2 mb-3 text-xs" data-hotel-room-filters="1">
     @foreach(['' => __('pos.hotel_all_rooms'), 'vacant' => __('pos.hotel_vacant'), 'occupied' => __('pos.hotel_occupied'), 'reserved' => __('pos.hotel_status_reserved'), 'dirty' => __('pos.hotel_hk_dirty'), 'oos' => __('pos.hotel_oos')] as $key => $label)
     <a href="{{ $filterBase }}{{ $key === '' ? '' : '?filter='.$key }}" class="px-2.5 py-1 rounded-full font-semibold {{ $filter === $key ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 text-gray-700 dark:text-gray-200' }}">{{ $label }}</a>
     @endforeach
 </div>
-<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6" data-hotel-room-board="1">
-    @forelse($visible as $card)
+<div data-hotel-room-board="1">
+@foreach($roomGroups as $state => $heading)
+    @php $groupCards = $state === '' ? $visible : $visible->where('state', $state); @endphp
+    @if($groupCards->isNotEmpty() || $state === '')
+    @if($heading)<h2 class="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide mt-5 mb-3">{{ $heading }} <span class="text-gray-500">({{ $groupCards->count() }})</span></h2>@endif
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-5" data-hotel-room-group="{{ $state }}">
+    @forelse($groupCards as $card)
     @php $room = $card['room']; $stay = $card['stay'] ?? null; @endphp
     <div class="rounded-xl border p-3 {{ $toneMap[$card['tone']] ?? 'border-gray-200 bg-white' }}">
         <p class="text-lg font-extrabold text-gray-900 dark:text-white">{{ $room->room_number }}</p>
@@ -31,6 +39,10 @@
         @elseif($stay)
         <p class="mt-1 text-xs font-semibold truncate">{{ $stay->guest_name }}</p>
         @endif
+        @if($stay)
+        <p class="mt-1 text-[11px] text-gray-600 dark:text-gray-300">{{ __('pos.hotel_check_in') }}: {{ $stay->check_in_date?->format('d M Y') }}</p>
+        <p class="text-[11px] text-gray-600 dark:text-gray-300">{{ __('pos.hotel_check_out') }}: {{ $stay->check_out_date?->format('d M Y') }}</p>
+        @endif
         @if($showReceptionActions && \App\Services\HotelAccessService::canFrontDesk(auth('pos')->user()))
             @if($card['state'] === 'vacant')
                 <a data-hotel-room-check-in="{{ $room->id }}" href="{{ route('pos.hotel.stays.create', ['walk_in' => 1, 'room_id' => $room->id]) }}" class="block mt-3 rounded-lg bg-teal-700 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_check_in_btn') }}</a>
@@ -41,6 +53,7 @@
         @if($room->housekeeping === 'dirty' && ($card['state'] ?? '') !== 'dirty')
         <p class="text-[10px] text-amber-800 mt-1">{{ __('pos.hotel_hk_dirty') }}</p>
         @endif
+        @if(\App\Services\HotelAccessService::canHousekeeping(auth('pos')->user()))
         <form method="POST" action="{{ route('pos.hotel.rooms.housekeeping', $room->id) }}" class="mt-2">
             @csrf
             <select name="housekeeping" onchange="this.form.submit()" class="w-full rounded-md border-gray-300 dark:bg-gray-800 text-[11px]">
@@ -49,8 +62,12 @@
                 <option value="inspected" @selected($room->housekeeping==='inspected')>{{ __('pos.hotel_hk_inspected') }}</option>
             </select>
         </form>
+        @endif
     </div>
     @empty
     <p class="col-span-full text-sm text-gray-500">{{ __('pos.hotel_no_rooms') }}</p>
     @endforelse
+    </div>
+    @endif
+@endforeach
 </div>

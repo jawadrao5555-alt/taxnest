@@ -138,6 +138,9 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString('data-hotel-room-check-in="'.$vacant->id.'"', $dashboard);
         $this->assertStringContainsString('room_id='.$vacant->id, $dashboard);
         $this->assertStringContainsString('data-hotel-room-stay="'.$occupied->id.'"', $dashboard);
+        $this->assertStringContainsString('data-hotel-room-group="vacant"', $dashboard);
+        $this->assertStringContainsString('data-hotel-room-group="occupied"', $dashboard);
+        $this->assertStringContainsString($stay->check_out_date->format('d M Y'), $dashboard);
         $this->assertStringContainsString('/pos/hotel/stays/'.$stay->id, $dashboard);
         $this->assertStringNotContainsString('data-hotel-room-check-in="'.$occupied->id.'"', $dashboard);
         $this->assertStringNotContainsString('data-hotel-room-check-in="'.$foreign->id.'"', $dashboard);

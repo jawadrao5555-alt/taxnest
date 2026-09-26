@@ -11938,11 +11938,12 @@ class PosController extends Controller
         $menuRate = $inclusive ? ($transaction->tax_menu_rate ?? null) : null;
         $cardSave = $menuRate !== null && (float) $menuRate > 0
             && abs((float) $menuRate - (float) $transaction->tax_rate) >= 0.005;
-        $displaySubtotal = $cardSave
-            ? (float) $transaction->items->sum('subtotal')
-            : ($inclusive
-                ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
-                : (float) $transaction->subtotal);
+        // Inclusive item rows retain the original menu prices. The header's
+        // ex-tax subtotal already incorporates the discount allocation, so
+        // adding included tax to it would show a discounted subtotal here.
+        $displaySubtotal = $inclusive
+            ? round((float) $transaction->items->sum('subtotal'), 2)
+            : (float) $transaction->subtotal;
         $cardSaving = $cardSave
             ? max(0.0, round($displaySubtotal - (float) $transaction->discount_amount - (float) $transaction->total_amount, 2))
             : 0.0;

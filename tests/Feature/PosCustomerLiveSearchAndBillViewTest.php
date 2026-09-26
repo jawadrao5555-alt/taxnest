@@ -187,6 +187,14 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
 
     public function test_cash_and_card_discounts_are_reflected_in_saved_payable_tax_and_customer_spend(): void
     {
+        $planId = DB::table('pricing_plans')->insertGetId([
+            'name' => 'Checkout Test POS',
+            'product_type' => 'pos',
+            'invoice_limit' => -1,
+            'price' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         $cases = [
             // Exclusive tax is added to the taxable amount after the discount.
             ['exclusive', 'cash', 'amount', 14, 32, 348],
@@ -201,6 +209,9 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
             $company = $this->company();
             DB::table('subscriptions')->insert([
                 'company_id' => $company->id,
+                'pricing_plan_id' => $planId,
+                'start_date' => now()->toDateString(),
+                'end_date' => now()->addYear()->toDateString(),
                 'active' => true,
                 'override_type' => 'lifetime',
                 'created_at' => now(),

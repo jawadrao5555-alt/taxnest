@@ -195,6 +195,24 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $company = $this->company();
+        DB::table('subscriptions')->insert([
+            'company_id' => $company->id,
+            'pricing_plan_id' => $planId,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addYear()->toDateString(),
+            'active' => true,
+            'override_type' => 'lifetime',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $product = PosProduct::create([
+            'company_id' => $company->id,
+            'name' => 'Menu Item',
+            'price' => 330,
+            'is_active' => true,
+        ]);
+        $owner = $this->owner($company);
         $cases = [
             // Exclusive tax is added to the taxable amount after the discount.
             ['exclusive', 'cash', 'amount', 14, 32, 348],
@@ -206,17 +224,6 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
         ];
 
         foreach ($cases as $index => [$mode, $method, $discountType, $discountValue, $tax, $payable]) {
-            $company = $this->company();
-            DB::table('subscriptions')->insert([
-                'company_id' => $company->id,
-                'pricing_plan_id' => $planId,
-                'start_date' => now()->toDateString(),
-                'end_date' => now()->addYear()->toDateString(),
-                'active' => true,
-                'override_type' => 'lifetime',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
             $company->update([
                 'pos_tax_pricing_mode' => $mode,
                 'pos_tax_inclusive' => $mode !== 'exclusive',
@@ -226,14 +233,6 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
             ]);
             $phone = '03001234'.str_pad((string) $index, 3, '0', STR_PAD_LEFT);
             $customer = $this->customer($company, 'Discount Customer '.$index, $phone);
-            $product = PosProduct::create([
-                'company_id' => $company->id,
-                'name' => 'Menu Item',
-                'price' => 330,
-                'is_active' => true,
-            ]);
-            $owner = $this->owner($company);
-
             $sale = $this->actingAs($owner, 'pos')->postJson('/pos/invoice/store', [
                 'items' => [[
                     'type' => 'product', 'item_id' => $product->id,

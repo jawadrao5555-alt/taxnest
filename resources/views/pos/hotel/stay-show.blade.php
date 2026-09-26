@@ -64,9 +64,12 @@
         <form method="POST" action="{{ route('pos.hotel.stays.move', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
             @csrf
             <h3 class="text-sm font-semibold">{{ __('pos.hotel_move') }}</h3>
-            <select name="room_id" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+            <select name="room_id" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+                <option value="" selected disabled>{{ __('pos.hotel_select_room') }}</option>
                 @foreach($rooms as $room)
-                <option value="{{ $room->id }}" @selected($room->id===$stay->room_id)>{{ $room->room_number }} · {{ $room->room_type }}</option>
+                @if($room->id !== $stay->room_id)
+                <option value="{{ $room->id }}">{{ $room->room_number }} · {{ $room->room_type }}</option>
+                @endif
                 @endforeach
             </select>
             <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_move_btn') }}</button>

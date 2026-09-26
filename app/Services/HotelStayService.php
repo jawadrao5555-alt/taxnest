@@ -409,6 +409,11 @@ class HotelStayService
                 $from = now()->toDateString();
             }
             $oldRoomId = (int) $stay->room_id;
+            // Repeated submissions of the current room must not split the
+            // assignment history or create a second assignment for one stay.
+            if ($oldRoomId === $newRoomId) {
+                return $stay->fresh(['room']);
+            }
             $lockIds = array_values(array_unique(array_filter([$oldRoomId, $newRoomId], fn ($id) => (int) $id > 0)));
             sort($lockIds);
             $lockedRooms = [];

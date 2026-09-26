@@ -564,6 +564,31 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertSame('clean', $reservedFrom->fresh()->housekeeping);
     }
 
+    public function test_reselecting_current_room_does_not_duplicate_stay_assignment(): void
+    {
+        $company = $this->company('hotel');
+        $stays = app(HotelStayService::class);
+        $user = $this->owner($company);
+        $room = $this->room($stays, $company, '101');
+        $stay = $stays->book((int) $company->id, (int) $user->id, [
+            'room_id' => $room->id,
+            'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDays(2)->toDateString(),
+            'guest_name' => 'Same Room',
+            'walk_in' => true,
+        ]);
+
+        $page = $this->actingAs($user, 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertOk()->getContent();
+        $this->assertStringContainsString('name="room_id" required', $page);
+        $this->assertStringNotContainsString('<option value="'.$room->id.'" selected', $page);
+
+        $original = $stay->assignments()->first();
+        $stays->moveRoom($stay, (int) $room->id, (int) $user->id);
+        $this->assertSame(1, $stay->assignments()->count());
+        $this->assertSame($original->to_date->toDateString(), $original->fresh()->to_date->toDateString());
+        $this->assertSame('clean', $room->fresh()->housekeeping);
+    }
+
     public function test_overpayment_shows_advance_credit_separate_from_deposit(): void
     {
         $company = $this->company('hotel', [

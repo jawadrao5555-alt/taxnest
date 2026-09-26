@@ -105,6 +105,11 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString('data-hotel-native-nav="1"', $html);
         $this->assertStringContainsString('data-hotel-primary-actions="1"', $html);
         $this->assertStringContainsString('data-hotel-room-board="1"', $html);
+        $this->assertStringContainsString('data-hotel-reception="1"', $html);
+        $this->assertStringContainsString('data-hotel-desk-menu="1"', $html);
+        $this->assertStringContainsString('data-hotel-reception-summary="1"', $html);
+        $this->assertStringContainsString('data-hotel-empty-rooms="1"', $html);
+        $this->assertStringContainsString('data-hotel-occupancy-rate="0"', $html);
         $this->assertStringContainsString(__('pos.hotel_action_booking'), $html);
         $this->assertStringContainsString(__('pos.hotel_stat_collections'), $html);
         $this->assertStringNotContainsString('data-nav-new-sale="static"', $html);
@@ -138,6 +143,13 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString('data-hotel-room-check-in="'.$vacant->id.'"', $dashboard);
         $this->assertStringContainsString('room_id='.$vacant->id, $dashboard);
         $this->assertStringContainsString('data-hotel-room-stay="'.$occupied->id.'"', $dashboard);
+        $this->assertStringContainsString('data-hotel-room-state="vacant"', $dashboard);
+        $this->assertStringContainsString('data-hotel-room-state="occupied"', $dashboard);
+        $this->assertStringContainsString('data-hotel-occupancy-rate="50"', $dashboard);
+        $this->assertStringContainsString('data-hotel-desk-link="checkin"', $dashboard);
+        $this->assertStringContainsString('data-hotel-desk-link="checkout"', $dashboard);
+        $this->assertStringContainsString('data-hotel-desk-link="folios"', $dashboard);
+        $this->assertStringNotContainsString('data-hotel-empty-rooms="1"', $dashboard);
         $this->assertStringContainsString('data-hotel-room-group="vacant"', $dashboard);
         $this->assertStringContainsString('data-hotel-room-group="occupied"', $dashboard);
         $this->assertStringContainsString($stay->check_out_date->format('d M Y'), $dashboard);

@@ -185,6 +185,14 @@ async function runJourney(browser, label, viewport, creds) {
         await dismissNotices(page);
         if (!dash || dash.status() >= 400) bad(`/pos/hotel HTTP ${dash?.status()}`);
         const dashText = await page.locator('body').innerText();
+        const deskMenu = page.locator('[data-hotel-desk-menu="1"]');
+        const summary = page.locator('[data-hotel-reception-summary="1"]');
+        const availableCard = page.locator('[data-hotel-room-group="vacant"] [data-hotel-room-check-in]').first();
+        if (await deskMenu.count() && await summary.count() && await availableCard.isVisible()) {
+            const checkInUrl = await availableCard.getAttribute('href');
+            if (checkInUrl?.includes('walk_in=1') && checkInUrl?.includes('room_id=')) ok('reference reception: menu, summary and room-specific walk-in visible');
+            else bad('available room action did not preselect the walk-in room');
+        } else bad('reference reception is missing menu, summary or available room action');
         const boardNeedles = [/arrival|آمد/i, /depart|روانگی/i, /in.?house|اندر/i, /pending|باقی/i, /available|دستیاب/i, /dirty|گند/i];
         const boardHits = boardNeedles.filter((re) => re.test(dashText)).length;
         if (boardHits >= 4) ok(`dashboard board sections visible (${boardHits}/6)`);

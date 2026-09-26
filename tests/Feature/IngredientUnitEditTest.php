@@ -31,7 +31,7 @@ class IngredientUnitEditTest extends TestCase
     public function test_display_cased_unit_is_normalized_when_unused_ingredient_is_edited(): void
     {
         $company = Company::create(['name' => 'Kitchen', 'ntn' => uniqid('KT-')]);
-        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs', 'current_stock' => 0]);
+        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs', 'current_stock' => 0, 'cost_per_unit' => 100, 'min_stock_level' => 0]);
 
         $this->edit($ingredient, ' Kg ', 'Kg');
 
@@ -42,7 +42,7 @@ class IngredientUnitEditTest extends TestCase
     public function test_stocked_ingredient_cannot_be_relabelled_as_a_different_unit(): void
     {
         $company = Company::create(['name' => 'Kitchen', 'ntn' => uniqid('KT-')]);
-        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs', 'current_stock' => 50]);
+        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs', 'current_stock' => 50, 'cost_per_unit' => 100, 'min_stock_level' => 0]);
 
         $this->edit($ingredient, 'Kg', 'Kg');
 
@@ -54,7 +54,7 @@ class IngredientUnitEditTest extends TestCase
     public function test_invalid_unit_is_rejected_and_existing_unit_is_preserved(): void
     {
         $company = Company::create(['name' => 'Kitchen', 'ntn' => uniqid('KT-')]);
-        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs']);
+        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs', 'current_stock' => 0, 'cost_per_unit' => 100, 'min_stock_level' => 0]);
 
         try {
             $this->edit($ingredient, 'stones', 'stones');
@@ -68,7 +68,7 @@ class IngredientUnitEditTest extends TestCase
     public function test_branch_stock_blocks_unit_change_even_when_company_stock_is_zero(): void
     {
         $company = Company::create(['name' => 'Kitchen', 'ntn' => uniqid('KT-')]);
-        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs', 'current_stock' => 0]);
+        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'Chicken', 'unit' => 'pcs', 'current_stock' => 0, 'cost_per_unit' => 100, 'min_stock_level' => 0]);
         IngredientStock::create(['company_id' => $company->id, 'ingredient_id' => $ingredient->id, 'quantity' => 50]);
 
         $this->edit($ingredient, 'Kg', 'Kg');

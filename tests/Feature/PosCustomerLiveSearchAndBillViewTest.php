@@ -246,7 +246,8 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
                 'customer_name' => $customer->name,
                 'customer_phone' => $phone,
             ]);
-            $sale->assertOk()->assertJson(['success' => true]);
+            $this->assertSame(200, $sale->status(), $mode.' '.$method.' checkout: '.$sale->getContent());
+            $sale->assertJson(['success' => true]);
             $bill = PosTransaction::findOrFail($sale->json('transaction_id'));
             $this->assertEquals($payable, (float) $bill->total_amount, $mode.' '.$method.' saved payable');
             $this->assertEquals($tax, (float) $bill->tax_amount, $mode.' '.$method.' post-discount tax');

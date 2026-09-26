@@ -73,6 +73,19 @@
                 <div class="flex justify-between text-sm font-semibold text-slate-700 dark:text-slate-200"><span>{{ __('pos.hotel_occupancy') }}</span><span>{{ $occupancyRate }}%</span></div>
                 <div class="mt-2 h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-label="{{ __('pos.hotel_occupancy') }}" aria-valuenow="{{ $occupancyRate }}" aria-valuemin="0" aria-valuemax="100"><div class="h-full rounded-full bg-teal-600" style="width: {{ $occupancyRate }}%"></div></div>
             </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3" data-hotel-operational-counts="1">
+                @foreach([
+                    ['hotel_stat_reserved', $roomStateCounts['reserved'] ?? 0],
+                    ['hotel_stat_dirty', $roomStateCounts['dirty'] ?? 0],
+                    ['hotel_stat_oos', $roomStateCounts['oos'] ?? 0],
+                    ['hotel_stat_due', $occupancy['pending_due_count'] ?? 0],
+                ] as [$label, $value])
+                <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 px-3 py-2">
+                    <p class="text-xs font-semibold text-slate-500">{{ __('pos.'.$label) }}</p>
+                    <p class="text-xl font-extrabold text-slate-900 dark:text-white">{{ $value }}</p>
+                </div>
+                @endforeach
+            </div>
 
             @if($totalRooms === 0)
             <div class="mt-5 rounded-2xl border border-dashed border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-6 text-center" data-hotel-empty-rooms="1">

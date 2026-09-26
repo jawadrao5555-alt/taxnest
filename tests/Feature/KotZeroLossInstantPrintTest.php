@@ -371,7 +371,7 @@ class KotZeroLossInstantPrintTest extends TestCase
         $lineIds = DB::table('restaurant_order_items')->where('order_id', $order->id)->pluck('id')->map(fn ($i) => (int) $i)->all();
         $handoff = KotPrintService::openLocalHandoff($this->companyA(), $order, 'zl-restart', $lineIds, 'dev-kitchen', $this->waiterId, now());
 
-        $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints($this->companyB(), 'dev-kitchen', ['zl-restart']));
+        $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints(Company::findOrFail($this->companyB), 'dev-kitchen', ['zl-restart']));
         $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints($this->companyA(), 'dev-other', ['zl-restart']));
         $this->assertSame(0, KotPrintService::reportInterruptedLocalPrints($this->companyA(), null, ['zl-restart']));
         $this->assertSame(KotPrintService::LOCAL_STATUS, $handoff->fresh()->status);

@@ -545,7 +545,31 @@ function openLocalCoreRuntime(config) {
     };
     coreRuntime = runtime;
     coreStartupError = null;
+    // The authenticated heartbeat opened this company's encrypted partition.
+    // Inspect old print claims before starting a new drain. A claim that never
+    // reached transport can be retried; an interrupted transport needs staff
+    // confirmation because paper may already be in the kitchen.
+    runtime.interruptedKotOrders = [];
+    try {
+      const domainStateFile = path.join(partitionDir, require('./src/local-core/domain-engine').DOMAIN_STATE_FILE);
+      if (fs.existsSync(domainStateFile)) {
+        const inspector = new LocalCoreDomain({ dataDir: partitionDir, encryptionKey: encryption.key,
+          encryptionKeyId: encryption.keyId, eventStore: store_ });
+        try {
+          runtime.interruptedKotOrders = inspector.interruptedLocalPrints().map((job) => job.order_id)
+            .filter((id) => typeof id === 'string').slice(0, 50);
+        } finally { inspector.close(); }
+      }
+    } catch (e) {
+      // A corrupt or unavailable state must still fail closed. Never infer a
+      // completed print or retry a possible kitchen slip on inspection error.
+      console.log('[local-kot] interrupted print inspection failed:', e && e.code || 'unknown');
+    }
     scheduleLocalKotDrain(LOCAL_KOT_DRAIN_MS);
+    if (runtime.interruptedKotOrders.length) {
+      console.log('[local-kot] uncertain kitchen print outcomes:', runtime.interruptedKotOrders.length);
+      try { wakeAgent('local-kot-interrupted'); } catch (e) {}
+    }
     // Scope and heartbeat may arrive in either order. Refresh from the owning
     // authenticated Electron session after a successful open; stale responses
     // are rejected by refreshTrustedPosScope's generation/config/window checks.
@@ -1144,6 +1168,9 @@ if (!gotInstanceLock) {
       }
       out.agent_diagnostics = heartbeatDiagnostics(getStatus());
       if (getPosSettings().offlineMode) {
+        if (coreRuntime && coreRuntime.interruptedKotOrders && coreRuntime.interruptedKotOrders.length) {
+          out.local_kot_interrupted_order_ids = coreRuntime.interruptedKotOrders;
+        }
         if (coreStartupError) {
           out.local_core_error_code = coreStartupError.code;
           out.local_core_error = coreStartupError.message;

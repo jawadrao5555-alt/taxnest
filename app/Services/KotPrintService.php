@@ -62,6 +62,35 @@ class KotPrintService
      */
     public const LOCAL_AGENT_UNRESPONSIVE_ERROR = 'local_agent_unresponsive: the shop PC stopped answering after it took this kitchen slip. Check the printer tray — reprint from the bill/order screen only if nothing came out.';
 
+    /** An authenticated agent restarted during printer transport. The paper outcome is unknown. */
+    public const LOCAL_INTERRUPTED_ERROR = 'local_agent_interrupted: the shop PC restarted during kitchen printing. Check the printer tray — reprint from the bill/order screen only if nothing came out.';
+
+    public static function reportInterruptedLocalPrints(Company $company, ?string $deviceUid, mixed $orderIds): int
+    {
+        // Never mark another PC's work or a legacy handoff with no device
+        // binding. A repeated heartbeat is safe after the first conditional flip.
+        if (!$deviceUid || !is_array($orderIds) || !self::deviceRoutingReadyForInterrupts()) return 0;
+        $ids = array_values(array_unique(array_filter($orderIds,
+            fn ($id) => is_string($id) && strlen($id) >= 1 && strlen($id) <= 100 && !str_contains($id, "\0"))));
+        $marked = 0;
+        foreach (array_slice($ids, 0, 50) as $id) {
+            $marked += PosPrintJob::where('company_id', $company->id)
+                ->where('device_uid', $deviceUid)->where('type', 'kot')
+                ->where('claim_token', self::localHandoffToken($id))
+                ->where('status', self::LOCAL_STATUS)
+                ->update(['status' => 'failed', 'error' => self::LOCAL_INTERRUPTED_ERROR, 'updated_at' => now()]);
+        }
+        return $marked;
+    }
+
+    private static function deviceRoutingReadyForInterrupts(): bool
+    {
+        try {
+            return \Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')
+                && \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'device_uid');
+        } catch (\Throwable $e) { return false; }
+    }
+
     /** claim_token the Local Core ack (print.* on aggregate kot:<order>) resolves to. */
     public static function localHandoffToken(string $orderAggregate): string
     {
@@ -423,6 +452,7 @@ class KotPrintService
                 ->where('status', 'failed')
                 ->where(function ($q) {
                     $q->where('error', 'like', 'local_agent_unresponsive%')
+                        ->orWhere('error', 'like', 'local_agent_interrupted%')
                         ->orWhere('error', 'like', 'unconfirmed_after_print_content_fetched%');
                 })
                 ->where('created_at', '>=', now()->subHours(12))

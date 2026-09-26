@@ -10,6 +10,7 @@ use App\Models\PosTransactionItem;
 use App\Models\User;
 use App\Services\PosFeatureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -198,6 +199,13 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
 
         foreach ($cases as $index => [$mode, $method, $discountType, $discountValue, $tax, $payable]) {
             $company = $this->company();
+            DB::table('subscriptions')->insert([
+                'company_id' => $company->id,
+                'active' => true,
+                'override_type' => 'lifetime',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
             $company->update([
                 'pos_tax_pricing_mode' => $mode,
                 'pos_tax_inclusive' => $mode !== 'exclusive',

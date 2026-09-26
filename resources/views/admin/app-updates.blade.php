@@ -31,6 +31,9 @@
             @if(session('error'))
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
+            @if($errors->any())
+                <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg" role="alert">{{ $errors->first() }}</div>
+            @endif
 
             {{-- Master feature switch --}}
             <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 flex items-center justify-between flex-wrap gap-3">
@@ -227,15 +230,7 @@
                 @include('admin.partials.elaan-categories', ['prefix' => 'add'])
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
-                    <select name="audience_family" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
-                        @foreach(\App\Support\PosVocabulary::audienceOptions() as $value => $label)
-                            <option value="{{ $value }}" {{ old('audience_family', 'all') === $value ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
-                    <select name="audience_family" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    <select name="audience_family" id="addAudienceFamily" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         @foreach(\App\Support\PosVocabulary::audienceOptions() as $value => $label)
                             <option value="{{ $value }}" {{ old('audience_family', 'all') === $value ? 'selected' : '' }}>{{ $label }}</option>
                         @endforeach
@@ -300,14 +295,6 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
-                    <select name="audience_family" id="editAudienceFamily" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
-                        @foreach(\App\Support\PosVocabulary::audienceOptions() as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                     <select name="type" id="editType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         <option value="improvement">Behtari / Masla Hal (improvement or fix)</option>
@@ -353,12 +340,22 @@
             });
         }
 
+        function elaanPreview(prefix) {
+            var box = elaanCatBox(prefix);
+            var audience = document.getElementById(prefix + 'Audience').value;
+            var family = document.getElementById(prefix + 'AudienceFamily').value;
+            var all = box.querySelector('[data-elaan-scope=all]').checked;
+            var chosen = Array.from(box.querySelectorAll('input[data-elaan-cat]:checked')).map(function (c) { return c.closest('label').textContent.trim(); });
+            box.querySelector('[data-elaan-preview]').textContent = 'Audience preview: ' + (audience === 'all' ? 'PRA + FBR' : audience === 'pos' ? 'PRA' : 'FBR') + ' · ' + (family === 'all' ? 'all families' : family.replace('_', ' ')) + ' · ' + (all ? 'all categories (explicit)' : chosen.length ? chosen.join(', ') : 'select a category before publishing');
+        }
+
         function elaanSyncScope(prefix) {
             var box = elaanCatBox(prefix);
             if (!box) return;
             var cats = box.querySelector('[data-elaan-scope="cats"]').checked;
             box.querySelector('[data-elaan-catbox]').classList.toggle('hidden', !cats);
             if (!cats) box.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+            elaanPreview(prefix);
         }
 
         function elaanSetCategories(prefix, list) {
@@ -370,6 +367,7 @@
             });
             box.querySelector('[data-elaan-scope="' + (chosen.length ? 'cats' : 'all') + '"]').checked = true;
             box.querySelector('[data-elaan-catbox]').classList.toggle('hidden', chosen.length === 0);
+            elaanPreview(prefix);
         }
 
         ['add', 'edit'].forEach(function (prefix) {
@@ -387,12 +385,16 @@
                         var el = box.querySelector('input[data-elaan-cat="' + k + '"]');
                         if (el && !el.closest('[data-elaan-panel]').classList.contains('hidden')) el.checked = true;
                     });
+                    elaanPreview(prefix);
                 });
             });
+            box.querySelectorAll('input[data-elaan-cat]').forEach(function (c) { c.addEventListener('change', function () { elaanPreview(prefix); }); });
+            document.getElementById(prefix + 'AudienceFamily').addEventListener('change', function () { elaanPreview(prefix); });
             var sel = document.getElementById(prefix + 'Audience');
             if (sel) {
-                sel.addEventListener('change', function () { elaanSyncPanels(prefix, sel.value); });
+                sel.addEventListener('change', function () { elaanSyncPanels(prefix, sel.value); elaanPreview(prefix); });
                 elaanSyncPanels(prefix, sel.value);
+                elaanPreview(prefix);
             }
         });
 
@@ -401,7 +403,7 @@
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
             document.getElementById('editAudience').value = ['pos','fbr_pos','all'].includes(audience) ? audience : 'pos';
-            document.getElementById('editAudienceFamily').value = ['all','food_service','goods_retail','pharmacy','services'].includes(audienceFamily) ? audienceFamily : 'all';
+            document.getElementById('editAudienceFamily').value = ['all','food_service','goods_retail','pharmacy','services','accommodation'].includes(audienceFamily) ? audienceFamily : 'all';
             document.getElementById('editType').value = type === 'feature' ? 'feature' : 'improvement';
             elaanSyncPanels('edit', document.getElementById('editAudience').value);
             elaanSetCategories('edit', categories || []);

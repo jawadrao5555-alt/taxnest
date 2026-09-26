@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ingredient;
+use App\Models\IngredientStock;
 use App\Models\ProductRecipe;
 use App\Models\PosProduct;
 use Illuminate\Http\Request;
@@ -156,6 +157,11 @@ class IngredientController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        $request->merge([
+            'unit' => strtolower(trim((string) $request->input('unit'))),
+            'base_unit' => $request->filled('base_unit') ? strtolower(trim((string) $request->input('base_unit'))) : null,
+        ]);
+
         $request->validate([
             'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
@@ -199,6 +205,11 @@ class IngredientController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        $request->merge([
+            'unit' => strtolower(trim((string) $request->input('unit'))),
+            'base_unit' => $request->filled('base_unit') ? strtolower(trim((string) $request->input('base_unit'))) : null,
+        ]);
+
         $request->validate([
             'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
@@ -223,7 +234,12 @@ class IngredientController extends Controller
             || $newBaseUnit !== (string) ($ingredient->base_unit ?: $ingredient->unit)
             || abs($newFactor - (float) ($ingredient->conversion_factor ?: 1)) > 0.000001;
         if ($unitMeaningChanged) {
-            $hasStock = abs((float) $ingredient->current_stock) > 0.000001;
+            $hasStock = abs((float) $ingredient->current_stock) > 0.000001
+                || (Schema::hasTable('ingredient_stocks') && IngredientStock::where('company_id', $companyId)
+                    ->where('ingredient_id', $ingredient->id)
+                    ->where(function ($q) {
+                        $q->where('quantity', '>', 0.000001)->orWhere('quantity', '<', -0.000001);
+                    })->exists());
             $hasRecipes = ProductRecipe::where('company_id', $companyId)
                 ->where('ingredient_id', $ingredient->id)
                 ->exists();

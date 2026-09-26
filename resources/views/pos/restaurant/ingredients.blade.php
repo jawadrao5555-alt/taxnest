@@ -21,6 +21,12 @@
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>
     @endif
+    @if($errors->any())
+    <div role="alert" class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+        <p class="font-semibold">Ingredient save nahi hua:</p>
+        <ul class="list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+    </div>
+    @endif
 
     @if($ingredients->count() > 0)
     <div class="mb-4 relative w-full sm:max-w-md">
@@ -171,16 +177,9 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.unit_label') }}</label>
-                        <input type="text" name="unit" x-model="edit.unit" required maxlength="20" list="unit-options" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
-                        <datalist id="unit-options">
-                            <option value="kg"></option>
-                            <option value="g"></option>
-                            <option value="ltr"></option>
-                            <option value="ml"></option>
-                            <option value="pcs"></option>
-                            <option value="dozen"></option>
-                            <option value="pack"></option>
-                        </datalist>
+                        <select name="unit" x-model="edit.unit" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                            @foreach(\App\Services\RecipeInventoryService::UNITS as $unit)<option value="{{ $unit }}">{{ $unit }}</option>@endforeach
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.cost_per_unit_rs') }}</label>

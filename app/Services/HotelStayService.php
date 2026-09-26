@@ -769,15 +769,15 @@ class HotelStayService
         $cards = [];
         foreach ($rooms as $room) {
             $stay = $open->get($room->id);
-            if ($room->isOutOfService()) {
-                $state = 'oos';
-                $tone = 'slate';
-            } elseif ($stay && $stay->status === HotelStay::STATUS_CHECKED_IN) {
+            if ($stay && $stay->status === HotelStay::STATUS_CHECKED_IN) {
                 $state = 'occupied';
                 $tone = 'rose';
             } elseif ($stay && $stay->status === HotelStay::STATUS_RESERVED) {
                 $state = 'reserved';
                 $tone = 'indigo';
+            } elseif ($room->isOutOfService()) {
+                $state = 'oos';
+                $tone = 'slate';
             } elseif ($room->housekeeping === HotelRoom::HK_DIRTY) {
                 $state = 'dirty';
                 $tone = 'amber';

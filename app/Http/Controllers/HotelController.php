@@ -37,8 +37,9 @@ class HotelController extends Controller
         $board = $this->stays->board($companyId, $branchId);
         $money = $this->stays->todayMoney($companyId, $branchId);
         $roomCards = $this->stays->roomCards($companyId, $branchId);
+        $roomStateCounts = array_count_values(array_column($roomCards, 'state'));
 
-        return view('pos.hotel.dashboard', $board + compact('money', 'roomCards'));
+        return view('pos.hotel.dashboard', $board + compact('money', 'roomCards', 'roomStateCounts'));
     }
 
     /**

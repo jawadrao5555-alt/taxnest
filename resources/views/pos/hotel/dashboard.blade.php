@@ -42,7 +42,7 @@
         </div>
     </div>
 
-    @include('pos.hotel._room-board', ['roomCards' => $roomCards ?? [], 'filter' => '', 'filterBase' => route('pos.hotel.rooms')])
+    @include('pos.hotel._room-board', ['roomCards' => $roomCards ?? [], 'filter' => '', 'filterBase' => route('pos.hotel.rooms'), 'showReceptionActions' => true])
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">

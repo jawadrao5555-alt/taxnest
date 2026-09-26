@@ -14,7 +14,7 @@
             <select name="room_id" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
                 <option value="">{{ __('pos.hotel_select_room') }}</option>
                 @foreach($rooms as $room)
-                <option value="{{ $room->id }}">{{ $room->room_number }} · {{ $room->room_type }} · {{ $room->capacity }} · Rs {{ number_format($room->rate_amount) }}/{{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</option>
+                <option value="{{ $room->id }}" @selected((int) old('room_id', $selectedRoomId) === (int) $room->id)>{{ $room->room_number }} · {{ $room->room_type }} · {{ $room->capacity }} · Rs {{ number_format($room->rate_amount) }}/{{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</option>
                 @endforeach
             </select>
         </div>

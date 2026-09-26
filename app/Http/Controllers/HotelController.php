@@ -236,8 +236,14 @@ class HotelController extends Controller
         }
 
         $walkIn = request()->boolean('walk_in');
+        // Only preselect a room from this tenant's active branch and active rooms.
+        // The booking service still checks capacity, overlaps and room state on POST.
+        $selectedRoomId = (int) request()->query('room_id', 0);
+        if (!$rooms->contains('id', $selectedRoomId)) {
+            $selectedRoomId = null;
+        }
 
-        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn'));
+        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId'));
     }
 
     public function storeStay(Request $request)

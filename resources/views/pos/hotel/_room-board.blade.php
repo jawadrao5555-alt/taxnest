@@ -8,6 +8,7 @@
     ];
     $filter = $filter ?? '';
     $filterBase = $filterBase ?? request()->url();
+    $showReceptionActions = $showReceptionActions ?? false;
     $visible = collect($roomCards ?? [])->filter(function ($card) use ($filter) {
         return $filter === '' || ($card['state'] ?? '') === $filter;
     });
@@ -23,11 +24,19 @@
     <div class="rounded-xl border p-3 {{ $toneMap[$card['tone']] ?? 'border-gray-200 bg-white' }}">
         <p class="text-lg font-extrabold text-gray-900 dark:text-white">{{ $room->room_number }}</p>
         <p class="text-[11px] text-gray-600 dark:text-gray-300">{{ $room->room_type }} · {{ $room->capacity }}</p>
+        <p class="text-[11px] text-gray-600 dark:text-gray-300">Rs {{ number_format($room->rate_amount) }}/{{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</p>
         <p class="mt-2 text-[11px] font-bold uppercase tracking-wide">{{ __('pos.hotel_board_'.$card['state']) }}</p>
         @if($stay && \App\Services\HotelAccessService::canFrontDesk(auth('pos')->user()))
         <a href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block mt-1 text-xs font-semibold text-teal-800 truncate">{{ $stay->guest_name }}</a>
         @elseif($stay)
         <p class="mt-1 text-xs font-semibold truncate">{{ $stay->guest_name }}</p>
+        @endif
+        @if($showReceptionActions && \App\Services\HotelAccessService::canFrontDesk(auth('pos')->user()))
+            @if($card['state'] === 'vacant')
+                <a data-hotel-room-check-in="{{ $room->id }}" href="{{ route('pos.hotel.stays.create', ['walk_in' => 1, 'room_id' => $room->id]) }}" class="block mt-3 rounded-lg bg-teal-700 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_check_in_btn') }}</a>
+            @elseif($stay)
+                <a data-hotel-room-stay="{{ $room->id }}" href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block mt-3 rounded-lg bg-teal-700 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_stays') }}</a>
+            @endif
         @endif
         @if($room->housekeeping === 'dirty' && ($card['state'] ?? '') !== 'dirty')
         <p class="text-[10px] text-amber-800 mt-1">{{ __('pos.hotel_hk_dirty') }}</p>

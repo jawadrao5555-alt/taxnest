@@ -13,7 +13,9 @@
 
     @include('pos.hotel._room-board')
 
-    @if(empty($housekeepingView) && !auth('pos')->user()?->posCashierBlocked())
+    @if(empty($housekeepingView) && !empty($canManageRooms))
+    <details class="mb-6" data-hotel-admin-setup="1" @if($rooms->isEmpty()) open @endif>
+        <summary class="cursor-pointer rounded-xl border border-teal-200 bg-white dark:bg-gray-900 px-5 py-3 text-sm font-semibold text-teal-800 dark:text-teal-200">{{ __('pos.hotel_add_room') }} · {{ __('pos.hotel_checkout_policy') }}</summary>
     <div class="tn-panel bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
         <h3 class="text-sm font-semibold mb-4">{{ __('pos.hotel_add_room') }}</h3>
         <form method="POST" action="{{ route('pos.hotel.rooms.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
@@ -33,9 +35,7 @@
         </form>
         <p class="text-xs text-gray-500 mt-2">{{ __('pos.hotel_charging_rule_note') }}</p>
     </div>
-    @endif
 
-    @if(!empty($canManageRooms))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
         <h3 class="text-sm font-semibold mb-2">{{ __('pos.hotel_checkout_policy') }}</h3>
         <p class="text-xs text-gray-500 mb-3">{{ __('pos.hotel_checkout_policy_hint') }}</p>
@@ -48,6 +48,7 @@
             <button class="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-sm rounded-lg font-semibold">{{ __('pos.hotel_checkout_policy_save') }}</button>
         </form>
     </div>
+    </details>
     @endif
 
     @if(empty($housekeepingView))
@@ -95,14 +96,7 @@
                         @endif
                     </td>
                     <td class="px-4 py-3">
-                        <form method="POST" action="{{ route('pos.hotel.rooms.housekeeping', $room->id) }}" class="flex gap-1">
-                            @csrf
-                            <select name="housekeeping" class="text-xs rounded border-gray-300 dark:bg-gray-800" onchange="this.form.submit()">
-                                <option value="clean" @selected($room->housekeeping==='clean')>{{ __('pos.hotel_hk_clean') }}</option>
-                                <option value="dirty" @selected($room->housekeeping==='dirty')>{{ __('pos.hotel_hk_dirty') }}</option>
-                                <option value="inspected" @selected($room->housekeeping==='inspected')>{{ __('pos.hotel_hk_inspected') }}</option>
-                            </select>
-                        </form>
+                        {{ __('pos.hotel_hk_'.$room->housekeeping) }}
                     </td>
                 </tr>
                 @empty

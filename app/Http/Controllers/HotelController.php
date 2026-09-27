@@ -427,6 +427,7 @@ class HotelController extends Controller
 
     public function folioRefund(Request $request, int $id)
     {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
         $stay = $this->stay($id);
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01|max:10000000',
@@ -449,6 +450,7 @@ class HotelController extends Controller
 
     public function folioReverse(Request $request, int $id)
     {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
         $stay = $this->stay($id);
         $data = $request->validate([
             'entry_id' => 'required|integer',
@@ -562,7 +564,7 @@ class HotelController extends Controller
 
     public function reports()
     {
-        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
         $companyId = (int) app('currentCompanyId');
         $branchId = $this->branches->getActiveBranchId();
         $occupancy = $this->stays->occupancy($companyId, $branchId);

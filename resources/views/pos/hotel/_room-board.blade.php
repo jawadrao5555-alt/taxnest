@@ -58,7 +58,7 @@
         @if($room->housekeeping === 'dirty' && ($card['state'] ?? '') !== 'dirty')
         <p class="text-[10px] text-amber-800 mt-1">{{ __('pos.hotel_hk_dirty') }}</p>
         @endif
-        @if(!$showReceptionActions && \App\Services\HotelAccessService::canHousekeeping(auth('pos')->user()))
+        @if(!$showReceptionActions && !empty($housekeepingView) && \App\Services\HotelAccessService::canHousekeeping(auth('pos')->user()))
         <form method="POST" action="{{ route('pos.hotel.rooms.housekeeping', $room->id) }}" class="mt-2">
             @csrf
             <select name="housekeeping" onchange="this.form.submit()" class="w-full rounded-md border-gray-300 dark:bg-gray-800 text-[11px]">

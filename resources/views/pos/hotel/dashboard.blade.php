@@ -9,14 +9,16 @@
         [route('pos.hotel.dashboard'), __('pos.nav_hotel_front_desk'), 'dashboard'],
         [route('pos.hotel.stays.create', ['walk_in' => 1]), __('pos.hotel_action_walkin'), 'checkin'],
         [route('pos.hotel.guests'), __('pos.nav_hotel_guests'), 'guests'],
-        [route('pos.hotel.rooms'), __('pos.nav_hotel_rooms'), 'rooms'],
         [route('pos.hotel.stays.index', ['status' => 'checked_in']), __('pos.hotel_in_house'), 'stays'],
         [route('pos.hotel.stays.index', ['status' => 'reserved']), __('pos.nav_hotel_reservations'), 'reservations'],
         [route('pos.hotel.stays.index', ['status' => 'checked_in']), __('pos.hotel_check_out_btn'), 'checkout'],
         [route('pos.hotel.folios'), __('pos.nav_hotel_folios'), 'folios'],
-        [route('pos.hotel.housekeeping'), __('pos.nav_hotel_housekeeping'), 'housekeeping'],
-        [route('pos.hotel.reports'), __('pos.nav_hotel_reports'), 'reports'],
     ];
+    if (\App\Services\HotelAccessService::canManageRooms(auth('pos')->user())) {
+        $deskLinks[] = [route('pos.hotel.rooms'), __('pos.nav_hotel_rooms'), 'rooms'];
+        $deskLinks[] = [route('pos.hotel.housekeeping'), __('pos.nav_hotel_housekeeping'), 'housekeeping'];
+        $deskLinks[] = [route('pos.hotel.reports'), __('pos.nav_hotel_reports'), 'reports'];
+    }
 @endphp
 <div class="tn-page tn-hotel-dashboard max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-5" data-hotel-reception="1">
     @include('pos.partials.back-link')
@@ -90,7 +92,9 @@
             @if($totalRooms === 0)
             <div class="mt-5 rounded-2xl border border-dashed border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-6 text-center" data-hotel-empty-rooms="1">
                 <p class="font-semibold text-slate-900 dark:text-white">{{ __('pos.hotel_no_rooms') }}</p>
+                @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()))
                 <a href="{{ route('pos.hotel.rooms') }}" class="inline-block mt-3 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{{ __('pos.hotel_rooms') }}</a>
+                @endif
             </div>
             @endif
             @include('pos.hotel._room-board', ['roomCards' => $roomCards, 'filter' => '', 'filterBase' => route('pos.hotel.rooms'), 'showReceptionActions' => true])

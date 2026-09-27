@@ -307,6 +307,52 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertSame('/pos/hotel/housekeeping', HotelShell::postLoginPath($hk));
     }
 
+    public function test_hotel_daily_panels_hide_manager_setup_and_correction_actions_from_reception(): void
+    {
+        $company = $this->company();
+        $other = $this->company();
+        $owner = $this->owner($company);
+        $reception = $this->staff($company, 'pos_cashier', ['dashboard', 'hotel']);
+        $housekeeping = $this->staff($company, 'pos_cashier', ['dashboard', 'hotel_housekeeping']);
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '101', 'room_type' => 'Deluxe', 'capacity' => 2, 'rate_amount' => 4000,
+        ]);
+        $stay = app(HotelStayService::class)->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Reception Guest', 'walk_in' => true,
+        ]);
+        $dirtyRoom = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '102', 'room_type' => 'Deluxe', 'capacity' => 2, 'rate_amount' => 4000,
+        ]);
+        app(HotelStayService::class)->setHousekeeping($dirtyRoom, 'dirty');
+
+        $ownerRooms = $this->actingAs($owner, 'pos')->get('/pos/hotel/rooms')->assertOk()->getContent();
+        $this->assertStringContainsString('data-hotel-admin-setup="1"', $ownerRooms);
+        $this->assertStringContainsString('name="room_number"', $ownerRooms);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/reports')->assertOk();
+
+        $rooms = $this->actingAs($reception, 'pos')->get('/pos/hotel/rooms')->assertOk()->getContent();
+        $this->assertStringNotContainsString('data-hotel-admin-setup="1"', $rooms);
+        $this->assertStringNotContainsString('name="room_number"', $rooms);
+        $this->assertStringNotContainsString('name="housekeeping"', $rooms);
+        $desk = $this->actingAs($reception, 'pos')->get('/pos/hotel')->assertOk()->getContent();
+        $this->assertStringContainsString('data-hotel-room-board="1"', $desk);
+        $this->assertStringNotContainsString('data-hotel-desk-link="reports"', $desk);
+        $this->assertStringNotContainsString('data-hotel-desk-link="housekeeping"', $desk);
+        $this->assertStringNotContainsString('data-hotel-desk-link="rooms"', $desk);
+        $stayPage = $this->actingAs($reception, 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertOk()->getContent();
+        $this->assertStringNotContainsString('action="'.route('pos.hotel.folio.refund', $stay->id).'"', $stayPage);
+        $this->assertStringNotContainsString('action="'.route('pos.hotel.folio.reverse', $stay->id).'"', $stayPage);
+        $this->actingAs($reception, 'pos')->get('/pos/hotel/reports')->assertForbidden();
+        $this->actingAs($reception, 'pos')->post('/pos/hotel/stays/'.$stay->id.'/folio/refund', [])->assertForbidden();
+        $this->actingAs($reception, 'pos')->post('/pos/hotel/stays/'.$stay->id.'/folio/reverse', [])->assertForbidden();
+
+        $hk = $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/housekeeping')->assertOk()->getContent();
+        $this->assertStringContainsString('name="housekeeping"', $hk);
+        $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertRedirect('/pos/dashboard');
+        $this->actingAs($this->owner($other), 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertRedirect('/pos/dashboard');
+    }
+
     public function test_housekeeping_denied_from_restaurant_outlet(): void
     {
         $flags = PosFeatureService::defaultsForCategory('hotel');

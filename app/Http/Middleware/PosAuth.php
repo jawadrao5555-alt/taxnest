@@ -174,7 +174,12 @@ class PosAuth
         if ($customAccess !== null) {
             $path = ltrim($request->path(), '/');
             $feature = \App\Services\PosAccessService::featureForPath($path);
-            if ($feature !== null && !in_array($feature, $customAccess, true)) {
+            // A Hotel front-desk grant includes the room/housekeeping board.
+            // Keep this route gate in sync with PosAccessService::customAllows()
+            // and HotelAccessService; otherwise the UI permits access but a
+            // receptionist is redirected before the Hotel controller runs.
+            $hotelRoomGrant = $feature === 'hotel_housekeeping' && in_array('hotel', $customAccess, true);
+            if ($feature !== null && !in_array($feature, $customAccess, true) && !$hotelRoomGrant) {
                 if ($request->expectsJson()) {
                     abort(403, __('pos.custom_access_denied'));
                 }

@@ -240,6 +240,11 @@ class HotelController extends Controller
                 ->get(['id', 'name', 'phone']);
         }
 
+        $recentGuests = HotelStay::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->orderByDesc('id')->limit(200)->get(['id', 'guest_name', 'guest_phone', 'guest_cnic'])
+            ->unique(fn ($stay) => mb_strtolower(trim($stay->guest_name)).'|'.$stay->guest_phone)->values();
+
         $walkIn = request()->boolean('walk_in');
         // Only preselect a room from this tenant's active branch and active rooms.
         // The booking service still checks capacity, overlaps and room state on POST.
@@ -248,7 +253,7 @@ class HotelController extends Controller
             $selectedRoomId = null;
         }
 
-        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId'));
+        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId', 'recentGuests'));
     }
 
     public function storeStay(Request $request)
@@ -472,6 +477,8 @@ class HotelController extends Controller
             'unit_amount' => 'required|numeric|min:0|max:10000000',
             'product_id' => 'nullable|integer',
             'service_id' => 'nullable|integer',
+            'discount_type' => 'nullable|in:amount,percentage',
+            'discount_value' => 'nullable|numeric|min:0|max:10000000',
             'idempotency_key' => 'nullable|string|max:64',
         ]);
         try {

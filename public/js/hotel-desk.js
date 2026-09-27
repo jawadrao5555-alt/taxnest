@@ -13,6 +13,10 @@ window.hotelBookingForm = function (config) {
             const guest = this.customers[event.target.value];
             if (guest) { this.$refs.guest.value = guest.name; this.$refs.phone.value = guest.phone || ''; }
         },
+        selectRecentGuest(event) {
+            const guest = this.recentGuests[event.target.value];
+            if (guest) { this.$refs.guest.value = guest.name; this.$refs.phone.value = guest.phone || ''; this.$refs.cnic.value = guest.cnic || ''; }
+        },
         async refresh() {
             const revision = ++this.revision;
             this.quote = null; this.error = ''; this.busy = true;

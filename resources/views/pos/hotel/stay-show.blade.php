@@ -52,6 +52,7 @@
     @if(in_array($stay->status, ['reserved','checked_in'], true))
     <details class="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
         <summary class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.hotel_desk_stay_options') }}</summary>
+        @if($stay->notes)<p class="mt-3 text-sm">{{ $stay->notes }}</p>@endif
     @php
         $changeConfig = ['url' => route('pos.hotel.change-quote', $stay->id), 'rate' => (float) $stay->rate_amount, 'date' => $stay->check_out_date->toDateString(), 'room' => '', 'failure' => __('pos.hotel_quote_failed')];
     @endphp
@@ -142,6 +143,12 @@
                 </select>
             </div>
             <input type="number" step="0.01" name="unit_amount" x-model="price" required placeholder="{{ __('pos.hotel_unit_amount') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+            <details class="text-sm"><summary class="cursor-pointer">{{ __('pos.hotel_extra_discount') }}</summary>
+                <div class="flex gap-2 mt-2">
+                    <select name="discount_type" class="rounded-lg border-gray-300 dark:bg-gray-800"><option value="amount">Rs</option><option value="percentage">%</option></select>
+                    <input name="discount_value" type="number" min="0" max="10000000" step="0.01" value="0" class="min-w-0 rounded-lg border-gray-300 dark:bg-gray-800">
+                </div>
+            </details>
             <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_post_charge') }}</button>
         </form>
         <div class="space-y-4">
@@ -209,7 +216,7 @@
                     <td class="px-4 py-3">
                         <span class="text-[10px] uppercase font-bold text-gray-500">{{ __('pos.hotel_entry_'.$entry->entry_type) }} · {{ __('pos.hotel_cat_'.($entry->category ?: 'other')) }}</span>
                         <p>{{ $entry->description }}</p>
-                        @if($entry->discount_amount > 0)<p class="text-xs text-teal-700">{{ __('pos.hotel_room_discount') }}: Rs {{ number_format($entry->discount_amount, 2) }}</p>@endif
+                        @if($entry->discount_amount > 0)<p class="text-xs text-teal-700">{{ __($entry->category === 'room' ? 'pos.hotel_room_discount' : 'pos.hotel_extra_discount') }}: Rs {{ number_format($entry->discount_amount, 2) }}</p>@endif
                         @if($entry->pos_transaction_id)
                         <a class="text-xs text-teal-800" href="{{ url('/pos/transaction/'.$entry->pos_transaction_id) }}">{{ __('pos.hotel_fiscal_bill') }}</a>
                         @endif

@@ -315,7 +315,16 @@ class HotelFolioService
                 }
             }
 
-            if ($amount == 0.0 && ($data['entry_type'] ?? '') === HotelFolioEntry::TYPE_CHARGE && empty($data['room_pricing'])) {
+            if (($data['entry_type'] ?? '') === HotelFolioEntry::TYPE_CHARGE && array_key_exists('discount_value', $data)) {
+                $gross = round($qty * $unit, 2);
+                $discount = HotelPricingService::discount($gross, $data['discount_type'] ?? 'amount', (float) ($data['discount_value'] ?? 0));
+                HotelPricingService::validateRate((int) $stay->company_id, $userId, $gross, $gross, 1, $data['discount_type'] ?? 'amount', (float) ($data['discount_value'] ?? 0));
+                $data['gross_amount'] = $gross;
+                $data['discount_amount'] = $discount;
+                $amount = round($gross - $discount, 2);
+            }
+
+            if ($amount == 0.0 && ($data['entry_type'] ?? '') === HotelFolioEntry::TYPE_CHARGE && empty($data['room_pricing']) && (float) ($data['discount_amount'] ?? 0) <= 0) {
                 throw new HotelStayException(__('pos.hotel_amount_required'));
             }
 

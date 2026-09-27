@@ -8,6 +8,7 @@
         'advance' => old('advance_amount', 0), 'method' => old('payment_method', 'cash'), 'walkIn' => (bool) $walkIn,
         'rooms' => $rooms->mapWithKeys(fn ($room) => [$room->id => ['rate' => $room->rate_amount]]),
         'customers' => collect($customers)->mapWithKeys(fn ($c) => [$c->id => ['name' => $c->name, 'phone' => $c->phone]]),
+        'recentGuests' => collect($recentGuests)->mapWithKeys(fn ($g) => [$g->id => ['name' => $g->guest_name, 'phone' => $g->guest_phone, 'cnic' => $g->guest_cnic]]),
         'failure' => __('pos.hotel_quote_failed'), 'unavailable' => __('pos.hotel_room_unavailable'), 'dirtyMessage' => __('pos.hotel_room_needs_clean'),
     ];
 @endphp
@@ -66,9 +67,15 @@
         <details class="sm:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3" @if($errors->any()) open @endif>
             <summary class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.hotel_desk_more_guest') }}</summary>
             <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="sm:col-span-2 text-xs font-medium">{{ __('pos.hotel_returning_guest') }}
+            <select @change="selectRecentGuest($event)" class="block w-full mt-1 rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
+                <option value="">{{ __('pos.optional') }}</option>
+                @foreach($recentGuests as $guest)<option value="{{ $guest->id }}">{{ $guest->guest_name }} · {{ $guest->guest_phone }}</option>@endforeach
+            </select>
+        </label>
         <div>
             <label class="block text-xs font-medium mb-1">{{ __('pos.hotel_cnic_optional') }}</label>
-            <input name="guest_cnic" value="{{ old('guest_cnic') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
+            <input x-ref="cnic" name="guest_cnic" value="{{ old('guest_cnic') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
             <p class="text-[10px] text-gray-400 mt-1">{{ __('pos.hotel_cnic_staff_only') }}</p>
         </div>
         <div>
@@ -98,6 +105,7 @@
             <input type="number" name="child_count" value="{{ old('child_count', 0) }}" min="0" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
         </div>
             </div>
+            <label class="block mt-3 text-xs font-medium">{{ __('pos.hotel_guest_notes') }}<textarea name="notes" maxlength="500" rows="2" class="block w-full mt-1 rounded-lg border-gray-300 dark:bg-gray-800">{{ old('notes') }}</textarea></label>
         </details>
         <details class="sm:col-span-2 rounded-lg border p-3" @if(old('advance_amount', 0) > 0) open @endif>
             <summary class="cursor-pointer text-sm font-semibold">{{ __('pos.hotel_payment_now') }}</summary>

@@ -7096,4 +7096,8 @@ return [
     'hotel_change_amount' => 'چارجز میں تبدیلی',
     'hotel_change_hint' => 'یہ تخمینہ نقد ادائیگی کے ٹیکس پر ہے۔ آخری طریقہ چیک آؤٹ پر منتخب ہوگا۔ مقررہ رعایت ایک بار لگتی ہے۔',
     'hotel_rate_change_line' => 'باقی راتوں کے کرائے کی تبدیلی',
+    'hotel_returning_guest' => 'پہلے آنے والا مہمان',
+    'hotel_guest_notes' => 'مہمان کے متعلق نوٹ',
+    'hotel_extra_discount' => 'صرف اس اضافی چارج پر رعایت',
+    'hotel_all_discounts' => 'رعایت',
 ];

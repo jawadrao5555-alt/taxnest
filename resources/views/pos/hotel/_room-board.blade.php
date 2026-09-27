@@ -38,7 +38,7 @@
             <span class="rounded-full bg-white/80 dark:bg-gray-800 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-200">{{ __('pos.hotel_board_'.$card['state']) }}</span>
         </div>
         <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">{{ $room->room_type }}@unless($showReceptionActions) · {{ $room->capacity }}@endunless</p>
-        <p class="text-xs text-gray-700 dark:text-gray-200 mt-1">Rs {{ number_format($room->rate_amount) }}/{{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</p>
+        <p class="text-xs text-gray-700 dark:text-gray-200 mt-1">Rs {{ number_format($stay && $showReceptionActions ? $stay->rate_amount : $room->rate_amount) }}/{{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</p>
         @if($stay && \App\Services\HotelAccessService::canFrontDesk(auth('pos')->user()))
         <a href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block mt-1 text-xs font-semibold text-teal-800 truncate">{{ $stay->guest_name }}</a>
         @elseif($stay)

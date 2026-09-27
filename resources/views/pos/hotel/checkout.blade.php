@@ -13,7 +13,7 @@
         <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) Illuminate\Support\Str::uuid()) }}">
         <div class="grid grid-cols-2 gap-3 text-sm" aria-live="polite">
             <span>{{ __('pos.hotel_room_charges') }}</span><strong class="text-right" x-text="'Rs ' + money(quote.room_gross)"></strong>
-            <span>{{ __('pos.hotel_room_discount') }}</span><strong class="text-right" x-text="'Rs ' + money(quote.discount)"></strong>
+            <span>{{ __('pos.hotel_all_discounts') }}</span><strong class="text-right" x-text="'Rs ' + money(quote.discount)"></strong>
             <span>{{ __('pos.hotel_extras') }}</span><strong class="text-right" x-text="'Rs ' + money(quote.extras)"></strong>
             <span>{{ __('pos.hotel_tax') }} <span x-show="quote.tax_inclusive">({{ __('pos.hotel_included') }})</span></span><strong class="text-right" x-text="'Rs ' + money(quote.tax)"></strong>
             <span>{{ __('pos.hotel_open_bill_total') }}</span><strong class="text-right" x-text="'Rs ' + money(quote.total)"></strong>

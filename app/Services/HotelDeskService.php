@@ -32,7 +32,7 @@ class HotelDeskService
         $quote['total_stay'] = round($quote['total'] + (float) \App\Models\PosTransaction::where('company_id', $stay->company_id)->whereIn('id', $priorIds)->sum('total_amount'), 2);
         $quote['room_gross'] = (float) $open->where('category', 'room')->sum(fn ($r) => $r->gross_amount ?? $r->amount);
         if ($stay->status === 'reserved' && $open->isEmpty()) $quote['room_gross'] = $net + $discount;
-        $quote['extras'] = (float) $open->where('category', '!=', 'room')->sum('amount');
+        $quote['extras'] = (float) $open->where('category', '!=', 'room')->sum(fn ($r) => $r->gross_amount ?? $r->amount);
         return $quote;
     }
 

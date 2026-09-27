@@ -7111,4 +7111,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'hotel_change_amount' => 'Change in charges',
     'hotel_change_hint' => 'Estimate uses cash tax rules. Final payment method is chosen at checkout. Fixed discounts are applied once.',
     'hotel_rate_change_line' => 'Room rate change (remaining nights)',
+    'hotel_returning_guest' => 'Returning guest',
+    'hotel_guest_notes' => 'Guest notes',
+    'hotel_extra_discount' => 'Discount on this extra charge',
+    'hotel_all_discounts' => 'Discounts',
 ];

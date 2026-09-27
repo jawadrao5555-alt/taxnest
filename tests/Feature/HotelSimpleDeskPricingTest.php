@@ -271,4 +271,21 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee('/checkout', false);
         $this->get('/pos/hotel/stays/'.$stay->id.'/checkout')->assertOk()->assertSee(__('pos.hotel_complete_checkout'));
     }
+    public function test_extra_discount_stays_on_its_own_charge_and_guest_picker_is_tenant_scoped(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        [$otherCompany, $otherOwner, $otherRoom] = $this->fixture();
+        $service = app(HotelStayService::class);
+        $stay = $service->book($company->id, $owner->id, $this->booking($room));
+        $foreign = $service->book($otherCompany->id, $otherOwner->id, $this->booking($otherRoom, ['guest_name' => 'Foreign private guest']));
+        $entry = app(\App\Services\HotelFolioService::class)->postCharge($stay, ['category' => 'food', 'description' => 'Meal', 'quantity' => 2, 'unit_amount' => 500, 'discount_type' => 'percentage', 'discount_value' => 10], $owner->id);
+        $this->assertEquals(100, $entry->discount_amount);
+        $this->assertEquals(900, $entry->amount);
+        $summary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
+        $this->assertEquals(1000, $summary['extras']);
+        $this->assertEquals(10900, $summary['total']);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create')->assertOk()->assertSee('Simple Desk Guest')->assertDontSee('Foreign private guest');
+        $this->get('/pos/hotel/stays/'.$foreign->id.'/checkout')->assertNotFound();
+    }
+
 }

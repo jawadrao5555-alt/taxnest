@@ -126,6 +126,7 @@
                 </select>
                 <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.save_btn') }}</button>
             </form>
+            @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()))
             <form method="POST" action="{{ route('pos.hotel.folio.refund', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
                 @csrf
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_refund') }}</h3>
@@ -139,6 +140,7 @@
                 </select>
                 <button class="px-3 py-2 bg-gray-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_refund') }}</button>
             </form>
+            @endif
             <form method="POST" action="{{ route('pos.hotel.folio.settle', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
                 @csrf
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_issue_bill') }}</h3>
@@ -174,7 +176,7 @@
                     <td class="px-4 py-3">{{ rtrim(rtrim(number_format($entry->quantity, 3), '0'), '.') }} {{ \App\Services\PosUnitCatalog::label($entry->uom) }}</td>
                     <td class="px-4 py-3 text-right">Rs {{ number_format($entry->amount, 2) }}</td>
                     <td class="px-4 py-3">
-                        @if($entry->entry_type === 'charge' && !$entry->pos_transaction_id)
+                        @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && $entry->entry_type === 'charge' && !$entry->pos_transaction_id)
                         <form method="POST" action="{{ route('pos.hotel.folio.reverse', $stay->id) }}">
                             @csrf
                             <input type="hidden" name="entry_id" value="{{ $entry->id }}">

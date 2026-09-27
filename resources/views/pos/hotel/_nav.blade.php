@@ -13,14 +13,16 @@
     <a href="{{ route('pos.hotel.dashboard') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.dashboard') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_front_desk') }}</a>
     <a href="{{ route('pos.hotel.reservations') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.reservations') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_reservations') }}</a>
     @endif
-    @if($hotelHk)
+    @if($hotelHk && (!$hotelDesk || \App\Services\HotelAccessService::canManageRooms($hotelUser)))
     <a href="{{ route('pos.hotel.rooms') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.rooms') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_rooms') }}</a>
     <a href="{{ route('pos.hotel.housekeeping') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.housekeeping') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_housekeeping') }}</a>
     @endif
     @if($hotelDesk)
     <a href="{{ route('pos.hotel.guests') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.guests') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_guests') }}</a>
     <a href="{{ route('pos.hotel.folios') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.folios') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_folios') }}</a>
+    @if(\App\Services\HotelAccessService::canManageRooms($hotelUser))
     <a href="{{ route('pos.hotel.reports') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.reports') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_reports') }}</a>
+    @endif
     @endif
     @if($hotelOutletOn && $hotelCanOutlet)
     <a href="{{ route('pos.hotel.restaurant-outlet') }}"
@@ -36,6 +38,8 @@
     <a href="{{ route('pos.hotel.stays.index', ['status' => 'checked_in']) }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.hotel_check_out_btn') }}</a>
     <a href="{{ route('pos.hotel.folios') }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.hotel_action_charge') }}</a>
     <a href="{{ route('pos.hotel.folios') }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.hotel_action_payment') }}</a>
+    @if(\App\Services\HotelAccessService::canManageRooms($hotelUser))
     <a href="{{ route('pos.hotel.housekeeping') }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.nav_hotel_housekeeping') }}</a>
+    @endif
 </div>
 @endif

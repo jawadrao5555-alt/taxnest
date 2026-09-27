@@ -6,6 +6,7 @@ use App\Services\PosSettingsSnapshot;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -49,6 +50,7 @@ class PosSettingsSnapshotTest extends TestCase
             $t->boolean('pos_receipt_show_tax')->default(true);
             $t->text('feature_flags')->nullable();
             $t->text('invoice_display_prefs')->nullable();
+            $t->text('pos_printer_settings')->nullable();
             $t->decimal('pos_tax_rate', 8, 2)->default(0);
             // Volatile surface — must be excluded
             $t->unsignedBigInteger('pos_invoice_counter')->default(0);
@@ -351,5 +353,144 @@ class PosSettingsSnapshotTest extends TestCase
     {
         $this->artisan('pos:settings-snapshot', ['--compare' => sys_get_temp_dir() . '/nope-' . uniqid() . '.json'])
             ->assertExitCode(1);
+    }
+
+    public function test_printer_reports_and_heartbeats_do_not_change_saved_routing_snapshot(): void
+    {
+        $routing = [
+            'receipt_printer' => 'Counter-A', 'kot_printer' => 'Kitchen',
+            'silent_print_enabled' => true, 'kot_printer_device' => 'counter-1',
+        ];
+        DB::table('companies')->where('id', 1)->update(['pos_printer_settings' => json_encode($routing)]);
+        $before = $this->snap->capture();
+
+        foreach ([
+            ['available_printers' => [['name' => 'Counter-A'], ['name' => 'Counter-B']]],
+            ['printers_reported_at' => '2026-09-27T01:00:00Z'],
+            ['agent_diagnostics' => ['reported_at' => '2026-09-27T01:01:00Z', 'queue' => ['pending_callbacks' => 4]]],
+        ] as $telemetry) {
+            $stored = json_encode($routing + $telemetry);
+            DB::table('companies')->where('id', 1)->update(['pos_printer_settings' => $stored]);
+            $after = $this->snap->capture();
+            $this->assertSame([], $this->snap->diff($before, $after)['changed']);
+            $this->assertSame([], $this->snap->diff($after, $before)['changed']);
+            $captured = json_decode($after['tables']['companies'][1]['pos_printer_settings'], true);
+            foreach (array_keys($telemetry) as $key) {
+                $this->assertArrayNotHasKey($key, $captured);
+            }
+            $this->assertEquals($routing, $captured);
+            $this->assertSame($stored, DB::table('companies')->where('id', 1)->value('pos_printer_settings'));
+        }
+    }
+
+    public function test_first_heartbeat_on_an_unconfigured_company_is_not_a_settings_reset(): void
+    {
+        $before = $this->snap->capture();
+        DB::table('companies')->where('id', 1)->update([
+            'pos_printer_settings' => '{"agent_diagnostics":{"reported_at":"2026-09-27T01:00:00Z"}}',
+        ]);
+        $this->assertSame([], $this->snap->diff($before, $this->snap->capture())['changed']);
+    }
+
+    public function test_retained_legacy_printer_telemetry_baseline_is_clean_without_restoring_customer_settings(): void
+    {
+        $routing = ['receipt_printer' => 'Counter-A', 'kot_printer' => 'Kitchen'];
+        $old = $routing + [
+            'available_printers' => [['name' => 'Counter-A']],
+            'printers_reported_at' => '2026-09-27T01:00:00Z',
+            'agent_diagnostics' => ['reported_at' => '2026-09-27T01:00:00Z'],
+        ];
+        $stored = json_encode($routing + [
+            'available_printers' => [['name' => 'Counter-A'], ['name' => 'Counter-B']],
+            'printers_reported_at' => '2026-09-27T01:05:00Z',
+            'agent_diagnostics' => ['reported_at' => '2026-09-27T01:05:00Z'],
+        ]);
+        DB::table('companies')->where('id', 1)->update(['pos_printer_settings' => $stored]);
+        $legacy = $this->snap->capture();
+        $legacy['tables']['companies'][1]['pos_printer_settings'] = json_encode($old);
+        $plan = $this->snap->planProtectedRestore($legacy, $this->snap->capture());
+        $this->assertTrue($plan['ok']);
+        $this->assertSame('already_clean', $plan['reason']);
+        $this->assertSame([], $plan['restore']);
+        $this->assertSame([], $plan['refused']);
+
+        $path = sys_get_temp_dir().'/tn-printer-baseline-'.uniqid().'.json';
+        file_put_contents($path, json_encode($legacy));
+        try {
+            $this->artisan('pos:settings-snapshot', ['--compare' => $path])->assertExitCode(0);
+            $this->artisan('pos:settings-restore', ['--from' => $path, '--write' => true])
+                ->expectsOutputToContain('Already clean against baseline')
+                ->assertExitCode(0);
+            $this->assertSame($stored, DB::table('companies')->where('id', 1)->value('pos_printer_settings'));
+
+            DB::table('companies')->where('id', 1)->update([
+                'pos_printer_settings' => json_encode(array_replace($routing, ['receipt_printer' => 'Wrong-Counter'])),
+            ]);
+            $this->artisan('pos:settings-snapshot', ['--compare' => $path])->assertExitCode(1);
+            $this->artisan('pos:settings-restore', ['--from' => $path, '--write' => true])
+                ->expectsOutputToContain('unsupported_column')->assertExitCode(1);
+            $this->assertSame('Wrong-Counter', json_decode(DB::table('companies')->where('id', 1)->value('pos_printer_settings'), true)['receipt_printer']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    #[DataProvider('protectedPrinterChanges')]
+    public function test_real_printer_changes_remain_protected_in_other_tenants(string $key, mixed $value): void
+    {
+        $routing = ['receipt_printer' => 'Counter-A', 'kot_printer' => 'Kitchen', 'silent_print_enabled' => true];
+        DB::table('companies')->update(['pos_printer_settings' => json_encode($routing)]);
+        $before = $this->snap->capture();
+        DB::table('companies')->where('id', 1)->update([
+            'pos_printer_settings' => json_encode($routing + ['agent_diagnostics' => ['reported_at' => 'new']]),
+        ]);
+        DB::table('companies')->where('id', 2)->update([
+            'pos_printer_settings' => json_encode(array_replace($routing, [$key => $value, 'printers_reported_at' => 'new'])),
+        ]);
+        $after = $this->snap->capture();
+        $diff = $this->snap->diff($before, $after);
+        $this->assertCount(1, $diff['changed']);
+        $this->assertSame('2', $diff['changed'][0]['company_id']);
+        $this->assertSame('pos_printer_settings', $diff['changed'][0]['column']);
+        $plan = $this->snap->planProtectedRestore($before, $after);
+        $this->assertFalse($plan['ok']);
+        $this->assertSame([], $plan['restore']);
+        $this->assertSame('unsupported_column', $plan['refused'][0]['reason']);
+        $filtered = $this->snap->capture(1);
+        $this->assertSame(['1'], array_map('strval', array_keys($filtered['tables']['companies'])));
+    }
+
+    public static function protectedPrinterChanges(): array
+    {
+        return [
+            'receipt selection' => ['receipt_printer', 'Counter-B'],
+            'kitchen selection' => ['kot_printer', 'Kitchen-2'],
+            'kitchen owner' => ['kot_printer_device', 'counter-2'],
+            'counter KOT owner' => ['counter_kot_printer_device', 'counter-2'],
+            'silent printing' => ['silent_print_enabled', false],
+            'confirmation preference' => ['print_confirm_ask', true],
+            'future setting' => ['future_routing', ['mode' => 'manual']],
+            'nested matching name is protected' => ['future_routing', ['printers_reported_at' => 'a configured value']],
+        ];
+    }
+
+    public function test_wiped_or_malformed_printer_configuration_still_fails_the_guard(): void
+    {
+        DB::table('companies')->where('id', 1)->update(['pos_printer_settings' => '{"receipt_printer":"Counter-A"}']);
+        $before = $this->snap->capture();
+        foreach ([null, '{invalid', '[{"receipt_printer":"Counter-A"}]', 'null', 'false'] as $invalid) {
+            DB::table('companies')->where('id', 1)->update(['pos_printer_settings' => $invalid]);
+            $this->assertCount(1, $this->snap->diff($before, $this->snap->capture())['changed']);
+        }
+    }
+
+    public function test_telemetry_names_in_other_json_settings_are_not_excluded(): void
+    {
+        DB::table('companies')->where('id', 1)->update(['invoice_display_prefs' => '{"agent_diagnostics":{"visible":true}}']);
+        $before = $this->snap->capture();
+        DB::table('companies')->where('id', 1)->update(['invoice_display_prefs' => '{"agent_diagnostics":{"visible":false}}']);
+        $diff = $this->snap->diff($before, $this->snap->capture());
+        $this->assertCount(1, $diff['changed']);
+        $this->assertSame('invoice_display_prefs', $diff['changed'][0]['column']);
     }
 }

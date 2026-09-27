@@ -25,14 +25,13 @@ use Tests\TestCase;
  *     an agent that sends none registers nothing (legacy path untouched).
  *  2. Enqueue routing: a cashier assigned to an ONLINE counter with its own
  *     receipt printer gets bill/proof jobs stamped device_uid + that printer;
- *     no assignment / offline device / no per-device printer → unstamped
- *     company-default job (today's behavior, popup fallback preserved).
+ *     no assignment → unstamped company-default job; an assigned counter that
+ *     is offline or lacks a printer returns 409 for browser print fallback.
  *  3. Claim scoping: a device-aware agent claims its own stamped jobs plus
  *     unstamped legacy jobs — NEVER another counter's stamped jobs; a legacy
  *     agent (no UID) claims only unstamped jobs.
- *  4. Stranded rescue: a stamped job left pending >90s (counter died right
- *     after enqueue) is unstamped + retargeted to the company default printer
- *     by housekeeping, so a bill never sits unclaimed forever.
+ *  4. Stranded receipts: a stamped job left pending when its counter dies is
+ *     marked failed for deliberate reprint, never sent to another till.
  *
  * Pattern: APP_ENV=testing + SQLite :memory: + minimal Schema::create.
  *
@@ -409,6 +408,28 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame('Counter-dev-c1', $job->target_printer);
     }
 
+    public function test_two_cashiers_at_two_counters_get_their_own_receipt_queues(): void
+    {
+        $this->seedDevice('dev-c1');
+        $this->seedDevice('dev-c2');
+        User::where('id', $this->cashierId)->update(['pos_device_uid' => 'dev-c1']);
+        $second = User::find($this->cashierId)->replicate();
+        $second->name = 'Second cashier';
+        $second->email = 'second-cashier@test.pk';
+        $second->pos_device_uid = 'dev-c2';
+        $second->save();
+
+        $first = $this->seedTransaction();
+        $secondTxn = $this->seedTransaction();
+        $this->createBillJob($this->cashierId, $first)->assertOk();
+        $this->createBillJob($second->id, $secondTxn)->assertOk();
+
+        $jobs = DB::table('pos_print_jobs')->whereIn('transaction_id', [$first, $secondTxn])
+            ->orderBy('id')->get();
+        $this->assertSame(['dev-c1', 'dev-c2'], $jobs->pluck('device_uid')->all());
+        $this->assertSame(['Counter-dev-c1', 'Counter-dev-c2'], $jobs->pluck('target_printer')->all());
+    }
+
     public function test_unassigned_admin_bill_stays_company_default_unstamped(): void
     {
         $this->seedDevice('dev-c1');
@@ -666,30 +687,26 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         )));
     }
 
-    public function test_assigned_but_offline_counter_falls_back_to_company_default(): void
+    public function test_assigned_but_offline_counter_does_not_print_on_company_default(): void
     {
         $this->seedDevice('dev-c1', ['last_seen_at' => now()->subMinutes(10)]);
         User::where('id', $this->cashierId)->update(['pos_device_uid' => 'dev-c1']);
         $txn = $this->seedTransaction();
 
-        $this->createBillJob($this->cashierId, $txn)->assertOk();
-
-        $job = DB::table('pos_print_jobs')->orderByDesc('id')->first();
-        $this->assertNull($job->device_uid, 'offline counter must never be stamped');
-        $this->assertSame('Manager-POS80', $job->target_printer);
+        $this->createBillJob($this->cashierId, $txn)->assertStatus(409)
+            ->assertJson(['reason' => 'counter_unavailable']);
+        $this->assertSame(0, DB::table('pos_print_jobs')->count());
     }
 
-    public function test_assigned_counter_without_printer_falls_back(): void
+    public function test_assigned_counter_without_printer_does_not_print_on_company_default(): void
     {
         $this->seedDevice('dev-c1', ['receipt_printer' => null]);
         User::where('id', $this->cashierId)->update(['pos_device_uid' => 'dev-c1']);
         $txn = $this->seedTransaction();
 
-        $this->createBillJob($this->cashierId, $txn)->assertOk();
-
-        $job = DB::table('pos_print_jobs')->orderByDesc('id')->first();
-        $this->assertNull($job->device_uid);
-        $this->assertSame('Manager-POS80', $job->target_printer);
+        $this->createBillJob($this->cashierId, $txn)->assertStatus(409)
+            ->assertJson(['reason' => 'counter_unavailable']);
+        $this->assertSame(0, DB::table('pos_print_jobs')->count());
     }
 
     public function test_device_routed_bill_works_even_without_company_default_printer(): void
@@ -1010,7 +1027,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
 
     // ── 4. Stranded stamped-job rescue ─────────────────────────────────────
 
-    public function test_stranded_stamped_job_is_rescued_to_company_scope(): void
+    public function test_stranded_counter_bill_is_parked_for_deliberate_reprint(): void
     {
         $stuck = $this->seedJob([
             'device_uid' => 'dev-dead',
@@ -1023,14 +1040,10 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $res = $this->agentGet('/api/agent/print-jobs')->assertOk();
 
         $job = DB::table('pos_print_jobs')->where('id', $stuck)->first();
-        $this->assertNull($job->device_uid, 'stranded job must be unstamped after 90s');
-        $this->assertSame('Manager-POS80', $job->target_printer, 'rescued bill retargets the company default printer');
-        // And the legacy agent claimed it in the same pass or can claim it now.
-        $ids = collect($res->json('jobs'))->pluck('id')->all();
-        if (!in_array($stuck, $ids, true)) {
-            $ids2 = collect($this->agentGet('/api/agent/print-jobs')->json('jobs'))->pluck('id')->all();
-            $this->assertContains($stuck, $ids2);
-        }
+        $this->assertSame('dev-dead', $job->device_uid);
+        $this->assertSame('Counter-dev-dead', $job->target_printer);
+        $this->assertSame('failed', $job->status);
+        $this->assertNotContains($stuck, collect($res->json('jobs'))->pluck('id')->all());
     }
 
     public function test_backlog_on_online_counter_is_never_released_to_other_agents(): void
@@ -1074,7 +1087,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertEmpty(array_diff($own, $jobIds));
     }
 
-    public function test_stamped_job_for_offline_device_row_is_rescued(): void
+    public function test_stamped_job_for_offline_device_row_is_parked(): void
     {
         // Same aged job, but the device row EXISTS and is offline — rescue fires.
         $this->seedDevice('dev-gone', ['last_seen_at' => now()->subMinutes(10)]);
@@ -1088,8 +1101,9 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->agentGet('/api/agent/print-jobs')->assertOk();
 
         $job = DB::table('pos_print_jobs')->where('id', $stuck)->first();
-        $this->assertNull($job->device_uid);
-        $this->assertSame('Manager-POS80', $job->target_printer);
+        $this->assertSame('dev-gone', $job->device_uid);
+        $this->assertSame('Counter-dev-gone', $job->target_printer);
+        $this->assertSame('failed', $job->status);
     }
 
     public function test_fresh_stamped_job_is_not_rescued(): void

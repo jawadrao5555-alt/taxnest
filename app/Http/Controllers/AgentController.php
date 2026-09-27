@@ -1817,11 +1817,9 @@ class AgentController extends Controller
         // beats last_seen at least every 60s): a busy-but-alive counter working
         // through a print backlog must never have its queued bills released to
         // another counter just because they aged past a timer. For a genuinely
-        // dead counter, wait 90s of no claim, then unstamp so any company agent
-        // picks the job up, retargeting bill/proof to the company default
-        // receipt printer when one is set (the per-device printer may not
-        // exist on the rescuing PC). Enqueue-time routing only stamps ONLINE
-        // devices, so this is rare.
+        // dead counter, wait 90s of no claim. Keep receipts at their assigned
+        // counter and mark them failed for a deliberate reprint. KOT printers
+        // can move only to another device reporting the same physical queue.
         if (self::deviceRoutingReady()) {
             $deviceOfflineBefore = now()->subSeconds(120);
             $stranded = DB::table('pos_print_jobs as j')
@@ -1840,7 +1838,6 @@ class AgentController extends Controller
                 })
                 ->get(['j.id', 'j.type', 'j.target_printer', 'j.device_uid']);
             if ($stranded->isNotEmpty()) {
-                $defaultReceipt = $company->printerSettings()['receipt_printer'] ?? null;
                 // Task 1194 — KOT-family jobs are stamped for the counter that
                 // OWNS the chosen printer, so blind-unstamping is wrong: an
                 // agent whose PC doesn't have that printer would claim the job
@@ -1888,14 +1885,19 @@ class AgentController extends Controller
                         ]);
                         continue;
                     }
-                    $upd = ['device_uid' => null, 'updated_at' => now()];
-                    // Task 1285: fbr_bill retargets to the company default receipt
-                    // printer exactly like PRA bills — the per-device printer may
-                    // not exist on the rescuing PC.
-                    if ($defaultReceipt && in_array($row->type, ['bill', 'proof', 'fbr_bill'], true)) {
-                        $upd['target_printer'] = $defaultReceipt;
+                    // A counter-specific receipt cannot safely migrate to the
+                    // company default: that may be a different physical till.
+                    // Surface the failed job for deliberate reprint instead.
+                    if (in_array($row->type, ['bill', 'proof', 'fbr_bill'], true)) {
+                        DB::table('pos_print_jobs')->where('id', $row->id)->update([
+                            'status' => 'failed',
+                            'error' => 'Assigned counter went offline before receipt printing. Check the original counter and reprint deliberately.',
+                            'updated_at' => now(),
+                        ]);
+                        continue;
                     }
-                    DB::table('pos_print_jobs')->where('id', $row->id)->update($upd);
+                    DB::table('pos_print_jobs')->where('id', $row->id)
+                        ->update(['device_uid' => null, 'updated_at' => now()]);
                 }
                 Log::info('PRINT_ROUTING stranded stamped jobs rescued to company scope', [
                     'company_id' => $company->id, 'count' => $stranded->count(),

@@ -196,7 +196,7 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
         $landing = $profile['landing'];
         $path = $panel === 'fbr' ? '/fbr-pos/billing' : ($landing === 'hotel_front_desk' ? '/pos/hotel'
             : ($landing === 'service_work_orders' ? '/pos/work-orders' : '/pos/invoice/create'));
-        $nativeMarker = $panel === 'fbr' ? 'FBR POS Plans' : ($landing === 'hotel_front_desk' ? 'Front Desk' : ($landing === 'service_work_orders' ? PosServiceWorkflowProfiles::forCompany($profileCompany)['noun'].' Board' : 'Current Order'));
+        $nativeMarker = $panel === 'fbr' ? 'FBR POS Plans' : ($landing === 'hotel_front_desk' ? 'Hotel front desk' : ($landing === 'service_work_orders' ? PosServiceWorkflowProfiles::forCompany($profileCompany)['noun'].' Board' : 'Current Order'));
         $companyCategory = $company("Synthetic {$panel} {$category}", "category-{$panel}-{$category}@rc-browser.invalid", 'RCB'.str_pad((string) (600 + count($categoryJourneys)), 8, '0', STR_PAD_LEFT), $product, [
             'business_category' => $category, 'pos_type' => $category,
             'feature_flags' => PosFeatureService::defaultsForCategory($category),
@@ -235,7 +235,7 @@ if (User::withoutGlobalScopes()->whereIn('email', $expectedCategoryEmails)->coun
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
-        ['name' => 'hotel-owner', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk'], 'usableSelectors' => ['[data-hotel-desk-menu="1"] a[data-hotel-desk-link="checkin"]', '[data-hotel-reception-summary="1"]', '[data-hotel-room-check-in]']],
+        ['name' => 'hotel-owner', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk'], 'usableSelectors' => ['[data-hotel-desk-menu="1"] a[data-hotel-desk-link="checkin"]', '[data-hotel-reception-summary="1"]', '[data-hotel-room-check-in]']],
         ['name' => 'pra-topnav', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'pra', 'topNavFactory' => 'restaurantPos'],
         ['name' => 'pra-inventory-navigation', 'login' => $inventoryOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/inventory'], 'markers' => ['Inventory Dashboard']],
         ['name' => 'pra-admin-view-topnav', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$hotel->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="view"])', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'pra', 'topNavFactory' => 'restaurantPos'],
@@ -243,7 +243,7 @@ $fixture = [
         ['name' => 'hotel-manager', 'login' => $hotelManager->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/rooms'], 'markers' => ['Rooms']],
         ['name' => 'hotel-housekeeping', 'login' => $hotelHousekeeping->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/housekeeping'], 'markers' => ['Housekeeping']],
         ['name' => 'hotel-outlet', 'login' => $hotelOutlet->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel/restaurant'], 'markers' => ['Current Order'], 'allowRedirectTo' => '/pos/invoice/create'],
-        ['name' => 'hotel-admin-manage-as', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$hotel->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="full"])', 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk'], 'usableSelectors' => ['[data-hotel-reception-summary="1"]', '[data-hotel-room-check-in]']],
+        ['name' => 'hotel-admin-manage-as', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$hotel->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="full"])', 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk'], 'usableSelectors' => ['[data-hotel-reception-summary="1"]', '[data-hotel-room-check-in]']],
         ['name' => 'service-work-orders-manager', 'login' => $serviceManager->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'markers' => ['Event Plan Board'], 'usableSelectors' => ['a[href$="/pos/work-orders/create"]']],
         ['name' => 'health', 'login' => $healthUser->email, 'password' => $password, 'loginPath' => '/health/login', 'paths' => ['/health/dashboard'], 'markers' => ['Synthetic Browser Health Clinic']],
         ['name' => 'fiscal', 'login' => $fiscalUser->email, 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'usableSelectors' => ['input[name="pos_product_search_nofill"]'], 'topNavPanel' => 'fbr', 'topNavFactory' => 'restaurantPos'],
@@ -253,7 +253,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
     'transactionalJourneys' => [
-        ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk']],
+        ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk']],
         [
         'name' => 'service-work-orders', 'login' => $serviceWorker->email, 'password' => $password,
         'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders'], 'markers' => ['Event Plan Board'],

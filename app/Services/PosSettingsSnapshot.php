@@ -104,6 +104,19 @@ class PosSettingsSnapshot
     ];
 
     /**
+     * Exact company columns reported/cleared by AgentController::heartbeat().
+     * Offline mode here is the PC's observed state, not server Agent policy.
+     * Keep agent_enabled, agent_submits_pra and all unknown settings protected.
+     * Apply this to retained legacy snapshots as well as new captures.
+     */
+    private const HEARTBEAT_COLUMNS = [
+        'companies' => [
+            'agent_version', 'agent_offline_mode', 'agent_update_target',
+            'agent_update_stage', 'agent_update_error',
+        ],
+    ];
+
+    /**
      * AgentController writes these top-level fields during ordinary printer
      * reports / heartbeats. They are observations, not saved routing choices.
      * Every other key, including future or nested keys, remains protected.
@@ -202,7 +215,8 @@ class PosSettingsSnapshot
                 $out[] = $column;
                 continue;
             }
-            if ($this->isVolatile($lower)) {
+            if ($this->isVolatile($lower)
+                || in_array($lower, self::HEARTBEAT_COLUMNS[$table] ?? [], true)) {
                 continue;
             }
             $out[] = $column;
@@ -262,8 +276,11 @@ class PosSettingsSnapshot
 
             $afterRows = $afterTables[$table] ?? [];
 
-            $beforeCols = $this->columnsOf($beforeRows);
-            $afterCols = $this->columnsOf($afterRows);
+            // Old retained files include heartbeat observations that newer
+            // captures omit. Their absence is not a dropped settings column.
+            $heartbeatColumns = self::HEARTBEAT_COLUMNS[$table] ?? [];
+            $beforeCols = array_values(array_diff($this->columnsOf($beforeRows), $heartbeatColumns));
+            $afterCols = array_values(array_diff($this->columnsOf($afterRows), $heartbeatColumns));
             $newCols = array_values(array_diff($afterCols, $beforeCols));
             $droppedCols = array_values(array_diff($beforeCols, $afterCols));
             if ($newCols !== []) {
@@ -281,7 +298,8 @@ class PosSettingsSnapshot
                 }
                 $afterRow = $afterRows[$key];
                 foreach ($beforeRow as $col => $beforeValue) {
-                    if ($col === '_company_id' || ! array_key_exists($col, $afterRow)) {
+                    if ($col === '_company_id' || in_array($col, $heartbeatColumns, true)
+                        || ! array_key_exists($col, $afterRow)) {
                         continue; // a dropped column is reported once, above
                     }
                     // Normalize BOTH sides here too: retained baselines made by

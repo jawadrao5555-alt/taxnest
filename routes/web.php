@@ -1564,12 +1564,14 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/risk-settings', [AdminController::class, 'riskSettings']);
     Route::post('/risk-settings', [AdminController::class, 'updateRiskSettings']);
     Route::get('/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements');
+    Route::post('/announcements/audience-preview', [AnnouncementController::class, 'audiencePreview'])->name('admin.announcements.audience-preview');
     Route::post('/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
     Route::post('/announcements/{id}/toggle', [AnnouncementController::class, 'toggle'])->name('admin.announcements.toggle');
     Route::delete('/announcements/{id}/delete', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
 
     // POS "What's New" app updates (popup + bell) — owner request 20 Jul 2026
     Route::get('/app-updates', [\App\Http\Controllers\AppUpdateController::class, 'index'])->name('admin.app-updates');
+    Route::post('/app-updates/audience-preview', [\App\Http\Controllers\AppUpdateController::class, 'audiencePreview'])->name('admin.app-updates.audience-preview');
     Route::post('/app-updates', [\App\Http\Controllers\AppUpdateController::class, 'store'])->name('admin.app-updates.store');
     Route::post('/app-updates/feature-toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggleFeature'])->name('admin.app-updates.feature-toggle');
     Route::post('/app-updates/{id}/update', [\App\Http\Controllers\AppUpdateController::class, 'update'])->name('admin.app-updates.update');
@@ -2992,4 +2994,3 @@ Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withou
     Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
     Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
 });
-

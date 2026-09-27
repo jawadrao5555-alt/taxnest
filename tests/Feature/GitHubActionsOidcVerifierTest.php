@@ -69,9 +69,16 @@ class GitHubActionsOidcVerifierTest extends TestCase
      */
     public function test_invalid_signature_or_identity_claim_is_rejected(string $claim, mixed $value): void
     {
-        $token = $claim === 'signature'
-            ? implode('.', [explode('.', $this->token)[0], explode('.', $this->token)[1], 'x'.substr(explode('.', $this->token)[2], 1)])
-            : $this->tokenWithClaim($claim, $value);
+        if ($claim === 'signature') {
+            $parts = explode('.', $this->token);
+            // RSA signatures vary for each generated test key. Replacing the
+            // first character with a fixed 'x' was sometimes a no-op when
+            // the original signature happened to start with 'x'.
+            $parts[2][0] = $parts[2][0] === 'x' ? 'y' : 'x';
+            $token = implode('.', $parts);
+        } else {
+            $token = $this->tokenWithClaim($claim, $value);
+        }
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         app(GitHubActionsOidcVerifier::class)->verify(
             Request::create('/', 'POST', [], [], [], ['HTTP_AUTHORIZATION' => 'Bearer '.$token]),

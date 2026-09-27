@@ -62,3 +62,15 @@ Local evidence before publication:
   workflow, approval provenance and production access boundaries are unchanged.
 - Twelve Laravel feature cases are added for CI. No local full PHPUnit,
   MariaDB, browser or production success is claimed.
+
+## First CI follow-up
+
+Run `36321972620` passed six verification lanes, including browser and native
+MariaDB. The full PHPUnit lane ran 5,153 tests / 40,559 assertions with one
+failure in the pre-existing OIDC negative-signature fixture. That fixture
+replaces the first character of a newly generated RSA signature with the
+literal `x`. The first character happened already to be `x`, so the supposed
+invalid token was unchanged and correctly accepted. The fixture now switches
+between `x` and `y`, guaranteeing a different signature while leaving the
+production verifier and security decision untouched. Fresh CI on the amended
+PR head is required before owner approval.

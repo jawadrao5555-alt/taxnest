@@ -349,7 +349,7 @@ class HotelCategoryNativeUiTest extends TestCase
 
         $hk = $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/housekeeping')->assertOk()->getContent();
         $this->assertStringContainsString('name="housekeeping"', $hk);
-        $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertForbidden();
+        $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertRedirect('/pos/dashboard');
         $this->actingAs($this->owner($other), 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertRedirect('/pos/dashboard');
     }
 

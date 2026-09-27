@@ -151,19 +151,25 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertSame('dirty', $room->fresh()->housekeeping);
     }
 
-    public function test_inclusive_and_card_save_quotes_match_saved_bill(): void
+    public static function inclusiveModes(): array
     {
-        foreach (['inclusive', 'inclusive_card_save'] as $mode) {
-            [$company, $owner, $room] = $this->fixture(['pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 5, 'pos_tax_pricing_mode' => $mode]);
-            $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room, ['discount_type' => 'amount', 'discount_value' => 720]));
-            $desk = app(\App\Services\HotelDeskService::class);
-            $summary = $desk->summary($stay, 'card');
-            $this->assertEquals($mode === 'inclusive' ? 9280 : 8400, $summary['total']);
-            $desk->checkout($stay, $owner->id, ['payment_method' => 'card', 'amount' => $summary['balance'], 'idempotency_key' => $mode]);
-            $txn = \App\Models\PosTransaction::where('company_id', $company->id)->firstOrFail();
-            $this->assertEquals($summary['total'], $txn->total_amount);
-            $this->assertEquals($summary['tax'], $txn->tax_amount);
-        }
+        return ['inclusive' => ['inclusive'], 'card save' => ['inclusive_card_save']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('inclusiveModes')]
+    public function test_inclusive_and_card_save_quotes_match_saved_bill(string $mode): void
+    {
+        // Each mode gets a fresh fixture: SQLite retains the legacy global
+        // invoice-number index, unlike the native tenant-scoped migration.
+        [$company, $owner, $room] = $this->fixture(['pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 5, 'pos_tax_pricing_mode' => $mode]);
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room, ['discount_type' => 'amount', 'discount_value' => 720]));
+        $desk = app(\App\Services\HotelDeskService::class);
+        $summary = $desk->summary($stay, 'card');
+        $this->assertEquals($mode === 'inclusive' ? 9280 : 8400, $summary['total']);
+        $desk->checkout($stay, $owner->id, ['payment_method' => 'card', 'amount' => $summary['balance'], 'idempotency_key' => $mode]);
+        $txn = \App\Models\PosTransaction::where('company_id', $company->id)->firstOrFail();
+        $this->assertEquals($summary['total'], $txn->total_amount);
+        $this->assertEquals($summary['tax'], $txn->tax_amount);
     }
 
     public function test_extension_applies_fixed_discount_once_and_percent_only_to_new_nights(): void
@@ -308,7 +314,9 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertEquals(1000, $summary['extras']);
         $this->assertEquals(10900, $summary['total']);
         $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create')->assertOk()->assertSee('Simple Desk Guest')->assertDontSee('Foreign private guest');
-        $this->get('/pos/hotel/stays/'.$foreign->id.'/checkout')->assertNotFound();
+        $this->get('/pos/hotel/stays/'.$foreign->id.'/checkout')->assertRedirect('/pos/dashboard')->assertSessionHas('error');
+        $this->getJson('/pos/hotel/stays/'.$foreign->id.'/checkout')->assertNotFound()->assertJson(['error' => 'Resource not found.']);
+        $this->assertSame(HotelStay::STATUS_CHECKED_IN, $foreign->fresh()->status);
     }
 
 }

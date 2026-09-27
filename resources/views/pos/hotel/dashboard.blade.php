@@ -64,7 +64,7 @@
                     [__('pos.hotel_pending_balances'), $pending, 'pending'],
                 ] as [$title, $stays, $queue])
                 <section class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 p-4" data-hotel-queue="{{ $queue }}">
-                    <h2 class="text-sm font-bold text-slate-900 dark:text-white">{{ $title }} <span class="text-slate-500">({{ $stays->count() }})</span></h2>
+                    <h2 class="text-sm font-bold text-slate-900 dark:text-white">{{ $title }} (<span class="text-slate-500" data-hotel-queue-count="{{ $queue }}">{{ $queue === 'pending' ? ($occupancy['pending_due_count'] ?? 0) : $stays->count() }}</span>)</h2>
                     @foreach($stays as $stay)
                     <a href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="flex justify-between gap-2 border-b border-slate-100 dark:border-slate-700 py-2.5 last:border-0 text-sm hover:text-teal-700">
                         <span><strong>{{ $stay->guest_name }}</strong><span class="block text-xs text-slate-500">{{ $stay->stay_number }} · {{ __('pos.hotel_room') }} {{ $stay->room?->room_number }}</span></span>

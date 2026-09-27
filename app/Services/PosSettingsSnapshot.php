@@ -104,6 +104,15 @@ class PosSettingsSnapshot
     ];
 
     /**
+     * AgentController writes these top-level fields during ordinary printer
+     * reports / heartbeats. They are observations, not saved routing choices.
+     * Every other key, including future or nested keys, remains protected.
+     */
+    private const PRINTER_TELEMETRY_KEYS = [
+        'available_printers', 'printers_reported_at', 'agent_diagnostics',
+    ];
+
+    /**
      * Build the snapshot.
      *
      * @param  int|null  $companyId  Limit to one company (null = every company).
@@ -140,12 +149,12 @@ class PosSettingsSnapshot
             $rows = [];
             // Chunked: a live shard has thousands of companies and tens of
             // thousands of users; a single get() would hold them all in memory.
-            $query->chunk(500, function ($chunk) use (&$rows, $keyColumn, $companyColumn, $columns) {
+            $query->chunk(500, function ($chunk) use (&$rows, $table, $keyColumn, $companyColumn, $columns) {
                 foreach ($chunk as $row) {
                     $arr = (array) $row;
                     $values = [];
                     foreach ($columns as $col) {
-                        $values[$col] = $this->normalize($arr[$col] ?? null);
+                        $values[$col] = $this->normalizeSetting($table, $col, $arr[$col] ?? null);
                     }
                     // The company id rides along so the diff can say WHICH shop
                     // moved, not just "users row 8412".
@@ -275,7 +284,10 @@ class PosSettingsSnapshot
                     if ($col === '_company_id' || ! array_key_exists($col, $afterRow)) {
                         continue; // a dropped column is reported once, above
                     }
-                    if ($afterRow[$col] === $beforeValue) {
+                    // Normalize BOTH sides here too: retained baselines made by
+                    // older releases still contain the Agent telemetry fields.
+                    if ($this->normalizeSetting($table, $col, $afterRow[$col])
+                        === $this->normalizeSetting($table, $col, $beforeValue)) {
                         continue;
                     }
                     $finding = [
@@ -566,6 +578,33 @@ class PosSettingsSnapshot
     public function normalizePublic(mixed $value): ?string
     {
         return $this->normalize($value);
+    }
+
+    private function normalizeSetting(string $table, string $column, mixed $value): ?string
+    {
+        $normalized = $this->normalize($value);
+        if ($table !== 'companies' || $column !== 'pos_printer_settings') {
+            return $normalized;
+        }
+
+        // A first heartbeat may turn NULL into a telemetry-only object. Both
+        // contain no configured routing. A nonempty routing blob becoming NULL
+        // still differs and remains a fatal settings regression.
+        if ($normalized === null) {
+            return '[]';
+        }
+
+        $decoded = json_decode($normalized);
+        if (! $decoded instanceof \stdClass) {
+            return $normalized; // malformed/scalar/list payloads are not hidden
+        }
+        foreach (self::PRINTER_TELEMETRY_KEYS as $key) {
+            unset($decoded->{$key});
+        }
+
+        $encoded = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return $encoded === false ? $normalized : $this->normalize($encoded);
     }
 
     /**

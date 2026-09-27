@@ -22,8 +22,6 @@
         <div class="flex flex-wrap gap-2">
             @if($stay->status === 'reserved')
             <form method="POST" action="{{ route('pos.hotel.stays.check-in', $stay->id) }}">@csrf<button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_check_in_btn') }}</button></form>
-            <form method="POST" action="{{ route('pos.hotel.stays.cancel', $stay->id) }}">@csrf<button class="px-3 py-2 bg-gray-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_cancel_btn') }}</button></form>
-            <form method="POST" action="{{ route('pos.hotel.stays.no-show', $stay->id) }}">@csrf<button class="px-3 py-2 bg-gray-600 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_no_show_btn') }}</button></form>
             @endif
             @if($stay->status === 'checked_in')
             @php $due = (float) ($totals['outstanding'] ?? 0); $blockDue = ($checkoutPolicy ?? 'allow') === 'block' && $due > 0; @endphp
@@ -38,13 +36,11 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
+    <div class="grid grid-cols-3 gap-2 mb-6">
         @foreach([
             ['hotel_folio_charges', $totals['charges']],
             ['hotel_folio_paid', $totals['payments'] - $totals['refunds']],
             ['hotel_folio_due', $totals['outstanding']],
-            ['hotel_folio_advance_credit', $totals['advance_credit'] ?? 0],
-            ['hotel_folio_deposit', $totals['deposit_held']],
         ] as $tile)
         <div class="rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3">
             <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">{{ __("pos.{$tile[0]}") }}</p>
@@ -53,8 +49,17 @@
         @endforeach
     </div>
 
+    @if(($totals['advance_credit'] ?? 0) > 0 || ($totals['deposit_held'] ?? 0) > 0)
+    <p class="text-xs text-slate-600 dark:text-slate-300 mb-5">
+        {{ __('pos.hotel_folio_advance_credit') }}: Rs {{ number_format($totals['advance_credit'] ?? 0) }}
+        · {{ __('pos.hotel_folio_deposit') }}: Rs {{ number_format($totals['deposit_held'] ?? 0) }}
+    </p>
+    @endif
+
     @if(in_array($stay->status, ['reserved','checked_in'], true))
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <details class="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+        <summary class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.hotel_desk_stay_options') }}</summary>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <form method="POST" action="{{ route('pos.hotel.stays.extend', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
             @csrf
             <h3 class="text-sm font-semibold">{{ __('pos.hotel_extend') }}</h3>
@@ -75,6 +80,13 @@
             <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_move_btn') }}</button>
         </form>
     </div>
+    @if($stay->status === 'reserved')
+    <div class="flex gap-3 mt-4">
+        <form method="POST" action="{{ route('pos.hotel.stays.cancel', $stay->id) }}">@csrf<button class="text-xs font-semibold text-gray-600 underline">{{ __('pos.hotel_cancel_btn') }}</button></form>
+        <form method="POST" action="{{ route('pos.hotel.stays.no-show', $stay->id) }}">@csrf<button class="text-xs font-semibold text-gray-600 underline">{{ __('pos.hotel_no_show_btn') }}</button></form>
+    </div>
+    @endif
+    </details>
     @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
@@ -127,7 +139,9 @@
                 <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.save_btn') }}</button>
             </form>
             @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()))
-            <form method="POST" action="{{ route('pos.hotel.folio.refund', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
+            <details class="bg-white dark:bg-gray-900 rounded-xl border p-4">
+                <summary class="cursor-pointer text-sm font-semibold">{{ __('pos.hotel_refund') }}</summary>
+            <form method="POST" action="{{ route('pos.hotel.folio.refund', $stay->id) }}" class="mt-3 space-y-2">
                 @csrf
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_refund') }}</h3>
                 <input type="number" step="0.01" name="amount" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
@@ -140,6 +154,7 @@
                 </select>
                 <button class="px-3 py-2 bg-gray-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_refund') }}</button>
             </form>
+            </details>
             @endif
             <form method="POST" action="{{ route('pos.hotel.folio.settle', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
                 @csrf
@@ -191,9 +206,9 @@
     </div>
     <p class="text-xs text-gray-500 mt-3">{{ __('pos.hotel_deposit_not_revenue') }}</p>
     @if(!empty($timeline))
-    <div class="mt-6 bg-white dark:bg-gray-900 rounded-xl border p-4">
-        <h2 class="text-sm font-bold uppercase tracking-wide mb-3">{{ __('pos.hotel_timeline') }}</h2>
-        <ol class="space-y-2">
+    <details class="mt-6 bg-white dark:bg-gray-900 rounded-xl border p-4">
+        <summary class="cursor-pointer text-sm font-bold">{{ __('pos.hotel_timeline') }}</summary>
+        <ol class="space-y-2 mt-3">
             @foreach($timeline as $row)
             <li class="text-sm text-gray-700 dark:text-gray-200">
                 <span class="text-[11px] text-gray-400 font-mono">{{ $row['at'] }}</span>
@@ -201,7 +216,7 @@
             </li>
             @endforeach
         </ol>
-    </div>
+    </details>
     @endif
 </div>
 </x-pos-layout>

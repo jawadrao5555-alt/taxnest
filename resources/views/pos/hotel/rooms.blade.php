@@ -11,7 +11,9 @@
     <div class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{{ session('error') }}</div>
     @endif
 
+    @if(!empty($housekeepingView))
     @include('pos.hotel._room-board')
+    @endif
 
     @if(empty($housekeepingView) && !empty($canManageRooms))
     <details class="mb-6" data-hotel-admin-setup="1" @if($rooms->isEmpty()) open @endif>

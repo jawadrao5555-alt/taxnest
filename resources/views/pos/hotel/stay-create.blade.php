@@ -2,9 +2,14 @@
 <div class="tn-page tn-hotel-page max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('pos.hotel._nav')
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ !empty($walkIn) ? __('pos.hotel_action_walkin') : __('pos.hotel_action_booking') }}</h1>
-    <p class="text-sm text-gray-500 mb-5">{{ __('pos.hotel_charging_rule_note') }}</p>
+    <p class="text-sm text-gray-500 mb-5">{{ __('pos.hotel_desk_enter_guest') }}</p>
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{{ session('error') }}</div>
+    @endif
+    @if($errors->any())
+    <div class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">
+        <ul class="list-disc ms-5">@foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul>
+    </div>
     @endif
     <form method="POST" action="{{ route('pos.hotel.stays.store') }}" class="tn-panel bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         @csrf
@@ -34,6 +39,9 @@
             <label class="block text-xs font-medium mb-1">{{ __('pos.hotel_phone') }}</label>
             <input name="guest_phone" value="{{ old('guest_phone') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
         </div>
+        <details class="sm:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 p-3" @if($errors->any()) open @endif>
+            <summary class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.hotel_desk_more_guest') }}</summary>
+            <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
             <label class="block text-xs font-medium mb-1">{{ __('pos.hotel_cnic_optional') }}</label>
             <input name="guest_cnic" value="{{ old('guest_cnic') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
@@ -65,14 +73,12 @@
             <label class="block text-xs font-medium mb-1">{{ __('pos.hotel_children') }}</label>
             <input type="number" name="child_count" value="{{ old('child_count', 0) }}" min="0" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
         </div>
-        <div class="sm:col-span-2">
-            <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="walk_in" value="1" class="rounded border-gray-300" @checked(old('walk_in', !empty($walkIn)))>
-                {{ __('pos.hotel_walk_in') }}
-            </label>
-        </div>
-        <div class="sm:col-span-2">
-            <button class="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white text-sm rounded-lg font-semibold">{{ __('pos.hotel_save_stay') }}</button>
+            </div>
+        </details>
+        <div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+            <input type="hidden" name="walk_in" value="{{ old('walk_in', !empty($walkIn) ? 1 : 0) ? 1 : 0 }}">
+            <button class="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white text-sm rounded-lg font-semibold">{{ !empty($walkIn) ? __('pos.hotel_check_in_btn') : __('pos.hotel_action_booking') }}</button>
+            <a href="{{ route('pos.hotel.dashboard') }}" class="text-sm font-semibold text-gray-500 hover:text-teal-700">{{ __('pos.hotel_front_desk') }}</a>
         </div>
     </form>
 </div>

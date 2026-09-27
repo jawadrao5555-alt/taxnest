@@ -10,14 +10,11 @@
         [route('pos.hotel.stays.create', ['walk_in' => 1]), __('pos.hotel_action_walkin'), 'checkin'],
         [route('pos.hotel.guests'), __('pos.nav_hotel_guests'), 'guests'],
         [route('pos.hotel.stays.index', ['status' => 'checked_in']), __('pos.hotel_in_house'), 'stays'],
-        [route('pos.hotel.stays.index', ['status' => 'reserved']), __('pos.nav_hotel_reservations'), 'reservations'],
         [route('pos.hotel.stays.index', ['status' => 'checked_in']), __('pos.hotel_check_out_btn'), 'checkout'],
         [route('pos.hotel.folios'), __('pos.nav_hotel_folios'), 'folios'],
     ];
     if (\App\Services\HotelAccessService::canManageRooms(auth('pos')->user())) {
         $deskLinks[] = [route('pos.hotel.rooms'), __('pos.nav_hotel_rooms'), 'rooms'];
-        $deskLinks[] = [route('pos.hotel.housekeeping'), __('pos.nav_hotel_housekeeping'), 'housekeeping'];
-        $deskLinks[] = [route('pos.hotel.reports'), __('pos.nav_hotel_reports'), 'reports'];
     }
 @endphp
 <div class="tn-page tn-hotel-dashboard max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-5" data-hotel-reception="1">
@@ -26,19 +23,24 @@
         <aside class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 p-4 lg:sticky lg:top-5" aria-label="{{ __('pos.nav_hotel_front_desk') }}" data-hotel-desk-menu="1">
             <p class="text-xs font-bold uppercase tracking-widest text-teal-700 dark:text-teal-300">{{ __('pos.nav_hotel_front_desk') }}</p>
             <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{{ auth('pos')->user()?->company?->name }}</p>
-            <nav class="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-1.5">
+            <nav class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-1" aria-label="{{ __('pos.nav_hotel_front_desk') }}">
                 @foreach($deskLinks as [$url, $label, $key])
                 <a href="{{ $url }}" data-hotel-desk-link="{{ $key }}" @if($key === 'dashboard') aria-current="page" @endif class="rounded-lg px-3 py-2.5 text-sm font-medium {{ $key === 'dashboard' ? 'bg-teal-700 text-white' : 'text-slate-700 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800' }}">{{ $label }}</a>
                 @endforeach
             </nav>
+            @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()))
+            <details class="mt-4 border-t border-slate-200 dark:border-slate-700 pt-3 text-sm">
+                <summary class="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">{{ __('pos.hotel_desk_more_management') }}</summary>
+                <div class="mt-2 grid gap-1">
+                    <a href="{{ route('pos.hotel.housekeeping') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_housekeeping') }}</a>
+                    <a href="{{ route('pos.hotel.reports') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_reports') }}</a>
+                </div>
+            </details>
+            @endif
             @if(\App\Services\HotelShell::restaurantOutletOn(auth('pos')->user()?->company)
                 && \App\Services\HotelShell::canOpenRestaurantOutlet(auth('pos')->user(), auth('pos')->user()?->company))
             <a href="{{ route('pos.hotel.restaurant-outlet') }}" data-hotel-restaurant-outlet="1" class="block mt-4 rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-900 dark:text-amber-200">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
             @endif
-            <details class="mt-5 border-t border-slate-200 dark:border-slate-700 pt-3 text-xs text-slate-600 dark:text-slate-300">
-                <summary class="cursor-pointer font-semibold">{{ __('pos.hotel_action_booking') }} · {{ __('pos.hotel_action_payment') }}</summary>
-                <div class="mt-3">@include('pos.hotel._nav', ['showHotelPrimaryActions' => true])</div>
-            </details>
         </aside>
 
         <main class="min-w-0">
@@ -46,10 +48,9 @@
                 <div>
                     <p class="text-xs uppercase font-bold tracking-widest text-teal-700 dark:text-teal-300">{{ __('pos.nav_hotel_front_desk') }}</p>
                     <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">{{ __('pos.hotel_front_desk') }}</h1>
-                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ __('pos.hotel_front_desk_hint_v2') }}</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ __('pos.hotel_desk_pick_room') }}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('pos.hotel.dashboard') }}" class="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-white">{{ __('pos.hotel_all_rooms') }}</a>
                     <a href="{{ route('pos.hotel.stays.create') }}" class="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_action_booking') }}</a>
                 </div>
             </div>
@@ -75,19 +76,6 @@
                 <div class="flex justify-between text-sm font-semibold text-slate-700 dark:text-slate-200"><span>{{ __('pos.hotel_occupancy') }}</span><span>{{ $occupancyRate }}%</span></div>
                 <div class="mt-2 h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-label="{{ __('pos.hotel_occupancy') }}" aria-valuenow="{{ $occupancyRate }}" aria-valuemin="0" aria-valuemax="100"><div class="h-full rounded-full bg-teal-600" style="width: {{ $occupancyRate }}%"></div></div>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3" data-hotel-operational-counts="1">
-                @foreach([
-                    ['hotel_stat_reserved', $roomStateCounts['reserved'] ?? 0],
-                    ['hotel_stat_dirty', $roomStateCounts['dirty'] ?? 0],
-                    ['hotel_stat_oos', $roomStateCounts['oos'] ?? 0],
-                    ['hotel_stat_due', $occupancy['pending_due_count'] ?? 0],
-                ] as [$label, $value])
-                <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 px-3 py-2">
-                    <p class="text-xs font-semibold text-slate-500">{{ __('pos.'.$label) }}</p>
-                    <p class="text-xl font-extrabold text-slate-900 dark:text-white">{{ $value }}</p>
-                </div>
-                @endforeach
-            </div>
 
             @if($totalRooms === 0)
             <div class="mt-5 rounded-2xl border border-dashed border-teal-300 bg-teal-50 dark:bg-teal-950/20 p-6 text-center" data-hotel-empty-rooms="1">
@@ -99,7 +87,9 @@
             @endif
             @include('pos.hotel._room-board', ['roomCards' => $roomCards, 'filter' => '', 'filterBase' => route('pos.hotel.rooms'), 'showReceptionActions' => true])
 
-            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6" data-hotel-desk-queues="1">
+            <details class="mt-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 p-4" data-hotel-desk-queues="1">
+                <summary class="cursor-pointer text-sm font-bold text-slate-900 dark:text-white">{{ __('pos.hotel_desk_today_details') }} · {{ ($arrivals ?? collect())->count() + ($departures ?? collect())->count() + ($pending ?? collect())->count() }}</summary>
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
                 @foreach([
                     [__('pos.hotel_arrivals_today'), $arrivals, 'arrivals'],
                     [__('pos.hotel_departures_today'), $departures, 'departures'],
@@ -126,7 +116,7 @@
                     <a href="{{ route('pos.hotel.folios') }}" class="inline-block mt-4 text-sm font-semibold text-teal-700 dark:text-teal-300">{{ __('pos.nav_hotel_folios') }} →</a>
                 </section>
             </div>
-            <p class="text-xs text-slate-500 mt-4">{{ __('pos.hotel_charging_rule_note') }}</p>
+            </details>
         </main>
     </div>
 </div>

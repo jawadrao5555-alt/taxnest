@@ -1076,12 +1076,18 @@ class PosController extends Controller
         // (no assignment, device never seen, offline, no per-device printer,
         // pre-migration schema) → NULL route = today's company-wide behavior.
         $deviceRoute = $this->resolveUserPrintDevice($user, $companyId);
+        // An explicit counter assignment must never silently print a receipt
+        // on another counter when its Agent or printer is unavailable. Keep
+        // the company default for unassigned users and legacy installations.
+        $assignedCounterUnavailable = \App\Http\Controllers\AgentController::deviceRoutingReady()
+            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')
+            && !empty($user->pos_device_uid) && !$deviceRoute;
 
         // ── BILL: single job, receipt printer (unchanged behavior) ─────────
         if ($validated['type'] === 'bill') {
             $printAttemptUuid = trim((string) ($validated['print_attempt_uuid'] ?? ''));
             try {
-                $billResult = DB::transaction(function () use ($company, $companyId, $validated, $user, $deviceRoute, $settings, $printAttemptUuid) {
+                $billResult = DB::transaction(function () use ($company, $companyId, $validated, $user, $deviceRoute, $assignedCounterUnavailable, $settings, $printAttemptUuid) {
                     // Lock the exact finalized transaction before the dedupe check.
                     // Concurrent retry/double-press requests for this bill serialize
                     // here, so only one can observe "no active job" and create it.
@@ -1122,6 +1128,9 @@ class PosController extends Controller
                     }
                     if (!$company->agentOnline()) {
                         return ['unavailable' => 'agent_offline'];
+                    }
+                    if ($assignedCounterUnavailable) {
+                        return ['unavailable' => 'counter_unavailable'];
                     }
                     if (!$deviceRoute && !$settings['receipt_printer']) {
                         return ['unavailable' => 'no_printer'];
@@ -1209,6 +1218,9 @@ class PosController extends Controller
         // ── PROOF BILL (ZFC 28 Jul 2026): pre-bill on the RECEIPT printer —
         // silent path so the desktop app never pops the Windows print dialog. ──
         if ($validated['type'] === 'proof') {
+            if ($assignedCounterUnavailable) {
+                return response()->json(['success' => false, 'reason' => 'counter_unavailable'], 409);
+            }
             if (!$deviceRoute && !$settings['receipt_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }

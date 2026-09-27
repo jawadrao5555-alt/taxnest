@@ -55,9 +55,11 @@ test('updater waits for graceful quit and retains rollback and relaunch', () => 
     srcDir: 'C:\\Temp\\new',
     destDir: 'C:\\Agent',
     backupDir: 'C:\\Temp\\backup',
+    logPath: 'C:\\Temp\\apply-update.log',
   });
   assert.doesNotMatch(script, /taskkill|uninstall/i);
   assert.match(script, /robocopy "C:\\Temp\\backup" "C:\\Agent"/);
   assert.match(script, /start "" "C:\\Agent\\TaxNest PRA Agent.exe"/);
+  assert.match(script, /apply-update\.log" 2>&1/);
   assert.throws(() => buildUpdateHandoffScript({ exePath: '"bad"' }), /path/);
 });

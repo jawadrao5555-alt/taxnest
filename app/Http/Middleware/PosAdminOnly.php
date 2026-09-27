@@ -22,7 +22,8 @@ class PosAdminOnly
         $customSet = \App\Services\PosAccessService::customSet($user);
         if ($customSet !== null) {
             $feature = \App\Services\PosAccessService::featureForPath($request->path());
-            if ($feature === null || !in_array($feature, $customSet, true)) {
+            $hotelRoomGrant = $feature === 'hotel_housekeeping' && in_array('hotel', $customSet, true);
+            if ($feature === null || (!in_array($feature, $customSet, true) && !$hotelRoomGrant)) {
                 if ($request->expectsJson()) {
                     abort(403, __('pos.custom_access_denied'));
                 }

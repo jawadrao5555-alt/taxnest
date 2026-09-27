@@ -102,7 +102,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertSame('/pos/hotel', HotelShell::postLoginPath($owner));
 
         $html = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
-        $this->assertStringNotContainsString('data-hotel-native-nav="1"', $html);
+        $this->assertStringContainsString('data-hotel-native-nav="1"', $html);
         $this->assertStringNotContainsString('data-hotel-primary-actions="1"', $html);
         $this->assertStringContainsString('data-hotel-room-board="1"', $html);
         $this->assertStringContainsString('data-hotel-reception="1"', $html);
@@ -217,7 +217,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->actingAs($owner, 'pos')->get('/pos/dashboard')->assertRedirect('/pos/hotel');
 
         $desk = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
-        $this->assertStringNotContainsString('data-hotel-native-nav="1"', $desk);
+        $this->assertStringContainsString('data-hotel-native-nav="1"', $desk);
         $this->assertStringContainsString('data-hotel-restaurant-outlet="1"', $desk);
         $this->assertStringContainsString(__('pos.nav_hotel_restaurant_outlet'), $desk);
         $this->assertStringNotContainsString('data-nav-new-sale="static"', $desk);

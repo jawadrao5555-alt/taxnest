@@ -23,7 +23,7 @@ class HotelFolioService
      *   deposit_held:float, uninvoiced_charges:float, advance_credit:float
      * }
      */
-    public function totals(HotelStay $stay): array
+    public function totals(HotelStay $stay, string $paymentMethod = 'cash'): array
     {
         $rows = HotelFolioEntry::where('company_id', $stay->company_id)
             ->where('stay_id', $stay->id)
@@ -72,7 +72,7 @@ class HotelFolioService
         $company = \App\Models\Company::find($stay->company_id);
         if ($company && $uninvoiced > 0) {
             $available = $this->invoices->availableTowardFiscal($stay);
-            $fiscalForOpen = $this->invoices->fiscalTotalFor($company, $uninvoiced, 'cash');
+            $fiscalForOpen = $this->invoices->fiscalTotalFor($company, $uninvoiced, $paymentMethod);
             $fiscalOutstanding = max(0, round($fiscalForOpen - max(0, $available), 2));
         }
 
@@ -223,6 +223,8 @@ class HotelFolioService
             'uom' => $original->uom,
             'unit_amount' => -1 * (float) $original->unit_amount,
             'amount' => -1 * (float) $original->amount,
+            'gross_amount' => -1 * (float) ($original->gross_amount ?? $original->amount),
+            'discount_amount' => -1 * (float) $original->discount_amount,
             'reverses_entry_id' => $original->id,
             'idempotency_key' => $idempotencyKey,
         ], $userId);
@@ -313,7 +315,7 @@ class HotelFolioService
                 }
             }
 
-            if ($amount == 0.0 && ($data['entry_type'] ?? '') === HotelFolioEntry::TYPE_CHARGE) {
+            if ($amount == 0.0 && ($data['entry_type'] ?? '') === HotelFolioEntry::TYPE_CHARGE && empty($data['room_pricing'])) {
                 throw new HotelStayException(__('pos.hotel_amount_required'));
             }
 
@@ -328,6 +330,11 @@ class HotelFolioService
                     'uom' => $uom,
                     'unit_amount' => $unit,
                     'amount' => $amount,
+                    'gross_amount' => $data['gross_amount'] ?? null,
+                    'discount_amount' => $data['discount_amount'] ?? 0,
+                    'room_pricing' => (bool) ($data['room_pricing'] ?? false),
+                    'room_from_date' => $data['room_from_date'] ?? null,
+                    'room_to_date' => $data['room_to_date'] ?? null,
                     'product_id' => $productId,
                     'payment_method' => $data['payment_method'] ?? null,
                     'is_deposit' => (bool) ($data['is_deposit'] ?? false),

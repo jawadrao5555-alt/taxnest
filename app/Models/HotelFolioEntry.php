@@ -18,13 +18,18 @@ class HotelFolioEntry extends Model
         'company_id', 'stay_id', 'entry_type', 'category', 'description',
         'quantity', 'uom', 'unit_amount', 'amount', 'pos_transaction_id',
         'product_id', 'payment_method', 'is_deposit', 'reverses_entry_id',
-        'idempotency_key', 'created_by',
+        'idempotency_key', 'created_by', 'gross_amount', 'discount_amount', 'room_pricing', 'room_from_date', 'room_to_date',
     ];
 
     protected $casts = [
         'quantity' => 'decimal:3',
         'unit_amount' => 'decimal:2',
         'amount' => 'decimal:2',
+        'gross_amount' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'room_pricing' => 'boolean',
+        'room_from_date' => 'date',
+        'room_to_date' => 'date',
         'is_deposit' => 'boolean',
     ];
 

@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-php artisan test --filter=HotelGuestHouse
+php artisan test --filter=Hotel
 VIDEO_PIPELINE_ALLOW=1 php scripts/cloud-local-hotel-qa-seed.php
 php artisan serve --host=127.0.0.1 --port=8000 >/tmp/hotel-final-serve.log 2>&1 &
 SERVE_PID=$!

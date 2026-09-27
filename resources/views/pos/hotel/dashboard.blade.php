@@ -1,49 +1,12 @@
-<x-pos-layout>
+<x-hotel-layout>
 @php
     $roomStateCounts = $roomStateCounts ?? array_count_values(array_column($roomCards ?? [], 'state'));
     $totalRooms = count($roomCards ?? []);
     $occupiedRooms = $roomStateCounts['occupied'] ?? 0;
     $availableRooms = $roomStateCounts['vacant'] ?? 0;
     $occupancyRate = $totalRooms ? round($occupiedRooms * 100 / $totalRooms) : 0;
-    $deskLinks = [
-        [route('pos.hotel.dashboard'), __('pos.nav_hotel_front_desk'), 'dashboard'],
-        [route('pos.hotel.stays.create', ['walk_in' => 1]), __('pos.hotel_action_walkin'), 'checkin'],
-        [route('pos.hotel.guests'), __('pos.nav_hotel_guests'), 'guests'],
-        [route('pos.hotel.stays.index', ['status' => 'checked_in']), __('pos.hotel_in_house'), 'stays'],
-        [route('pos.hotel.stays.index', ['status' => 'checked_in']), __('pos.hotel_check_out_btn'), 'checkout'],
-        [route('pos.hotel.folios'), __('pos.nav_hotel_folios'), 'folios'],
-    ];
-    if (\App\Services\HotelAccessService::canManageRooms(auth('pos')->user())) {
-        $deskLinks[] = [route('pos.hotel.rooms'), __('pos.nav_hotel_rooms'), 'rooms'];
-    }
 @endphp
-<div class="tn-page tn-hotel-dashboard max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-5" data-hotel-reception="1">
-    @include('pos.partials.back-link')
-    <div class="grid grid-cols-1 lg:grid-cols-[14rem_minmax(0,1fr)] gap-5 items-start">
-        <aside class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 p-4 lg:sticky lg:top-5" aria-label="{{ __('pos.nav_hotel_front_desk') }}" data-hotel-desk-menu="1">
-            <p class="text-xs font-bold uppercase tracking-widest text-teal-700 dark:text-teal-300">{{ __('pos.nav_hotel_front_desk') }}</p>
-            <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{{ auth('pos')->user()?->company?->name }}</p>
-            <nav class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-1" aria-label="{{ __('pos.nav_hotel_front_desk') }}">
-                @foreach($deskLinks as [$url, $label, $key])
-                <a href="{{ $url }}" data-hotel-desk-link="{{ $key }}" @if($key === 'dashboard') aria-current="page" @endif class="rounded-lg px-3 py-2.5 text-sm font-medium {{ $key === 'dashboard' ? 'bg-teal-700 text-white' : 'text-slate-700 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800' }}">{{ $label }}</a>
-                @endforeach
-            </nav>
-            @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()))
-            <details class="mt-4 border-t border-slate-200 dark:border-slate-700 pt-3 text-sm">
-                <summary class="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">{{ __('pos.hotel_desk_more_management') }}</summary>
-                <div class="mt-2 grid gap-1">
-                    <a href="{{ route('pos.hotel.housekeeping') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_housekeeping') }}</a>
-                    <a href="{{ route('pos.hotel.reports') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_reports') }}</a>
-                </div>
-            </details>
-            @endif
-            @if(\App\Services\HotelShell::restaurantOutletOn(auth('pos')->user()?->company)
-                && \App\Services\HotelShell::canOpenRestaurantOutlet(auth('pos')->user(), auth('pos')->user()?->company))
-            <a href="{{ route('pos.hotel.restaurant-outlet') }}" data-hotel-restaurant-outlet="1" class="block mt-4 rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-900 dark:text-amber-200">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
-            @endif
-        </aside>
-
-        <main class="min-w-0">
+<div data-hotel-reception="1" x-data="{ roomSearch: '' }">
             <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
                 <div>
                     <p class="text-xs uppercase font-bold tracking-widest text-teal-700 dark:text-teal-300">{{ __('pos.nav_hotel_front_desk') }}</p>
@@ -87,6 +50,9 @@
                 @endif
             </div>
             @endif
+            <label class="block mt-5 text-sm font-semibold dark:text-white">{{ __('pos.hotel_search') }}
+                <input x-model="roomSearch" type="search" class="mt-1 w-full sm:max-w-sm rounded-lg border-slate-300 dark:bg-gray-800" placeholder="{{ __('pos.hotel_search') }}">
+            </label>
             @include('pos.hotel._room-board', ['roomCards' => $roomCards, 'filter' => '', 'filterBase' => route('pos.hotel.rooms'), 'showReceptionActions' => true])
 
             <details class="mt-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 p-4" data-hotel-desk-queues="1">
@@ -119,7 +85,5 @@
                 </section>
             </div>
             </details>
-        </main>
-    </div>
 </div>
-</x-pos-layout>
+</x-hotel-layout>

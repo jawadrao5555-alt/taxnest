@@ -1,7 +1,6 @@
-<x-pos-layout>
-<div class="tn-page tn-hotel-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    @include('pos.hotel._nav')
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-5">{{ __('pos.nav_hotel_folios') }}</h1>
+<x-hotel-layout>
+<div class="tn-page tn-hotel-page max-w-6xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-5">{{ __('pos.hotel_menu_bills') }}</h1>
     <div class="tn-table-shell bg-white dark:bg-gray-900 rounded-xl border overflow-x-auto">
         <table class="min-w-[40rem] w-full text-sm">
             <thead>
@@ -29,4 +28,5 @@
         </table>
     </div>
 </div>
-</x-pos-layout>
+    <div class="mt-4">{{ $stays->links() }}</div>
+</x-hotel-layout>

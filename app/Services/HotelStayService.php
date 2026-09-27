@@ -195,6 +195,14 @@ class HotelStayService
             $payer = $this->resolveCustomer($companyId, $data['payer_customer_id'] ?? null);
             $walkIn = (bool) ($data['walk_in'] ?? false);
 
+            $rate = isset($data['rate_amount']) ? round((float) $data['rate_amount'], 2) : (float) $room->rate_amount;
+            $discountType = $data['discount_type'] ?? 'amount';
+            $discountValue = (float) ($data['discount_value'] ?? 0);
+            HotelPricingService::validateRate($companyId, $userId, (float) $room->rate_amount, $rate, $nights, $discountType, $discountValue);
+            if ($walkIn && $room->housekeeping === HotelRoom::HK_DIRTY) {
+                throw new HotelStayException(__('pos.hotel_room_needs_clean'));
+            }
+
             $payload = [
                 'company_id' => $companyId,
                 'branch_id' => $room->branch_id,
@@ -212,7 +220,10 @@ class HotelStayService
                 'adult_count' => $adults,
                 'child_count' => $children,
                 'nights' => $nights,
-                'rate_amount' => (float) $room->rate_amount,
+                'rate_amount' => $rate,
+                'standard_rate_amount' => $room->rate_amount,
+                'discount_type' => $discountType,
+                'discount_value' => $discountValue,
                 'rate_unit' => $room->rate_unit ?: 'NGT',
                 'charging_rule' => HotelRoom::CHARGING_NIGHTLY,
                 'notes' => $data['notes'] ?? null,
@@ -258,10 +269,24 @@ class HotelStayService
                 $this->postNightlyCharge($stay, $nights, 'check-in', $userId);
             }
 
+            if ((float) ($data['advance_amount'] ?? 0) > 0) {
+                $method = $data['payment_method'] ?? 'cash';
+                HotelPricingService::quote(Company::findOrFail($companyId), 0, 0, $method);
+                $this->folio->postPayment($stay, [
+                    'amount' => round((float) $data['advance_amount'], 2),
+                    'payment_method' => $method,
+                    'description' => __('pos.hotel_advance_payment'),
+                    'idempotency_key' => $key ? hash('sha256', 'advance|'.$stay->id.'|'.$key) : null,
+                ], $userId);
+            }
+
             AuditLogService::log('hotel_stay_created', 'hotel_stay', $stay->id, null, [
                 'stay_number' => $stay->stay_number,
                 'status' => $stay->status,
                 'walk_in' => $walkIn,
+                'rate_amount' => $rate,
+                'discount_type' => $discountType,
+                'discount_value' => $discountValue,
             ], $companyId, $userId);
 
             return $stay->fresh(['room', 'occupants', 'folioEntries']);
@@ -294,6 +319,9 @@ class HotelStayService
             if (!$room || $room->isOutOfService()) {
                 throw new HotelStayException(__('pos.hotel_room_out_of_service'));
             }
+            if ($room->housekeeping === HotelRoom::HK_DIRTY) {
+                throw new HotelStayException(__('pos.hotel_room_needs_clean'));
+            }
             $this->assertRoomFree(
                 (int) $stay->company_id,
                 (int) $stay->room_id,
@@ -314,9 +342,9 @@ class HotelStayService
         });
     }
 
-    public function checkOut(HotelStay $stay, int $userId): HotelStay
+    public function checkOut(HotelStay $stay, int $userId, string $paymentMethod = 'cash'): HotelStay
     {
-        return DB::transaction(function () use ($stay, $userId) {
+        return DB::transaction(function () use ($stay, $userId, $paymentMethod) {
             $stay = HotelStay::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($stay->id);
             if ($stay->status === HotelStay::STATUS_CHECKED_OUT) {
                 return $stay;
@@ -324,7 +352,7 @@ class HotelStayService
             if ($stay->status !== HotelStay::STATUS_CHECKED_IN) {
                 throw new HotelStayException(__('pos.hotel_transition_blocked'));
             }
-            $totals = $this->folio->totals($stay);
+            $totals = $this->folio->totals($stay, $paymentMethod);
             if (($totals['outstanding'] ?? 0) > 0.009) {
                 $company = Company::find($stay->company_id);
                 if (!HotelCheckoutPolicy::allowsOutstandingCheckout($company)) {
@@ -430,6 +458,9 @@ class HotelStayService
             if ($room->isOutOfService()) {
                 throw new HotelStayException(__('pos.hotel_room_out_of_service'));
             }
+            if ($stay->status === HotelStay::STATUS_CHECKED_IN && $room->housekeeping === HotelRoom::HK_DIRTY) {
+                throw new HotelStayException(__('pos.hotel_room_needs_clean'));
+            }
             if (!$this->sameBranchId($stay->branch_id, $room->branch_id)) {
                 throw new HotelStayException(__('pos.hotel_room_other_branch'));
             }
@@ -457,8 +488,8 @@ class HotelStayService
                 'room_id' => $room->id,
                 'from_date' => $from,
                 'to_date' => $to,
-                'rate_amount' => $room->rate_amount,
-                'rate_unit' => $room->rate_unit,
+                'rate_amount' => $stay->rate_amount,
+                'rate_unit' => $stay->rate_unit,
             ]);
             $stay->room_id = $room->id;
             $stay->branch_id = $room->branch_id;
@@ -681,7 +712,16 @@ class HotelStayService
         if ($nights < 1) {
             return;
         }
+        $gross = round($nights * (float) $stay->rate_amount, 2);
+        $discount = HotelPricingService::discount($gross, $stay->discount_type ?? 'amount',
+            ($stay->discount_type ?? 'amount') === 'percentage' || $reason === 'check-in' ? (float) ($stay->discount_value ?? 0) : 0);
         $this->folio->postCharge($stay, [
+            'gross_amount' => $gross,
+            'discount_amount' => $discount,
+            'amount' => round($gross - $discount, 2),
+            'room_pricing' => true,
+            'room_from_date' => $reason === 'extension' ? $stay->check_out_date->copy()->subDays($nights) : $stay->check_in_date,
+            'room_to_date' => $stay->check_out_date,
             'category' => 'room',
             'description' => __('pos.hotel_room_charge_line', [
                 'room' => $stay->room?->room_number ?? ('#' . $stay->room_id),

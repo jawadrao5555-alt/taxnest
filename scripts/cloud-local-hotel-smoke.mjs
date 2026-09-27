@@ -242,7 +242,7 @@ async function runJourney(browser, label, viewport, creds) {
         const hkSelect = page.locator('form[action*="housekeeping"] select[name="housekeeping"]').first();
         if (await hkSelect.count()) {
             const cur = await hkSelect.inputValue().catch(() => '');
-            const next = cur === 'dirty' ? 'clean' : 'dirty';
+            const next = 'clean';
             await Promise.all([
                 page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null),
                 hkSelect.selectOption(next),
@@ -254,7 +254,7 @@ async function runJourney(browser, label, viewport, creds) {
         await shot(page, `${prefix}-03-rooms-hk`);
 
         say('Book walk-in stay');
-        await page.goto(`${BASE_URL}/pos/hotel/stays/create`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.goto(`${BASE_URL}/pos/hotel/stays/create?walk_in=1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await dismissNotices(page);
         const roomOptions = await page.locator('select[name="room_id"] option').evaluateAll((opts) =>
             opts.map((o) => ({ value: o.value, text: o.textContent || '' }))
@@ -268,7 +268,10 @@ async function runJourney(browser, label, viewport, creds) {
         await page.fill('input[name="check_out_date"]', tomorrowIso());
         await page.fill('input[name="guest_name"]', `QA Guest ${label}`);
         await page.fill('input[name="guest_phone"]', '03001234567');
-        await page.check('input[name="walk_in"]').catch(() => null);
+        await page.fill('input[name="rate_amount"]', '4500');
+        await page.selectOption('select[name="discount_type"]', 'amount');
+        await page.fill('input[name="discount_value"]', '500');
+        await page.waitForFunction(() => { const form = document.querySelector('[data-hotel-booking-quote]')?.closest('form'); return form && !form.querySelector('button[type="submit"], button:not([type])')?.disabled; });
         await dismissNotices(page);
         const createForm = page.locator('form[action*="pos/hotel/stays"]').first();
         await Promise.all([
@@ -287,6 +290,9 @@ async function runJourney(browser, label, viewport, creds) {
         if (/\/pos\/hotel\/stays\/\d+/.test(stayUrl)) {
             say('Payment + deposit on folio');
             await dismissNotices(page);
+            await page.goto(stayUrl + '#hotel-payment');
+            await page.reload({ waitUntil: 'domcontentloaded' });
+            await dismissNotices(page);
             let payForm = page.locator('form[action*="folio/payment"]').first();
             if (await payForm.count()) {
                 await dismissNotices(page);
@@ -299,6 +305,9 @@ async function runJourney(browser, label, viewport, creds) {
                 const afterDep = await page.locator('body').innerText();
                 if (/deposit|امانت|security|2000/i.test(afterDep)) ok('deposit posted (UI reflects money)');
                 else ok('deposit form submitted');
+                await dismissNotices(page);
+                await page.goto(stayUrl + '#hotel-payment');
+                await page.reload({ waitUntil: 'domcontentloaded' });
                 await dismissNotices(page);
                 payForm = page.locator('form[action*="folio/payment"]').first();
                 await payForm.locator('input[name="amount"]').fill('8000');
@@ -317,18 +326,16 @@ async function runJourney(browser, label, viewport, creds) {
             await shot(page, `${prefix}-05-folio-payments`);
 
             say('Checkout');
-            page.once('dialog', (d) => d.accept().catch(() => {}));
-            const co = page.locator('form[action*="check-out"] button').first();
-            if (await co.count()) {
-                await dismissNotices(page);
-                await Promise.all([
-                    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null),
-                    co.click({ force: true }),
-                ]);
-                ok('checkout submitted');
-            } else {
-                bad('checkout button missing');
-            }
+            await page.goto(stayUrl + '/checkout', { waitUntil: 'domcontentloaded' });
+            await dismissNotices(page);
+            const checkoutForm = page.locator('form[action$="/checkout"]');
+            await checkoutForm.locator('select[name="payment_method"]').selectOption('card');
+            await Promise.all([
+                page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, { timeout: 30000 }),
+                checkoutForm.locator('button').click(),
+            ]);
+            if (await page.locator('a[href*="/pos/transaction/"]').count()) ok('checkout issued a bill and exposed receipt link');
+            else bad('checkout did not expose an issued bill');
             await shot(page, `${prefix}-06-checkout`);
 
             // Tenant isolation: foreign stay id must not render as THIS stay show.

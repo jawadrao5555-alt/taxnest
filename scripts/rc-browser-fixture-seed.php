@@ -108,6 +108,13 @@ HotelRoom::withoutGlobalScopes()->create([
     'room_type' => 'Synthetic Deluxe', 'capacity' => 2, 'rate_amount' => 5000,
     'rate_unit' => 'NGT', 'housekeeping' => 'clean', 'is_active' => true,
 ]);
+foreach (['RC-201', 'RC-202'] as $number) {
+    HotelRoom::withoutGlobalScopes()->create([
+        'company_id' => $hotel->id, 'branch_id' => $hotelBranch, 'room_number' => $number,
+        'room_type' => 'Synthetic Simple Desk', 'capacity' => 2, 'rate_amount' => 5000,
+        'rate_unit' => 'NGT', 'housekeeping' => 'clean', 'is_active' => true,
+    ]);
+}
 $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
 $hotelHousekeeping = $user($hotel, 'Synthetic Hotel Housekeeping', 'hotel-housekeeping@rc-browser.invalid', 'staff', 'pos_cashier', ['dashboard', 'hotel_housekeeping']);
@@ -245,7 +252,9 @@ $fixture = [
         ['name' => 'hotel-denied', 'login' => $hotelDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel', '/pos/hotel/restaurant'], 'denied' => true],
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
-    'transactionalJourneys' => [[
+    'transactionalJourneys' => [
+        ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Front Desk']],
+        [
         'name' => 'service-work-orders', 'login' => $serviceWorker->email, 'password' => $password,
         'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders'], 'markers' => ['Event Plan Board'],
         'serviceWorkflow' => [

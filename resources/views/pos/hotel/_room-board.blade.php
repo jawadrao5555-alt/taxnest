@@ -32,7 +32,7 @@
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-5" data-hotel-room-group="{{ $state }}">
     @forelse($groupCards as $card)
     @php $room = $card['room']; $stay = $card['stay'] ?? null; @endphp
-    <div class="rounded-2xl border p-3.5 {{ $toneMap[$card['tone']] ?? 'border-gray-200 bg-white' }} {{ $showReceptionActions ? 'shadow-sm min-h-[10rem] flex flex-col' : '' }}" data-hotel-room-state="{{ $card['state'] }}">
+    <div class="rounded-2xl border p-3.5 {{ $toneMap[$card['tone']] ?? 'border-gray-200 bg-white' }} {{ $showReceptionActions ? 'shadow-sm min-h-[10rem] flex flex-col' : '' }}" data-hotel-room-state="{{ $card['state'] }}" @if($showReceptionActions) x-show="!roomSearch || $el.dataset.search.includes(roomSearch.toLocaleLowerCase())" data-search="{{ mb_strtolower($room->room_number.' '.($stay?->guest_name ?? '')) }}" @endif>
         <div class="flex items-start justify-between gap-2">
             <p class="text-lg font-extrabold text-gray-900 dark:text-white">{{ __('pos.hotel_room') }} {{ $room->room_number }}</p>
             <span class="rounded-full bg-white/80 dark:bg-gray-800 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-200">{{ __('pos.hotel_board_'.$card['state']) }}</span>

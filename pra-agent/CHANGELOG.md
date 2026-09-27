@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.14 (2026-09-27)
+**Release the bounded Windows update recovery from PR #123**
+
+- Package the updater changes merged in PR #123 under a new immutable version. The existing v1.13.13 release belongs to an earlier source commit and is preserved.
+- Remember automatic install handoff attempts across Agent restarts. After two unsuccessful attempts for the same target version, show the manual-install option instead of repeatedly launching the update; retain the update log for diagnosis.
+- This release metadata change preserves saved company, device and printer settings. Windows packaging and installation still require verification through the owner-approved release flow and a test PC.
+
 ## v1.13.11 (2026-09-25)
 **Branded Windows Agent icon**
 

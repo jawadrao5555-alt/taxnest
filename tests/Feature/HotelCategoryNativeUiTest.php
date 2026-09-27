@@ -102,15 +102,15 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertSame('/pos/hotel', HotelShell::postLoginPath($owner));
 
         $html = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
-        $this->assertStringContainsString('data-hotel-native-nav="1"', $html);
-        $this->assertStringContainsString('data-hotel-primary-actions="1"', $html);
+        $this->assertStringNotContainsString('data-hotel-native-nav="1"', $html);
+        $this->assertStringNotContainsString('data-hotel-primary-actions="1"', $html);
         $this->assertStringContainsString('data-hotel-room-board="1"', $html);
         $this->assertStringContainsString('data-hotel-reception="1"', $html);
         $this->assertStringContainsString('data-hotel-desk-menu="1"', $html);
         $this->assertStringContainsString('data-hotel-reception-summary="1"', $html);
         $this->assertStringContainsString('data-hotel-empty-rooms="1"', $html);
         $this->assertStringContainsString('data-hotel-occupancy-rate="0"', $html);
-        $this->assertStringContainsString(__('pos.hotel_action_booking'), $html);
+        $this->assertStringNotContainsString('data-hotel-new-booking="1"', $html);
         $this->assertStringContainsString(__('pos.hotel_stat_collections'), $html);
         $this->assertStringNotContainsString('data-nav-new-sale="static"', $html);
         $this->assertStringNotContainsString('>checked_in<', $html);
@@ -140,6 +140,7 @@ class HotelCategoryNativeUiTest extends TestCase
         ]);
 
         $dashboard = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
+        $this->assertStringContainsString('data-hotel-new-booking="1"', $dashboard);
         $this->assertStringContainsString('data-hotel-room-check-in="'.$vacant->id.'"', $dashboard);
         $this->assertStringContainsString('room_id='.$vacant->id, $dashboard);
         $this->assertStringContainsString('data-hotel-room-stay="'.$occupied->id.'"', $dashboard);
@@ -216,11 +217,11 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->actingAs($owner, 'pos')->get('/pos/dashboard')->assertRedirect('/pos/hotel');
 
         $desk = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
-        $this->assertStringContainsString('data-hotel-native-nav="1"', $desk);
+        $this->assertStringNotContainsString('data-hotel-native-nav="1"', $desk);
         $this->assertStringContainsString('data-hotel-restaurant-outlet="1"', $desk);
         $this->assertStringContainsString(__('pos.nav_hotel_restaurant_outlet'), $desk);
         $this->assertStringNotContainsString('data-nav-new-sale="static"', $desk);
-        $this->assertStringContainsString('data-hotel-primary-actions="1"', $desk);
+        $this->assertStringNotContainsString('data-hotel-primary-actions="1"', $desk);
 
         $this->actingAs($owner, 'pos')->get('/pos/hotel/restaurant')
             ->assertRedirect('/pos/invoice/create');

@@ -51,7 +51,9 @@
                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ __('pos.hotel_desk_pick_room') }}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <a href="{{ route('pos.hotel.stays.create') }}" class="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_action_booking') }}</a>
+                    @if($totalRooms > 0)
+                    <a href="{{ route('pos.hotel.stays.create') }}" data-hotel-new-booking="1" class="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_action_booking') }}</a>
+                    @endif
                 </div>
             </div>
             @if(session('success'))<div class="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>@endif

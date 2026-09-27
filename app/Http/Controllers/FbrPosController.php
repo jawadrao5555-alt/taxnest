@@ -5574,6 +5574,11 @@ class FbrPosController extends Controller
 
         // ── BILL: single job on the receipt printer ─────────────────────────
         if ($validated['type'] === 'fbr_bill') {
+            if (\App\Http\Controllers\AgentController::deviceRoutingReady()
+                && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')
+                && !empty($user->pos_device_uid) && !$deviceRoute) {
+                return response()->json(['success' => false, 'reason' => 'counter_unavailable'], 409);
+            }
             if (!$deviceRoute && !$settings['receipt_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }

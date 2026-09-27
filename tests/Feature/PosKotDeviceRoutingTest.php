@@ -662,10 +662,8 @@ class PosKotDeviceRoutingTest extends TestCase
         $this->assertNotContains($stuck, collect($res->json('jobs'))->pluck('id')->all());
     }
 
-    // Task 1285 — stranded FBR bills mirror PRA bills: unstamp + retarget to
-    // the company default receipt printer (the per-device printer may not
-    // exist on the rescuing PC).
-    public function test_stranded_fbr_bill_retargets_company_receipt_default(): void
+    // A stranded receipt must not appear at a different till.
+    public function test_stranded_fbr_bill_waits_for_deliberate_reprint(): void
     {
         $stuck = DB::table('pos_print_jobs')->insertGetId([
             'company_id' => $this->companyId,
@@ -682,9 +680,9 @@ class PosKotDeviceRoutingTest extends TestCase
         $this->agentGet('/api/agent/print-jobs')->assertOk();
 
         $job = DB::table('pos_print_jobs')->where('id', $stuck)->first();
-        $this->assertNull($job->device_uid);
-        $this->assertSame('Manager-POS80', $job->target_printer);
-        $this->assertContains($job->status, ['pending', 'printing']);
+        $this->assertSame('dev-dead', $job->device_uid);
+        $this->assertSame('Counter-dev-dead', $job->target_printer);
+        $this->assertSame('failed', $job->status);
     }
 
     // ── 5. Fingerprint ─────────────────────────────────────────────────────

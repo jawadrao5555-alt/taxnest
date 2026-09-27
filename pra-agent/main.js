@@ -18,6 +18,7 @@ const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridg
 const { validateUpdateInfo } = require('./src/release-manifest');
 const { registerPortableUninstall } = require('./src/windows-uninstall');
 const { buildUpdateHandoffScript } = require('./src/update-handoff');
+const { shouldStopHandoff, nextHandoff } = require('./src/update-retry');
 const { retireLegacyElectronLogin } = require('./src/windows-login-item');
 const { heartbeatDiagnostics } = require('./src/heartbeat-diagnostics');
 const offlineSnapshot = require('./src/offline-snapshot');
@@ -65,6 +66,9 @@ let updateInProgress = false;
 const UPDATE_MAX_ATTEMPTS = 6;
 const UPDATE_BACKOFF_MS = [2 * 60e3, 5 * 60e3, 15 * 60e3, 30 * 60e3, 60 * 60e3];
 const updateAttempts = new Map(); // version -> { count, nextAt }
+// Unlike in-memory download retries, a failed file-copy handoff survives an
+// Agent restart. Without this guard the old executable starts, downloads the
+// same ZIP, and launches the updater forever.
 // Last self-update attempt outcome — piggybacked on the heartbeat so a stuck
 // shop is VISIBLE server-side instead of silent.
 let lastUpdateAttempt = null; // { target, stage, error, at }
@@ -112,6 +116,18 @@ async function handleAgentUpdate(info) {
     if (process.platform !== 'win32' || !app.isPackaged) return;
     if (updateInProgress) return;
     if (!isNewerVersion(info.version, app.getVersion())) return;
+    const priorHandoff = store.get('updateHandoffState') || {};
+    if (shouldStopHandoff(priorHandoff, info.version)) {
+      updateInfo = {
+        available: true, downloading: false, latestBuild: info.version,
+        currentBuild: app.getVersion(), downloadUrl: DOWNLOAD_URL,
+        autoRetrying: false, manualRequired: true,
+        error: 'Automatic installation could not replace the running Agent. Close the Agent and install manually.',
+      };
+      lastUpdateAttempt = { target: info.version, stage: 'install', error: updateInfo.error, at: new Date().toISOString() };
+      sendUpdateState();
+      return;
+    }
     // Backoff-gated retry (was: one attempt per version per run). This runs
     // on every heartbeat (~30s); the nextAt gate turns that into 2m/5m/15m/
     // 30m/60m re-attempts, capped at UPDATE_MAX_ATTEMPTS per app run.
@@ -253,7 +269,10 @@ async function handleAgentUpdate(info) {
     // single-instance lock prevents a twin on this profile.
     // If files remain locked, robocopy restores the backup rather than
     // uninstalling another installation or touching saved config.
-    const script = buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir });
+    const script = buildUpdateHandoffScript({
+      exePath, srcDir, destDir, backupDir,
+      logPath: path.join(workDir, 'apply-update.log'),
+    });
     fs.writeFileSync(cmdPath, script);
 
     console.log('[self-update] handing off to updater script, quitting…');
@@ -261,6 +280,7 @@ async function handleAgentUpdate(info) {
     updateInfo = { ...updateInfo, downloading: false, downloaded: true, progress: 100 };
     sendUpdateState();
 
+    store.set('updateHandoffState', nextHandoff(priorHandoff, info.version));
     const child = spawn('cmd.exe', ['/c', cmdPath], { detached: true, stdio: 'ignore', windowsHide: true, cwd: workDir });
     child.unref();
     isQuitting = true;
@@ -1130,6 +1150,10 @@ if (!gotInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    const previousUpdate = store.get('updateHandoffState');
+    if (previousUpdate && !isNewerVersion(previousUpdate.target, app.getVersion())) {
+      store.delete('updateHandoffState'); // target version actually started
+    }
     // Agent windows keep the agent identity; the POS window overrides its own
     // AppUserModelID in pos-window.js so NestPOS groups separately on the taskbar.
     try { app.setAppUserModelId('com.taxnest.pra-agent'); } catch (e) {}

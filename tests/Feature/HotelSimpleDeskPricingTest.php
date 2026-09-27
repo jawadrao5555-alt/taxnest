@@ -204,6 +204,29 @@ class HotelSimpleDeskPricingTest extends TestCase
         app(HotelStayService::class)->book($company->id, $cashier->id, $this->booking($room, ['rate_amount' => 4000]));
     }
 
+    public function test_cashier_can_continue_manager_agreed_pricing_but_cannot_reduce_it_again(): void
+    {
+        foreach ([false, true] as $walkIn) {
+            [$company, $owner, $room] = $this->fixture(['cashier_discount_limit' => 10]);
+            $cashier = $this->staff($company, 'pos_cashier');
+            $service = app(HotelStayService::class);
+            $other = $service->createRoom($company->id, ['room_number' => '102', 'rate_amount' => 6000, 'capacity' => 3]);
+            $stay = $service->book($company->id, $owner->id, $this->booking($room, ['walk_in' => $walkIn, 'rate_amount' => 3000, 'discount_type' => 'percentage', 'discount_value' => 20]));
+            $desk = app(\App\Services\HotelDeskService::class);
+            $stay = $desk->changeStay($stay, $cashier->id, ['kind' => 'move', 'room_id' => $other->id]);
+            $stay = $desk->changeStay($stay, $cashier->id, ['kind' => 'extend', 'check_out_date' => now()->addDays(3)->toDateString()]);
+            $this->assertEquals(3000, $stay->rate_amount);
+            $this->assertEquals(7200, $desk->summary($stay, 'cash')['total']);
+            try {
+                $desk->changeStay($stay, $cashier->id, ['kind' => 'extend', 'rate_amount' => 2900, 'check_out_date' => now()->addDays(4)->toDateString()]);
+                $this->fail('Changing agreed pricing must still enforce the cashier limit');
+            } catch (\App\Exceptions\HotelStayException $e) {
+                $this->assertEquals(3000, $stay->fresh()->rate_amount);
+                $this->assertEquals(3, $stay->fresh()->nights);
+            }
+        }
+    }
+
     public function test_failed_checkout_rolls_back_payment_and_leaves_stay_open(): void
     {
         [$company, $owner, $room] = $this->fixture(['hotel_checkout_outstanding' => 'block']);

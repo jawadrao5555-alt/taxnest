@@ -19,6 +19,8 @@ stay actions, change previews, and guided checkout with receipt links.
 - Room changes can reprice remaining unbilled dated room charges; past segments
   keep their amounts. Existing issued invoices cannot be repriced.
 - Existing cashier percentage limit includes any negotiated-rate reduction.
+  An ordinary move/extension keeps previously agreed pricing without requiring
+  the cashier to re-approve a manager's discount; a new rate still enforces the cap.
 - Checkout locks the stay, records payment and issues the covered bill in one
   transaction. Repeated completed checkout cannot take payment again. PRA handoff
   is deferred until commit. Deposits never become room revenue.
@@ -37,6 +39,7 @@ stay actions, change previews, and guided checkout with receipt links.
 | Move to another room | Past nights preserved; future unbilled segments explicit |
 | Frozen issued bill | Discount/rate revision rejected; ordinary move still possible |
 | Cashier / housekeeping | Existing discount cap and front-desk access respected |
+| Manager-negotiated existing rate | Cashier can move/extend at saved terms; further rate reduction still blocked |
 | Other company/branch | Room, stay, quote and checkout inaccessible |
 | Checkout retry / failure | No duplicate payment, no partial financial write |
 | Desktop / 390px mobile | Reference room flow to edited rate, advance, checkout, receipt |

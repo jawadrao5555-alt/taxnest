@@ -20,7 +20,7 @@ class HotelPricingService
         return $discount;
     }
 
-    public static function validateRate(int $companyId, int $userId, float $standard, float $rate, int $nights, string $type, float $value): float
+    public static function validateRate(int $companyId, int $userId, float $standard, float $rate, int $nights, string $type, float $value, bool $enforceDiscountLimit = true): float
     {
         if (!is_finite($rate) || $rate < 0 || $rate > 10000000 || $nights < 1) {
             throw new HotelStayException(__('pos.hotel_price_invalid'));
@@ -30,7 +30,7 @@ class HotelPricingService
         if (!$user || !HotelAccessService::canFrontDesk($user)) {
             throw new HotelStayException(__('pos.custom_access_denied'));
         }
-        if (($user->pos_role ?? '') === 'pos_cashier') {
+        if ($enforceDiscountLimit && ($user->pos_role ?? '') === 'pos_cashier') {
             $limit = max(0, min(100, (float) (Company::find($companyId)?->cashier_discount_limit ?? 50)));
             $reference = max($standard, $rate) * $nights;
             $reduction = $reference - ($rate * $nights - $discount);

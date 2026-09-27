@@ -89,10 +89,13 @@ class HotelDeskService
             throw new HotelStayException(__('pos.hotel_room_not_found'));
         }
         $discountValue = ($stay->discount_type ?? 'amount') === 'percentage' ? (float) $stay->discount_value : 0;
-        HotelPricingService::validateRate((int) $stay->company_id, $userId, (float) $room->rate_amount, $rate, max(1, $nights), $stay->discount_type ?? 'amount', $discountValue);
+        // Continuing an already agreed price is not a new cashier discount.
+        // Still validate access and amounts; enforce the cap on every rate change.
+        $rateChanged = abs($rate - (float) $stay->rate_amount) > 0.009;
+        HotelPricingService::validateRate((int) $stay->company_id, $userId, (float) $room->rate_amount, $rate, max(1, $nights), $stay->discount_type ?? 'amount', $discountValue, $rateChanged);
         if ($stay->status === 'reserved') {
             $newNights = (int) $stay->nights + ($kind === 'extend' ? $nights : 0);
-            HotelPricingService::validateRate((int) $stay->company_id, $userId, (float) $room->rate_amount, $rate, $newNights, $stay->discount_type ?? 'amount', (float) $stay->discount_value);
+            HotelPricingService::validateRate((int) $stay->company_id, $userId, (float) $room->rate_amount, $rate, $newNights, $stay->discount_type ?? 'amount', (float) $stay->discount_value, $rateChanged);
             $gross = round($newNights * $rate, 2);
             $discount = HotelPricingService::discount($gross, $stay->discount_type ?? 'amount', (float) $stay->discount_value);
             $newNet = $gross - $discount;

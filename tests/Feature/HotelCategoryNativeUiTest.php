@@ -321,6 +321,10 @@ class HotelCategoryNativeUiTest extends TestCase
             'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
             'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Reception Guest', 'walk_in' => true,
         ]);
+        $dirtyRoom = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '102', 'room_type' => 'Deluxe', 'capacity' => 2, 'rate_amount' => 4000,
+        ]);
+        app(HotelStayService::class)->setHousekeeping($dirtyRoom, 'dirty');
 
         $ownerRooms = $this->actingAs($owner, 'pos')->get('/pos/hotel/rooms')->assertOk()->getContent();
         $this->assertStringContainsString('data-hotel-admin-setup="1"', $ownerRooms);
@@ -343,7 +347,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->actingAs($reception, 'pos')->post('/pos/hotel/stays/'.$stay->id.'/folio/refund', [])->assertForbidden();
         $this->actingAs($reception, 'pos')->post('/pos/hotel/stays/'.$stay->id.'/folio/reverse', [])->assertForbidden();
 
-        $hk = $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/housekeeping?filter=')->assertOk()->getContent();
+        $hk = $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/housekeeping')->assertOk()->getContent();
         $this->assertStringContainsString('name="housekeeping"', $hk);
         $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertForbidden();
         $this->actingAs($this->owner($other), 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertRedirect('/pos/dashboard');

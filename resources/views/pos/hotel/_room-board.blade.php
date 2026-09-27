@@ -32,19 +32,19 @@
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-5" data-hotel-room-group="{{ $state }}">
     @forelse($groupCards as $card)
     @php $room = $card['room']; $stay = $card['stay'] ?? null; @endphp
-    <div class="rounded-2xl border p-4 {{ $toneMap[$card['tone']] ?? 'border-gray-200 bg-white' }} {{ $showReceptionActions ? 'shadow-sm min-h-[12rem] flex flex-col' : '' }}" data-hotel-room-state="{{ $card['state'] }}">
+    <div class="rounded-2xl border p-3.5 {{ $toneMap[$card['tone']] ?? 'border-gray-200 bg-white' }} {{ $showReceptionActions ? 'shadow-sm min-h-[10rem] flex flex-col' : '' }}" data-hotel-room-state="{{ $card['state'] }}" @if($showReceptionActions) x-show="!roomSearch || $el.dataset.search.includes(roomSearch.toLocaleLowerCase())" data-search="{{ mb_strtolower($room->room_number.' '.($stay?->guest_name ?? '')) }}" @endif>
         <div class="flex items-start justify-between gap-2">
             <p class="text-lg font-extrabold text-gray-900 dark:text-white">{{ __('pos.hotel_room') }} {{ $room->room_number }}</p>
             <span class="rounded-full bg-white/80 dark:bg-gray-800 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-200">{{ __('pos.hotel_board_'.$card['state']) }}</span>
         </div>
-        <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">{{ $room->room_type }} · {{ $room->capacity }}</p>
-        <p class="text-xs text-gray-700 dark:text-gray-200 mt-1">Rs {{ number_format($room->rate_amount) }}/{{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</p>
+        <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">{{ $room->room_type }}@unless($showReceptionActions) · {{ $room->capacity }}@endunless</p>
+        <p class="text-xs text-gray-700 dark:text-gray-200 mt-1">Rs {{ number_format($stay && $showReceptionActions ? $stay->rate_amount : $room->rate_amount) }}/{{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</p>
         @if($stay && \App\Services\HotelAccessService::canFrontDesk(auth('pos')->user()))
         <a href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block mt-1 text-xs font-semibold text-teal-800 truncate">{{ $stay->guest_name }}</a>
         @elseif($stay)
         <p class="mt-1 text-xs font-semibold truncate">{{ $stay->guest_name }}</p>
         @endif
-        @if($stay)
+        @if($stay && (!$showReceptionActions || $card['state'] === 'occupied'))
         <p class="mt-1 text-[11px] text-gray-600 dark:text-gray-300">{{ __('pos.hotel_check_in') }}: {{ $stay->check_in_date?->format('d M Y') }}</p>
         <p class="text-[11px] text-gray-600 dark:text-gray-300">{{ __('pos.hotel_check_out') }}: {{ $stay->check_out_date?->format('d M Y') }}</p>
         @endif
@@ -52,7 +52,7 @@
             @if($card['state'] === 'vacant')
                 <a data-hotel-room-check-in="{{ $room->id }}" href="{{ route('pos.hotel.stays.create', ['walk_in' => 1, 'room_id' => $room->id]) }}" class="block mt-auto rounded-lg bg-teal-700 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_check_in_btn') }}</a>
             @elseif($stay)
-                <a data-hotel-room-stay="{{ $room->id }}" href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block mt-auto rounded-lg {{ $card['state'] === 'occupied' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-teal-700 hover:bg-teal-800' }} px-3 py-2 text-center text-xs font-semibold text-white">{{ __('pos.hotel_stays') }}</a>
+                <a data-hotel-room-stay="{{ $room->id }}" href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block mt-auto rounded-lg {{ $card['state'] === 'occupied' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-teal-700 hover:bg-teal-800' }} px-3 py-2 text-center text-xs font-semibold text-white">{{ __('pos.hotel_desk_stay_details') }}</a>
             @endif
         @endif
         @if($room->housekeeping === 'dirty' && ($card['state'] ?? '') !== 'dirty')

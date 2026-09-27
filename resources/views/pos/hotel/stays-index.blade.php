@@ -1,17 +1,19 @@
-<x-pos-layout>
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    @include('pos.hotel._nav')
+<x-hotel-layout>
+<div class="max-w-6xl mx-auto">
     <div class="flex items-center justify-between mb-5">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $heading ?? __('pos.hotel_stays') }}</h1>
         <a href="{{ route('pos.hotel.stays.create') }}" class="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm font-semibold">{{ __('pos.hotel_new_stay') }}</a>
     </div>
-    <form method="GET" class="mb-4">
-        <select name="status" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
-            <option value="">{{ __('pos.hotel_all_stays') }}</option>
-            @foreach(['reserved','checked_in','checked_out','cancelled','no_show'] as $st)
-            <option value="{{ $st }}" @selected($status===$st)>{{ \App\Services\HotelShell::statusLabel($st) }}</option>
-            @endforeach
-        </select>
+    <nav class="flex flex-wrap gap-2 mb-4" aria-label="{{ __('pos.hotel_menu_stays') }}">
+        @foreach(['' => 'hotel_all_stays', 'reserved' => 'hotel_upcoming', 'checked_in' => 'hotel_in_house', 'checked_out' => 'hotel_completed'] as $value => $label)
+        <a href="{{ route('pos.hotel.stays.index', ['status' => $value, 'checkout' => request('checkout')]) }}" class="rounded-lg px-3 py-2 text-sm {{ $status === $value ? 'bg-teal-700 text-white' : 'bg-white border dark:bg-gray-900 dark:text-white' }}">{{ __('pos.'.$label) }}</a>
+        @endforeach
+    </nav>
+    <form method="GET" class="flex gap-2 mb-4">
+        <input type="hidden" name="status" value="{{ $status }}">
+        <input type="hidden" name="checkout" value="{{ request('checkout') }}">
+        <input name="q" value="{{ request('q') }}" placeholder="{{ __('pos.hotel_search') }}" class="w-full max-w-sm rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
+        <button class="rounded-lg border px-3 text-sm dark:text-white">{{ __('pos.hotel_search_btn') }}</button>
     </form>
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
         <table class="min-w-[40rem] w-full text-sm">
@@ -27,7 +29,7 @@
             <tbody>
                 @forelse($stays as $stay)
                 <tr class="border-b border-gray-100 dark:border-gray-800">
-                    <td class="px-4 py-3"><a class="font-semibold text-teal-800" href="{{ route('pos.hotel.stays.show', $stay->id) }}">{{ $stay->stay_number }}</a></td>
+                    <td class="px-4 py-3"><a class="font-semibold text-teal-800" href="{{ route(request()->boolean('checkout') && $stay->status === 'checked_in' ? 'pos.hotel.checkout' : 'pos.hotel.stays.show', $stay->id) }}">{{ $stay->stay_number }}</a></td>
                     <td class="px-4 py-3">{{ $stay->guest_name }}</td>
                     <td class="px-4 py-3">{{ $stay->room?->room_number }}</td>
                     <td class="px-4 py-3">{{ $stay->check_in_date->format('d M') }} – {{ $stay->check_out_date->format('d M') }} ({{ $stay->nights }} {{ \App\Services\PosUnitCatalog::label($stay->rate_unit) }})</td>
@@ -41,4 +43,4 @@
     </div>
     <div class="mt-4">{{ $stays->links() }}</div>
 </div>
-</x-pos-layout>
+</x-hotel-layout>

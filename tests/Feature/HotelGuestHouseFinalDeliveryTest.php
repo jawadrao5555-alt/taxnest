@@ -358,7 +358,7 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         $this->assertSame($invoiceId, \App\Models\HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'charge')->whereNotNull('pos_transaction_id')->value('pos_transaction_id'));
     }
 
-    public function test_occupancy_counts_all_in_house_dues_for_dashboard_strip(): void
+    public function test_occupancy_counts_all_in_house_dues_for_dashboard_details(): void
     {
         $company = $this->company('hotel', [
             'pos_tax_rate_cash' => 0,
@@ -386,10 +386,7 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
             ->get('/pos/hotel')
             ->assertOk()
             ->getContent();
-        $this->assertMatchesRegularExpression(
-            '/>(?:Pending due|Baqaya|باقی رقم)<\/p>\s*<p class="text-xl[^"]*">1<\/p>/u',
-            $html
-        );
+        $this->assertStringContainsString('data-hotel-queue-count="pending">1</span>', $html);
 
         $folio->postPayment($dueStay, [
             'amount' => 10000,
@@ -399,6 +396,7 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         $cleared = $stays->occupancy((int) $company->id, null);
         $this->assertSame(0, $cleared['pending_due_count']);
         $this->assertEquals(0.0, $cleared['pending_due_amount']);
+        $this->get('/pos/hotel')->assertOk()->assertSee('data-hotel-queue-count="pending">0</span>', false);
     }
 
     public function test_board_pending_list_truncation_does_not_shrink_occupancy_due_count(): void
@@ -423,6 +421,7 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         $this->assertSame(21, $board['occupancy']['pending_due_count']);
         $this->assertCount(20, $board['pending']);
         $this->assertGreaterThan(0.009, $board['occupancy']['pending_due_amount']);
+        $this->actingAs($user, 'pos')->get('/pos/hotel')->assertOk()->assertSee('data-hotel-queue-count="pending">21</span>', false);
     }
 
     public function test_tenant_cannot_open_foreign_stay_or_policy_page_side_effect(): void

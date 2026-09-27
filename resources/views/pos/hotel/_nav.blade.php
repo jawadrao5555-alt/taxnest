@@ -1,45 +1,36 @@
 @php
-    // Returning to any Hotel chrome page leaves the Restaurant Outlet context.
     \App\Services\HotelShell::leaveRestaurantOutlet();
     $hotelUser = auth('pos')->user();
     $hotelDesk = \App\Services\HotelAccessService::canFrontDesk($hotelUser);
-    $hotelHk = \App\Services\HotelAccessService::canHousekeeping($hotelUser);
+    $hotelManager = \App\Services\HotelAccessService::canManageRooms($hotelUser);
     $hotelCompany = \App\Models\Company::find(app('currentCompanyId'));
-    $hotelOutletOn = \App\Services\HotelShell::restaurantOutletOn($hotelCompany);
-    $hotelCanOutlet = \App\Services\HotelShell::canOpenRestaurantOutlet($hotelUser, $hotelCompany);
+    $links = $hotelDesk ? [
+        ['pos.hotel.dashboard', [], 'hotel_menu_dashboard', 'dashboard'],
+        ['pos.hotel.stays.create', ['walk_in' => 1], 'hotel_check_in_btn', 'checkin'],
+        ['pos.hotel.stays.index', [], 'hotel_menu_stays', 'stays'],
+        ['pos.hotel.guests', [], 'hotel_menu_guests', 'guests'],
+        ['pos.hotel.stays.index', ['status' => 'checked_in', 'checkout' => 1], 'hotel_check_out_btn', 'checkout'],
+        ['pos.hotel.folios', [], 'hotel_menu_bills', 'folios'],
+    ] : [];
 @endphp
-<nav class="flex flex-wrap gap-1.5 mb-5" data-hotel-native-nav="1">
-    @if($hotelDesk)
-    <a href="{{ route('pos.hotel.dashboard') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.dashboard') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_front_desk') }}</a>
-    <a href="{{ route('pos.hotel.reservations') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.reservations') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_reservations') }}</a>
-    @endif
-    @if($hotelHk && (!$hotelDesk || \App\Services\HotelAccessService::canManageRooms($hotelUser)))
-    <a href="{{ route('pos.hotel.rooms') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.rooms') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_rooms') }}</a>
-    <a href="{{ route('pos.hotel.housekeeping') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.housekeeping') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_housekeeping') }}</a>
-    @endif
-    @if($hotelDesk)
-    <a href="{{ route('pos.hotel.guests') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.guests') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_guests') }}</a>
-    <a href="{{ route('pos.hotel.folios') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.folios') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_folios') }}</a>
-    @if(\App\Services\HotelAccessService::canManageRooms($hotelUser))
-    <a href="{{ route('pos.hotel.reports') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.hotel.reports') ? 'bg-teal-700 text-white' : 'bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 dark:text-teal-200' }}">{{ __('pos.nav_hotel_reports') }}</a>
-    @endif
-    @endif
-    @if($hotelOutletOn && $hotelCanOutlet)
-    <a href="{{ route('pos.hotel.restaurant-outlet') }}"
-       data-hotel-restaurant-outlet="1"
-       class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('pos.invoice.create', 'pos.v2.invoice.create', 'pos.hotel.restaurant-outlet') || \App\Services\HotelShell::inRestaurantOutlet() ? 'bg-amber-700 text-white' : 'bg-white dark:bg-gray-900 border border-amber-300 text-amber-900 dark:text-amber-200' }}">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
+<nav class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-1" data-hotel-native-nav="1" aria-label="{{ __('pos.nav_hotel_front_desk') }}">
+    @foreach($links as [$name, $params, $label, $key])
+    <a href="{{ route($name, $params) }}" data-hotel-desk-link="{{ $key }}" class="rounded-lg px-3 py-2.5 text-sm font-semibold {{ request()->routeIs($name) && !request()->boolean('checkout') && $key !== 'checkout' ? 'bg-teal-700 text-white' : 'text-slate-700 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800' }}">{{ __('pos.'.$label) }}</a>
+    @endforeach
+    @if(!$hotelDesk && \App\Services\HotelAccessService::canHousekeeping($hotelUser))
+    <a href="{{ route('pos.hotel.housekeeping') }}" class="rounded-lg px-3 py-2.5 bg-teal-700 text-white text-sm font-semibold">{{ __('pos.nav_hotel_housekeeping') }}</a>
     @endif
 </nav>
-@if($hotelDesk && !empty($showHotelPrimaryActions))
-<div class="flex flex-wrap gap-2 mb-5" data-hotel-primary-actions="1">
-    <a href="{{ route('pos.hotel.stays.create') }}" class="px-3 py-2 rounded-lg bg-teal-700 text-white text-xs font-semibold">{{ __('pos.hotel_action_booking') }}</a>
-    <a href="{{ route('pos.hotel.stays.create', ['walk_in' => 1]) }}" class="px-3 py-2 rounded-lg bg-teal-700 text-white text-xs font-semibold">{{ __('pos.hotel_action_walkin') }}</a>
-    <a href="{{ route('pos.hotel.stays.index', ['status' => 'reserved']) }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.hotel_check_in_btn') }}</a>
-    <a href="{{ route('pos.hotel.stays.index', ['status' => 'checked_in']) }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.hotel_check_out_btn') }}</a>
-    <a href="{{ route('pos.hotel.folios') }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.hotel_action_charge') }}</a>
-    <a href="{{ route('pos.hotel.folios') }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.hotel_action_payment') }}</a>
-    @if(\App\Services\HotelAccessService::canManageRooms($hotelUser))
-    <a href="{{ route('pos.hotel.housekeeping') }}" class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-teal-200 text-teal-900 text-xs font-semibold">{{ __('pos.nav_hotel_housekeeping') }}</a>
-    @endif
-</div>
+@if($hotelManager)
+<details class="mt-4 border-t border-slate-200 dark:border-slate-700 pt-3" @if(request()->routeIs('pos.hotel.rooms', 'pos.hotel.housekeeping', 'pos.hotel.reports')) open @endif>
+    <summary class="cursor-pointer text-sm font-semibold dark:text-white">{{ __('pos.hotel_desk_more_management') }}</summary>
+    <nav class="mt-2 grid gap-1 text-sm">
+        <a href="{{ route('pos.hotel.rooms') }}" data-hotel-desk-link="rooms" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_rooms') }}</a>
+        <a href="{{ route('pos.hotel.housekeeping') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_housekeeping') }}</a>
+        <a href="{{ route('pos.hotel.reports') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_reports') }}</a>
+    </nav>
+</details>
+@endif
+@if(\App\Services\HotelShell::restaurantOutletOn($hotelCompany) && \App\Services\HotelShell::canOpenRestaurantOutlet($hotelUser, $hotelCompany))
+<a href="{{ route('pos.hotel.restaurant-outlet') }}" data-hotel-restaurant-outlet="1" class="block mt-4 rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-900 dark:text-amber-200">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
 @endif

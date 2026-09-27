@@ -283,7 +283,40 @@ async function surface(page,t,path,v) {
   pass(`${t.name}/${v.width}: ${path} rendered at its exact native destination`);
   await checkUsability(page,t,path,v);
 }
+async function hotelWorkflow(page, t, v) {
+  const room = v.width < 768 ? 'RC-202' : 'RC-201';
+  await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const card = page.locator('[data-hotel-room-state="vacant"]').filter({hasText: room});
+  await Promise.all([page.waitForURL(/stays\/create/), card.locator('[data-hotel-room-check-in]').click()]);
+  await dismiss(page);
+  const form = page.locator('form[action$="/pos/hotel/stays"]');
+  await form.locator('[name="guest_name"]').fill('Synthetic Simple Desk ' + room);
+  await form.locator('[name="guest_phone"]').fill('03000000000');
+  await form.locator('[name="rate_amount"]').fill('4000');
+  await form.locator('[name="discount_type"]').selectOption('amount');
+  await form.locator('[name="discount_value"]').fill('500');
+  await form.locator('details').filter({has: page.locator('[name="advance_amount"]')}).locator('summary').click();
+  await form.locator('[name="advance_amount"]').fill('1000');
+  await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, {timeout:30000}), form.locator('button').click()]);
+  const stayPath = new URL(page.url()).pathname;
+  await dismiss(page);
+  if (await page.locator('#hotel-charge').isVisible() || await page.locator('#hotel-payment').isVisible()) throw new Error('Hotel action forms must start collapsed');
+  await saveEvidenceScreenshot(page, `hotel-simple-desk-${v.width}-stay.png`);
+  await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).click();
+  await dismiss(page);
+  const checkout = page.locator('form[action$="/checkout"]');
+  await checkout.locator('[name="payment_method"]').selectOption('card');
+  await page.waitForFunction(() => { const f = document.querySelector('form[action$="/checkout"]'); return f && !f.querySelector('button').disabled && Number(f.querySelector('[name="amount"]').value) === 2500; });
+  await saveEvidenceScreenshot(page, `hotel-simple-desk-${v.width}-checkout.png`);
+  await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000}), checkout.locator('button').click()]);
+  await dismiss(page);
+  if (!await page.locator('a[href*="/pos/transaction/"]').count()) throw new Error('Checkout must expose the issued receipt');
+  if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
+  pass(`${t.name}/${v.width}: room check-in, edited rate, discount, advance, card checkout and receipt passed`);
+}
 async function workflow(page,t,v) {
+  if (t.hotelWorkflow) return hotelWorkflow(page,t,v);
   const f=t.serviceWorkflow; if(!f)return;
   await page.goto(baseUrl+f.createPath,{waitUntil:'domcontentloaded',timeout:30000});
   await waitForOperationalSurface(page); await dismiss(page);

@@ -57,10 +57,11 @@ class HotelFolioInvoiceService
         $available = $this->availableTowardFiscal($stay);
         $picked = [];
         $running = 0.0;
+        $allCovered = $this->fiscalTotalFor($company, (float) $charges->sum('amount'), $paymentMethod) - $available <= 0.009;
         foreach ($charges as $line) {
             $next = round($running + (float) $line->amount, 2);
             $fiscal = $this->fiscalTotalFor($company, $next, $paymentMethod);
-            if ($fiscal - $available > 0.009) {
+            if (!$allCovered && $fiscal - $available > 0.009) {
                 break;
             }
             $picked[] = $line;
@@ -105,11 +106,9 @@ class HotelFolioInvoiceService
         foreach ($picked as $line) {
             $lineTotal = (float) $line->amount;
             $subtotal += $lineTotal;
-            if ($lineTotal > 0) {
-                $taxableSubtotal += $lineTotal;
-            }
+            $taxableSubtotal += $lineTotal;
             $qty = max(0.001, (float) $line->quantity);
-            $unitPrice = round($lineTotal / $qty, 2);
+            $unitPrice = round((float) ($line->gross_amount ?? $lineTotal) / $qty, 2);
             $label = trim($line->description . ' (' . rtrim(rtrim(number_format($qty, 3), '0'), '.') . ' ' . PosUnitCatalog::label($line->uom) . ')');
             $itemPayload[] = [
                 'line' => $line,
@@ -190,6 +189,9 @@ class HotelFolioInvoiceService
                 'quantity' => $row['qty'],
                 'unit_price' => $row['unit_price'],
                 'subtotal' => $row['line_total'],
+                'item_discount_type' => 'amount',
+                'item_discount_value' => (float) $line->discount_amount,
+                'item_discount_amount' => (float) $line->discount_amount,
                 'is_tax_exempt' => false,
                 'tax_rate' => $taxRate,
                 'tax_amount' => $itemTax,
@@ -205,7 +207,7 @@ class HotelFolioInvoiceService
             'amount' => $totalAmount,
         ], (int) $stay->company_id, $userId);
 
-        $this->submitPra($company, $transaction, $praEnabled);
+        \Illuminate\Support\Facades\DB::afterCommit(fn () => $this->submitPra($company, $transaction, $praEnabled));
 
         return [
             'transaction' => $transaction->fresh('items'),

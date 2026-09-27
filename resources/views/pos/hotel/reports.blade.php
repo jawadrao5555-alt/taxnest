@@ -1,6 +1,5 @@
-<x-pos-layout>
-<div class="tn-page tn-hotel-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    @include('pos.hotel._nav')
+<x-hotel-layout>
+<div class="tn-page tn-hotel-page max-w-6xl mx-auto">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ __('pos.nav_hotel_reports') }}</h1>
     <p class="text-sm text-gray-500 mb-5">{{ __('pos.hotel_reports_hint') }}</p>
     @include('pos.hotel._occupancy-strip', ['occupancy' => $occupancy])
@@ -30,4 +29,4 @@
         @endforelse
     </div>
 </div>
-</x-pos-layout>
+</x-hotel-layout>

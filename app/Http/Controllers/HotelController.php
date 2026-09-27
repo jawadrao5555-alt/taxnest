@@ -199,6 +199,10 @@ class HotelController extends Controller
         $stays = HotelStay::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($status !== '' && in_array($status, $statusFilter, true), fn ($q) => $q->where('status', $status))
+            ->when($request->filled('q'), fn ($query) => $query->where(function ($q) use ($request) {
+                $term = '%'.mb_substr(trim((string) $request->input('q')), 0, 100).'%';
+                $q->where('guest_name', 'like', $term)->orWhere('stay_number', 'like', $term)->orWhereHas('room', fn ($room) => $room->where('room_number', 'like', $term));
+            }))
             ->with('room')
             ->orderByDesc('id')
             ->paginate(40)
@@ -236,6 +240,11 @@ class HotelController extends Controller
                 ->get(['id', 'name', 'phone']);
         }
 
+        $recentGuests = HotelStay::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->orderByDesc('id')->limit(200)->get(['id', 'guest_name', 'guest_phone', 'guest_cnic'])
+            ->unique(fn ($stay) => mb_strtolower(trim($stay->guest_name)).'|'.$stay->guest_phone)->values();
+
         $walkIn = request()->boolean('walk_in');
         // Only preselect a room from this tenant's active branch and active rooms.
         // The booking service still checks capacity, overlaps and room state on POST.
@@ -244,7 +253,7 @@ class HotelController extends Controller
             $selectedRoomId = null;
         }
 
-        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId'));
+        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId', 'recentGuests'));
     }
 
     public function storeStay(Request $request)
@@ -262,6 +271,11 @@ class HotelController extends Controller
             'adult_count' => 'nullable|integer|min:1|max:50',
             'child_count' => 'nullable|integer|min:0|max:50',
             'notes' => 'nullable|string|max:500',
+            'rate_amount' => 'nullable|numeric|min:0|max:10000000',
+            'discount_type' => 'nullable|in:amount,percentage',
+            'discount_value' => 'nullable|numeric|min:0|max:10000000',
+            'advance_amount' => 'nullable|numeric|min:0|max:10000000',
+            'payment_method' => 'nullable|in:cash,card,debit_card,credit_card,qr_payment',
             'walk_in' => 'nullable|boolean',
             'idempotency_key' => 'nullable|string|max:64',
         ]);
@@ -296,8 +310,75 @@ class HotelController extends Controller
         $uomGroups = PosUnitCatalog::groupsFor(\App\Models\Company::find($companyId));
         $checkoutPolicy = HotelCheckoutPolicy::forCompany(\App\Models\Company::find($companyId));
         $timeline = $this->stays->stayTimeline($stay);
+        $deskSummary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
 
-        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline'));
+        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline', 'deskSummary'));
+    }
+
+    public function bookingQuote(Request $request)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $data = $request->validate([
+            'room_id' => 'required|integer', 'check_in_date' => 'required|date',
+            'check_out_date' => 'required|date|after:check_in_date',
+            'rate_amount' => 'required|numeric|min:0|max:10000000',
+            'discount_type' => 'required|in:amount,percentage', 'discount_value' => 'required|numeric|min:0|max:10000000',
+            'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
+        ]);
+        $room = $this->room((int) $data['room_id']);
+        try {
+            $nights = HotelStayService::nights($data['check_in_date'], $data['check_out_date']);
+            $discount = \App\Services\HotelPricingService::validateRate((int) $room->company_id, (int) auth('pos')->id(), (float) $room->rate_amount, (float) $data['rate_amount'], $nights, $data['discount_type'], (float) $data['discount_value']);
+            $quote = \App\Services\HotelPricingService::quote(Company::findOrFail($room->company_id), round($nights * $data['rate_amount'], 2), $discount, $data['payment_method']);
+            $busy = HotelStay::where('company_id', $room->company_id)->where('room_id', $room->id)->whereIn('status', HotelStay::OPEN_STATUSES)
+                ->whereDate('check_in_date', '<', $data['check_out_date'])->whereDate('check_out_date', '>', $data['check_in_date'])->exists();
+            return response()->json($quote + ['nights' => $nights, 'available' => !$busy && $room->is_active && !$room->isOutOfService(), 'dirty' => $room->housekeeping === HotelRoom::HK_DIRTY]);
+        } catch (HotelStayException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function showCheckout(int $id)
+    {
+        $stay = $this->stay($id)->load(['room', 'folioEntries']);
+        abort_unless($stay->status === HotelStay::STATUS_CHECKED_IN, 409);
+        $summary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
+        $allowBalance = HotelCheckoutPolicy::allowsOutstandingCheckout(Company::find($stay->company_id));
+        return view('pos.hotel.checkout', compact('stay', 'summary', 'allowBalance'));
+    }
+
+    public function checkoutQuote(Request $request, int $id)
+    {
+        $data = $request->validate(['payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment']);
+        return response()->json(app(\App\Services\HotelDeskService::class)->summary($this->stay($id), $data['payment_method']));
+    }
+
+    public function completeCheckout(Request $request, int $id)
+    {
+        $stay = $this->stay($id);
+        $data = $request->validate([
+            'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
+            'amount' => 'required|numeric|min:0|max:10000000', 'leave_balance' => 'nullable|boolean',
+            'idempotency_key' => 'required|string|max:64',
+        ]);
+        try {
+            app(\App\Services\HotelDeskService::class)->checkout($stay, (int) auth('pos')->id(), $data);
+        } catch (HotelStayException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+        return redirect()->route('pos.hotel.stays.show', $id)->with('success', __('pos.hotel_checked_out'));
+    }
+
+    public function discount(Request $request, int $id)
+    {
+        $stay = $this->stay($id);
+        $data = $request->validate(['discount_type' => 'required|in:amount,percentage', 'discount_value' => 'required|numeric|min:0|max:10000000']);
+        try {
+            app(\App\Services\HotelDeskService::class)->changeDiscount($stay, (int) auth('pos')->id(), $data['discount_type'], (float) $data['discount_value']);
+        } catch (HotelStayException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+        return back()->with('success', __('pos.hotel_pricing_saved'));
     }
 
     public function checkIn(Request $request, int $id)
@@ -322,29 +403,42 @@ class HotelController extends Controller
         return back()->with('success', __('pos.hotel_checked_out'));
     }
 
+    public function changeQuote(Request $request, int $id)
+    {
+        $stay = $this->stay($id);
+        $data = $request->validate([
+            'kind' => 'required|in:extend,move', 'rate_amount' => 'required|numeric|min:0|max:10000000',
+            'check_out_date' => 'required_if:kind,extend|nullable|date', 'room_id' => 'required_if:kind,move|nullable|integer',
+        ]);
+        if ($data['kind'] === 'move') $this->room((int) $data['room_id']);
+        try {
+            return response()->json(app(\App\Services\HotelDeskService::class)->changeQuote($stay, (int) auth('pos')->id(), $data));
+        } catch (HotelStayException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     public function extend(Request $request, int $id)
     {
-        $data = $request->validate([
-            'check_out_date' => 'required|date',
-        ]);
+        $data = $request->validate(['check_out_date' => 'required|date', 'rate_amount' => 'nullable|numeric|min:0|max:10000000']);
         try {
-            $this->stays->extend($this->stay($id), $data['check_out_date'], (int) auth('pos')->id());
+            $stay = $this->stay($id);
+            app(\App\Services\HotelDeskService::class)->changeStay($stay, (int) auth('pos')->id(), $data + ['kind' => 'extend']);
         } catch (HotelStayException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
-
         return back()->with('success', __('pos.hotel_extended'));
     }
 
     public function move(Request $request, int $id)
     {
-        $data = $request->validate(['room_id' => 'required|integer']);
+        $data = $request->validate(['room_id' => 'required|integer', 'rate_amount' => 'nullable|numeric|min:0|max:10000000']);
+        $this->room((int) $data['room_id']);
         try {
-            $this->stays->moveRoom($this->stay($id), (int) $data['room_id'], (int) auth('pos')->id());
+            app(\App\Services\HotelDeskService::class)->changeStay($this->stay($id), (int) auth('pos')->id(), $data + ['kind' => 'move']);
         } catch (HotelStayException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
-
         return back()->with('success', __('pos.hotel_moved'));
     }
 
@@ -376,13 +470,15 @@ class HotelController extends Controller
     {
         $stay = $this->stay($id);
         $data = $request->validate([
-            'description' => 'required_without:product_id|nullable|string|max:255',
+            'description' => 'required_without_all:product_id,service_id|nullable|string|max:255',
             'category' => 'required|in:room,food,laundry,extra,other',
             'quantity' => 'required|numeric|min:0.001|max:9999',
             'uom' => 'nullable|string|max:8',
             'unit_amount' => 'required|numeric|min:0|max:10000000',
             'product_id' => 'nullable|integer',
             'service_id' => 'nullable|integer',
+            'discount_type' => 'nullable|in:amount,percentage',
+            'discount_value' => 'nullable|numeric|min:0|max:10000000',
             'idempotency_key' => 'nullable|string|max:64',
         ]);
         try {
@@ -546,18 +642,19 @@ class HotelController extends Controller
         return view('pos.hotel.guests', compact('guests'));
     }
 
-    public function folios()
+    public function folios(Request $request)
     {
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $companyId = (int) app('currentCompanyId');
         $branchId = $this->branches->getActiveBranchId();
         $stays = HotelStay::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->whereIn('status', HotelStay::OPEN_STATUSES)
+            ->whereIn('status', ['reserved', 'checked_in', 'checked_out'])
             ->with('room')
             ->orderByDesc('id')
-            ->get();
-        $dues = $this->folio->chargeDuesForStayIds($companyId, $stays->pluck('id')->all());
+            ->paginate(30)->withQueryString();
+        $dues = [];
+        foreach ($stays as $stay) $dues[$stay->id] = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance'];
 
         return view('pos.hotel.folios', compact('stays', 'dues'));
     }

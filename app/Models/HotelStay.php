@@ -22,7 +22,7 @@ class HotelStay extends Model
         'guest_cnic', 'check_in_date', 'check_out_date', 'actual_check_in_at',
         'actual_check_out_at', 'adult_count', 'child_count', 'nights',
         'rate_amount', 'rate_unit', 'charging_rule', 'notes', 'cancel_reason',
-        'idempotency_key', 'created_by',
+        'idempotency_key', 'created_by', 'standard_rate_amount', 'discount_type', 'discount_value',
     ];
 
     protected $casts = [
@@ -34,6 +34,8 @@ class HotelStay extends Model
         'child_count' => 'integer',
         'nights' => 'integer',
         'rate_amount' => 'decimal:2',
+        'standard_rate_amount' => 'decimal:2',
+        'discount_value' => 'decimal:2',
     ];
 
     public function company(): BelongsTo

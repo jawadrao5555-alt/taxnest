@@ -1136,7 +1136,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/stays', [HotelController::class, 'storeStay'])->name('pos.hotel.stays.store');
         Route::get('/quote', [HotelController::class, 'bookingQuote'])->name('pos.hotel.quote');
         Route::get('/stays/{id}/change-quote', [HotelController::class, 'changeQuote'])->whereNumber('id')->name('pos.hotel.change-quote');
-        Route::get('/stays/{id}/checkout', [HotelController::class, 'checkout'])->whereNumber('id')->name('pos.hotel.checkout');
+        Route::get('/stays/{id}/checkout', [HotelController::class, 'showCheckout'])->whereNumber('id')->name('pos.hotel.checkout');
         Route::get('/stays/{id}/checkout-quote', [HotelController::class, 'checkoutQuote'])->whereNumber('id')->name('pos.hotel.checkout-quote');
         Route::post('/stays/{id}/checkout', [HotelController::class, 'completeCheckout'])->whereNumber('id')->name('pos.hotel.checkout.complete');
         Route::post('/stays/{id}/discount', [HotelController::class, 'discount'])->whereNumber('id')->name('pos.hotel.stays.discount');
@@ -2992,5 +2992,4 @@ Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withou
     Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
     Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
 });
-
 

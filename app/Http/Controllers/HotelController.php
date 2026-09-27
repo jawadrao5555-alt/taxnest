@@ -338,7 +338,7 @@ class HotelController extends Controller
         }
     }
 
-    public function checkout(int $id)
+    public function showCheckout(int $id)
     {
         $stay = $this->stay($id)->load(['room', 'folioEntries']);
         abort_unless($stay->status === HotelStay::STATUS_CHECKED_IN, 409);

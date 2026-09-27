@@ -2666,7 +2666,7 @@ function restaurantPos() {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
                     this.lastOrderId = orderId;
-                    this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
+                    this.lastTotal = Number(data.total_amount ?? savedTotal ?? 0); this.lastPaymentMethod = method;
                     this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                     this.lastSaleAt = Date.now();

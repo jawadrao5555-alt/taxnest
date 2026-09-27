@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\PosCustomer;
+use App\Models\PosProduct;
 use App\Models\PosTransaction;
 use App\Models\PosTransactionItem;
 use App\Models\User;
 use App\Services\PosFeatureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -181,6 +183,96 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
         $this->assertSame(2.0, (float) $items->firstWhere('name', 'Beast Burger')['qty']);
         $this->assertStringContainsString('/pos/transaction/' . $bill->id, (string) $response->json('url'),
             'The modal must be able to hand off to the full bill page.');
+    }
+
+    public function test_cash_and_card_discounts_are_reflected_in_saved_payable_tax_and_customer_spend(): void
+    {
+        $planId = DB::table('pricing_plans')->insertGetId([
+            'name' => 'Checkout Test POS',
+            'product_type' => 'pos',
+            'invoice_limit' => -1,
+            'price' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $company = $this->company();
+        DB::table('subscriptions')->insert([
+            'company_id' => $company->id,
+            'pricing_plan_id' => $planId,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addYear()->toDateString(),
+            'active' => true,
+            'override_type' => 'lifetime',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $product = PosProduct::create([
+            'company_id' => $company->id,
+            'name' => 'Menu Item',
+            'price' => 330,
+            'is_active' => true,
+        ]);
+        $owner = $this->owner($company);
+        $cases = [
+            // Exclusive tax is added to the taxable amount after the discount.
+            ['exclusive', 'cash', 'amount', 14, 32, 348],
+            // Inclusive tax is extracted from the discounted menu price.
+            ['inclusive', 'cash', 'percentage', 10, 40.97, 297],
+            // Card-save uses the discounted menu amount and the card rate.
+            ['inclusive_card_save', 'card', 'amount', 14, 21.79, 294],
+            ['exclusive', 'cash', 'amount', 0, 33, 363],
+        ];
+
+        foreach ($cases as $index => [$mode, $method, $discountType, $discountValue, $tax, $payable]) {
+            $company->update([
+                'pos_tax_pricing_mode' => $mode,
+                'pos_tax_inclusive' => $mode !== 'exclusive',
+                'pos_tax_rate_cash' => $mode === 'exclusive' ? 10 : 16,
+                'pos_tax_rate_card' => 8,
+                'pra_reporting_enabled' => false,
+            ]);
+            $phone = '03001234'.str_pad((string) $index, 3, '0', STR_PAD_LEFT);
+            $customer = $this->customer($company, 'Discount Customer '.$index, $phone);
+            $sale = $this->actingAs($owner, 'pos')->postJson('/pos/invoice/store', [
+                'items' => [[
+                    'type' => 'product', 'item_id' => $product->id,
+                    'name' => 'Menu Item', 'quantity' => 1, 'unit_price' => 330,
+                    'is_tax_exempt' => false,
+                ]],
+                'payment_method' => $method,
+                'discount_type' => $discountType,
+                'discount_value' => $discountValue,
+                'customer_name' => $customer->name,
+                'customer_phone' => $phone,
+            ]);
+            $this->assertSame(200, $sale->status(), $mode.' '.$method.' checkout: '.$sale->getContent());
+            $sale->assertJson(['success' => true]);
+            $bill = PosTransaction::findOrFail($sale->json('transaction_id'));
+            $this->assertEquals($payable, (float) $bill->total_amount, $mode.' '.$method.' saved payable');
+            $this->assertEquals($tax, (float) $bill->tax_amount, $mode.' '.$method.' post-discount tax');
+            $this->assertEquals($payable, (float) $sale->json('total_amount'));
+
+            $quickView = $this->actingAs($owner, 'pos')
+                ->getJson('/pos/customers/history/bill/'.$bill->id)
+                ->assertOk();
+            $this->assertEquals($payable, (float) $quickView->json('total'));
+            $this->assertEquals(330, (float) $quickView->json('display_subtotal'));
+            $this->assertEquals($mode === 'inclusive_card_save' ? 22 : 0, (float) $quickView->json('card_saving'));
+            $this->assertSame($mode !== 'exclusive', $quickView->json('tax_inclusive'));
+            $this->actingAs($owner, 'pos')
+                ->get('/pos/customers/'.$customer->id.'/history')
+                ->assertOk()
+                ->assertViewHas('totalSpent', fn ($spent) => abs((float) $spent - $payable) < 0.001)
+                ->assertSee('PKR '.number_format($payable));
+            $this->actingAs($owner, 'pos')
+                ->get('/pos/transactions?tab=local')
+                ->assertOk()
+                ->assertViewHas('transactions', fn ($rows) => abs((float) $rows->first()?->total_amount - $payable) < 0.001)
+                ->assertSee('PKR '.number_format($payable));
+            $this->actingAs($owner, 'pos')
+                ->get('/pos/transaction/'.$bill->id.'/receipt')
+                ->assertOk()->assertSee('PKR '.number_format($payable, 2));
+        }
     }
 
     public function test_the_history_page_makes_real_bills_clickable(): void

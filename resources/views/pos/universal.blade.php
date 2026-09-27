@@ -11361,7 +11361,9 @@ function restaurantPos() {
                 // Task 1025: paid bill ki order type ka snapshot — clearCart/reset ke
                 // baad tables-first wapsi isi se faisla karti hai (live widget se nahi).
                 this.lastOrderType = this.orderType || null;
-                this.lastTotal = Math.round(savedTotal || data.total_amount || 0);
+                // The server's settled bill is authoritative; the pre-pay quote
+                // can be stale when discount/tax/payment method changed.
+                this.lastTotal = Math.round(Number(data.total_amount ?? savedTotal ?? 0));
                 this.lastPaymentMethod = method;
                 this.lastPraNumber = data.pra_invoice_number || '';
                 this.lastPraStatus = data.pra_status || '';
@@ -13027,7 +13029,7 @@ function restaurantPos() {
             // Task 1025: paid bill ki order type ka snapshot (payOrderType pehle hi
             // held-order/override se capture ho chuka) — tables-first wapsi ka gate.
             this.lastOrderType = payOrderType || null;
-            this.lastTotal = Math.round(savedTotal || data.total_amount || 0); this.lastPaymentMethod = method;
+            this.lastTotal = Math.round(Number(data.total_amount ?? savedTotal ?? 0)); this.lastPaymentMethod = method;
             this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
             this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
             // Task 921: clear the claimed-waiter state once its order is paid so the NEXT

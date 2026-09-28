@@ -157,7 +157,8 @@ class HotelCategoryNativeUiTest extends TestCase
             'room_id' => $foreignRoom->id, 'check_in_date' => now()->toDateString(),
             'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Other guest', 'walk_in' => true,
         ]);
-        $this->get(route('pos.hotel.stays.statement', $foreignStay->id))->assertNotFound();
+        $this->get(route('pos.hotel.stays.statement', $foreignStay->id))
+            ->assertRedirect(route('pos.dashboard'));
     }
 
     public function test_reception_room_actions_preselect_only_a_room_from_its_own_company(): void

@@ -371,7 +371,6 @@
             .dark .tn-hotel-shell .dark\:text-teal-300 { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
             [data-hotel-back-front-desk] { background-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
 
-
             .topnav-bar { background: var(--nav-bg, linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)); }
             .nav-pill { transition: all 0.15s ease; }
             .nav-pill:hover { background: var(--pill-hover); }

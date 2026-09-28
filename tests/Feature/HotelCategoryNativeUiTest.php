@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\HotelStay;
+use App\Models\HotelFolioEntry;
 use App\Models\AdminUser;
 use App\Models\User;
 use App\Services\HotelShell;
@@ -375,6 +376,56 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString('name="housekeeping"', $hk);
         $this->actingAs($housekeeping, 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertRedirect('/pos/dashboard');
         $this->actingAs($this->owner($other), 'pos')->get('/pos/hotel/stays/'.$stay->id)->assertRedirect('/pos/dashboard');
+    }
+
+    public function test_owner_can_void_unpaid_unbilled_erroneous_stay_but_not_a_paid_or_foreign_stay(): void
+    {
+        $company = $this->company();
+        $other = $this->company();
+        $owner = $this->owner($company);
+        $reception = $this->staff($company, 'pos_cashier', ['dashboard', 'hotel']);
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '909', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
+        ]);
+        $stay = app(HotelStayService::class)->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Mistake', 'walk_in' => true,
+        ]);
+        app(HotelStayService::class)->checkOut($stay, (int) $owner->id);
+        $url = route('pos.hotel.stays.void-error', $stay->id);
+        $this->actingAs($reception, 'pos')->post($url, ['reason' => 'Wrong booking'])->assertForbidden();
+        $this->assertSame(HotelStay::STATUS_CHECKED_OUT, $stay->fresh()->status);
+        $this->actingAs($owner, 'pos')->get(route('pos.hotel.stays.show', $stay->id))->assertSee('data-hotel-void-error="1"', false);
+        $this->post($url, ['reason' => 'Wrong booking'])->assertRedirect();
+        $this->assertSame(HotelStay::STATUS_CANCELLED, $stay->fresh()->status);
+        $this->assertSame('Wrong booking', $stay->fresh()->cancel_reason);
+        $this->assertEqualsWithDelta(0, (float) HotelFolioEntry::where('stay_id', $stay->id)->sum('amount'), 0.01);
+        $this->assertNotNull(HotelFolioEntry::where('stay_id', $stay->id)->whereNotNull('reverses_entry_id')->first());
+        $this->post($url, ['reason' => 'Wrong booking'])->assertSessionHas('error');
+
+        $paidRoom = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '910', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
+        ]);
+        $paidStay = app(HotelStayService::class)->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $paidRoom->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Paid', 'walk_in' => true,
+        ]);
+        app(\App\Services\HotelFolioService::class)->postPayment($paidStay, [
+            'amount' => 100, 'payment_method' => 'cash',
+        ], (int) $owner->id);
+        $this->post(route('pos.hotel.stays.void-error', $paidStay->id), ['reason' => 'Wrong booking'])->assertSessionHas('error');
+        $this->assertSame(HotelStay::STATUS_CHECKED_IN, $paidStay->fresh()->status);
+
+        $foreignRoom = app(HotelStayService::class)->createRoom((int) $other->id, [
+            'room_number' => '909', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
+        ]);
+        $foreignStay = app(HotelStayService::class)->book((int) $other->id, (int) $this->owner($other)->id, [
+            'room_id' => $foreignRoom->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Other', 'walk_in' => true,
+        ]);
+        $this->post(route('pos.hotel.stays.void-error', $foreignStay->id), ['reason' => 'Wrong booking'])
+            ->assertRedirect('/pos/dashboard');
+        $this->assertSame(HotelStay::STATUS_CHECKED_IN, $foreignStay->fresh()->status);
     }
 
     public function test_housekeeping_denied_from_restaurant_outlet(): void

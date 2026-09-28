@@ -108,6 +108,20 @@
     </details>
     @endif
 
+    @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
+    <details class="mb-6 rounded-xl border border-red-200 p-3" data-hotel-void-error="1">
+        <summary class="cursor-pointer text-sm font-semibold text-red-700">{{ __('pos.hotel_void_error_title') }}</summary>
+        <p class="mt-2 text-xs text-gray-600">{{ __('pos.hotel_void_error_hint') }}</p>
+        <form method="POST" action="{{ route('pos.hotel.stays.void-error', $stay->id) }}" class="mt-2 flex flex-wrap items-end gap-2">
+            @csrf
+            <label class="text-xs">{{ __('pos.hotel_void_reason') }}
+                <input name="reason" required minlength="5" maxlength="255" class="block rounded-lg border-gray-300 dark:bg-gray-800">
+            </label>
+            <button class="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700">{{ __('pos.hotel_void_error_title') }}</button>
+        </form>
+    </details>
+    @endif
+
     <div class="mb-6" x-data="{ action: window.location.hash === '#hotel-charge' ? 'charge' : (window.location.hash === '#hotel-payment' ? 'payment' : '') }">
         <div class="flex flex-wrap gap-3 mb-4">
             <button type="button" @click="action = action === 'payment' ? '' : 'payment'" :aria-expanded="action === 'payment'" class="rounded-lg bg-teal-700 px-4 py-2 text-white text-sm font-semibold">{{ __('pos.hotel_take_money') }}</button>

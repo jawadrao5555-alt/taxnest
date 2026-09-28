@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('hotel_bill.statement') }} · {{ $stay->stay_number }}</title>
+    @include('partials.urdu-font')
     <style>
         body { font: 14px system-ui, sans-serif; color: #172033; margin: 0; background: #f4f6f7; }
         .sheet { max-width: 700px; margin: 24px auto; padding: 28px; background: white; border-radius: 12px; }

@@ -31,6 +31,7 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('product_type')->nullable();
+            $table->string('pra_connection_mode')->nullable();
             $table->boolean('agent_enabled')->default(true);
             $table->boolean('agent_submits_pra')->default(false);
             $table->string('agent_api_key')->nullable();
@@ -94,6 +95,17 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
         $this->assertNull($company->agent_update_stage);
         $this->assertNull($company->agent_update_error);
         $this->assertNull($company->agent_update_at);
+    }
+
+    public function test_authenticated_heartbeat_identifies_pra_fiscal_device_for_agent_ui(): void
+    {
+        $this->makeCompany(['pra_connection_mode' => 'fiscal_device']);
+
+        $this->postJson('/api/agent/heartbeat', ['version' => '1.13.15'], [
+            'Authorization' => 'Bearer test-agent-key-1209',
+        ])->assertOk()->assertJsonPath('company.product_type', 'pos')
+          ->assertJsonPath('company.pra_connection_mode', 'fiscal_device')
+          ->assertJsonPath('company.fbr_connection_mode', 'cloud');
     }
 
     public function test_passing_target_version_also_clears(): void

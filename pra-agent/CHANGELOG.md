@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.15 (2026-09-28)
+**Scoped IMS display and verified Windows update handoff**
+
+- Show FBR IMS setup only to authenticated FBR fiscal-device companies. PRA fiscal-device companies see PRA-specific local IMS guidance; cloud modes do not show an IMS installer.
+- Wait for this Agent process to quit before ZIP replacement, verify the copied app.asar, attempt rollback on failure and report install-stage outcomes after restart. The downloaded archive still requires the canonical SHA-256 manifest check.
+- Preserve existing printer/device settings and bound repeat handoff attempts. Windows installation needs a real test PC and owner-approved immutable release build before claiming field verification.
+
 ## v1.13.14 (2026-09-27)
 **Release the bounded Windows update recovery from PR #123**
 

@@ -9659,6 +9659,10 @@ class PosController extends Controller
         }
         $managerBranchId = $newRole === 'pos_manager'
             ? $this->posResolveBranchId($request, (int) $companyId) : null;
+        if ($newRole === 'pos_manager' && \Illuminate\Support\Facades\Schema::hasTable('branches')
+            && \App\Models\Branch::where('company_id', $companyId)->exists() && !$managerBranchId) {
+            return back()->with('error', __('pos.access_denied'));
+        }
         if ($user->pos_role !== 'pos_admin' && $user->role !== 'company_admin'
             && \Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id')) {
             $requestedBranch = $this->posResolveBranchId($request, (int) $companyId);
@@ -9975,6 +9979,15 @@ class PosController extends Controller
         ], [
             ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
+
+        if ($user->pos_role !== 'pos_admin' && $user->role !== 'company_admin'
+            && $request->has('default_branch_id')
+            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id')) {
+            $requestedBranch = $this->posResolveBranchId($request, (int) $companyId);
+            if (!$requestedBranch || !app(\App\Services\BranchContextService::class)->canAccess($requestedBranch)) {
+                return back()->with('error', __('pos.access_denied'));
+            }
+        }
 
         $cashierData = [
             'name' => $request->name,

@@ -98,8 +98,18 @@
         <form method="POST" action="{{ route('pos.hotel.stays.no-show', $stay->id) }}">@csrf<button class="text-xs font-semibold text-gray-600 underline">{{ __('pos.hotel_no_show_btn') }}</button></form>
     </div>
     @endif
+    <form method="POST" action="{{ route('pos.hotel.stays.discount', $stay->id) }}" class="mt-4 flex flex-wrap gap-2 items-end">
+        @csrf
+        <label class="text-xs">{{ __('pos.hotel_room_discount') }}<input name="discount_value" value="{{ $stay->discount_value ?? 0 }}" type="number" min="0" max="10000000" step="0.01" required class="block mt-1 rounded-lg border-gray-300 dark:bg-gray-800"></label>
+        <select name="discount_type" class="rounded-lg border-gray-300 dark:bg-gray-800 text-sm"><option value="amount" @selected($stay->discount_type !== 'percentage')>Rs</option><option value="percentage" @selected($stay->discount_type === 'percentage')>%</option></select>
+        <button class="rounded-lg border px-3 py-2 text-sm">{{ __('pos.save_btn') }}</button>
+        <p class="w-full text-xs text-gray-500">{{ __('pos.hotel_pricing_invoiced') }}</p>
+    </form>
+    </details>
+    @endif
+
     @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
-    <details class="mt-4 rounded-xl border border-red-200 p-3" data-hotel-void-error="1">
+    <details class="mb-6 rounded-xl border border-red-200 p-3" data-hotel-void-error="1">
         <summary class="cursor-pointer text-sm font-semibold text-red-700">{{ __('pos.hotel_void_error_title') }}</summary>
         <p class="mt-2 text-xs text-gray-600">{{ __('pos.hotel_void_error_hint') }}</p>
         <form method="POST" action="{{ route('pos.hotel.stays.void-error', $stay->id) }}" class="mt-2 flex flex-wrap items-end gap-2">
@@ -109,15 +119,6 @@
             </label>
             <button class="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700">{{ __('pos.hotel_void_error_title') }}</button>
         </form>
-    </details>
-    @endif
-    <form method="POST" action="{{ route('pos.hotel.stays.discount', $stay->id) }}" class="mt-4 flex flex-wrap gap-2 items-end">
-        @csrf
-        <label class="text-xs">{{ __('pos.hotel_room_discount') }}<input name="discount_value" value="{{ $stay->discount_value ?? 0 }}" type="number" min="0" max="10000000" step="0.01" required class="block mt-1 rounded-lg border-gray-300 dark:bg-gray-800"></label>
-        <select name="discount_type" class="rounded-lg border-gray-300 dark:bg-gray-800 text-sm"><option value="amount" @selected($stay->discount_type !== 'percentage')>Rs</option><option value="percentage" @selected($stay->discount_type === 'percentage')>%</option></select>
-        <button class="rounded-lg border px-3 py-2 text-sm">{{ __('pos.save_btn') }}</button>
-        <p class="w-full text-xs text-gray-500">{{ __('pos.hotel_pricing_invoiced') }}</p>
-    </form>
     </details>
     @endif
 

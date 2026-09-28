@@ -155,16 +155,19 @@
             <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_post_charge') }}</button>
         </form>
         <div class="space-y-4">
-            <form method="POST" action="{{ route('pos.hotel.folio.payment', $stay->id) }}" id="hotel-payment" x-show="action === 'payment'" x-cloak class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
+            <form method="POST" action="{{ route('pos.hotel.folio.payment', $stay->id) }}" id="hotel-payment" x-data="hotelCollectionForm(@js(['url' => route('pos.hotel.checkout-quote', $stay->id), 'failure' => __('pos.hotel_quote_failed')]))" x-show="action === 'payment'" x-cloak class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
                 @csrf
             <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_take_money') }}</h3>
-                <label class="block text-sm">{{ __('pos.hotel_collect_now') }}<input type="number" min="0.01" max="10000000" step="0.01" name="amount" required class="block mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm"></label>
+                <p data-hotel-collection-quote="1" x-show="kind === 'payment' && quote" class="text-sm">{{ __('pos.hotel_folio_due') }} ({{ __('pos.hotel_payment_method') }}): <strong x-text="'Rs ' + money(quote?.balance)"></strong></p>
+                <p x-show="busy" class="text-xs">{{ __('pos.hotel_calculating') }}</p>
+                <p x-show="error" x-text="error" class="text-xs text-red-700" role="alert"></p>
+                <label class="block text-sm">{{ __('pos.hotel_collect_now') }}<input x-model="amount" @input="edited = true" type="number" min="0.01" max="10000000" step="0.01" name="amount" required class="block mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm"></label>
                 <p class="text-xs text-slate-600">{{ __('hotel_simplify.method_changes_tax') }}</p>
-                <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+                <select x-model="method" @change="selectMethod()" name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                     @include('pos.hotel._payment-methods')
                 </select>
-                <select name="kind" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+                <select x-model="kind" @change="if (kind === 'deposit') { amount = ''; edited = true; } else { selectMethod(); }" name="kind" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                     <option value="payment">{{ __('pos.hotel_advance_payment') }}</option>
                     <option value="deposit">{{ __('pos.hotel_security_deposit') }}</option>
                 </select>

@@ -454,6 +454,19 @@ class HotelController extends Controller
         return back()->with('success', __('pos.hotel_cancelled'));
     }
 
+    public function voidErroneousStay(Request $request, int $id)
+    {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        $data = $request->validate(['reason' => 'required|string|min:5|max:255']);
+        try {
+            $this->stays->voidErroneousStay($this->stay($id), (int) auth('pos')->id(), $data['reason']);
+        } catch (HotelStayException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', __('pos.hotel_erroneous_stay_voided'));
+    }
+
     public function noShow(Request $request, int $id)
     {
         $data = $request->validate(['reason' => 'nullable|string|max:255']);

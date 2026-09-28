@@ -184,7 +184,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringNotContainsString('data-hotel-room-check-in="'.$room->id.'"', $page);
         $this->post(route('pos.hotel.rooms.housekeeping', $room->id), ['housekeeping' => 'clean'])->assertRedirect();
         $this->get('/pos/hotel')->assertOk()->assertSee('data-hotel-room-check-in="'.$room->id.'"', false);
-        $this->post(route('pos.hotel.rooms.housekeeping', $foreign->id), ['housekeeping' => 'clean'])->assertNotFound();
+        $this->post(route('pos.hotel.rooms.housekeeping', $foreign->id), ['housekeeping' => 'clean'])->assertRedirect('/pos/dashboard');
     }
 
     public function test_manage_as_hotel_header_keeps_exit_in_a_responsive_scoped_layout(): void

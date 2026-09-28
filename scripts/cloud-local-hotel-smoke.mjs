@@ -188,15 +188,24 @@ async function runJourney(browser, label, viewport, creds) {
         const deskMenu = page.locator('[data-hotel-desk-menu="1"]');
         const summary = page.locator('[data-hotel-reception-summary="1"]');
         const availableCard = page.locator('[data-hotel-room-group="vacant"] [data-hotel-room-check-in]').first();
+        const shellLayout = await page.evaluate(() => {
+            const menu = document.querySelector('[data-hotel-desk-menu="1"]')?.getBoundingClientRect();
+            const main = document.querySelector('.tn-hotel-shell-grid > main')?.getBoundingClientRect();
+            return menu && main ? { menu: { right: menu.right, bottom: menu.bottom }, main: { left: main.left, top: main.top } } : null;
+        });
+        if (shellLayout && (viewport.width >= 1024
+            ? shellLayout.main.left > shellLayout.menu.right
+            : shellLayout.main.top >= shellLayout.menu.bottom)) ok('reception navigation stays beside rooms on desktop and stacks on mobile');
+        else bad('reception navigation obscures or displaces the room board');
         if (await deskMenu.count() && await summary.count() && await availableCard.isVisible()) {
             const checkInUrl = await availableCard.getAttribute('href');
             if (checkInUrl?.includes('walk_in=1') && checkInUrl?.includes('room_id=')) ok('reference reception: menu, summary and room-specific walk-in visible');
             else bad('available room action did not preselect the walk-in room');
         } else bad('reference reception is missing menu, summary or available room action');
-        const boardNeedles = [/arrival|آمد/i, /depart|روانگی/i, /in.?house|اندر/i, /pending|باقی/i, /available|دستیاب/i, /dirty|گند/i];
+        const boardNeedles = [/in.?house|اندر/i, /available|دستیاب/i, /dirty|گند/i];
         const boardHits = boardNeedles.filter((re) => re.test(dashText)).length;
-        if (boardHits >= 4) ok(`dashboard board sections visible (${boardHits}/6)`);
-        else bad(`dashboard board sections weak (${boardHits}/6)`);
+        if (boardHits === 3) ok('compact availability, occupancy and dirty-room summary visible');
+        else bad(`compact dashboard summary incomplete (${boardHits}/3)`);
         const hasRoomsLink = await page.locator('a[href*="/pos/hotel/rooms"]').count();
         const hasNewStay = await page.locator('a[href*="/pos/hotel/stays/create"]').count();
         if (hasRoomsLink && hasNewStay) ok('dashboard shows rooms + new stay actions');

@@ -53,6 +53,12 @@
                 <a data-hotel-room-check-in="{{ $room->id }}" href="{{ route('pos.hotel.stays.create', ['walk_in' => 1, 'room_id' => $room->id]) }}" class="block mt-auto rounded-lg bg-teal-700 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-teal-800">{{ __('pos.hotel_check_in_btn') }}</a>
             @elseif($stay)
                 <a data-hotel-room-stay="{{ $room->id }}" href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block mt-auto rounded-lg {{ $card['state'] === 'occupied' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-teal-700 hover:bg-teal-800' }} px-3 py-2 text-center text-xs font-semibold text-white">{{ __('pos.hotel_desk_stay_details') }}</a>
+            @elseif($card['state'] === 'dirty' && \App\Services\HotelAccessService::canHousekeeping(auth('pos')->user()))
+                <form method="POST" action="{{ route('pos.hotel.rooms.housekeeping', $room->id) }}" class="mt-auto">
+                    @csrf
+                    <input type="hidden" name="housekeeping" value="clean">
+                    <button class="w-full rounded-lg bg-amber-700 px-3 py-2 text-xs font-semibold text-white">{{ __('hotel_simplify.mark_clean') }}</button>
+                </form>
             @endif
         @endif
         @if($room->housekeeping === 'dirty' && ($card['state'] ?? '') !== 'dirty')

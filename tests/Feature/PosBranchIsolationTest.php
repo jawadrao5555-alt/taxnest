@@ -584,6 +584,40 @@ class PosBranchIsolationTest extends TestCase
         session([BranchContextService::SESSION_KEY => $branch]);
     }
 
+    public function test_branch_manager_team_view_excludes_other_branch_and_owner_accounts(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $owner = $this->makeUser($companyId);
+        $manager = $this->makeUser($companyId, [
+            'name' => 'Main manager', 'role' => 'employee', 'pos_role' => 'pos_manager',
+            'default_branch_id' => $mainId,
+        ]);
+        $this->makeUser($companyId, [
+            'name' => 'City cashier', 'role' => 'employee', 'pos_role' => 'pos_cashier',
+            'default_branch_id' => $cityId,
+        ]);
+        $this->makeUser($companyId, [
+            'name' => 'Main cashier', 'role' => 'employee', 'pos_role' => 'pos_cashier',
+            'default_branch_id' => $mainId,
+        ]);
+
+        $this->standOn($companyId, $manager, $mainId);
+        app()->forgetInstance(BranchContextService::class);
+        $view = (new PosController())->posTeam(Request::create('/pos/team', 'GET'));
+        $names = $view->getData()['team']->pluck('name')->all();
+        $this->assertContains('Main cashier', $names);
+        $this->assertNotContains('City cashier', $names);
+        $this->assertNotContains('POS Owner', $names);
+        $this->assertSame([], $view->getData()['teamPasswords']);
+
+        $this->standOn($companyId, $owner, BranchContextService::ALL);
+        app()->forgetInstance(BranchContextService::class);
+        $ownerNames = (new PosController())->posTeam(Request::create('/pos/team', 'GET'))
+            ->getData()['team']->pluck('name')->all();
+        $this->assertContains('City cashier', $ownerNames);
+        $this->assertContains('Main cashier', $ownerNames);
+    }
+
     /** Invoice numbers on the Transactions page, sorted. */
     private function transactionNumbers(): array
     {

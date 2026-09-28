@@ -236,6 +236,10 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="rounded-lg bg-blue-50 dark:bg-gray-700 p-3 text-sm">
+                    <button type="button" data-audience-check="add" class="font-semibold text-blue-700 dark:text-blue-300">Check actual audience</button>
+                    <p data-audience-result="add" role="status" class="mt-1">Check recipients before publishing.</p>
+                </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                     <select name="type" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
@@ -254,7 +258,7 @@
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="document.getElementById('addUpdateModal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">Cancel</button>
-                    <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">Publish Update</button>
+                    <button type="submit" data-audience-submit="add" disabled class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">Publish Update</button>
                 </div>
             </form>
         </div>
@@ -316,15 +320,55 @@
                     <input type="checkbox" name="is_featured" value="1" id="featEdit" class="rounded border-gray-300 text-amber-500 mt-0.5">
                     <label for="featEdit" class="text-sm text-gray-700 dark:text-gray-300">⭐ Bara elaan (featured) <span class="block text-xs text-gray-400 font-normal">Celebratory hero popup — bare features ke liye. "Abhi Try Karein" button bills/receipts page par le jata hai.</span></label>
                 </div>
+                <div class="rounded-lg bg-blue-50 dark:bg-gray-700 p-3 text-sm">
+                    <button type="button" data-audience-check="edit" class="font-semibold text-blue-700 dark:text-blue-300">Check actual audience</button>
+                    <p data-audience-result="edit" role="status" class="mt-1">Check recipients before saving audience changes.</p>
+                </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="document.getElementById('editUpdateModal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">Cancel</button>
-                    <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">Save Changes</button>
+                    <button type="submit" data-audience-submit="edit" disabled class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script>
+        var audienceVersions = { add: 0, edit: 0 };
+        function resetAudienceCheck(prefix) {
+            audienceVersions[prefix]++;
+            document.querySelector('[data-audience-submit="' + prefix + '"]').disabled = true;
+            document.querySelector('[data-audience-result="' + prefix + '"]').textContent = 'Audience changed. Check recipients again.';
+        }
+
+        ['add', 'edit'].forEach(function (prefix) {
+            var trigger = document.querySelector('[data-audience-check="' + prefix + '"]');
+            var form = trigger.closest('form');
+            form.addEventListener('change', function (event) {
+                if (['audience', 'audience_family', 'audience_scope', 'target_categories[]'].includes(event.target.name)) {
+                    resetAudienceCheck(prefix);
+                }
+            });
+            trigger.addEventListener('click', async function () {
+                resetAudienceCheck(prefix);
+                var version = audienceVersions[prefix];
+                var result = document.querySelector('[data-audience-result="' + prefix + '"]');
+                result.textContent = 'Checking recipients…';
+                try {
+                    var response = await fetch('/admin/app-updates/audience-preview', {
+                        method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' }
+                    });
+                    var data = await response.json();
+                    if (version !== audienceVersions[prefix]) return;
+                    if (!response.ok) throw new Error(Object.values(data.errors || {}).flat().join(' ') || 'Preview unavailable.');
+                    result.textContent = data.count + ' companies: ' + (data.examples.length ? data.examples.join(', ') : 'none') + (data.count > 5 ? '…' : '');
+                    document.querySelector('[data-audience-submit="' + prefix + '"]').disabled = data.count === 0;
+                } catch (error) {
+                    if (version !== audienceVersions[prefix]) return;
+                    result.textContent = error.message;
+                }
+            });
+        });
+
         // Task 1585: "Which shops" control — All shops vs a category list, with
         // the visible panel sections following the chosen audience.
         function elaanCatBox(prefix) { return document.querySelector('[data-elaan-cats="' + prefix + '"]'); }
@@ -399,6 +443,7 @@
         });
 
         function openEditModal(id, title, pointsText, imageUrl, audience, isFeatured, type, categories, audienceFamily) {
+            resetAudienceCheck('edit');
             document.getElementById('editUpdateForm').action = '/admin/app-updates/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;

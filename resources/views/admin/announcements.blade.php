@@ -55,7 +55,10 @@
                                     </td>
                                     <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
                                         @if($ann->target === 'all')
-                                            <span class="text-emerald-600 font-medium">All Companies</span>
+                                            <span class="text-emerald-600 font-medium">{{ match ($ann->audience_panel) { 'pra' => 'PRA POS', 'fbr' => 'FBR POS', default => 'All Companies' } }}</span>
+                                            @if($ann->target_categories)
+                                                <span class="block">{{ implode(', ', $ann->target_categories) }}</span>
+                                            @endif
                                         @else
                                             {{ $ann->targetCompany->name ?? 'N/A' }}
                                         @endif
@@ -109,8 +112,11 @@
                     <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">New Announcement</h3>
                     <button onclick="document.getElementById('addAnnouncementModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-400"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
-                <form method="POST" action="/admin/announcements" class="p-6 space-y-4" x-data="{ target: 'all' }">
+                <form method="POST" action="/admin/announcements" class="p-6 space-y-4" x-data="{ target: 'all', panel: 'all', scope: 'all' }" id="announcementForm">
                     @csrf
+                    @if($errors->any())
+                        <p role="alert" class="text-sm text-red-700">{{ $errors->first() }}</p>
+                    @endif
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Title *</label>
                         <input type="text" name="title" required maxlength="255" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
@@ -146,16 +152,86 @@
                             @endforeach
                         </select>
                     </div>
+                    <div x-show="target === 'all'" x-cloak class="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">POS panel</label>
+                            <select name="audience_panel" x-model="panel" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
+                                <option value="all">PRA + FBR (all companies)</option>
+                                <option value="pra">PRA POS only</option>
+                                <option value="fbr">FBR POS only</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Business categories</label>
+                            <select name="audience_scope" x-model="scope" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
+                                <option value="all">All categories in selected panel</option>
+                                <option value="categories">Selected categories only</option>
+                            </select>
+                        </div>
+                        <div x-show="scope === 'categories'" x-cloak class="max-h-44 overflow-y-auto space-y-2 text-sm">
+                            @foreach($categoryGroups as $panel => $groups)
+                                <div x-show="panel === 'all' || panel === '{{ $panel }}'" x-cloak>
+                                    <p class="font-semibold text-gray-700 dark:text-gray-200">{{ strtoupper($panel) }}</p>
+                                    @foreach($groups as $group => $categories)
+                                        <p class="text-xs text-gray-500">{{ ucfirst(str_replace('_', ' ', $group)) }}</p>
+                                        <div class="grid grid-cols-2 gap-1">
+                                            @foreach($categories as $category)
+                                                <label class="flex gap-1 items-center"><input type="checkbox" name="target_categories[]" value="{{ $category }}" :disabled="target !== 'all' || scope !== 'categories' || (panel !== 'all' && panel !== '{{ $panel }}')">{{ \App\Services\PosFeatureService::categoryMeta($category)['label'] }}</label>
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    <div class="rounded-lg bg-blue-50 dark:bg-gray-700 p-3 text-sm">
+                        <button type="button" id="announcementPreviewButton" class="font-semibold text-blue-700 dark:text-blue-300">Preview audience</button>
+                        <p id="announcementPreviewResult" role="status" class="mt-1 text-gray-700 dark:text-gray-200">Preview audience before publishing.</p>
+                    </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Expires At (optional)</label>
                         <input type="datetime-local" name="expires_at" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm">
                     </div>
                     <div class="flex justify-end gap-3 pt-2">
                         <button type="button" onclick="document.getElementById('addAnnouncementModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">Publish</button>
+                        <button type="submit" id="announcementPublish" disabled class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50">Publish</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+    <script>
+        (function () {
+            var form = document.getElementById('announcementForm');
+            var button = document.getElementById('announcementPublish');
+            var result = document.getElementById('announcementPreviewResult');
+            var audienceFields = ['target', 'target_company_id', 'audience_panel', 'audience_scope', 'target_categories[]'];
+            var audienceVersion = 0;
+            form.addEventListener('change', function (event) {
+                if (audienceFields.includes(event.target.name)) {
+                    audienceVersion++;
+                    button.disabled = true;
+                    result.textContent = 'Audience changed. Preview again before publishing.';
+                }
+            });
+            document.getElementById('announcementPreviewButton').addEventListener('click', async function () {
+                button.disabled = true;
+                var version = audienceVersion;
+                result.textContent = 'Checking audience…';
+                try {
+                    var response = await fetch('/admin/announcements/audience-preview', {
+                        method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' }
+                    });
+                    var data = await response.json();
+                    if (version !== audienceVersion) return;
+                    if (!response.ok) throw new Error(Object.values(data.errors || {}).flat().join(' ') || 'Preview unavailable.');
+                    result.textContent = data.count + ' companies: ' + (data.examples.length ? data.examples.join(', ') : 'none') + (data.count > 5 ? '…' : '');
+                    button.disabled = data.count === 0;
+                } catch (error) {
+                    if (version !== audienceVersion) return;
+                    result.textContent = error.message;
+                }
+            });
+        })();
+    </script>
 </x-admin-layout>

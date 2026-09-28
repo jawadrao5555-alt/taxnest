@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\AppUpdate;
 use App\Models\AppUpdateSeen;
+use App\Models\Company;
 use App\Models\SystemSetting;
+use App\Services\PosFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -50,6 +52,37 @@ class AppUpdateController extends Controller
         $filtersActive = $q !== '' || in_array($status, ['published', 'hidden'], true) || $request->filled('from') || $request->filled('to');
 
         return view('admin.app-updates', compact('updates', 'featureOn', 'filtersActive'));
+    }
+
+    /** Actual current recipient companies for the existing POS category picker. */
+    public function audiencePreview(Request $request)
+    {
+        $request->validate([
+            'audience' => 'required|in:pos,fbr_pos,all',
+            'audience_family' => 'required|in:all,food_service,goods_retail,pharmacy,services,accommodation',
+            'audience_scope' => 'required|in:all,cats',
+            'target_categories' => 'nullable|array',
+            'target_categories.*' => 'string|max:50',
+        ]);
+        $categories = $this->validatedCategories($request);
+        $count = 0;
+        $examples = [];
+        foreach (Company::whereIn('product_type', ['pos', 'fbrpos'])
+            ->select(['id', 'name', 'product_type', 'business_category', 'pos_type'])->cursor() as $company) {
+            $panel = PosFeatureService::panelFor($company);
+            if ($request->input('audience') === 'pos' && $panel !== 'pra'
+                || $request->input('audience') === 'fbr_pos' && $panel !== 'fbr'
+                || !PosFeatureService::audienceMatches($company, $request->input('audience_family'))
+                || ($categories && !in_array(PosFeatureService::resolveCategory($company), $categories, true))) {
+                continue;
+            }
+            $count++;
+            if (count($examples) < 5) {
+                $examples[] = $company->name;
+            }
+        }
+
+        return response()->json(['count' => $count, 'examples' => $examples]);
     }
 
     public function store(Request $request)

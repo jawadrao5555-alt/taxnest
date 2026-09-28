@@ -22,17 +22,16 @@
             @if(session('success'))<div class="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>@endif
             @if(session('error'))<div class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{{ session('error') }}</div>@endif
 
-            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3" data-hotel-reception-summary="1">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3" data-hotel-reception-summary="1">
                 @foreach([
                     [__('pos.hotel_stat_rooms'), $totalRooms, 'border-slate-200'],
                     [__('pos.hotel_stat_in_house'), $occupiedRooms, 'border-rose-200'],
                     [__('pos.hotel_stat_available'), $availableRooms, 'border-emerald-200'],
-                    [__('pos.hotel_arrivals_today'), $occupancy['arrivals'] ?? 0, 'border-sky-200'],
-                    [__('pos.hotel_departures_today'), $occupancy['departures'] ?? 0, 'border-amber-200'],
+                    [__('pos.hotel_stat_dirty'), $roomStateCounts['dirty'] ?? 0, 'border-amber-200'],
                 ] as [$label, $value, $border])
-                <div class="rounded-2xl border {{ $border }} bg-white dark:bg-gray-900 dark:border-slate-700 p-4 shadow-sm">
+                <div class="rounded-xl border {{ $border }} bg-white dark:bg-gray-900 dark:border-slate-700 p-3">
                     <p class="text-xs font-semibold text-slate-500 dark:text-slate-300">{{ $label }}</p>
-                    <p class="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white">{{ $value }}</p>
+                    <p class="mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">{{ $value }}</p>
                 </div>
                 @endforeach
             </div>
@@ -50,8 +49,8 @@
                 @endif
             </div>
             @endif
-            <label class="block mt-5 text-sm font-semibold dark:text-white">{{ __('pos.hotel_search') }}
-                <input x-model="roomSearch" type="search" class="mt-1 w-full sm:max-w-sm rounded-lg border-slate-300 dark:bg-gray-800" placeholder="{{ __('pos.hotel_search') }}">
+            <label class="block mt-4 text-sm font-semibold dark:text-white"><span class="sr-only">{{ __('pos.hotel_search') }}</span>
+                <input x-model="roomSearch" type="search" class="w-full sm:max-w-sm rounded-lg border-slate-300 dark:bg-gray-800" placeholder="{{ __('pos.hotel_search') }}">
             </label>
             @include('pos.hotel._room-board', ['roomCards' => $roomCards, 'filter' => '', 'filterBase' => route('pos.hotel.rooms'), 'showReceptionActions' => true])
 

@@ -53,6 +53,27 @@ window.hotelCheckoutForm = function (config) {
         money(value) { return Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); },
     };
 };
+window.hotelCollectionForm = function (config) {
+    return {
+        ...config, method: 'cash', amount: '', kind: 'payment', quote: null, busy: false, error: '', revision: 0, edited: false,
+        init() { this.refresh(); },
+        selectMethod() { this.edited = false; this.refresh(); },
+        async refresh() {
+            const revision = ++this.revision;
+            this.busy = true; this.error = '';
+            try {
+                const response = await fetch(this.url + '?payment_method=' + encodeURIComponent(this.method), {headers: {Accept: 'application/json'}, credentials: 'same-origin'});
+                const data = await response.json();
+                if (revision !== this.revision) return;
+                if (!response.ok) throw new Error(data.message || this.failure);
+                this.quote = data;
+                if (!this.edited && this.kind === 'payment') this.amount = data.balance > 0 ? data.balance : '';
+            } catch (error) { if (revision === this.revision) { this.quote = null; this.error = error.message || this.failure; } }
+            finally { if (revision === this.revision) this.busy = false; }
+        },
+        money(value) { return Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); },
+    };
+};
 window.hotelChangeForm = function (config) {
     return {
         ...config, quote: null, error: '', busy: false, revision: 0,

@@ -249,6 +249,28 @@ class HotelSimpleDeskPricingTest extends TestCase
         app(\App\Services\HotelDeskService::class)->checkout($stay, $owner->id, ['amount' => 100, 'payment_method' => 'cash', 'leave_balance' => true, 'idempotency_key' => 'allow-balance']);
         $this->assertSame('checked_out', $stay->fresh()->status);
         $this->assertEquals(9900, app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance']);
+        $billPage = $this->actingAs($owner, 'pos')->get('/pos/hotel/folios')->assertOk()->getContent();
+        $this->assertStringContainsString(__('hotel_simplify.payment_pending'), $billPage);
+        $this->assertStringContainsString('/pos/hotel/stays/'.$stay->id.'#hotel-payment', $billPage);
+        $this->assertStringContainsString(__('hotel_simplify.cash_estimate'), $billPage);
+        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee(__('pos.hotel_collect_now'));
+    }
+
+    public function test_checked_out_collection_preview_uses_the_selected_payment_method(): void
+    {
+        [$company, $owner, $room] = $this->fixture([
+            'hotel_checkout_outstanding' => 'allow', 'pos_tax_rate_cash' => 16,
+            'pos_tax_rate_card' => 5, 'pos_tax_pricing_mode' => 'exclusive',
+        ]);
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        app(\App\Services\HotelDeskService::class)->checkout($stay, $owner->id, [
+            'amount' => 0, 'payment_method' => 'cash', 'leave_balance' => true, 'idempotency_key' => 'unpaid-checkout',
+        ]);
+        $this->actingAs($owner, 'pos')->getJson('/pos/hotel/stays/'.$stay->id.'/checkout-quote?payment_method=cash')
+            ->assertOk()->assertJsonPath('balance', 11600);
+        $this->getJson('/pos/hotel/stays/'.$stay->id.'/checkout-quote?payment_method=card')
+            ->assertOk()->assertJsonPath('balance', 10500);
+        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee('data-hotel-collection-quote="1"', false);
     }
 
     public function test_booking_quote_is_read_only_and_rejects_foreign_rooms_and_housekeeping(): void

@@ -13,7 +13,7 @@
         ['pos.hotel.folios', [], 'hotel_menu_bills', 'folios'],
     ] : [];
 @endphp
-<nav class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-1" data-hotel-native-nav="1" aria-label="{{ __('pos.nav_hotel_front_desk') }}">
+<nav class="tn-hotel-main-nav grid grid-cols-2 sm:grid-cols-3 gap-1" data-hotel-native-nav="1" aria-label="{{ __('pos.nav_hotel_front_desk') }}">
     @foreach($links as [$name, $params, $label, $key])
     <a href="{{ route($name, $params) }}" data-hotel-desk-link="{{ $key }}" class="rounded-lg px-3 py-2.5 text-sm font-semibold {{ request()->routeIs($name) && !request()->boolean('checkout') && $key !== 'checkout' ? 'bg-teal-700 text-white' : 'text-slate-700 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800' }}">{{ __('pos.'.$label) }}</a>
     @endforeach

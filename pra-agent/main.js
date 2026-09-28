@@ -19,6 +19,7 @@ const { validateUpdateInfo } = require('./src/release-manifest');
 const { registerPortableUninstall } = require('./src/windows-uninstall');
 const { buildUpdateHandoffScript } = require('./src/update-handoff');
 const { shouldStopHandoff, nextHandoff } = require('./src/update-retry');
+const { failedHandoff } = require('./src/update-install-result');
 const { retireLegacyElectronLogin } = require('./src/windows-login-item');
 const { heartbeatDiagnostics } = require('./src/heartbeat-diagnostics');
 const offlineSnapshot = require('./src/offline-snapshot');
@@ -264,6 +265,7 @@ async function handleAgentUpdate(info) {
     const destDir = path.dirname(process.execPath);
     const backupDir = path.join(workDir, 'backup');
     const cmdPath = path.join(workDir, 'apply-update.cmd');
+    const resultPath = path.join(workDir, 'apply-update.result');
     const exePath = path.join(destDir, exeName);
     // Shut down this instance via stopAgent()/app.quit() below. The
     // single-instance lock prevents a twin on this profile.
@@ -272,6 +274,7 @@ async function handleAgentUpdate(info) {
     const script = buildUpdateHandoffScript({
       exePath, srcDir, destDir, backupDir,
       logPath: path.join(workDir, 'apply-update.log'),
+      resultPath, sourcePid: process.pid,
     });
     fs.writeFileSync(cmdPath, script);
 
@@ -280,12 +283,17 @@ async function handleAgentUpdate(info) {
     updateInfo = { ...updateInfo, downloading: false, downloaded: true, progress: 100 };
     sendUpdateState();
 
-    store.set('updateHandoffState', nextHandoff(priorHandoff, info.version));
+    store.set('updateHandoffState', { ...nextHandoff(priorHandoff, info.version), resultPath });
     const child = spawn('cmd.exe', ['/c', cmdPath], { detached: true, stdio: 'ignore', windowsHide: true, cwd: workDir });
     child.unref();
     isQuitting = true;
     stopAgent();
-    setTimeout(() => app.quit(), 500);
+    setTimeout(() => {
+      app.quit();
+      // If an Electron window/handle refuses graceful quit, only this Agent
+      // instance exits. The detached updater waits for its exact PID.
+      setTimeout(() => app.exit(0), 5000).unref();
+    }, 500);
   } catch (e) {
     console.log('[self-update] failed at stage', updStage, ':', e && e.message);
     const attemptsSoFar = (updateAttempts.get(info && info.version) || { count: 0 }).count;
@@ -1153,6 +1161,9 @@ if (!gotInstanceLock) {
     const previousUpdate = store.get('updateHandoffState');
     if (previousUpdate && !isNewerVersion(previousUpdate.target, app.getVersion())) {
       store.delete('updateHandoffState'); // target version actually started
+    } else if (previousUpdate) {
+      lastUpdateAttempt = failedHandoff(previousUpdate, app.getVersion(), isNewerVersion,
+        (file, encoding) => fs.readFileSync(file, encoding));
     }
     // Agent windows keep the agent identity; the POS window overrides its own
     // AppUserModelID in pos-window.js so NestPOS groups separately on the taskbar.
@@ -1648,6 +1659,10 @@ ipcMain.handle('check-ims-service', async () => {
 });
 
 ipcMain.handle('install-fbr-ims', async () => {
+  const { imsMode } = require('./src/ims-visibility');
+  if (imsMode(getStatus()) !== 'fbr') {
+    return { ok: false, error: 'Connect an FBR fiscal-device company before installing FBR IMS.' };
+  }
   if (process.platform !== 'win32') {
     return { ok: false, error: 'FBR IMS software only runs on Windows. Use the shop\'s Windows PC.' };
   }
@@ -1709,6 +1724,9 @@ ipcMain.handle('install-fbr-ims', async () => {
     };
     walk(extractDir, 0);
     const setup = found.find((f) => /setup|install/i.test(path.basename(f))) || found[0] || null;
+    if (imsMode(getStatus()) !== 'fbr') {
+      return { ok: false, error: 'The connected company changed. FBR IMS installer was not launched.' };
+    }
     sendImsProgress({ stage: 'launch', message: setup ? 'Launching FBR installer...' : 'Opening extracted folder...' });
     if (setup) {
       await shell.openPath(setup);

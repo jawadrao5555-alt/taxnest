@@ -1,9 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { imsMode } = require('./src/ims-visibility');
 
 contextBridge.exposeInMainWorld('agentAPI', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   getStatus: () => ipcRenderer.invoke('get-status'),
+  imsMode,
   toggleAgent: (enabled) => ipcRenderer.invoke('toggle-agent', enabled),
   testConnection: (config) => ipcRenderer.invoke('test-connection', config),
   onStatusUpdate: (callback) =>

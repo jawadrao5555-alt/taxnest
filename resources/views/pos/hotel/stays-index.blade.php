@@ -24,6 +24,7 @@
                     <th class="px-4 py-3">{{ __('pos.hotel_room') }}</th>
                     <th class="px-4 py-3">{{ __('pos.hotel_dates') }}</th>
                     <th class="px-4 py-3">{{ __('pos.status_col') }}</th>
+                    <th class="px-4 py-3">{{ __('pos.hotel_menu_bills') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -34,9 +35,10 @@
                     <td class="px-4 py-3">{{ $stay->room?->room_number }}</td>
                     <td class="px-4 py-3">{{ $stay->check_in_date->format('d M') }} – {{ $stay->check_out_date->format('d M') }} ({{ $stay->nights }} {{ \App\Services\PosUnitCatalog::label($stay->rate_unit) }})</td>
                     <td class="px-4 py-3">{{ \App\Services\HotelShell::statusLabel($stay->status) }}</td>
+                    <td class="px-4 py-3"><a class="font-semibold text-teal-700" href="{{ route('pos.hotel.stays.statement', $stay->id) }}">{{ __('hotel_bill.bill_action') }}</a></td>
                 </tr>
                 @empty
-                <tr><td colspan="5" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_stays') }}</td></tr>
+                <tr><td colspan="6" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_stays') }}</td></tr>
                 @endforelse
             </tbody>
         </table>

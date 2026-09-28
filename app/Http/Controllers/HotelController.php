@@ -287,7 +287,8 @@ class HotelController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('pos.hotel.stays.show', $stay->id)
+        return redirect()->route($data['walk_in'] ? 'pos.hotel.stays.statement' : 'pos.hotel.stays.show',
+            $data['walk_in'] ? [$stay->id, 'print' => 1] : [$stay->id])
             ->with('success', $data['walk_in'] ? __('pos.hotel_checked_in') : __('pos.hotel_reserved'));
     }
 
@@ -313,6 +314,15 @@ class HotelController extends Controller
         $deskSummary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
 
         return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline', 'deskSummary'));
+    }
+
+    public function statement(int $id)
+    {
+        $stay = $this->stay($id)->load(['room', 'folioEntries']);
+        $summary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
+        $totals = $this->folio->totals($stay);
+
+        return view('pos.hotel.statement', compact('stay', 'summary', 'totals'));
     }
 
     public function bookingQuote(Request $request)
@@ -389,7 +399,8 @@ class HotelController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', __('pos.hotel_checked_in'));
+        return redirect()->route('pos.hotel.stays.statement', [$id, 'print' => 1])
+            ->with('success', __('pos.hotel_checked_in'));
     }
 
     public function checkOut(int $id)
@@ -650,7 +661,7 @@ class HotelController extends Controller
         $stays = HotelStay::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->whereIn('status', ['reserved', 'checked_in', 'checked_out'])
-            ->with('room')
+            ->with(['room', 'folioEntries' => fn ($q) => $q->whereNotNull('pos_transaction_id')])
             ->orderByDesc('id')
             ->paginate(30)->withQueryString();
         $dues = [];

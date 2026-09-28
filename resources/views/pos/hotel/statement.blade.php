@@ -57,6 +57,7 @@
 <body>
 @if(empty($agentPrint))
 <nav class="toolbar actions" aria-label="{{ __('hotel_bill.paper_size') }}">
+    <a href="{{ route('pos.hotel.stays.show', $stay->id) }}">{{ __('hotel_bill.back') }}</a>
     <span>{{ __('hotel_bill.paper_size') }}:</span>
     @foreach(['a4' => 'A4', '80mm' => '80mm', '58mm' => '58mm'] as $value => $label)
         <a class="{{ $paper === $value ? 'selected' : '' }}" href="{{ route('pos.hotel.stays.statement', ['id' => $stay->id, 'paper' => $value]) }}">{{ $label }}</a>
@@ -65,7 +66,6 @@
     @if($paper !== 'a4')
         <button type="button" id="silent-print">{{ __('hotel_bill.silent_print') }}</button>
     @endif
-    <a href="{{ route('pos.hotel.stays.show', $stay->id) }}">{{ __('hotel_bill.back') }}</a>
     <a href="{{ route('pos.hotel.folios') }}">{{ __('pos.hotel_menu_bills') }}</a>
     <span class="status" id="print-status" role="status" aria-live="polite"></span>
 </nav>

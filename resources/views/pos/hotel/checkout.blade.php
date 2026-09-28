@@ -26,6 +26,8 @@
             <label class="text-sm">{{ __('pos.hotel_payment_method') }}<select name="payment_method" x-model="method" @change="refresh()" class="block mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-800">@include('pos.hotel._payment-methods')</select></label>
             <label class="text-sm">{{ __('pos.hotel_collect_now') }}<input name="amount" x-model="amount" required type="number" min="0" :max="quote.balance" step="0.01" class="block mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-800"></label>
         </div>
+        <p class="text-sm text-slate-600">{{ __('hotel_simplify.method_changes_tax') }}</p>
+        <div class="flex justify-between rounded-lg bg-teal-50 px-3 py-3 text-sm font-semibold" aria-live="polite"><span>{{ __('hotel_simplify.remaining_after_collection') }}</span><strong x-text="'Rs ' + money(Math.max(0, Number(quote.balance || 0) - Number(amount || 0)))"></strong></div>
         @if($allowBalance)
         <label class="flex gap-2 text-sm"><input type="checkbox" name="leave_balance" value="1" class="rounded" @checked(old('leave_balance'))>{{ __('pos.hotel_leave_balance') }}</label>
         @endif

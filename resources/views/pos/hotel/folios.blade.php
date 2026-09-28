@@ -9,7 +9,8 @@
                     <th class="px-4 py-3">{{ __('pos.hotel_guest') }}</th>
                     <th class="px-4 py-3">{{ __('pos.hotel_room') }}</th>
                     <th class="px-4 py-3">{{ __('pos.status_col') }}</th>
-                    <th class="px-4 py-3 text-right">{{ __('pos.hotel_folio_due') }}</th>
+                    <th class="px-4 py-3 text-right">{{ __('pos.hotel_folio_due') }} ({{ __('hotel_simplify.cash_estimate') }})</th>
+                    <th class="px-4 py-3">{{ __('pos.action_col') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -19,10 +20,11 @@
                     <td class="px-4 py-3">{{ $stay->guest_name }}</td>
                     <td class="px-4 py-3">{{ $stay->room?->room_number }}</td>
                     <td class="px-4 py-3">{{ \App\Services\HotelShell::statusLabel($stay->status) }}</td>
-                    <td class="px-4 py-3 text-right font-semibold">Rs {{ number_format($dues[$stay->id] ?? 0, 2) }}</td>
+                    <td class="px-4 py-3 text-right font-semibold">@if(($dues[$stay->id] ?? 0) > 0.009)<span class="text-amber-800">Rs {{ number_format($dues[$stay->id], 2) }}</span><span class="block text-xs font-normal">{{ __('hotel_simplify.payment_pending') }}</span>@else<span class="text-emerald-700">Rs 0.00</span>@endif</td>
+                    <td class="px-4 py-3">@if(($dues[$stay->id] ?? 0) > 0.009)<a class="font-semibold text-teal-700" href="{{ route('pos.hotel.stays.show', $stay->id) }}#hotel-payment">{{ __('pos.hotel_collect_now') }}</a>@else<a class="text-teal-700" href="{{ route('pos.hotel.stays.show', $stay->id) }}">{{ __('pos.hotel_desk_stay_details') }}</a>@endif</td>
                 </tr>
                 @empty
-                <tr><td colspan="5" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_pending') }}</td></tr>
+                <tr><td colspan="6" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_pending') }}</td></tr>
                 @endforelse
             </tbody>
         </table>

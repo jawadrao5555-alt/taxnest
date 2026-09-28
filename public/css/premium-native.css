@@ -169,3 +169,25 @@
         border-radius: var(--tn-radius-sm);
     }
 }
+
+.tn-hotel-shell {
+    max-width: 1440px;
+    margin-inline: auto;
+}
+
+.tn-hotel-shell-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+@media (min-width: 1024px) {
+    .tn-hotel-shell-grid {
+        grid-template-columns: 13rem minmax(0, 1fr);
+    }
+
+    .tn-hotel-main-nav {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

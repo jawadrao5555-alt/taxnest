@@ -249,6 +249,11 @@ class HotelSimpleDeskPricingTest extends TestCase
         app(\App\Services\HotelDeskService::class)->checkout($stay, $owner->id, ['amount' => 100, 'payment_method' => 'cash', 'leave_balance' => true, 'idempotency_key' => 'allow-balance']);
         $this->assertSame('checked_out', $stay->fresh()->status);
         $this->assertEquals(9900, app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance']);
+        $billPage = $this->actingAs($owner, 'pos')->get('/pos/hotel/folios')->assertOk()->getContent();
+        $this->assertStringContainsString(__('hotel_simplify.payment_pending'), $billPage);
+        $this->assertStringContainsString('/pos/hotel/stays/'.$stay->id.'#hotel-payment', $billPage);
+        $this->assertStringContainsString(__('hotel_simplify.cash_estimate'), $billPage);
+        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee(__('pos.hotel_collect_now'));
     }
 
     public function test_booking_quote_is_read_only_and_rejects_foreign_rooms_and_housekeeping(): void

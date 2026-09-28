@@ -41,6 +41,9 @@
         </div>
         @endforeach
     </div>
+    @if(($deskSummary['balance'] ?? 0) > 0.009)
+    <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{{ __('hotel_simplify.payment_pending') }} · {{ __('hotel_simplify.cash_estimate') }}. {{ __('hotel_simplify.method_changes_tax') }} <a href="#hotel-payment" class="font-semibold underline">{{ __('pos.hotel_collect_now') }}</a></p>
+    @endif
 
     @if(($totals['advance_credit'] ?? 0) > 0 || ($totals['deposit_held'] ?? 0) > 0)
     <p class="text-xs text-slate-600 dark:text-slate-300 mb-5">
@@ -156,7 +159,8 @@
                 @csrf
             <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
                 <h3 class="text-sm font-semibold">{{ __('pos.hotel_take_money') }}</h3>
-                <input type="number" step="0.01" name="amount" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+                <label class="block text-sm">{{ __('pos.hotel_collect_now') }}<input type="number" min="0.01" max="10000000" step="0.01" name="amount" required class="block mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm"></label>
+                <p class="text-xs text-slate-600">{{ __('hotel_simplify.method_changes_tax') }}</p>
                 <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                     @include('pos.hotel._payment-methods')
                 </select>

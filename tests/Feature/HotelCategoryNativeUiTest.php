@@ -107,6 +107,8 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringContainsString('data-hotel-room-board="1"', $html);
         $this->assertStringContainsString('data-hotel-reception="1"', $html);
         $this->assertStringContainsString('data-hotel-desk-menu="1"', $html);
+        $this->assertStringContainsString('tn-hotel-shell-grid', $html);
+        $this->assertStringContainsString('grid-template-columns: 13rem minmax(0, 1fr)', file_get_contents(public_path('css/premium-native.css')));
         $this->assertStringContainsString('data-hotel-reception-summary="1"', $html);
         $this->assertStringContainsString('data-hotel-empty-rooms="1"', $html);
         $this->assertStringContainsString('data-hotel-occupancy-rate="0"', $html);
@@ -162,6 +164,27 @@ class HotelCategoryNativeUiTest extends TestCase
             ->assertOk()->assertSee('value="'.$vacant->id.'" selected', false);
         $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create?walk_in=1&room_id='.$foreign->id)
             ->assertOk()->assertDontSee('value="'.$foreign->id.'"', false);
+    }
+
+    public function test_dirty_room_has_a_scoped_clean_action_and_returns_to_available_board(): void
+    {
+        $company = $this->company();
+        $other = $this->company();
+        $owner = $this->owner($company);
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '104', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 4500,
+        ]);
+        $foreign = app(HotelStayService::class)->createRoom((int) $other->id, [
+            'room_number' => '204', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 4500,
+        ]);
+        app(HotelStayService::class)->setHousekeeping($room, 'dirty');
+        $page = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
+        $this->assertStringContainsString('action="'.route('pos.hotel.rooms.housekeeping', $room->id).'"', $page);
+        $this->assertStringNotContainsString('action="'.route('pos.hotel.rooms.housekeeping', $foreign->id).'"', $page);
+        $this->assertStringNotContainsString('data-hotel-room-check-in="'.$room->id.'"', $page);
+        $this->post(route('pos.hotel.rooms.housekeeping', $room->id), ['housekeeping' => 'clean'])->assertRedirect();
+        $this->get('/pos/hotel')->assertOk()->assertSee('data-hotel-room-check-in="'.$room->id.'"', false);
+        $this->post(route('pos.hotel.rooms.housekeeping', $foreign->id), ['housekeeping' => 'clean'])->assertNotFound();
     }
 
     public function test_manage_as_hotel_header_keeps_exit_in_a_responsive_scoped_layout(): void

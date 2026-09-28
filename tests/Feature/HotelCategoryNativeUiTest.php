@@ -423,7 +423,9 @@ class HotelCategoryNativeUiTest extends TestCase
             'room_id' => $foreignRoom->id, 'check_in_date' => now()->toDateString(),
             'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Other', 'walk_in' => true,
         ]);
-        $this->post(route('pos.hotel.stays.void-error', $foreignStay->id), ['reason' => 'Wrong booking'])->assertNotFound();
+        $this->post(route('pos.hotel.stays.void-error', $foreignStay->id), ['reason' => 'Wrong booking'])
+            ->assertRedirect('/pos/dashboard');
+        $this->assertSame(HotelStay::STATUS_CHECKED_IN, $foreignStay->fresh()->status);
     }
 
     public function test_housekeeping_denied_from_restaurant_outlet(): void

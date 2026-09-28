@@ -1,4 +1,5 @@
 <!doctype html>
+@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
 <html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="utf-8">
@@ -8,7 +9,7 @@
         @include('partials.urdu-font')
     @endif
     <style>
-        @if(app()->getLocale() === 'ur')
+        @if($urduScript)
             @include('partials.urdu-print-font')
         @endif
         * { box-sizing: border-box; }
@@ -20,7 +21,7 @@
         .toolbar .status { flex-basis: 100%; min-height: 18px; font-size: 12px; }
         .bill { background: white; width: min(100% - 24px, {{ $paper === 'a4' ? '720px' : ($paper === '58mm' ? '58mm' : '80mm') }}); margin: 16px auto; padding: {{ $paper === 'a4' ? '28px' : '4mm' }}; box-shadow: 0 2px 12px #0002; overflow-wrap: anywhere; }
         .bill.thermal { font-size: {{ $paper === '58mm' ? '10px' : '11px' }}; }
-        @if(app()->getLocale() === 'ur')
+        @if($urduScript)
         .bill { font-family: 'Jameel Noori Nastaleeq', Arial, sans-serif; }
         @endif
         .brand { text-align: center; border-bottom: 2px solid #20252a; padding-bottom: 12px; }
@@ -55,7 +56,7 @@
 </head>
 <body>
 @if(empty($agentPrint))
-<nav class="toolbar" aria-label="{{ __('hotel_bill.paper_size') }}">
+<nav class="toolbar actions" aria-label="{{ __('hotel_bill.paper_size') }}">
     <span>{{ __('hotel_bill.paper_size') }}:</span>
     @foreach(['a4' => 'A4', '80mm' => '80mm', '58mm' => '58mm'] as $value => $label)
         <a class="{{ $paper === $value ? 'selected' : '' }}" href="{{ route('pos.hotel.stays.statement', ['id' => $stay->id, 'paper' => $value]) }}">{{ $label }}</a>

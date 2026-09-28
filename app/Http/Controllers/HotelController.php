@@ -16,7 +16,10 @@ use App\Services\HotelStayService;
 use App\Services\PosFeatureService;
 use App\Services\PosUnitCatalog;
 use App\Models\Company;
+use App\Models\PosAgentDevice;
+use App\Models\PosPrintJob;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class HotelController extends Controller
@@ -316,13 +319,78 @@ class HotelController extends Controller
         return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline', 'deskSummary'));
     }
 
-    public function statement(int $id)
+    public function statement(Request $request, int $id)
     {
         $stay = $this->stay($id)->load(['room', 'folioEntries']);
         $summary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
         $totals = $this->folio->totals($stay);
+        $company = Company::findOrFail((int) app('currentCompanyId'));
+        $paper = $request->query('paper', $company->receipt_printer_size === '58mm' ? '58mm' : '80mm');
+        abort_unless(in_array($paper, ['a4', '58mm', '80mm'], true), 422);
 
-        return view('pos.hotel.statement', compact('stay', 'summary', 'totals'));
+        return view('pos.hotel.statement', compact('stay', 'summary', 'totals', 'paper', 'company'));
+    }
+
+    public function silentStatement(Request $request, int $id)
+    {
+        $stay = $this->stay($id);
+        $data = $request->validate([
+            'paper' => 'required|in:58mm,80mm',
+            'print_attempt_uuid' => 'required|uuid',
+        ]);
+        $company = Company::findOrFail((int) app('currentCompanyId'));
+        $settings = $company->printerSettings();
+        $user = auth('pos')->user();
+        try {
+            $result = DB::transaction(function () use ($stay, $data, $company, $settings, $user) {
+                HotelStay::where('company_id', $company->id)->whereKey($stay->id)->lockForUpdate()->firstOrFail();
+                $existing = PosPrintJob::where('company_id', $company->id)
+                    ->where('print_attempt_uuid', $data['print_attempt_uuid'])->first();
+                if ($existing) {
+                    return $existing->type === 'hotel_bill' && (int) $existing->hotel_stay_id === (int) $stay->id
+                        ? ['job' => $existing, 'deduped' => true] : ['reason' => 'idempotency_conflict'];
+                }
+                if (!$settings['silent_print_enabled']) return ['reason' => 'disabled'];
+                if (!$company->agentOnline()) return ['reason' => 'agent_offline'];
+
+                $deviceUid = null;
+                $printer = $settings['receipt_printer'];
+                if (\App\Http\Controllers\AgentController::deviceRoutingReady()
+                    && Schema::hasColumn('users', 'pos_device_uid') && $user->pos_device_uid) {
+                    $device = PosAgentDevice::where('company_id', $company->id)
+                        ->where('device_uid', $user->pos_device_uid)->first();
+                    if (!$device || !$device->isOnline() || !$device->receipt_printer) {
+                        return ['reason' => 'counter_unavailable'];
+                    }
+                    $deviceUid = $device->device_uid;
+                    $printer = $device->receipt_printer;
+                }
+                if (!$printer) return ['reason' => 'no_printer'];
+
+                return ['job' => PosPrintJob::create([
+                    'company_id' => $company->id,
+                    'type' => 'hotel_bill',
+                    'hotel_stay_id' => $stay->id,
+                    'print_attempt_uuid' => $data['print_attempt_uuid'],
+                    'render_query' => 'paper=' . $data['paper'],
+                    'target_printer' => $printer,
+                    'device_uid' => $deviceUid,
+                    'status' => 'pending',
+                    'created_by' => $user->id,
+                ]), 'deduped' => false];
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            // The unique company/UUID index handles simultaneous requests from different stays.
+            $winner = PosPrintJob::where('company_id', $company->id)
+                ->where('print_attempt_uuid', $data['print_attempt_uuid'])->first();
+            if (!$winner) throw $e;
+            $result = $winner->type === 'hotel_bill' && (int) $winner->hotel_stay_id === (int) $stay->id
+                ? ['job' => $winner, 'deduped' => true] : ['reason' => 'idempotency_conflict'];
+        }
+        if (isset($result['reason'])) {
+            return response()->json(['success' => false, 'reason' => $result['reason']], 409);
+        }
+        return response()->json(['success' => true, 'job_id' => $result['job']->id, 'deduped' => $result['deduped']]);
     }
 
     public function bookingQuote(Request $request)

@@ -27,6 +27,7 @@ class UrduPrintFontCoverageTest extends TestCase
 {
     /** Thermal templates that must carry the JNN print @font-face + gate. */
     private const JNN_PRINT_TEMPLATES = [
+        'resources/views/pos/hotel/statement.blade.php',
         'resources/views/pos/receipts/receipt_80mm.blade.php',
         'resources/views/pos/receipts/receipt_58mm.blade.php',
         'resources/views/pos/restaurant/kitchen-ticket.blade.php',

@@ -8,4 +8,9 @@ return [
     'cash_estimate' => 'Unpaid balance is a cash estimate; card or QR tax may change the final amount.',
     'issued_receipt' => 'Reprint POS receipt',
     'bill_action' => 'Bill / reprint',
+    'paper_size' => 'Paper size',
+    'silent_print' => 'Print silently via Agent',
+    'sending' => 'Sending to printer…',
+    'queued' => 'Print job queued',
+    'unavailable' => 'Silent printing unavailable; use Print bill',
 ];

@@ -8,4 +8,9 @@ return [
     'cash_estimate' => 'Baqaya cash estimate hai; card ya QR tax se final amount badal sakta hai.',
     'issued_receipt' => 'POS receipt dobara print',
     'bill_action' => 'Bill / reprint',
+    'paper_size' => 'Paper size',
+    'silent_print' => 'Agent se silent print',
+    'sending' => 'Printer ko bhej rahe hain…',
+    'queued' => 'Print job queue mein hai',
+    'unavailable' => 'Silent print available nahi; Print bill use karein',
 ];

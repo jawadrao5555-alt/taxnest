@@ -2074,6 +2074,22 @@ class AgentController extends Controller
             ])->render())->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
+        if ($job->type === 'hotel_bill') {
+            $stay = \App\Models\HotelStay::where('company_id', $company->id)
+                ->with(['room', 'folioEntries'])->find($job->hotel_stay_id);
+            if (!$stay) return response()->json(['error' => 'Stay not found'], 404);
+            $this->setPrintLocale(null, $job, $company);
+            parse_str((string) $job->render_query, $options);
+            $paper = in_array($options['paper'] ?? null, ['58mm', '80mm'], true)
+                ? $options['paper'] : ($company->receipt_printer_size === '58mm' ? '58mm' : '80mm');
+            $summary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
+            $totals = app(\App\Services\HotelFolioService::class)->totals($stay);
+            return response(view('pos.hotel.statement', [
+                'stay' => $stay, 'company' => $company, 'summary' => $summary,
+                'totals' => $totals, 'paper' => $paper, 'agentPrint' => true,
+            ])->render())->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
         if ($job->type === 'bill') {
             $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $company->id)

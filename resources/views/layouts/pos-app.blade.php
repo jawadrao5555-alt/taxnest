@@ -348,6 +348,29 @@
             [data-theme="midnight"] { --nav-bg: linear-gradient(135deg, #0a0a0a 0%, #171717 40%, #262626 100%); --accent-h: 0; --accent-s: 0%; --accent-l: 45%; --avatar-from: #a3a3a3; --avatar-to: #525252; --accent-glow: rgba(115,115,115,0.2); --meta-color: #d4d4d4; --status-text: #d4d4d4; --pill-hover: rgba(255,255,255,0.1); --pill-active: rgba(255,255,255,0.15); }
             [data-theme="rose"] { --nav-bg: linear-gradient(135deg, #4c0519 0%, #881337 40%, #be123c 100%); --accent-h: 347; --accent-s: 77%; --accent-l: 50%; --avatar-from: #fb7185; --avatar-to: #e11d48; --accent-glow: rgba(225,29,72,0.2); --meta-color: #fecdd3; --status-text: #fecdd3; --pill-hover: rgba(255,255,255,0.12); --pill-active: rgba(255,255,255,0.18); }
 
+            /* Hotel reception uses teal utilities for its accent. Keep its status
+               colours (dirty/occupied/payment warnings) distinct from the theme. */
+            .tn-hotel-shell .bg-teal-600 { background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l)) !important; }
+            .tn-hotel-shell .bg-teal-700 { background-color: hsl(var(--accent-h), var(--accent-s), 40%) !important; }
+            .tn-hotel-shell .bg-teal-50 { background-color: hsl(var(--accent-h), var(--accent-s), 97%) !important; }
+            .tn-hotel-shell .bg-teal-50\/40 { background-color: hsl(var(--accent-h) var(--accent-s) 97% / 0.4) !important; }
+            .tn-hotel-shell .text-teal-700 { color: hsl(var(--accent-h), var(--accent-s), 35%) !important; }
+            .tn-hotel-shell .text-teal-800 { color: hsl(var(--accent-h), var(--accent-s), 28%) !important; }
+            .tn-hotel-shell .border-teal-100 { border-color: hsl(var(--accent-h), var(--accent-s), 90%) !important; }
+            .tn-hotel-shell .border-teal-200 { border-color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            .tn-hotel-shell .border-teal-300 { border-color: hsl(var(--accent-h), var(--accent-s), 74%) !important; }
+            .tn-hotel-shell .hover\:bg-teal-50:hover { background-color: hsl(var(--accent-h), var(--accent-s), 97%) !important; }
+            .tn-hotel-shell .hover\:bg-teal-800:hover { background-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+            .tn-hotel-shell .hover\:text-teal-700:hover { color: hsl(var(--accent-h), var(--accent-s), 35%) !important; }
+            .dark .tn-hotel-shell .dark\:bg-teal-900\/10 { background-color: hsl(var(--accent-h) var(--accent-s) 22% / 0.1) !important; }
+            .dark .tn-hotel-shell .dark\:bg-teal-950\/20 { background-color: hsl(var(--accent-h) var(--accent-s) 15% / 0.2) !important; }
+            .dark .tn-hotel-shell .dark\:bg-teal-950\/30 { background-color: hsl(var(--accent-h) var(--accent-s) 15% / 0.3) !important; }
+            .dark .tn-hotel-shell .dark\:border-teal-800 { border-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+            .dark .tn-hotel-shell .dark\:border-teal-900 { border-color: hsl(var(--accent-h), var(--accent-s), 22%) !important; }
+            .dark .tn-hotel-shell .dark\:text-teal-200 { color: hsl(var(--accent-h), var(--accent-s), 84%) !important; }
+            .dark .tn-hotel-shell .dark\:text-teal-300 { color: hsl(var(--accent-h), var(--accent-s), 76%) !important; }
+            [data-hotel-back-front-desk] { background-color: hsl(var(--accent-h), var(--accent-s), 32%) !important; }
+
             .topnav-bar { background: var(--nav-bg, linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)); }
             .nav-pill { transition: all 0.15s ease; }
             .nav-pill:hover { background: var(--pill-hover); }

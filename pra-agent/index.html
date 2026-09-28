@@ -280,8 +280,8 @@
     <div id="lanSaved" style="display:none; margin-top:8px; font-size:12px; color:#10b981;">Saved</div>
   </div>
 
-  <div class="card">
-    <h3>FBR IMS Fiscal Service (Fiscal Device Mode)</h3>
+  <div class="card" id="imsCard" style="display:none;">
+    <h3 id="imsHeading">IMS Fiscal Service</h3>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
       <span id="imsBadge" class="badge offline"><span class="dot"></span> Checking…</span>
       <div class="btn-row">
@@ -298,8 +298,11 @@
       3️⃣ Select <b>Production</b><br>
       Then press <b>Re-check</b> — when the badge turns green, queued bills sync automatically.
     </div>
+    <div id="praImsSteps" style="display:none; font-size:12px; color:#c4b5fd; line-height:1.7;">
+      PRA Fiscal Device mode needs PRAL's local IMS service on this PC. Install and activate it using your PRA POS credentials, then press Re-check.
+    </div>
     <div id="imsOkNote" style="display:none; font-size:12px; color:#10b981;">
-      ✓ FBR IMS service detected on this PC — fiscal bills will submit through it automatically.
+      ✓ Local IMS service detected on this PC. This checks local availability only; invoice submission is confirmed separately.
     </div>
   </div>
 
@@ -395,6 +398,18 @@
   }
 
   function renderStatus(s) {
+    const mode = window.agentAPI.imsMode(s);
+    if (mode !== currentImsMode) {
+      currentImsMode = mode;
+      imsGeneration++;
+      $('imsCard').style.display = mode ? 'block' : 'none';
+      $('imsHeading').textContent = mode === 'fbr' ? 'FBR IMS Fiscal Service' : 'PRA IMS Fiscal Service';
+      $('imsSteps').style.display = 'none';
+      $('praImsSteps').style.display = 'none';
+      $('imsInstallBtn').style.display = 'none';
+      $('imsProgress').style.display = 'none';
+      if (mode) checkIms();
+    }
     const badge = $('statusBadge');
     if (s.running && s.connected) {
       badge.className = 'badge online';
@@ -571,22 +586,29 @@
     showUpdateBanner(u);
   })();
 
+  let currentImsMode = null;
+  let imsGeneration = 0;
   async function checkIms() {
+    if (!currentImsMode) return;
+    const generation = imsGeneration;
     const badge = $('imsBadge');
     badge.className = 'badge offline';
     badge.innerHTML = '<span class="dot"></span> Checking…';
     const r = await window.agentAPI.checkImsService();
+    if (generation !== imsGeneration || !currentImsMode) return;
     if (r.running) {
       badge.className = 'badge online';
       badge.innerHTML = '<span class="dot"></span> IMS Running';
       $('imsInstallBtn').style.display = 'none';
       $('imsSteps').style.display = 'none';
+      $('praImsSteps').style.display = 'none';
       $('imsOkNote').style.display = 'block';
     } else {
       badge.className = 'badge error';
       badge.innerHTML = '<span class="dot"></span> IMS Not Found';
-      $('imsInstallBtn').style.display = 'inline-block';
-      $('imsSteps').style.display = 'block';
+      $('imsInstallBtn').style.display = currentImsMode === 'fbr' ? 'inline-block' : 'none';
+      $('imsSteps').style.display = currentImsMode === 'fbr' ? 'block' : 'none';
+      $('praImsSteps').style.display = currentImsMode === 'pra' ? 'block' : 'none';
       $('imsOkNote').style.display = 'none';
     }
   }
@@ -594,6 +616,7 @@
   $('imsCheckBtn').addEventListener('click', checkIms);
 
   $('imsInstallBtn').addEventListener('click', async () => {
+    if (currentImsMode !== 'fbr') return;
     const btn = $('imsInstallBtn');
     btn.disabled = true;
     $('imsProgress').style.display = 'block';
@@ -610,6 +633,7 @@
   });
 
   window.agentAPI.onImsProgress((p) => {
+    if (currentImsMode !== 'fbr') return;
     $('imsProgress').style.display = 'block';
     $('imsProgress').style.color = p.stage === 'error' ? '#fca5a5' : '#c4b5fd';
     $('imsProgress').textContent =
@@ -774,8 +798,7 @@
     }
   }, 5000);
 
-  checkIms();
-  setInterval(checkIms, 60000);
+  setInterval(() => { if (currentImsMode) checkIms(); }, 60000);
 
   loadConfig();
   window.agentAPI.getStatus().then(renderStatus);

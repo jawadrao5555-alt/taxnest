@@ -486,6 +486,11 @@ class AgentController extends Controller
                 'name' => $company->name,
                 'pra_pos_id' => $company->pra_pos_id,
                 'pra_environment' => $company->pra_environment,
+                // Additive, authenticated UI identity. Old agents ignore these
+                // fields; new agents never infer FBR from a listening port.
+                'product_type' => $company->product_type,
+                'pra_connection_mode' => $company->pra_connection_mode ?? 'cloud',
+                'fbr_connection_mode' => $company->fbr_connection_mode ?? 'cloud',
             ],
             'healed' => $healed,
             'repromoted' => $repromoted,

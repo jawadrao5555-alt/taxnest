@@ -275,6 +275,38 @@ class PosTeamAccountLimitTest extends TestCase
         $this->assertSame('ok', $this->addTeamMember('pos_manager', 'm9@shop.test'));
     }
 
+    public function test_one_branch_manager_per_active_branch_has_an_included_seat(): void
+    {
+        Schema::table('users', fn (Blueprint $table) => $table->unsignedBigInteger('default_branch_id')->nullable());
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+        $first = \DB::table('branches')->insertGetId(['company_id' => $this->companyId, 'name' => 'Main', 'is_active' => true]);
+        $second = \DB::table('branches')->insertGetId(['company_id' => $this->companyId, 'name' => 'Second', 'is_active' => true]);
+        $this->makePlan('Starter', 2);
+        $this->staff('pos_cashier', 'c1@shop.test');
+        $this->staff('pos_cashier', 'c2@shop.test');
+
+        $this->assertFalse(PlanLimitService::canAddPosUser($this->companyId, 'pos_cashier')['allowed']);
+        $this->assertTrue(PlanLimitService::canAddPosUser($this->companyId, 'pos_manager', $first)['branch_manager_included']);
+        $manager = $this->staff('pos_manager', 'main-manager@shop.test');
+        $manager->default_branch_id = $first;
+        $manager->save();
+        $this->assertFalse(PlanLimitService::canAddPosUser($this->companyId, 'pos_manager', $first)['allowed']);
+        $this->assertTrue(PlanLimitService::canAddPosUser($this->companyId, 'pos_manager', $second)['branch_manager_included']);
+        $secondManager = $this->staff('pos_manager', 'second-manager@shop.test');
+        $secondManager->default_branch_id = $second;
+        $secondManager->save();
+        $this->assertFalse(PlanLimitService::canAddPosUser($this->companyId, 'pos_cashier')['allowed']);
+
+        \DB::table('branches')->where('id', $second)->update(['is_active' => false]);
+        $this->assertFalse(PlanLimitService::canAddPosUser($this->companyId, 'pos_manager', $second)['allowed']);
+    }
+
     public function test_every_pos_plan_gate_uses_the_number_the_table_prints(): void
     {
         auth('pos')->setUser($this->owner());

@@ -369,24 +369,45 @@ class PlanLimitService
     }
 
     /**
-     * PRA POS team-account quota: plan user_limit counts ADDED team accounts
-     * only (pos_manager + pos_cashier). The company owner's pos_admin account
-     * is EXEMPT (owner rule, Jul 2026) — Starter 1 = owner + 1 team account.
-     * Kitchen/waiter/rider are limit-exempt confined roles; read-only portal
+     * PRA POS team-account quota: user_limit counts active cashiers and
+     * additional managers. The owner and one manager assigned to each active
+     * company branch do not consume team seats. Kitchen/waiter/rider are
+     * limit-exempt confined roles; read-only portal
      * accounts (local_viewer / archive_viewer) are super-admin provisioned
      * and never consume the quota.
      */
-    public static function canAddPosUser(int $companyId): array
+    public static function canAddPosUser(int $companyId, ?string $newRole = null, ?int $newBranchId = null): array
     {
         $company = \App\Models\Company::find($companyId);
         if ($company && $company->is_internal_account) {
             return ['allowed' => true, 'internal' => true];
         }
 
-        $count = User::where('company_id', $companyId)
-            ->where('is_active', true)
+        $branchSeatsReady = \Illuminate\Support\Facades\Schema::hasTable('branches')
+            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id');
+        $team = User::where('company_id', $companyId)->where('is_active', true)
             ->whereIn('pos_role', ['pos_manager', 'pos_cashier'])
-            ->count();
+            ->orderBy('id')->get($branchSeatsReady ? ['id', 'pos_role', 'default_branch_id'] : ['id', 'pos_role']);
+        // One active, branch-assigned manager per real branch is included with
+        // that branch. A second manager there consumes a regular team seat.
+        // Legacy managers without a branch remain regular team accounts.
+        $realBranches = $branchSeatsReady ? \Illuminate\Support\Facades\DB::table('branches')->where('company_id', $companyId)
+            ->where(function ($q) { $q->where('is_active', true)->orWhereNull('is_active'); })
+            ->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
+        $included = [];
+        $count = 0;
+        foreach ($team as $member) {
+            $branch = (int) $member->default_branch_id;
+            if ($member->pos_role === 'pos_manager' && $branch
+                && in_array($branch, $realBranches, true) && !isset($included[$branch])) {
+                $included[$branch] = true;
+                continue;
+            }
+            $count++;
+        }
+        $includedManager = $newRole === 'pos_manager' && $newBranchId
+            && in_array($newBranchId, $realBranches, true) && !isset($included[$newBranchId]);
+        if ($includedManager) return ['allowed' => true, 'branch_manager_included' => true];
 
         if ($company && $company->user_limit_override !== null) {
             if ((int) $company->user_limit_override === -1) {

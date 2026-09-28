@@ -9557,9 +9557,15 @@ class PosController extends Controller
             return redirect()->route('pos.dashboard')->with('error', __('pos.access_denied'));
         }
 
-        $team = User::where('company_id', $companyId)
+        $ownerView = $user->pos_role === 'pos_admin' || $user->role === 'company_admin';
+        $teamQuery = User::where('company_id', $companyId)
             ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])
-            ->orderByRaw("CASE WHEN pos_role = 'pos_admin' THEN 0 WHEN pos_role = 'pos_manager' THEN 1 WHEN pos_role = 'pos_cashier' THEN 2 ELSE 3 END")
+            ->orderByRaw("CASE WHEN pos_role = 'pos_admin' THEN 0 WHEN pos_role = 'pos_manager' THEN 1 WHEN pos_role = 'pos_cashier' THEN 2 ELSE 3 END");
+        if (!$ownerView && \Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id')) {
+            $branchIds = app(\App\Services\BranchContextService::class)->accessibleBranches()->pluck('id')->all();
+            $teamQuery->whereIn('default_branch_id', $branchIds);
+        }
+        $team = $teamQuery
             ->orderBy('name')
             ->get();
 
@@ -9569,7 +9575,7 @@ class PosController extends Controller
         // Accounts created before this feature have no copy until the admin
         // sets a new password (hashes are irreversible).
         $teamPasswords = [];
-        foreach ($team as $member) {
+        foreach ($ownerView ? $team : [] as $member) {
             if (in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'], true)
                 && !empty($member->pos_team_password_enc)) {
                 try {
@@ -9589,10 +9595,10 @@ class PosController extends Controller
         // selector only appear once the company actually has branches.
         // hasTable guard mirrors BranchContextService::branchesReady() — the
         // team page must survive a deployment whose branch migration is missing.
-        $branches = \Illuminate\Support\Facades\Schema::hasTable('branches')
+        $branches = $ownerView && \Illuminate\Support\Facades\Schema::hasTable('branches')
             ? \App\Models\Branch::where('company_id', $companyId)
                 ->orderByDesc('is_head_office')->orderBy('name')->get()
-            : collect();
+            : app(\App\Services\BranchContextService::class)->accessibleBranches();
 
         return view('pos.team', compact('team', 'teamPasswords', 'company', 'branches'));
     }
@@ -9609,6 +9615,14 @@ class PosController extends Controller
         $branchId = (int) $request->default_branch_id;
         return \App\Models\Branch::where('company_id', $companyId)->where('id', $branchId)->exists()
             ? $branchId : null;
+    }
+
+    private function posCanManageTeamMember($actor, User $member): bool
+    {
+        if ($actor->pos_role === 'pos_admin' || $actor->role === 'company_admin') return true;
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id')) return true;
+        return $member->default_branch_id
+            && app(\App\Services\BranchContextService::class)->canAccess((int) $member->default_branch_id);
     }
 
     public function storeCashier(Request $request)
@@ -9639,15 +9653,29 @@ class PosController extends Controller
         ]);
 
         $newRole = $request->input('pos_role') ?: 'pos_cashier';
+        if ($newRole === 'pos_manager' && $user->pos_role !== 'pos_admin'
+            && $user->role !== 'company_admin') {
+            return back()->with('error', __('pos.access_denied'));
+        }
+        $managerBranchId = $newRole === 'pos_manager'
+            ? $this->posResolveBranchId($request, (int) $companyId) : null;
+        if ($user->pos_role !== 'pos_admin' && $user->role !== 'company_admin'
+            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id')) {
+            $requestedBranch = $this->posResolveBranchId($request, (int) $companyId);
+            if (!$requestedBranch || !app(\App\Services\BranchContextService::class)->canAccess($requestedBranch)) {
+                return back()->with('error', __('pos.access_denied'));
+            }
+        }
 
         // Team-account quota (paid-plan package limits, Jul 2026):
-        // user_limit counts ADDED accounts only — the owner's pos_admin account
-        // is EXEMPT. Starter 1 = owner + 1, Business 5, Pro 10, Unlimited -1.
-        // Managers count toward the limit exactly like cashiers.
+        // Owner and the first manager assigned to each active branch are
+        // included; additional managers consume a regular team seat.
         // Kitchen (P5, F4) + Waiter (P7, F6) + Delivery Manager accounts are
         // limit-EXEMPT — confined roles (owner, 20 Jul 2026).
         if (!in_array($newRole, ['pos_kitchen', 'pos_waiter', 'pos_delivery'], true)) {
-            $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
+            $quota = \App\Services\PlanLimitService::canAddPosUser(
+                (int) $companyId, $newRole, $managerBranchId
+            );
             if (!($quota['allowed'] ?? true)) {
                 return back()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']));
             }
@@ -9816,6 +9844,7 @@ class PosController extends Controller
         $cashier = User::where('company_id', $companyId)
             ->where('pos_role', 'pos_cashier')
             ->findOrFail($id);
+        abort_unless($this->posCanManageTeamMember($user, $cashier), 404);
 
         $company = Company::find($companyId);
 
@@ -9894,6 +9923,7 @@ class PosController extends Controller
         $member = User::where('company_id', $companyId)
             ->whereIn('pos_role', \App\Services\PosAccessService::CUSTOMIZABLE_ROLES)
             ->findOrFail($id);
+        abort_unless($this->posCanManageTeamMember($user, $member), 404);
 
         if (!$request->boolean('custom_enabled')) {
             $member->pos_custom_access = null;
@@ -9922,6 +9952,11 @@ class PosController extends Controller
         }
 
         $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])->findOrFail($id);
+        abort_unless($this->posCanManageTeamMember($user, $cashier), 404);
+        if ($cashier->pos_role === 'pos_manager' && $user->pos_role !== 'pos_admin'
+            && $user->role !== 'company_admin') {
+            return back()->with('error', __('pos.access_denied'));
+        }
         $company = Company::find($companyId);
 
         $request->validate([
@@ -10239,12 +10274,17 @@ class PosController extends Controller
         }
 
         $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])->findOrFail($id);
+        abort_unless($this->posCanManageTeamMember($user, $cashier), 404);
+        if ($cashier->pos_role === 'pos_manager' && $user->pos_role !== 'pos_admin'
+            && $user->role !== 'company_admin') return back()->with('error', __('pos.access_denied'));
 
         // Reactivating a cashier re-consumes a team-account slot — same gate as
         // storeCashier, otherwise deactivate→create→reactivate bypasses the limit.
         // Kitchen + Waiter + Delivery Manager accounts are limit-EXEMPT (never consume a slot).
         if (!$cashier->is_active && !in_array($cashier->pos_role, ['pos_kitchen', 'pos_waiter', 'pos_delivery'], true)) {
-            $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
+            $quota = \App\Services\PlanLimitService::canAddPosUser(
+                (int) $companyId, $cashier->pos_role, (int) $cashier->default_branch_id ?: null
+            );
             if (!($quota['allowed'] ?? true)) {
                 return back()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']));
             }

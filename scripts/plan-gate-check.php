@@ -91,7 +91,7 @@ $MATRIX = [
     // package carries it. The column stays FALSE on every PRA row; an active
     // PRA trial still opens it by the blanket trial rule, which is harmless
     // because the pharmacy screens live on the FBR panel only.
-    'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false, false],
+    'Starter'   => [false, false, false, false, false, false, false, false, true, false, true, true, true, false, false, false],
     'Business'  => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, true,  false],
     'Unlimited' => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, true,  true,  false],
 ];
@@ -107,8 +107,8 @@ $BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Unlimited' => 2];
 $CUSTOM_SET_PLANS = ['Business', 'Unlimited']; // included Business+
 $QR_URL_PLANS     = ['Business', 'Unlimited'];
 // Restaurant module (pricing_plans.restaurant_enabled → restaurantAllowed()):
-// Business+ since 13 Aug 2026 (Kitchen mode opened up for Business).
-$RESTAURANT_PLANS = ['Business', 'Unlimited'];
+// Kitchen/KOT works for a restaurant on every paid PRA POS package.
+$RESTAURANT_PLANS = ['Starter', 'Business', 'Unlimited'];
 
 $fail = 0;
 $pass = 0;

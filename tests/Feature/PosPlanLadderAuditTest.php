@@ -50,7 +50,7 @@ class PosPlanLadderAuditTest extends TestCase
 
     /** plan name => the tick/cross row keys that must be ON. Everything else is a cross. */
     private const FEATURES_ON = [
-        'Starter'   => [],
+        'Starter'   => ['restaurant', 'offline'],
         'Business'  => ['restaurant', 'deals', 'riders', 'qr_menu', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
         'Pro'       => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
         'Unlimited' => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],

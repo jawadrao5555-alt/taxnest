@@ -217,6 +217,30 @@ class PosPlanMergeMigrationTest extends TestCase
         );
     }
 
+    public function test_core_pos_workflows_migration_only_expands_current_pra_packages(): void
+    {
+        $starter = $this->insertPlan('Starter', 17999, 2000, 2, 1, 1);
+        $business = $this->insertPlan('Business', 27999, -1, 7, 1, -1);
+        $unlimited = $this->insertPlan('Unlimited', 34999, -1, 12, 2, -1);
+        $legacy = $this->insertPlan('Pro', 34999, -1, 20, 3, -1);
+        $fbr = $this->insertPlan('Starter', 17999, 2000, 2, 1, 1, ['product_type' => 'fbrpos']);
+
+        $migration = require database_path('migrations/2026_09_28_200000_include_core_pos_workflows_in_starter.php');
+        $migration->up();
+        $migration->up();
+        foreach ([$starter, $business, $unlimited] as $id) {
+            $plan = DB::table('pricing_plans')->find($id);
+            $this->assertSame(1, (int) $plan->offline_enabled);
+            $this->assertSame(1, (int) $plan->restaurant_enabled);
+            $this->assertSame(1, (int) $plan->kot_enabled);
+        }
+        foreach ([$legacy, $fbr] as $id) {
+            $plan = DB::table('pricing_plans')->find($id);
+            $this->assertSame(0, (int) $plan->offline_enabled);
+            $this->assertSame(0, (int) $plan->restaurant_enabled);
+        }
+    }
+
     private function insertPlan(
         string $name,
         int $price,

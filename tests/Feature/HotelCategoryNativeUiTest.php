@@ -202,7 +202,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $other = $this->company();
         $this->actingAs($this->owner($other), 'pos')->postJson($endpoint, [
             'paper' => '58mm', 'print_attempt_uuid' => '55246d5e-dacb-441e-a375-1212c6fab3de',
-        ])->assertRedirect(route('pos.dashboard'));
+        ])->assertNotFound();
     }
 
     public function test_reception_room_actions_preselect_only_a_room_from_its_own_company(): void

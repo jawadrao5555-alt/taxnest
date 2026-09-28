@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('hotel_bill.statement') }} · {{ $stay->stay_number }}</title>
+    @if(empty($agentPrint))
+        @include('partials.urdu-font')
+    @endif
     <style>
         @if(app()->getLocale() === 'ur')
             @include('partials.urdu-print-font')

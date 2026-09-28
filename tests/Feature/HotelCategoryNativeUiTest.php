@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Company;
 use App\Models\HotelStay;
 use App\Models\HotelFolioEntry;
+use App\Models\PosPrintJob;
 use App\Models\AdminUser;
 use App\Models\User;
 use App\Services\HotelShell;
@@ -160,6 +161,48 @@ class HotelCategoryNativeUiTest extends TestCase
         ]);
         $this->get(route('pos.hotel.stays.statement', $foreignStay->id))
             ->assertRedirect(route('pos.dashboard'));
+    }
+
+    public function test_statement_has_browser_paper_choices_and_silent_queue_requires_online_agent(): void
+    {
+        $company = $this->company();
+        $owner = $this->owner($company);
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '211', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 4200,
+        ]);
+        $stay = app(HotelStayService::class)->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Print guest', 'walk_in' => true,
+        ]);
+        $this->actingAs($owner, 'pos');
+        $url = route('pos.hotel.stays.statement', $stay->id);
+        $this->get($url)->assertOk()->assertSee('size: 80mm auto')->assertSee('Rs 4,200.00');
+        $this->get($url . '?paper=a4')->assertOk()->assertSee('size: A4')->assertDontSee('id="silent-print"', false);
+        $this->get($url . '?paper=58mm')->assertOk()->assertSee('size: 58mm auto');
+
+        $endpoint = route('pos.hotel.stays.statement.silent-print', $stay->id);
+        $uuid = 'd28830e3-f368-4df1-9739-778011028402';
+        $payload = ['paper' => '80mm', 'print_attempt_uuid' => $uuid];
+        $this->postJson($endpoint, $payload)->assertStatus(409)->assertJsonPath('reason', 'disabled');
+        $this->assertSame(0, PosPrintJob::where('company_id', $company->id)->count());
+
+        $company->update([
+            'agent_enabled' => true, 'agent_last_seen' => now(),
+            'pos_printer_settings' => ['silent_print_enabled' => true, 'receipt_printer' => 'Counter Receipt'],
+        ]);
+        $this->postJson($endpoint, $payload)->assertOk()->assertJsonPath('deduped', false);
+        $this->postJson($endpoint, $payload)->assertOk()->assertJsonPath('deduped', true);
+        $this->assertDatabaseHas('pos_print_jobs', [
+            'company_id' => $company->id, 'hotel_stay_id' => $stay->id,
+            'type' => 'hotel_bill', 'target_printer' => 'Counter Receipt',
+            'render_query' => 'paper=80mm', 'print_attempt_uuid' => $uuid,
+        ]);
+        $this->assertSame(1, PosPrintJob::where('company_id', $company->id)->count());
+
+        $other = $this->company();
+        $this->actingAs($this->owner($other), 'pos')->postJson($endpoint, [
+            'paper' => '58mm', 'print_attempt_uuid' => '55246d5e-dacb-441e-a375-1212c6fab3de',
+        ])->assertRedirect(route('pos.dashboard'));
     }
 
     public function test_reception_room_actions_preselect_only_a_room_from_its_own_company(): void

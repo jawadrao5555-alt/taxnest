@@ -17,6 +17,7 @@ class PosPrintJob extends Model
         'transaction_id',
         'print_attempt_uuid',
         'restaurant_order_id',
+        'hotel_stay_id',
         'render_query',
         'status',
         'claim_token',

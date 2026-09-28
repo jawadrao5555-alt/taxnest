@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\HotelStayException;
 use App\Models\Company;
 use App\Models\HotelRoom;
+use App\Models\HotelFolioEntry;
 use App\Models\HotelStay;
 use App\Models\HotelStayAssignment;
 use App\Models\HotelStayGuest;
@@ -507,6 +508,40 @@ class HotelStayService
     public function cancel(HotelStay $stay, int $userId, ?string $reason = null): HotelStay
     {
         return $this->closeWithoutStay($stay, HotelStay::STATUS_CANCELLED, $userId, $reason, 'hotel_cancelled');
+    }
+
+    public function voidErroneousStay(HotelStay $stay, int $userId, string $reason): HotelStay
+    {
+        return DB::transaction(function () use ($stay, $userId, $reason) {
+            $stay = HotelStay::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($stay->id);
+            if (!in_array($stay->status, [HotelStay::STATUS_CHECKED_IN, HotelStay::STATUS_CHECKED_OUT], true)) {
+                throw new HotelStayException(__('pos.hotel_transition_blocked'));
+            }
+            $entries = HotelFolioEntry::where('company_id', $stay->company_id)
+                ->where('stay_id', $stay->id)->lockForUpdate()->get();
+            if ($entries->contains(fn ($entry) => $entry->pos_transaction_id ||
+                !in_array($entry->entry_type, [HotelFolioEntry::TYPE_CHARGE, HotelFolioEntry::TYPE_ADJUSTMENT], true) ||
+                ($entry->entry_type === HotelFolioEntry::TYPE_ADJUSTMENT && !$entry->reverses_entry_id))) {
+                throw new HotelStayException(__('pos.hotel_void_has_payment_or_bill'));
+            }
+            $reversedIds = $entries->whereNotNull('reverses_entry_id')->pluck('reverses_entry_id');
+            foreach ($entries->where('entry_type', HotelFolioEntry::TYPE_CHARGE)->whereNotIn('id', $reversedIds) as $charge) {
+                $this->folio->reverseCharge($stay, (int) $charge->id, $userId);
+            }
+            $wasCheckedIn = $stay->status === HotelStay::STATUS_CHECKED_IN;
+            $stay->status = HotelStay::STATUS_CANCELLED;
+            $stay->cancel_reason = $reason;
+            $stay->save();
+            if ($wasCheckedIn && $stay->room_id) {
+                HotelRoom::where('company_id', $stay->company_id)->where('id', $stay->room_id)
+                    ->update(['housekeeping' => HotelRoom::HK_DIRTY]);
+            }
+            AuditLogService::log('hotel_erroneous_stay_voided', 'hotel_stay', $stay->id, null, [
+                'stay_number' => $stay->stay_number, 'reason' => $reason,
+            ], (int) $stay->company_id, $userId);
+
+            return $stay->fresh(['room', 'folioEntries']);
+        });
     }
 
     public function markNoShow(HotelStay $stay, int $userId, ?string $reason = null): HotelStay

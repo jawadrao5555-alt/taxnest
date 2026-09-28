@@ -1147,6 +1147,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/stays/{id}/extend', [HotelController::class, 'extend'])->whereNumber('id')->name('pos.hotel.stays.extend');
         Route::post('/stays/{id}/move', [HotelController::class, 'move'])->whereNumber('id')->name('pos.hotel.stays.move');
         Route::post('/stays/{id}/cancel', [HotelController::class, 'cancel'])->whereNumber('id')->name('pos.hotel.stays.cancel');
+        Route::post('/stays/{id}/void-error', [HotelController::class, 'voidErroneousStay'])->whereNumber('id')->name('pos.hotel.stays.void-error');
         Route::post('/stays/{id}/no-show', [HotelController::class, 'noShow'])->whereNumber('id')->name('pos.hotel.stays.no-show');
         Route::post('/stays/{id}/folio/charge', [HotelController::class, 'folioCharge'])->whereNumber('id')->name('pos.hotel.folio.charge');
         Route::post('/stays/{id}/folio/payment', [HotelController::class, 'folioPayment'])->whereNumber('id')->name('pos.hotel.folio.payment');

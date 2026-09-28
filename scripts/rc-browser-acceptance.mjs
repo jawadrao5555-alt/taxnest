@@ -298,7 +298,9 @@ async function hotelWorkflow(page, t, v) {
   await form.locator('[name="discount_value"]').fill('500');
   await form.locator('details').filter({has: page.locator('[name="advance_amount"]')}).locator('summary').click();
   await form.locator('[name="advance_amount"]').fill('1000');
-  await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, {timeout:30000}), form.locator('button').click()]);
+  await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+\/statement\?print=1$/, {timeout:30000,waitUntil:'domcontentloaded'}), form.locator('button').click()]);
+  if (!await page.locator('[data-hotel-statement="1"]').count()) throw new Error('Check-in must open its printable stay bill');
+  await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, {timeout:30000,waitUntil:'domcontentloaded'}), page.locator('.actions a[href*="/pos/hotel/stays/"]').first().click()]);
   const stayPath = new URL(page.url()).pathname;
   await dismiss(page);
   if (await page.locator('#hotel-charge').isVisible() || await page.locator('#hotel-payment').isVisible()) throw new Error('Hotel action forms must start collapsed');

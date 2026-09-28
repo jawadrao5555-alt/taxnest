@@ -1141,6 +1141,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/stays/{id}/checkout', [HotelController::class, 'completeCheckout'])->whereNumber('id')->name('pos.hotel.checkout.complete');
         Route::post('/stays/{id}/discount', [HotelController::class, 'discount'])->whereNumber('id')->name('pos.hotel.stays.discount');
         Route::get('/stays/{id}', [HotelController::class, 'showStay'])->whereNumber('id')->name('pos.hotel.stays.show');
+        Route::get('/stays/{id}/statement', [HotelController::class, 'statement'])->whereNumber('id')->name('pos.hotel.stays.statement');
         Route::post('/stays/{id}/check-in', [HotelController::class, 'checkIn'])->whereNumber('id')->name('pos.hotel.stays.check-in');
         Route::post('/stays/{id}/check-out', [HotelController::class, 'checkOut'])->whereNumber('id')->name('pos.hotel.stays.check-out');
         Route::post('/stays/{id}/extend', [HotelController::class, 'extend'])->whereNumber('id')->name('pos.hotel.stays.extend');

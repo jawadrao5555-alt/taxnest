@@ -21,7 +21,15 @@
                     <td class="px-4 py-3">{{ $stay->room?->room_number }}</td>
                     <td class="px-4 py-3">{{ \App\Services\HotelShell::statusLabel($stay->status) }}</td>
                     <td class="px-4 py-3 text-right font-semibold">@if(($dues[$stay->id] ?? 0) > 0.009)<span class="text-amber-800">Rs {{ number_format($dues[$stay->id], 2) }}</span><span class="block text-xs font-normal">{{ __('hotel_simplify.payment_pending') }}</span>@else<span class="text-emerald-700">Rs 0.00</span>@endif</td>
-                    <td class="px-4 py-3">@if(($dues[$stay->id] ?? 0) > 0.009)<a class="font-semibold text-teal-700" href="{{ route('pos.hotel.stays.show', $stay->id) }}#hotel-payment">{{ __('pos.hotel_collect_now') }}</a>@else<a class="text-teal-700" href="{{ route('pos.hotel.stays.show', $stay->id) }}">{{ __('pos.hotel_desk_stay_details') }}</a>@endif</td>
+                    <td class="px-4 py-3">
+                        <a class="font-semibold text-teal-700" href="{{ route('pos.hotel.stays.statement', $stay->id) }}" data-hotel-bill-reprint="1">{{ __('hotel_bill.bill_action') }}</a>
+                        @if($receiptId = $stay->folioEntries->pluck('pos_transaction_id')->filter()->first())
+                        <a class="block text-xs text-teal-700 mt-1" href="{{ route('pos.receipt', $receiptId) }}" target="_blank" rel="noopener">{{ __('hotel_bill.issued_receipt') }}</a>
+                        @endif
+                        @if(($dues[$stay->id] ?? 0) > 0.009)
+                        <a class="block text-xs text-teal-700 mt-1" href="{{ route('pos.hotel.stays.show', $stay->id) }}#hotel-payment">{{ __('pos.hotel_collect_now') }}</a>
+                        @endif
+                    </td>
                 </tr>
                 @empty
                 <tr><td colspan="6" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_pending') }}</td></tr>

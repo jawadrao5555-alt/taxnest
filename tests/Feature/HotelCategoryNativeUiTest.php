@@ -119,6 +119,49 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringNotContainsString('>checked_in<', $html);
     }
 
+    public function test_walk_in_opens_printable_statement_and_bills_allow_reprint_without_exposing_other_tenants(): void
+    {
+        $company = $this->company();
+        $other = $this->company();
+        $owner = $this->owner($company);
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '118', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
+        ]);
+        $response = $this->actingAs($owner, 'pos')->post(route('pos.hotel.stays.store'), [
+            'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Walk-in',
+            'walk_in' => 1, 'rate_amount' => 5000,
+        ]);
+        $stay = HotelStay::where('company_id', $company->id)->latest('id')->firstOrFail();
+        $response->assertRedirect(route('pos.hotel.stays.statement', [$stay->id, 'print' => 1]));
+        $this->get(route('pos.hotel.stays.statement', [$stay->id, 'print' => 1]))
+            ->assertOk()->assertSee('data-hotel-statement="1"', false)
+            ->assertSee($stay->stay_number)->assertSee(__('hotel_bill.not_fiscal'))
+            ->assertDontSee('guest_cnic');
+        $this->get(route('pos.hotel.folios'))->assertOk()
+            ->assertSee('data-hotel-bill-reprint="1"', false)
+            ->assertSee(route('pos.hotel.stays.statement', $stay->id));
+        $reservedRoom = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '119', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
+        ]);
+        $reserved = app(HotelStayService::class)->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $reservedRoom->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Reserved guest',
+        ]);
+        $this->post(route('pos.hotel.stays.check-in', $reserved->id))
+            ->assertRedirect(route('pos.hotel.stays.statement', [$reserved->id, 'print' => 1]));
+        $foreign = $this->company();
+        $foreignRoom = app(HotelStayService::class)->createRoom((int) $foreign->id, [
+            'room_number' => '118', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
+        ]);
+        $foreignStay = app(HotelStayService::class)->book((int) $foreign->id, (int) $this->owner($foreign)->id, [
+            'room_id' => $foreignRoom->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Other guest', 'walk_in' => true,
+        ]);
+        $this->get(route('pos.hotel.stays.statement', $foreignStay->id))
+            ->assertRedirect(route('pos.dashboard'));
+    }
+
     public function test_reception_room_actions_preselect_only_a_room_from_its_own_company(): void
     {
         $company = $this->company();

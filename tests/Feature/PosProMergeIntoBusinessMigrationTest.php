@@ -201,7 +201,7 @@ class PosProMergeIntoBusinessMigrationTest extends TestCase
         $this->assertSame(17999.0, (float) $starter->price, 'Starter is untouched');
         $this->assertSame(2000, (int) $starter->invoice_limit);
         $this->assertSame(2, (int) $starter->user_limit);
-        $this->assertSame(0, (int) $starter->whatsapp_enabled, 'Starter still buys WhatsApp Bill');
+        $this->assertSame(0, (int) $starter->whatsapp_enabled, 'Starter does not include WhatsApp Bill');
 
         // ── Retired rows survive, but are off the shelf ──────────────────
         foreach ([$proId, $proMaxId] as $retiredId) {

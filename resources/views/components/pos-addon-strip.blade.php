@@ -18,7 +18,7 @@
         $adsLabels[$adsCode] = __('pos.addon_label_' . $adsCode);
     }
     $adsPlans = ($plans ?? \App\Services\PosPlanComparisonService::plans())
-        ->filter(fn ($plan) => \App\Services\PosAddonService::planEligibleForPurchase($plan))
+        ->filter(fn ($plan) => \App\Services\PosAddonService::purchasableCodesForPlan($plan) !== [])
         ->values();
     $adsAvailable = $adsPlans->mapWithKeys(fn ($plan) => [
         (string) $plan->id => \App\Services\PosAddonService::purchasableCodesForPlan($plan),
@@ -40,7 +40,7 @@
     .tn-addons__cycle.is-active { background:#0A4D5C; color:#FFFFFF; }
     .tn-addons__hint { margin:0; color:#6B7280; font-size:.75rem; text-align:right; }
     .tn-addons__plan { padding:.5rem .75rem; border:1px solid #D1D5DB; background:#FFFFFF; color:#052730; font-size:.8125rem; }
-    .tn-addons__grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; max-width:64rem; margin:0 auto; }
+    .tn-addons__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; max-width:64rem; margin:0 auto; }
     .tn-addons__card { position:relative; display:flex; min-height:10.5rem; flex-direction:column; padding:1.125rem; border:1px solid #D1D5DB; background:#FFFFFF; cursor:pointer; transition:border-color .15s,background-color .15s,box-shadow .15s; }
     .tn-addons__card:hover { border-color:#0A4D5C; }
     .tn-addons__card.is-selected { border-color:#0A4D5C; background:#F3F8F8; box-shadow:0 0 0 1px #0A4D5C; }
@@ -114,6 +114,7 @@
 
     <div class="tn-addons__toolbar">
         {{-- Annual-only since 23 Aug 2026 (owner) — nothing left to pick. --}}
+        @if($adsPlans->count() > 1)
         <span class="tn-addons__cycle is-active">{{ __('pos.addons_cycle_annual') }}</span>
         <label>{{ __('pos.auth_select_package') }}
             <select class="tn-addons__plan" x-model="planId" @change="changePlan()">
@@ -121,6 +122,9 @@
                 <option value="{{ $adsPlan->id }}">{{ $adsPlan->name }}</option>
                 @endforeach
             </select>
+        @elseif($adsPlans->isNotEmpty())
+        <span>{{ __('pos.auth_select_package') }}: {{ $adsPlans->first()->name }}</span>
+        @endif
         </label>
         <p class="tn-addons__hint">{{ __('pos.addons_public_hint') }}</p>
     </div>

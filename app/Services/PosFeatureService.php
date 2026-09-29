@@ -1411,9 +1411,9 @@ class PosFeatureService
                         // no plan at all) keeps the old blanket access: there
                         // is nothing to read, and legacy partner/internal
                         // grants must never lose access overnight.
-                        // Add-on-only features (Caller ID, WhatsApp Bill, Rider
-                        // Tracking) belong to NO PRA package, so package-scoping
-                        // them would just switch them off for every granted
+                        // Paid add-on features (Caller ID, Rider Tracking) can
+                        // be bought by Business, so package-scoping could
+                        // switch them off for granted shops that already bought
                         // shop with no admin way to hand them back — free
                         // access keeps them open, exactly like a trial does.
                         // PRA POS only: the catalogue is PRA's, and other

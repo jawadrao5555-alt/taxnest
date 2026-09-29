@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\Schema;
  * verified, unexpired add-on.
  */
 class PosAddonService
+    /** Previously sold WhatsApp entitlements remain readable until they expire. */
+    private const LEGACY_GATES = ['whatsapp_bill' => 'whatsapp_enabled'];
+
 {
     /**
      * A public landing selection survives registration in the browser session
@@ -77,9 +80,7 @@ class PosAddonService
     /** The package-level rule shared by checkout and public comparison copy. */
     public static function planEligibleForPurchase(?PricingPlan $plan): bool
     {
-        return $plan !== null
-            && !$plan->is_trial
-            && ($plan->product_type ?? null) === 'pos'
+        return PosPlanComparisonService::isSellablePlan($plan)
             && $plan->name !== 'Starter';
     }
 
@@ -136,13 +137,19 @@ class PosAddonService
                 return $code;
             }
         }
+        $legacyCode = array_search($gate, self::LEGACY_GATES, true);
+        if ($legacyCode !== false) {
+            return $legacyCode;
+        }
+
 
         return null;
     }
 
     public static function hasActive(?Company $company, string $code): bool
     {
-        if (!$company || !self::isPraCompany($company) || !isset(PosAddonPricingService::ADDONS[$code])) {
+        if (!$company || !self::isPraCompany($company)
+            || (!isset(PosAddonPricingService::ADDONS[$code]) && !isset(self::LEGACY_GATES[$code]))) {
             return false;
         }
 
@@ -186,7 +193,7 @@ class PosAddonService
                 $q->whereNull('ends_at')->orWhereDate('ends_at', '>=', now()->toDateString());
             })
             ->pluck('addon_code')
-            ->filter(fn ($code) => isset(PosAddonPricingService::ADDONS[$code]))
+            ->filter(fn ($code) => isset(PosAddonPricingService::ADDONS[$code]) || isset(self::LEGACY_GATES[$code]))
             ->values()
             ->all();
     }

@@ -147,7 +147,7 @@
                 "name": "What do the NestPOS plans include?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), Delivery Riders, QR Menu, analytics, offline billing, deals, Excel import/export, 5 team accounts and unlimited bills, plus Team Custom Access. Pro adds Staff Attendance, 20 team accounts, 3 branches and unlimited bills. Unlimited gives unlimited team accounts, 5 branches, unlimited billing and priority support. Three optional paid add-ons are available to Business and above: WhatsApp Bill, Rider Live Tracking and Caller ID."
+                    "text": "Starter has 2 team accounts and 1 included branch. Business has 7 team accounts, 1 included branch, the restaurant and kitchen module, Staff Attendance, Delivery Riders, QR Menu and WhatsApp Bill. Unlimited has 12 team accounts, 2 included branches, Rider Live Tracking and Caller ID. Offline billing is available on all three packages. Business can buy Rider Live Tracking and Caller ID as optional paid add-ons; WhatsApp Bill is included, not an add-on. Extra branches can be purchased for Rs 10,000 per branch per year."
                 }
             },
             {
@@ -480,7 +480,7 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), Delivery Riders, QR Menu, analytics, offline billing, deals, Excel import/export, 5 team accounts and unlimited bills, plus Team Custom Access. Pro adds Staff Attendance, 20 team accounts, 3 branches and unlimited bills. Unlimited gives unlimited team accounts, 5 branches, unlimited billing and priority support. Three optional paid add-ons are available to Business and above: WhatsApp Bill, Rider Live Tracking and Caller ID. Need more branches than your package includes? Extra branches are Rs 10,000 per branch per year on any package.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter has 2 team accounts and 1 included branch. Business has 7 team accounts, 1 included branch, the restaurant and kitchen module, Staff Attendance, Delivery Riders, QR Menu and WhatsApp Bill. Unlimited has 12 team accounts, 2 included branches, Rider Live Tracking and Caller ID. Offline billing is available on all three packages. Business can buy Rider Live Tracking and Caller ID as optional paid add-ons; WhatsApp Bill is included, not an add-on. Extra branches can be purchased for Rs 10,000 per branch per year.</div>
                 </div>
                 <div class="border-b border-gray-200">
                     <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left">

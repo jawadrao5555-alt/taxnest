@@ -10,7 +10,8 @@
  *
  * Current package policy (owner-approved Aug 22, 2026):
  *   Business+ includes Delivery Riders and QR Menu; Pro+ includes Staff Hazri.
- *   WhatsApp Bill, Rider Live Tracking and Caller ID remain paid add-ons.
+ *   WhatsApp Bill is included in Business/Unlimited, unavailable in Starter.
+ *   Rider Live Tracking and Caller ID are Business add-ons and included in Unlimited.
  * and the cross-cutting rules: active trial unlocks everything, expired
  * trial locks the premium gates, admin override unlocks everything,
  * no-subscription locks everything, internal accounts bypass all gates.
@@ -69,10 +70,11 @@ $MATRIX = [
     // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id, whatsapp, pharmacy]
     // 23 Aug 2026 (owner): Pro and Pro Max are RETIRED — Pro was merged into
     // Business, which keeps the name and takes Pro's whole feature set at
-    // Rs 27,999/yr. Three sellable packages remain: Starter, Business,
-    // Unlimited. WhatsApp Bill is now INCLUDED in Business and Unlimited, and
-    // Caller ID is included in Unlimited (still a paid add-on below it) — an
-    // add-on gate may ride a package only because both now have a comparison
+    // Three sellable packages remain: Starter, Business,
+    // Unlimited. WhatsApp Bill is INCLUDED in Business and Unlimited, never
+    // sold as an add-on, and unavailable in Starter.
+    // Caller ID is included in Unlimited (still a paid add-on in Business) — an
+    // add-on gate may ride a package only because it also has a comparison
     // row. Rider Live Tracking is included in Unlimited, and remains an
     // optional paid add-on for Business.
     // 22 Aug 2026 (owner): Delivery Riders + QR Menu are included from

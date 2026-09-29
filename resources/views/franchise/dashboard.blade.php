@@ -2,22 +2,18 @@
 <div class="p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Franchise Dashboard</h1>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">My Companies</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ number_format($stats['total_companies']) }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Active Subscriptions</p>
-            <p class="text-2xl font-bold text-teal-600">{{ number_format($stats['active_subscriptions']) }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Pending Company Reviews</p>
+            <p class="text-2xl font-bold text-emerald-600">{{ number_format($stats['pending_approvals']) }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Revenue</p>
-            <p class="text-2xl font-bold text-emerald-600">PKR {{ number_format($stats['total_revenue'], 0) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Today Transactions</p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ number_format($stats['today_transactions']) }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Commission Balance</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($stats['commission_balance'], 2) }}</p>
         </div>
     </div>
 

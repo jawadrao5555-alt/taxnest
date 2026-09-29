@@ -33,6 +33,7 @@ class PaymentProof extends Model
         'file_pruned_at',
         'distributor_quote_snapshot',
         'distributor_net_amount',
+        'franchise_id_at_verification', 'franchise_rate_at_verification', 'franchise_attribution_conflict',
     ];
 
     protected $casts = [
@@ -45,6 +46,8 @@ class PaymentProof extends Model
         'addon_quote_snapshot' => 'array',
         'distributor_quote_snapshot' => 'array',
         'distributor_net_amount' => 'decimal:2',
+        'franchise_rate_at_verification' => 'decimal:2',
+        'franchise_attribution_conflict' => 'boolean',
     ];
 
     /** Non-package request lanes. Anything NOT listed here is a renewal proof. */

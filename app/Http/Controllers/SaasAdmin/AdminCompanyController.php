@@ -111,7 +111,7 @@ class AdminCompanyController extends Controller
             'website' => $request->website,
             'status' => $request->status,
             'franchise_id' => $request->franchise_id,
-            'company_status' => 'active',
+            'company_status' => $request->status === 'pending' ? 'pending' : 'active',
             'standard_tax_rate' => $request->product_type === 'di' ? 18.00 : 16.00,
             'fbr_pos_enabled' => $request->product_type === 'fbrpos',
             'fbr_pos_environment' => $request->product_type === 'fbrpos' ? 'sandbox' : null,
@@ -290,7 +290,17 @@ class AdminCompanyController extends Controller
             $data['cnic'] = \App\Services\LoginIdentifierResolver::normalizeCnic($data['cnic']);
         }
 
+        $oldFranchiseId = $company->franchise_id;
         $company->update($data);
+        // A pending review belongs to its original franchise. Reassignment
+        // requires a fresh review from the new partner, while the audit log
+        // still preserves the earlier decision.
+        if (array_key_exists('franchise_id', $data)
+            && (string) $oldFranchiseId !== (string) $company->franchise_id
+            && $company->status === 'pending'
+            && \Illuminate\Support\Facades\Schema::hasTable('franchise_company_approvals')) {
+            DB::table('franchise_company_approvals')->where('company_id', $company->id)->delete();
+        }
 
         AdminAuditLog::log(auth('admin')->id(), 'Company profile updated', 'Company', $id, ['name' => $company->name]);
         return redirect()->route('saas.admin.companies.show', $id)->with('success', "Company '{$company->name}' updated successfully.");

@@ -10,6 +10,7 @@
                         <th class="px-4 py-3">NTN</th>
                         <th class="px-4 py-3 text-center">Status</th>
                         <th class="px-4 py-3">Created</th>
+                        <th class="px-4 py-3">Review</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -19,9 +20,14 @@
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $company->ntn ?? '—' }}</td>
                         <td class="px-4 py-3 text-center"><span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $company->status === 'approved' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' }}">{{ $company->status }}</span></td>
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ $company->created_at->format('d M Y') }}</td>
+                        <td class="px-4 py-3">@if(in_array($company->id, $reviewedIds))Reviewed — TaxNest activation pending
+                            @elseif($company->status === 'pending' && $company->company_status === 'pending')
+                            <form method="POST" action="{{ route('franchise.companies.approve', $company->id) }}">@csrf
+                                <button class="text-teal-600 font-semibold">Approve registration</button>
+                            </form>@else — @endif</td>
                     </tr>
                     @empty
-                    <tr><td colspan="4" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No companies in your franchise.</td></tr>
+                    <tr><td colspan="5" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No companies in your franchise.</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -236,6 +236,7 @@ class PosSurveyTest extends TestCase
         $resp->assertStatus(200);
         $resp->assertSee(self::TITLE);
         $resp->assertSee('data-pos-survey', false);
+        $resp->assertSee('svOpen: true', false);
     }
 
     public function test_popup_never_renders_for_cashier(): void
@@ -401,7 +402,7 @@ class PosSurveyTest extends TestCase
 
     // ── 5. Dismiss + close ──────────────────────────────────────────────
 
-    public function test_dismiss_records_seen_row_and_hides_popup_for_session(): void
+    public function test_dismiss_records_seen_row_and_does_not_auto_open_after_new_login(): void
     {
         $this->actingAs(User::find($this->adminId), 'pos')
             ->postJson("/pos/survey/{$this->surveyId}/dismiss")->assertStatus(200);
@@ -410,12 +411,17 @@ class PosSurveyTest extends TestCase
         $this->assertNotNull($row);
         $this->assertNull($row->answered_at);
 
-        // Same session: popup markup renders closed (svOpen false) but the pill stays.
+        // A new session/login still renders the pill, but does not reopen the popup.
+        $this->flushSession();
         $page = $this->actingAs(User::find($this->adminId), 'pos')
-            ->withSession(['pos_survey_dismissed_' . $this->surveyId => true])
             ->get('/pos/my-profile');
         $page->assertSee('svOpen: false', false);
         $page->assertSee(self::TITLE); // pill + popup markup still present until answered
+
+        // Another company's admin has not dismissed it, so their prompt remains.
+        $otherPage = $this->actingAs(User::find($this->restAdminId), 'pos')
+            ->get('/pos/my-profile');
+        $otherPage->assertSee('svOpen: true', false);
     }
 
     public function test_closed_survey_hides_popup_and_rejects_responses_but_keeps_results(): void

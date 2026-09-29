@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 /**
  * Task 1022: POS survey popup (Caller ID elaan / advice collection).
  *
- * POS side: submit answers / dismiss-for-session — admin/manager only
+ * POS side: submit answers / persist a per-user "Later" dismissal — admin/manager only
  * (same owner rule as What's New: cashiers/confined roles never see it,
  * so their POSTs are also refused). Admin side: surveys list + results.
  */
@@ -104,7 +104,7 @@ class PosSurveyController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** "Baad mein" — hides the popup for THIS session; pill/bell entry stays until answered. */
+    /** "Baad mein" — no auto-popup on later logins; pill remains until answered. */
     public function dismiss(Request $request, $id)
     {
         $user = auth('pos')->user();

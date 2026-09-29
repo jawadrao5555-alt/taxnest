@@ -160,12 +160,14 @@
                 if ($sv->audience === 'pos_restaurant' && !($companyLayout->restaurant_mode ?? false)) {
                     continue;
                 }
-                $svAnswered = \App\Models\SurveyResponse::where('survey_id', $sv->id)
-                    ->where('user_id', $posUserLayout->id)->whereNotNull('answered_at')->exists();
-                if (!$svAnswered) {
+                $svResponse = \App\Models\SurveyResponse::where('survey_id', $sv->id)
+                    ->where('user_id', $posUserLayout->id)->first(['answered_at']);
+                if (!$svResponse?->answered_at) {
                     $surveyPopup = $sv;
-                    // "Baad mein" hides the popup for this session; pill stays until answered.
-                    $surveyDismissedSession = (bool) session('pos_survey_dismissed_' . $sv->id);
+                    // The unanswered seen row records "Later" across logins. Keep
+                    // the header pill so this user can still answer deliberately.
+                    $surveyDismissedSession = (bool) $svResponse
+                        || (bool) session('pos_survey_dismissed_' . $sv->id);
                     break;
                 }
             }

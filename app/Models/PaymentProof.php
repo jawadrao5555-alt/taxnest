@@ -104,7 +104,9 @@ class PaymentProof extends Model
     /** 'subscription' | 'extra_branch' | 'pos_addon' — pre-migration rows = subscription. */
     public function kind(): string
     {
-        if (self::kindColumnExists() && in_array($this->request_type, self::ADDON_KINDS, true)) {
+        // The persisted row already carries its kind. A process-wide schema
+        // memo can be stale after an isolated test drops/recreates the table.
+        if (in_array($this->request_type, self::ADDON_KINDS, true)) {
             return $this->request_type;
         }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\FranchiseCommission;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class FranchiseDashboardController extends Controller
 {
@@ -19,11 +20,11 @@ class FranchiseDashboardController extends Controller
         $franchiseId = $this->franchiseId();
         $stats = [
             'total_companies' => Company::where('franchise_id', $franchiseId)->count(),
-            'pending_approvals' => Company::where('franchise_id', $franchiseId)
+            'pending_approvals' => Schema::hasTable('franchise_company_approvals') ? Company::where('franchise_id', $franchiseId)
                 ->where('status', 'pending')->where('company_status', 'pending')
-                ->whereNotIn('id', DB::table('franchise_company_approvals')->select('company_id'))->count(),
-            'commission_balance' => FranchiseCommission::where('franchise_id', $franchiseId)
-                ->where('status', 'pending')->sum('amount'),
+                ->whereNotIn('id', DB::table('franchise_company_approvals')->select('company_id'))->count() : 0,
+            'commission_balance' => Schema::hasTable('franchise_commissions')
+                ? FranchiseCommission::where('franchise_id', $franchiseId)->where('status', 'pending')->sum('amount') : 0,
         ];
 
         $recentCompanies = Company::where('franchise_id', $franchiseId)->orderBy('created_at', 'desc')->take(5)->get();
@@ -38,10 +39,10 @@ class FranchiseDashboardController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
-        $reviewedIds = DB::table('franchise_company_approvals')
+        $reviewedIds = Schema::hasTable('franchise_company_approvals') ? DB::table('franchise_company_approvals')
             ->where('franchise_id', $franchiseId)
             ->whereIn('company_id', $companies->pluck('id'))
-            ->pluck('company_id')->all();
+            ->pluck('company_id')->all() : [];
 
         return view('franchise.companies', compact('companies', 'reviewedIds'));
     }

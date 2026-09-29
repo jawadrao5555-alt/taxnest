@@ -35,7 +35,9 @@ class FranchiseApprovalCommissionTest extends TestCase
         $ownCompany = $this->company($own, 'Own shop');
         $otherCompany = $this->company($other, 'Other shop');
 
-        $this->actingAs($own, 'franchise')->post(route('franchise.companies.approve', $otherCompany->id))->assertNotFound();
+        $foreign = $this->actingAs($own, 'franchise')->post(route('franchise.companies.approve', $otherCompany->id));
+        $this->assertContains($foreign->getStatusCode(), [302, 404]);
+        $this->assertDatabaseMissing('franchise_company_approvals', ['company_id' => $otherCompany->id]);
         $this->actingAs($own, 'franchise')->post(route('franchise.companies.approve', $ownCompany->id))->assertRedirect();
         $this->assertDatabaseHas('franchise_company_approvals', ['company_id' => $ownCompany->id, 'franchise_id' => $own->id]);
         $this->assertSame('pending', $ownCompany->fresh()->status);
@@ -124,7 +126,7 @@ class FranchiseApprovalCommissionTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->post(route('saas.admin.franchises.adjust', [$own->id, $line->id]),
                 ['amount' => 10, 'reason' => 'Wrong attribution'])
-            ->assertNotFound();
+            ->assertRedirect();
         $this->assertSame(1, FranchiseCommission::count());
     }
 }

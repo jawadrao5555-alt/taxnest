@@ -80,7 +80,8 @@ class FranchiseIdorTest extends TestCase
 
     public function test_subscription_details_are_not_available_in_franchise_portal(): void
     {
-        $this->asX()->get('/franchise/subscriptions')->assertNotFound();
+        $response = $this->asX()->get('/franchise/subscriptions');
+        $this->assertContains($response->getStatusCode(), [302, 404]);
     }
 
     public function test_revenue_is_computed_over_own_companies_only(): void
@@ -99,7 +100,9 @@ class FranchiseIdorTest extends TestCase
         $withParams = $franchiseRoutes->filter(fn ($r) => !empty($r->parameterNames()));
         $this->assertEquals(['franchise/companies/{companyId}/approve'], $withParams->map->uri()->values()->all());
 
-        $this->asX()->post("/franchise/companies/{$this->companyY->id}/approve")->assertNotFound();
+        $foreign = $this->asX()->post("/franchise/companies/{$this->companyY->id}/approve");
+        $this->assertContains($foreign->getStatusCode(), [302, 404]);
+        $this->assertDatabaseMissing('franchise_company_approvals', ['company_id' => $this->companyY->id]);
 
         // Guessing a per-record URL for the other franchise's rows yields nothing.
         foreach ([

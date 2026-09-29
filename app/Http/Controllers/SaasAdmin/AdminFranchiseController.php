@@ -9,21 +9,26 @@ use App\Models\AdminAuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class AdminFranchiseController extends Controller
 {
     public function index()
     {
         $franchises = Franchise::withCount('companies')->orderBy('created_at', 'desc')->get();
-        $balances = FranchiseCommission::where('status', 'pending')
-            ->selectRaw('franchise_id, SUM(amount) as balance')
-            ->groupBy('franchise_id')->pluck('balance', 'franchise_id');
-        $approvals = DB::table('franchise_company_approvals as a')
+        $balances = Schema::hasTable('franchise_commissions')
+            ? FranchiseCommission::where('status', 'pending')
+                ->selectRaw('franchise_id, SUM(amount) as balance')
+                ->groupBy('franchise_id')->pluck('balance', 'franchise_id')
+            : collect();
+        $approvals = Schema::hasTable('franchise_company_approvals')
+            ? DB::table('franchise_company_approvals as a')
             ->join('companies as c', 'c.id', '=', 'a.company_id')
             ->join('franchises as f', 'f.id', '=', 'a.franchise_id')
             ->where('c.status', 'pending')
             ->select('c.id', 'c.name', 'f.name as franchise_name', 'a.approved_at')
-            ->orderByDesc('a.approved_at')->limit(20)->get();
+            ->orderByDesc('a.approved_at')->limit(20)->get()
+            : collect();
         return view('saas-admin.franchises', compact('franchises', 'balances', 'approvals'));
     }
 

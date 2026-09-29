@@ -317,6 +317,80 @@ class AdminActionPostsSmokeTest extends TestCase
         $this->assertFalse((bool) DB::table('subscriptions')->where('id', $subscriptionId)->value('active'));
     }
 
+    public function test_subscription_page_lists_each_company_once_and_keeps_its_history(): void
+    {
+        $planId = $this->makePlan(['name' => 'Business', 'product_type' => 'pos']);
+        $otherPlanId = $this->makePlan(['name' => 'Starter', 'product_type' => 'pos']);
+        $companyId = $this->makeCompany(['name' => 'Repeated Guest House', 'product_type' => 'pos']);
+        $otherCompanyId = $this->makeCompany(['name' => 'Separate Shop', 'product_type' => 'pos']);
+        foreach ([
+            [$companyId, $otherPlanId, false],
+            [$companyId, $otherPlanId, false],
+            [$companyId, $planId, true],
+            [$otherCompanyId, $planId, true],
+        ] as [$company, $plan, $active]) {
+            DB::table('subscriptions')->insert([
+                'company_id' => $company, 'pricing_plan_id' => $plan,
+                'billing_cycle' => 'annual', 'active' => $active,
+                'start_date' => now()->toDateString(),
+                'end_date' => now()->addYear()->toDateString(),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $this->actingAsAdmin()->get('/admin/subscriptions')
+            ->assertOk()
+            ->assertViewHas('companiesPage', fn ($page) => $page->total() === 2)
+            ->assertSee('History (2)');
+        $this->actingAsAdmin()->get('/admin/subscriptions?status=active')
+            ->assertViewHas('companiesPage', fn ($page) => $page->total() === 2);
+        $this->assertSame(4, DB::table('subscriptions')->count(), 'Historical records must remain untouched');
+    }
+
+    public function test_repeated_admin_assign_is_idempotent_but_paid_renewal_still_creates_history(): void
+    {
+        $planId = $this->makePlan(['name' => 'Business', 'product_type' => 'pos', 'price' => 29999]);
+        $companyId = $this->makeCompany(['product_type' => 'pos', 'status' => 'approved', 'company_status' => 'active']);
+        $payload = ['company_id' => $companyId, 'pricing_plan_id' => $planId, 'billing_cycle' => 'annual'];
+
+        $this->actingAsAdmin()->post('/admin/subscriptions/assign', $payload)->assertSessionHas('success');
+        $this->actingAsAdmin()->post('/admin/subscriptions/assign', $payload)->assertSessionHas('success');
+        $this->assertSame(1, DB::table('subscriptions')->where('company_id', $companyId)->count());
+
+        \App\Services\SubscriptionAssignmentService::assign($companyId, $planId, 'annual');
+        $this->assertSame(2, DB::table('subscriptions')->where('company_id', $companyId)->count());
+        $this->assertSame(1, DB::table('subscriptions')->where('company_id', $companyId)->where('active', true)->count());
+    }
+
+    public function test_historical_activation_cannot_create_two_active_subscriptions(): void
+    {
+        $planId = $this->makePlan(['name' => 'Business', 'product_type' => 'pos']);
+        $companyId = $this->makeCompany(['product_type' => 'pos']);
+        $oldId = DB::table('subscriptions')->insertGetId([
+            'company_id' => $companyId, 'pricing_plan_id' => $planId,
+            'billing_cycle' => 'annual', 'active' => false,
+            'start_date' => now()->toDateString(), 'end_date' => now()->addYear()->toDateString(),
+            'created_at' => now()->subDay(), 'updated_at' => now()->subDay(),
+        ]);
+        DB::table('subscriptions')->insert([
+            'company_id' => $companyId, 'pricing_plan_id' => $planId,
+            'billing_cycle' => 'annual', 'active' => true,
+            'start_date' => now()->toDateString(), 'end_date' => now()->addYear()->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $otherCompanyId = $this->makeCompany(['name' => 'Independent Tenant', 'product_type' => 'pos']);
+        DB::table('subscriptions')->insert([
+            'company_id' => $otherCompanyId, 'pricing_plan_id' => $planId,
+            'billing_cycle' => 'annual', 'active' => true,
+            'start_date' => now()->toDateString(), 'end_date' => now()->addYear()->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAsAdmin()->post("/admin/subscriptions/{$oldId}/toggle")->assertSessionHas('error');
+        $this->assertSame(1, DB::table('subscriptions')->where('company_id', $companyId)->where('active', true)->count());
+        $this->assertFalse((bool) DB::table('subscriptions')->where('id', $oldId)->value('active'));
+        $this->assertSame(1, DB::table('subscriptions')->where('company_id', $otherCompanyId)->where('active', true)->count());
+    }
+
     public function test_company_reject_flips_both_status_columns(): void
     {
         $id = $this->makeCompany();

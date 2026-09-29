@@ -17,6 +17,13 @@
         }
         $adsLabels[$adsCode] = __('pos.addon_label_' . $adsCode);
     }
+    $adsPlans = ($plans ?? \App\Services\PosPlanComparisonService::plans())
+        ->filter(fn ($plan) => \App\Services\PosAddonService::planEligibleForPurchase($plan))
+        ->values();
+    $adsAvailable = $adsPlans->mapWithKeys(fn ($plan) => [
+        (string) $plan->id => \App\Services\PosAddonService::purchasableCodesForPlan($plan),
+    ])->all();
+    $adsNames = $adsPlans->mapWithKeys(fn ($plan) => [(string) $plan->id => $plan->name])->all();
 @endphp
 
 @once
@@ -32,6 +39,7 @@
     .tn-addons__cycle { border:0; padding:.5rem .875rem; background:transparent; color:#6B7280; cursor:pointer; font-size:.75rem; font-weight:700; }
     .tn-addons__cycle.is-active { background:#0A4D5C; color:#FFFFFF; }
     .tn-addons__hint { margin:0; color:#6B7280; font-size:.75rem; text-align:right; }
+    .tn-addons__plan { padding:.5rem .75rem; border:1px solid #D1D5DB; background:#FFFFFF; color:#052730; font-size:.8125rem; }
     .tn-addons__grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; max-width:64rem; margin:0 auto; }
     .tn-addons__card { position:relative; display:flex; min-height:10.5rem; flex-direction:column; padding:1.125rem; border:1px solid #D1D5DB; background:#FFFFFF; cursor:pointer; transition:border-color .15s,background-color .15s,box-shadow .15s; }
     .tn-addons__card:hover { border-color:#0A4D5C; }
@@ -69,6 +77,9 @@
      x-data="{
         cycle: 'annual',
         picked: [],
+        planId: {{ \Illuminate\Support\Js::from((string) ($adsPlans->first()?->id ?? '')) }},
+        available: {{ \Illuminate\Support\Js::from($adsAvailable) }},
+        planNames: {{ \Illuminate\Support\Js::from($adsNames) }},
         prices: {{ \Illuminate\Support\Js::from($adsPrices) }},
         labels: {{ \Illuminate\Support\Js::from($adsLabels) }},
         selectedSuffix: {{ \Illuminate\Support\Js::from(__('pos.addons_selected_suffix')) }},
@@ -79,6 +90,12 @@
         total() {
             return this.picked.reduce((sum, code) => sum + this.priceOf(code), 0);
         },
+        canBuy(code) {
+            return (this.available[this.planId] || []).includes(code);
+        },
+        changePlan() {
+            this.picked = this.picked.filter(code => this.canBuy(code));
+        },
         fmt(value) {
             return Number(value || 0).toLocaleString('en-US');
         },
@@ -86,6 +103,7 @@
             const params = new URLSearchParams();
             this.picked.forEach(code => params.append('addons[]', code));
             params.set('addon_cycle', this.cycle);
+            params.set('plan', this.planNames[this.planId] || '');
             return '/pos/register?' + params.toString();
         }
      }">
@@ -97,6 +115,13 @@
     <div class="tn-addons__toolbar">
         {{-- Annual-only since 23 Aug 2026 (owner) — nothing left to pick. --}}
         <span class="tn-addons__cycle is-active">{{ __('pos.addons_cycle_annual') }}</span>
+        <label>{{ __('pos.auth_select_package') }}
+            <select class="tn-addons__plan" x-model="planId" @change="changePlan()">
+                @foreach($adsPlans as $adsPlan)
+                <option value="{{ $adsPlan->id }}">{{ $adsPlan->name }}</option>
+                @endforeach
+            </select>
+        </label>
         <p class="tn-addons__hint">{{ __('pos.addons_public_hint') }}</p>
     </div>
 
@@ -109,6 +134,7 @@
                        class="tn-addons__check"
                        value="{{ $adsCode }}"
                        x-model="picked"
+                       :disabled="!canBuy({{ \Illuminate\Support\Js::from($adsCode) }})"
                        aria-label="{{ __('pos.addon_label_' . $adsCode) }}">
                 <div>
                     <p class="tn-addons__name">{{ __('pos.addon_label_' . $adsCode) }}</p>
@@ -116,8 +142,9 @@
                 </div>
             </div>
             <p class="tn-addons__price">
-                PKR <span x-text="fmt(priceOf({{ \Illuminate\Support\Js::from($adsCode) }}))">{{ number_format($adsSpec['annual_price']) }}</span>
-                <span class="tn-addons__period">/ {{ __('pos.addons_per_year') }}</span>
+                <span x-show="canBuy({{ \Illuminate\Support\Js::from($adsCode) }})">PKR <span x-text="fmt(priceOf({{ \Illuminate\Support\Js::from($adsCode) }}))">{{ number_format($adsSpec['annual_price']) }}</span>
+                    <span class="tn-addons__period">/ {{ __('pos.addons_per_year') }}</span></span>
+                <span x-show="!canBuy({{ \Illuminate\Support\Js::from($adsCode) }})" x-cloak>{{ __('pos_plan_addon.included') }}</span>
             </p>
         </label>
         @endforeach

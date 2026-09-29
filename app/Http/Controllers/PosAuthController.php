@@ -165,9 +165,10 @@ class PosAuthController extends Controller
         // The public add-on picker carries only allow-listed feature codes and
         // a cycle. Amounts are deliberately absent: the billing/proof flow
         // quotes current server-managed prices after the shop becomes eligible.
-        $requestedAddonQuote = \App\Services\PosAddonService::quote(
+        $requestedAddonQuote = \App\Services\PosAddonService::quoteForPlan(
             (array) request()->query('addons', []),
-            (string) request()->query('addon_cycle', 'annual')
+            (string) request()->query('addon_cycle', 'annual'),
+            $preselected
         );
 
         // Annual-only since 23 Aug 2026 (owner): the picker is gone and every
@@ -330,9 +331,10 @@ class PosAuthController extends Controller
         // Keep the visitor's add-on quote ready for the real authenticated
         // purchase box. A trial/Starter account cannot buy yet; once Business+
         // is active, billing() intersects this with the live purchasable list.
-        $requestedAddonQuote = \App\Services\PosAddonService::quote(
+        $requestedAddonQuote = \App\Services\PosAddonService::quoteForPlan(
             (array) $request->input('requested_addons', []),
-            (string) $request->input('requested_addon_cycle', 'annual')
+            (string) $request->input('requested_addon_cycle', 'annual'),
+            $selectedPlan
         );
         if (!empty($requestedAddonQuote['codes'])) {
             $request->session()->put(\App\Services\PosAddonService::SIGNUP_SESSION_KEY, [

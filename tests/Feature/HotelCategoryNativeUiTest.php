@@ -107,10 +107,10 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->actingAs($owner, 'pos')->get(route('pos.hotel.rooms', ['edit_room' => $room->id]))
             ->assertOk()->assertSee('data-hotel-edit-room="'.$room->id.'"', false)
             ->assertSee('data-hotel-remove-room="'.$room->id.'"', false)
-            ->assertSee('Rate set at check-in');
+            ->assertSee(__('hotel_rooms_manage.hotel_rate_at_checkin'));
         $this->get(route('pos.hotel.dashboard'))->assertOk()->assertDontSee('Room Room 10');
         $this->get(route('pos.hotel.stays.create', ['walk_in' => 1, 'room_id' => $room->id]))
-            ->assertOk()->assertSee('Rate set at check-in')->assertSee('name="rate_amount"', false);
+            ->assertOk()->assertSee(__('hotel_rooms_manage.hotel_rate_at_checkin'))->assertSee('name="rate_amount"', false);
         $this->post(route('pos.hotel.stays.store'), [
             'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
             'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'No agreed rate',
@@ -150,7 +150,7 @@ class HotelCategoryNativeUiTest extends TestCase
             ->assertRedirect(route('pos.hotel.rooms'));
         $this->assertFalse($room->fresh()->is_active);
         $this->assertDatabaseHas('hotel_stays', ['id' => $stay->id, 'room_id' => $room->id]);
-        $this->get(route('pos.hotel.rooms'))->assertOk()->assertSee('Removed rooms');
+        $this->get(route('pos.hotel.rooms'))->assertOk()->assertSee(__('hotel_rooms_manage.hotel_removed_rooms'));
         $this->get(route('pos.hotel.dashboard'))->assertOk()->assertDontSee('Room 201');
 
         $this->post(route('pos.hotel.rooms.restore', $room->id))
@@ -171,7 +171,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->delete(route('pos.hotel.rooms.remove', $room->id))->assertForbidden();
         $this->post(route('pos.hotel.rooms.restore', $room->id))->assertForbidden();
         $this->actingAs($this->owner($other), 'pos')
-            ->delete(route('pos.hotel.rooms.remove', $room->id))->assertNotFound();
+            ->delete(route('pos.hotel.rooms.remove', $room->id))->assertRedirect('/pos/dashboard');
         $this->assertTrue($room->fresh()->is_active);
     }
 

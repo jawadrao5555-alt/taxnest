@@ -25,6 +25,7 @@
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <p class="px-4 py-3 text-xs text-gray-400 border-b border-gray-800">One row per company. Previous trials, package changes and renewals are available under History.</p>
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
                 <thead>
@@ -36,32 +37,80 @@
                         <th class="px-4 py-3 hidden md:table-cell">End</th>
                         <th class="px-4 py-3 text-center">Status</th>
                         <th class="px-4 py-3 text-center">Action</th>
+                        <th class="px-4 py-3 text-center">History</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-800">
-                    @forelse($subscriptions as $sub)
+                <tbody class="divide-y divide-gray-800" x-data="{ history: {} }">
+                    @forelse($companiesPage as $company)
+                    @php
+                        $allSubs = $companySubscriptions->get($company->id, collect());
+                        $sub = $allSubs->first();
+                        $activeCount = $allSubs->where('active', true)->count();
+                    @endphp
                     <tr class="hover:bg-gray-800/50">
-                        <td class="px-4 py-3 text-white font-medium">{{ $sub->company->name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-white font-medium">{{ $company->name }}@if($company->trashed()) <span class="text-xs text-gray-400">(archived)</span>@endif</td>
                         <td class="px-4 py-3 text-gray-300">{{ $sub->pricingPlan->name ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">{{ ucfirst($sub->billing_cycle ?? 'monthly') }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ optional($sub->start_date)->format('d M Y') ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ optional($sub->end_date)->format('d M Y') ?? '—' }}</td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sub->active ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $sub->active ? 'Active' : 'Inactive' }}</span>
+                            @if($activeCount > 1)<span class="block text-xs text-amber-400 mt-1">Multiple active records — review</span>@endif
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <form method="POST" action="{{ route('saas.admin.subscriptions.toggle', $sub->id) }}" class="inline">@csrf
-                                <button class="text-xs {{ $sub->active ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300' }}">{{ $sub->active ? 'Deactivate' : 'Activate' }}</button>
-                            </form>
+                            @if(!$company->trashed())
+                                @if($activeCount > 1)
+                                <span class="text-xs text-amber-400">Review conflict</span>
+                                @elseif($sub->active || ($activeCount === 0 && !$sub->isExpired() && !$sub->isTrialExpired() && !\App\Services\PlanSellabilityService::isRetired($sub->pricingPlan)))
+                                <form method="POST" action="{{ route('saas.admin.subscriptions.toggle', $sub->id) }}" class="inline">@csrf
+                                    <button class="text-xs {{ $sub->active ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300' }}">{{ $sub->active ? 'Deactivate' : 'Activate' }}</button>
+                                </form>
+                                @else
+                                <span class="text-xs text-gray-500">Assign package</span>
+                                @endif
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            @if($allSubs->count() > 1)
+                            <button type="button" class="text-xs text-indigo-400 hover:underline"
+                                    @click="history[{{ $company->id }}] = !history[{{ $company->id }}]"
+                                    :aria-expanded="!!history[{{ $company->id }}]">
+                                <span x-show="!history[{{ $company->id }}]">History ({{ $allSubs->count() - 1 }})</span>
+                                <span x-show="history[{{ $company->id }}]" x-cloak>Hide history</span>
+                            </button>
+                            @else<span class="text-gray-500">—</span>@endif
                         </td>
                     </tr>
+                    @if($allSubs->count() > 1)
+                    <tr x-show="history[{{ $company->id }}]" x-cloak class="bg-gray-950/50">
+                        <td colspan="8" class="px-4 py-3">
+                            <div class="text-xs font-semibold text-gray-400 mb-2">Previous subscription records for {{ $company->name }}</div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-xs text-gray-400">
+                                    <thead><tr class="text-left"><th class="py-1">Plan</th><th>Cycle</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
+                                    <tbody>
+                                    @foreach($allSubs->skip(1) as $past)
+                                    <tr class="border-t border-gray-800">
+                                        <td class="py-1">{{ $past->pricingPlan->name ?? '—' }}</td>
+                                        <td>{{ ucfirst($past->billing_cycle ?? 'monthly') }}</td>
+                                        <td>{{ optional($past->start_date)->format('d M Y') ?? '—' }}</td>
+                                        <td>{{ optional($past->end_date)->format('d M Y') ?? '—' }}</td>
+                                        <td>{{ $past->active ? 'Active — review' : 'Inactive' }}</td>
+                                    </tr>
+                                    @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    @endif
                     @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No subscriptions found.</td></tr>
+                    <tr><td colspan="8" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No subscriptions found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
     </div>
-    @if($subscriptions->hasPages())<div class="mt-4">{{ $subscriptions->links() }}</div>@endif
+    @if($companiesPage->hasPages())<div class="mt-4">{{ $companiesPage->links() }}</div>@endif
 </div>
 </x-admin-layout>

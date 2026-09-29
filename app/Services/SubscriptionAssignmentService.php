@@ -127,7 +127,7 @@ class SubscriptionAssignmentService
     /**
      * @param  string  $billingCycle  monthly | quarterly | semi_annual | annual (legacy 'yearly' ok)
      */
-    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly'): Subscription
+    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly', bool $reuseCurrentPlan = false): Subscription
     {
         $plan = PricingPlan::findOrFail($pricingPlanId);
         if (PlanSellabilityService::isRetired($plan)) {
@@ -136,11 +136,25 @@ class SubscriptionAssignmentService
             ]);
         }
 
-        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $plan) {
+        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $plan, $reuseCurrentPlan) {
             // This is the subscription-replacement mutex. Add-on approval takes
             // the same company lock, so it can never attach a paid feature to a
             // package renewal that is being replaced at the same moment.
             $company = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+
+            // The admin Assign button is idempotent for a still-current plan.
+            // Paid proof approval deliberately passes the default false: each
+            // genuine renewal retains its own payment and period snapshot.
+            if ($reuseCurrentPlan) {
+                $current = Subscription::where('company_id', $companyId)
+                    ->where('active', true)->orderByDesc('id')->first();
+                if ($current
+                    && (int) $current->pricing_plan_id === $pricingPlanId
+                    && self::normalizeCycle($current->billing_cycle) === self::purchaseCycle($billingCycle, $plan->product_type)
+                    && !$current->isExpired() && !$current->isTrialExpired()) {
+                    return $current;
+                }
+            }
 
             // Product-type-aware pricing also normalizes/forces the correct cycle
             // (e.g. POS is annual-only), so the expiry below always matches the charge.

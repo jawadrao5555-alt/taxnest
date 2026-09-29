@@ -374,7 +374,7 @@ class PlanLimitService
      * company branch do not consume team seats. Kitchen/waiter/rider are
      * limit-exempt confined roles; read-only portal
      * accounts (local_viewer / archive_viewer) are super-admin provisioned
-     * and never consume the quota.
+     * and never consume the quota. Delivery Manager IDs are also excluded.
      */
     public static function canAddPosUser(int $companyId, ?string $newRole = null, ?int $newBranchId = null): array
     {

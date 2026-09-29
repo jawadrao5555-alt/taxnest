@@ -73,7 +73,8 @@ $MATRIX = [
     // Unlimited. WhatsApp Bill is now INCLUDED in Business and Unlimited, and
     // Caller ID is included in Unlimited (still a paid add-on below it) — an
     // add-on gate may ride a package only because both now have a comparison
-    // row. Rider Live Tracking stays add-on-only on every package.
+    // row. Rider Live Tracking is included in Unlimited, and remains an
+    // optional paid add-on for Business.
     // 22 Aug 2026 (owner): Delivery Riders + QR Menu are included from
     // Business upward. Active trials still unlock everything by rule; admin
     // override and internal accounts too. Custom Access is included from
@@ -93,7 +94,7 @@ $MATRIX = [
     // because the pharmacy screens live on the FBR panel only.
     'Starter'   => [false, false, false, false, false, false, false, false, true, false, true, true, true, false, false, false],
     'Business'  => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, true,  false],
-    'Unlimited' => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, true,  true,  false],
+    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true, true,  true,  false],
 ];
 // Branch ladder (owner-approved 21 Aug 2026): har package apne card wali
 // branches MUFT deta hai; us se ooper har branch Rs 10,000 SAALANA paid add-on
@@ -432,9 +433,9 @@ try {
     // in the table for legacy subscriptions but are NOT sellable, so only the
     // annual rate is asserted — and every requested cycle must charge it.
     $PRICE_LADDER = [
-        'Starter'   => ['annual' => 17999],
-        'Business'  => ['annual' => 27999],
-        'Unlimited' => ['annual' => 34999],
+        'Starter'   => ['annual' => 19999],
+        'Business'  => ['annual' => 29999],
+        'Unlimited' => ['annual' => 37999],
     ];
     check(\App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES === ['annual'],
         'price: annual must be the ONLY sellable cycle, got '

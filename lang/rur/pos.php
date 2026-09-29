@@ -5947,7 +5947,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pcmp_bills' => 'Bills har maheene',
     'pcmp_bills_hint' => 'PRA fiscal bills',
     'pcmp_team' => 'Team accounts',
-    'pcmp_team_hint' => 'Extra team accounts; owner aur har active branch ka aik manager included',
+    'pcmp_team_hint' => 'Cashiers aur extra managers count; owner, har branch ka aik manager, waiter aur delivery IDs count nahi hotin',
     'pcmp_branches' => 'Branches',
     'pcmp_branches_hint' => 'Shamil branches ke ooper har branch Rs :price saalana',
     'pcmp_counters' => 'Counters (terminals)',

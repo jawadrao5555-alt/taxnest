@@ -432,7 +432,12 @@ class PosPaidAddonFlowTest extends TestCase
             $this->assertSame([], PosAddonService::quoteForPlan(['whatsapp_bill'], 'annual', $plan)['codes']);
             $shop = $this->makeShop($plan);
             $this->assertSame($name !== 'Starter', PosFeatureService::planAllows($shop, 'whatsapp_enabled'));
-            $this->buy($shop, ['whatsapp_bill'])->assertSessionHasErrors();
+            $response = $this->buy($shop, ['whatsapp_bill']);
+            if ($name === 'Starter') {
+                $response->assertSessionHas('error'); // package eligibility is checked before POST validation
+            } else {
+                $response->assertSessionHasErrors('addon_codes.0');
+            }
             $this->assertSame(0, PaymentProof::count());
         }
     }

@@ -100,7 +100,7 @@ class MadadgarLocalEngineTest extends TestCase
         $knowledge = file_get_contents(resource_path('madadgar/knowledge-pos.md'));
 
         $this->assertIsString($knowledge);
-        $this->assertStringContainsString('Business: Starter + poora Restaurant module', $knowledge);
+        $this->assertStringContainsString('Business (Rs 29,999/year): Starter + poora Restaurant module', $knowledge);
         $this->assertStringContainsString('Delivery Riders, public QR Menu', $knowledge);
         $this->assertStringContainsString('Unlimited (Rs 37,999/year): Business ke sab features + Rider Live Tracking aur Caller ID', $knowledge);
         $this->assertStringContainsString('Sirf do optional paid POS feature add-ons hain: Rider Live Tracking aur Caller ID', $knowledge);

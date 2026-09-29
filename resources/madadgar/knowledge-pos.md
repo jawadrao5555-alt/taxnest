@@ -159,7 +159,7 @@ Sale screen ki mazeed cheezein:
 - Deal sirf apne set kiye dino (aur date range) mein sale screen par aati hai.
 - Deals sirf seedhi billing ke liye hain — hold/KOT par nahi ja sakti.
 
-## Restaurant Module (Pro/Unlimited packages)
+## Restaurant Module (Business/Unlimited packages)
 - Chahiye: Pro ya Unlimited package (ya active trial), phir /pos/features se restaurant features ON karein (KOT, Table Management, KDS, Kitchen Notes, Recipes).
 - Order types ke rules: Dine-In = pehle Hold/KOT, khana banne ke baad payment; Takeaway = seedha final bill; Delivery = final ya provisional dono.
 - Tables/Floors: /pos/restaurant/table-management → "+ Add Floor" (floor ka naam, jaise Ground Floor) → "+ Add Table" (Table Number jaise T1, Seats 1-50). Table delete = card par × button.
@@ -275,7 +275,7 @@ Sale screen ki mazeed cheezein:
 
 ## POS Features (/pos/features) — sirf admin/manager
 - Step 1 — Business Type: 9 presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid) — chunte hi features ki sifarish set ho jati hai.
-- Step 2 — Feature toggles: Inventory Tracking, Delivery/Takeaway, Barcode Scanning, Customer Profiles, Service Jobs, Bulk Pricing, Prescription (Pharmacy), Customer Loyalty, Multi-Branch; Restaurant walay (Pro/Unlimited): KOT, Table Management, KDS, Kitchen Notes, Recipes.
+- Step 2 — Feature toggles: Inventory Tracking, Delivery/Takeaway, Barcode Scanning, Customer Profiles, Service Jobs, Bulk Pricing, Prescription (Pharmacy), Customer Loyalty, Multi-Branch; Restaurant walay (Business/Unlimited): KOT, Table Management, KDS, Kitchen Notes, Recipes.
 - Cashier & Receipt preferences: density (Simple/Standard/Premium), Guided Keyboard Billing, Auto-Print KOT, Allow KOT Reprint.
 - Sales Tax Rates (PRA): Cash Rate (%) aur Card/Digital Rate (%).
 - "Reset" se features dobara default par aa jate hain.
@@ -425,12 +425,11 @@ Sale screen ki mazeed cheezein:
 - Cancel hue orders ab delete NAHI hote — record mehfooz rehta hai. Reports menu mein naya page "Cancelled Orders" (sirf admin/manager): tareekh ka filter (aaj / 7 din / 30 din / apni marzi), kul ginti aur maliyat, aur CSV ya PDF download.
 - Cancel modal mein (jab KOT ja chuki ho) har item ke aage "Ban gaya ✓ / Nahi bana" ka tick hota hai — poora order nahi, item-wise batayein. Cancelled Orders report mein bane hue items par ✓ aur "zaya (bane hue) ki maliyat" ka alag khana aata hai.
 
-## Subscription packages — kis package mein kya hai (2 Aug 2026)
-- Starter: bunyadi billing — PRA receipts, barcode, thermal print, customers/khata, inventory, basic reports + day close. Delivery Riders, public QR Menu aur Staff Hazri ismein NAHI.
-- Business: Starter + poora Restaurant module, offline billing/desktop app, Deals & combos, analytics, advanced reports/exports, Team Custom Access, Delivery Riders, public QR Menu, 5 team accounts aur unlimited final bills.
-- Pro: Business ke sab features + Staff Hazri report, 20 team accounts, 3 branches aur unlimited final bills.
-- Unlimited: Pro ke sab features + unlimited team accounts, 5 branches, unlimited billing aur Priority Support.
-- Sirf teen optional paid add-ons hain: WhatsApp Bill, Rider Live Tracking aur Caller ID. Delivery Riders, QR Menu aur Staff Hazri add-ons nahi rahe.
+## Subscription packages — kis package mein kya hai (29 Sep 2026)
+- Starter (Rs 19,999/year): bunyadi billing, offline billing, 2 team accounts, 1 branch. WhatsApp Bill, Delivery Riders aur public QR Menu ismein NAHI aur WhatsApp Bill ka paid add-on bhi nahi.
+- Business (Rs 29,999/year): Starter + poora Restaurant module, Deals & combos, analytics, advanced reports/exports, Team Custom Access, Delivery Riders, public QR Menu, Staff Hazri aur WhatsApp Bill. 7 team accounts, 1 branch.
+- Unlimited (Rs 37,999/year): Business ke sab features + Rider Live Tracking aur Caller ID. 12 team accounts, 2 branches.
+- Sirf do optional paid POS feature add-ons hain: Rider Live Tracking aur Caller ID, dono Business par. Unlimited mein dono included. Zyada branches alag paid branch add-on se milti hain.
 - Trial ke dauran SAB features milte hain. Agar koi feature package mein na ho to us ka page Billing par le jata hai — upgrade kar ke khul jata hai.
 
 ### Physical Stock Check mein scope select na ho

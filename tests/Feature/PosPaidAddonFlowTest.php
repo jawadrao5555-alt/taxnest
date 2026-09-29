@@ -24,10 +24,9 @@ use Tests\TestCase;
 /**
  * PAID FEATURE ADD-ONS — request → approval → gate (owner approved, Aug 2026)
  *
- * Three optional PRA POS features (WhatsApp Bill, Rider Live Tracking and
- * Caller ID) can be bought on top of a package instead of upgrading. Delivery
- * Riders and QR Menu are included from Business upward; Staff Attendance is
- * included from Pro upward; Custom Access is included from Business upward.
+ * Rider Live Tracking and Caller ID are the two optional PRA POS features.
+ * WhatsApp Bill, Delivery Riders, QR Menu, Staff Attendance and Custom Access
+ * are included from Business upward; Starter cannot purchase WhatsApp Bill.
  *
  * The regressions that would be expensive and silent:
  *
@@ -387,14 +386,14 @@ class PosPaidAddonFlowTest extends TestCase
             $this->assertArrayNotHasKey($code, PosAddonPricingService::ADDONS);
         }
         $this->assertSame(
-            ['whatsapp_bill', 'rider_tracking', 'caller_id'],
+            ['rider_tracking', 'caller_id'],
             array_keys(PosAddonPricingService::ADDONS)
         );
     }
 
     public function test_server_rejects_a_retired_addon_code_from_a_tampered_post(): void
     {
-        $company = $this->makeShop($this->makePlan('Pro', ['riders_enabled' => true]));
+        $company = $this->makeShop($this->makePlan('Business', ['riders_enabled' => true]));
 
         // The form is only a hint — a retired code must make a tampered request
         // fail instead of charging an ambiguous subset.
@@ -406,13 +405,13 @@ class PosPaidAddonFlowTest extends TestCase
 
     public function test_request_with_only_already_owned_codes_is_refused(): void
     {
-        $company = $this->makeShop($this->makePlan('Pro', ['riders_enabled' => true]));
+        $company = $this->makeShop($this->makePlan('Business', ['riders_enabled' => true]));
 
         $this->buy($company, ['delivery_riders']);
         $this->assertSame(0, PaymentProof::count());
     }
 
-    public function test_only_the_three_optional_features_remain_purchasable(): void
+    public function test_only_two_optional_features_remain_purchasable(): void
     {
         $this->assertArrayNotHasKey('custom_access', PosAddonPricingService::ADDONS);
         $gates = array_column(PosAddonPricingService::ADDONS, 'gate');
@@ -421,7 +420,49 @@ class PosPaidAddonFlowTest extends TestCase
         foreach (['riders_enabled', 'qr_menu_enabled', 'hazri_enabled'] as $gate) {
             $this->assertNotContains($gate, $gates);
         }
-        $this->assertCount(3, PosAddonPricingService::ADDONS);
+        $this->assertNotContains('whatsapp_enabled', $gates);
+        $this->assertCount(2, PosAddonPricingService::ADDONS);
+    }
+
+    public function test_whatsapp_cannot_be_purchased_even_with_a_tampered_request(): void
+    {
+        foreach (['Starter', 'Business', 'Unlimited'] as $name) {
+            $plan = $this->makePlan($name, ['whatsapp_enabled' => $name !== 'Starter']);
+            $this->assertNotContains('whatsapp_bill', PosAddonService::purchasableCodesForPlan($plan));
+            $this->assertSame([], PosAddonService::quoteForPlan(['whatsapp_bill'], 'annual', $plan)['codes']);
+            $shop = $this->makeShop($plan);
+            $this->assertSame($name !== 'Starter', PosFeatureService::planAllows($shop, 'whatsapp_enabled'));
+            $response = $this->buy($shop, ['whatsapp_bill']);
+            if ($name === 'Starter') {
+                $response->assertSessionHas('error'); // package eligibility is checked before POST validation
+            } else {
+                $response->assertSessionHasErrors('addon_codes.0');
+            }
+            $this->assertSame(0, PaymentProof::count());
+        }
+    }
+
+    public function test_previously_sold_whatsapp_access_survives_until_expiry_or_downgrade(): void
+    {
+        $legacyBusiness = $this->makePlan('Business');
+        $starter = $this->makePlan('Starter');
+        $buyer = $this->makeShop($legacyBusiness);
+        $other = $this->makeShop($legacyBusiness);
+        PosAddon::create([
+            'company_id' => $buyer->id, 'addon_code' => 'whatsapp_bill',
+            'active' => true, 'billing_cycle' => 'annual', 'amount' => 4999,
+            'starts_at' => now()->toDateString(), 'ends_at' => now()->addDays(20)->toDateString(),
+            'subscription_id' => PosAddonService::activeSubscription($buyer)->id,
+        ]);
+        PosAddonService::flushCache();
+        PosFeatureService::flushGateCaches();
+        $this->assertTrue(PosFeatureService::planAllows($buyer, 'whatsapp_enabled'));
+        $this->assertFalse(PosFeatureService::planAllows($other, 'whatsapp_enabled'));
+
+        Subscription::where('company_id', $buyer->id)->update(['pricing_plan_id' => $starter->id]);
+        PosAddonService::flushCache();
+        PosFeatureService::flushGateCaches();
+        $this->assertFalse(PosFeatureService::planAllows($buyer->fresh(), 'whatsapp_enabled'));
     }
 
     public function test_public_quote_follows_the_selected_plan_columns(): void
@@ -429,14 +470,14 @@ class PosPaidAddonFlowTest extends TestCase
         $starter = $this->makePlan('Starter');
         $business = $this->makePlan('Business', ['whatsapp_enabled' => true]);
         $unlimited = $this->makePlan('Unlimited', [
-            'whatsapp_enabled' => true, 'caller_id_enabled' => true,
+            'whatsapp_enabled' => true, 'caller_id_enabled' => true, 'rider_tracking_enabled' => true,
         ]);
         $requested = ['whatsapp_bill', 'rider_tracking', 'caller_id'];
 
         $this->assertSame([], PosAddonService::quoteForPlan($requested, 'annual', $starter)['codes']);
         $this->assertSame(['rider_tracking', 'caller_id'],
             PosAddonService::quoteForPlan($requested, 'annual', $business)['codes']);
-        $this->assertSame(['rider_tracking'],
+        $this->assertSame([],
             PosAddonService::quoteForPlan($requested, 'annual', $unlimited)['codes']);
         $this->assertEquals(PosAddonPricingService::price('caller_id', 'annual'),
             PosAddonService::quoteForPlan(['whatsapp_bill', 'caller_id'], 'annual', $business)['total']);
@@ -448,7 +489,7 @@ class PosPaidAddonFlowTest extends TestCase
     {
         $company = $this->makeShop($this->makePlan('Business'));
 
-        $this->buy($company, ['caller_id', 'whatsapp_bill'], 'annual');
+        $this->buy($company, ['caller_id', 'rider_tracking'], 'annual');
 
         $proof = PaymentProof::first();
         $this->assertNotNull($proof);
@@ -457,11 +498,11 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertFalse($proof->isExtraBranch());
         $this->assertSame('annual', $proof->billing_cycle);
         $this->assertSame('annual', PosAddonService::cycleForProof($proof));
-        $this->assertEqualsCanonicalizing(['caller_id', 'whatsapp_bill'], $proof->addonCodeList());
+        $this->assertEqualsCanonicalizing(['caller_id', 'rider_tracking'], $proof->addonCodeList());
 
         // Paid add-ons have one annual rate, prorated to package time remaining.
         $expected = round(PosAddonPricingService::price('caller_id', 'annual'))
-            + round(PosAddonPricingService::price('whatsapp_bill', 'annual'));
+            + round(PosAddonPricingService::price('rider_tracking', 'annual'));
         $this->assertEquals($expected, (float) $proof->amount);
         $this->assertEquals($expected, $proof->addonQuoteSnapshot()['total'] ?? null);
     }
@@ -500,7 +541,7 @@ class PosPaidAddonFlowTest extends TestCase
         $company = $this->makeShop($this->makePlan('Business'));
 
         $this->buy($company, ['caller_id']);
-        $this->buy($company, ['whatsapp_bill']);
+        $this->buy($company, ['rider_tracking']);
 
         $this->assertSame(1, PaymentProof::count(), 'Only one add-on request may sit in the queue');
     }
@@ -536,13 +577,13 @@ class PosPaidAddonFlowTest extends TestCase
     public function test_approval_activates_only_the_requested_features(): void
     {
         $company = $this->makeShop($this->makePlan('Business'));
-        $this->buy($company, ['caller_id', 'whatsapp_bill']);
+        $this->buy($company, ['caller_id', 'rider_tracking']);
         $proof = PaymentProof::first();
 
         $this->approve($proof);
 
         $codes = PosAddon::where('company_id', $company->id)->pluck('addon_code')->all();
-        $this->assertEqualsCanonicalizing(['caller_id', 'whatsapp_bill'], $codes);
+        $this->assertEqualsCanonicalizing(['caller_id', 'rider_tracking'], $codes);
         $this->assertSame('verified', $proof->fresh()->status);
     }
 
@@ -576,11 +617,11 @@ class PosPaidAddonFlowTest extends TestCase
     public function test_admin_may_narrow_the_list_but_never_widen_it(): void
     {
         $company = $this->makeShop($this->makePlan('Business'));
-        $this->buy($company, ['caller_id', 'whatsapp_bill']);
+        $this->buy($company, ['caller_id', 'rider_tracking']);
         $proof = PaymentProof::first();
 
         // Admin unticks one and tries to slip in a third the shop never paid for.
-        $this->approve($proof, ['addon_codes' => ['caller_id', 'rider_tracking']]);
+        $this->approve($proof, ['addon_codes' => ['caller_id', 'whatsapp_bill']]);
 
         $codes = PosAddon::where('company_id', $company->id)->pluck('addon_code')->all();
         $this->assertSame(['caller_id'], $codes, 'Approval must only ever activate features the shop requested');
@@ -723,7 +764,7 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertTrue(PosFeatureService::callerIdLive($company->fresh()));
 
         // Plan-granted but the shop's own switch is off: still not live.
-        $off = $this->makeShop($this->makePlan('Pro', ['caller_id_enabled' => true]), ['name' => 'Switch Off Store']);
+        $off = $this->makeShop($this->makePlan('Unlimited', ['caller_id_enabled' => true]), ['name' => 'Switch Off Store']);
         PosFeatureService::flushGateCaches();
         $this->assertTrue(PosFeatureService::planAllows($off, 'caller_id_enabled'));
         $this->assertFalse(PosFeatureService::callerIdLive($off));
@@ -856,10 +897,10 @@ class PosPaidAddonFlowTest extends TestCase
     {
         $business = $this->makePlan('Business');
         $company = $this->makeShop($business);
-        $this->buy($company, ['whatsapp_bill']);
+        $this->buy($company, ['rider_tracking']);
         $proof = PaymentProof::firstOrFail();
 
-        PricingPlan::whereKey($business->id)->update(['whatsapp_enabled' => true]);
+        PricingPlan::whereKey($business->id)->update(['rider_tracking_enabled' => true]);
         PosFeatureService::flushGateCaches();
         PosAddonService::flushCache();
         $this->approve($proof);

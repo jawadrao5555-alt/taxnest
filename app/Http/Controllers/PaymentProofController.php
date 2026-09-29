@@ -232,9 +232,9 @@ class PaymentProofController extends Controller
     /**
      * Paid feature add-on request (owner-approved, Aug 2026).
      *
-     * Chhe optional features — Delivery Riders, QR Menu, WhatsApp Bill, Staff
-     * Attendance, Rider Live Tracking, Caller ID — Business se ooper ke PRA POS
-     * shops alag khareed sakte hain. Yahan sirf REQUEST banti hai; feature admin
+     * Rider Live Tracking and Caller ID are the optional paid PRA POS features
+     * for Business. WhatsApp Bill is included in Business and Unlimited.
+     * Yahan sirf REQUEST banti hai; feature admin
      * ke approve karne par khulta hai. Extra-branch ki tarah: NO instant access
      * grant aur subscription row ko bilkul haath nahi lagta.
      */

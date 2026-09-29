@@ -114,18 +114,18 @@
 
     <div class="tn-addons__toolbar">
         {{-- Annual-only since 23 Aug 2026 (owner) — nothing left to pick. --}}
-        @if($adsPlans->count() > 1)
         <span class="tn-addons__cycle is-active">{{ __('pos.addons_cycle_annual') }}</span>
+        @if($adsPlans->count() > 1)
         <label>{{ __('pos.auth_select_package') }}
             <select class="tn-addons__plan" x-model="planId" @change="changePlan()">
                 @foreach($adsPlans as $adsPlan)
                 <option value="{{ $adsPlan->id }}">{{ $adsPlan->name }}</option>
                 @endforeach
             </select>
+        </label>
         @elseif($adsPlans->isNotEmpty())
         <span>{{ __('pos.auth_select_package') }}: {{ $adsPlans->first()->name }}</span>
         @endif
-        </label>
         <p class="tn-addons__hint">{{ __('pos.addons_public_hint') }}</p>
     </div>
 

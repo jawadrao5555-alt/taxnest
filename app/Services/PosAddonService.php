@@ -21,10 +21,10 @@ use Illuminate\Support\Facades\Schema;
  * verified, unexpired add-on.
  */
 class PosAddonService
+{
     /** Previously sold WhatsApp entitlements remain readable until they expire. */
     private const LEGACY_GATES = ['whatsapp_bill' => 'whatsapp_enabled'];
 
-{
     /**
      * A public landing selection survives registration in the browser session
      * until the paid Business+ shop opens the authenticated billing page.
@@ -137,11 +137,11 @@ class PosAddonService
                 return $code;
             }
         }
+
         $legacyCode = array_search($gate, self::LEGACY_GATES, true);
         if ($legacyCode !== false) {
             return $legacyCode;
         }
-
 
         return null;
     }

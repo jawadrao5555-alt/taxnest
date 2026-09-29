@@ -101,7 +101,7 @@ class PosPlanCardClaimsTest extends TestCase
 
         foreach (['whatsapp', 'caller_id'] as $key) {
             $row = collect($rows)->firstWhere('key', $key);
-            $this->assertSame([false, true, true], $row['addon_values'], $key);
+            $this->assertSame($key === 'whatsapp' ? [false, false, false] : [false, true, true], $row['addon_values'], $key);
             $this->assertFalse($row['values'][0], 'Starter does not include this feature either');
         }
     }
@@ -152,8 +152,7 @@ class PosPlanCardClaimsTest extends TestCase
 
     /**
      * A paid add-on may NOT be claimed by a card whose plan row does not grant
-     * it. Since 23 Aug 2026 an add-on column CAN ride a package (WhatsApp Bill
-     * is included in Business and Unlimited, Caller ID in Unlimited), so the
+     * it. An add-on column CAN ride a package (Caller ID in Unlimited), so the
      * old blanket "never on a card" rule became a per-row rule: the card may
      * only say it when the plan column is really on.
      */

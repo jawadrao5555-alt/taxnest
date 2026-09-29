@@ -35,26 +35,18 @@ class PosAddonPricingService
 
     /**
      * Package-included features are intentionally absent from this catalogue:
-     * Custom Access, Delivery Riders and QR Menu are included from Business
-     * upward, while Staff Attendance is included from Pro upward.
+     * WhatsApp Bill, Custom Access, Delivery Riders, QR Menu and Staff
+     * Attendance are included from Business upward. Starter cannot buy them.
      *
      * Prices are deliberately a small fraction of the package they ride on —
      * an add-on that costs half the package pushes shops to skip it entirely.
      */
     public const ADDONS = [
-        'whatsapp_bill' => [
-            'label' => 'WhatsApp Bill',
-            'description' => 'Send bills to customers on WhatsApp',
-            'gate' => 'whatsapp_enabled',
-            'annual' => 4999,
-            'quarterly' => 1299,
-            'monthly' => 449,
-        ],
         'rider_tracking' => [
             'label' => 'Rider Live Tracking',
             'description' => 'Show rider location live on a map',
             'gate' => 'rider_tracking_enabled',
-            // Dearest of the three: live maps, GPS and the rider mobile app.
+            // Live maps, GPS and the rider mobile app.
             'annual' => 7999,
             'quarterly' => 2099,
             'monthly' => 749,

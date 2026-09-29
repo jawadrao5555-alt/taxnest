@@ -61,11 +61,9 @@ class PosPlanComparisonService
         'excel'          => ['column' => 'excel_enabled',          'hint' => true],
         'offline'        => ['column' => 'offline_enabled',        'hint' => true],
         'custom_access'  => ['column' => 'custom_access_enabled',  'hint' => true],
-        // Sold BOTH ways (23 Aug 2026): included in the packages whose column
-        // is ON, still buyable as an add-on by the packages below them. Marked
-        // 'addon' so a cross renders as "Add-on" instead of a flat no — the
-        // shop can have the feature, it is simply not in that package's price.
-        'whatsapp'       => ['column' => 'whatsapp_enabled',       'hint' => true, 'addon' => true],
+        // WhatsApp is included in Business and Unlimited; Starter has no
+        // purchase path. Its crossed cell must never claim "Add-on".
+        'whatsapp'       => ['column' => 'whatsapp_enabled',       'hint' => true],
         'rider_tracking' => ['column' => 'rider_tracking_enabled', 'hint' => true, 'addon' => true],
         'caller_id'      => ['column' => 'caller_id_enabled',      'hint' => true, 'addon' => true],
     ];
@@ -124,18 +122,17 @@ class PosPlanComparisonService
      * Gate columns that can be BOUGHT as paid add-ons.
      *
      * Until 23 Aug 2026 this also meant "no package may include them", so they
-     * had no tick/cross row at all. The owner then folded WhatsApp Bill into
-     * Business + Unlimited and Caller ID into Unlimited, so the rule changed:
+     * had no tick/cross row at all. The owner then folded Caller ID into
+     * Unlimited, so the rule changed:
      * an add-on column MAY ride a package, but only if it also has a
      * FEATURE_ROWS row — otherwise the shop pays for a package containing
      * something no surface admits to. audit() enforces exactly that, and
      * auditNames() still demands the catalogue name in all three languages
-     * (the add-on is still sold to the packages that do not include it).
+     * (the remaining add-ons are still sold to eligible packages).
      *
      * Map: pricing_plans gate column => add-on code.
      */
     public const ADDON_COLUMNS = [
-        'whatsapp_enabled'       => 'whatsapp_bill',
         'rider_tracking_enabled' => 'rider_tracking',
         'caller_id_enabled'      => 'caller_id',
     ];

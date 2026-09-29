@@ -93,6 +93,8 @@ class RequestedPackageSignupTest extends TestCase
             $table->boolean('is_trial')->default(false);
             $table->integer('invoice_limit')->nullable();
             $table->integer('branch_limit')->nullable();
+            $table->boolean('whatsapp_enabled')->default(false);
+            $table->boolean('caller_id_enabled')->default(false);
             $table->timestamps();
         });
 
@@ -174,6 +176,8 @@ class RequestedPackageSignupTest extends TestCase
 
         // PRA POS: price is ALREADY the annual total.
         PricingPlan::create(['name' => 'Starter', 'product_type' => 'pos', 'price' => 30000, 'is_trial' => false]);
+        $business = PricingPlan::create(['name' => 'Business', 'product_type' => 'pos', 'price' => 40000, 'is_trial' => false]);
+        PricingPlan::whereKey($business->id)->update(['whatsapp_enabled' => true]);
         PricingPlan::create(['name' => 'Pro Max', 'product_type' => 'pos', 'price' => 50000, 'is_trial' => false]);
         PricingPlan::create(['name' => 'POS Trial', 'product_type' => 'pos', 'price' => 0, 'is_trial' => true]);
     }
@@ -238,7 +242,7 @@ class RequestedPackageSignupTest extends TestCase
             'password' => 'secret-pass-123',
             'password_confirmation' => 'secret-pass-123',
             'pos_type' => 'restaurant',
-            'pricing_plan_id' => $this->plan('Starter', 'pos')->id,
+            'pricing_plan_id' => $this->plan('Business', 'pos')->id,
             'requested_addons' => $addons,
             'requested_addon_cycle' => $cycle,
         ];
@@ -364,9 +368,10 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_pos_signup_page_carries_only_allow_listed_addons_into_the_form(): void
     {
-        $this->get('/pos/register?addons[]=caller_id&addons[]=delivery_riders&addons[]=not-a-real-feature&addon_cycle=quarterly')
+        $this->get('/pos/register?plan=Business&addons[]=caller_id&addons[]=whatsapp_bill&addons[]=delivery_riders&addons[]=not-a-real-feature&addon_cycle=quarterly')
             ->assertOk()
             ->assertSee('name="requested_addons[]" value="caller_id"', false)
+            ->assertDontSee('name="requested_addons[]" value="whatsapp_bill"', false)
             ->assertDontSee('name="requested_addons[]" value="delivery_riders"', false)
             ->assertDontSee('name="requested_addons[]" value="not-a-real-feature"', false)
             ->assertSee('name="requested_addon_cycle" value="annual"', false);
@@ -382,7 +387,7 @@ class RequestedPackageSignupTest extends TestCase
         );
 
         $selection = session(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
-        $this->assertSame(['caller_id', 'whatsapp_bill'], $selection['codes']);
+        $this->assertSame(['caller_id'], $selection['codes']);
         $this->assertSame('annual', $selection['cycle']);
         $this->assertSame(['codes', 'cycle'], array_keys($selection));
     }

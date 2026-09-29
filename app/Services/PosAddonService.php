@@ -83,6 +83,25 @@ class PosAddonService
             && $plan->name !== 'Starter';
     }
 
+    /** The catalogue entries not already granted by this exact paid package. */
+    public static function purchasableCodesForPlan(?PricingPlan $plan): array
+    {
+        if (!self::planEligibleForPurchase($plan)) {
+            return [];
+        }
+
+        return array_keys(array_filter(PosAddonPricingService::ADDONS, function (array $addon) use ($plan) {
+            $gate = $addon['gate'];
+            return empty($plan->{$gate});
+        }));
+    }
+
+    /** Public/signup quote: never price a feature already inside the chosen package. */
+    public static function quoteForPlan(array $codes, string $cycle, ?PricingPlan $plan): array
+    {
+        return self::quote(array_values(array_intersect($codes, self::purchasableCodesForPlan($plan))), $cycle);
+    }
+
     /**
      * Add-ons can be purchased by paid Business+ PRA packages only.
      * Starter and trial accounts must upgrade first.
@@ -148,8 +167,21 @@ class PosAddonService
             return self::$activeCache[$company->id] = [];
         }
 
+        // A paid add-on belongs to its paid Business+ subscription. A later
+        // Starter downgrade or replacement subscription cannot inherit it.
+        // NULL subscription_id rows predate this binding and keep their old
+        // access while this eligible package remains active, until expiry.
+        $subscription = self::activeSubscription($company);
+        if (!self::planEligibleForPurchase($subscription?->pricingPlan)
+            || (self::remainingMonths($subscription) ?? 0) === 0) {
+            return self::$activeCache[$company->id] = [];
+        }
+
         return self::$activeCache[$company->id] = PosAddon::where('company_id', $company->id)
             ->where('active', true)
+            ->where(function ($q) use ($subscription) {
+                $q->whereNull('subscription_id')->orWhere('subscription_id', $subscription->id);
+            })
             ->where(function ($q) {
                 $q->whereNull('ends_at')->orWhereDate('ends_at', '>=', now()->toDateString());
             })

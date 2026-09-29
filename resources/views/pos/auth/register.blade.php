@@ -61,10 +61,18 @@
                     </div>
 
                     @php
-                        $signupAddonQuote = \App\Services\PosAddonService::quote(
+                        $signupSelectedPlan = ($plans ?? collect())->first(fn ($plan) =>
+                            (int) $plan->id === (int) old('pricing_plan_id', $preselectedPlanId ?? 0));
+                        $signupAddonQuote = \App\Services\PosAddonService::quoteForPlan(
                             (array) old('requested_addons', $requestedAddonQuote['codes'] ?? []),
-                            (string) old('requested_addon_cycle', $requestedAddonQuote['cycle'] ?? 'annual')
+                            (string) old('requested_addon_cycle', $requestedAddonQuote['cycle'] ?? 'annual'),
+                            $signupSelectedPlan
                         );
+                        $signupAllowedByPlan = ($plans ?? collect())->mapWithKeys(fn ($plan) => [
+                            (string) $plan->id => \App\Services\PosAddonService::purchasableCodesForPlan($plan),
+                        ])->all();
+                        $signupAddonPrices = collect(\App\Services\PosAddonPricingService::catalog())
+                            ->mapWithKeys(fn ($item, $code) => [$code => (int) $item['annual_price']])->all();
 
                         // Business-type picker data. The offered list, its family
                         // grouping and the words each type can be found by all come
@@ -83,7 +91,7 @@
                             );
                         }
                     @endphp
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), btFilter: '', btTerms: @js($praBusinessTypeTerms), btMatch(k) { const q = (this.btFilter || '').trim().toLowerCase(); if (! q) return true; const hay = this.btTerms[k] || ''; return q.split(/\s+/).every(w => hay.includes(w)); }, btGroupHas(keys) { return keys.some(k => this.btMatch(k)); }, get btAnyMatch() { return Object.keys(this.btTerms).some(k => this.btMatch(k)); }, priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), addonCodes: @js($signupAddonQuote['codes']), addonAllowed: @js($signupAllowedByPlan), addonPrices: @js($signupAddonPrices), billableAddons() { return this.addonCodes.filter(code => (this.addonAllowed[this.planId] || []).includes(code)); }, addonTotal() { return this.billableAddons().reduce((sum, code) => sum + Number(this.addonPrices[code] || 0), 0); }, btFilter: '', btTerms: @js($praBusinessTypeTerms), btMatch(k) { const q = (this.btFilter || '').trim().toLowerCase(); if (! q) return true; const hay = this.btTerms[k] || ''; return q.split(/\s+/).every(w => hay.includes(w)); }, btGroupHas(keys) { return keys.some(k => this.btMatch(k)); }, get btAnyMatch() { return Object.keys(this.btTerms).some(k => this.btMatch(k)); }, priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
                         @csrf
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at
@@ -129,7 +137,7 @@
                         <p class="text-[10px] text-purple-300/40 leading-snug">{{ __('pos.auth_trial_note') }}</p>
 
                         @if(!empty($signupAddonQuote['codes']))
-                        <div class="rounded-xl px-3 py-3" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
+                        <div class="rounded-xl px-3 py-3" x-show="billableAddons().length > 0" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <p class="text-xs font-bold text-white">{{ __('pos.addons_signup_title') }}</p>
@@ -137,14 +145,14 @@
                                         {{ __('pos.addons_cycle_annual') }}
                                     </p>
                                 </div>
-                                <p class="text-sm font-bold text-amber-300">PKR {{ number_format($signupAddonQuote['total']) }}</p>
+                                <p class="text-sm font-bold text-amber-300">PKR <span x-text="addonTotal().toLocaleString('en-US')">{{ number_format($signupAddonQuote['total']) }}</span></p>
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1.5">
                                 @foreach($signupAddonQuote['codes'] as $signupAddonCode)
-                                    <span class="rounded px-2 py-1 text-[10px] font-medium text-purple-50" style="background: rgba(255,255,255,0.08);">
+                                    <span class="rounded px-2 py-1 text-[10px] font-medium text-purple-50" x-show="billableAddons().includes(@js($signupAddonCode))" style="background: rgba(255,255,255,0.08);">
                                         {{ __('pos.addon_label_' . $signupAddonCode) }}
                                     </span>
-                                    <input type="hidden" name="requested_addons[]" value="{{ $signupAddonCode }}">
+                                    <input type="hidden" name="requested_addons[]" value="{{ $signupAddonCode }}" :disabled="!billableAddons().includes(@js($signupAddonCode))">
                                 @endforeach
                                 <input type="hidden" name="requested_addon_cycle" value="{{ $signupAddonQuote['cycle'] }}">
                             </div>

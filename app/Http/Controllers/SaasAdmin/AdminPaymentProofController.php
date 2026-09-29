@@ -513,6 +513,15 @@ class AdminPaymentProofController extends Controller
                 return ['outcome' => 'no_expiry'];
             }
 
+            // Pending requests can outlive a package change. Never activate
+            // a feature now included in the replacement plan or attach an old
+            // proof to a different package, even if its end date happens to
+            // match. The owner can reject/reconcile that payment explicitly.
+            if (($locked->pricing_plan_id && (int) $locked->pricing_plan_id !== (int) $sub->pricing_plan_id)
+                || array_diff($codes, \App\Services\PosAddonService::purchasableCodesForPlan($sub->pricingPlan))) {
+                return ['outcome' => 'subscription_changed'];
+            }
+
             if ($snapshot) {
                 $currentUntil = $sub->end_date instanceof \DateTimeInterface
                     ? $sub->end_date->format('Y-m-d')

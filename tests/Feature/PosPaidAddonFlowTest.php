@@ -424,6 +424,24 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertCount(3, PosAddonPricingService::ADDONS);
     }
 
+    public function test_public_quote_follows_the_selected_plan_columns(): void
+    {
+        $starter = $this->makePlan('Starter');
+        $business = $this->makePlan('Business', ['whatsapp_enabled' => true]);
+        $unlimited = $this->makePlan('Unlimited', [
+            'whatsapp_enabled' => true, 'caller_id_enabled' => true,
+        ]);
+        $requested = ['whatsapp_bill', 'rider_tracking', 'caller_id'];
+
+        $this->assertSame([], PosAddonService::quoteForPlan($requested, 'annual', $starter)['codes']);
+        $this->assertSame(['rider_tracking', 'caller_id'],
+            PosAddonService::quoteForPlan($requested, 'annual', $business)['codes']);
+        $this->assertSame(['rider_tracking'],
+            PosAddonService::quoteForPlan($requested, 'annual', $unlimited)['codes']);
+        $this->assertEquals(PosAddonPricingService::price('caller_id', 'annual'),
+            PosAddonService::quoteForPlan(['whatsapp_bill', 'caller_id'], 'annual', $business)['total']);
+    }
+
     // ─── 3. the request row ──────────────────────────────────────────────
 
     public function test_purchase_creates_a_pos_addon_proof_with_the_server_quote(): void
@@ -832,6 +850,53 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertSame(0, PosAddon::where('company_id', $company->id)->count(),
             'Approving a stale request must not grant a feature the shop is no longer entitled to');
         $this->assertSame('pending', $proof->fresh()->status);
+    }
+
+    public function test_approval_cannot_sell_a_feature_newly_included_in_the_package(): void
+    {
+        $business = $this->makePlan('Business');
+        $company = $this->makeShop($business);
+        $this->buy($company, ['whatsapp_bill']);
+        $proof = PaymentProof::firstOrFail();
+
+        PricingPlan::whereKey($business->id)->update(['whatsapp_enabled' => true]);
+        PosFeatureService::flushGateCaches();
+        PosAddonService::flushCache();
+        $this->approve($proof);
+
+        $this->assertSame('pending', $proof->fresh()->status);
+        $this->assertSame(0, PosAddon::where('company_id', $company->id)->count());
+    }
+
+    public function test_paid_addon_does_not_follow_another_subscription_or_starter_downgrade(): void
+    {
+        $business = $this->makePlan('Business');
+        $starter = $this->makePlan('Starter');
+        $buyer = $this->makeShop($business);
+        $other = $this->makeShop($business, ['name' => 'Unrelated shop']);
+        $this->buy($buyer, ['caller_id']);
+        $this->approve(PaymentProof::firstOrFail());
+
+        PosFeatureService::flushGateCaches();
+        PosAddonService::flushCache();
+        $this->assertTrue(PosFeatureService::planAllows($buyer, 'caller_id_enabled'));
+        $this->assertFalse(PosFeatureService::planAllows($other, 'caller_id_enabled'));
+
+        Subscription::where('company_id', $buyer->id)->update(['pricing_plan_id' => $starter->id]);
+        PosFeatureService::flushGateCaches();
+        PosAddonService::flushCache();
+        $this->assertFalse(PosFeatureService::planAllows($buyer->fresh(), 'caller_id_enabled'));
+
+        Subscription::where('company_id', $buyer->id)->update(['active' => false]);
+        Subscription::create([
+            'company_id' => $buyer->id, 'pricing_plan_id' => $business->id,
+            'active' => true, 'billing_cycle' => 'annual',
+            'start_date' => now()->toDateString(), 'end_date' => now()->addYear()->toDateString(),
+        ]);
+        PosFeatureService::flushGateCaches();
+        PosAddonService::flushCache();
+        $this->assertFalse(PosFeatureService::planAllows($buyer->fresh(), 'caller_id_enabled'));
+        $this->assertFalse(PosFeatureService::planAllows($other->fresh(), 'caller_id_enabled'));
     }
 
     public function test_approval_is_refused_if_the_package_lapsed_while_waiting(): void

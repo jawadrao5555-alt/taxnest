@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\PaymentProof;
 use App\Models\PosAddon;
+use App\Models\PricingPlan;
 use App\Models\Subscription;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -73,6 +74,15 @@ class PosAddonService
         return PlanLimitService::getActiveSubscription($company->id);
     }
 
+    /** The package-level rule shared by checkout and public comparison copy. */
+    public static function planEligibleForPurchase(?PricingPlan $plan): bool
+    {
+        return $plan !== null
+            && !$plan->is_trial
+            && ($plan->product_type ?? null) === 'pos'
+            && $plan->name !== 'Starter';
+    }
+
     /**
      * Add-ons can be purchased by paid Business+ PRA packages only.
      * Starter and trial accounts must upgrade first.
@@ -85,11 +95,7 @@ class PosAddonService
 
         $sub = self::activeSubscription($company);
         $plan = $sub?->pricingPlan;
-        if (!$sub || !$plan || $plan->is_trial || ($plan->product_type ?? null) !== 'pos') {
-            return ['allowed' => false, 'reason_key' => 'pos.addons_upgrade_required'];
-        }
-
-        if ($plan->name === 'Starter') {
+        if (!$sub || !self::planEligibleForPurchase($plan)) {
             return ['allowed' => false, 'reason_key' => 'pos.addons_upgrade_required'];
         }
 

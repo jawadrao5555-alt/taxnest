@@ -10,24 +10,40 @@ use App\Models\AdminAuditLog;
 use App\Services\PlanSellabilityService;
 use App\Services\SubscriptionAssignmentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminSubscriptionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Subscription::with(['company', 'pricingPlan'])->orderBy('created_at', 'desc');
+        // Paginate companies, not historical subscription rows. A renewal,
+        // trial conversion or plan change must not repeat the company in this
+        // operational list; its underlying financial history remains intact.
+        $query = Company::withTrashed()->whereHas('subscriptions');
 
         if ($request->filled('status')) {
-            $query->where('active', $request->status === 'active');
+            if ($request->status === 'active') {
+                $query->whereHas('subscriptions', fn ($q) => $q->where('active', true));
+            } elseif ($request->status === 'inactive') {
+                $query->whereDoesntHave('subscriptions', fn ($q) => $q->where('active', true));
+            }
         }
 
-        $subscriptions = $query->paginate(20)->appends($request->all());
+        $companiesPage = $query
+            ->addSelect(['latest_subscription_id' => Subscription::select('id')
+                ->whereColumn('company_id', 'companies.id')->orderByDesc('id')->limit(1)])
+            ->orderByDesc('latest_subscription_id')
+            ->paginate(20)->appends($request->all());
+        $companySubscriptions = Subscription::with('pricingPlan')
+            ->whereIn('company_id', $companiesPage->pluck('id'))
+            ->orderByDesc('active')->orderByDesc('id')->get()
+            ->groupBy('company_id');
         $companies = Company::orderBy('name')->get();
         $plans = PricingPlan::orderBy('price')->get()
             ->reject(fn (PricingPlan $plan) => PlanSellabilityService::isRetired($plan))
             ->values();
 
-        return view('saas-admin.subscriptions', compact('subscriptions', 'companies', 'plans'));
+        return view('saas-admin.subscriptions', compact('companiesPage', 'companySubscriptions', 'companies', 'plans'));
     }
 
     public function assign(Request $request)
@@ -48,9 +64,13 @@ class AdminSubscriptionController extends Controller
         $sub = SubscriptionAssignmentService::assign(
             (int) $request->company_id,
             (int) $request->pricing_plan_id,
-            $request->billing_cycle
+            $request->billing_cycle,
+            reuseCurrentPlan: true
         );
 
+        if (!$sub->wasRecentlyCreated) {
+            return back()->with('success', 'This company already has that active package. No new subscription was created. Use the payment renewal flow for a new paid term.');
+        }
         AdminAuditLog::log(auth('admin')->id(), 'Subscription assigned', 'Subscription', $sub->id, [
             'company_id' => $request->company_id,
             'plan' => $plan->name,
@@ -61,17 +81,35 @@ class AdminSubscriptionController extends Controller
 
     public function toggle($id)
     {
-        $sub = Subscription::with('pricingPlan')->findOrFail($id);
-        $plan = $sub->pricingPlan;
-        if (!$sub->active && PlanSellabilityService::isRetired($plan)) {
-            return back()->with('error', 'That retired ' . PlanSellabilityService::productLabel($plan)
-                . ' package is historical and cannot be reactivated.');
-        }
+        $outcome = DB::transaction(function () use ($id) {
+            $target = Subscription::findOrFail($id);
+            Company::withTrashed()->whereKey($target->company_id)->lockForUpdate()->firstOrFail();
+            $sub = Subscription::with('pricingPlan')->whereKey($id)->lockForUpdate()->firstOrFail();
 
-        $sub->update(['active' => !$sub->active]);
+            if (Subscription::where('company_id', $sub->company_id)->where('active', true)->count() > 1) {
+                return ['error' => 'Multiple active subscriptions need review before changing this company. No records were changed.'];
+            }
 
-        $action = $sub->active ? 'activated' : 'deactivated';
-        AdminAuditLog::log(auth('admin')->id(), "Subscription {$action}", 'Subscription', $sub->id);
-        return back()->with('success', "Subscription {$action}.");
+            if (!$sub->active) {
+                if (PlanSellabilityService::isRetired($sub->pricingPlan)) {
+                    return ['error' => 'That historical package is retired and cannot be reactivated.'];
+                }
+                if ($sub->isExpired() || $sub->isTrialExpired()) {
+                    return ['error' => 'An expired subscription cannot be reactivated. Assign a current package instead.'];
+                }
+                if (Subscription::where('company_id', $sub->company_id)->where('active', true)->exists()) {
+                    return ['error' => 'This company already has an active subscription. Deactivate it before activating another.'];
+                }
+                if (Subscription::where('company_id', $sub->company_id)->where('id', '>', $sub->id)->exists()) {
+                    return ['error' => 'A historical subscription cannot be reactivated. Assign a current package instead.'];
+                }
+            }
+            $sub->update(['active' => !$sub->active]);
+            $action = $sub->active ? 'activated' : 'deactivated';
+            AdminAuditLog::log(auth('admin')->id(), "Subscription {$action}", 'Subscription', $sub->id);
+            return ['success' => "Subscription {$action}."];
+        });
+
+        return back()->with(key($outcome), current($outcome));
     }
 }

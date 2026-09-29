@@ -80,6 +80,7 @@ install_build_tools() {
         git \
         libicu-dev \
         libonig-dev \
+        libsodium23 \
         libsqlite3-dev \
         libssl-dev \
         libxml2-dev \

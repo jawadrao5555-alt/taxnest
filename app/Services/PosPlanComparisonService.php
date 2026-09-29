@@ -66,6 +66,7 @@ class PosPlanComparisonService
         // 'addon' so a cross renders as "Add-on" instead of a flat no — the
         // shop can have the feature, it is simply not in that package's price.
         'whatsapp'       => ['column' => 'whatsapp_enabled',       'hint' => true, 'addon' => true],
+        'rider_tracking' => ['column' => 'rider_tracking_enabled', 'hint' => true, 'addon' => true],
         'caller_id'      => ['column' => 'caller_id_enabled',      'hint' => true, 'addon' => true],
     ];
 

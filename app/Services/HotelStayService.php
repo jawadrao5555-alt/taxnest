@@ -113,6 +113,49 @@ class HotelStayService
         return $room;
     }
 
+    /**
+     * Remove a mistaken unused room. Retain any room referenced by a past
+     * stay or room-change assignment so old bills and stay history still work.
+     * The room lock matches booking's lock and closes the check-in race.
+     *
+     * @return bool true when archived, false when deleted
+     */
+    public function removeRoom(HotelRoom $room): bool
+    {
+        return DB::transaction(function () use ($room): bool {
+            $locked = HotelRoom::where('company_id', $room->company_id)
+                ->whereKey($room->id)->lockForUpdate()->firstOrFail();
+            if (HotelStay::where('company_id', $locked->company_id)
+                ->where('room_id', $locked->id)
+                ->whereIn('status', HotelStay::OPEN_STATUSES)->exists()) {
+                throw new HotelStayException(__('hotel_rooms_manage.hotel_room_remove_open'));
+            }
+
+            $hasHistory = HotelStay::where('company_id', $locked->company_id)
+                ->where('room_id', $locked->id)->exists()
+                || HotelStayAssignment::where('company_id', $locked->company_id)
+                    ->where('room_id', $locked->id)->exists();
+            if ($hasHistory) {
+                $locked->is_active = false;
+                $locked->save();
+                return true;
+            }
+
+            $locked->delete();
+            return false;
+        });
+    }
+
+    public function restoreRoom(HotelRoom $room): void
+    {
+        DB::transaction(function () use ($room): void {
+            $locked = HotelRoom::where('company_id', $room->company_id)
+                ->whereKey($room->id)->lockForUpdate()->firstOrFail();
+            $locked->is_active = true;
+            $locked->save();
+        });
+    }
+
     public function setHousekeeping(HotelRoom $room, string $state): HotelRoom
     {
         $room->housekeeping = $this->normalizeHousekeeping($state);

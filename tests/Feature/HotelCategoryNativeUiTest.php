@@ -96,6 +96,85 @@ class HotelCategoryNativeUiTest extends TestCase
         return $user->fresh();
     }
 
+    public function test_owner_can_edit_and_remove_unused_room_without_a_default_rate(): void
+    {
+        $company = $this->company();
+        $owner = $this->owner($company);
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => 'Room 10', 'capacity' => 2, 'rate_amount' => 0,
+        ]);
+
+        $this->actingAs($owner, 'pos')->get(route('pos.hotel.rooms', ['edit_room' => $room->id]))
+            ->assertOk()->assertSee('data-hotel-edit-room="'.$room->id.'"', false)
+            ->assertSee('data-hotel-remove-room="'.$room->id.'"', false)
+            ->assertSee('Rate set at check-in');
+        $this->get(route('pos.hotel.dashboard'))->assertOk()->assertDontSee('Room Room 10');
+        $this->get(route('pos.hotel.stays.create', ['walk_in' => 1, 'room_id' => $room->id]))
+            ->assertOk()->assertSee('Rate set at check-in')->assertSee('name="rate_amount"', false);
+        $this->post(route('pos.hotel.stays.store'), [
+            'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'No agreed rate',
+            'walk_in' => 1,
+        ])->assertSessionHasErrors('rate_amount');
+
+        $this->put(route('pos.hotel.rooms.update', $room->id), [
+            'room_number' => '10', 'room_type' => 'Family', 'capacity' => 4,
+            'rate_amount' => 0, 'rate_unit' => 'NGT',
+        ])->assertRedirect();
+        $this->assertSame('10', $room->fresh()->room_number);
+        $this->assertSame('Family', $room->fresh()->room_type);
+        $this->assertEquals(0, $room->fresh()->rate_amount);
+
+        $this->delete(route('pos.hotel.rooms.remove', $room->id))->assertRedirect(route('pos.hotel.rooms'));
+        $this->assertDatabaseMissing('hotel_rooms', ['id' => $room->id]);
+    }
+
+    public function test_room_with_open_booking_cannot_be_removed_but_past_stay_is_archived_and_restorable(): void
+    {
+        $company = $this->company();
+        $owner = $this->owner($company);
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '201', 'capacity' => 2, 'rate_amount' => 0,
+        ]);
+        $stay = app(HotelStayService::class)->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(),
+            'guest_name' => 'History Guest', 'rate_amount' => 3500,
+        ]);
+
+        $this->actingAs($owner, 'pos')->delete(route('pos.hotel.rooms.remove', $room->id))
+            ->assertSessionHas('error');
+        $this->assertTrue($room->fresh()->is_active);
+        app(HotelStayService::class)->cancel($stay, (int) $owner->id);
+        $this->delete(route('pos.hotel.rooms.remove', $room->id))
+            ->assertRedirect(route('pos.hotel.rooms'));
+        $this->assertFalse($room->fresh()->is_active);
+        $this->assertDatabaseHas('hotel_stays', ['id' => $stay->id, 'room_id' => $room->id]);
+        $this->get(route('pos.hotel.rooms'))->assertOk()->assertSee('Removed rooms');
+        $this->get(route('pos.hotel.dashboard'))->assertOk()->assertDontSee('Room 201');
+
+        $this->post(route('pos.hotel.rooms.restore', $room->id))
+            ->assertRedirect(route('pos.hotel.rooms'));
+        $this->assertTrue($room->fresh()->is_active);
+    }
+
+    public function test_reception_cannot_manage_rooms_and_other_company_room_is_not_accessible(): void
+    {
+        $company = $this->company();
+        $other = $this->company();
+        $room = app(HotelStayService::class)->createRoom((int) $company->id, [
+            'room_number' => '301', 'capacity' => 2, 'rate_amount' => 0,
+        ]);
+        $reception = $this->staff($company, 'pos_cashier', ['hotel']);
+        $this->actingAs($reception, 'pos')->get(route('pos.hotel.rooms'))->assertOk()
+            ->assertDontSee('data-hotel-edit-room="'.$room->id.'"', false);
+        $this->delete(route('pos.hotel.rooms.remove', $room->id))->assertForbidden();
+        $this->post(route('pos.hotel.rooms.restore', $room->id))->assertForbidden();
+        $this->actingAs($this->owner($other), 'pos')
+            ->delete(route('pos.hotel.rooms.remove', $room->id))->assertNotFound();
+        $this->assertTrue($room->fresh()->is_active);
+    }
+
     public function test_hotel_login_lands_on_front_desk_and_hides_new_sale(): void
     {
         $company = $this->company();

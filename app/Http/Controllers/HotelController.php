@@ -97,6 +97,9 @@ class HotelController extends Controller
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->orderBy('room_number')
             ->get();
+        $activeRooms = $rooms->where('is_active', true);
+        $removedRooms = $rooms->where('is_active', false);
+        $editRoomId = (int) request()->query('edit_room', 0);
         $openStayByRoom = HotelStay::where('company_id', $companyId)
             ->whereIn('status', HotelStay::OPEN_STATUSES)
             ->whereIn('room_id', $rooms->pluck('id'))
@@ -111,7 +114,8 @@ class HotelController extends Controller
         $housekeepingView = false;
 
         return view('pos.hotel.rooms', compact(
-            'rooms', 'openStayByRoom', 'uomGroups', 'canManageRooms', 'canFrontDesk',
+            'rooms', 'activeRooms', 'removedRooms', 'editRoomId',
+            'openStayByRoom', 'uomGroups', 'canManageRooms', 'canFrontDesk',
             'checkoutPolicy', 'roomCards', 'filter', 'housekeepingView'
         ));
     }
@@ -151,7 +155,6 @@ class HotelController extends Controller
             'service_state' => 'nullable|in:in_service,out_of_service',
             'housekeeping' => 'nullable|in:clean,dirty,inspected',
             'notes' => 'nullable|string|max:500',
-            'is_active' => 'nullable|boolean',
         ]);
         try {
             $this->stays->updateRoom($room, $data);
@@ -160,6 +163,27 @@ class HotelController extends Controller
         }
 
         return back()->with('success', __('pos.hotel_room_saved'));
+    }
+
+    public function removeRoom(int $id)
+    {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        try {
+            $archived = $this->stays->removeRoom($this->room($id));
+        } catch (HotelStayException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('pos.hotel.rooms')
+            ->with('success', __($archived ? 'hotel_rooms_manage.hotel_room_archived' : 'hotel_rooms_manage.hotel_room_deleted'));
+    }
+
+    public function restoreRoom(int $id)
+    {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        $this->stays->restoreRoom($this->room($id));
+
+        return redirect()->route('pos.hotel.rooms')->with('success', __('hotel_rooms_manage.hotel_room_restored'));
     }
 
     public function housekeeping(Request $request, int $id)
@@ -274,7 +298,7 @@ class HotelController extends Controller
             'adult_count' => 'nullable|integer|min:1|max:50',
             'child_count' => 'nullable|integer|min:0|max:50',
             'notes' => 'nullable|string|max:500',
-            'rate_amount' => 'nullable|numeric|min:0|max:10000000',
+            'rate_amount' => 'required|numeric|min:0|max:10000000',
             'discount_type' => 'nullable|in:amount,percentage',
             'discount_value' => 'nullable|numeric|min:0|max:10000000',
             'advance_amount' => 'nullable|numeric|min:0|max:10000000',

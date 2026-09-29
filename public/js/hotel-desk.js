@@ -8,7 +8,10 @@ window.hotelBookingForm = function (config) {
             }
             this.refresh();
         },
-        selectRoom() { this.rate = this.rooms[this.room]?.rate ?? ''; },
+        selectRoom() {
+            const standard = Number(this.rooms[this.room]?.rate || 0);
+            this.rate = standard > 0 ? standard : '';
+        },
         selectGuest(event) {
             const guest = this.customers[event.target.value];
             if (guest) { this.$refs.guest.value = guest.name; this.$refs.phone.value = guest.phone || ''; }

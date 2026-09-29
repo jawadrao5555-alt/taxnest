@@ -1212,6 +1212,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/hotel/rooms', [HotelController::class, 'storeRoom'])->name('pos.hotel.rooms.store')->middleware('feature:rooms');
         Route::post('/hotel/checkout-policy', [HotelController::class, 'updateCheckoutPolicy'])->name('pos.hotel.checkout-policy')->middleware('feature:rooms');
         Route::put('/hotel/rooms/{id}', [HotelController::class, 'updateRoom'])->whereNumber('id')->name('pos.hotel.rooms.update')->middleware('feature:rooms');
+        Route::delete('/hotel/rooms/{id}', [HotelController::class, 'removeRoom'])->whereNumber('id')->name('pos.hotel.rooms.remove')->middleware('feature:rooms');
+        Route::post('/hotel/rooms/{id}/restore', [HotelController::class, 'restoreRoom'])->whereNumber('id')->name('pos.hotel.rooms.restore')->middleware('feature:rooms');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         // NO plan.limit middleware here on purpose: at-cap shops must still be

@@ -35,6 +35,7 @@
             <button class="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-sm rounded-lg font-semibold">{{ __('pos.hotel_save_room') }}</button>
         </form>
         <p class="text-xs text-gray-500 mt-2">{{ __('pos.hotel_charging_rule_note') }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ __('hotel_rooms_manage.hotel_room_default_rate_hint') }}</p>
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
@@ -64,16 +65,17 @@
                     <th class="px-4 py-3">{{ __('pos.hotel_occupancy') }}</th>
                     <th class="px-4 py-3">{{ __('pos.hotel_service') }}</th>
                     <th class="px-4 py-3">{{ __('pos.hotel_hk') }}</th>
+                    @if(!empty($canManageRooms))<th class="px-4 py-3">{{ __('hotel_rooms_manage.hotel_room_actions') }}</th>@endif
                 </tr>
             </thead>
             <tbody>
-                @forelse($rooms as $room)
+                @forelse($activeRooms as $room)
                 @php $open = $openStayByRoom[$room->id] ?? null; @endphp
-                <tr class="border-b border-gray-100 dark:border-gray-800">
+                <tr id="room-{{ $room->id }}" class="border-b border-gray-100 dark:border-gray-800">
                     <td class="px-4 py-3 font-semibold">{{ $room->room_number }}</td>
                     <td class="px-4 py-3">{{ $room->room_type }}</td>
                     <td class="px-4 py-3">{{ $room->capacity }}</td>
-                    <td class="px-4 py-3">Rs {{ number_format($room->rate_amount) }} / {{ \App\Services\PosUnitCatalog::label($room->rate_unit) }}</td>
+                    <td class="px-4 py-3">{{ (float) $room->rate_amount > 0 ? 'Rs '.number_format($room->rate_amount).' / '.\App\Services\PosUnitCatalog::label($room->rate_unit) : __('hotel_rooms_manage.hotel_rate_at_checkin') }}</td>
                     <td class="px-4 py-3">
                         @if(!empty($canFrontDesk) && $open)
                         <a class="text-teal-800 font-semibold" href="{{ route('pos.hotel.stays.show', $open->id) }}">{{ $open->stay_number }}</a>
@@ -99,13 +101,68 @@
                     <td class="px-4 py-3">
                         {{ __('pos.hotel_hk_'.$room->housekeeping) }}
                     </td>
+                    @if(!empty($canManageRooms))
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-3">
+                            <a data-hotel-edit-room="{{ $room->id }}" class="font-semibold text-teal-700" href="{{ route('pos.hotel.rooms', ['edit_room' => $room->id]) }}#room-edit-{{ $room->id }}">{{ __('hotel_rooms_manage.hotel_edit_room') }}</a>
+                            <form method="POST" action="{{ route('pos.hotel.rooms.remove', $room->id) }}" data-confirm="{{ __('hotel_rooms_manage.hotel_room_remove_confirm') }}" onsubmit="return confirm(this.dataset.confirm);">
+                                @csrf
+                                @method('DELETE')
+                                <button data-hotel-remove-room="{{ $room->id }}" type="submit" class="font-semibold text-rose-700">{{ __('hotel_rooms_manage.hotel_remove_room') }}</button>
+                            </form>
+                        </div>
+                    </td>
+                    @endif
                 </tr>
+                @if(!empty($canManageRooms) && $editRoomId === (int) $room->id)
+                <tr id="room-edit-{{ $room->id }}" class="bg-teal-50 dark:bg-slate-800">
+                    <td colspan="8" class="p-4">
+                        <h2 class="font-semibold mb-3">{{ __('hotel_rooms_manage.hotel_edit_room') }} · {{ $room->room_number }}</h2>
+                        <form method="POST" action="{{ route('pos.hotel.rooms.update', $room->id) }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            @csrf
+                            @method('PUT')
+                            <label class="text-xs">{{ __('pos.hotel_room_number') }}<input name="room_number" required maxlength="32" value="{{ old('room_number', $room->room_number) }}" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900 dark:text-white text-sm"></label>
+                            <label class="text-xs">{{ __('pos.hotel_room_type') }}<input name="room_type" maxlength="80" value="{{ old('room_type', $room->room_type) }}" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900 dark:text-white text-sm"></label>
+                            <label class="text-xs">{{ __('pos.hotel_capacity') }}<input type="number" name="capacity" min="1" max="50" required value="{{ old('capacity', $room->capacity) }}" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900 dark:text-white text-sm"></label>
+                            <label class="text-xs">{{ __('pos.hotel_rate') }}<input type="number" name="rate_amount" min="0" max="10000000" step="0.01" required value="{{ old('rate_amount', $room->rate_amount) }}" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900 dark:text-white text-sm"></label>
+                            <label class="text-xs">{{ __('pos.hotel_service') }}<select name="service_state" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900 dark:text-white text-sm">
+                                <option value="in_service" @selected(old('service_state', $room->service_state) === 'in_service')>{{ __('pos.hotel_in_service') }}</option>
+                                <option value="out_of_service" @selected(old('service_state', $room->service_state) === 'out_of_service')>{{ __('pos.hotel_oos') }}</option>
+                            </select></label>
+                            <label class="text-xs">{{ __('pos.hotel_hk') }}<select name="housekeeping" class="mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-900 dark:text-white text-sm">
+                                @foreach(['clean', 'dirty', 'inspected'] as $state)
+                                <option value="{{ $state }}" @selected(old('housekeeping', $room->housekeeping) === $state)>{{ __('pos.hotel_hk_'.$state) }}</option>
+                                @endforeach
+                            </select></label>
+                            <div class="sm:col-span-2 flex items-end gap-3">
+                                <button class="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white">{{ __('pos.hotel_save_room') }}</button>
+                                <a href="{{ route('pos.hotel.rooms') }}#room-{{ $room->id }}" class="text-sm text-gray-600">{{ __('hotel_rooms_manage.hotel_cancel_edit') }}</a>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+                @endif
                 @empty
-                <tr><td colspan="7" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_rooms') }}</td></tr>
+                <tr><td colspan="{{ !empty($canManageRooms) ? 8 : 7 }}" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_rooms') }}</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
+    @if(!empty($canManageRooms) && $removedRooms->isNotEmpty())
+    <details class="mt-5 rounded-xl border border-gray-200 bg-white dark:bg-gray-900 p-4">
+        <summary class="cursor-pointer text-sm font-semibold">{{ __('hotel_rooms_manage.hotel_removed_rooms') }} ({{ $removedRooms->count() }})</summary>
+        <p class="mt-2 text-xs text-gray-500">{{ __('hotel_rooms_manage.hotel_removed_rooms_hint') }}</p>
+        @foreach($removedRooms as $room)
+        <div class="mt-3 flex items-center justify-between gap-3 border-t pt-3 text-sm">
+            <span>{{ $room->room_number }} · {{ $room->room_type }}</span>
+            <form method="POST" action="{{ route('pos.hotel.rooms.restore', $room->id) }}">
+                @csrf
+                <button class="font-semibold text-teal-700">{{ __('hotel_rooms_manage.hotel_restore_room') }}</button>
+            </form>
+        </div>
+        @endforeach
+    </details>
+    @endif
     @endif
 </div>
 </x-hotel-layout>

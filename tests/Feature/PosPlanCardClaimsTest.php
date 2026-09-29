@@ -37,6 +37,8 @@ class PosPlanCardClaimsTest extends TestCase
         $make = function (array $attributes): PricingPlan {
             $plan = new PricingPlan();
             $plan->forceFill(array_merge([
+                'product_type'           => 'pos',
+                'is_trial'               => false,
                 // Included in every package (audited by the comparison service).
                 'khata_enabled'          => true,
                 'loyalty_enabled'        => true,
@@ -90,6 +92,18 @@ class PosPlanCardClaimsTest extends TestCase
     private function keys(array $rows): array
     {
         return array_map(fn (array $row) => $row['key'], $rows);
+    }
+
+    public function test_comparison_only_advertises_addons_on_packages_that_can_buy_them(): void
+    {
+        $plans = $this->ladder()->filter(fn (PricingPlan $plan) => $plan->name !== 'Pro')->values();
+        $rows = collect(PosPlanComparisonService::sections($plans))->firstWhere('key', 'features')['rows'];
+
+        foreach (['whatsapp', 'caller_id'] as $key) {
+            $row = collect($rows)->firstWhere('key', $key);
+            $this->assertSame([false, true, true], $row['addon_values'], $key);
+            $this->assertFalse($row['values'][0], 'Starter does not include this feature either');
+        }
     }
 
     public function test_base_card_lists_what_every_package_includes(): void

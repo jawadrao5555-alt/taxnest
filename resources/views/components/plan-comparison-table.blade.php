@@ -310,7 +310,7 @@
                                 <span class="tnpc-tick" role="img" aria-label="{{ $tickLabel }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
                                 </span>
-                            @elseif(!empty($row['addon_text']))
+                            @elseif(!empty($row['addon_text']) && ($row['addon_values'][$colIndex] ?? false))
                                 {{-- Not in this package's price, but the shop CAN buy it --}}
                                 <span class="tnpc-addon">{{ $row['addon_text'] }}</span>
                             @else

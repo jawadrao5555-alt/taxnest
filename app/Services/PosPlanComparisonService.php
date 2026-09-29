@@ -290,11 +290,16 @@ class PosPlanComparisonService
                 'column' => $spec['column'],
                 'label'  => __('pos.pcmp_' . $key),
                 'hint'   => $spec['hint'] ? __('pos.pcmp_' . $key . '_hint') : null,
-                // A package that does not include a still-sellable add-on gets
-                // "Add-on", not a cross: the shop can buy it on top.
+                // The add-on label only applies to packages that can actually
+                // buy it. Starter must not advertise a blocked purchase.
                 'addon_text' => !empty($spec['addon']) && isset(self::ADDON_COLUMNS[$spec['column']])
                     ? __('pos.pcmp_addon')
                     : null,
+                'addon_values' => $plans->map(fn (PricingPlan $plan) =>
+                    !empty($spec['addon'])
+                    && isset(self::ADDON_COLUMNS[$spec['column']])
+                    && PosAddonService::planEligibleForPurchase($plan)
+                )->all(),
                 'values' => $plans->map(fn (PricingPlan $plan) => (bool) $plan->{$spec['column']})->all(),
             ];
         }

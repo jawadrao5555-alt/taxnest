@@ -1439,4 +1439,53 @@ class PosBranchIsolationTest extends TestCase
         $csv = $this->csvRows((new PosArchiveController())->exportCsv(Request::create('/pos/archive/export', 'GET')));
         $this->assertSame(['A-CITY', 'A-OLD'], $csv['numbers']);
     }
+    public function test_active_pos_panel_retains_branch_with_another_guard_signed_in(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $cashier = $this->makeUser($companyId, [
+            'role' => 'user', 'pos_role' => 'pos_cashier', 'default_branch_id' => $cityId,
+        ]);
+        $otherCompany = $this->makeCompany(['product_type' => 'fbrpos']);
+        $otherBranch = $this->makeBranch($otherCompany, 'Other tenant HQ', true);
+        $otherUser = $this->makeUser($otherCompany, ['default_branch_id' => $otherBranch]);
+        $this->standOn($companyId, $cashier, $cityId);
+        Auth::guard('fbrpos')->setUser($otherUser);
+
+        try {
+            $request = Request::create('/pos/dashboard', 'GET');
+            app()->instance('request', $request);
+            app()->forgetInstance(BranchContextService::class);
+            (new \App\Http\Middleware\PosAuth())->handle($request, function () use ($cityId, $mainId) {
+                $this->assertSame($cityId, app('currentBranchId'),
+                    'another panel session must not remove the POS cashier branch filter');
+                $this->assertFalse(app(BranchContextService::class)->canAccess($mainId));
+                return response('ok');
+            });
+        } finally {
+            Auth::guard('fbrpos')->logout();
+        }
+    }
+
+    public function test_manager_auto_selection_cannot_return_a_default_outside_its_pivot(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $manager = $this->makeUser($companyId, [
+            'role' => 'employee', 'pos_role' => 'pos_manager', 'default_branch_id' => $mainId,
+        ]);
+        DB::table('branch_user')->insert([
+            'user_id' => $manager->id, 'branch_id' => $cityId,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->standOn($companyId, $manager, $mainId);
+        session()->forget(BranchContextService::SESSION_KEY);
+        app()->forgetInstance(BranchContextService::class);
+        $svc = app(BranchContextService::class);
+
+        $this->assertSame([$cityId], $svc->accessibleBranches()->pluck('id')->all());
+        $this->assertFalse($svc->canAccess($mainId));
+        $this->assertSame($cityId, $svc->getActiveBranchId(),
+            'a rejected default must not be returned as the active manager branch');
+        $this->assertSame($cityId, $svc->stampBranchId());
+    }
+
 }

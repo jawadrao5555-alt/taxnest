@@ -571,8 +571,19 @@ class PosLocalSeriesResetTest extends TestCase
 
     // ── 6. quota honesty ─────────────────────────────────────────────────────
 
-    public function test_clearing_never_buys_back_monthly_bill_quota(): void
+    public static function quotaClearDates(): array
     {
+        return [
+            'mid month' => ['2026-09-15 12:00:00'],
+            'last day' => ['2026-09-30 12:00:00'],
+            'leap day' => ['2028-02-29 12:00:00'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('quotaClearDates')]
+    public function test_clearing_never_buys_back_monthly_bill_quota(string $date): void
+    {
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse($date));
         // Real (non-internal) shop on a 2-bills-per-month allowance.
         $cid = $this->makeCompany(['is_internal_account' => false, 'invoice_limit_override' => 2]);
         $finalArgs = ['invoice_mode' => 'pra', 'pra_status' => null];

@@ -3,7 +3,7 @@
 Audited commit: `063859f56343fca4a0226086b6693710e3decc8e` (30 September 2026).
 Status: preliminary source audit; not a complete security certification or product acceptance.
 Scope: tenant and branch context, POS roles and quotas, Guest House pricing/folio boundaries, Agent print-claim and update helpers.
-No application behavior, tenant settings, production data or deployment was changed.
+The original checkpoint changed no application behavior. The follow-up below implements branch-context and month-end quota corrections on the draft PR; no tenant settings, production data or deployment was changed.
 
 ## Evidence levels
 
@@ -81,3 +81,28 @@ Required follow-up: include observers, all finalization paths and MariaDB interl
 5. Queues, notification audiences, data retention, performance and recovery boundaries.
 
 Owner action: no approval relay or production action for this audit checkpoint. This report is evidence for prioritized follow-up, not a behavior fix.
+
+## Follow-up implementation — 30 September 2026
+
+Baseline Actions run 36687500011 at HEAD 5b073dddcd6cef0ada9f324c3724529c4fee38e8 reproduced A01 (actual branch NULL, expected 2) and A02 (actual branch 1, expected 2). Full PHPUnit: 5202 tests, 40957 assertions, 3 failures, 28 deprecations, 9 skipped. The third failure was the existing monthly-quota clear test on the last calendar day. This is CI evidence, not local or production reproduction.
+
+Corrections under test:
+- Resolve the authenticated panel in POS/FBR/Health/DI middleware and carry it in the shared branch switch form. Validate the requested guard before binding its company. Old single-login switch requests remain valid; ambiguous requests are refused.
+- Honor a failed default selection and fall back to accessible assignments. Managers with branches but no accessible assignment receive 403 instead of an unrestricted NULL branch.
+- Use half-open calendar-month ranges for deleted-final DATE ledgers. SQLite date-cast values can contain a time suffix on the last day; an inclusive date-string upper bound excluded them. Pin quota-clear regression dates to mid-month, last day and leap day. Runtime confirmation of this correction is pending CI.
+
+Compatibility matrix:
+| Configuration | Required behavior | Coverage |
+|---|---|---|
+| POS cashier plus FBR login, same/different tenant | POS cashier branch and rights retained | Active-panel regression provider |
+| Manager default outside pivot | Select accessible pivot, never rejected default | Original A02 regression |
+| Manager with no assignment, company has branches | Refuse rather than company-wide access | New no-assignment regression |
+| Shared switch, multiple guards | Act under explicitly authenticated panel | New switch regression |
+| Requested guard signed out | 403 | New switch regression |
+| Old single-login form | Still switches allowed branch | New legacy regression |
+| Owner ALL, inactive-cashier HQ fallback, branchless audit/legacy | Existing policy preserved | Existing branch suite |
+| Clear current-month finals on last/leap day | No restored quota; older bills excluded | Date-provider quota regression |
+
+No quota concurrency change or dependency advisory suppression is included here. A03/A04 remain separate reproduction work. Baseline dependency audit also reported low-severity Laravel GHSA-jh5r-qr3c-85q8 and Flysystem GHSA-cxf4-7mrp-vvpr; dependency remediation remains pending.
+
+Local PHP/Composer, MariaDB application runtime and Chrome HTTP smoke are unavailable in this partial workspace. Post-fix PHPUnit and browser verification must be read from the new CI result. Do not approve/relay this draft while those checks are unresolved.

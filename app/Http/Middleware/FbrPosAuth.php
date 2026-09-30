@@ -38,6 +38,7 @@ class FbrPosAuth
         }
 
         app()->instance('currentCompanyId', $user->company_id);
+        app()->instance('currentBranchGuard', 'fbrpos');
 
         // ═══ Online heartbeat (Task 558 — Live Activity) ═══
         // Same throttled "last seen" stamp as PRA POS: max ONE UPDATE per

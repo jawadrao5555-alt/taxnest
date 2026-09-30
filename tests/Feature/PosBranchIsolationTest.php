@@ -1439,13 +1439,19 @@ class PosBranchIsolationTest extends TestCase
         $csv = $this->csvRows((new PosArchiveController())->exportCsv(Request::create('/pos/archive/export', 'GET')));
         $this->assertSame(['A-CITY', 'A-OLD'], $csv['numbers']);
     }
-    public function test_active_pos_panel_retains_branch_with_another_guard_signed_in(): void
+    public static function otherPanelTenants(): array
+    {
+        return ['different tenant' => [false], 'same tenant' => [true]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('otherPanelTenants')]
+    public function test_active_pos_panel_retains_branch_with_another_guard_signed_in(bool $sameTenant): void
     {
         [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
         $cashier = $this->makeUser($companyId, [
             'role' => 'user', 'pos_role' => 'pos_cashier', 'default_branch_id' => $cityId,
         ]);
-        $otherCompany = $this->makeCompany(['product_type' => 'fbrpos']);
+        $otherCompany = $sameTenant ? $companyId : $this->makeCompany(['product_type' => 'fbrpos']);
         $otherBranch = $this->makeBranch($otherCompany, 'Other tenant HQ', true);
         $otherUser = $this->makeUser($otherCompany, ['default_branch_id' => $otherBranch]);
         $this->standOn($companyId, $cashier, $cityId);
@@ -1486,6 +1492,62 @@ class PosBranchIsolationTest extends TestCase
         $this->assertSame($cityId, $svc->getActiveBranchId(),
             'a rejected default must not be returned as the active manager branch');
         $this->assertSame($cityId, $svc->stampBranchId());
+    }
+
+    public function test_manager_without_an_accessible_assignment_cannot_become_company_wide(): void
+    {
+        [$companyId, $mainId] = $this->seedTwoBranchShop();
+        $manager = $this->makeUser($companyId, [
+            'role' => 'employee', 'pos_role' => 'pos_manager', 'default_branch_id' => null,
+        ]);
+        $this->standOn($companyId, $manager, $mainId);
+        session()->forget(BranchContextService::SESSION_KEY);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectExceptionMessage('No accessible branch assigned.');
+        app(BranchContextService::class)->getActiveBranchId();
+    }
+
+    public function test_shared_switch_uses_the_requested_authenticated_panel(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $cashier = $this->makeUser($companyId, [
+            'role' => 'user', 'pos_role' => 'pos_cashier', 'default_branch_id' => $cityId,
+        ]);
+        $otherCompany = $this->makeCompany(['product_type' => 'fbrpos']);
+        $otherBranch = $this->makeBranch($otherCompany, 'Other HQ', true);
+        $otherOwner = $this->makeUser($otherCompany);
+        $this->standOn($companyId, $cashier, $cityId);
+        Auth::guard('fbrpos')->setUser($otherOwner);
+        try {
+            $this->post('/branch/switch', ['panel_guard' => 'pos', 'branch_id' => 'all'])
+                ->assertSessionHas('error');
+            $this->assertSame($cityId, session(BranchContextService::SESSION_KEY));
+            $this->post('/branch/switch', ['panel_guard' => 'pos', 'branch_id' => $mainId])
+                ->assertSessionHas('error');
+            $this->post('/branch/switch', ['panel_guard' => 'fbrpos', 'branch_id' => $otherBranch])
+                ->assertSessionHas('success');
+            $this->assertSame($otherBranch, session(BranchContextService::SESSION_KEY));
+            $this->assertSame($otherCompany, app('currentCompanyId'));
+        } finally {
+            Auth::guard('fbrpos')->logout();
+        }
+    }
+
+    public function test_shared_switch_rejects_an_unauthenticated_panel(): void
+    {
+        [$companyId, $mainId] = $this->seedTwoBranchShop();
+        $this->actingAs($this->makeUser($companyId), 'pos')
+            ->post('/branch/switch', ['panel_guard' => 'fbrpos', 'branch_id' => $mainId])
+            ->assertForbidden();
+    }
+
+    public function test_legacy_single_panel_switch_still_works(): void
+    {
+        [$companyId, , $cityId] = $this->seedTwoBranchShop();
+        $this->actingAs($this->makeUser($companyId), 'pos')
+            ->post('/branch/switch', ['branch_id' => $cityId])
+            ->assertSessionHas('success');
+        $this->assertSame($cityId, session(BranchContextService::SESSION_KEY));
     }
 
 }

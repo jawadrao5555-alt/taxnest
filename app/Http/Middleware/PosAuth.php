@@ -41,6 +41,7 @@ class PosAuth
         }
 
         app()->instance('currentCompanyId', $user->company_id);
+        app()->instance('currentBranchGuard', 'pos');
 
         // ═══ Archive Viewer isolation ═══
         // Users with pos_role='archive_viewer' are confined to /pos/archive/* and

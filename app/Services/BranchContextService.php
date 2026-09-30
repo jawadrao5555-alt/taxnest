@@ -101,10 +101,26 @@ class BranchContextService
         if (!$user) return null;
 
         $branchId = $this->autoSelectBranch($user);
-        if ($branchId) {
-            $this->setActiveBranch($branchId);
+        if (!$branchId && !($user->default_branch_id ?? null)
+            && in_array($user->pos_role ?? '', self::PORTAL_AUDIT_ROLES, true)) {
+            return null;
         }
-        return $branchId;
+        if ($branchId && $this->setActiveBranch($branchId)) {
+            return $branchId;
+        }
+        // A rejected default is not an active branch. Select only from the
+        // user's allowed branches, including the manager's pivot assignments.
+        $allowed = $this->accessibleBranches()->first();
+        if ($allowed && $this->setActiveBranch((int) $allowed->id)) {
+            return (int) $allowed->id;
+        }
+        // NULL means company-wide to callers. Keep it for branchless legacy
+        // companies and audit portals, never for an unassigned branch manager.
+        if ($this->isManager($user) && $this->branchesReady()
+            && Branch::where('company_id', $user->company_id)->exists()) {
+            abort(403, 'No accessible branch assigned.');
+        }
+        return null;
     }
 
     /** True when the owner has selected the company-wide ("all branches") view. */
@@ -313,17 +329,48 @@ class BranchContextService
         return $user && in_array($this->effectiveRole($user), ['cashier', 'employee']);
     }
 
-    private function currentUser()
+    /** Resolve the panel rather than letting an unrelated login win. */
+    public function currentGuard(): ?string
     {
-        // 'health' joins the list so the Healthcare ERP panel reuses the SAME
-        // branch context (active branch, branch_user pivot, owner "all
-        // branches") instead of growing a second notion of "which branch am I
-        // in". Left out, every healthcare page saw a branch-less company.
+        if (app()->bound('currentBranchGuard')) {
+            return app('currentBranchGuard');
+        }
+        foreach (['pos' => 'pos', 'fbr-pos' => 'fbrpos', 'health' => 'health'] as $path => $guard) {
+            if (request()->is($path, $path.'/*')) {
+                return $guard;
+            }
+        }
+        $eligible = [];
         foreach (['fbrpos', 'pos', 'health', 'web'] as $guard) {
             $user = Auth::guard($guard)->user();
-            if ($user) return $user;
+            if ($user && (!app()->bound('currentCompanyId')
+                || (int) $user->company_id === (int) app('currentCompanyId'))) {
+                $eligible[] = $guard;
+            }
         }
-        return null;
+        abort_if(count($eligible) > 1, 403, 'Ambiguous branch panel.');
+        return $eligible[0] ?? null;
+    }
+
+    /** Used by the shared switch endpoint after validating an authenticated guard. */
+    public function useGuard(string $guard): void
+    {
+        abort_unless(in_array($guard, ['pos', 'fbrpos', 'health', 'web'], true), 403);
+        $user = Auth::guard($guard)->user();
+        abort_unless($user && $user->is_active && $user->company_id, 403);
+        app()->instance('currentBranchGuard', $guard);
+        app()->instance('currentCompanyId', $user->company_id);
+        $this->branchMemo = null;
+    }
+
+    private function currentUser()
+    {
+        $guard = $this->currentGuard();
+        $user = $guard ? Auth::guard($guard)->user() : null;
+        if ($user && app()->bound('currentCompanyId')) {
+            abort_unless((int) $user->company_id === (int) app('currentCompanyId'), 403);
+        }
+        return $user;
     }
 
     private function autoSelectBranch($user): ?int

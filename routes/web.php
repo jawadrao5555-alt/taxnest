@@ -1743,6 +1743,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/franchises', [AdminFranchiseController::class, 'store'])->name('saas.admin.franchises.store');
     Route::put('/franchises/{id}', [AdminFranchiseController::class, 'update'])->name('saas.admin.franchises.update');
     Route::post('/franchises/{id}/toggle', [AdminFranchiseController::class, 'toggleStatus'])->name('saas.admin.franchises.toggle');
+    Route::get('/franchises/{id}/statement', [AdminFranchiseController::class, 'statement'])->name('saas.admin.franchises.statement');
+    Route::post('/franchises/{id}/reconcile', [AdminFranchiseController::class, 'reconcile'])->name('saas.admin.franchises.reconcile');
+    Route::post('/franchises/{id}/payout', [AdminFranchiseController::class, 'markPaid'])->name('saas.admin.franchises.paid');
+    Route::post('/franchises/{id}/commissions/{lineId}/adjust', [AdminFranchiseController::class, 'adjust'])->name('saas.admin.franchises.adjust');
     Route::get('/company-usage', [AdminUsageController::class, 'index'])->name('saas.admin.usage');
     Route::get('/system-control', [AdminSystemController::class, 'index'])->name('saas.admin.system');
     Route::get('/system-control/mysql-health', [AdminSystemController::class, 'mysqlHealth'])->name('saas.admin.system.mysql-health');
@@ -1793,8 +1797,8 @@ Route::post('/franchise/logout', [FranchiseAuthController::class, 'logout'])->na
 Route::prefix('franchise')->middleware(['franchise.auth'])->group(function () {
     Route::get('/dashboard', [FranchiseDashboardController::class, 'dashboard'])->name('franchise.dashboard');
     Route::get('/companies', [FranchiseDashboardController::class, 'companies'])->name('franchise.companies');
-    Route::get('/subscriptions', [FranchiseDashboardController::class, 'subscriptions'])->name('franchise.subscriptions');
     Route::get('/revenue', [FranchiseDashboardController::class, 'revenue'])->name('franchise.revenue');
+    Route::post('/companies/{companyId}/approve', [\App\Http\Controllers\Franchise\FranchiseApprovalController::class, 'approve'])->name('franchise.companies.approve');
 });
 
 Route::get('/fbr-pos-landing', function () {

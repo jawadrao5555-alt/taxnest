@@ -1,74 +1,19 @@
 <x-franchise-layout>
 <div class="p-6 max-w-7xl mx-auto">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Revenue Overview</h1>
-
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Revenue</p>
-            <p class="text-2xl font-bold text-emerald-600">PKR {{ number_format($totalRevenue, 0) }}</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Commission Rate</p>
-            <p class="text-2xl font-bold text-teal-600">{{ $commissionRate }}%</p>
-        </div>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Commission</p>
-            <p class="text-2xl font-bold text-indigo-600">PKR {{ number_format($totalCommission, 0) }}</p>
-        </div>
+    <h1 class="text-2xl font-bold mb-2">Commission statement</h1>
+    <p class="text-sm text-gray-500 mb-6">Commission is recorded when TaxNest verifies a package payment. Shop sales do not affect this statement.</p>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-900 rounded-xl p-5">Earned<br><strong>PKR {{ number_format($totals['earned'], 2) }}</strong></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl p-5">Balance including adjustments<br><strong>PKR {{ number_format($totals['balance'], 2) }}</strong></div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl p-5">Paid<br><strong>PKR {{ number_format($totals['paid'], 2) }}</strong></div>
     </div>
-
-    @if($monthlyRevenue->count() > 0)
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mb-6">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Monthly Revenue (Last 12 Months)</h3>
-        <canvas id="revenueChart" height="120"></canvas>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                new Chart(document.getElementById('revenueChart'), {
-                    type: 'line',
-                    data: {
-                        labels: {!! json_encode($monthlyRevenue->pluck('month')) !!},
-                        datasets: [{
-                            label: 'Revenue (PKR)',
-                            data: {!! json_encode($monthlyRevenue->pluck('revenue')) !!},
-                            borderColor: 'rgb(13, 148, 136)',
-                            backgroundColor: 'rgba(13, 148, 136, 0.1)',
-                            fill: true, tension: 0.3, borderWidth: 2
-                        }]
-                    },
-                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-                });
-            });
-        </script>
+    <div class="overflow-x-auto bg-white dark:bg-gray-900 rounded-xl">
+        <table class="w-full text-sm"><thead><tr class="border-b"><th class="p-3 text-left">Date</th><th class="p-3 text-left">Company</th><th class="p-3 text-left">Entry</th><th class="p-3 text-right">Received</th><th class="p-3 text-right">Rate</th><th class="p-3 text-right">Commission</th><th class="p-3 text-left">Status</th></tr></thead>
+            <tbody>@forelse($commissions as $line)
+            <tr class="border-b"><td class="p-3">{{ $line->earned_at?->format('d M Y') }}</td><td class="p-3">{{ $line->company_name }}</td><td class="p-3">{{ $line->type === 'adjustment' ? 'Refund adjustment' : 'Package payment' }}</td><td class="p-3 text-right">{{ number_format($line->base_amount, 2) }}</td><td class="p-3 text-right">{{ $line->rate_percent }}%</td><td class="p-3 text-right">{{ number_format($line->amount, 2) }}</td><td class="p-3">{{ str_replace('_', ' ', ucfirst($line->status)) }}</td></tr>
+            @empty<tr><td colspan="7" class="p-8 text-center">No verified package payments yet.</td></tr>@endforelse</tbody>
+        </table>
     </div>
-
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm table-cards">
-                <thead>
-                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                        <th class="px-4 py-3">Month</th>
-                        <th class="px-4 py-3 text-right">Transactions</th>
-                        <th class="px-4 py-3 text-right">Revenue (PKR)</th>
-                        <th class="px-4 py-3 text-right">Commission (PKR)</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    @foreach($monthlyRevenue as $m)
-                    <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}">
-                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $m->month }}</td>
-                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-300">{{ number_format($m->count) }}</td>
-                        <td class="px-4 py-3 text-right text-emerald-600 font-medium">{{ number_format($m->revenue, 0) }}</td>
-                        <td class="px-4 py-3 text-right text-indigo-600 font-medium">{{ number_format($m->revenue * $commissionRate / 100, 0) }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-    @else
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
-        <p class="text-gray-500 dark:text-gray-400">No revenue data yet.</p>
-    </div>
-    @endif
+    <div class="mt-4">{{ $commissions->links() }}</div>
 </div>
 </x-franchise-layout>

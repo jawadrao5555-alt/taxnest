@@ -2,6 +2,7 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Franchises</h1>
 
+    @if(auth('admin')->user()?->isSuperAdmin())
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-white">Create Franchise</h3>
@@ -17,6 +18,7 @@
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Create</button>
         </form>
     </div>
+    @endif
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div class="overflow-x-auto">
@@ -29,6 +31,7 @@
                         <th class="px-4 py-3 text-right">Commission</th>
                         <th class="px-4 py-3 text-right">Companies</th>
                         <th class="px-4 py-3 text-center">Status</th>
+                        <th class="px-4 py-3 text-right">Balance</th>
                         <th class="px-4 py-3 text-center">Action</th>
                     </tr>
                 </thead>
@@ -43,18 +46,26 @@
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $f->status === 'active' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400' }}">{{ $f->status }}</span>
                         </td>
+                        <td class="px-4 py-3 text-right text-white">PKR {{ number_format((float) ($balances[$f->id] ?? 0), 2) }}</td>
                         <td class="px-4 py-3 text-center">
-                            <form method="POST" action="{{ route('saas.admin.franchises.toggle', $f->id) }}" class="inline">@csrf
+                            <a href="{{ route('saas.admin.franchises.statement', $f->id) }}" class="text-xs text-indigo-400 mr-3">Statement</a>
+                            @if(auth('admin')->user()?->isSuperAdmin())<form method="POST" action="{{ route('saas.admin.franchises.toggle', $f->id) }}" class="inline">@csrf
                                 <button class="text-xs {{ $f->status === 'active' ? 'text-red-400' : 'text-emerald-400' }}">{{ $f->status === 'active' ? 'Suspend' : 'Activate' }}</button>
-                            </form>
+                            </form>@endif
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No franchises created yet.</td></tr>
+                    <tr><td colspan="8" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">No franchises created yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
+        <h2 class="text-white font-semibold mb-2">Franchise reviewed registrations awaiting TaxNest activation</h2>
+        @forelse($approvals as $approval)
+            <p class="text-sm text-gray-300 py-1"><a class="text-indigo-400" href="{{ route('saas.admin.companies.show', $approval->id) }}">{{ $approval->name }}</a> — {{ $approval->franchise_name }} — {{ $approval->approved_at }}</p>
+        @empty<p class="text-sm text-gray-400">None pending.</p>@endforelse
     </div>
 </div>
 </x-admin-layout>

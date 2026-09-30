@@ -33,6 +33,7 @@ class PaymentProof extends Model
         'file_pruned_at',
         'distributor_quote_snapshot',
         'distributor_net_amount',
+        'franchise_id_at_verification', 'franchise_rate_at_verification', 'franchise_attribution_conflict',
     ];
 
     protected $casts = [
@@ -45,6 +46,8 @@ class PaymentProof extends Model
         'addon_quote_snapshot' => 'array',
         'distributor_quote_snapshot' => 'array',
         'distributor_net_amount' => 'decimal:2',
+        'franchise_rate_at_verification' => 'decimal:2',
+        'franchise_attribution_conflict' => 'boolean',
     ];
 
     /** Non-package request lanes. Anything NOT listed here is a renewal proof. */
@@ -101,7 +104,9 @@ class PaymentProof extends Model
     /** 'subscription' | 'extra_branch' | 'pos_addon' — pre-migration rows = subscription. */
     public function kind(): string
     {
-        if (self::kindColumnExists() && in_array($this->request_type, self::ADDON_KINDS, true)) {
+        // The persisted row already carries its kind. A process-wide schema
+        // memo can be stale after an isolated test drops/recreates the table.
+        if (in_array($this->request_type, self::ADDON_KINDS, true)) {
             return $this->request_type;
         }
 

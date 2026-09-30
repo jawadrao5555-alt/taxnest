@@ -4,10 +4,9 @@ namespace App\Http\Controllers\Franchise;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
-use App\Models\Subscription;
-use App\Models\PosTransaction;
-use Illuminate\Http\Request;
+use App\Models\FranchiseCommission;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class FranchiseDashboardController extends Controller
 {
@@ -19,13 +18,13 @@ class FranchiseDashboardController extends Controller
     public function dashboard()
     {
         $franchiseId = $this->franchiseId();
-        $companyIds = Company::where('franchise_id', $franchiseId)->pluck('id');
-
         $stats = [
-            'total_companies' => $companyIds->count(),
-            'active_subscriptions' => Subscription::whereIn('company_id', $companyIds)->where('active', true)->count(),
-            'total_revenue' => PosTransaction::whereIn('company_id', $companyIds)->where('status', 'completed')->sum('total_amount'),
-            'today_transactions' => PosTransaction::whereIn('company_id', $companyIds)->where('status', 'completed')->whereDate('created_at', today())->count(),
+            'total_companies' => Company::where('franchise_id', $franchiseId)->count(),
+            'pending_approvals' => Schema::hasTable('franchise_company_approvals') ? Company::where('franchise_id', $franchiseId)
+                ->where('status', 'pending')->where('company_status', 'pending')
+                ->whereNotIn('id', DB::table('franchise_company_approvals')->select('company_id'))->count() : 0,
+            'commission_balance' => Schema::hasTable('franchise_commissions')
+                ? FranchiseCommission::where('franchise_id', $franchiseId)->where('status', 'pending')->sum('amount') : 0,
         ];
 
         $recentCompanies = Company::where('franchise_id', $franchiseId)->orderBy('created_at', 'desc')->take(5)->get();
@@ -35,44 +34,29 @@ class FranchiseDashboardController extends Controller
 
     public function companies()
     {
+        $franchiseId = $this->franchiseId();
         $companies = Company::where('franchise_id', $this->franchiseId())
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
-        return view('franchise.companies', compact('companies'));
+        $reviewedIds = Schema::hasTable('franchise_company_approvals') ? DB::table('franchise_company_approvals')
+            ->where('franchise_id', $franchiseId)
+            ->whereIn('company_id', $companies->pluck('id'))
+            ->pluck('company_id')->all() : [];
+
+        return view('franchise.companies', compact('companies', 'reviewedIds'));
     }
 
-    public function subscriptions()
+    public function revenue()
     {
-        $companyIds = Company::where('franchise_id', $this->franchiseId())->pluck('id');
+        $query = FranchiseCommission::where('franchise_id', $this->franchiseId());
+        $totals = [
+            'earned' => (clone $query)->where('type', 'earned')->where('status', '!=', 'attribution_conflict')->sum('amount'),
+            'balance' => (clone $query)->where('status', 'pending')->sum('amount'),
+            'paid' => (clone $query)->where('status', 'paid')->sum('amount'),
+        ];
+        $commissions = $query->orderByDesc('earned_at')->orderByDesc('id')->paginate(20);
 
-        $subscriptions = Subscription::whereIn('company_id', $companyIds)
-            ->with(['company', 'pricingPlan'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
-
-        return view('franchise.subscriptions', compact('subscriptions'));
-    }
-
-    public function revenue(Request $request)
-    {
-        $companyIds = Company::where('franchise_id', $this->franchiseId())->pluck('id');
-
-        $monthlyRevenue = PosTransaction::whereIn('company_id', $companyIds)
-            ->where('status', 'completed')
-            ->where('created_at', '>=', now()->subMonths(12))
-            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month, SUM(total_amount) as revenue, COUNT(*) as count")
-            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
-            ->orderBy('month')
-            ->get();
-
-        $totalRevenue = PosTransaction::whereIn('company_id', $companyIds)
-            ->where('status', 'completed')
-            ->sum('total_amount');
-
-        $commissionRate = auth('franchise')->user()->commission_rate;
-        $totalCommission = round($totalRevenue * $commissionRate / 100, 2);
-
-        return view('franchise.revenue', compact('monthlyRevenue', 'totalRevenue', 'commissionRate', 'totalCommission'));
+        return view('franchise.revenue', compact('commissions', 'totals'));
     }
 }

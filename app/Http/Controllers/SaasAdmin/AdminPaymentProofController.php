@@ -210,6 +210,15 @@ class AdminPaymentProofController extends Controller
                 // never recompute against a later agent allowance or policy.
                 $proofAttrs['distributor_net_amount'] = round($netReceived, 2);
             }
+            if (Schema::hasColumn('payment_proofs', 'franchise_id_at_verification')
+                && $attributedCompany->franchise_id) {
+                $franchise = \App\Models\Franchise::find($attributedCompany->franchise_id);
+                if ($franchise && $franchise->isActive()) {
+                    $proofAttrs['franchise_id_at_verification'] = $franchise->id;
+                    $proofAttrs['franchise_rate_at_verification'] = $franchise->commission_rate;
+                    $proofAttrs['franchise_attribution_conflict'] = (bool) $attributedCompany->agent_id;
+                }
+            }
             $locked->update($proofAttrs);
 
             return [
@@ -249,6 +258,7 @@ class AdminPaymentProofController extends Controller
         // Agent commission: a verified proof is the "cleared payment" that
         // earns the introducing agent their Schedule A cut. Never breaks approval.
         \App\Services\AgentCommissionService::recordForProof($proof->fresh());
+        \App\Services\FranchiseCommissionService::recordForProof($proof->fresh());
 
         AdminAuditLog::log(auth('admin')->id(), 'Payment proof approved', 'PaymentProof', $proof->id, array_filter([
             'company_id' => $proof->company_id,

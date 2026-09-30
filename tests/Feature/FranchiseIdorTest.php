@@ -13,13 +13,11 @@ use Tests\TestCase;
 /**
  * Franchise portal (guard `franchise`, routes /franchise/*).
  *
- * Audit item: "franchise IDOR — UNKNOWN". Verified: the portal exposes FOUR
- * read-only screens (dashboard, companies, subscriptions, revenue) and NO route
- * that takes a company / subscription / payment id. Every query is constrained
+ * The portal exposes a dashboard, companies, commission statement and the
+ * constrained review route. Every query is constrained
  * to `companies.franchise_id = auth('franchise')->id()` (directly, or through
- * the id list that constraint produces). These tests pin that shape so a
- * future id-taking route cannot land without a franchise constraint and a
- * test.
+ * the id list that constraint produces). The one company-id review route
+ * must keep that constraint and must not activate a subscription.
  *
  * Run:
  *   php vendor/bin/phpunit tests/Feature/FranchiseIdorTest.php --testdox
@@ -80,24 +78,19 @@ class FranchiseIdorTest extends TestCase
             ->assertDontSee($this->companyY->name);
     }
 
-    public function test_franchise_x_sees_only_its_own_subscriptions(): void
+    public function test_subscription_details_are_not_available_in_franchise_portal(): void
     {
-        $this->asX()->get('/franchise/subscriptions')
-            ->assertOk()
-            ->assertSee($this->companyX->name)
-            ->assertDontSee($this->companyY->name);
+        $response = $this->asX()->get('/franchise/subscriptions');
+        $this->assertContains($response->getStatusCode(), [302, 404]);
     }
 
     public function test_revenue_is_computed_over_own_companies_only(): void
     {
         $this->asX()->get('/franchise/revenue')->assertOk();
-        // The controller only ever sees ids from the franchise-constrained
-        // company list — pin that no other company id could have been summed.
-        $ids = Company::where('franchise_id', $this->x->id)->pluck('id');
-        $this->assertEquals([$this->companyX->id], $ids->all());
+        $this->assertEquals([$this->companyX->id], Company::where('franchise_id', $this->x->id)->pluck('id')->all());
     }
 
-    public function test_no_franchise_route_accepts_a_company_or_subscription_id(): void
+    public function test_company_id_route_is_limited_to_review_and_other_franchise_is_forbidden(): void
     {
         $franchiseRoutes = collect(Route::getRoutes()->getRoutes())
             ->filter(fn ($r) => str_starts_with($r->uri(), 'franchise/'));
@@ -105,9 +98,11 @@ class FranchiseIdorTest extends TestCase
         $this->assertNotEmpty($franchiseRoutes);
 
         $withParams = $franchiseRoutes->filter(fn ($r) => !empty($r->parameterNames()));
-        $this->assertCount(0, $withParams,
-            'A /franchise/* route now takes an id: ' . $withParams->map->uri()->implode(', ')
-            . ' — it MUST constrain the query to companies.franchise_id = auth(\'franchise\')->id() and be covered here.');
+        $this->assertEquals(['franchise/companies/{companyId}/approve'], $withParams->map->uri()->values()->all());
+
+        $foreign = $this->asX()->post("/franchise/companies/{$this->companyY->id}/approve");
+        $this->assertContains($foreign->getStatusCode(), [302, 404]);
+        $this->assertDatabaseMissing('franchise_company_approvals', ['company_id' => $this->companyY->id]);
 
         // Guessing a per-record URL for the other franchise's rows yields nothing.
         foreach ([

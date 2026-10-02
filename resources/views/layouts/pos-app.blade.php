@@ -135,10 +135,11 @@
                     ->whereIn('app_update_id', $whatsNewList->pluck('id'))->pluck('app_update_id')->all();
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
-                $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null : $whatsNewUnseen->first();
-                // Auto-popup only the latest unseen update. The remaining unread
-                // rows stay unread and can be opened individually from the bell.
-                $whatsNewPopupList = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? collect() : $whatsNewUnseen->take(1)->values();
+                $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null
+                    : $whatsNewUnseen->first(fn ($u) => (bool) ($u->is_featured ?? false));
+                // Routine updates stay in the bell. Only explicitly featured notices
+                // interrupt work; refreshing must not drain the unread queue.
+                $whatsNewPopupList = $whatsNewPopup ? collect([$whatsNewPopup]) : collect();
                 // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
                 // the popup renders in celebratory hero style with that update on top.
                 // ?? false: column may not exist yet mid-deploy (missing attr = null).

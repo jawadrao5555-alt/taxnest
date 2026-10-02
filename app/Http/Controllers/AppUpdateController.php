@@ -327,12 +327,10 @@ class AppUpdateController extends Controller
     {
         // Both panels share the 'users' provider, so AppUpdateSeen.user_id is safe
         // for either guard. Audience 'all' targets both panels.
-        $user = auth('pos')->user();
-        $panel = 'pra';
-        if (!$user) {
-            $user = auth('fbrpos')->user();
-            $panel = 'fbr';
-        }
+        // The endpoint determines the panel; a simultaneous login must never
+        // consume another account's notifications.
+        $panel = $request->is('fbr-pos/*') ? 'fbr' : 'pra';
+        $user = auth($panel === 'fbr' ? 'fbrpos' : 'pos')->user();
         if (!$user) {
             return response()->json(['ok' => false], 401);
         }
@@ -356,11 +354,9 @@ class AppUpdateController extends Controller
 
         foreach ($ids as $id) {
             if (!in_array($id, $already)) {
-                try {
-                    AppUpdateSeen::create(['app_update_id' => $id, 'user_id' => $user->id]);
-                } catch (\Throwable $e) {
-                    // Unique-constraint race (double click / two tabs) — already seen, ignore.
-                }
+                // firstOrCreate handles a unique-key race; other database
+                // failures must not be reported to the browser as success.
+                AppUpdateSeen::firstOrCreate(['app_update_id' => $id, 'user_id' => $user->id]);
             }
         }
 

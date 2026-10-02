@@ -72,6 +72,7 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->string('status')->default('approved');
             $table->string('company_status')->default('approved');
             $table->boolean('restaurant_mode')->default(false);
+            $table->boolean('is_internal_account')->default(false);
             $table->boolean('pos_setup_completed')->default(true);
             $table->boolean('fbr_pos_enabled')->default(false);
             $table->boolean('fbr_reporting_enabled')->default(false);
@@ -169,6 +170,7 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->text('points');
             $table->string('image_path')->nullable();
             $table->string('audience')->default('pos');
+            $table->string('audience_family')->nullable();
             $table->string('type', 20)->nullable(); // Task 1286: feature|improvement (null = legacy)
             $table->text('target_categories')->nullable(); // Task 1585: null/[] = all shops
             $table->boolean('is_published')->default(true);
@@ -677,5 +679,38 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
         DB::table('app_updates')->where('id', $upd->id)->update(['type' => 'garbage']);
         $this->assertSame('improvement', $upd->fresh()->type, 'unknown type values must normalize to improvement');
+    }
+
+    public function test_hotel_food_notices_require_an_enabled_food_outlet_and_preserve_category(): void
+    {
+        $this->setCategory($this->posCompanyId, 'hotel');
+        DB::table('companies')->where('id', $this->posCompanyId)->update([
+            'is_internal_account' => true, 'feature_flags' => json_encode(['kitchen' => false, 'kot' => false, 'tables' => false]),
+        ]);
+        AppUpdate::create([
+            'title' => 'WN-HOTEL-ROOMS', 'points' => ['Room operations'],
+            'audience' => 'pos', 'is_published' => true, 'target_categories' => ['hotel'],
+            'audience_family' => 'accommodation',
+        ]);
+        AppUpdate::create([
+            'title' => 'WN-FOOD-FAMILY', 'points' => ['Kitchen operations'],
+            'audience' => 'pos', 'is_published' => true, 'audience_family' => 'food_service',
+        ]);
+        \App\Services\PosFeatureService::flushGateCaches();
+        $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile')
+            ->assertStatus(200)->assertSee('WN-HOTEL-ROOMS')
+            ->assertDontSee('WN-FOOD-FAMILY')->assertDontSee(self::T_RESTAURANT);
+
+        DB::table('companies')->where('id', $this->posCompanyId)->update([
+            'feature_flags' => json_encode(['kitchen' => true, 'kot' => true, 'tables' => true]),
+        ]);
+        \App\Services\PosFeatureService::flushGateCaches();
+        $this->get('/pos/my-profile')->assertStatus(200)->assertSee('WN-HOTEL-ROOMS')
+            ->assertSee('WN-FOOD-FAMILY')->assertSee(self::T_RESTAURANT);
+        $this->assertSame('hotel', DB::table('companies')->where('id', $this->posCompanyId)->value('business_category'));
+
+        // Another tenant remains a pharmacy and receives neither room nor PRA food notices.
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile')
+            ->assertStatus(200)->assertDontSee('WN-HOTEL-ROOMS')->assertDontSee('WN-FOOD-FAMILY');
     }
 }

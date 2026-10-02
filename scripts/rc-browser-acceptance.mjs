@@ -317,7 +317,44 @@ async function hotelWorkflow(page, t, v) {
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
   pass(`${t.name}/${v.width}: room check-in, edited rate, discount, advance, card checkout and receipt passed`);
 }
+async function notificationWorkflow(page, t, v) {
+  const panel=t.notificationWorkflow, prefix=panel==='fbr'?'/fbr-pos':'/pos';
+  await page.goto(baseUrl+prefix+'/my-profile',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);
+  const modal=page.locator('[data-wn-featured="1"]:visible');
+  await modal.waitFor({state:'visible',timeout:15000});
+  if(await modal.count()!==1)throw new Error('duplicate featured receipts rendered multiple popups');
+  const button=modal.locator('button').filter({hasText:/Samajh|Got|Theek|OK/i}).first();
+  const dismissButton=modal.locator('button').last();
+  const endpoint='**'+prefix+'/whats-new/seen';
+  await page.route(endpoint, route=>route.fulfill({status:500,contentType:'application/json',body:'{"ok":false}'}));
+  await dismissButton.click();
+  await modal.locator('[role="alert"]:visible').waitFor({state:'visible',timeout:5000});
+  if(!await modal.isVisible())throw new Error('failed acknowledgement silently closed the notice');
+  await page.unroute(endpoint);
+  const [ack]=await Promise.all([
+    page.waitForResponse(r=>r.url().endsWith(prefix+'/whats-new/seen')&&r.request().method()==='POST'),
+    dismissButton.click(),
+  ]);
+  if(!ack.ok()||!(await ack.json()).ok)throw new Error('notification retry was not acknowledged by the real server');
+  await modal.waitFor({state:'hidden',timeout:5000});
+  for(let refresh=0;refresh<2;refresh++){
+    await page.reload({waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page);
+    if(await page.locator('[x-show="wnOpen"]:visible').count())throw new Error('refresh reopened an acknowledged featured notice or routine queue');
+    await page.locator('[data-tn-topnav-control="notification"]').first().click();
+    const bell=page.locator('[x-show="bellOpen"]:visible').first();
+    await bell.waitFor({state:'visible',timeout:5000});
+    const text=await bell.innerText();
+    for(let i=1;i<=7;i++)if(!text.includes('Synthetic routine '+panel+' '+i))throw new Error('routine bell history disappeared after refresh');
+    if((text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
+    await page.locator('[data-tn-topnav-control="notification"]').first().click();
+  }
+  pass(t.name+'/'+v.width+': real failed-save retry, duplicate consolidation and seven routine notices across refresh');
+}
+
 async function workflow(page,t,v) {
+  if (t.notificationWorkflow) return notificationWorkflow(page,t,v);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v);
   const f=t.serviceWorkflow; if(!f)return;
   await page.goto(baseUrl+f.createPath,{waitUntil:'domcontentloaded',timeout:30000});
@@ -366,7 +403,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t); await waitForOperationalSurface(p); await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

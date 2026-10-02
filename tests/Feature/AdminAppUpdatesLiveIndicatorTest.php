@@ -78,6 +78,11 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
             $table->text('target_categories')->nullable();
             $table->string('audience_family')->nullable();
             $table->boolean('is_featured')->default(false);
+            $table->string('deployment_key', 40)->nullable();
+            $table->string('notification_key', 64)->nullable()->index();
+            $table->string('manual_publish_key', 64)->nullable()->unique();
+            $table->uuid('announcement_revision')->nullable();
+            $table->timestamp('archived_at')->nullable();
             $table->boolean('is_published')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
@@ -242,5 +247,83 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
     public function test_guest_is_redirected_away_from_admin_history(): void
     {
         $this->get('/admin/app-updates')->assertRedirect();
+    }
+
+    public function test_repeated_admin_submission_creates_one_announcement(): void
+    {
+        $payload = [
+            'title' => 'Stable reception update', 'points_text' => 'Room board is easier',
+            'audience' => 'pos', 'audience_family' => 'accommodation',
+            'audience_scope' => 'cats', 'target_categories' => ['hotel'],
+            'is_published' => '1',
+        ];
+        $this->actingAsAdmin()->post('/admin/app-updates', $payload)->assertRedirect();
+        $original = AppUpdate::where('title', $payload['title'])->firstOrFail();
+        \App\Models\AppUpdateSeen::create(['app_update_id' => $original->id, 'user_id' => 123]);
+        $this->post('/admin/app-updates', $payload)->assertRedirect();
+        $this->assertSame(1, AppUpdate::where('title', $payload['title'])->count());
+        $this->assertDatabaseHas('app_update_seens', ['app_update_id' => $original->id, 'user_id' => 123]);
+    }
+
+    public function test_new_deployment_receipt_does_not_duplicate_delivery_or_reset_seen_state(): void
+    {
+        $data = ['title' => 'Stable reception update', 'points' => ['Room board is easier'],
+            'audience' => 'pos', 'is_published' => true, 'is_featured' => true];
+        $first = AppUpdate::create($data + ['deployment_key' => str_repeat('a', 40)]);
+        $second = AppUpdate::create($data + ['deployment_key' => str_repeat('b', 40)]);
+        \App\Models\AppUpdateSeen::create(['app_update_id' => $second->id, 'user_id' => 123]);
+
+        $this->assertSame([$first->id], AppUpdate::customerCanonical()->published()->liveWindow()->pluck('id')->all());
+        $this->assertContains($first->id, AppUpdate::seenIdsForUser(123));
+        $this->assertFalse($first->isCustomerDuplicate());
+        $this->assertTrue($second->isCustomerDuplicate());
+        $this->assertSame(2, AppUpdate::whereNotNull('deployment_key')->count(),
+            'both exact-SHA release receipts must survive');
+        $this->assertSame(1, \App\Models\AppUpdateSeen::count(),
+            'deduplication must not rewrite acknowledgement history');
+
+        DB::table('app_updates')->where('id', $first->id)->update(['created_at' => now()->subDays(8)]);
+        $this->assertSame(0, AppUpdate::customerCanonical()->published()->liveWindow()->count(),
+            'a repeated deploy must not restart the customer announcement window');
+        $changed = AppUpdate::create(array_replace($data, ['points' => ['Checkout is easier']]));
+        $this->assertSame([$changed->id], AppUpdate::customerCanonical()->published()->liveWindow()->pluck('id')->all());
+    }
+
+    public function test_explicit_reannouncement_creates_a_revision_without_erasing_history(): void
+    {
+        $original = AppUpdate::create([
+            'title' => 'Reception reminder', 'points' => ['Room board is easier'],
+            'audience' => 'pos', 'is_published' => true,
+        ]);
+        DB::table('app_updates')->where('id', $original->id)->update(['created_at' => now()->subDays(8)]);
+        $created = $original->fresh()->created_at->toDateTimeString();
+        \App\Models\AppUpdateSeen::create(['app_update_id' => $original->id, 'user_id' => 123]);
+        $this->actingAsAdmin()->post('/admin/app-updates/'.$original->id.'/reannounce')->assertRedirect();
+        $revision = AppUpdate::where('id', '!=', $original->id)->firstOrFail();
+        $this->assertNotEmpty($revision->announcement_revision);
+        $this->assertNotSame($original->notification_key, $revision->notification_key);
+        $this->assertSame($created, $original->fresh()->created_at->toDateTimeString());
+        $this->assertDatabaseHas('app_update_seens', ['app_update_id' => $original->id, 'user_id' => 123]);
+        $this->assertNotContains($revision->id, AppUpdate::seenIdsForUser(123));
+        $this->assertSame([$revision->id], AppUpdate::customerCanonical()->published()->liveWindow()->pluck('id')->all());
+    }
+
+    public function test_archive_stops_the_whole_duplicate_group_and_keeps_receipts_and_seen_history(): void
+    {
+        $data = ['title' => 'Archive reminder', 'points' => ['Room board is easier'],
+            'audience' => 'pos', 'is_published' => true];
+        $first = AppUpdate::create($data + ['deployment_key' => str_repeat('a', 40)]);
+        $second = AppUpdate::create($data + ['deployment_key' => str_repeat('b', 40)]);
+        \App\Models\AppUpdateSeen::create(['app_update_id' => $first->id, 'user_id' => 123]);
+        $this->actingAsAdmin()->delete('/admin/app-updates/'.$second->id.'/delete')->assertRedirect();
+        $this->assertSame(2, AppUpdate::whereNotNull('deployment_key')->published()->count());
+        $this->assertSame(0, AppUpdate::customerCanonical()->published()->liveWindow()->count());
+        $this->assertDatabaseHas('app_update_seens', ['app_update_id' => $first->id, 'user_id' => 123]);
+        AppUpdate::create($data + ['deployment_key' => str_repeat('c', 40)]);
+        $this->assertSame(0, AppUpdate::customerCanonical()->published()->liveWindow()->count(),
+            'later repeated deployment must not resurrect archived content');
+        $this->post('/admin/app-updates/'.$first->id.'/reannounce')->assertRedirect();
+        $this->assertSame(1, AppUpdate::customerCanonical()->published()->liveWindow()->count(),
+            'an explicit new revision may announce archived content again');
     }
 }

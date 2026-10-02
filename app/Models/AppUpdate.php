@@ -17,13 +17,14 @@ class AppUpdate extends Model
         'title', 'points', 'image_path', 'audience', 'target_categories', 'type', 'is_published', 'is_featured', 'created_by',
         // Task 1582: category family this update is for (all / food_service /
         // goods_retail / pharmacy / services). Legacy rows read as 'all'.
-        'audience_family', 'deployment_key',
+        'audience_family', 'deployment_key', 'notification_key', 'manual_publish_key', 'announcement_revision', 'archived_at',
     ];
 
-    protected $hidden = ['deployment_key'];
+    protected $hidden = ['deployment_key', 'notification_key', 'manual_publish_key', 'announcement_revision'];
 
     protected $casts = [
         'points' => 'array',
+        'archived_at' => 'datetime',
         // Task 1585: NULL / [] = every shop of the audience panel; a non-empty
         // list narrows the elaan to those business categories.
         'target_categories' => 'array',
@@ -31,6 +32,79 @@ class AppUpdate extends Model
         // Featured "bara elaan" (Task 722): renders as a celebratory hero popup.
         'is_featured' => 'boolean',
     ];
+
+    public function isCustomerDuplicate(): bool
+    {
+        return $this->is_published
+            && \Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'notification_key')
+            && $this->notification_key
+            && self::where('notification_key', $this->notification_key)
+                ->where('id', '<', $this->id)->where('is_published', true)->exists();
+    }
+
+    public static function seenIdsForUser(int $userId): array
+    {
+        $seen = AppUpdateSeen::where('user_id', $userId)->pluck('app_update_id')->all();
+        if (!$seen || !\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'notification_key')) {
+            return $seen;
+        }
+        $keys = self::whereIn('id', $seen)->whereNotNull('notification_key')->pluck('notification_key');
+        return array_values(array_unique(array_merge($seen,
+            self::whereIn('notification_key', $keys)->pluck('id')->all())));
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $update) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'notification_key')) {
+                $update->notification_key = $update->contentKey();
+            }
+        });
+    }
+
+    /** Content identity excludes deployment SHA, creation date and publisher. */
+    public function contentKey(): string
+    {
+        $categories = (array) $this->target_categories;
+        sort($categories);
+        return hash('sha256', json_encode([
+            'title' => trim($this->customerTitle()),
+            'points' => array_map(fn ($point) => trim((string) $point), (array) $this->points),
+            'image' => $this->image_path ?: null,
+            'audience' => $this->audience ?: 'pos',
+            'family' => $this->audience_family,
+            'categories' => $categories,
+            'type' => $this->type,
+            'featured' => (bool) $this->is_featured,
+            'revision' => $this->announcement_revision ?: null,
+        ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Keep release receipt rows/history, but deliver identical published content
+     * once. The first row owns the customer window: a new SHA cannot restart it.
+     */
+    public function scopeCustomerCanonical($query)
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'notification_key')) {
+            return $query;
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'archived_at')) {
+            $query->whereNull('app_updates.archived_at')->whereNotExists(function ($archive) {
+                $archive->selectRaw('1')->from('app_updates as archived')
+                    ->whereColumn('archived.notification_key', 'app_updates.notification_key')
+                    ->whereNotNull('archived.archived_at');
+            });
+        }
+        return $query->where(function ($q) {
+            $q->whereNull('app_updates.notification_key')->orWhereNotExists(function ($duplicate) {
+                $duplicate->selectRaw('1')->from('app_updates as original')
+                    ->whereColumn('original.notification_key', 'app_updates.notification_key')
+                    ->whereColumn('original.id', '<', 'app_updates.id')
+                    ->where('original.is_published', true);
+            });
+        });
+    }
 
     /**
      * Self-healing accessor (11 Aug 2026): a write path once DOUBLE-encoded
@@ -81,9 +155,9 @@ class AppUpdate extends Model
     public function reachesCompany(?\App\Models\Company $company): bool
     {
         try {
-            return \App\Services\PosFeatureService::audienceMatches($company, $this->audience_family);
+            return $this->audience_family === 'all' || in_array($this->audience_family, self::recipientFamilies($company), true);
         } catch (\Throwable $e) {
-            return true; // never hide an announcement over a profile fault
+            return false; // an audience resolution error must not widen delivery
         }
     }
 
@@ -97,12 +171,40 @@ class AppUpdate extends Model
         if (!$company || !\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')) {
             return $query;
         }
-        $families = array_merge(['all'], \App\Services\PosFeatureService::audiencesFor($company));
+        $families = array_merge(['all'], self::recipientFamilies($company));
         return $query->where(function ($q) use ($families) {
             $q->whereNull('audience_family')->orWhere('audience_family', '')
               ->orWhereIn('audience_family', $families)
               ->orWhereNotIn('audience_family', \App\Services\PosCategoryProfiles::AUDIENCE_FAMILIES);
         });
+    }
+
+    /** A hotel's food outlet is an enabled module, not its business identity. */
+    private static function hotelHasFoodOutlet(?Company $company): bool
+    {
+        return $company
+            && \App\Services\PosFeatureService::resolveCategory($company) === 'hotel'
+            && \App\Services\PosFeatureService::restaurantModeFrom(
+                (array) \App\Services\PosFeatureService::forCompany($company));
+    }
+
+    public static function recipientCategories(?Company $company): array
+    {
+        $categories = [\App\Services\PosFeatureService::resolveCategory($company)];
+        if (self::hotelHasFoodOutlet($company)) {
+            $categories[] = 'restaurant';
+        }
+        return $categories;
+    }
+
+    public static function recipientFamilies(?Company $company): array
+    {
+        $families = \App\Services\PosFeatureService::audiencesFor($company);
+        if (\App\Services\PosFeatureService::resolveCategory($company) === 'hotel'
+            && !self::hotelHasFoodOutlet($company)) {
+            $families = array_values(array_diff($families, ['food_service']));
+        }
+        return $families;
     }
 
     public function scopePublished($query)
@@ -157,22 +259,24 @@ class AppUpdate extends Model
     {
         $panel = $panel ?: \App\Services\PosFeatureService::panelFor($company);
         $audiences = $panel === 'fbr' ? ['fbr_pos', 'all'] : ['pos', 'all'];
-        $query->whereIn('audience', $audiences);
+        $query->whereIn('audience', $audiences)->customerCanonical();
 
         if (!\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')) {
             return $query; // mid-deploy: column not there yet = everything is universal
         }
 
-        $category = \App\Services\PosFeatureService::resolveCategory($company);
+        $categories = self::recipientCategories($company);
 
-        return $query->where(function ($w) use ($category) {
+        return $query->where(function ($w) use ($categories) {
             $w->whereNull('target_categories')
               ->orWhere('target_categories', '')
-              ->orWhere('target_categories', '[]')
+              ->orWhere('target_categories', '[]');
               // Category keys are a fixed slug set (see PosFeatureService), so
               // a quoted-token LIKE matches the JSON list on both MySQL and
               // SQLite without needing JSON_CONTAINS.
-              ->orWhere('target_categories', 'like', '%"' . $category . '"%');
+            foreach ($categories as $category) {
+                $w->orWhere('target_categories', 'like', '%"' . $category . '"%');
+            }
         });
     }
 

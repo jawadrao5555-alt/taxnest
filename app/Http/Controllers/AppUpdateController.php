@@ -68,12 +68,13 @@ class AppUpdateController extends Controller
         $count = 0;
         $examples = [];
         foreach (Company::whereIn('product_type', ['pos', 'fbrpos'])
-            ->select(['id', 'name', 'product_type', 'business_category', 'pos_type'])->cursor() as $company) {
+            ->cursor() as $company) {
             $panel = PosFeatureService::panelFor($company);
             if ($request->input('audience') === 'pos' && $panel !== 'pra'
                 || $request->input('audience') === 'fbr_pos' && $panel !== 'fbr'
-                || !PosFeatureService::audienceMatches($company, $request->input('audience_family'))
-                || ($categories && !in_array(PosFeatureService::resolveCategory($company), $categories, true))) {
+                || ($request->input('audience_family') !== 'all'
+                    && !in_array($request->input('audience_family'), AppUpdate::recipientFamilies($company), true))
+                || ($categories && !array_intersect(AppUpdate::recipientCategories($company), $categories))) {
                 continue;
             }
             $count++;
@@ -115,7 +116,7 @@ class AppUpdateController extends Controller
             );
         }
 
-        AppUpdate::create([
+        $attributes = [
             'title' => $request->title,
             'points' => $points,
             'image_path' => $this->storeImage($request),
@@ -131,7 +132,24 @@ class AppUpdateController extends Controller
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')
             ? ['target_categories' => $categories] : [])
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')
-            ? ['audience_family' => $request->input('audience_family', 'all')] : []));
+            ? ['audience_family' => $request->input('audience_family', 'all')] : []);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'manual_publish_key')) {
+            $key = (new AppUpdate($attributes))->contentKey();
+            // Repeated submit is idempotent, including concurrent submissions:
+            // firstOrCreate's createOrFirst path relies on the unique DB key.
+            $existing = AppUpdate::where('notification_key', $key)->orderBy('id')->first();
+            if ($existing) {
+                return redirect('/admin/app-updates')->with('success',
+                    'Same announcement already exists. Its history and seen state were preserved. Use Reannounce for an intentional reminder.');
+            }
+            $created = AppUpdate::firstOrCreate(['manual_publish_key' => $key], $attributes);
+            if (!$created->wasRecentlyCreated) {
+                return redirect('/admin/app-updates')->with('success', 'Duplicate submission ignored; existing announcement preserved.');
+            }
+        } else {
+            AppUpdate::create($attributes);
+        }
 
         return redirect('/admin/app-updates')->with('success', 'Update published. POS users will see it on their next page load.');
     }
@@ -187,7 +205,7 @@ class AppUpdateController extends Controller
         }
 
         if ($request->boolean('remove_image')) {
-            $this->deleteImage($appUpdate->image_path);
+            $this->deleteImage($appUpdate->image_path, (int) $appUpdate->id);
             $data['image_path'] = null;
         } elseif ($request->hasFile('image')) {
             $this->deleteImage($appUpdate->image_path);
@@ -206,12 +224,11 @@ class AppUpdateController extends Controller
 
         // Task 1295: publishing a row whose 7-day live window has already
         // expired would be silently invisible on POS (liveWindow filters it
-        // out). Treat that publish as a RE-ANNOUNCE: restart the clock and
-        // clear seen rows so the popup + bell fire again for everyone.
+        // out). Publish a new revision; do not erase the original seen history.
         if ($publishing && $appUpdate->created_at->lt(now()->subDays(AppUpdate::LIVE_DAYS))) {
             $this->restartLiveWindow($appUpdate);
 
-            return redirect('/admin/app-updates')->with('success', 'Update dobara elaan ho gaya — 7-din ka clock restart, POS users ko popup + bell phir dikhega.');
+            return redirect('/admin/app-updates')->with('success', 'Update dobara elaan ho gaya — nayi announcement revision bani; purana seen/history record mehfooz hai.');
         }
 
         $appUpdate->update(['is_published' => $publishing]);
@@ -257,27 +274,38 @@ class AppUpdateController extends Controller
     }
 
     /**
-     * Restart the POS live window: bump created_at to now (liveWindow reads
-     * created_at) and wipe seen rows so the one-time popup fires again even
-     * for users who dismissed it the first time. created_at is not fillable,
-     * so set it directly and save.
+     * Publish an explicit new revision, preserving the original timestamps,
+     * release provenance and every acknowledgement. Only the revision is unread.
      */
     private function restartLiveWindow(AppUpdate $appUpdate): void
     {
-        $appUpdate->is_published = true;
-        $appUpdate->created_at = now();
-        $appUpdate->save();
-        AppUpdateSeen::where('app_update_id', $appUpdate->id)->delete();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($appUpdate) {
+            $original = AppUpdate::whereKey($appUpdate->id)->lockForUpdate()->firstOrFail();
+            $revision = $original->replicate(['deployment_key', 'manual_publish_key', 'notification_key', 'announcement_revision', 'archived_at']);
+            $revision->is_published = true;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'announcement_revision')) {
+                $revision->announcement_revision = (string) \Illuminate\Support\Str::uuid();
+            }
+            $revision->save();
+            // The original identity, timestamp and all acknowledgements survive.
+        });
     }
 
     public function destroy($id)
     {
         $appUpdate = AppUpdate::findOrFail($id);
-        AppUpdateSeen::where('app_update_id', $appUpdate->id)->delete();
-        $this->deleteImage($appUpdate->image_path);
-        $appUpdate->delete();
+        if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'archived_at')) {
+            $group = AppUpdate::whereKey($appUpdate->id);
+            if ($appUpdate->notification_key) {
+                $group = AppUpdate::where('notification_key', $appUpdate->notification_key);
+            }
+            $group->update(['archived_at' => now()]);
+        } else {
+            $appUpdate->update(['is_published' => false]);
+        }
 
-        return redirect('/admin/app-updates')->with('success', 'Update deleted.');
+        return redirect('/admin/app-updates')->with('success',
+            'Announcement archived. Customer delivery stopped; release receipts, images and seen history were preserved.');
     }
 
     /**
@@ -295,8 +323,12 @@ class AppUpdateController extends Controller
         return 'app-updates/' . $name;
     }
 
-    private function deleteImage(?string $path): void
+    private function deleteImage(?string $path, ?int $exceptId = null): void
     {
+        if ($path && AppUpdate::where('image_path', $path)
+            ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))->exists()) {
+            return; // a history-preserving revision still uses this image
+        }
         if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
         }
@@ -350,6 +382,9 @@ class AppUpdateController extends Controller
             $query->whereKey((int) $request->input('update_id'));
         }
         $ids = $query->pluck('id');
+        if ($request->filled('update_id') && $ids->isEmpty()) {
+            return response()->json(['ok' => false], 404);
+        }
         $already = AppUpdateSeen::where('user_id', $user->id)->whereIn('app_update_id', $ids)->pluck('app_update_id')->all();
 
         foreach ($ids as $id) {

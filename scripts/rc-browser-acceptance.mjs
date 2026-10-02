@@ -317,21 +317,36 @@ async function hotelWorkflow(page, t, v) {
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
   pass(`${t.name}/${v.width}: room check-in, edited rate, discount, advance, card checkout and receipt passed`);
 }
-async function notificationWorkflow(page, t, v) {
+async function notificationWorkflow(page, t, v, diagnostics) {
   const panel=t.notificationWorkflow, prefix=panel==='fbr'?'/fbr-pos':'/pos';
   await page.goto(baseUrl+prefix+'/my-profile',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
   const modal=page.locator('[data-wn-featured="1"]:visible');
   await modal.waitFor({state:'visible',timeout:15000});
   if(await modal.count()!==1)throw new Error('duplicate featured receipts rendered multiple popups');
-  const button=modal.locator('button').filter({hasText:/Samajh|Got|Theek|OK/i}).first();
   const dismissButton=modal.locator('button').last();
   const endpoint='**'+prefix+'/whats-new/seen';
-  await page.route(endpoint, route=>route.fulfill({status:500,contentType:'application/json',body:'{"ok":false}'}));
-  await dismissButton.click();
+  let injectedFailures=0;
+  const expectedFailureUrl=baseUrl+prefix+'/whats-new/seen';
+  await page.route(endpoint, route=>{
+    if(route.request().method()!=='POST')return route.continue();
+    injectedFailures++;
+    return route.fulfill({status:500,contentType:'application/json',body:'{"ok":false}'});
+  });
+  const [failedAck]=await Promise.all([
+    page.waitForResponse(r=>r.url()===expectedFailureUrl&&r.request().method()==='POST'),
+    dismissButton.click(),
+  ]);
+  if(failedAck.status()!==500||injectedFailures!==1)throw new Error('failed-save probe did not inject exactly one expected response');
   await modal.locator('[role="alert"]:visible').waitFor({state:'visible',timeout:5000});
   if(!await modal.isVisible())throw new Error('failed acknowledgement silently closed the notice');
   await page.unroute(endpoint);
+  // Remove only the one asserted fault-injection response; later real failures still fail acceptance.
+  const injectedHttp=diagnostics.httpErrors.findIndex(x=>x.url===expectedFailureUrl&&x.method==='POST'&&x.status===500);
+  if(injectedHttp<0)throw new Error('expected injected failure was not recorded by diagnostics');
+  diagnostics.httpErrors.splice(injectedHttp,1);
+  const injectedConsole=diagnostics.consoleErrors.findIndex(x=>x.includes(expectedFailureUrl)&&/500/.test(x)&&/Failed to load resource/.test(x));
+  if(injectedConsole>=0)diagnostics.consoleErrors.splice(injectedConsole,1);
   const [ack]=await Promise.all([
     page.waitForResponse(r=>r.url().endsWith(prefix+'/whats-new/seen')&&r.request().method()==='POST'),
     dismissButton.click(),
@@ -353,8 +368,8 @@ async function notificationWorkflow(page, t, v) {
   pass(t.name+'/'+v.width+': real failed-save retry, duplicate consolidation and seven routine notices across refresh');
 }
 
-async function workflow(page,t,v) {
-  if (t.notificationWorkflow) return notificationWorkflow(page,t,v);
+async function workflow(page,t,v,diagnostics) {
+  if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v);
   const f=t.serviceWorkflow; if(!f)return;
   await page.goto(baseUrl+f.createPath,{waitUntil:'domcontentloaded',timeout:30000});
@@ -403,7 +418,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

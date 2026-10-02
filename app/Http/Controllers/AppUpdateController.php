@@ -393,7 +393,15 @@ class AppUpdateController extends Controller
         $company = \App\Models\Company::find($user->company_id);
         $query = AppUpdate::forCompany($company, $panel)->forCompanyFamily($company)->published()->liveWindow();
         if ($request->filled('update_id')) {
-            $query->whereKey((int) $request->input('update_id'));
+            $requestedId = (int) $request->input('update_id');
+            $requested = AppUpdate::find($requestedId);
+            if ($requested && $requested->notification_key) {
+                // Cached pre-dedup pages may submit a later duplicate ID.
+                // Resolve it through the same authorized canonical query.
+                $query->where('notification_key', $requested->notification_key);
+            } else {
+                $query->whereKey($requestedId);
+            }
         }
         $ids = $query->pluck('id');
         if ($request->filled('update_id') && $ids->isEmpty()) {

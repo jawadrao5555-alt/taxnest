@@ -171,6 +171,7 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->string('image_path')->nullable();
             $table->string('audience')->default('pos');
             $table->string('audience_family')->nullable();
+            $table->string('notification_key', 64)->nullable()->index();
             $table->string('type', 20)->nullable(); // Task 1286: feature|improvement (null = legacy)
             $table->text('target_categories')->nullable(); // Task 1585: null/[] = all shops
             $table->boolean('is_published')->default(true);
@@ -355,8 +356,8 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
         $this->actingAs(User::find($this->posAdminId), 'pos')
             ->postJson('/pos/whats-new/seen', ['update_id' => $fbrId])
-            ->assertStatus(200)
-            ->assertJson(['ok' => true]);
+            ->assertStatus(404)
+            ->assertJson(['ok' => false]);
 
         $this->assertDatabaseMissing('app_update_seens', [
             'user_id' => $this->posAdminId,
@@ -712,5 +713,18 @@ class WhatsNewAudienceTargetingTest extends TestCase
         // Another tenant remains a pharmacy and receives neither room nor PRA food notices.
         $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile')
             ->assertStatus(200)->assertDontSee('WN-HOTEL-ROOMS')->assertDontSee('WN-FOOD-FAMILY');
+    }
+
+    public function test_cached_duplicate_notice_id_acknowledges_the_authorized_canonical_notice(): void
+    {
+        $data = ['title' => 'Cached duplicate notice', 'points' => ['Reception update'],
+            'audience' => 'pos', 'is_published' => true];
+        $original = AppUpdate::create($data);
+        $duplicate = AppUpdate::create($data);
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->postJson('/pos/whats-new/seen', ['update_id' => $duplicate->id])->assertOk();
+        $this->assertDatabaseHas('app_update_seens', ['app_update_id' => $original->id, 'user_id' => $this->posAdminId]);
+        $this->assertContains($duplicate->id, AppUpdate::seenIdsForUser($this->posAdminId));
+        $this->assertDatabaseMissing('app_update_seens', ['user_id' => $this->fbrAdminId, 'app_update_id' => $original->id]);
     }
 }

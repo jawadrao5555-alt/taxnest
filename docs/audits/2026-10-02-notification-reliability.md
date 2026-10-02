@@ -26,3 +26,11 @@ Four behavior tests execute the real featured Alpine component with failed/succe
 New HTTP tests cover publishing idempotency, duplicate delivery, seen preservation, expiry, content changes, revision, archive and hotel module targeting.
 New real browser journeys cover both panels at desktop/mobile: featured duplicate consolidation, server failure and retry, then seven routine notices across refresh.
 No manual workflow rerun, production access, cleanup, merge or deploy. Draft remains until all required exact-HEAD checks and original flow acceptance pass.
+
+
+## Category authorization browser test boundary
+Negative category checks first assert the real authenticated HTTP denial (redirects may only remain in the correct panel). This cohort blocks Service Workers so it observes Laravel authorization and follows the real browser redirect without cached/opaque worker responses. Playwright documents missing network events when workers intercept requests: https://playwright.dev/docs/network#missing-network-events-and-service-workers.
+All notification retry/refresh journeys, Hotel transactions and other browser cohorts keep Service Workers enabled. This change does not alter the production worker or claim the exact historical cause of its intermittent category navigation aborts. Offline/PWA transport behavior is a separate acceptance scope.
+
+The audience-preview fixture now has real package/subscription tables. A regression enables stored hotel outlet flags and admin module grants, then proves a package without Restaurant still cannot receive food notices; a downgrade hides those notices while preserving saved flags.
+Real simultaneous native MariaDB workers also prove one manual publication, one repeated-click reannouncement revision and an unchanged original timestamp.

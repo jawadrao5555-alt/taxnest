@@ -384,10 +384,48 @@ async function workflow(page,t,v,diagnostics) {
 }
 async function categoryMismatch(page,t,v) {
   const path=t.categoryCoverage?.mismatchPath; if(!path)return;
-  const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:30000});
-  const status=response?.status()||0, finalPath=new URL(page.url()).pathname;
-  if(status<400&&finalPath===path)fail(`${t.name}/${v.width}: category mismatch direct URL rendered ${path}`);
-  else pass(`CATEGORY URL GATE PASS: ${t.name}/${v.width}: ${t.categoryCoverage.category} rejected ${path}`);
+  const requestedUrl=baseUrl+path;
+  // Prove server-side denial with the same authenticated browser session.
+  // Client redirects or a failed navigation alone do not prove a category gate.
+  const gate=await page.request.get(requestedUrl,{maxRedirects:0,headers:{Accept:'text/html'}});
+  const denied=[401,403,404].includes(gate.status());
+  const redirected=[302,303,307,308].includes(gate.status());
+  if(!denied&&!redirected)throw new Error('category URL returned '+gate.status()+' instead of a server-side denial');
+  const destination=redirected?new URL(gate.headers().location||'',requestedUrl):null;
+  const prefix=t.categoryCoverage.panel==='fbr'?'/fbr-pos/':'/pos/';
+  if(destination&&(destination.origin!==new URL(baseUrl).origin||!destination.pathname.startsWith(prefix)||destination.pathname.endsWith('/login')||destination.pathname===path))
+    throw new Error('category rejection redirected outside the authenticated native panel');
+  let navigationGate=null;
+  const observe=response=>{
+    if(response.url()===requestedUrl&&response.request().isNavigationRequest())navigationGate=response;
+  };
+  page.on('response',observe);
+  let response;
+  try {
+    response=await page.goto(requestedUrl,{waitUntil:'commit',timeout:30000});
+    await page.waitForLoadState('domcontentloaded');
+  } catch(error) {
+    // Chrome may abort a multi-hop dashboard -> native landing redirect.
+    // Accept only a separately observed real denial AND a settled, usable
+    // original native surface. Never retry or treat ERR_ABORTED alone as pass.
+    if(!/net::ERR_ABORTED/.test(error.message)||!redirected||!navigationGate
+        ||![302,303,307,308].includes(navigationGate.status()))throw error;
+    const actual=new URL(navigationGate.headers().location||'',requestedUrl);
+    if(actual.href!==destination.href)throw new Error('browser denial differs from server-side gate');
+    const expected=t.expectedPaths||t.paths||[t.path];
+    await page.waitForURL(url=>url.origin===new URL(baseUrl).origin&&expected.includes(url.pathname),{timeout:15000});
+    await waitForOperationalSurface(page);
+    const main=page.locator('main,[role="main"]').first();
+    if(!await main.isVisible())throw new Error('aborted redirect did not settle on usable native content');
+    const text=await main.innerText();
+    for(const marker of t.mainMarkers||t.markers||[])if(!text.includes(marker))throw new Error('aborted redirect omitted native marker '+marker);
+    pass('CATEGORY REDIRECT PROOF: '+t.name+'/'+v.width+': HTTP '+navigationGate.status()+' -> '+destination.pathname+'; native landing remained usable');
+  } finally {
+    page.off('response',observe);
+  }
+  const status=response?.status()||navigationGate?.status()||gate.status(), finalPath=new URL(page.url()).pathname;
+  if(status>=500||(!denied&&finalPath===path))throw new Error('category mismatch URL rendered or server failed: '+path+' ('+status+')');
+  pass('CATEGORY URL GATE PASS: '+t.name+'/'+v.width+': '+t.categoryCoverage.category+' rejected '+path+' with HTTP '+gate.status());
 }
 async function sameProductCategorySurface(page,t,v) {
   const path=t.categoryCoverage?.sameProductPositivePath; if(!path)return;

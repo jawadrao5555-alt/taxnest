@@ -106,3 +106,9 @@ Compatibility matrix:
 No quota concurrency change or dependency advisory suppression is included here. A03/A04 remain separate reproduction work. Baseline dependency audit also reported low-severity Laravel GHSA-jh5r-qr3c-85q8 and Flysystem GHSA-cxf4-7mrp-vvpr; dependency remediation remains pending.
 
 Local PHP/Composer, MariaDB application runtime and Chrome HTTP smoke are unavailable in this partial workspace. Post-fix PHPUnit and browser verification must be read from the new CI result. Do not approve/relay this draft while those checks are unresolved.
+
+## Compatibility correction — 2 October 2026
+
+Post-fix run 36726838178 failed with 2 errors and 10 failures. Returning middleware 403 for an unassigned manager conflicted with stock's existing DENIED_BRANCH_ID=-1 empty-view contract; lean schemas without branch_user also failed before authorization handlers could respond. Branchless companies now exit before resolving assignments; absent pivot table yields no mappings. Read context returns -1 for a branch-enabled manager without access, while stampBranchId refuses writes with 403. applyToQuery's denied context never includes legacy NULL rows. Synthetic browser Hotel manager is explicitly assigned the fixture's Hotel branch rather than depending on the old invalid fallback. No real user/tenant assignment is changed.
+
+New CI must validate this correction. Local runtime bootstrap was attempted; package-manager sandbox permissions prevent normal system installation. Dependency audit remediation remains pending; no advisory suppression.

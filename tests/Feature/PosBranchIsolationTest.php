@@ -1502,9 +1502,11 @@ class PosBranchIsolationTest extends TestCase
         ]);
         $this->standOn($companyId, $manager, $mainId);
         session()->forget(BranchContextService::SESSION_KEY);
+        $svc = app(BranchContextService::class);
+        $this->assertSame(\App\Services\BranchStockService::DENIED_BRANCH_ID, $svc->getActiveBranchId());
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         $this->expectExceptionMessage('No accessible branch assigned.');
-        app(BranchContextService::class)->getActiveBranchId();
+        $svc->stampBranchId();
     }
 
     public function test_shared_switch_uses_the_requested_authenticated_panel(): void

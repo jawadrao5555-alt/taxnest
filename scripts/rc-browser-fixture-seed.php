@@ -117,6 +117,7 @@ foreach (['RC-201', 'RC-202'] as $number) {
 }
 $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
+$hotelManager->forceFill(['default_branch_id' => $hotelBranch])->save();
 $hotelHousekeeping = $user($hotel, 'Synthetic Hotel Housekeeping', 'hotel-housekeeping@rc-browser.invalid', 'staff', 'pos_cashier', ['dashboard', 'hotel_housekeeping']);
 $hotelOutlet = $user($hotel, 'Synthetic Restaurant Outlet Cashier', 'hotel-outlet@rc-browser.invalid', 'staff', 'pos_cashier', ['dashboard', 'orders']);
 $hotelDenied = $user($hotel, 'Synthetic Hotel Denied Waiter', 'hotel-denied@rc-browser.invalid', 'staff', 'pos_waiter');

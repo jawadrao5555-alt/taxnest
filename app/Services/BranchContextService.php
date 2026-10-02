@@ -100,6 +100,12 @@ class BranchContextService
         $user = $this->currentUser();
         if (!$user) return null;
 
+        // Branchless companies and lean schemas retain their legacy behavior.
+        if (!$this->branchesReady()
+            || !Branch::where('company_id', $user->company_id)->exists()) {
+            return null;
+        }
+
         $branchId = $this->autoSelectBranch($user);
         if (!$branchId && !($user->default_branch_id ?? null)
             && in_array($user->pos_role ?? '', self::PORTAL_AUDIT_ROLES, true)) {
@@ -118,7 +124,7 @@ class BranchContextService
         // companies and audit portals, never for an unassigned branch manager.
         if ($this->isManager($user) && $this->branchesReady()
             && Branch::where('company_id', $user->company_id)->exists()) {
-            abort(403, 'No accessible branch assigned.');
+            return \App\Services\BranchStockService::DENIED_BRANCH_ID;
         }
         return null;
     }
@@ -138,6 +144,7 @@ class BranchContextService
     {
         $active = $this->getActiveBranchId();
         if ($active) {
+            abort_if($active < 0, 403, 'No accessible branch assigned.');
             return $active;
         }
         $user = $this->currentUser();
@@ -198,7 +205,9 @@ class BranchContextService
 
         // Manager → pivoted branches (or fall back to default if pivot empty)
         if ($role === 'manager') {
-            $pivotIds = \DB::table('branch_user')->where('user_id', $user->id)->pluck('branch_id')->all();
+            $pivotIds = \Illuminate\Support\Facades\Schema::hasTable('branch_user')
+                ? \DB::table('branch_user')->where('user_id', $user->id)->pluck('branch_id')->all()
+                : [];
             if (empty($pivotIds) && $user->default_branch_id) {
                 $pivotIds = [$user->default_branch_id];
             }
@@ -257,6 +266,9 @@ class BranchContextService
     public function applyToQuery($query, string $column = 'branch_id')
     {
         $branchId = $this->getActiveBranchId();
+        if ($branchId !== null && $branchId < 0) {
+            return $query->where($column, $branchId);
+        }
         if ($branchId) {
             $query->where(function ($q) use ($branchId, $column) {
                 // Include rows for the active branch + legacy NULL rows

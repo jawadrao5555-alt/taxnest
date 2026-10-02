@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const forge = require('node-forge');
+const { makeCertificate } = require('./lan-tls-certificate');
 
 function atomicWrite(file, bytes) {
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -17,29 +17,6 @@ function atomicWrite(file, bytes) {
     }
     fs.renameSync(tmp, file);
     try { fs.chmodSync(file, 0o600); } catch (e) {}
-}
-
-function makeCertificate() {
-    const keys = forge.pki.rsa.generateKeyPair(2048);
-    const cert = forge.pki.createCertificate();
-    cert.publicKey = keys.publicKey;
-    cert.serialNumber = crypto.randomBytes(16).toString('hex').replace(/^0/, '1');
-    cert.validity.notBefore = new Date(Date.now() - 5 * 60 * 1000);
-    cert.validity.notAfter = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000);
-    const cn = [{ name: 'commonName', value: 'NestPOS Local Core' }];
-    cert.setSubject(cn);
-    cert.setIssuer(cn);
-    cert.setExtensions([
-        { name: 'basicConstraints', cA: false, critical: true },
-        { name: 'keyUsage', digitalSignature: true, keyEncipherment: true, critical: true },
-        { name: 'extKeyUsage', serverAuth: true },
-        { name: 'subjectKeyIdentifier' },
-    ]);
-    cert.sign(keys.privateKey, forge.md.sha256.create());
-    return {
-        key: forge.pki.privateKeyToPem(keys.privateKey),
-        cert: forge.pki.certificateToPem(cert),
-    };
 }
 
 function pins(certPem) {

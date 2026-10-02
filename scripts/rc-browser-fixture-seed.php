@@ -170,7 +170,7 @@ foreach (['pra' => $hotel, 'fbr' => $fiscal] as $panel => $noticeCompany) {
             'audience' => $panel === 'fbr' ? 'fbr_pos' : 'pos',
             'target_categories' => [$panel === 'fbr' ? 'retail' : 'hotel'],
             'is_published' => true, 'is_featured' => true,
-            'deployment_key' => str_repeat($receipt, 40),
+            'deployment_key' => sha1('synthetic-notification-'.$panel.'-'.$receipt),
         ]);
     }
 }

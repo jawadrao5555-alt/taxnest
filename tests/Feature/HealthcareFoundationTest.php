@@ -869,8 +869,9 @@ class HealthcareFoundationTest extends TestCase
 
         $nurse = $this->makeStaff('health_nurse');
 
-        // Posted to the Annex, standing in Main (which is where a plain
-        // employee's branch context lands).
+        // Posted to the Annex for HR, with explicit panel access to Main.
+        // Cross-branch attendance policy and branch access are separate rules.
+        DB::table('branch_user')->insert(['branch_id' => $mainId, 'user_id' => $nurse->id]);
         $profile = HealthHrService::profile($this->healthCompanyId, (int) $nurse->id);
         $profile->forceFill(['branch_id' => $annexId])->save();
 
@@ -893,6 +894,25 @@ class HealthcareFoundationTest extends TestCase
             ->where('user_id', $nurse->id)->count());
         $this->assertSame($mainId, (int) HealthAttendancePunch::withoutGlobalScopes()
             ->where('user_id', $nurse->id)->value('branch_id'));
+    }
+
+    public function test_cross_branch_permission_does_not_allow_an_unassigned_branch_punch(): void
+    {
+        $this->prepareHrModule();
+        DB::table('branches')->insert([
+            'company_id' => $this->healthCompanyId, 'name' => 'Main',
+            'is_head_office' => true, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $nurse = $this->makeStaff('health_nurse');
+        $policy = HealthHrService::policy($this->healthCompanyId);
+        $policy->forceFill(['cross_branch_allowed' => true])->save();
+        HealthHrService::forget();
+
+        $this->actingAs($nurse, HealthPanel::GUARD);
+        $this->postJson('/health/my/punch', ['channel' => 'web'])->assertStatus(422);
+        $this->assertSame(0, HealthAttendancePunch::withoutGlobalScopes()
+            ->where('user_id', $nurse->id)->count());
     }
 
     /**

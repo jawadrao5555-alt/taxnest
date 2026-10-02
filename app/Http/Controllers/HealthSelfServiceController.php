@@ -192,6 +192,12 @@ class HealthSelfServiceController extends Controller
             return $this->punchResponse($request, false, __('health.hr_checkin_mobile_off'));
         }
 
+        // A denied branch context is a read-filter sentinel, never a real
+        // attendance location. Cross-branch policy does not grant branch access.
+        if ((int) app('currentBranchId') < 0) {
+            return $this->punchResponse($request, false, __('health.hr_checkin_wrong_branch'));
+        }
+
         $profile = HealthHrService::profile($companyId, $userId, false);
         if ($profile && $profile->attendance_exempt) {
             return $this->punchResponse($request, false, __('health.hr_checkin_exempt'));

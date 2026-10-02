@@ -27,11 +27,11 @@ class DomainMoveNoticeTest extends TestCase
 
             $this->assertStringContainsString('$sharedDomainAgentNoticeLive', $markup);
             $this->assertStringContainsString(
-                '$whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null : $whatsNewUnseen->first()',
+                '$whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null',
                 $markup
             );
             $this->assertStringContainsString(
-                '$whatsNewPopupList = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? collect() : $whatsNewUnseen->take(1)->values()',
+                '$whatsNewPopupList = $whatsNewPopup ? collect([$whatsNewPopup]) : collect()',
                 $markup
             );
             $this->assertStringContainsString($targetedHistoryQuery, $markup);

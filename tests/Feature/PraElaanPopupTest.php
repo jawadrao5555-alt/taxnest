@@ -525,7 +525,7 @@ class PraElaanPopupTest extends TestCase
             'points'       => json_encode(['Check it out']),
             'audience'     => 'pos',
             'is_published' => true,
-            'is_featured'  => false,
+            'is_featured'  => true,
             'created_at'   => now(),
             'updated_at'   => now(),
         ]);
@@ -551,7 +551,7 @@ class PraElaanPopupTest extends TestCase
             'points'       => json_encode(['Check it out']),
             'audience'     => 'pos',
             'is_published' => true,
-            'is_featured'  => false,
+            'is_featured'  => true,
             'created_at'   => now(),
             'updated_at'   => now(),
         ]);
@@ -807,5 +807,20 @@ class PraElaanPopupTest extends TestCase
 
         $resp->assertStatus(200);
         $resp->assertSee(self::SURVEY_OPEN_MARKER, false);
+    }
+
+    public function test_routine_bell_update_does_not_suppress_pra_decision_popup(): void
+    {
+        $this->createAppUpdatesTables();
+        \App\Models\SystemSetting::set('pos_whats_new_enabled', '1', 'test');
+        DB::table('app_updates')->insert([
+            'title' => 'Routine POS update', 'points' => json_encode(['Small improvement']),
+            'audience' => 'pos', 'is_published' => true, 'is_featured' => false,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        for ($refresh = 0; $refresh < 2; $refresh++) {
+            $this->actingAs(User::find($this->adminId), 'pos')->get('/pos/my-profile')
+                ->assertOk()->assertSee(self::MARKER, false)->assertDontSee('wnOpen: true', false);
+        }
     }
 }

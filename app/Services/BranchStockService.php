@@ -148,7 +148,11 @@ class BranchStockService
                 }
             }
             $guard = $ctx->currentGuard();
-            $userId = $guard ? (int) \Illuminate\Support\Facades\Auth::guard($guard)->id() : 0;
+            $selectedUserId = $guard ? (int) \Illuminate\Support\Facades\Auth::guard($guard)->id() : 0;
+            if ($userId > 0 && $selectedUserId === 0) {
+                return collect(); // another login does not turn a signed-out panel into console access
+            }
+            $userId = $selectedUserId;
             $key = $companyId . ':' . $userId;
             if (isset(self::$actorMemo[$key])) {
                 return self::$actorMemo[$key];

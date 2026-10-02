@@ -82,6 +82,7 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
             $table->string('notification_key', 64)->nullable()->index();
             $table->string('manual_publish_key', 64)->nullable()->unique();
             $table->uuid('announcement_revision')->nullable();
+            $table->unsignedBigInteger('announcement_parent_id')->nullable()->index();
             $table->timestamp('archived_at')->nullable();
             $table->boolean('is_published')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
@@ -299,6 +300,8 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
         $created = $original->fresh()->created_at->toDateTimeString();
         \App\Models\AppUpdateSeen::create(['app_update_id' => $original->id, 'user_id' => 123]);
         $this->actingAsAdmin()->post('/admin/app-updates/'.$original->id.'/reannounce')->assertRedirect();
+        $this->post('/admin/app-updates/'.$original->id.'/reannounce')->assertRedirect();
+        $this->assertSame(2, AppUpdate::count(), 'a repeated reannounce click must reuse its new revision');
         $revision = AppUpdate::where('id', '!=', $original->id)->firstOrFail();
         $this->assertNotEmpty($revision->announcement_revision);
         $this->assertNotSame($original->notification_key, $revision->notification_key);
@@ -325,5 +328,44 @@ class AdminAppUpdatesLiveIndicatorTest extends TestCase
         $this->post('/admin/app-updates/'.$first->id.'/reannounce')->assertRedirect();
         $this->assertSame(1, AppUpdate::customerCanonical()->published()->liveWindow()->count(),
             'an explicit new revision may announce archived content again');
+    }
+
+    public function test_editing_does_not_permanently_reserve_the_old_publication_key(): void
+    {
+        $payload = ['title' => 'Reception notice', 'points_text' => 'Original room flow',
+            'audience' => 'pos', 'audience_family' => 'all', 'audience_scope' => 'all',
+            'is_published' => '1'];
+        $this->actingAsAdmin()->post('/admin/app-updates', $payload)->assertRedirect();
+        $original = AppUpdate::where('title', $payload['title'])->firstOrFail();
+        $this->post('/admin/app-updates/'.$original->id.'/update',
+            array_replace($payload, ['points_text' => 'Improved room flow']))->assertRedirect();
+        $this->assertNull($original->fresh()->manual_publish_key);
+        $this->post('/admin/app-updates', $payload)->assertRedirect();
+        $this->assertSame(2, AppUpdate::count());
+        $this->assertSame(['Original room flow'], AppUpdate::latest('id')->first()->points);
+    }
+
+    public function test_identity_backfill_is_replay_safe_and_keeps_legacy_acknowledgements(): void
+    {
+        foreach (['a', 'b'] as $sha) {
+            DB::table('app_updates')->insert([
+                'title' => 'Legacy reception notice [deploy '.str_repeat($sha, 40).']',
+                'points' => json_encode(['Room board is easier']),
+                'audience' => 'pos', 'is_published' => true, 'is_featured' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $rows = AppUpdate::orderBy('id')->get();
+        \App\Models\AppUpdateSeen::create(['app_update_id' => $rows->last()->id, 'user_id' => 123]);
+        $timestamps = $rows->pluck('created_at', 'id')->map(fn ($date) => $date->toDateTimeString())->all();
+        $migration = require database_path('migrations/2026_10_02_130000_add_app_update_content_identity.php');
+        $migration->up();
+        $migration->up();
+        $this->assertSame(2, AppUpdate::count());
+        $this->assertSame([$rows->first()->id], AppUpdate::customerCanonical()->published()->pluck('id')->all());
+        $this->assertContains($rows->first()->id, AppUpdate::seenIdsForUser(123));
+        $this->assertSame($timestamps, AppUpdate::orderBy('id')->get()->pluck('created_at', 'id')
+            ->map(fn ($date) => $date->toDateTimeString())->all());
+        $this->assertSame(1, \App\Models\AppUpdateSeen::count());
     }
 }

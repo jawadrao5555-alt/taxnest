@@ -17,7 +17,7 @@ class AppUpdate extends Model
         'title', 'points', 'image_path', 'audience', 'target_categories', 'type', 'is_published', 'is_featured', 'created_by',
         // Task 1582: category family this update is for (all / food_service /
         // goods_retail / pharmacy / services). Legacy rows read as 'all'.
-        'audience_family', 'deployment_key', 'notification_key', 'manual_publish_key', 'announcement_revision', 'archived_at',
+        'audience_family', 'deployment_key', 'notification_key', 'manual_publish_key', 'announcement_revision', 'announcement_parent_id', 'archived_at',
     ];
 
     protected $hidden = ['deployment_key', 'notification_key', 'manual_publish_key', 'announcement_revision'];
@@ -57,7 +57,14 @@ class AppUpdate extends Model
     {
         static::saving(function (self $update) {
             if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'notification_key')) {
-                $update->notification_key = $update->contentKey();
+                $key = $update->contentKey();
+                if ($update->exists && $update->manual_publish_key
+                    && $update->getRawOriginal('notification_key') !== $key) {
+                    // Editing content retires the original submit key; a later
+                    // genuine publication of the old content must remain possible.
+                    $update->manual_publish_key = null;
+                }
+                $update->notification_key = $key;
             }
         });
     }

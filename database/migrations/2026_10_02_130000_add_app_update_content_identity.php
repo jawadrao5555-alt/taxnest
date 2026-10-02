@@ -13,10 +13,12 @@ return new class extends Migration
         if (!Schema::hasTable('app_updates')) {
             return;
         }
-        foreach (['notification_key', 'manual_publish_key', 'announcement_revision', 'archived_at'] as $column) {
+        foreach (['notification_key', 'manual_publish_key', 'announcement_revision', 'announcement_parent_id', 'archived_at'] as $column) {
             if (!Schema::hasColumn('app_updates', $column)) {
                 Schema::table('app_updates', function (Blueprint $table) use ($column) {
-                    if ($column === 'archived_at') {
+                    if ($column === 'announcement_parent_id') {
+                        $table->unsignedBigInteger($column)->nullable()->index();
+                    } elseif ($column === 'archived_at') {
                         $table->timestamp($column)->nullable();
                     } elseif ($column === 'announcement_revision') {
                         $table->uuid($column)->nullable();
@@ -39,7 +41,7 @@ return new class extends Migration
     public function down(): void
     {
         // Removing only the metadata restores legacy delivery behavior.
-        foreach (['notification_key', 'manual_publish_key', 'announcement_revision', 'archived_at'] as $column) {
+        foreach (['notification_key', 'manual_publish_key', 'announcement_revision', 'announcement_parent_id', 'archived_at'] as $column) {
             if (Schema::hasColumn('app_updates', $column)) {
                 Schema::table('app_updates', fn (Blueprint $table) => $table->dropColumn($column));
             }

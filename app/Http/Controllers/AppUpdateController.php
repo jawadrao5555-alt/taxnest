@@ -281,10 +281,24 @@ class AppUpdateController extends Controller
     {
         \Illuminate\Support\Facades\DB::transaction(function () use ($appUpdate) {
             $original = AppUpdate::whereKey($appUpdate->id)->lockForUpdate()->firstOrFail();
-            $revision = $original->replicate(['deployment_key', 'manual_publish_key', 'notification_key', 'announcement_revision', 'archived_at']);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'announcement_parent_id')) {
+                $recent = AppUpdate::where('announcement_parent_id', $original->id)
+                    ->where('created_at', '>=', now()->subMinute())->first();
+                if ($recent) {
+                    $comparison = clone $recent;
+                    $comparison->announcement_revision = $original->announcement_revision;
+                    if ($comparison->contentKey() === $original->contentKey()) {
+                        return; // repeated click/retry, serialized by the source row lock
+                    }
+                }
+            }
+            $revision = $original->replicate(['deployment_key', 'manual_publish_key', 'notification_key', 'announcement_revision', 'announcement_parent_id', 'archived_at']);
             $revision->is_published = true;
             if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'announcement_revision')) {
                 $revision->announcement_revision = (string) \Illuminate\Support\Str::uuid();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'announcement_parent_id')) {
+                $revision->announcement_parent_id = $original->id;
             }
             $revision->save();
             // The original identity, timestamp and all acknowledgements survive.

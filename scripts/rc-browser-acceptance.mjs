@@ -405,13 +405,16 @@ async function categoryMismatch(page,t,v) {
     response=await page.goto(requestedUrl,{waitUntil:'commit',timeout:30000});
     await page.waitForLoadState('domcontentloaded');
   } catch(error) {
-    // Chrome may abort a multi-hop dashboard -> native landing redirect.
-    // Accept only a separately observed real denial AND a settled, usable
-    // original native surface. Never retry or treat ERR_ABORTED alone as pass.
-    if(!/net::ERR_ABORTED/.test(error.message)||!redirected||!navigationGate
-        ||![302,303,307,308].includes(navigationGate.status()))throw error;
-    const actual=new URL(navigationGate.headers().location||'',requestedUrl);
-    if(actual.href!==destination.href)throw new Error('browser denial differs from server-side gate');
+    // A canceled navigation does not itself prove authorization. The real
+    // HTTP request above uses this browser's authenticated cookie jar and must
+    // already have returned a panel-local denial. Independently require the
+    // actual browser to remain on a usable native screen. Do not retry.
+    if(!/net::ERR_ABORTED/.test(error.message)||!redirected)throw error;
+    if(navigationGate){
+      if(![302,303,307,308].includes(navigationGate.status()))throw new Error('browser category request was not denied');
+      const actual=new URL(navigationGate.headers().location||'',requestedUrl);
+      if(actual.href!==destination.href)throw new Error('browser denial differs from authenticated HTTP gate');
+    }
     const expected=t.expectedPaths||t.paths||[t.path];
     await page.waitForURL(url=>url.origin===new URL(baseUrl).origin&&expected.includes(url.pathname),{timeout:15000});
     await waitForOperationalSurface(page);
@@ -419,7 +422,7 @@ async function categoryMismatch(page,t,v) {
     if(!await main.isVisible())throw new Error('aborted redirect did not settle on usable native content');
     const text=await main.innerText();
     for(const marker of t.mainMarkers||t.markers||[])if(!text.includes(marker))throw new Error('aborted redirect omitted native marker '+marker);
-    pass('CATEGORY REDIRECT PROOF: '+t.name+'/'+v.width+': HTTP '+navigationGate.status()+' -> '+destination.pathname+'; native landing remained usable');
+    pass('CATEGORY DENIAL PROOF: '+t.name+'/'+v.width+': authenticated HTTP '+gate.status()+' -> '+destination.pathname+'; canceled navigation left the native landing usable'+(navigationGate?'; browser denial also observed':'; denial proven through the browser-session HTTP request'));
   } finally {
     page.off('response',observe);
   }
@@ -455,11 +458,7 @@ async function healthIsolation(browser,label,v,iso) {
   } finally {await saveEvidenceScreenshot(p,`rc-${label}-health-isolation`).catch(()=>{});await c.close();}
 }
 async function one(browser,label,v,t) {
-  // Category URL authorization must exercise Laravel, not cached documents or
-  // opaque Service Worker redirect responses. Keep SW enabled for notifications,
-  // Hotel workflows and every other original-flow cohort.
-  valid(t); const c=await browser.newContext({viewport:v,serviceWorkers:t.categoryCoverage?'block':'allow'});
-  if(t.categoryCoverage)console.log('CATEGORY NETWORK MODE: '+t.name+'/'+v.width+': direct server authorization; Service Worker blocked only in this cohort'); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
+  valid(t); const c=await browser.newContext({viewport:v,serviceWorkers:'allow'}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
   try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }

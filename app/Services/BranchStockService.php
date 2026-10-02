@@ -147,6 +147,12 @@ class BranchStockService
                     break;
                 }
             }
+            $guard = $ctx->currentGuard();
+            $selectedUserId = $guard ? (int) \Illuminate\Support\Facades\Auth::guard($guard)->id() : 0;
+            if ($userId > 0 && $selectedUserId === 0) {
+                return collect(); // another login does not turn a signed-out panel into console access
+            }
+            $userId = $selectedUserId;
             $key = $companyId . ':' . $userId;
             if (isset(self::$actorMemo[$key])) {
                 return self::$actorMemo[$key];
@@ -228,6 +234,8 @@ class BranchStockService
         }
         try {
             $active = app(BranchContextService::class)->stampBranchId();
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             $active = null;
         }
@@ -259,6 +267,11 @@ class BranchStockService
             $active = $ctx->getActiveBranchId();
             $isOwner = $ctx->isOwner();
         } catch (\Throwable $e) {
+            foreach (['pos', 'fbrpos', 'health', 'web'] as $guard) {
+                if (\Illuminate\Support\Facades\Auth::guard($guard)->check()) {
+                    return self::DENIED_BRANCH_ID;
+                }
+            }
             return null;
         }
 

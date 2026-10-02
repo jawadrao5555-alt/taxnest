@@ -919,6 +919,22 @@ class PosBranchStockTest extends TestCase
         }
     }
 
+    public function test_signed_out_active_panel_does_not_inherit_console_stock_access_from_another_login(): void
+    {
+        Auth::guard('pos')->logout();
+        Auth::guard('fbrpos')->logout();
+        Auth::guard('health')->logout();
+        Auth::guard('web')->logout();
+        BranchStockService::flushMemo();
+        $this->assertSame(2, BranchStockService::actorBranches($this->companyId)->count());
+
+        Auth::guard('fbrpos')->setUser($this->makeUser('pos_admin', null));
+        app()->instance('currentBranchGuard', 'pos');
+        // Do not flush the memo: a cached anonymous context must not be reused.
+        $this->assertTrue(BranchStockService::actorBranches($this->companyId)->isEmpty());
+        $this->assertFalse(BranchStockService::actorCanUse($this->companyId, $this->mainBranchId));
+    }
+
     public function test_console_without_auth_still_sees_company_branches(): void
     {
         Auth::guard('pos')->logout();

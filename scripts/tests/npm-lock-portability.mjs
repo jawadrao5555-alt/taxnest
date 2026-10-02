@@ -17,7 +17,7 @@ const LOCKS = [
     lock: 'package-lock.json',
     packages: 249,
     resolved: 242,
-    graph: 'ad57413e5eee38427f5921996f271f473f1a2e50778a1a8782d920e9f90e986d',
+    graph: 'f53a97b8a32ece9b858c5587cabe49b0680627c24a21eead8e759bba30a316b0',
   },
   {
     lock: 'agent-realtime-gateway/package-lock.json',
@@ -33,9 +33,9 @@ const LOCKS = [
   },
   {
     lock: 'pra-agent/package-lock.json',
-    packages: 356,
-    resolved: 355,
-    graph: '7b7ca63970186ea826500ed89fd22652dc6b9fcfca1bbd197babdbddac6d0a23',
+    packages: 355,
+    resolved: 354,
+    graph: '3c8a988819bed3399140e2e04f93bf2ddf71f4f7f9f9b4669a79bfd8c7431ee0',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

@@ -196,7 +196,8 @@ class PlanLimitService
             $deletedFinals = 0;
             try {
                 $deletedFinals = (int) \App\Models\PosDayCloseReport::where('company_id', $companyId)
-                    ->whereBetween('report_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+                    ->where('report_date', '>=', now()->startOfMonth()->toDateString())
+                    ->where('report_date', '<', now()->startOfMonth()->addMonth()->toDateString())
                     ->sum('deleted_final_count');
             } catch (\Throwable $e) {
                 // column missing pre-migration — quota falls back to live count only
@@ -210,7 +211,8 @@ class PlanLimitService
             try {
                 if (\Illuminate\Support\Facades\Schema::hasTable('pos_local_series_resets')) {
                     $deletedFinals += (int) \App\Models\PosLocalSeriesReset::where('company_id', $companyId)
-                        ->whereBetween('reset_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+                        ->where('reset_date', '>=', now()->startOfMonth()->toDateString())
+                        ->where('reset_date', '<', now()->startOfMonth()->addMonth()->toDateString())
                         ->sum('deleted_final_count');
                 }
             } catch (\Throwable $e) {

@@ -7140,5 +7140,14 @@ return [
     'hotel_settings_on' => 'فعال',
     'hotel_settings_off' => 'بند',
     'hotel_settings_never' => 'کبھی نہیں',
+    'cashier_handoff_title' => 'آرڈر دوسرے کیشیئر کے پاس ہے',
+    'cashier_handoff_assigned' => 'کیشیئر',
+    'cashier_handoff_help' => 'یہ آرڈر دوسرے کیشیئر کے پاس ہے۔ ترمیم یا بل بنانے سے پہلے مالک یا مینیجر سے منتقل کروائیں۔',
+    'cashier_handoff_target' => 'اس کیشیئر کو منتقل کریں',
+    'cashier_handoff_choose' => 'کیشیئر منتخب کریں',
+    'cashier_handoff_confirm' => 'پچھلے کیشیئر سے ہینڈ اوور کی تصدیق کریں۔ ان کا کھلا کارٹ ریفریش ہونا ضروری ہے۔',
+    'cashier_handoff_transfer' => 'منتقلی کی تصدیق کریں',
+    'cashier_handoff_changed' => 'آرڈر تبدیل یا بند ہو چکا ہے۔ منتقلی سے پہلے دوبارہ لوڈ کریں۔',
+    'cashier_handoff_done' => 'آرڈر منتقل ہو گیا۔ منتخب کیشیئر اب اسے کھول سکتا ہے۔',
 ];
 

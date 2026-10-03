@@ -448,7 +448,15 @@
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.recent_print_activity') }}</h3>
         <div class="space-y-2">
             @foreach($recentPrintJobs as $job)
-            @php $state = \App\Support\KotPrintState::forJob($job); @endphp
+            @php
+                $state = \App\Support\KotPrintState::forJob($job);
+                if ($state['key'] === 'no_document') {
+                    $state['label'] = __('pos.print_no_document');
+                } elseif ($state['key'] === \App\Support\KotPrintState::PRINTED) {
+                    $state['label'] = ($job->result_outcome ?? '') === 'spool_accepted'
+                        ? __('pos.print_windows_accepted') : __('pos.print_agent_acknowledged');
+                }
+            @endphp
             <div class="flex items-start justify-between gap-3 p-2.5 rounded-lg border border-gray-100 dark:border-gray-800" data-print-state="{{ $state['key'] }}">
                 <div class="min-w-0">
                     <p class="text-xs font-semibold text-gray-800 dark:text-gray-200">

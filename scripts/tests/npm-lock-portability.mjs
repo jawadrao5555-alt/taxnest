@@ -17,7 +17,7 @@ const LOCKS = [
     lock: 'package-lock.json',
     packages: 249,
     resolved: 242,
-    graph: 'f53a97b8a32ece9b858c5587cabe49b0680627c24a21eead8e759bba30a316b0',
+    graph: 'b6360658696269329155038cf0357422e2dd3b9b056275ec82f0369c844d1e8f',
   },
   {
     lock: 'agent-realtime-gateway/package-lock.json',
@@ -29,13 +29,13 @@ const LOCKS = [
     lock: 'artifacts/mockup-sandbox/package-lock.json',
     packages: 318,
     resolved: 311,
-    graph: '78ac9805108bd028718895e4b599fe910e890ded7dc5233d9aca317dc811e2d5',
+    graph: '06d2b71f4cc180a879e77e041310051758d61914cadad77b91b2db7cd9bb944b',
   },
   {
     lock: 'pra-agent/package-lock.json',
-    packages: 355,
-    resolved: 354,
-    graph: '5b85e74d86811f31102f8a954c1c2b635ffafa97fb6fb87cb21b749b9b427b17',
+    packages: 308,
+    resolved: 307,
+    graph: '19942f185176d061e29809a188c92968a4576e0452141f5784ac32cf85877645',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',
@@ -53,6 +53,53 @@ const root = path.resolve(
   rootFlag === -1 ? scriptRoot : (process.argv[rootFlag + 1] ?? ''),
 );
 const errors = [];
+
+
+// A single explicitly reviewed local security fork is allowed. Every file is
+// hash-pinned below; local packages are not silently exempt from validation.
+const FORK_FILES = {
+  "LICENSE": "35bdd8a44339719441900fb50fbefc5e2dca1ca662cbaed7a687de842c8b70f2",
+  "PATCH.md": "0846cca26dbe372499f1445eee2f0eaedfa9e7c4286e83b409d4407b4228ecd5",
+  "README.md": "947b0fc3cc12eaaa070207126213fbdf9ab2bf8cd13dcc6e4007b36b79309866",
+  "index.js": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+  "lib/compile.js": "925bd3f251d79825fa03b3230678ac2d2fd3291906ff89a8e4eda7616534d7cf",
+  "lib/constants.js": "c18ac5adb57308f1ce42a28552da3a31f5d83709743ebd9a636336813a744d4b",
+  "lib/depth-guard.js": "aa2a5b699212348a3d6a6903c06ab308d6c925e39358b0a26188ecae40a731e4",
+  "lib/expand.js": "7a81ed45b9b873ac19df030a0b2a1aa02c5016425d43c2e049ce4775fa622e3d",
+  "lib/parse.js": "7edbc21687b6e031a5cc17b2c38bfc8377320968a573f5e369f58b07a40e5a64",
+  "lib/stringify.js": "ab1fa4364cc41ce6c4bdafcf22775b9941653c78c44367b3d2134862afeb2e4c",
+  "lib/utils.js": "b5a7596aa67730412b3c029ef09e84e6b67b8e445cffd35d1d295549c89066c7",
+  "package.json": "41ae524edddcd03b8289de9cfb73051115fc6830cb1042c69ee7e204caf9e542"
+};
+function reviewedFork(lockPath, entryPath, pkg) {
+  const expected = lockPath === 'package-lock.json'
+    ? 'file:tools/npm-patches/braces'
+    : lockPath === 'artifacts/mockup-sandbox/package-lock.json'
+      ? 'file:../../tools/npm-patches/braces' : undefined;
+  return entryPath === 'node_modules/braces' && expected &&
+    pkg.resolved === expected && pkg.name === '@taxnest/braces-bounded' &&
+    pkg.version === '3.0.3-taxnest.1';
+}
+const forkRoot = path.join(root, 'tools/npm-patches/braces');
+function forkInventory(dir, prefix = '') {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const name = prefix + entry.name;
+    if (entry.isSymbolicLink()) throw new Error('symlink in reviewed fork');
+    return entry.isDirectory() ? forkInventory(path.join(dir, entry.name), name + '/') : [name];
+  });
+}
+try {
+  if (JSON.stringify(forkInventory(forkRoot).sort()) !== JSON.stringify(Object.keys(FORK_FILES).sort())) {
+    errors.push('reviewed fork source inventory differs');
+  }
+} catch { errors.push('reviewed fork source inventory unreadable'); }
+
+for (const [file, expected] of Object.entries(FORK_FILES)) {
+  try {
+    const actual = crypto.createHash('sha256').update(fs.readFileSync(path.join(forkRoot, file))).digest('hex');
+    if (actual !== expected) errors.push(`reviewed fork source hash mismatch: ${file}`);
+  } catch { errors.push(`reviewed fork source missing: ${file}`); }
+}
 
 function withoutResolved(value) {
   if (Array.isArray(value)) return value.map(withoutResolved);
@@ -109,7 +156,8 @@ for (const expected of LOCKS) {
 
   const entries = Object.entries(lock.packages);
   const resolvedEntries = entries.filter(([, pkg]) => pkg && pkg.resolved);
-  const privateEntries = resolvedEntries.filter(([, pkg]) => {
+  const privateEntries = resolvedEntries.filter(([entryPath, pkg]) => {
+    if (reviewedFork(expected.lock, entryPath, pkg)) return false;
     try {
       const url = new URL(pkg.resolved);
       return url.protocol !== 'https:' || url.host !== 'registry.npmjs.org';
@@ -118,7 +166,8 @@ for (const expected of LOCKS) {
     }
   });
   const invalidIntegrity = resolvedEntries.filter(
-    ([, pkg]) => typeof pkg.integrity !== 'string' || !SRI.test(pkg.integrity),
+    ([entryPath, pkg]) => !reviewedFork(expected.lock, entryPath, pkg) &&
+      (typeof pkg.integrity !== 'string' || !SRI.test(pkg.integrity)),
   );
 
   if (entries.length !== expected.packages) {
@@ -159,7 +208,7 @@ for (const expected of LOCKS) {
   }
 
   console.log(
-    `${expected.lock}: ${entries.length} packages, ${resolvedEntries.length} public resolved URLs, graph ${actualGraph}`,
+    `${expected.lock}: ${entries.length} packages, ${resolvedEntries.length} reviewed resolved sources, graph ${actualGraph}`,
   );
 }
 

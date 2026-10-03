@@ -111,6 +111,8 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Check Guest House settings regressions before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelSettingsCategoryTest.php
+      - name: Check occupied waiter table regressions before the full suite
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosCounterOrderOpenStatusesTest.php tests/Feature/PosWaiterOrderSettleAuthTest.php tests/Feature/WaiterCashierEditBehaviorTest.php
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence

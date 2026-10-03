@@ -5,6 +5,10 @@ use App\Models\AdminUser;
 use App\Models\AppUpdate;
 use App\Models\Company;
 use App\Models\HotelRoom;
+use App\Models\RestaurantFloor;
+use App\Models\RestaurantOrder;
+use App\Models\RestaurantOrderItem;
+use App\Models\RestaurantTable;
 use App\Models\User;
 use App\Services\HealthModuleService;
 use App\Services\PosFeatureService;
@@ -122,6 +126,36 @@ $settingsHotel = $company('Synthetic Rooms Only Settings', 'settings-hotel@rc-br
     'pos_theme' => 'blue', 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
 ]);
 $settingsOwner = $user($settingsHotel, 'Synthetic Hotel Settings Owner', 'hotel-settings@rc-browser.invalid', 'company_admin', 'pos_admin');
+$tableShop = $company('Synthetic Table Order Recovery', 'table-orders-company@rc-browser.invalid', 'RCBROWSERTABLES', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant',
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
+    'restaurant_mode' => true, 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
+    'table_click_direct_open' => true, 'pos_guided_flow_enabled' => false,
+    'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
+]);
+$tableCashier = $user($tableShop, 'Synthetic Table Cashier', 'table-orders@rc-browser.invalid', 'user', 'pos_cashier');
+$tableWaiter = $user($tableShop, 'Synthetic Table Waiter', 'table-waiter@rc-browser.invalid', 'user', 'pos_waiter');
+$tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);
+$tableCases = [];
+foreach (['held', 'preparing', 'ready'] as $index => $status) {
+    $table = RestaurantTable::create([
+        'company_id' => $tableShop->id, 'floor_id' => $tableFloor->id,
+        'table_number' => 'RC-'.($index + 1), 'seats' => 4, 'status' => 'occupied',
+        'occupied_since' => $now, 'is_active' => true,
+    ]);
+    $order = RestaurantOrder::create([
+        'company_id' => $tableShop->id, 'table_id' => $table->id,
+        'order_number' => 'RC-TABLE-'.($index + 1), 'order_type' => 'dine_in',
+        'source' => 'waiter', 'status' => $status, 'created_by' => $tableWaiter->id,
+        'subtotal' => 500, 'total_amount' => 500,
+    ]);
+    RestaurantOrderItem::create([
+        'order_id' => $order->id, 'item_type' => 'manual', 'item_name' => 'Synthetic '.$status.' dish',
+        'quantity' => 1, 'unit_price' => 500, 'subtotal' => 500,
+    ]);
+    $tableCases[] = ['tableId' => $table->id, 'number' => $table->table_number,
+        'orderId' => $order->id, 'itemName' => 'Synthetic '.$status.' dish', 'status' => $status];
+}
 $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
 $hotelManager->forceFill(['default_branch_id' => $hotelBranch])->save();
@@ -288,6 +322,9 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
     'transactionalJourneys' => [
+        ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
+            'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
+            'tableOrderWorkflow' => $tableCases],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
         ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],
@@ -320,5 +357,4 @@ if (file_put_contents($temporary, json_encode($fixture, JSON_PRETTY_PRINT | JSON
 }
 chmod($fixturePath, 0600);
 fwrite(STDOUT, "RC browser fresh synthetic fixture ready.\n");
-
 

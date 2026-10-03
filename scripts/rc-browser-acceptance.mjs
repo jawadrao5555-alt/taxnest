@@ -12,7 +12,7 @@ const requested = String(process.env.RC_BROWSER_ONLY || '').split(',').map(x => 
 const regular = [...fixture.readOnlyJourneys, ...fixture.transactionalJourneys];
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
 // Exercise the new settings interaction first; retain every existing journey.
-const ordered = [...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>!x.hotelSettingsWorkflow)];
+const ordered = [...regular.filter(x=>x.tableOrderWorkflow), ...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>!x.hotelSettingsWorkflow&&!x.tableOrderWorkflow)];
 const cases = requested.length ? ordered.filter(x => requested.includes(x.name)) : ordered;
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
@@ -420,6 +420,7 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v);
@@ -433,6 +434,36 @@ async function workflow(page,t,v,diagnostics) {
   for(const s of f.transitions){const b=page.locator(`button[name="to_status"][value="${s}"]`).first();if(!await b.count())throw new Error(`${t.name}: transition ${s} unavailable`);await b.click();await page.waitForLoadState('domcontentloaded');await dismiss(page);}
   const invoice=page.locator('form[action$="/invoice"] button[type="submit"],form[action$="/invoice"] button').first(); await Promise.all([page.waitForURL(/\/pos\/transaction\/\d+$/,{timeout:30000}),invoice.click()]); await dismiss(page);
   await page.goto(baseUrl+order,{waitUntil:'domcontentloaded',timeout:30000}); if(!(await page.locator('body').innerText()).includes(f.invoiceMarker))throw new Error(`${t.name}: invoice linkage marker missing`); pass(`${t.name}/${v.width}: actual service create, transitions, and invoice linked`);
+}
+
+async function tableOrderWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const root=page.locator('[data-tn-sale-root]');
+  for(const expected of t.tableOrderWorkflow) {
+    await page.locator('[data-video="counter-dine-in"]').click();
+    const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});
+    await tile.waitFor({state:'visible'});
+    // Table-status must identify this exact waiter order before the click.
+    await page.waitForFunction(({id,orderId})=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return d.tablePickerFlat().some(x=>Number(x.id)===id&&Number(x.order?.id)===orderId);
+    },{id:expected.tableId,orderId:expected.orderId});
+    const [response]=await Promise.all([
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'),
+      tile.click(),
+    ]);
+    if(!response.ok()||(await response.json()).success!==true)throw new Error(expected.status+' table claim failed');
+    await page.waitForFunction(({id,orderId,name})=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return Number(d.incomingOrderId)===orderId&&Number(d.selectedTable?.id)===id
+        &&d.cart.length===1&&d.cart[0].item_name===name&&d.orderType==='dine_in'&&!d.showTablePicker;
+    },{id:expected.tableId,orderId:expected.orderId,name:expected.itemName});
+    await openMobileCart(page,v,['Current Order']);
+    await root.getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
+    if(!await page.locator('[data-video="open-payment"]').isEnabled())throw new Error(expected.status+' table lost its payment action');
+    pass(t.name+'/'+v.width+': '+expected.status+' exact occupied table opened with items and enabled payment');
+  }
 }
 async function categoryMismatch(page,t,v) {
   const path=t.categoryCoverage?.mismatchPath; if(!path)return;
@@ -515,5 +546,5 @@ async function one(browser,label,v,t) {
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();
-try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if(t.hotelSettingsWorkflow&&failures)throw new Error("Guest House settings preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow)&&failures)throw new Error("Settings/table-order preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');

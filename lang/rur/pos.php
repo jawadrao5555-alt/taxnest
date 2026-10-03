@@ -7143,5 +7143,14 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'hotel_settings_on' => 'On',
     'hotel_settings_off' => 'Off',
     'hotel_settings_never' => 'Kabhi nahi',
+    'cashier_handoff_title' => 'Order doosray cashier ko assigned hai',
+    'cashier_handoff_assigned' => 'Cashier',
+    'cashier_handoff_help' => 'Yeh order doosray cashier ka hai. Edit ya bill bananay se pehle owner ya manager se transfer karwayein.',
+    'cashier_handoff_target' => 'Cashier ko transfer karein',
+    'cashier_handoff_choose' => 'Cashier chunein',
+    'cashier_handoff_confirm' => 'Pichlay cashier se handoff confirm karein. Unka khula cart refresh karna zaroori hai.',
+    'cashier_handoff_transfer' => 'Transfer confirm karein',
+    'cashier_handoff_changed' => 'Order badal gaya ya band ho gaya hai. Transfer se pehle dobara load karein.',
+    'cashier_handoff_done' => 'Order transfer ho gaya. Chuna hua cashier ab isay khol sakta hai.',
 ];
 

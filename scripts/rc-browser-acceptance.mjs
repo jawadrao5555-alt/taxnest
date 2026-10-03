@@ -497,10 +497,10 @@ async function cashierHandoffWorkflow(page,t,v) {
   await login(managerPage,h.manager); await openConflict(managerPage);
   await managerPage.locator('[data-video="handoff-cashier"]').selectOption(String(h.cashierId));
   const [transfer]=await Promise.all([
-    managerPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/transfer'&&r.request().method()==='POST'),
+    managerPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/transfer'&&r.request().method()==='POST').then(async r=>({ok:r.ok(),data:await r.json()})),
     managerPage.locator('[data-video="handoff-confirm"]').click(),
   ]);
-  if(!transfer.ok()||(await transfer.json()).success!==true)throw new Error('Manager transfer failed');
+  if(!transfer.ok||transfer.data.success!==true)throw new Error('Manager transfer failed');
   await managerPage.locator('[data-video="cashier-conflict"]').waitFor({state:'hidden'});
   await managerContext.close();
   const cashierContext=await managerContext.browser().newContext({viewport:v});
@@ -510,10 +510,10 @@ async function cashierHandoffWorkflow(page,t,v) {
   await waitForOperationalSurface(cashierPage); await dismiss(cashierPage);
   await cashierPage.locator('[data-video="counter-dine-in"]').click();
   const [claim]=await Promise.all([
-    cashierPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'),
+    cashierPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST').then(async r=>({ok:r.ok(),data:await r.json()})),
     cashierPage.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click(),
   ]);
-  if(!claim.ok()||(await claim.json()).success!==true)throw new Error('Transferred table still cannot open');
+  if(!claim.ok||claim.data.success!==true)throw new Error('Transferred table still cannot open');
   await openMobileCart(cashierPage,v,['Current Order']);
   await cashierPage.locator('[data-tn-sale-root]').getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
   if(!await cashierPage.locator('[data-video="open-payment"]').isEnabled())throw new Error('Transferred table payment disabled');

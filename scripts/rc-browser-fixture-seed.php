@@ -115,6 +115,13 @@ foreach (['RC-201', 'RC-202'] as $number) {
         'rate_unit' => 'NGT', 'housekeeping' => 'clean', 'is_active' => true,
     ]);
 }
+$settingsHotel = $company('Synthetic Rooms Only Settings', 'settings-hotel@rc-browser.invalid', 'RCBROWSERSETTINGS', 'pos', [
+    'business_category' => 'hotel', 'pos_type' => 'hotel',
+    'feature_flags' => PosFeatureService::defaultsForCategory('hotel'),
+    'restaurant_mode' => false, 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
+    'pos_theme' => 'blue', 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
+]);
+$settingsOwner = $user($settingsHotel, 'Synthetic Hotel Settings Owner', 'hotel-settings@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
 $hotelManager->forceFill(['default_branch_id' => $hotelBranch])->save();
@@ -281,6 +288,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
     'transactionalJourneys' => [
+        ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
         ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],
         ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk']],
@@ -312,4 +320,5 @@ if (file_put_contents($temporary, json_encode($fixture, JSON_PRETTY_PRINT | JSON
 }
 chmod($fixturePath, 0600);
 fwrite(STDOUT, "RC browser fresh synthetic fixture ready.\n");
+
 

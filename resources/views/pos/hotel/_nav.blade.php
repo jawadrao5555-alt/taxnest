@@ -27,6 +27,7 @@
     <nav class="mt-2 grid gap-1 text-sm">
         <a href="{{ route('pos.hotel.rooms') }}" data-hotel-desk-link="rooms" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_rooms') }}</a>
         <a href="{{ route('pos.hotel.housekeeping') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_housekeeping') }}</a>
+        <a href="{{ route('pos.customize') }}" data-hotel-desk-link="settings" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.hotel_settings_title') }}</a>
         <a href="{{ route('pos.hotel.reports') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_reports') }}</a>
     </nav>
 </details>
@@ -34,3 +35,4 @@
 @if(\App\Services\HotelShell::restaurantOutletOn($hotelCompany) && \App\Services\HotelShell::canOpenRestaurantOutlet($hotelUser, $hotelCompany))
 <a href="{{ route('pos.hotel.restaurant-outlet') }}" data-hotel-restaurant-outlet="1" class="block mt-4 rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-900 dark:text-amber-200">{{ __('pos.nav_hotel_restaurant_outlet') }}</a>
 @endif
+

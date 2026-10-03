@@ -713,11 +713,10 @@ class HotelController extends Controller
         if (!$company) {
             return back()->with('error', __('pos.hotel_company_missing'));
         }
-        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'hotel_checkout_outstanding')) {
-            $company->forceFill([
-                'hotel_checkout_outstanding' => $data['hotel_checkout_outstanding'],
-            ])->save();
-        }
+        abort_unless(\Illuminate\Support\Facades\Schema::hasColumn('companies', 'hotel_checkout_outstanding'), 503, __('pos.setting_not_available_yet'));
+        $company->forceFill([
+            'hotel_checkout_outstanding' => $data['hotel_checkout_outstanding'],
+        ])->save();
 
         return back()->with('success', __('pos.hotel_checkout_policy_saved'));
     }
@@ -815,3 +814,4 @@ class HotelController extends Controller
         return $query->findOrFail($id);
     }
 }
+

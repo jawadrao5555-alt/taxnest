@@ -11,7 +11,9 @@ if (!fixture.synthetic || !Array.isArray(fixture.readOnlyJourneys) || !Array.isA
 const requested = String(process.env.RC_BROWSER_ONLY || '').split(',').map(x => x.trim()).filter(Boolean);
 const regular = [...fixture.readOnlyJourneys, ...fixture.transactionalJourneys];
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
-const cases = requested.length ? regular.filter(x => requested.includes(x.name)) : regular;
+// Exercise the new settings interaction first; retain every existing journey.
+const ordered = [...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>!x.hotelSettingsWorkflow)];
+const cases = requested.length ? ordered.filter(x => requested.includes(x.name)) : ordered;
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
 if (unknown.length) throw new Error(`unknown requested journey: ${unknown.join(', ')}`);
@@ -368,7 +370,57 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   pass(t.name+'/'+v.width+': real failed-save retry, duplicate consolidation and seven routine notices across refresh');
 }
 
+async function hotelSettingsWorkflow(page,t,v,diagnostics) {
+  await page.goto(baseUrl+'/pos/customize',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);
+  await dismiss(page);
+  const root=page.locator('[data-hotel-settings="1"]');
+  await root.waitFor({state:'visible'});
+  if(await root.locator('[data-hotel-settings-card]').count()!==6)throw new Error('Hotel settings must have exactly six primary groups');
+  if(await root.locator('[data-hotel-settings-outlet]').count())throw new Error('Rooms-only settings exposed restaurant controls');
+  if(await root.locator('[data-hotel-settings-advanced]').getAttribute('open')!==null)throw new Error('Advanced settings were expanded by default');
+  const appearance=root.locator('[data-hotel-settings-card="appearance"]');
+  await appearance.locator('summary').click();
+  pass(t.name+'/'+v.width+': Appearance opened through an actual pointer click');
+  const rose=appearance.locator('[data-hotel-theme="rose"]');
+  const themeUrl=baseUrl+'/pos/settings/theme';
+  await page.route('**/pos/settings/theme',route=>route.fulfill({status:500,contentType:'application/json',body:'{"success":false,"message":"Synthetic failed save"}'}));
+  const [failure]=await Promise.all([page.waitForResponse(r=>r.url()===themeUrl&&r.request().method()==='POST'),rose.click()]).catch(async error=>{
+    const state=await root.evaluate(el=>{const d=window.Alpine.$data(el);return {busy:d.busy,status:d.status,error:d.error,component:el.getAttribute('x-data')};});
+    throw new Error('Theme request failed: '+error.message+'; state='+JSON.stringify(state)+'; pageErrors='+JSON.stringify(diagnostics.pageErrors));
+  });
+  if(failure.status()!==500)throw new Error('Failed-save probe did not inject expected response');
+  await root.locator('[role="alert"]:visible').waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelector('[data-hotel-theme="rose"]')?.disabled===false,null,{timeout:5000}).catch(async error=>{
+    const state=await root.evaluate(el=>{const d=window.Alpine.$data(el);return {busy:d.busy,status:d.status,error:d.error};});
+    throw new Error('Failed save did not release theme control: '+JSON.stringify(state)+'; '+error.message);
+  });
+  pass(t.name+'/'+v.width+': injected failure kept the control usable for retry');
+  if(await page.locator('body').getAttribute('data-theme')!=='blue')throw new Error('Unconfirmed theme save changed appearance');
+  if(await appearance.locator('[data-hotel-theme="blue"]').getAttribute('aria-pressed')!=='true')throw new Error('Failed save changed selected colour');
+  await page.unroute('**/pos/settings/theme');
+  const injectedHttp=diagnostics.httpErrors.findIndex(x=>x.url===themeUrl&&x.method==='POST'&&x.status===500);
+  if(injectedHttp<0)throw new Error('Expected failed-save response not recorded');
+  diagnostics.httpErrors.splice(injectedHttp,1);
+  const injectedConsole=diagnostics.consoleErrors.findIndex(x=>x.includes(themeUrl)&&/500/.test(x)&&/Failed to load resource/.test(x));
+  if(injectedConsole>=0)diagnostics.consoleErrors.splice(injectedConsole,1);
+  const [saved]=await Promise.all([page.waitForResponse(r=>r.url()===themeUrl&&r.request().method()==='POST'),rose.click()]);
+  if(!saved.ok()||(await saved.json()).success!==true)throw new Error('Theme retry did not save to actual server');
+  await page.waitForFunction(()=>document.body.getAttribute('data-theme')==='rose');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);
+  await dismiss(page);
+  if(await page.locator('body').getAttribute('data-theme')!=='rose')throw new Error('Confirmed theme was lost after refresh');
+  // Restore the fictional fixture so both viewport runs exercise the same initial value.
+  await root.locator('[data-hotel-settings-card="appearance"] summary').click();
+  const [restore]=await Promise.all([page.waitForResponse(r=>r.url()===themeUrl&&r.request().method()==='POST'),root.locator('[data-hotel-theme="blue"]').click()]);
+  if(!restore.ok()||(await restore.json()).success!==true)throw new Error('Synthetic fixture theme restore failed');
+  await page.waitForFunction(()=>document.body.getAttribute('data-theme')==='blue');
+  pass(t.name+'/'+v.width+': six category-specific groups, no outlet leakage, real failed-save retry and persisted colour');
+}
+
 async function workflow(page,t,v,diagnostics) {
+  if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v);
   const f=t.serviceWorkflow; if(!f)return;
@@ -463,5 +515,5 @@ async function one(browser,label,v,t) {
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();
-try { for(const [label,v]of views)for(const t of cases)await one(browser,label,v,t); for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if(t.hotelSettingsWorkflow&&failures)throw new Error("Guest House settings preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');

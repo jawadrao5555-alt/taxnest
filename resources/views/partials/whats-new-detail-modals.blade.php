@@ -1,6 +1,7 @@
 {{-- Re-openable large detail views for every update in the bell history.
      Opening the bell does not mark anything read; dismissing this modal marks
      only this update. Seen updates remain re-openable for the full live window. --}}
+<div data-tn-whats-new-history="1" data-tn-seen-endpoint="{{ $seenEndpoint ?? '' }}">
 @foreach($updates as $detailUpdate)
     <div
         x-data="{
@@ -16,7 +17,7 @@
                 this.$nextTick(() => window.TnModalA11y.close(dialog));
                 if (this.wasSeen || @json(empty($seenEndpoint))) return;
                 try {
-                    const response = await fetch('{{ $seenEndpoint }}', {
+                    const response = await fetch(this.$el.closest('[data-tn-whats-new-history]').dataset.seenEndpoint, {
                         method: 'POST',
                         headers: {
                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
@@ -93,3 +94,4 @@
         </div>
     </div>
 @endforeach
+</div>

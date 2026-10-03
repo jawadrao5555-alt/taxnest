@@ -227,6 +227,31 @@ class FeaturedWhatsNewTest extends TestCase
         ]);
     }
 
+    public function test_empty_history_keeps_acknowledgement_component_on_both_panels(): void
+    {
+        $this->assertSame(0, AppUpdate::count());
+        foreach (['pos' => $this->posAdminId, 'fbrpos' => $this->fbrAdminId] as $guard => $id) {
+            $prefix = $guard === 'pos' ? '/pos' : '/fbr-pos';
+            $response = $this->actingAs(User::find($id), $guard)->get($prefix.'/my-profile');
+            $response->assertOk()
+                ->assertSee('data-tn-whats-new-history="1"', false)
+                ->assertSee('data-tn-seen-endpoint="'.$prefix.'/whats-new/seen"', false)
+                ->assertDontSee('data-whats-new-detail-id=', false)
+                ->assertDontSee(self::WN_POPUP_MARKER, false);
+        }
+        $this->assertSame(0, AppUpdateSeen::count());
+    }
+
+    public function test_read_only_empty_history_has_no_writable_endpoint(): void
+    {
+        $html = view('partials.whats-new-detail-modals', [
+            'updates' => collect(), 'seenIds' => [], 'seenEndpoint' => null,
+        ])->render();
+        $this->assertStringContainsString('data-tn-whats-new-history="1"', $html);
+        $this->assertStringContainsString('data-tn-seen-endpoint=""', $html);
+        $this->assertStringNotContainsString('data-whats-new-detail-id=', $html);
+    }
+
     private function makeUpdate(string $title, string $audience, bool $featured): AppUpdate
     {
         return AppUpdate::create([

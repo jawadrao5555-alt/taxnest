@@ -291,4 +291,93 @@ class PosCounterOrderOpenStatusesTest extends TestCase
         $this->assertSame(409, $claim->getStatusCode(), 'assigned-elsewhere ready order must stay 409 for another cashier');
         $this->assertSame($cashierA->id, (int) DB::table('restaurant_orders')->find($orderId)->assigned_cashier_id);
     }
+
+    public function test_three_occupied_waiter_tables_open_with_items_in_every_kitchen_status(): void
+    {
+        $cashier = $this->actAs($this->makeUser('pos_cashier'));
+        foreach (['held', 'preparing', 'ready'] as $status) {
+            $table = $this->table();
+            $id = $this->order(['table_id' => $table, 'order_type' => 'dine_in', 'status' => $status]);
+            $claim = (new RestaurantWaiterController())->claimIncoming(Request::create('/', 'POST'), $id);
+            $this->assertSame(200, $claim->getStatusCode(), "$status table must open from the board");
+            $json = $claim->getData();
+            $this->assertTrue($json->success);
+            $this->assertSame($id, $json->order->id);
+            $this->assertSame($table, $json->order->table_id);
+            $this->assertSame('Chai', $json->order->items[0]->name);
+            $this->assertSame(500, (int) $json->order->total_amount);
+            $this->assertSame($status, DB::table('restaurant_orders')->find($id)->status);
+            $this->assertSame('occupied', DB::table('restaurant_tables')->find($table)->status);
+            $this->assertSame($cashier->id, (int) DB::table('restaurant_orders')->find($id)->assigned_cashier_id);
+            // Reopening one's own order is safe; it does not create a new order/KOT.
+            $this->assertSame(200, (new RestaurantWaiterController())->claimIncoming(Request::create('/', 'POST'), $id)->getStatusCode());
+        }
+        $this->assertSame(3, DB::table('restaurant_orders')->count());
+        $this->assertSame(3, DB::table('restaurant_order_items')->count());
+    }
+
+    public function test_table_waiter_settles_after_kitchen_transition_once_and_keeps_sibling_occupied(): void
+    {
+        $cashier = $this->actAs($this->makeUser('pos_cashier'));
+        $table = $this->table();
+        $id = $this->order(['table_id' => $table, 'assigned_cashier_id' => $cashier->id]);
+        $sibling = $this->order(['table_id' => $table, 'status' => 'ready']);
+        DB::table('restaurant_orders')->where('id', $id)->update(['status' => 'preparing']);
+        $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier));
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(9999), $cashier));
+        $this->assertSame('occupied', DB::table('restaurant_tables')->find($table)->status);
+        $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $sibling, $this->makeTxn(9302), $cashier));
+        $this->assertSame('available', DB::table('restaurant_tables')->find($table)->status);
+        $this->assertSame(9301, (int) DB::table('restaurant_orders')->find($id)->pos_transaction_id);
+    }
+
+    public function test_ready_table_claim_and_settle_preserve_cashier_and_tenant_boundaries(): void
+    {
+        $owner = $this->makeUser('pos_cashier');
+        $other = $this->actAs($this->makeUser('pos_cashier'));
+        $id = $this->order(['table_id' => $this->table(), 'status' => 'ready', 'assigned_cashier_id' => $owner->id]);
+        $controller = new RestaurantWaiterController();
+        $this->assertSame(409, $controller->claimIncoming(Request::create('/', 'POST'), $id)->getStatusCode());
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $other));
+        $this->assertSame($owner->id, (int) DB::table('restaurant_orders')->find($id)->assigned_cashier_id);
+        $foreign = $this->order(['company_id' => $this->companyId + 1, 'table_id' => $this->table(), 'status' => 'ready']);
+        $admin = $this->actAs($this->makeUser('pos_admin'));
+        $this->assertSame(409, $controller->claimIncoming(Request::create('/', 'POST'), $foreign)->getStatusCode());
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $foreign, $this->makeTxn(), $admin));
+        $this->assertNull(DB::table('restaurant_orders')->find($foreign)->assigned_cashier_id);
+        // The existing explicit admin rescue policy still works within this tenant.
+        $this->assertSame(200, $controller->claimIncoming(Request::create('/', 'POST'), $id)->getStatusCode());
+        $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $admin));
+    }
+
+    public function test_closed_table_orders_cannot_be_claimed_or_settled_again(): void
+    {
+        $admin = $this->actAs($this->makeUser('pos_admin'));
+        foreach (['completed', 'cancelled'] as $status) {
+            $id = $this->order(['table_id' => $this->table(), 'status' => $status]);
+            $this->assertSame(409, (new RestaurantWaiterController())->claimIncoming(Request::create('/', 'POST'), $id)->getStatusCode());
+            $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $admin));
+            $this->assertSame($status, DB::table('restaurant_orders')->find($id)->status);
+        }
+    }
+
+    public function test_ready_table_online_payment_still_requires_confirmation(): void
+    {
+        Schema::table('restaurant_orders', fn (Blueprint $t) => $t->timestamp('online_payment_awaited_at')->nullable());
+        $cashier = $this->actAs($this->makeUser('pos_cashier'));
+        $id = $this->order(['table_id' => $this->table(), 'status' => 'ready', 'online_payment_awaited_at' => now()]);
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier));
+        $this->assertSame('ready', DB::table('restaurant_orders')->find($id)->status);
+        $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, true));
+        $this->assertNull(DB::table('restaurant_orders')->find($id)->online_payment_awaited_at);
+    }
+
+    public function test_preparing_table_stale_edit_revision_is_not_settled(): void
+    {
+        Schema::table('restaurant_orders', fn (Blueprint $t) => $t->unsignedInteger('edit_revision')->default(0));
+        $cashier = $this->actAs($this->makeUser('pos_cashier'));
+        $id = $this->order(['table_id' => $this->table(), 'status' => 'preparing', 'edit_revision' => 2]);
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, false, 1));
+        $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, false, 2));
+    }
 }

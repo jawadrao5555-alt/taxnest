@@ -1285,7 +1285,7 @@ class RestaurantWaiterController extends Controller
      * Two idle terminals polling the same unassigned order must never BOTH load
      * it (payment runs before settlement's atomic claim → duplicate final bill).
      * Conditional UPDATE = single-winner: sets assigned_cashier_id to the caller
-     * only while the order is still held and unassigned (or already theirs).
+     * only while the order is open (held/preparing/ready) and unassigned (or already theirs).
      */
     public function claimIncoming(Request $request, $id)
     {
@@ -1295,7 +1295,10 @@ class RestaurantWaiterController extends Controller
         $claimQuery = RestaurantOrder::where('company_id', $companyId)
             ->where('id', $id)
             ->where('source', 'waiter');
-        self::whereOpenWaiterOrder($claimQuery);
+        // The incoming feed intentionally hides table-attached preparing/ready
+        // orders; the table board still opens them through this same claim.
+        // Visibility in that feed must not decide whether an open table can bill.
+        $claimQuery->whereIn('status', ['held', 'preparing', 'ready']);
         // Admin/manager override (Jul 2026): admins see ALL held waiter orders in
         // the table picker — without an override, an order assigned to an
         // off-shift cashier stays stuck for everyone else. Admin claim simply
@@ -1315,7 +1318,7 @@ class RestaurantWaiterController extends Controller
             $mineQ = RestaurantOrder::where('company_id', $companyId)
                 ->where('id', $id)->where('source', 'waiter')
                 ->where('assigned_cashier_id', $user->id);
-            self::whereOpenWaiterOrder($mineQ);
+            $mineQ->whereIn('status', ['held', 'preparing', 'ready']);
             $mine = $mineQ->exists();
             if (!$mine) {
                 return response()->json(['success' => false, 'message' => 'Order already taken by another cashier.'], 409);
@@ -1411,7 +1414,9 @@ class RestaurantWaiterController extends Controller
         if ($expectedRevision !== null && Schema::hasColumn('restaurant_orders', 'edit_revision')) {
             $claimQuery->where('edit_revision', $expectedRevision);
         }
-        self::whereOpenWaiterOrder($claimQuery);
+        // Kitchen progress never closes a bill. Match the table board and claim
+        // path while retaining the atomic assignee, revision and online gates.
+        $claimQuery->whereIn('status', ['held', 'preparing', 'ready']);
         // ONLINE-PAYMENT GATE (owner batch, 26 Aug 2026). An order marked
         // "paisay online aa rahay hain" is not final until a human confirms the
         // transfer landed. Both callers ask that question BEFORE they build a
@@ -1479,10 +1484,10 @@ class RestaurantWaiterController extends Controller
      * bell panel is its ONLY surface (owner rule 5 Aug 2026: counter orders never
      * appear on the table board/picker). Open = held, OR tableless in
      * preparing/ready. Table-attached waiter orders keep the old held-only panel
-     * behaviour: the Tables board already lists/settles them in every open status.
-     * Keep this predicate the mirror of the dashboard's counterOrdersCount slice
-     * (RestaurantPosController::dashboard) — every counted order must be
-     * reachable and settleable through this trio.
+     * behaviour: the Tables board opens them separately. This is a FEED visibility
+     * predicate, not a claim/settlement predicate; applying its held-only table
+     * slice to those actions stranded occupied tables after kitchen progress.
+     * Keep the feed's tableless slice aligned with dashboard counterOrdersCount.
      */
     private static function whereOpenWaiterOrder($q)
     {

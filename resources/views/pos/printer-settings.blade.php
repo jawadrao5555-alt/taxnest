@@ -433,6 +433,16 @@
     </script>
     @endif
 
+    @if(isset($agedPrintQueue) && $agedPrintQueue->count())
+    <section data-aged-print-queue class="mt-6 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-5">
+        <h3 class="font-semibold">{{ __('pos.print_delayed_queue') }}</h3>
+        <p class="text-xs mt-1">{{ __('pos.print_delayed_queue_help') }}</p>
+        @foreach($agedPrintQueue as $queue)
+        <p class="text-sm mt-2">{{ $queue->target_printer }} · {{ $queue->job_count }} · {{ \Carbon\Carbon::parse($queue->oldest_at)->diffForHumans() }}</p>
+        @endforeach
+    </section>
+    @endif
+
     @if(isset($recentPrintJobs) && $recentPrintJobs->count())
     <div class="mt-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5" data-print-activity>
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.recent_print_activity') }}</h3>
@@ -448,6 +458,9 @@
                     </p>
                     @if($job->error)
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">{{ $job->error }}</p>
+                    @endif
+                    @if($job->no_document_reason)
+                    <p class="text-[11px] text-amber-700 dark:text-amber-300">{{ __('pos.print_no_document') }} · {{ __('pos.print_no_document_reason_'.$job->no_document_reason) }}</p>
                     @endif
                 </div>
                 <span class="text-[11px] font-semibold whitespace-nowrap {{ $state['tone'] === 'rose' ? 'text-red-600' : ($state['tone'] === 'amber' ? 'text-amber-600' : 'text-emerald-600') }}">{{ $state['label'] }}</span>

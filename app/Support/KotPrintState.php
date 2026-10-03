@@ -23,6 +23,9 @@ final class KotPrintState
         $error = (string) ($job->error ?? '');
 
         return match (true) {
+            $status === 'done' && ($job->result_outcome ?? '') === 'no_document' => [
+                'key' => 'no_document', 'label' => __('pos.print_no_document'), 'tone' => 'amber',
+            ],
             $status === 'printing', $status === 'local' => [
                 'key' => self::PRINTING,
                 'label' => $status === 'local' ? 'Printing (local)' : 'Printing',
@@ -41,7 +44,8 @@ final class KotPrintState
             ],
             $status === 'done' => [
                 'key' => self::PRINTED,
-                'label' => 'Printed',
+                'label' => ($job->result_outcome ?? '') === 'spool_accepted'
+                    ? __('pos.print_windows_accepted') : __('pos.print_agent_acknowledged'),
                 'tone' => 'emerald',
             ],
             default => [

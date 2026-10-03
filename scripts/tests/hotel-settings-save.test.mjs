@@ -13,6 +13,13 @@ function fixture(fetcher) {
     vm.createContext(context); vm.runInContext(source, context);
     return { ui: context.TnHotelSettings({theme:'blue', whatsapp:true}, {saving:'Saving', saved:'Saved', failed:'Failed'}), applied };
 }
+test('each rendered setting starts explicitly idle so Alpine disabled bindings stay false', () => {
+    const {ui}=fixture(async()=>{throw Error('No request expected');});
+    for (const key of Object.keys(ui.values)) {
+        assert.equal(Object.hasOwn(ui.busy,key),true);
+        assert.equal(ui.busy[key],false);
+    }
+});
 test('failed HTTP, invalid JSON and network saves preserve confirmed values and colour', async () => {
     for (const fetcher of [
         async () => ({ok:false, json:async()=>({success:false,message:'Denied'})}),

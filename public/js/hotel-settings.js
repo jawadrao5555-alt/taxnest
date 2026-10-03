@@ -2,7 +2,12 @@
     'use strict';
     root.TnHotelSettings = function (initial, messages) {
         return {
-            values: { ...initial }, busy: {}, status: '', error: '',
+            values: { ...initial },
+            // Alpine treats an undefined dotted x-bind value as an empty
+            // attribute; for disabled that means true. Start every control
+            // with an explicit boolean instead of an absent busy key.
+            busy: Object.fromEntries(Object.keys(initial).map(key => [key, false])),
+            status: '', error: '',
             async save(key, url, payload, acceptedValue, acknowledgementKey = 'success') {
                 if (this.busy[key]) return false;
                 this.busy[key] = true;

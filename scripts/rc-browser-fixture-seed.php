@@ -139,6 +139,7 @@ $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' =>
 $tableCases = [];
 $handoffCases = [];
 $tableOwner = $user($tableShop, 'Synthetic Table Owner', 'table-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
 foreach (['held', 'preparing', 'ready'] as $index => $status) {
     $table = RestaurantTable::create([
         'company_id' => $tableShop->id, 'floor_id' => $tableFloor->id,
@@ -339,7 +340,7 @@ $fixture = [
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
             'tableOrderWorkflow' => $tableCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
-                'manager' => ['name' => 'synthetic-table-owner', 'login' => $tableOwner->email, 'password' => $password, 'loginPath' => '/pos/login']]],
+                'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
         ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],

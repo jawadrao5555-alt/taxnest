@@ -484,7 +484,8 @@ async function cashierHandoffWorkflow(page,t,v) {
     const [claim]=await Promise.all([
       page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'), tile.click(),
     ]);
-    if(claim.status()!==409||(await claim.json()).code!=='cashier_assignment_conflict')throw new Error('Assigned table did not expose its assignment conflict');
+    const rejected=await claim.json().catch(()=>null);
+    if(claim.status()!==409||rejected?.code!=='cashier_assignment_conflict')throw new Error('Assigned table conflict: HTTP '+claim.status()+', code='+rejected?.code+', message='+rejected?.message);
     await page.locator('[data-video="cashier-conflict"]').waitFor({state:'visible'});
     await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).cart.length===0);
   };

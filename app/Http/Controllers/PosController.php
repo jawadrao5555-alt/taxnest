@@ -771,6 +771,10 @@ class PosController extends Controller
             ->orderByDesc('id')
             ->limit(15)
             ->get();
+        $agedPrintQueue = \App\Models\PosPrintJob::where('company_id', $companyId)
+            ->whereIn('status', ['pending', 'printing'])->where('created_at', '<', now()->subMinutes(2))
+            ->selectRaw('target_printer, COUNT(*) as job_count, MIN(created_at) as oldest_at')
+            ->groupBy('target_printer')->get();
         $kotPrinterStale = \App\Support\PrinterIdentity::savedNameLooksStale(
             $settings['kot_printer'] ?? null,
             $settings['available_printers'] ?? []
@@ -802,7 +806,7 @@ class PosController extends Controller
         // counter-labeled). Single-counter/legacy shops get today's list back.
         $kotOptions = \App\Models\PosAgentDevice::kotPrinterOptions($company);
 
-        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'recentPrintJobs', 'kotActionRequired', 'kotPrinterStale', 'devices', 'assignableTeam', 'kotOptions'));
+        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'recentPrintJobs', 'agedPrintQueue', 'kotActionRequired', 'kotPrinterStale', 'devices', 'assignableTeam', 'kotOptions'));
     }
 
     /**
@@ -1007,6 +1011,8 @@ class PosController extends Controller
                 'order_id' => is_numeric($data['order_id'] ?? null) ? (int) $data['order_id'] : null,
                 'error' => substr((string) ($data['error'] ?? ''), 0, 300),
                 'http_status' => is_numeric($data['http_status'] ?? null) ? (int) $data['http_status'] : null,
+                'reason' => in_array($data['reason'] ?? '', ['disabled', 'agent_offline', 'counter_unavailable', 'no_printer', 'not_found', 'idempotency_conflict'], true) ? $data['reason'] : null,
+                'request_id' => \Illuminate\Support\Str::isUuid($data['request_id'] ?? '') ? $data['request_id'] : null,
                 'flags' => substr((string) ($data['flags'] ?? ''), 0, 200),
                 'online' => $data['online'] ?? null,
                 'at_client' => substr((string) ($data['at'] ?? ''), 0, 40),
@@ -1055,6 +1061,17 @@ class PosController extends Controller
      * printer not chosen, or agent offline) — the sale screen falls back to
      * the normal popup/iframe print path on ANY non-2xx.
      */
+    private function rejectPrintJob(Request $request, string $reason, int $status = 409)
+    {
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $user = auth('pos')->user();
+        \App\Services\PrintJobEvidence::record((int) app('currentCompanyId'), 'enqueue_rejected', null, null,
+            ['request_id' => $requestId, 'reason' => $reason, 'user_id' => $user?->id,
+                'type' => $request->input('type'), 'order_id' => $request->integer('restaurant_order_id') ?: null,
+                'device_uid' => $user?->pos_device_uid]);
+        return response()->json(['success' => false, 'reason' => $reason, 'request_id' => $requestId], $status);
+    }
+
     public function apiCreatePrintJob(Request $request)
     {
         $user = auth('pos')->user();
@@ -1208,10 +1225,7 @@ class PosController extends Controller
                 return response()->json(['success' => false, 'reason' => 'idempotency_conflict'], 409);
             }
             if (!empty($billResult['unavailable'])) {
-                return response()->json([
-                    'success' => false,
-                    'reason' => $billResult['unavailable'],
-                ], 409);
+                return $this->rejectPrintJob($request, $billResult['unavailable']);
             }
             return response()->json([
                 'success' => true,
@@ -1221,20 +1235,20 @@ class PosController extends Controller
         }
 
         if (!$settings['silent_print_enabled']) {
-            return response()->json(['success' => false, 'reason' => 'disabled'], 409);
+            return $this->rejectPrintJob($request, 'disabled');
         }
         if (!$company->agentOnline()) {
-            return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
+            return $this->rejectPrintJob($request, 'agent_offline');
         }
 
         // ── PROOF BILL (ZFC 28 Jul 2026): pre-bill on the RECEIPT printer —
         // silent path so the desktop app never pops the Windows print dialog. ──
         if ($validated['type'] === 'proof') {
             if ($assignedCounterUnavailable) {
-                return response()->json(['success' => false, 'reason' => 'counter_unavailable'], 409);
+                return $this->rejectPrintJob($request, 'counter_unavailable');
             }
             if (!$deviceRoute && !$settings['receipt_printer']) {
-                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+                return $this->rejectPrintJob($request, 'no_printer');
             }
             $exists = \App\Models\RestaurantOrder::where('company_id', $companyId)
                 ->where('id', (int) $validated['restaurant_order_id'])

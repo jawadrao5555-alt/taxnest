@@ -25,6 +25,7 @@ class PosPrintJob extends Model
         // Set when the agent fetched the printable content of a claimed job:
         // from here on the paper may exist, so a lost result must not requeue.
         'content_fetched_at',
+        'result_outcome', 'no_document_reason', 'result_received_at',
 
         'printed_item_ids',
         'error',
@@ -36,6 +37,7 @@ class PosPrintJob extends Model
         'attempts' => 'integer',
         'printed_item_ids' => 'array',
         'content_fetched_at' => 'datetime',
+        'result_received_at' => 'datetime',
     ];
 
     /**

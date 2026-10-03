@@ -433,12 +433,30 @@
     </script>
     @endif
 
+    @if(isset($agedPrintQueue) && $agedPrintQueue->count())
+    <section data-aged-print-queue class="mt-6 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-5">
+        <h3 class="font-semibold">{{ __('pos.print_delayed_queue') }}</h3>
+        <p class="text-xs mt-1">{{ __('pos.print_delayed_queue_help') }}</p>
+        @foreach($agedPrintQueue as $queue)
+        <p class="text-sm mt-2">{{ $queue->target_printer }} · {{ $queue->job_count }} · {{ \Carbon\Carbon::parse($queue->oldest_at)->diffForHumans() }}</p>
+        @endforeach
+    </section>
+    @endif
+
     @if(isset($recentPrintJobs) && $recentPrintJobs->count())
     <div class="mt-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5" data-print-activity>
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.recent_print_activity') }}</h3>
         <div class="space-y-2">
             @foreach($recentPrintJobs as $job)
-            @php $state = \App\Support\KotPrintState::forJob($job); @endphp
+            @php
+                $state = \App\Support\KotPrintState::forJob($job);
+                if ($state['key'] === 'no_document') {
+                    $state['label'] = __('pos.print_no_document');
+                } elseif ($state['key'] === \App\Support\KotPrintState::PRINTED) {
+                    $state['label'] = ($job->result_outcome ?? '') === 'spool_accepted'
+                        ? __('pos.print_windows_accepted') : __('pos.print_agent_acknowledged');
+                }
+            @endphp
             <div class="flex items-start justify-between gap-3 p-2.5 rounded-lg border border-gray-100 dark:border-gray-800" data-print-state="{{ $state['key'] }}">
                 <div class="min-w-0">
                     <p class="text-xs font-semibold text-gray-800 dark:text-gray-200">
@@ -449,8 +467,11 @@
                     @if($job->error)
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">{{ $job->error }}</p>
                     @endif
+                    @if($job->no_document_reason)
+                    <p class="text-[11px] text-amber-700 dark:text-amber-300">{{ __('pos.print_no_document') }} · {{ __('pos.print_no_document_reason_'.$job->no_document_reason) }}</p>
+                    @endif
                 </div>
-                <span class="text-[11px] font-semibold whitespace-nowrap {{ $state['tone'] === 'rose' ? 'text-red-600' : ($state['tone'] === 'amber' ? 'text-amber-600' : 'text-emerald-600') }}">{{ $state['label'] }}</span>
+                <span class="text-[11px] font-semibold max-w-[50%] shrink-0 text-right {{ $state['tone'] === 'rose' ? 'text-red-600' : ($state['tone'] === 'amber' ? 'text-amber-600' : 'text-emerald-600') }}">{{ $state['label'] }}</span>
             </div>
             @endforeach
         </div>

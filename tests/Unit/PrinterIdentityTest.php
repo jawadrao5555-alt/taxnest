@@ -35,6 +35,13 @@ class PrinterIdentityTest extends TestCase
         $this->assertSame(KotPrintState::PRINTING, KotPrintState::forJob((object) ['status' => 'local'])['key']);
         $this->assertSame(KotPrintState::PENDING, KotPrintState::forJob((object) ['status' => 'pending'])['key']);
         $this->assertSame(KotPrintState::PRINTED, KotPrintState::forJob((object) ['status' => 'done'])['key']);
+        $noDocument = KotPrintState::forJob((object) ['status' => 'done', 'result_outcome' => 'no_document']);
+        $this->assertSame('no_document', $noDocument['key']);
+        $this->assertSame('No document; no print submitted', $noDocument['label']);
+        $accepted = KotPrintState::forJob((object) ['status' => 'done', 'result_outcome' => 'spool_accepted']);
+        $this->assertSame(KotPrintState::PRINTED, $accepted['key']);
+        $this->assertSame('Accepted by Windows; paper not verified', $accepted['label']);
+        $this->assertSame('Agent acknowledged; paper not verified', KotPrintState::forJob((object) ['status' => 'done'])['label']);
         $this->assertSame(KotPrintState::RECOVERED, KotPrintState::forJob((object) [
             'status' => 'done',
             'error' => 'Superseded: shop PC confirmed this kitchen slip.',

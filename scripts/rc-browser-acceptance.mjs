@@ -470,6 +470,55 @@ async function tableOrderWorkflow(page,t,v) {
       await page.locator('[data-video="counter-dine-in"]').waitFor({state:'visible'});
     }
   }
+  if(t.cashierHandoff) await cashierHandoffWorkflow(page,t,v);
+}
+async function cashierHandoffWorkflow(page,t,v) {
+  const h=t.cashierHandoff, expected=h.cases[v.width<768?'mobile':'desktop'];
+  const initialContext=await page.context().browser().newContext({viewport:v});
+  page=await initialContext.newPage(); await login(page,t);
+  const openConflict=async(page)=>{
+    await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    await page.locator('[data-video="counter-dine-in"]').click();
+    const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});
+    const [claim]=await Promise.all([
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'), tile.click(),
+    ]);
+    const rejected=await claim.json().catch(()=>null);
+    if(claim.status()!==409||rejected?.code!=='cashier_assignment_conflict')throw new Error('Assigned table conflict: HTTP '+claim.status()+', code='+rejected?.code+', message='+rejected?.message);
+    await page.locator('[data-video="cashier-conflict"]').waitFor({state:'visible'});
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).cart.length===0);
+  };
+  await openConflict(page);
+  if(await page.locator('[data-video="handoff-confirm"]').count())throw new Error('Cashier received manager handoff control');
+  await initialContext.close();
+  const managerContext=await initialContext.browser().newContext({viewport:v});
+  const managerPage=await managerContext.newPage();
+  await login(managerPage,h.manager); await openConflict(managerPage);
+  await managerPage.locator('[data-video="handoff-cashier"]').selectOption(String(h.cashierId));
+  const [transfer]=await Promise.all([
+    managerPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/transfer'&&r.request().method()==='POST').then(async r=>({ok:r.ok(),data:await r.json()})),
+    managerPage.locator('[data-video="handoff-confirm"]').click(),
+  ]);
+  if(!transfer.ok||transfer.data.success!==true)throw new Error('Manager transfer failed');
+  await managerPage.locator('[data-video="cashier-conflict"]').waitFor({state:'hidden'});
+  await managerContext.close();
+  const cashierContext=await managerContext.browser().newContext({viewport:v});
+  const cashierPage=await cashierContext.newPage();
+  await login(cashierPage,t);
+  await cashierPage.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(cashierPage); await dismiss(cashierPage);
+  await cashierPage.locator('[data-video="counter-dine-in"]').click();
+  const [claim]=await Promise.all([
+    cashierPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST').then(async r=>({ok:r.ok(),data:await r.json()})),
+    cashierPage.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click(),
+  ]);
+  if(!claim.ok||claim.data.success!==true)throw new Error('Transferred table still cannot open');
+  await openMobileCart(cashierPage,v,['Current Order']);
+  await cashierPage.locator('[data-tn-sale-root]').getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
+  if(!await cashierPage.locator('[data-video="open-payment"]').isEnabled())throw new Error('Transferred table payment disabled');
+  pass(t.name+'/'+v.width+': cashier conflict, explicit manager transfer and exact-order reopen passed');
+  await cashierContext.close();
 }
 async function categoryMismatch(page,t,v) {
   const path=t.categoryCoverage?.mismatchPath; if(!path)return;

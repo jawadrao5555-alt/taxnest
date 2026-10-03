@@ -2234,6 +2234,28 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    <div x-show="cashierConflict" x-cloak data-video="cashier-conflict" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+        <section role="dialog" aria-modal="true" aria-label="{{ __('pos.cashier_handoff_title') }}" class="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-900 p-5 shadow-xl space-y-3">
+            <h2 class="font-bold text-lg">{{ __('pos.cashier_handoff_title') }}</h2>
+            <p class="text-sm">{{ __('pos.cashier_handoff_assigned') }}: <strong x-text="cashierConflict?.assigned_cashier || '#' + cashierConflict?.assigned_cashier_id"></strong></p>
+            <p class="text-sm">{{ __('pos.cashier_handoff_help') }}</p>
+            @if(auth('pos')->user()->isPosAdmin())
+            <label class="block text-sm">{{ __('pos.cashier_handoff_target') }}
+                <select data-video="handoff-cashier" x-model="handoffCashierId" :disabled="handoffBusy" class="mt-1 w-full rounded-lg border p-2 dark:bg-gray-800">
+                    <option value="">{{ __('pos.cashier_handoff_choose') }}</option>
+                    <template x-for="cashier in (cashierConflict?.cashiers || [])" :key="cashier.id">
+                        <option :value="cashier.id" x-text="cashier.name" :disabled="Number(cashier.id) === Number(cashierConflict?.assigned_cashier_id)"></option>
+                    </template>
+                </select>
+            </label>
+            <p class="text-xs">{{ __('pos.cashier_handoff_confirm') }}</p>
+            <button data-video="handoff-confirm" @click="transferCashier()" :disabled="handoffBusy || !handoffCashierId" class="w-full rounded-lg bg-purple-600 text-white p-2 disabled:opacity-50">{{ __('pos.cashier_handoff_transfer') }}</button>
+            @endif
+            <p x-show="handoffError" x-text="handoffError" role="alert" class="text-sm text-red-600"></p>
+            <button data-video="handoff-close" @click="cashierConflict = null" :disabled="handoffBusy" class="w-full rounded-lg border p-2">{{ __('pos.close') }}</button>
+        </section>
+    </div>
+
     {{-- ═══ TABLE BOARD ACTION MENU (Jul 2026) ═══
          Tile click NEVER acts directly — this menu is the single control hub
          for a table: View/Edit (recall to cart), Final (confirm modal), KOT
@@ -5134,6 +5156,10 @@ function restaurantPos() {
         canKotReprint: {{ !empty($canKotReprint) ? 'true' : 'false' }},
         canKotLastAddon: {{ !empty($canKotLastAddon) ? 'true' : 'false' }},
         tableBoardOpen: false, // board ab MODAL hai (owner 26 Jul 2026) — load par band, Alt+B / TABLE button se khulta hai
+        cashierConflict: null,
+        handoffCashierId: '',
+        handoffBusy: false,
+        handoffError: '',
         boardMenuTable: null,   // tile clicked → action menu modal
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
         boardOnlineQuote: null, // authoritative qr_payment total for the open order
@@ -8978,10 +9004,16 @@ function restaurantPos() {
             try {
                 const res = await fetch('/pos/api/incoming-orders/' + o.id + '/claim', {
                     method: 'POST',
-                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({allow_reassign: false}),
                 });
                 let data = null; try { data = await res.json(); } catch (_) {}
                 if (!res.ok || !data || !data.success) {
+                    if (data?.code === 'cashier_assignment_conflict') {
+                        this.cashierConflict = data;
+                        this.handoffCashierId = ''; this.handoffError = '';
+                        this.showTablePicker = false; this.boardMenuTable = null;
+                    }
                     this.showToast((data && data.message) || window.TXT.order_taken_by_other_cashier, 'warning');
                     this.loadIncoming(); this.loadTableStatus();
                     return;
@@ -8997,6 +9029,27 @@ function restaurantPos() {
             } catch (e) {
                 this.showToast(window.TXT.could_not_load_order_conn, 'error');
             } finally { this._claimBusy = false; }
+        },
+        async transferCashier() {
+            if (this.handoffBusy || !this.cashierConflict || !this.handoffCashierId) return;
+            const c = this.cashierConflict;
+            this.handoffBusy = true; this.handoffError = '';
+            try {
+                const r = await fetch('/pos/api/incoming-orders/' + c.order_id + '/transfer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
+                    body: JSON.stringify({cashier_id: Number(this.handoffCashierId), assigned_cashier_id: c.assigned_cashier_id, revision: c.revision}),
+                });
+                const data = await r.json().catch(() => null);
+                if (!r.ok || !data?.success) {
+                    this.handoffError = data?.message || @json(__('pos.cashier_handoff_changed'));
+                    return;
+                }
+                this.cashierConflict = null;
+                this.showToast(@json(__('pos.cashier_handoff_done')), 'success');
+                this.loadIncoming(); this.loadTableStatus();
+            } catch (_) { this.handoffError = window.TXT.could_not_load_order_conn; }
+            finally { this.handoffBusy = false; }
         },
         // Task #409 (owner, 10 Aug 2026): cancel a waiter order straight from the
         // ghanti (incoming) panel — the ONLY surface where waiter takeaway/delivery
@@ -9163,7 +9216,9 @@ function restaurantPos() {
         tableOrderLine(t) {
             if (!t || !t.order) return '';
             const who = t.order.staff_name ? String(t.order.staff_name).split(' ')[0] : '';
-            return (who ? who + ' • ' : '') + 'Rs ' + Math.round(parseFloat(t.order.total_amount) || 0).toLocaleString();
+            const cashier = t.order.assigned_cashier;
+            return (who ? who + ' • ' : '') + 'Rs ' + Math.round(parseFloat(t.order.total_amount) || 0).toLocaleString()
+                + (cashier ? ' • ' + @json(__('pos.cashier_handoff_assigned')) + ': ' + cashier : '');
         },
         boardTileSub(t) {
             if (t.order) return this.tableOrderLine(t);

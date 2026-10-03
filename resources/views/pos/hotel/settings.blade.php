@@ -151,7 +151,9 @@
         <details data-hotel-settings-outlet="1" class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
             <summary class="cursor-pointer font-semibold dark:text-white">{{ __('pos.nav_hotel_restaurant_outlet') }}</summary>
             <div class="mt-4 space-y-3 text-sm dark:text-gray-200">
-                <a href="{{ route('pos.restaurant.kitchen-settings') }}" class="block underline">{{ __('pos.card_kitchen_kot') }}</a>
+                @if($hotelSettings['kitchen'])
+                    <a href="{{ route('pos.restaurant.kitchen-settings') }}" class="block underline">{{ __('pos.card_kitchen_kot') }}</a>
+                @endif
                 @if(\App\Services\PosFeatureService::moduleAvailable($company, 'deals_enabled'))
                     <a href="{{ route('pos.deals') }}" class="block underline">{{ __('pos.card_deals') }}</a>
                 @endif
@@ -162,7 +164,7 @@
                     ['waiterCancel', 'pos.settings.waiter-permission', 'waiter_cancel_toggle', ['enabled', 'permission' => 'cancel']],
                     ['waiterTakeaway', 'pos.settings.waiter-permission', 'waiter_takeaway_toggle', ['enabled', 'permission' => 'takeaway']],
                 ] as [$key, $route, $label, $payload])
-                    @continue($key === 'kds' && !$hotelSettings['kot'])
+                    @continue($key === 'kds' && !$hotelSettings['kdsPrint'])
                     <div class="flex items-center justify-between gap-3">
                         <span>{{ __('pos.'.$label) }}</span>
                         <button type="button" role="switch" :aria-checked="values.{{ $key }} ? 'true' : 'false'" :disabled="busy.{{ $key }}" @click="save('{{ $key }}', '{{ route($route, [], false) }}', {enabled: !values.{{ $key }} @if(isset($payload['permission'])), permission: '{{ $payload['permission'] }}' @endif}, !values.{{ $key }})" class="rounded-lg border px-3 py-2 disabled:opacity-50" x-text="values.{{ $key }} ? {{ Js::from(__('pos.hotel_settings_on')) }} : {{ Js::from(__('pos.hotel_settings_off')) }}"></button>

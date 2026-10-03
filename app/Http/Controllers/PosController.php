@@ -8548,8 +8548,9 @@ class PosController extends Controller
     {
         \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $settingCompany = Company::find(app('currentCompanyId'));
-        if (\App\Services\HotelShell::isNativeCategory($settingCompany)) {
-            abort_unless(\App\Services\PosFeatureService::moduleAvailable($settingCompany, 'kot'), 403, __('pos.access_denied'));
+        if (\App\Services\HotelSettingsProfile::isAccommodation($settingCompany)) {
+            abort_unless(\App\Services\PosFeatureService::moduleAvailable($settingCompany, 'kitchen')
+                && \App\Services\PosFeatureService::moduleAvailable($settingCompany, 'kot'), 403, __('pos.access_denied'));
         }
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {

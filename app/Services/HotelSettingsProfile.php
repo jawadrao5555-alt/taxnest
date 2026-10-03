@@ -18,7 +18,9 @@ class HotelSettingsProfile
         abort_unless($user->isPosAdmin(), 403, __('pos.only_admin_change_setting'));
         return [
             'outlet' => self::outletAvailable($company),
-            'kot' => PosFeatureService::moduleAvailable($company, 'kot'),
+            'kitchen' => PosFeatureService::moduleAvailable($company, 'kitchen'),
+            'kdsPrint' => PosFeatureService::moduleAvailable($company, 'kitchen')
+                && PosFeatureService::moduleAvailable($company, 'kot'),
             'whatsapp' => PosFeatureService::moduleAvailable($company, 'whatsapp_enabled'),
             'caller' => PosFeatureService::moduleRelevant($company, 'caller_id_enabled')
                 && PosFeatureService::planAllows($company, 'caller_id_enabled'),
@@ -29,8 +31,7 @@ class HotelSettingsProfile
     public static function outletAvailable(?Company $company): bool
     {
         return HotelShell::restaurantOutletOn($company)
-            && PosFeatureService::restaurantAllowed($company)
-            && PosFeatureService::moduleAvailable($company, 'kitchen');
+            && PosFeatureService::restaurantAllowed($company);
     }
 
     public static function assertAccountWrite(?Company $company, ?User $user): void

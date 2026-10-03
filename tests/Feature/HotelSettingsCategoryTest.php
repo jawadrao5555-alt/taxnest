@@ -173,6 +173,21 @@ class HotelSettingsCategoryTest extends TestCase
         $this->assertTrue((bool) $company->fresh()->caller_id_enabled);
     }
 
+    public function test_outlet_without_kitchen_keeps_its_existing_billing_controls(): void
+    {
+        $flags = PosFeatureService::defaultsForCategory('hotel');
+        $flags['tables'] = true;
+        $flags['kitchen'] = $flags['kot'] = false;
+        [$company, $owner] = $this->fixture(['feature_flags' => $flags, 'restaurant_mode' => true]);
+        $this->actingAs($owner, 'pos')->get('/pos/customize')->assertOk()
+            ->assertSee('data-hotel-settings-outlet="1"', false)
+            ->assertSee('/pos/settings/quick-type', false)
+            ->assertDontSee('/pos/settings/kds-auto-print', false);
+        $this->postJson('/pos/settings/quick-type', ['enabled' => true])->assertOk();
+        $this->postJson('/pos/settings/kds-auto-print', ['enabled' => true])->assertForbidden();
+        $this->assertEquals($flags, $company->fresh()->feature_flags);
+    }
+
     public function test_reception_and_housekeeping_cannot_write_property_settings(): void
     {
         [$company] = $this->fixture(['pos_theme' => 'blue']);

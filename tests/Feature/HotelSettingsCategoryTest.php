@@ -157,6 +157,8 @@ class HotelSettingsCategoryTest extends TestCase
         $this->assertTrue($profile['caller']);
         $this->actingAs($owner, 'pos')->get('/pos/customize')->assertOk()
             ->assertSee('/pos/settings/caller-id', false);
+        $this->postJson('/pos/settings/caller-id', ['enabled' => true])->assertOk()->assertJson(['ok' => true, 'enabled' => true]);
+        $this->assertTrue((bool) $company->fresh()->caller_id_enabled);
     }
 
     public function test_reception_and_housekeeping_cannot_write_property_settings(): void

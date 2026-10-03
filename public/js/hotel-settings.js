@@ -3,7 +3,7 @@
     root.TnHotelSettings = function (initial, messages) {
         return {
             values: { ...initial }, busy: {}, status: '', error: '',
-            async save(key, url, payload, acceptedValue) {
+            async save(key, url, payload, acceptedValue, acknowledgementKey = 'success') {
                 if (this.busy[key]) return false;
                 this.busy[key] = true;
                 this.status = messages.saving;
@@ -16,7 +16,7 @@
                         body: JSON.stringify(payload),
                     });
                     const result = await response.json();
-                    if (!response.ok || result?.success !== true) {
+                    if (!response.ok || result?.[acknowledgementKey] !== true) {
                         throw new Error(result?.message || messages.failed);
                     }
                     this.values[key] = acceptedValue;

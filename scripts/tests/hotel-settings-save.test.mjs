@@ -46,3 +46,15 @@ test('repeated clicks during save produce one request and leave old value until 
     release(); assert.equal(await first,true);
     assert.equal(calls,1); assert.equal(ui.values.whatsapp,false);
 });
+test('Caller ID uses its existing ok response without treating an error as saved', async () => {
+    for (const [response, expected] of [
+        [{ok:true,json:async()=>({ok:true})},true],
+        [{ok:true,json:async()=>({ok:false})},false],
+        [{ok:false,json:async()=>({ok:true})},false],
+    ]) {
+        const {ui}=fixture(async()=>response);
+        ui.values.caller=false;
+        assert.equal(await ui.save('caller','/pos/settings/caller-id',{enabled:true},true,'ok'),expected);
+        assert.equal(ui.values.caller,expected);
+    }
+});

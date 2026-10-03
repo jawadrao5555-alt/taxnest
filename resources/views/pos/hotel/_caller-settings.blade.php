@@ -71,7 +71,7 @@
                         </div>
                         @if($tnCallerPlanAllowed)
                         <button type="button"
-                            @click="save('caller', '{{ route('pos.settings.caller-id', [], false) }}', {enabled: !values.caller}, !values.caller)" :disabled="busy.caller"
+                            @click="save('caller', '{{ route('pos.settings.caller-id', [], false) }}', {enabled: !values.caller}, !values.caller, 'ok')" :disabled="busy.caller"
                             class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="values.caller ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600'">
                             <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="values.caller && 'translate-x-6'"></span>
                         </button>
@@ -99,7 +99,8 @@
                                         @if($tnCd['seen']) · {{ __('pos.caller_id_last_seen') }}: {{ $tnCd['seen'] }} @endif
                                     </span>
                                     <button type="button"
-                                        @click="if (confirm('{{ __('pos.caller_dev_revoke_confirm') }}')) { if (revoking) return; revoking = true; fetch('{{ route('pos.settings.caller-devices.revoke') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({device_id: '{{ $tnCd['id'] }}'})}).then(r => r.json().then(d => ({ok:r.ok,d}))).then(({ok,d}) => { if (ok && d.success === true) revoked = true; else alert(d.message || {{ Js::from(__('pos.setting_save_failed')) }}); }).catch(() => alert({{ Js::from(__('pos.setting_save_failed')) }})).finally(() => revoking = false); }"
+                                        :disabled="revoking"
+                                        @click="if (confirm({{ Js::from(__('pos.caller_dev_revoke_confirm')) }})) { if (revoking) return; revoking = true; fetch('{{ route('pos.settings.caller-devices.revoke') }}', {method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({device_id: '{{ $tnCd['id'] }}'})}).then(r => r.json().then(d => ({ok:r.ok,d}))).then(({ok,d}) => { if (ok && d.ok === true) revoked = true; else alert(d.message || {{ Js::from(__('pos.setting_save_failed')) }}); }).catch(() => alert({{ Js::from(__('pos.setting_save_failed')) }})).finally(() => revoking = false); }"
                                         class="ml-auto shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-bold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition">{{ __('pos.caller_dev_revoke') }}</button>
                                 </div>
                             @endforeach
@@ -148,4 +149,3 @@
                     </div>
                 </div>
                 @endif
-

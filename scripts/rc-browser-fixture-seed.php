@@ -149,6 +149,33 @@ foreach (['pos', 'fbr_pos'] as $audience) {
     ]);
 }
 
+$notificationUsers = [];
+foreach (['pra' => $hotel, 'fbr' => $fiscal] as $panel => $noticeCompany) {
+    foreach (['desktop', 'mobile'] as $viewport) {
+        $account = $user($noticeCompany, 'Synthetic Notification '.$panel.' '.$viewport,
+            'notice-'.$panel.'-'.$viewport.'@rc-browser.invalid', 'company_admin', 'pos_admin');
+        $account->forceFill(['pra_elaan_seen_at' => now()])->save();
+        $notificationUsers[$panel][$viewport] = $account->email;
+    }
+    for ($i = 1; $i <= 7; $i++) {
+        AppUpdate::create([
+            'title' => 'Synthetic routine '.$panel.' '.$i, 'points' => ['Reception notice'],
+            'audience' => $panel === 'fbr' ? 'fbr_pos' : 'pos',
+            'target_categories' => [$panel === 'fbr' ? 'retail' : 'hotel'],
+            'is_published' => true, 'is_featured' => false,
+        ]);
+    }
+    foreach (['a', 'b'] as $receipt) {
+        AppUpdate::create([
+            'title' => 'Synthetic featured '.$panel, 'points' => ['Important reception notice'],
+            'audience' => $panel === 'fbr' ? 'fbr_pos' : 'pos',
+            'target_categories' => [$panel === 'fbr' ? 'retail' : 'hotel'],
+            'is_published' => true, 'is_featured' => true,
+            'deployment_key' => sha1('synthetic-notification-'.$panel.'-'.$receipt),
+        ]);
+    }
+}
+
 $health = $company('Synthetic Browser Health Clinic', 'health-company@rc-browser.invalid', 'RCBROWSER004', 'health', [
     'health_org_type' => 'clinic', 'health_modules' => HealthModuleService::MODULES,
     'health_setup_completed' => true,
@@ -254,6 +281,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
     'transactionalJourneys' => [
+        ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
+        ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],
         ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk']],
         [
         'name' => 'service-work-orders', 'login' => $serviceWorker->email, 'password' => $password,
@@ -283,3 +312,4 @@ if (file_put_contents($temporary, json_encode($fixture, JSON_PRETTY_PRINT | JSON
 }
 chmod($fixturePath, 0600);
 fwrite(STDOUT, "RC browser fresh synthetic fixture ready.\n");
+

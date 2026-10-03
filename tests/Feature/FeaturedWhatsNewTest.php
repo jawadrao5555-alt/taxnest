@@ -20,7 +20,7 @@ use Tests\TestCase;
  * PRA POS (pos-app) and FBR POS (fbr-pos-app) layouts. Invariants:
  *
  *   1. Unseen featured update → hero popup marker present (both panels).
- *   2. Only non-featured unseen updates → NORMAL popup (no hero marker).
+ *   2. Only non-featured unseen updates → bell history without auto-popup.
  *   3. Featured update already seen → no popup at all (dismiss sticks).
  *   4. Cashier never sees the hero popup (same isPosAdmin gate).
  *   5. While a shared domain/Agent announcement window is live, NO What's New
@@ -268,7 +268,7 @@ class FeaturedWhatsNewTest extends TestCase
     // 2. Non-featured updates keep the NORMAL popup (no hero marker)
     // ════════════════════════════════════════════════════════════════════
 
-    public function test_plain_update_keeps_normal_popup_without_hero_marker(): void
+    public function test_plain_update_stays_in_bell_without_auto_popup(): void
     {
         $this->makeUpdate(self::T_PLAIN, 'pos', false);
 
@@ -277,6 +277,7 @@ class FeaturedWhatsNewTest extends TestCase
         $resp->assertStatus(200);
         $resp->assertSee(self::T_PLAIN);
         $resp->assertDontSee(self::HERO_MARKER, false);
+        $resp->assertDontSee(self::WN_POPUP_MARKER, false);
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -369,5 +370,49 @@ class FeaturedWhatsNewTest extends TestCase
         $after = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
         $after->assertStatus(200);
         $after->assertSee(self::HERO_MARKER, false);
+    }
+
+    public function test_seven_routine_updates_do_not_form_a_refresh_popup_queue(): void
+    {
+        for ($i = 1; $i <= 7; $i++) {
+            $this->makeUpdate('Routine update '.$i, 'all', false);
+        }
+        foreach (['pos' => $this->posAdminId, 'fbrpos' => $this->fbrAdminId] as $guard => $id) {
+            $path = $guard === 'pos' ? '/pos/my-profile' : '/fbr-pos/my-profile';
+            for ($refresh = 0; $refresh < 2; $refresh++) {
+                $response = $this->actingAs(User::find($id), $guard)->get($path);
+                $response->assertOk()->assertSee('Routine update 7')
+                    ->assertDontSee(self::WN_POPUP_MARKER, false);
+            }
+        }
+        $this->assertSame(0, AppUpdateSeen::count(), 'visibility is not proof of reading');
+    }
+
+    public function test_dismissed_featured_update_leaves_routine_updates_without_a_popup(): void
+    {
+        $featured = $this->makeUpdate(self::T_FEATURED_POS, 'pos', true);
+        $this->makeUpdate(self::T_PLAIN, 'pos', false);
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->postJson('/pos/whats-new/seen', ['update_id' => $featured->id])
+            ->assertOk()->assertJson(['ok' => true]);
+        $response = $this->get('/pos/my-profile');
+        $response->assertOk()->assertSee(self::T_PLAIN)
+            ->assertDontSee(self::WN_POPUP_MARKER, false);
+        $this->assertSame(1, AppUpdateSeen::count());
+    }
+
+    public function test_fbr_seen_endpoint_uses_fbr_identity_when_pos_is_also_signed_in(): void
+    {
+        $update = $this->makeUpdate(self::T_FEATURED_FBR, 'fbr_pos', true);
+        \Illuminate\Support\Facades\Auth::guard('pos')->setUser(User::find($this->posAdminId));
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->postJson('/fbr-pos/whats-new/seen', ['update_id' => $update->id])
+            ->assertOk()->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('app_update_seens', [
+            'app_update_id' => $update->id, 'user_id' => $this->fbrAdminId,
+        ]);
+        $this->assertDatabaseMissing('app_update_seens', [
+            'app_update_id' => $update->id, 'user_id' => $this->posAdminId,
+        ]);
     }
 }

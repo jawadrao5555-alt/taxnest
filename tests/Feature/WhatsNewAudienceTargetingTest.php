@@ -72,6 +72,7 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->string('status')->default('approved');
             $table->string('company_status')->default('approved');
             $table->boolean('restaurant_mode')->default(false);
+            $table->boolean('is_internal_account')->default(false);
             $table->boolean('pos_setup_completed')->default(true);
             $table->boolean('fbr_pos_enabled')->default(false);
             $table->boolean('fbr_reporting_enabled')->default(false);
@@ -169,6 +170,8 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->text('points');
             $table->string('image_path')->nullable();
             $table->string('audience')->default('pos');
+            $table->string('audience_family')->nullable();
+            $table->string('notification_key', 64)->nullable()->index();
             $table->string('type', 20)->nullable(); // Task 1286: feature|improvement (null = legacy)
             $table->text('target_categories')->nullable(); // Task 1585: null/[] = all shops
             $table->boolean('is_published')->default(true);
@@ -353,8 +356,8 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
         $this->actingAs(User::find($this->posAdminId), 'pos')
             ->postJson('/pos/whats-new/seen', ['update_id' => $fbrId])
-            ->assertStatus(200)
-            ->assertJson(['ok' => true]);
+            ->assertStatus(404)
+            ->assertJson(['ok' => false]);
 
         $this->assertDatabaseMissing('app_update_seens', [
             'user_id' => $this->posAdminId,
@@ -677,5 +680,51 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
         DB::table('app_updates')->where('id', $upd->id)->update(['type' => 'garbage']);
         $this->assertSame('improvement', $upd->fresh()->type, 'unknown type values must normalize to improvement');
+    }
+
+    public function test_hotel_food_notices_require_an_enabled_food_outlet_and_preserve_category(): void
+    {
+        $this->setCategory($this->posCompanyId, 'hotel');
+        DB::table('companies')->where('id', $this->posCompanyId)->update([
+            'is_internal_account' => true, 'feature_flags' => json_encode(['kitchen' => false, 'kot' => false, 'tables' => false]),
+        ]);
+        AppUpdate::create([
+            'title' => 'WN-HOTEL-ROOMS', 'points' => ['Room operations'],
+            'audience' => 'pos', 'is_published' => true, 'target_categories' => ['hotel'],
+            'audience_family' => 'accommodation',
+        ]);
+        AppUpdate::create([
+            'title' => 'WN-FOOD-FAMILY', 'points' => ['Kitchen operations'],
+            'audience' => 'pos', 'is_published' => true, 'audience_family' => 'food_service',
+        ]);
+        \App\Services\PosFeatureService::flushGateCaches();
+        $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile')
+            ->assertStatus(200)->assertSee('WN-HOTEL-ROOMS')
+            ->assertDontSee('WN-FOOD-FAMILY')->assertDontSee(self::T_RESTAURANT);
+
+        DB::table('companies')->where('id', $this->posCompanyId)->update([
+            'feature_flags' => json_encode(['kitchen' => true, 'kot' => true, 'tables' => true]),
+        ]);
+        \App\Services\PosFeatureService::flushGateCaches();
+        $this->get('/pos/my-profile')->assertStatus(200)->assertSee('WN-HOTEL-ROOMS')
+            ->assertSee('WN-FOOD-FAMILY')->assertSee(self::T_RESTAURANT);
+        $this->assertSame('hotel', DB::table('companies')->where('id', $this->posCompanyId)->value('business_category'));
+
+        // Another tenant remains a pharmacy and receives neither room nor PRA food notices.
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile')
+            ->assertStatus(200)->assertDontSee('WN-HOTEL-ROOMS')->assertDontSee('WN-FOOD-FAMILY');
+    }
+
+    public function test_cached_duplicate_notice_id_acknowledges_the_authorized_canonical_notice(): void
+    {
+        $data = ['title' => 'Cached duplicate notice', 'points' => ['Reception update'],
+            'audience' => 'pos', 'is_published' => true];
+        $original = AppUpdate::create($data);
+        $duplicate = AppUpdate::create($data);
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->postJson('/pos/whats-new/seen', ['update_id' => $duplicate->id])->assertOk();
+        $this->assertDatabaseHas('app_update_seens', ['app_update_id' => $original->id, 'user_id' => $this->posAdminId]);
+        $this->assertContains($duplicate->id, AppUpdate::seenIdsForUser($this->posAdminId));
+        $this->assertDatabaseMissing('app_update_seens', ['user_id' => $this->fbrAdminId, 'app_update_id' => $original->id]);
     }
 }

@@ -131,14 +131,14 @@
                 ->where('created_at', '>=', now()->subDays(\App\Models\AppUpdate::LIVE_DAYS))
                 ->orderByDesc('created_at')->limit(10)->get();
             if ($whatsNewList->isNotEmpty()) {
-                $whatsNewSeenIds = \App\Models\AppUpdateSeen::where('user_id', $posUserLayout->id)
-                    ->whereIn('app_update_id', $whatsNewList->pluck('id'))->pluck('app_update_id')->all();
+                $whatsNewSeenIds = \App\Models\AppUpdate::seenIdsForUser((int) $posUserLayout->id);
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
-                $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null : $whatsNewUnseen->first();
-                // Auto-popup only the latest unseen update. The remaining unread
-                // rows stay unread and can be opened individually from the bell.
-                $whatsNewPopupList = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? collect() : $whatsNewUnseen->take(1)->values();
+                $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null
+                    : $whatsNewUnseen->first(fn ($u) => (bool) ($u->is_featured ?? false));
+                // Routine updates stay in the bell. Only explicitly featured notices
+                // interrupt work; refreshing must not drain the unread queue.
+                $whatsNewPopupList = $whatsNewPopup ? collect([$whatsNewPopup]) : collect();
                 // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
                 // the popup renders in celebratory hero style with that update on top.
                 // ?? false: column may not exist yet mid-deploy (missing attr = null).
@@ -1549,15 +1549,26 @@
             .wnf-cta { position: relative; overflow: hidden; }
             .wnf-cta::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); animation: wnfSheen 2.6s ease-in-out infinite; }
         </style>
-        <div x-data="{ wnOpen: true,
-                wnDismiss() {
+        <div x-data="{ wnOpen: true, wnSaving: false, wnError: '',
+                async wnDismiss() {
+                    if (this.wnSaving) return false;
+                    this.wnSaving = true; this.wnError = '';
+                    try {
+                        const response = await fetch('/pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) });
+                        if (!response.ok || !(await response.json()).ok) throw new Error('Acknowledgement failed');
+                    } catch (error) {
+                        this.wnError = 'Could not save. Please try again.';
+                        return false;
+                    } finally {
+                        this.wnSaving = false;
+                    }
                     const dialog = this.$refs.wnDialog;
                     this.wnOpen = false;
                     this.$nextTick(() => window.TnModalA11y.close(dialog));
-                    fetch('/pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) }).catch(() => {});
                     @if($surveyPopup && !$surveyDismissedSession) window.dispatchEvent(new CustomEvent('open-pos-survey')); @endif
+                    return true;
                 },
-                wnTry(url) { this.wnDismiss(); window.location.href = url; } }"
+                async wnTry(url) { if (await this.wnDismiss()) window.location.href = url; } }"
              x-show="wnOpen" x-cloak data-wn-featured="1" x-ref="wnDialog"
              x-init="$nextTick(() => window.TnModalA11y.open($refs.wnDialog))"
              @keydown.tab="window.TnModalA11y.trap($event, $refs.wnDialog)"
@@ -1623,7 +1634,8 @@
                             style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 48%), hsl(var(--accent-h), var(--accent-s), 32%)); box-shadow: 0 10px 24px -8px hsla(var(--accent-h), var(--accent-s), 40%, 0.6);">
                         {{ __('pos.wn_featured_try_now') }} →
                     </button>
-                    <button @click="wnDismiss()"
+                    <p x-show="wnError" x-text="wnError" role="alert" class="text-sm text-red-600 mb-2"></p>
+                    <button :disabled="wnSaving" @click="wnDismiss()"
                             class="px-4 py-3.5 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition cursor-pointer">
                         {{ __('pos.whats_new_got_it') }}
                     </button>
@@ -1632,7 +1644,7 @@
         </div>
         @else
         {{-- One-time "What's New" popup — dismiss marks ALL current updates seen (per user) --}}
-        <div x-data="{ wnOpen: true,
+        <div x-data="{ wnOpen: true, wnSaving: false, wnError: '',
                 wnDismiss() {
                     const dialog = this.$refs.wnDialog;
                     this.wnOpen = false;
@@ -1688,7 +1700,8 @@
                     @endforeach
                 </div>
                 <div class="px-6 pb-5">
-                    <button @click="wnDismiss()" x-ref="wnBtn" x-init="$nextTick(() => $refs.wnBtn.focus())"
+                    <p x-show="wnError" x-text="wnError" role="alert" class="text-sm text-red-600 mb-2"></p>
+                    <button :disabled="wnSaving" @click="wnDismiss()" x-ref="wnBtn" x-init="$nextTick(() => $refs.wnBtn.focus())"
                             class="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-sm transition cursor-pointer">
                         {{ __('pos.whats_new_got_it') }}
                     </button>

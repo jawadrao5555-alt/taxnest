@@ -19,8 +19,22 @@ class AdminAnnouncementAudienceTest extends TestCase
         Schema::create('companies', function (Blueprint $t) {
             $t->id(); $t->string('name'); $t->string('product_type')->nullable();
             $t->string('business_category')->nullable(); $t->string('pos_type')->nullable();
+            $t->json('feature_flags')->nullable(); $t->json('pos_module_extras')->nullable();
+            $t->boolean('is_internal_account')->default(false);
             $t->softDeletes(); $t->timestamps();
         });
+        Schema::create('pricing_plans', function (Blueprint $t) {
+            $t->id(); $t->string('name'); $t->boolean('is_trial')->default(false);
+            $t->boolean('restaurant_enabled')->default(false); $t->boolean('pharmacy_enabled')->default(false);
+            $t->timestamps();
+        });
+        Schema::create('subscriptions', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->unsignedBigInteger('pricing_plan_id')->nullable();
+            $t->boolean('active')->default(true); $t->date('end_date')->nullable();
+            $t->timestamp('trial_ends_at')->nullable(); $t->string('override_type')->default('none');
+            $t->timestamp('override_until')->nullable(); $t->timestamps();
+        });
+        \App\Services\PosFeatureService::flushGateCaches();
         Schema::create('admin_announcements', function (Blueprint $t) {
             $t->id(); $t->string('title'); $t->text('message'); $t->string('type');
             $t->string('target'); $t->unsignedBigInteger('target_company_id')->nullable();
@@ -134,5 +148,44 @@ class AdminAnnouncementAudienceTest extends TestCase
             ->assertOk()->assertJsonPath('count', 1)->assertJsonPath('examples.0', 'Hotel PRA');
         $this->postJson('/admin/app-updates/audience-preview', array_merge($data, ['target_categories' => []]))
             ->assertUnprocessable()->assertJsonValidationErrors('target_categories');
+    }
+
+    public function test_food_preview_requires_the_hotels_effective_package_and_module_access(): void
+    {
+        $locked = $this->company('Hotel without restaurant package', 'pos', 'hotel');
+        $covered = $this->company('Hotel with restaurant package', 'pos', 'hotel');
+        foreach ([$locked, $covered] as $hotel) {
+            DB::table('companies')->where('id', $hotel->id)->update([
+                'feature_flags' => json_encode(['kitchen' => true, 'kot' => true, 'tables' => true]),
+                'pos_module_extras' => json_encode([
+                    'kitchen' => ['source' => 'admin'], 'kot' => ['source' => 'admin'], 'tables' => ['source' => 'admin'],
+                ]),
+            ]);
+            $plan = DB::table('pricing_plans')->insertGetId([
+                'name' => 'Synthetic package '.$hotel->id, 'restaurant_enabled' => $hotel->id === $covered->id,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            DB::table('subscriptions')->insert([
+                'company_id' => $hotel->id, 'pricing_plan_id' => $plan, 'active' => true,
+                'end_date' => now()->addMonth()->toDateString(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        DB::table('admin_users')->insert([
+            'name' => 'Owner', 'email' => 'owner@example.test', 'password' => bcrypt('secret'),
+            'role' => 'super_admin', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs(AdminUser::first(), 'admin');
+        $food = ['audience' => 'pos', 'audience_family' => 'food_service',
+            'audience_scope' => 'cats', 'target_categories' => ['restaurant']];
+        \App\Services\PosFeatureService::flushGateCaches();
+        $this->postJson('/admin/app-updates/audience-preview', $food)
+            ->assertOk()->assertJsonPath('count', 1)->assertJsonPath('examples.0', $covered->name);
+
+        // A stored outlet toggle does not bypass a package downgrade.
+        DB::table('pricing_plans')->where('restaurant_enabled', true)->update(['restaurant_enabled' => false]);
+        \App\Services\PosFeatureService::flushGateCaches();
+        $this->postJson('/admin/app-updates/audience-preview', $food)->assertOk()->assertJsonPath('count', 0);
+        $this->assertSame('hotel', $covered->fresh()->business_category);
+        $this->assertTrue((bool) $covered->fresh()->feature_flags['kitchen'], 'the saved setup survives plan masking');
     }
 }

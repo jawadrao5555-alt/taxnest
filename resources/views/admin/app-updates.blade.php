@@ -140,7 +140,11 @@
                                         @endif
                                         {{-- 7-day live window indicator (Task 1286): what POS users can still see --}}
                                         @php $updLive = $upd->is_published && $upd->created_at->gte(now()->subDays(\App\Models\AppUpdate::LIVE_DAYS)); @endphp
-                                        @if($updLive)
+                                        @if($upd->archived_at)
+                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500">Archived — history only</span>
+                                        @elseif($upd->isCustomerDuplicate())
+                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">Duplicate — history only</span>
+                                        @elseif($updLive)
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-bold text-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">● Live on POS</span>
                                         @elseif($upd->is_published)
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400" title="Published updates auto-disappear from POS users {{ \App\Models\AppUpdate::LIVE_DAYS }} days after publish (history stays here)">Expired ({{ \App\Models\AppUpdate::LIVE_DAYS }} din guzar gaye)</span>
@@ -155,7 +159,7 @@
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
                                             @php $updExpired = $upd->created_at->lt(now()->subDays(\App\Models\AppUpdate::LIVE_DAYS)); @endphp
                                             <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline"
-                                                @if(!$upd->is_published && $updExpired) onsubmit="return confirm('Yeh update {{ \App\Models\AppUpdate::LIVE_DAYS }} din se purana hai — publish karne se DOBARA ELAAN hoga: 7-din ka clock restart hoga aur sab POS users ko popup + bell dobara dikhega. Jaari rakhein?');" @endif>
+                                                @if(!$upd->is_published && $updExpired) onsubmit="return confirm('Yeh update {{ \App\Models\AppUpdate::LIVE_DAYS }} din se purana hai — publish karne se DOBARA ELAAN hoga: Nayi revision publish hogi; purana history aur dismiss record mehfooz rahega. Jaari rakhein?');" @endif>
                                                 @csrf
                                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium {{ $upd->is_published ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200' }}">
                                                     {{ $upd->is_published ? 'Unpublish' : ($updExpired ? 'Publish (dobara elaan)' : 'Publish') }}
@@ -163,15 +167,15 @@
                                             </form>
                                             @if($upd->is_published && $updExpired)
                                                 {{-- Task 1295: expired-but-published rows need a dedicated re-announce (toggle would just unpublish) --}}
-                                                <form method="POST" action="/admin/app-updates/{{ $upd->id }}/reannounce" class="inline" onsubmit="return confirm('Dobara elaan karein? 7-din ka clock restart hoga aur sab POS users ko popup + bell dobara dikhega (pehle wale dismiss reset ho jayenge).');">
+                                                <form method="POST" action="/admin/app-updates/{{ $upd->id }}/reannounce" class="inline" onsubmit="return confirm('Dobara elaan karein? Nayi revision publish hogi; purana history aur dismiss record mehfooz rahega.');">
                                                     @csrf
                                                     <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 hover:bg-emerald-200">Dobara Elaan Karein</button>
                                                 </form>
                                             @endif
-                                            <form method="POST" action="/admin/app-updates/{{ $upd->id }}/delete" class="inline" onsubmit="return confirm('Delete this update permanently?');">
+                                            <form method="POST" action="/admin/app-updates/{{ $upd->id }}/delete" class="inline" onsubmit="return confirm('Archive this announcement? Customer delivery will stop; history and acknowledgements will remain.');">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200">Delete</button>
+                                                <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200">Archive</button>
                                             </form>
                                         </div>
                                     </td>

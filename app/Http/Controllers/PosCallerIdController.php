@@ -780,6 +780,7 @@ class PosCallerIdController extends Controller
     /** POST /pos/settings/caller-id (+ FBR twin) {enabled} — admin-only toggle. */
     public function toggle(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         // Company-wide integration switch = admin/manager ONLY. A cashier with
         // custom 'customize' access passes posCashierBlocked(), so enforce the
         // same isPosAdmin() boundary the app-login uses.
@@ -1196,6 +1197,7 @@ class PosCallerIdController extends Controller
      */
     public function revokeDevice(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = $this->panelUser();
         if (!$user || !$user->isPosAdmin() || $user->posCashierBlocked()) {
             return response()->json(['ok' => false], 403);
@@ -1356,3 +1358,4 @@ class PosCallerIdController extends Controller
         ];
     }
 }
+

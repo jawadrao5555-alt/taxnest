@@ -70,6 +70,7 @@ class PosController extends Controller
     }
     public function updateTheme(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), false);
         $theme = $request->input('theme', 'purple');
         $allowed = ['purple', 'blue', 'emerald', 'orange', 'midnight', 'rose'];
         if (!in_array($theme, $allowed)) {
@@ -118,6 +119,7 @@ class PosController extends Controller
 
     public function updateDashboardStyle(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin']);
         if (!$isAdmin) {
@@ -135,6 +137,7 @@ class PosController extends Controller
 
     public function updateGuidedFlow(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -152,6 +155,7 @@ class PosController extends Controller
      */
     public function updateQuickType(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -170,6 +174,7 @@ class PosController extends Controller
      */
     public function updateReceiptAutoclose(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), false);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -198,6 +203,7 @@ class PosController extends Controller
      */
     public function toggleCashReceived(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -221,6 +227,7 @@ class PosController extends Controller
      */
     public function toggleWhatsappBill(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), false);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -259,6 +266,7 @@ class PosController extends Controller
      */
     public function updateTaxPricingMode(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), false);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -293,6 +301,7 @@ class PosController extends Controller
 
     public function updateRestockToggle(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -305,6 +314,7 @@ class PosController extends Controller
 
     public function updateInventoryToggle(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -331,6 +341,7 @@ class PosController extends Controller
      */
     public function receiptSettings(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can change receipt settings.');
@@ -646,6 +657,7 @@ class PosController extends Controller
      */
     public function printerSettings(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can change printer settings.');
@@ -1673,6 +1685,10 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
+        if (\App\Services\HotelShell::isNativeCategory($company)) {
+            $hotelSettings = \App\Services\HotelSettingsProfile::for($company, $user);
+            return view('pos.hotel.settings', compact('company', 'hotelSettings'));
+        }
         // Local Billing card (Task 1358): archived local bills silently reserve
         // their L-numbers, so the card explains WHY the series is stuck and offers
         // the clear action. count 0 = nothing to show.
@@ -3155,6 +3171,7 @@ class PosController extends Controller
 
     public function featureSettings(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can customize POS features.');
@@ -3194,6 +3211,7 @@ class PosController extends Controller
 
     public function updateFeatureSettings(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can customize POS features.');
@@ -8528,6 +8546,11 @@ class PosController extends Controller
      */
     public function toggleKdsAutoPrint(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
+        $settingCompany = Company::find(app('currentCompanyId'));
+        if (\App\Services\HotelShell::isNativeCategory($settingCompany)) {
+            abort_unless(\App\Services\PosFeatureService::moduleAvailable($settingCompany, 'kot'), 403, __('pos.access_denied'));
+        }
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -8555,6 +8578,7 @@ class PosController extends Controller
      */
     public function toggleWaiterPermission(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         // Waiter PERMISSION toggles are strictly admin/manager territory —
         // stricter than posCashierBlocked(): a Custom-Access-granted cashier
         // may reach other settings, but must never grant waiters abilities.
@@ -8584,6 +8608,7 @@ class PosController extends Controller
 
     public function updateLocalBillingSettings(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertAccountWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -8617,6 +8642,7 @@ class PosController extends Controller
      */
     public function updateLocalNumberStyle(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertAccountWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -8865,6 +8891,7 @@ class PosController extends Controller
      */
     public function clearCustomerSpendRecords(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertAccountWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         // Same bar as clearArchivedLocalBills: this is a permanent delete, so
         // custom-access cashiers are out too.
         $user = auth('pos')->user();
@@ -8900,6 +8927,7 @@ class PosController extends Controller
      */
     public function clearArchivedLocalBills(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertAccountWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         // Stricter than the sibling settings endpoints' posCashierBlocked(): this
         // permanently deletes bills, so custom-access cashiers are out too.
         $user = auth('pos')->user();
@@ -9037,6 +9065,7 @@ class PosController extends Controller
      */
     public function resetLocalNumbering(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertAccountWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $user = auth('pos')->user();
         if (!$user || !$user->isPosAdmin()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -9074,6 +9103,7 @@ class PosController extends Controller
      */
     public function toggleAutoDayclose(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -9163,6 +9193,7 @@ class PosController extends Controller
      */
     public function toggleCashierDayclose(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -9192,6 +9223,7 @@ class PosController extends Controller
      */
     public function toggleCashierOrderCancel(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user(), true);
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -13034,6 +13066,7 @@ class PosController extends Controller
 
     public function businessProfile(Request $request)
     {
+        \App\Services\HotelSettingsProfile::assertWrite(Company::find(app('currentCompanyId')), auth('pos')->user());
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 

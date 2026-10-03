@@ -101,7 +101,8 @@ class HotelSettingsCategoryTest extends TestCase
     public function test_rooms_only_property_has_six_groups_and_preserves_saved_settings(): void
     {
         [$company, $owner] = $this->fixture(['pos_theme' => 'blue', 'pos_quick_type_enabled' => true]);
-        $before = $company->getAttributes();
+        $company->forceFill(['pos_quick_type_enabled' => true])->save();
+        $before = $company->fresh()->getAttributes();
         $response = $this->actingAs($owner, 'pos')->get('/pos/customize');
         $response->assertOk()->assertViewIs('pos.hotel.settings')
             ->assertSee('data-hotel-settings="1"', false)
@@ -133,7 +134,7 @@ class HotelSettingsCategoryTest extends TestCase
         $company = $this->company('hotel', ['feature_flags' => $flags]);
         $owner = $this->owner($company);
         $this->actingAs($owner, 'pos')->get('/pos/customize')->assertOk()->assertViewIs('pos.hotel.settings');
-        $cashier = $this->staff($company, 'pos_cashier', ['hotel', 'settings']);
+        $cashier = $this->staff($company, 'pos_cashier', ['hotel', 'customize']);
         $this->actingAs($cashier, 'pos')->postJson('/pos/settings/theme', ['theme' => 'rose'])->assertForbidden();
         $this->assertFalse((bool) $company->fresh()->feature_flags['rooms']);
     }
@@ -191,11 +192,13 @@ class HotelSettingsCategoryTest extends TestCase
     public function test_reception_and_housekeeping_cannot_write_property_settings(): void
     {
         [$company] = $this->fixture(['pos_theme' => 'blue']);
-        foreach ([['hotel', 'settings'], ['hotel_housekeeping', 'settings']] as $custom) {
+        foreach ([['hotel', 'customize'], ['hotel_housekeeping', 'customize']] as $custom) {
             $staff = $this->staff($company, 'pos_cashier', $custom);
             $this->actingAs($staff, 'pos')->get('/pos/customize')->assertForbidden();
             $this->postJson('/pos/settings/theme', ['theme' => 'rose'])->assertForbidden();
             $this->postJson('/pos/settings/tax-pricing-mode', ['mode' => 'inclusive'])->assertForbidden();
+            $path = in_array('hotel', $custom, true) ? '/pos/hotel' : '/pos/hotel/housekeeping';
+            $this->get($path)->assertOk()->assertDontSee('data-tn-topnav-control="theme"', false);
         }
         $this->assertSame('blue', $company->fresh()->pos_theme);
     }

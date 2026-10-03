@@ -69,6 +69,7 @@ class HealthAuth
         }
 
         app()->instance('currentCompanyId', $user->company_id);
+        app()->instance('currentBranchGuard', 'health');
 
         // Active branch comes from the shared platform service — healthcare
         // never keeps its own idea of "which branch am I in".

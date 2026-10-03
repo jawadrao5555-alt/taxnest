@@ -13,6 +13,7 @@
 ])
 @php
     $svc = app(\App\Services\BranchContextService::class);
+    $panelGuard = $svc->currentGuard();
     $branches = $svc->accessibleBranches();
     $current = $currentBranch ?? null;
     $canSwitch = $svc->canSwitch();
@@ -67,6 +68,7 @@
                 <form method="POST" action="/branch/switch" class="block">
                     @csrf
                     <input type="hidden" name="branch_id" value="all">
+                    <input type="hidden" name="panel_guard" value="{{ $panelGuard }}">
                     <button type="submit"
                         class="w-full text-left px-4 py-2.5 hover:{{ $c['bg'] }} flex items-center justify-between gap-3 {{ $allActive ? $c['bg'] : '' }}">
                         <div class="min-w-0">
@@ -83,6 +85,7 @@
                 <form method="POST" action="/branch/switch" class="block">
                     @csrf
                     <input type="hidden" name="branch_id" value="{{ $b->id }}">
+                    <input type="hidden" name="panel_guard" value="{{ $panelGuard }}">
                     <button type="submit"
                         class="w-full text-left px-4 py-2.5 hover:{{ $c['bg'] }} flex items-center justify-between gap-3 {{ $current && $current->id === $b->id ? $c['bg'] : '' }}">
                         <div class="min-w-0">

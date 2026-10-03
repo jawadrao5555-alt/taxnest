@@ -11,7 +11,15 @@ class BranchSwitchController extends Controller
     {
         // Task 1347: 'all' is the owner-only company-wide view (PRA POS panel);
         // every other value must be a branch id the user may actually reach.
-        $request->validate(['branch_id' => 'required']);
+        $request->validate([
+            'branch_id' => 'required',
+            'panel_guard' => 'nullable|in:pos,fbrpos,health,web',
+        ]);
+        // The shared route has no panel middleware. Old single-login clients
+        // remain valid; multiple logins must identify their originating panel.
+        $guard = $request->input('panel_guard') ?: $svc->currentGuard();
+        abort_unless($guard, 403);
+        $svc->useGuard($guard);
         $raw = $request->input('branch_id');
         $target = $raw === BranchContextService::ALL ? BranchContextService::ALL : (int) $raw;
 

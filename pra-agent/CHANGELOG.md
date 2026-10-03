@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.16 (2026-10-03)
+**Release the reviewed Agent security updates under a new immutable version**
+
+- Package the dependency security updates and native LAN certificate implementation merged in PR #144. The previously published v1.13.15 release and its assets remain unchanged.
+- Existing LAN certificate identity and pairing pins are reused; company, device and printer configuration is preserved.
+- Replace the build-only legacy Electron downloader chain with the checksum-verified downloader already used by Electron. No further updater or printing behavior changes. Windows packaging and installation require the owner-approved release flow and a real test PC before claiming field verification.
+
 ## v1.13.15 (2026-09-28)
 **Scoped IMS display and verified Windows update handoff**
 

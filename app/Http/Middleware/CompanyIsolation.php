@@ -12,6 +12,7 @@ class CompanyIsolation
     {
         if (auth()->check()) {
             $user = auth()->user();
+            app()->instance('currentBranchGuard', 'web');
 
             if (!$user->is_active) {
                 auth()->logout();

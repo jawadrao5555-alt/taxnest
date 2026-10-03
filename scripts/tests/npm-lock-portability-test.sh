@@ -25,6 +25,9 @@ for lock in "${locks[@]}"; do
   cp "$ROOT/${lock%package-lock.json}package.json" "$tmp/${lock%package-lock.json}package.json"
 done
 
+mkdir -p "$tmp/tools/npm-patches"
+cp -R "$ROOT/tools/npm-patches/braces" "$tmp/tools/npm-patches/braces"
+
 "$NODE_BIN" "$GUARD" --root "$tmp"
 
 "$NODE_BIN" - "$tmp/package-lock.json" <<'NODE'
@@ -45,3 +48,11 @@ if "$NODE_BIN" "$GUARD" --root "$tmp" >/dev/null 2>&1; then
 fi
 
 echo "NPM LOCK PORTABILITY ISOLATED REGRESSION TEST PASSED"
+# A reviewed local fork must fail closed when even one source byte changes.
+cp "$ROOT/package-lock.json" "$tmp/package-lock.json"
+printf "\\n// unauthorized change\\n" >> "$tmp/tools/npm-patches/braces/lib/parse.js"
+if "$NODE_BIN" "$GUARD" --root "$tmp" >/dev/null 2>&1; then
+  echo "NPM LOCK GUARD FAILED to reject modified local fork source" >&2
+  exit 1
+fi
+echo "REVIEWED LOCAL FORK SOURCE-INTEGRITY REGRESSION PASSED"

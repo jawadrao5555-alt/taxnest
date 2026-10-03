@@ -463,6 +463,12 @@ async function tableOrderWorkflow(page,t,v) {
     await root.getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
     if(!await page.locator('[data-video="open-payment"]').isEnabled())throw new Error(expected.status+' table lost its payment action');
     pass(t.name+'/'+v.width+': '+expected.status+' exact occupied table opened with items and enabled payment');
+    if(v.width<768) {
+      // Return through the real mobile cart back button before opening another table.
+      // The Dine-in selector belongs to the menu pane and is hidden while the cart is open.
+      await root.locator('.tn-cart-header > button').first().click();
+      await page.locator('[data-video="counter-dine-in"]').waitFor({state:'visible'});
+    }
   }
 }
 async function categoryMismatch(page,t,v) {

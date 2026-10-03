@@ -1685,7 +1685,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
-        if (\App\Services\HotelShell::isNativeCategory($company)) {
+        if (\App\Services\HotelSettingsProfile::isAccommodation($company)) {
             $hotelSettings = \App\Services\HotelSettingsProfile::for($company, $user);
             return view('pos.hotel.settings', compact('company', 'hotelSettings'));
         }

@@ -8,6 +8,11 @@ use App\Models\User;
 /** Presentation and write gates only; never rewrite stored company flags. */
 class HotelSettingsProfile
 {
+    public static function isAccommodation(?Company $company): bool
+    {
+        return $company && PosFeatureService::profileCategory($company) === 'hotel';
+    }
+
     public static function for(Company $company, User $user): array
     {
         abort_unless($user->isPosAdmin(), 403, __('pos.only_admin_change_setting'));
@@ -31,14 +36,14 @@ class HotelSettingsProfile
     public static function assertAccountWrite(?Company $company, ?User $user): void
     {
         self::assertWrite($company, $user);
-        if (HotelShell::isNativeCategory($company)) {
+        if (self::isAccommodation($company)) {
             abort_unless($user && ($user->role === 'company_admin' || $user->pos_role === 'pos_admin'), 403, __('pos.access_denied'));
         }
     }
 
     public static function assertWrite(?Company $company, ?User $user, bool $outletOnly = false): void
     {
-        if (!HotelShell::isNativeCategory($company)) {
+        if (!self::isAccommodation($company)) {
             return; // Other categories retain their existing authorization.
         }
         abort_unless($user?->isPosAdmin(), 403, __('pos.only_admin_change_setting'));

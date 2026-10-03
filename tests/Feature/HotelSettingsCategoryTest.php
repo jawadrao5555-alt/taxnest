@@ -126,6 +126,18 @@ class HotelSettingsCategoryTest extends TestCase
         $this->assertEquals($flags, $company->fresh()->feature_flags);
     }
 
+    public function test_disabled_rooms_flag_keeps_category_settings_and_role_gates(): void
+    {
+        $flags = PosFeatureService::defaultsForCategory('hotel');
+        $flags['rooms'] = false;
+        $company = $this->company('hotel', ['feature_flags' => $flags]);
+        $owner = $this->owner($company);
+        $this->actingAs($owner, 'pos')->get('/pos/customize')->assertOk()->assertViewIs('pos.hotel.settings');
+        $cashier = $this->staff($company, 'pos_cashier', ['hotel', 'settings']);
+        $this->actingAs($cashier, 'pos')->postJson('/pos/settings/theme', ['theme' => 'rose'])->assertForbidden();
+        $this->assertFalse((bool) $company->fresh()->feature_flags['rooms']);
+    }
+
     public function test_room_only_property_rejects_direct_outlet_setting_writes(): void
     {
         [$company, $owner] = $this->fixture();

@@ -371,6 +371,7 @@ async function notificationWorkflow(page, t, v, diagnostics) {
 async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   await page.goto(baseUrl+'/pos/customize',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
+  await dismiss(page);
   const root=page.locator('[data-hotel-settings="1"]');
   await root.waitFor({state:'visible'});
   if(await root.locator('[data-hotel-settings-card]').count()!==6)throw new Error('Hotel settings must have exactly six primary groups');
@@ -378,12 +379,18 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   if(await root.locator('[data-hotel-settings-advanced]').getAttribute('open')!==null)throw new Error('Advanced settings were expanded by default');
   const appearance=root.locator('[data-hotel-settings-card="appearance"]');
   await appearance.locator('summary').click();
+  pass(t.name+'/'+v.width+': Appearance opened through an actual pointer click');
   const rose=appearance.locator('[data-hotel-theme="rose"]');
   const themeUrl=baseUrl+'/pos/settings/theme';
   await page.route('**/pos/settings/theme',route=>route.fulfill({status:500,contentType:'application/json',body:'{"success":false,"message":"Synthetic failed save"}'}));
   const [failure]=await Promise.all([page.waitForResponse(r=>r.url()===themeUrl&&r.request().method()==='POST'),rose.click()]);
   if(failure.status()!==500)throw new Error('Failed-save probe did not inject expected response');
   await root.locator('[role="alert"]:visible').waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelector('[data-hotel-theme="rose"]')?.disabled===false,null,{timeout:5000}).catch(async error=>{
+    const state=await root.evaluate(el=>{const d=window.Alpine.$data(el);return {busy:d.busy,status:d.status,error:d.error};});
+    throw new Error('Failed save did not release theme control: '+JSON.stringify(state)+'; '+error.message);
+  });
+  pass(t.name+'/'+v.width+': injected failure kept the control usable for retry');
   if(await page.locator('body').getAttribute('data-theme')!=='blue')throw new Error('Unconfirmed theme save changed appearance');
   if(await appearance.locator('[data-hotel-theme="blue"]').getAttribute('aria-pressed')!=='true')throw new Error('Failed save changed selected colour');
   await page.unroute('**/pos/settings/theme');
@@ -397,6 +404,7 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   await page.waitForFunction(()=>document.body.getAttribute('data-theme')==='rose');
   await page.reload({waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
+  await dismiss(page);
   if(await page.locator('body').getAttribute('data-theme')!=='rose')throw new Error('Confirmed theme was lost after refresh');
   // Restore the fictional fixture so both viewport runs exercise the same initial value.
   await root.locator('[data-hotel-settings-card="appearance"] summary').click();
@@ -504,4 +512,3 @@ async function one(browser,label,v,t) {
 const {browser}=await launchLocalBrowser();
 try { for(const [label,v]of views)for(const t of cases)await one(browser,label,v,t); for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
-

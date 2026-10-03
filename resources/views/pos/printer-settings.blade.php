@@ -463,7 +463,7 @@
                     <p class="text-[11px] text-amber-700 dark:text-amber-300">{{ __('pos.print_no_document') }} · {{ __('pos.print_no_document_reason_'.$job->no_document_reason) }}</p>
                     @endif
                 </div>
-                <span class="text-[11px] font-semibold whitespace-nowrap {{ $state['tone'] === 'rose' ? 'text-red-600' : ($state['tone'] === 'amber' ? 'text-amber-600' : 'text-emerald-600') }}">{{ $state['label'] }}</span>
+                <span class="text-[11px] font-semibold max-w-[50%] shrink-0 text-right {{ $state['tone'] === 'rose' ? 'text-red-600' : ($state['tone'] === 'amber' ? 'text-amber-600' : 'text-emerald-600') }}">{{ $state['label'] }}</span>
             </div>
             @endforeach
         </div>

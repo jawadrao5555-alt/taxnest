@@ -270,6 +270,7 @@ jobs:
           node-version: '22.23.2'
       - name: Install locked platform-independent test dependencies
         run: |
+          bash scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund
           (cd pra-agent && bash ../scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund)
           (cd agent-realtime-gateway && bash ../scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund)
       - name: Run PRA Agent JavaScript tests with egress blocked

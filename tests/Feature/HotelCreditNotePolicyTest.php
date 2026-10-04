@@ -271,6 +271,14 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
     }
 
+    public function test_archiving_keeps_original_guest_money_accounted_for(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        $bill->update(['is_archived' => true, 'archived_at' => now()]);
+        $this->assertEquals(0, app(\App\Services\HotelFolioInvoiceService::class)->availableTowardFiscal($stay));
+        $this->assertDatabaseMissing('hotel_credit_notes', ['stay_id' => $stay->id]);
+    }
+
     private function company(string $category, array $overrides = []): Company
     {
         $defaults = PosFeatureService::defaultsForCategory($category);

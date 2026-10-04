@@ -269,7 +269,7 @@ class HotelFolioInvoiceService
         }
         $prior = 0.0;
         if ($txnIds !== []) {
-            $prior = (float) PosTransaction::where('company_id', $stay->company_id)
+            $prior = (float) PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
                 ->whereIn('id', array_keys($txnIds))
                 ->selectRaw("SUM(CASE WHEN transaction_type = 'return' THEN -total_amount ELSE total_amount END) AS net_total")->value('net_total');
         }

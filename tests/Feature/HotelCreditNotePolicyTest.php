@@ -124,6 +124,7 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertSame($note->id, $same->id);
         $credit = PosTransaction::findOrFail($note->credit_transaction_id);
         $this->assertEquals(1000, $credit->total_amount);
+        $this->assertEquals(1000, app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['total_stay']);
         $this->assertSame('hotel_credit_note', $credit->payment_method);
         $this->assertSame('checked_in', $stay->fresh()->status);
         $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
@@ -276,6 +277,7 @@ class HotelCreditNotePolicyTest extends TestCase
         [$stay, $owner, $bill] = $this->fixture();
         $bill->update(['is_archived' => true, 'archived_at' => now()]);
         $this->assertEquals(0, app(\App\Services\HotelFolioInvoiceService::class)->availableTowardFiscal($stay));
+        $this->assertEquals($bill->total_amount, app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['total_stay']);
         $this->assertDatabaseMissing('hotel_credit_notes', ['stay_id' => $stay->id]);
     }
 

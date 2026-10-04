@@ -318,6 +318,24 @@ async function hotelWorkflow(page, t, v) {
   if (!await page.locator('a[href*="/pos/transaction/"]').count()) throw new Error('Checkout must expose the issued receipt');
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
   pass(`${t.name}/${v.width}: room check-in, edited rate, discount, advance, card checkout and receipt passed`);
+  // Correct the actual fictional issued stay through the owner UI, not mocks.
+  await page.goto(baseUrl + stayPath + '/correction', {waitUntil:'domcontentloaded'});
+  await dismiss(page);
+  const correction = page.locator('[data-hotel-correction="1"] form');
+  await correction.locator('[name="reason"]').fill('Synthetic duplicate stay correction');
+  await correction.locator('[name="payment_method"]').selectOption('card');
+  await correction.locator('[name="confirmed"]').check();
+  await saveEvidenceScreenshot(page, `hotel-correction-${v.width}-preview.png`);
+  await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000,waitUntil:'domcontentloaded'}), correction.locator('button').click()]);
+  await dismiss(page);
+  if (!await page.locator('a[href*="/pos/transaction/"]').count()) throw new Error('Correction erased the source receipt');
+  await page.goto(baseUrl + stayPath + '/correction', {waitUntil:'domcontentloaded'});
+  await dismiss(page);
+  await page.locator('[data-hotel-correction="1"] [role="alert"]').waitFor({state:'visible'});
+  if (await page.locator('[data-hotel-correction="1"] form').count()) throw new Error('Corrected stay can be reversed twice');
+  if (!(await page.locator('[data-hotel-correction="1"]').innerText()).includes('Rs 0.00')) throw new Error('Corrected charges/money did not become zero');
+  pass(`${t.name}/${v.width}: actual owner correction preserved source bill and prevented repeated reversal`);
+
 }
 async function notificationWorkflow(page, t, v, diagnostics) {
   const panel=t.notificationWorkflow, prefix=panel==='fbr'?'/fbr-pos':'/pos';

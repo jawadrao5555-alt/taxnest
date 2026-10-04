@@ -557,6 +557,32 @@ class HotelController extends Controller
         return back()->with('success', __('pos.hotel_cancelled'));
     }
 
+    public function correctionPreview(int $id)
+    {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        $stay = $this->stay($id);
+        $plan = app(\App\Services\HotelCorrectionService::class)->preview($stay, auth('pos')->user());
+        return view('pos.hotel.correction', compact('stay', 'plan'));
+    }
+
+    public function correctStay(Request $request, int $id)
+    {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        $data = $request->validate([
+            'reason' => 'required|string|min:5|max:255',
+            'fingerprint' => 'required|string|size:64',
+            'payment_method' => 'required|in:cash,card',
+            'confirmed' => 'accepted',
+        ]);
+        $stay = $this->stay($id);
+        try {
+            app(\App\Services\HotelCorrectionService::class)->correct($stay, auth('pos')->user(), $data['fingerprint'], $data['reason'], $data['payment_method']);
+        } catch (HotelStayException $e) {
+            return redirect()->route('pos.hotel.stays.correction', $stay->id)->with('error', $e->getMessage());
+        }
+        return redirect()->route('pos.hotel.stays.show', $stay->id)->with('success', __('hotel_correction.done'));
+    }
+
     public function voidErroneousStay(Request $request, int $id)
     {
         HotelAccessService::abortUnlessManageRooms(auth('pos')->user());

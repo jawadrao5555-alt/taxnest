@@ -682,4 +682,92 @@ class HotelGuestHouseV1Test extends TestCase
             ->assertSee('ROOM-A-11', false)
             ->assertDontSee('ROOM-B-99', false);
     }
+
+    public function test_owner_correction_reverses_issued_sale_payment_and_deposit_once(): void
+    {
+        $company = $this->company('hotel', ['pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0]);
+        $owner = $this->owner($company);
+        $stays = app(HotelStayService::class);
+        $folio = app(HotelFolioService::class);
+        $room = $this->room($stays, $company, 'COR-1', 4000);
+        $stay = $stays->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => '2026-10-04', 'check_out_date' => '2026-10-06',
+            'guest_name' => 'Synthetic correction guest', 'walk_in' => true,
+        ]);
+        $folio->postPayment($stay, ['amount' => 8000, 'payment_method' => 'cash'], (int) $owner->id);
+        $folio->postDeposit($stay, ['amount' => 2000, 'payment_method' => 'cash'], (int) $owner->id);
+        $issued = $folio->settleCoveredCharges($stay, (int) $owner->id, 'cash');
+        $this->assertNotNull($issued['transaction']);
+        $service = app(\App\Services\HotelCorrectionService::class);
+        $plan = $service->preview($stay->fresh(), $owner);
+        $this->assertNull($plan['blocked']);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/'.$stay->id.'/correction')->assertOk()->assertSee('data-hotel-correction', false);
+        $results = $service->correct($stay, $owner, $plan['fingerprint'], 'Duplicate synthetic entry', 'cash');
+        $this->assertCount(1, $results);
+        $this->assertSame('return', $results[0]['return']->transaction_type);
+        $this->assertEquals(8000, $results[0]['return']->total_amount);
+        $this->assertSame($issued['transaction']->id, $results[0]['return']->parent_transaction_id);
+        $totals = $folio->totals($stay->fresh());
+        $this->assertEquals(0, $totals['charges']);
+        $this->assertEquals(0, $totals['invoiced']);
+        $this->assertEquals(0, $totals['deposit_held']);
+        $this->assertEquals(8000, $totals['refunds']);
+        $this->assertSame('cancelled', $stay->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'hotel_stay_corrected', 'entity_id' => $stay->id, 'company_id' => $company->id]);
+        try {
+            $folio->postPayment($stay, ['amount' => 100, 'payment_method' => 'cash'], (int) $owner->id);
+            $this->fail('Cancelled stay accepted new money');
+        } catch (HotelStayException $e) {
+            $this->assertEquals(8000, $folio->totals($stay)['payments']);
+        }
+        $count = \App\Models\HotelFolioEntry::where('stay_id', $stay->id)->count();
+        try {
+            $service->correct($stay, $owner, $plan['fingerprint'], 'Duplicate synthetic entry', 'cash');
+            $this->fail('Repeated correction accepted');
+        } catch (HotelStayException $e) {
+            $this->assertSame($count, \App\Models\HotelFolioEntry::where('stay_id', $stay->id)->count());
+        }
+    }
+
+    public function test_owner_correction_refuses_stale_preview_and_foreign_actor(): void
+    {
+        $company = $this->company('hotel'); $owner = $this->owner($company);
+        $stays = app(HotelStayService::class); $folio = app(HotelFolioService::class);
+        $room = $this->room($stays, $company, 'COR-2', 1000);
+        $stay = $stays->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => '2026-10-04', 'check_out_date' => '2026-10-05',
+            'guest_name' => 'Synthetic stale guest', 'walk_in' => true,
+        ]);
+        $service = app(\App\Services\HotelCorrectionService::class);
+        $plan = $service->preview($stay->fresh(), $owner);
+        $folio->postPayment($stay, ['amount' => 100, 'payment_method' => 'cash'], (int) $owner->id);
+        try {
+            $service->correct($stay, $owner, $plan['fingerprint'], 'Wrong synthetic entry', 'cash');
+            $this->fail('Stale correction accepted');
+        } catch (HotelStayException $e) {
+            $this->assertSame('checked_in', $stay->fresh()->status);
+            $this->assertEquals(0, $folio->totals($stay)['refunds']);
+        }
+        $foreign = $this->owner($this->company('hotel'));
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $service->preview($stay, $foreign);
+    }
+
+    public function test_owner_correction_cashier_cannot_use_route_and_prior_adjustment_blocks_preview(): void
+    {
+        $company = $this->company('hotel'); $owner = $this->owner($company);
+        $stays = app(HotelStayService::class); $folio = app(HotelFolioService::class);
+        $room = $this->room($stays, $company, 'COR-3', 1000);
+        $stay = $stays->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => '2026-10-04', 'check_out_date' => '2026-10-05',
+            'guest_name' => 'Synthetic guarded guest', 'walk_in' => true,
+        ]);
+        $cashier = $this->staff($company, 'pos_cashier');
+        $this->actingAs($cashier, 'pos')->get('/pos/hotel/stays/'.$stay->id.'/correction')->assertForbidden();
+        $this->actingAs($cashier, 'pos')->post('/pos/hotel/stays/'.$stay->id.'/correction', [])->assertForbidden();
+        $charge = \App\Models\HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'charge')->firstOrFail();
+        $folio->reverseCharge($stay, (int) $charge->id, (int) $owner->id);
+        $plan = app(\App\Services\HotelCorrectionService::class)->preview($stay->fresh(), $owner);
+        $this->assertNotNull($plan['blocked']);
+    }
 }

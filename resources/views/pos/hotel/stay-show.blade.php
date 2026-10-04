@@ -123,6 +123,9 @@
     </details>
     @endif
 
+    @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
+    <a href="{{ route('pos.hotel.stays.correction', $stay->id) }}" class="block mb-6 text-red-700 underline font-semibold">{{ __('hotel_correction.title') }}</a>
+    @endif
     <div class="mb-6" x-data="{ action: window.location.hash === '#hotel-charge' ? 'charge' : (window.location.hash === '#hotel-payment' ? 'payment' : '') }">
         <div class="flex flex-wrap gap-3 mb-4">
             <button type="button" @click="action = action === 'payment' ? '' : 'payment'" :aria-expanded="action === 'payment'" class="rounded-lg bg-teal-700 px-4 py-2 text-white text-sm font-semibold">{{ __('pos.hotel_take_money') }}</button>

@@ -7,7 +7,10 @@
             <p class="mt-1 mb-4 text-sm font-semibold dark:text-white">{{ auth('pos')->user()?->company?->name }}</p>
             @include('pos.hotel._nav')
         </aside>
-        <main class="min-w-0">{{ $slot }}</main>
+        <main class="min-w-0">
+            @include('pos.hotel._pra-reporting')
+            {{ $slot }}
+        </main>
     </div>
 </div>
 </x-pos-layout>

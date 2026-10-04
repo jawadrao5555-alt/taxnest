@@ -129,12 +129,33 @@
                 @endif
                 <a href="{{ route('pos.pra-settings') }}" class="block underline">{{ __('pos.hotel_settings_tax_compliance') }}</a>
                 <p>{{ __('pos.hotel_settings_configured_tax', ['cash' => \App\Models\PosTaxRule::getRateForMethod('cash', $company), 'card' => \App\Models\PosTaxRule::getRateForMethod('card', $company)]) }}</p>
-                <label for="hotel-tax-mode" class="block font-semibold">{{ __('pos.hotel_settings_tax_price') }}</label>
-                <select id="hotel-tax-mode" :value="values.taxMode" :disabled="busy.taxMode" @change="const chosen = $event.target.value; $event.target.value = values.taxMode; save('taxMode', '{{ route('pos.settings.tax-pricing-mode', [], false) }}', {mode: chosen}, chosen).then(() => $el.value = values.taxMode)" class="w-full rounded-lg border-gray-300 bg-white dark:bg-gray-800 text-sm">
-                    <option value="exclusive">{{ __('pos.hotel_settings_tax_exclusive') }}</option>
-                    <option value="inclusive">{{ __('pos.hotel_settings_tax_inclusive') }}</option>
-                    <option value="inclusive_card_save">{{ __('pos.hotel_settings_tax_card_save') }}</option>
-                </select>
+                @php
+                    $sample = 1000;
+                    $sampleCashRate = (float) \App\Models\PosTaxRule::getRateForMethod('cash', $company);
+                    $sampleCardRate = (float) \App\Models\PosTaxRule::getRateForMethod('card', $company);
+                    $taxCards = [
+                        'exclusive' => ['label' => __('pos.hotel_settings_tax_exclusive'), 'cash' => $sample * (1 + $sampleCashRate / 100), 'card' => $sample * (1 + $sampleCardRate / 100)],
+                        'inclusive' => ['label' => __('pos.hotel_settings_tax_inclusive'), 'cash' => $sample, 'card' => $sample],
+                        'inclusive_card_save' => ['label' => __('pos.hotel_settings_tax_card_save'), 'cash' => $sample, 'card' => $sample / (1 + $sampleCashRate / 100) * (1 + $sampleCardRate / 100)],
+                    ];
+                @endphp
+                <fieldset data-hotel-tax-cards="1">
+                    <legend class="font-semibold">{{ __('pos.hotel_settings_tax_price') }}</legend>
+                    <p class="mb-2 text-xs text-gray-500">{{ __('hotel_reporting.example') }}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" role="radiogroup" aria-label="{{ __('pos.hotel_settings_tax_price') }}">
+                        @foreach($taxCards as $mode => $card)
+                        <button type="button" role="radio" data-hotel-tax-mode="{{ $mode }}" :aria-checked="(values.taxMode === @js($mode)).toString()"
+                            :disabled="busy.taxMode || values.taxMode === @js($mode) || @js((bool) data_get(session('impersonation'), 'readonly', false))"
+                            @click="save('taxMode', '{{ route('pos.settings.tax-pricing-mode', [], false) }}', {mode: @js($mode)}, @js($mode))"
+                            class="rounded-xl border-2 p-3 text-left dark:bg-gray-800 disabled:cursor-default"
+                            :class="values.taxMode === @js($mode) ? 'border-blue-600 bg-blue-50 dark:border-blue-400' : 'border-gray-200 dark:border-gray-700'">
+                            <span class="block font-semibold">{{ $card['label'] }} <span x-show="values.taxMode === @js($mode)" aria-hidden="true">✓</span></span>
+                            <span class="mt-2 block text-xs">{{ __('hotel_reporting.sample_cash', ['amount' => number_format($card['cash'], 2)]) }}</span>
+                            <span class="mt-1 block text-xs">{{ __('hotel_reporting.sample_card', ['amount' => number_format($card['card'], 2)]) }}</span>
+                        </button>
+                        @endforeach
+                    </div>
+                </fieldset>
                 <p class="text-xs text-gray-500">{{ __('pos.hotel_settings_tax_history') }}</p>
                 @if($hotelSettings['outlet'])
                 <label for="hotel-receipt-seconds" class="block font-semibold">{{ __('pos.receipt_popup_autoclose') }}</label>

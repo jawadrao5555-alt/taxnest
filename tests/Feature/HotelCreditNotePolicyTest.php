@@ -250,6 +250,27 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertSame(2, $payload['PaymentMode']);
     }
 
+    public function test_item_discount_credit_payload_uses_original_net_line(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        config(['hotel_credit_notes.enabled' => true]);
+        $owner->update(['pra_reporting_enabled' => true]);
+        $item = $bill->items->first();
+        $item->update(['subtotal' => 1750, 'item_discount_amount' => 250]);
+        $bill->update(['subtotal' => 1750, 'total_amount' => 1750]);
+        HotelFolioEntry::findOrFail($item->hotel_folio_entry_id)->update(['amount' => 1750, 'gross_amount' => 2000, 'discount_amount' => 250]);
+        $selection = [$item->id => 1.0];
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id, $selection);
+        $note = app(\App\Services\HotelCreditNoteService::class)->issue($stay, $owner, (int) $bill->id,
+            $selection, 'Synthetic discounted night', 'synthetic-item-discount-001', $plan['fingerprint']);
+        $credit = PosTransaction::findOrFail($note->credit_transaction_id);
+        $payload = (new \App\Services\PraIntegrationService(Company::findOrFail($stay->company_id)))->generatePayload($credit);
+        $this->assertEquals(875, $credit->total_amount);
+        $this->assertEquals(875, $payload['TotalBillAmount']);
+        $this->assertEquals(875, $payload['Items'][0]['SaleValue']);
+        $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
+    }
+
     private function company(string $category, array $overrides = []): Company
     {
         $defaults = PosFeatureService::defaultsForCategory($category);

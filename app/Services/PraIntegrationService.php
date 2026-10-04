@@ -145,6 +145,7 @@ class PraIntegrationService
         $itemsSubtotal = (float) $transaction->subtotal;
         $totalDiscount = (float) $transaction->discount_amount;
         $taxRate = (float) $transaction->tax_rate;
+        $hotelCredit = $transaction->payment_method === 'hotel_credit_note';
 
         // Tax-Inclusive Pricing (Menu-Rate-Final, owner Jul 2026): on inclusive bills
         // the stored item lines are MENU (tax-in) prices and the header subtotal is
@@ -173,10 +174,14 @@ class PraIntegrationService
                 return (float) $item->unit_price > 0 && (float) $item->quantity > 0;
             })
             ->values()
-            ->map(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive, $menuRate) {
+            ->map(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive, $menuRate, $hotelCredit) {
                 $qty = (float) $item->quantity;
                 $unitPrice = (float) $item->unit_price;
                 $lineSubtotal = (float) $item->subtotal;
+                if ($hotelCredit && $qty > 0) {
+                    // Hotel line subtotal already includes its original item discount.
+                    $unitPrice = round($lineSubtotal / $qty, 2);
+                }
                 $itemDiscount = $shareBase > 0 ? round($totalDiscount * ($lineSubtotal / $shareBase), 2) : 0;
                 $perUnitDiscount = $qty > 0 ? round($itemDiscount / $qty, 2) : 0;
                 $saleValuePerUnit = round($unitPrice - $perUnitDiscount, 2);

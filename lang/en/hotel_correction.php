@@ -1,8 +1,9 @@
 <?php
 
 return [
+    'fiscal_locked' => 'Fiscal bill locked. Cancellation, editing and credit-note reversal are unavailable here. The original bill and payments remain unchanged.',
     'title' => 'Correct / cancel entry',
-    'help' => 'Cancel the entire erroneous stay. Source bills remain in history; linked credit notes reverse sales and folio entries reverse charges and recorded money. PRA credit notes follow the existing submission process.',
+    'help' => 'Cancel the entire erroneous stay. Source bills remain in history; local return records reverse local sales and folio entries reverse charges and recorded money. Fiscal bills cannot be corrected through this screen.',
     'charges' => 'Charges to reverse',
     'money' => 'Recorded money to refund / reverse',
     'reason' => 'Reason for correction',

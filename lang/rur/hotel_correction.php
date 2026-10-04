@@ -1,8 +1,9 @@
 <?php
 
 return [
+    'fiscal_locked' => 'Fiscal bill locked hai. Yahan cancel, edit ya credit-note reversal available nahi. Asal bill aur payments mehfooz rahenge.',
     'title' => 'Entry correct / cancel karein',
-    'help' => 'Poori ghalat stay cancel karein. Asal bills history mein rahenge; credit notes sales aur folio entries charges aur recorded payment reverse karengi. PRA credit note ka mojooda submission flow barqarar hai.',
+    'help' => 'Poori ghalat stay cancel karein. Asal bills history mein rahenge; local return records local sales aur folio entries charges aur recorded payment reverse karengi. Fiscal bills ki correction yahan band hai.',
     'charges' => 'Reverse honay walay charges',
     'money' => 'Refund / reverse honay wali recorded raqam',
     'reason' => 'Correction ki wajah',

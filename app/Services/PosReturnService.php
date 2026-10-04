@@ -300,6 +300,12 @@ class PosReturnService
             }
 
             if ($hotelCredit) {
+                if ($taxInclusive && (float) $original->tax_menu_rate > 0) {
+                    $snapshot = PosTaxMath::inclusiveHeader($lineSum, $lineSum - $exemptSum, 0,
+                        (float) $original->tax_rate, (float) $original->tax_menu_rate);
+                    $headerSubtotal = $snapshot['subtotal_col'];
+                    $refundTotal = $snapshot['total_amount'];
+                }
                 $prior = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)
                     ->where('parent_transaction_id', $original->id)->where('transaction_type', 'return')->get();
                 $remainingTotal = max(0, round((float) $original->total_amount - (float) $prior->sum('total_amount'), 2));

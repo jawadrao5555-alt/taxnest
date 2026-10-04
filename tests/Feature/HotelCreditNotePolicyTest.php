@@ -21,10 +21,10 @@ class HotelCreditNotePolicyTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function fixture(): array
+    private function fixture(array $overrides = [], string $method = 'cash'): array
     {
         PosFeatureService::flushGateCaches();
-        $company = $this->company('hotel', ['pos_tax_rate_cash' => 0]);
+        $company = $this->company('hotel', array_merge(['pos_tax_rate_cash' => 0], $overrides));
         $owner = $this->owner($company);
         $stays = app(HotelStayService::class);
         $room = $this->room($stays, $company, 'CN-1', 1000);
@@ -33,8 +33,9 @@ class HotelCreditNotePolicyTest extends TestCase
             'guest_name' => 'Synthetic credit review', 'walk_in' => true,
         ]);
         $folio = app(HotelFolioService::class);
-        $folio->postPayment($stay, ['amount' => 2000, 'payment_method' => 'cash'], (int) $owner->id);
-        $bill = $folio->settleCoveredCharges($stay, (int) $owner->id, 'cash')['transaction'];
+        $paid = app(\App\Services\HotelFolioInvoiceService::class)->fiscalTotalFor($company, 2000, $method);
+        $folio->postPayment($stay, ['amount' => $paid, 'payment_method' => $method], (int) $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, (int) $owner->id, $method)['transaction'];
         // Synthetic acceptance fixture only; no regulator call.
         $bill->update(['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'TEST-FISCAL-CN']);
         return [$stay, $owner, $bill->fresh('items')];
@@ -201,6 +202,52 @@ class HotelCreditNotePolicyTest extends TestCase
             $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
             $this->assertEquals(0, $bill->items->first()->fresh()->returned_quantity);
         }
+    }
+
+    public function test_credit_payload_references_original_and_keeps_original_tax_snapshot(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture(['pos_tax_rate_cash' => 16]);
+        config(['hotel_credit_notes.enabled' => true]);
+        $owner->update(['pra_reporting_enabled' => true]);
+        $company = Company::findOrFail($stay->company_id);
+        $company->update(['pos_tax_rate_cash' => 20]);
+        $item = $bill->items->first();
+        $selection = [$item->id => 1.0];
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id, $selection);
+        $note = app(\App\Services\HotelCreditNoteService::class)->issue($stay, $owner, (int) $bill->id,
+            $selection, 'Synthetic unused night', 'synthetic-tax-credit-001', $plan['fingerprint']);
+        $credit = PosTransaction::findOrFail($note->credit_transaction_id);
+        $this->assertEquals(16, $credit->tax_rate);
+        $this->assertEquals(160, $credit->tax_amount);
+        $this->assertEquals(1160, $credit->total_amount);
+        $payload = (new \App\Services\PraIntegrationService($company))->generatePayload($credit);
+        $this->assertSame(3, $payload['InvoiceType']);
+        $this->assertSame($bill->invoice_number, $payload['RefUSIN']);
+        $this->assertEquals(16, $payload['Items'][0]['TaxRate']);
+        $this->assertGreaterThan(0, $payload['TotalBillAmount']);
+        $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
+    }
+
+    public function test_card_save_credit_uses_original_menu_and_card_rates(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture(['pos_tax_pricing_mode' => 'inclusive_card_save',
+            'pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 8], 'card');
+        config(['hotel_credit_notes.enabled' => true]);
+        $owner->update(['pra_reporting_enabled' => true]);
+        $item = $bill->items->first();
+        $selection = [$item->id => 1.0];
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id, $selection);
+        $note = app(\App\Services\HotelCreditNoteService::class)->issue($stay, $owner, (int) $bill->id,
+            $selection, 'Synthetic card save credit', 'synthetic-card-save-001', $plan['fingerprint']);
+        $credit = PosTransaction::findOrFail($note->credit_transaction_id);
+        $this->assertTrue((bool) $credit->tax_inclusive);
+        $this->assertEquals(16, $credit->tax_menu_rate);
+        $this->assertEquals(8, $credit->tax_rate);
+        $this->assertEquals(931, $credit->total_amount);
+        $this->assertEquals($plan['estimated_total'], $credit->total_amount);
+        $payload = (new \App\Services\PraIntegrationService(Company::findOrFail($stay->company_id)))->generatePayload($credit);
+        $this->assertEquals($credit->total_amount, $payload['TotalBillAmount']);
+        $this->assertSame(2, $payload['PaymentMode']);
     }
 
     private function company(string $category, array $overrides = []): Company

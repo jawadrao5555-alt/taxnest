@@ -78,13 +78,19 @@ class HotelCreditNotePolicy
             && $charges->contains(fn ($entry) => (int) $entry->id === (int) $item->hotel_folio_entry_id))
             && $bill->items->pluck('hotel_folio_entry_id')->unique()->count() === $bill->items->count()
             && $charges->count() === $bill->items->count();
+        $lineTotal = array_sum(array_column($lines, 'original_subtotal_share'));
+        $estimate = round($lineTotal + ($bill->tax_inclusive ? 0 : array_sum(array_column($lines, 'original_tax_share'))));
+        if ($bill->tax_inclusive && (float) $bill->tax_menu_rate > 0) {
+            $estimate = PosTaxMath::inclusiveHeader($lineTotal, $lineTotal, 0,
+                (float) $bill->tax_rate, (float) $bill->tax_menu_rate)['total_amount'];
+        }
         return [
             'fingerprint' => hash('sha256', json_encode([$bill->getAttributes(), $bill->items->toArray(), $charges->toArray(), $lines], JSON_THROW_ON_ERROR)),
             'folio_mapping_complete' => $mappingComplete,
             'kind' => $full ? 'full_remaining' : 'partial', 'bill_id' => (int) $bill->id,
             'original_usin' => $bill->invoice_number, 'original_fiscal_number' => $bill->pra_invoice_number,
             'lines' => $lines, 'tax_inclusive' => (bool) $bill->tax_inclusive,
-            'estimated_total' => round(array_sum(array_column($lines, 'original_subtotal_share')) + ($bill->tax_inclusive ? 0 : array_sum(array_column($lines, 'original_tax_share'))), 0),
+            'estimated_total' => $estimate,
             'original_bill_discount' => (float) $bill->discount_amount,
             // Shares are inputs for reconciliation, not an authorized credit total or refund.
             'issuance_enabled' => (bool) config('hotel_credit_notes.enabled', false) && $mappingComplete && (float) $bill->discount_amount === 0.0, 'refund_amount' => null, 'stay_action' => 'unchanged',

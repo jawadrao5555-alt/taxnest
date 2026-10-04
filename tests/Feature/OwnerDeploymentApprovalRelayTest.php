@@ -364,6 +364,42 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_upstream_github_failure_is_a_safe_503_without_claiming_or_mutating_approval(): void
+    {
+        $row = $this->row(['status' => 'dispatching', 'dispatch_lease_expires_at' => now()->addMinute()]);
+        $this->mock(GitHubActionsOidcVerifier::class, fn ($m) => $m->shouldReceive('verify')->once()->andReturn([
+            'workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1,
+        ]));
+        Http::fake(['*' => Http::response(['message' => 'secret-upstream-body'], 403, ['Retry-After' => '120'])]);
+        $response = $this->postJson('/api/deployment-approval/v1/approval-claims', [
+            'approval_request_id' => $row->request_id, 'repository' => $row->repository,
+            'pull_number' => 17, 'expected_head_sha' => self::SHA,
+        ])->assertStatus(503)->assertHeader('Retry-After', '120')->assertJson([
+            'code' => 'github_validation_unavailable', 'stage' => 'pull_request', 'upstream_status' => 403,
+        ]);
+        $this->assertStringNotContainsString('secret-upstream-body', $response->getContent());
+        $this->assertSame('dispatching', $row->fresh()->status);
+        $this->assertNull($row->fresh()->provenance_receipt_hash);
+        $this->assertNull($row->fresh()->claimed_at);
+        $this->assertNull($row->fresh()->merge_sha);
+        Http::assertSentCount(1);
+    }
+
+    public function test_stale_head_is_an_ineligible_409_without_claiming_approval(): void
+    {
+        $row = $this->row(['status' => 'dispatching', 'dispatch_lease_expires_at' => now()->addMinute()]);
+        $this->github(false);
+        $this->mock(GitHubActionsOidcVerifier::class, fn ($m) => $m->shouldReceive('verify')->once()->andReturn([
+            'workflow_sha' => self::OWNER_SHA, 'run_id' => 701, 'run_attempt' => 1,
+        ]));
+        $this->postJson('/api/deployment-approval/v1/approval-claims', [
+            'approval_request_id' => $row->request_id, 'repository' => $row->repository,
+            'pull_number' => 17, 'expected_head_sha' => self::SHA,
+        ])->assertStatus(409)->assertJson(['code' => 'deployment_ineligible']);
+        $this->assertSame('dispatching', $row->fresh()->status);
+        $this->assertNull($row->fresh()->provenance_receipt_hash);
+    }
+
     public function test_claim_binds_request_and_stores_only_hash_returning_raw_receipt_once(): void
     {
         $this->github();

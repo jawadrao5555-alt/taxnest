@@ -67,10 +67,17 @@ RELAY_URL="${OWNER_APPROVAL_RELAY_URL%/}"
 jq -n --arg id "$APPROVAL_REQUEST_ID" --arg repo "$REPO" \
   --argjson pull "$PULL" --arg sha "$EXPECTED" \
   '{approval_request_id:$id,repository:$repo,pull_number:$pull,expected_head_sha:$sha}' > "$TMP/claim-request.json"
-curl --fail --silent --show-error \
+CLAIM_HTTP=$(curl --silent --show-error \
   -H "Authorization: Bearer ${OIDC_TOKEN}" -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
   --data-binary @"$TMP/claim-request.json" \
-  "${RELAY_URL}/api/deployment-approval/v1/approval-claims" > "$TMP/claim.json"
+  -o "$TMP/claim.json" -w '%{http_code}' \
+  "${RELAY_URL}/api/deployment-approval/v1/approval-claims")
+if [[ "$CLAIM_HTTP" != 2?? ]]; then
+  # Do not print raw upstream bodies: they may contain secrets or HTML debug pages.
+  python3 "$ROOT/scripts/lib/approval_claim_error.py" "$CLAIM_HTTP" "$TMP/claim.json" >&2
+  exit 1
+fi
 RECEIPT=$(python3 - "$TMP/claim.json" <<'PY'
 import json, sys
 d=json.load(open(sys.argv[1], encoding="utf-8"))

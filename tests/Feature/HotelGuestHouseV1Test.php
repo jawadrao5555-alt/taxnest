@@ -770,4 +770,18 @@ class HotelGuestHouseV1Test extends TestCase
         $plan = app(\App\Services\HotelCorrectionService::class)->preview($stay->fresh(), $owner);
         $this->assertNotNull($plan['blocked']);
     }
+    public function test_room_boards_use_natural_sequence_and_keep_other_tenants_out(): void
+    {
+        $company = $this->company('hotel');
+        $stays = app(HotelStayService::class);
+        foreach (['10', '2', '1', 'A10', 'A2'] as $number) {
+            $this->room($stays, $company, $number, 1000);
+        }
+        $foreign = $this->company('hotel');
+        $this->room($stays, $foreign, '3', 1000);
+        $this->assertSame(['1', '2', '10', 'A2', 'A10'], $stays->board((int) $company->id)['available']->pluck('room_number')->all());
+        $cards = $stays->roomCards((int) $company->id);
+        $this->assertSame(['1', '2', '10', 'A2', 'A10'], array_map(fn ($c) => $c['room']->room_number, $cards));
+    }
+
 }

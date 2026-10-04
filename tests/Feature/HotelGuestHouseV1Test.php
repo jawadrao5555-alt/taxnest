@@ -770,4 +770,39 @@ class HotelGuestHouseV1Test extends TestCase
         $plan = app(\App\Services\HotelCorrectionService::class)->preview($stay->fresh(), $owner);
         $this->assertNotNull($plan['blocked']);
     }
+    public function test_owner_correction_locks_fiscal_and_ambiguous_bills_without_mutation(): void
+    {
+        $company = $this->company('hotel', ['pos_tax_rate_cash' => 0]);
+        $owner = $this->owner($company);
+        $stays = app(HotelStayService::class);
+        $folio = app(HotelFolioService::class);
+        $service = app(\App\Services\HotelCorrectionService::class);
+        foreach (['pending', 'submitted', 'offline', 'failed', null] as $state) {
+            $room = $this->room($stays, $company, 'LOCK-'.($state ?? 'legacy'), 1000);
+            $stay = $stays->book((int) $company->id, (int) $owner->id, [
+                'room_id' => $room->id, 'check_in_date' => '2026-10-04', 'check_out_date' => '2026-10-05',
+                'guest_name' => 'Synthetic locked bill', 'walk_in' => true,
+            ]);
+            $folio->postPayment($stay, ['amount' => 1000, 'payment_method' => 'cash'], (int) $owner->id);
+            $bill = $folio->settleCoveredCharges($stay, (int) $owner->id, 'cash')['transaction'];
+            $bill->update(['invoice_mode' => 'pra', 'pra_status' => $state, 'invoice_number' => 'P-LOCK-'.($state ?? 'legacy'), 'pra_invoice_number' => $state === 'submitted' ? 'SYNTHETIC-FISCAL' : null]);
+            $before = $bill->fresh()->getAttributes();
+            $entries = HotelFolioEntry::where('stay_id', $stay->id)->count();
+            $plan = $service->preview($stay->fresh(), $owner);
+            $this->assertSame(__('hotel_correction.fiscal_locked'), $plan['blocked']);
+            $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/'.$stay->id.'/correction')->assertOk()->assertDontSee('name="confirmed"', false);
+            try {
+                $service->correct($stay, $owner, $plan['fingerprint'], 'Synthetic wrong entry', 'cash');
+                $this->fail('Fiscal correction accepted');
+            } catch (HotelStayException $e) {
+                $this->assertSame(__('hotel_correction.fiscal_locked'), $e->getMessage());
+            }
+            $this->assertSame($before, $bill->fresh()->getAttributes());
+            $this->assertSame($entries, HotelFolioEntry::where('stay_id', $stay->id)->count());
+            $this->assertSame('checked_in', $stay->fresh()->status);
+            $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
+        }
+    }
+
+
 }

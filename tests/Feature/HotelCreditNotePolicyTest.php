@@ -131,6 +131,7 @@ class HotelCreditNotePolicyTest extends TestCase
         $refund = $service->refund($stay, $owner, (int) $note->id, 500, 'cash', 'synthetic-refund-request-001');
         $again = $service->refund($stay, $owner, (int) $note->id, 500, 'cash', 'synthetic-refund-request-001');
         $this->assertSame($refund->id, $again->id);
+        $this->assertLessThanOrEqual(64, strlen($refund->idempotency_key));
         $this->assertEquals(500, app(HotelFolioService::class)->totals($stay)['refunds']);
         $this->assertEquals(500, app(\App\Services\HotelFolioInvoiceService::class)->availableTowardFiscal($stay));
         $this->assertSame('checked_in', $stay->fresh()->status);

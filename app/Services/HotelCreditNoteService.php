@@ -122,7 +122,7 @@ class HotelCreditNoteService
             if ($credit->pra_status !== 'submitted' || !$credit->pra_invoice_number) {
                 throw new HotelStayException('Resolve fiscal submission before refunding this credit note.');
             }
-            $refundKey = 'hotel-cn-refund-'.hash('sha256', $key);
+            $refundKey = 'hcn-refund-'.substr(hash('sha256', $key), 0, 52);
             $existing = HotelFolioEntry::where('company_id', $stay->company_id)->where('idempotency_key', $refundKey)->first();
             if ($existing) {
                 if ((int) $existing->stay_id !== (int) $stay->id || (int) $existing->pos_transaction_id !== (int) $credit->id

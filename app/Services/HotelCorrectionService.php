@@ -35,6 +35,14 @@ class HotelCorrectionService
                 $blocked = __('hotel_correction.review');
             }
         }
+        // Fiscal documents are preserved while category-specific credit notes are deferred.
+        // Fail closed for ambiguous/legacy modes as well as pending/submitted bills.
+        if ($bills->contains(fn ($bill) => !empty($bill->pra_invoice_number)
+            || !in_array($bill->pra_status, [null, 'local'], true)
+            || !($bill->invoice_mode === 'local' || $bill->pra_status === 'local'
+                || ($bill->pra_status === null && PosLocalSeries::isSeriesSerial($bill->invoice_number))))) {
+            $blocked = __('hotel_correction.fiscal_locked');
+        }
         $totals = app(HotelFolioService::class)->totals($stay);
         // An issued bill must be covered by recorded money; never invent a refund.
         if ((float) $bills->sum('total_amount') - $totals['payments'] > 0.009) {
@@ -43,7 +51,7 @@ class HotelCorrectionService
         $fingerprint = hash('sha256', json_encode([
             $stay->id, $stay->status, $stay->room_id, $stay->branch_id, (string) $stay->check_in_date, (string) $stay->check_out_date, $stay->updated_at?->format('Y-m-d H:i:s.u'),
             $entries->map(fn ($e) => [$e->id, $e->entry_type, $e->amount, $e->payment_method, $e->pos_transaction_id, $e->updated_at?->format('Y-m-d H:i:s.u')])->all(),
-            $bills->map(fn ($b) => [$b->id, $b->status, $b->total_amount, $b->tax_amount, $b->discount_amount, $b->payment_method, $b->pra_status, $b->pra_invoice_number, $b->updated_at?->format('Y-m-d H:i:s.u'), $b->items->map(fn ($i) => [$i->id, $i->quantity, $i->unit_price, $i->total_amount, $i->returned_quantity])->all()])->all(),
+            $bills->map(fn ($b) => [$b->id, $b->status, $b->total_amount, $b->tax_amount, $b->discount_amount, $b->payment_method, $b->invoice_mode, $b->pra_status, $b->pra_invoice_number, $b->updated_at?->format('Y-m-d H:i:s.u'), $b->items->map(fn ($i) => [$i->id, $i->quantity, $i->unit_price, $i->total_amount, $i->returned_quantity])->all()])->all(),
         ], JSON_THROW_ON_ERROR));
 
         return compact('entries', 'bills', 'totals', 'blocked', 'fingerprint');

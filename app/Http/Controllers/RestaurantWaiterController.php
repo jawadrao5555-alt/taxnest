@@ -1303,7 +1303,7 @@ class RestaurantWaiterController extends Controller
         // the table picker — without an override, an order assigned to an
         // off-shift cashier stays stuck for everyone else. Admin claim simply
         // re-assigns it (single-winner UPDATE still holds per request).
-        if (!$user->isPosAdmin()) {
+        if (!$user->isPosAdmin() || ($request->has('allow_reassign') && !$request->boolean('allow_reassign'))) {
             $claimQuery->where(function ($w) use ($user) {
                 $w->whereNull('assigned_cashier_id')->orWhere('assigned_cashier_id', $user->id);
             });
@@ -1321,6 +1321,20 @@ class RestaurantWaiterController extends Controller
             $mineQ->whereIn('status', ['held', 'preparing', 'ready']);
             $mine = $mineQ->exists();
             if (!$mine) {
+                $conflict = RestaurantOrder::where('company_id', $companyId)->where('id', $id)
+                    ->where('source', 'waiter')->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->with('assignedCashier')->first();
+                if ($conflict && $conflict->assigned_cashier_id) {
+                    return response()->json([
+                        'success' => false, 'code' => 'cashier_assignment_conflict',
+                        'message' => __('pos.cashier_handoff_help'),
+                        'order_id' => (int) $conflict->id,
+                        'assigned_cashier_id' => (int) $conflict->assigned_cashier_id,
+                        'assigned_cashier' => $conflict->assignedCashier?->name,
+                        'revision' => (int) ($conflict->edit_revision ?? 0),
+                        'cashiers' => $user->isPosAdmin() ? $this->handoffCashiers($companyId)->get(['id', 'name']) : [],
+                    ], 409);
+                }
                 return response()->json(['success' => false, 'message' => 'Order already taken by another cashier.'], 409);
             }
         }
@@ -1336,6 +1350,47 @@ class RestaurantWaiterController extends Controller
             ->first();
 
         return response()->json(['success' => true, 'order' => $order ? $this->orderJson($order) : null]);
+    }
+
+    private function handoffCashiers(int $companyId)
+    {
+        $query = \App\Models\User::where('company_id', $companyId)
+            ->where(function ($q) {
+                $q->whereIn('pos_role', ['pos_cashier', 'pos_admin', 'pos_manager'])->orWhere('role', 'company_admin');
+            });
+        if (Schema::hasColumn('users', 'is_active')) $query->where('is_active', true);
+        return $query->orderBy('name');
+    }
+
+    /** Explicit manager handoff; locked against settlement/edit and stale dialogs. */
+    public function transferIncoming(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $actor = auth('pos')->user();
+        abort_unless($actor->isPosAdmin(), 403);
+        $data = $request->validate([
+            'cashier_id' => 'required|integer', 'assigned_cashier_id' => 'required|integer',
+            'revision' => 'required|integer|min:0',
+        ]);
+        abort_unless($this->handoffCashiers($companyId)->where('id', $data['cashier_id'])->exists(), 422);
+        // Refuse rather than transfer without a stale-edit/payment fence.
+        abort_unless(Schema::hasColumn('restaurant_orders', 'edit_revision'), 409);
+        return DB::transaction(function () use ($companyId, $actor, $data, $id) {
+            $order = RestaurantOrder::where('company_id', $companyId)->where('source', 'waiter')
+                ->lockForUpdate()->findOrFail($id);
+            if (!in_array($order->status, ['held', 'preparing', 'ready'], true)
+                || $order->pos_transaction_id || $order->payment_method
+                || (int) $order->assigned_cashier_id !== (int) $data['assigned_cashier_id']
+                || (int) $order->edit_revision !== (int) $data['revision']) {
+                return response()->json(['success' => false, 'message' => __('pos.cashier_handoff_changed')], 409);
+            }
+            $before = ['assigned_cashier_id' => (int) $order->assigned_cashier_id, 'revision' => (int) $order->edit_revision];
+            $order->update(['assigned_cashier_id' => $data['cashier_id'], 'edit_revision' => $order->edit_revision + 1]);
+            \App\Services\AuditLogService::log('waiter_order_cashier_transferred', 'restaurant_order', $order->id,
+                $before, ['assigned_cashier_id' => (int) $order->assigned_cashier_id, 'revision' => (int) $order->edit_revision],
+                $companyId, $actor->id);
+            return response()->json(['success' => true]);
+        });
     }
 
     /** Link the paid PosTransaction to the waiter order, mark completed, free the table. */

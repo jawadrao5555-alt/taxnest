@@ -131,10 +131,11 @@ class PosReturnService
      */
     public static function createReturn(int $companyId, int $originalId, ?array $items, string $refundMethod, ?int $userId, array $opts = []): array
     {
+        $hotelCredit = (bool) ($opts['hotel_credit_note'] ?? false);
         $wastage = (bool) ($opts['wastage'] ?? false);
         $expiryHours = isset($opts['expiry_hours']) ? (int) $opts['expiry_hours'] : null;
 
-        return DB::transaction(function () use ($companyId, $originalId, $items, $refundMethod, $userId, $wastage, $expiryHours) {
+        return DB::transaction(function () use ($companyId, $originalId, $items, $refundMethod, $userId, $wastage, $expiryHours, $hotelCredit) {
             // Re-fetch UNDER LOCK — concurrent returns of the same bill must
             // serialize here or both see the same remaining quantities and
             // double-refund/double-restock.
@@ -187,6 +188,19 @@ class PosReturnService
                 $sub = round((float) $orig->subtotal * $ratio, 2);
                 $tax = round((float) ($orig->tax_amount ?? 0) * $ratio, 2);
                 $itemDisc = round((float) ($orig->item_discount_amount ?? 0) * $ratio, 2);
+                if ($hotelCredit) {
+                    $previousItems = PosTransactionItem::where('parent_item_id', $orig->id)
+                        ->whereIn('transaction_id', PosTransaction::withoutGlobalScope('hide_archived')
+                            ->where('company_id', $companyId)->where('parent_transaction_id', $original->id)
+                            ->where('transaction_type', 'return')->select('id'))->get();
+                    $finalLine = abs($qty - $remaining) < 0.0000001;
+                    $subRemaining = max(0, round((float) $orig->subtotal - (float) $previousItems->sum('subtotal'), 2));
+                    $taxRemaining = max(0, round((float) $orig->tax_amount - (float) $previousItems->sum('tax_amount'), 2));
+                    $discRemaining = max(0, round((float) $orig->item_discount_amount - (float) $previousItems->sum('item_discount_amount'), 2));
+                    $sub = $finalLine ? $subRemaining : min($sub, $subRemaining);
+                    $tax = $finalLine ? $taxRemaining : min($tax, $taxRemaining);
+                    $itemDisc = $finalLine ? $discRemaining : min($itemDisc, $discRemaining);
+                }
 
                 $lineSum += $sub;
                 $taxSum += $tax;
@@ -285,6 +299,19 @@ class PosReturnService
                 $refundTotal = 0.0;
             }
 
+            if ($hotelCredit) {
+                $prior = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)
+                    ->where('parent_transaction_id', $original->id)->where('transaction_type', 'return')->get();
+                $remainingTotal = max(0, round((float) $original->total_amount - (float) $prior->sum('total_amount'), 2));
+                $remainingTax = max(0, round((float) $original->tax_amount - (float) $prior->sum('tax_amount'), 2));
+                $allReturned = !$original->items()->whereRaw('quantity > COALESCE(returned_quantity, 0)')->exists();
+                $refundTotal = $allReturned ? $remainingTotal : min($refundTotal, $remainingTotal);
+                $headerTax = $allReturned ? $remainingTax : min($headerTax, $remainingTax);
+                if ($allReturned) {
+                    $headerSubtotal = max(0, round((float) $original->subtotal - (float) $prior->sum('subtotal'), 2));
+                }
+            }
+
             $invNum = 'RET-' . date('ymd') . '-' . strtoupper(Str::random(5));
 
             $data = [
@@ -351,7 +378,7 @@ class PosReturnService
             // restoring would mint stock out of thin air.
             // Wastage (Task 586): goods came back spoiled — NOTHING is restored.
             $company = Company::find($companyId);
-            if (!$wastage && $company && $company->inventory_enabled) {
+            if (!$hotelCredit && !$wastage && $company && $company->inventory_enabled) {
                 $deductedProductIds = InventoryMovement::where('company_id', $companyId)
                     ->where('reference_type', 'pos_transaction')
                     ->where('reference_id', $original->id)
@@ -395,7 +422,7 @@ class PosReturnService
             // Recipe products have their own immutable sale snapshot.  Restore
             // only normal-restock lines; cooked and wastage lines intentionally
             // leave the consumed ingredients untouched.
-            if ($company && $company->inventory_enabled) {
+            if (!$hotelCredit && $company && $company->inventory_enabled) {
                 RecipeInventoryService::restoreForReturn(
                     $companyId,
                     (int) $original->id,

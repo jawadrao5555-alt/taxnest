@@ -53,6 +53,9 @@ final class PosPaymentBuckets
     {
         $sums = ['cash' => 0.0, 'card' => 0.0, 'other' => 0.0];
         foreach ($transactions as $t) {
+            if ($t->payment_method === 'hotel_credit_note') {
+                continue; // Sales credit is not money refunded.
+            }
             $sums[self::bucket($t->payment_method)] += (float) ($t->{$column} ?? 0);
         }
 

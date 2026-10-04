@@ -16799,6 +16799,9 @@ class PosController extends Controller
          $sums = ['cash' => 0.0, 'card' => 0.0, 'online' => 0.0, 'other' => 0.0];
 
          foreach ($saleRows as $transaction) {
+             if ($transaction->payment_method === 'hotel_credit_note') {
+                 continue; // Accounting credit has no payment movement.
+             }
              $method = strtolower(trim((string) ($transaction->payment_method ?? '')));
              $bucket = $method === 'cash'
                  ? 'cash'
@@ -16808,6 +16811,9 @@ class PosController extends Controller
              $sums[$bucket] += (float) ($transaction->total_amount ?? 0);
          }
          foreach ($returnRows as $transaction) {
+             if ($transaction->payment_method === 'hotel_credit_note') {
+                 continue; // Accounting credit has no payment movement.
+             }
              $method = strtolower(trim((string) ($transaction->payment_method ?? '')));
              $bucket = $method === 'cash'
                  ? 'cash'

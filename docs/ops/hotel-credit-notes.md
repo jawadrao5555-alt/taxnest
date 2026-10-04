@@ -1,6 +1,6 @@
 # Hotel fiscal credit notes — draft implementation and evidence
 
-Status: Draft. The read-only HotelCreditNotePolicy prepares original-line review data; it cannot issue or submit a credit note, refund money, or cancel a stay. This is not the complete user-facing feature. The fiscal lock from PR #153 remains in force.
+Status: Draft; fiscal issuance and linked money refunds are deliberately disabled in `config/hotel_credit_notes.php`. Owner review screens are available. The implementation now includes issuance and separate refund services, but sandbox and cash-report reconciliation evidence are still required before enabling the feature. The fiscal lock from PR #153 remains in force.
 
 ## Legal and technical evidence (4 October 2026)
 
@@ -31,17 +31,22 @@ FAQ: https://e.pra.punjab.gov.pk/templates/PRA_Iris_Sales_Tax_Return_FAQs.pdf
 | Legacy agent | Preserve existing PRA queue contract; no new payload fields without compatibility proof |
 | Day closed | Preserve current return policy; no automatic bypass |
 
-## Remaining implementation before ready for owner approval
+## Implemented workflow
 
-1. Explicit owner reason, confirmation and durable idempotency; server-side preview recheck under stay, bill and item locks.
-2. Unique original-line/folio linkage. Historical bills lack direct item-to-folio IDs; never match by display name or assume row order. Migrate new linkage and define a safe legacy review route.
-3. Calculate final header/discount/rounding from original immutable values. The current review exposes shares only, not a final authorized amount. Cumulative partial credits must never exceed original value or tax.
-4. Separate accounting credit from cash refund. Generic POS returns carry a payment method and completed status; reuse only after Hotel ledger and day-close reporting correctly distinguish unpaid guest credit from actual refund.
-5. Keep original bill and service history. A partial/full credit must not implicitly cancel a stay or release its room. Booking cancellation is a separate confirmed action.
-6. Preserve PRA queue/agent routing. Pending/offline/failed child is visible and retryable with its same identity; submitted status needs regulator acceptance evidence.
-7. Simple EN/UR/Roman Urdu owner preview, partial/full actions, receipt and refund action; actual desktop/mobile browser checks.
-8. Sandbox acceptance for full/partial notes, reference matching, duplicates and retry recovery; reconcile monthly-return export/Annexure I independently. No production credential or live invoice experiment.
+Owner-only, company/active-branch scoped Hotel screens review full remaining bills or selected original item quantities. Review does not write. Issuance requires an explicit reason, confirmation, unique request key and unchanged review fingerprint. Stay and original invoice/item locks serialize attempts. Durable request identity handles repeats, including JSON numeric representation/order differences.
 
-## Verification limitations
+New Hotel invoice items store `hotel_folio_entry_id`; existing deployments without the column preserve billing. Historical rows are not guessed by name or order: missing/ambiguous mappings and bill-level discounts remain review-only. Credit lines use original tax/pricing snapshots; last remaining quantities consume residual original line values and header rounding, while cumulative value/tax are capped.
 
-Local PHP/Composer are not installed in this workspace, so application tests cannot run locally. Canonical CI is required. The new behavioral test covers read-only partial/full review, tenant access, outstanding fiscal submission and over-quantity rejection. Database, browser, issuance and sandbox evidence remain outstanding. This PR must stay Draft until the complete feature and required evidence are added.
+Credit issuance creates an audited fiscal return and negative charge adjustments without cancelling the stay, releasing the room, restoring inventory, or paying money. Original payment mode is retained for PRA payload classification, while the stored `hotel_credit_note` marker is excluded from cash/card/other payment buckets and the compact day-close summary. Submission happens after commit using existing cloud/agent routing; failed/pending children block another adjustment.
+
+A separately confirmed money refund requires accepted credit status/fiscal number, a unique request key, two-decimal cash/card amount, and both remaining document credit and available guest funds. It posts an audited folio refund; it cannot create another fiscal note. Deposits stay separate. Receipt uses the existing POS receipt route.
+
+## Remaining release gates
+
+1. Run canonical PHPUnit, native MariaDB and desktop/390px browser CI on the final head. Local PHP/Composer are unavailable; local diff checks are not runtime verification.
+2. Complete actual Hotel full/partial credit-note sandbox acceptance, original RefUSIN matching, duplicate/retry recovery and legacy-agent compatibility evidence. No production credential or live invoice experiment.
+3. Reconcile actual folio money refunds with drawer/day-close payment reports. Excluding a sales credit from payment buckets is implemented; folio refund settlement reporting must also be proven before enabling either write action.
+4. Verify monthly-return/Annexure I procedure and applicable consolidated adjustment rules independently; API acceptance is not monthly-return completion.
+5. Browser evidence for enabled issuance/refund and translated desktop/mobile flows; the default gate is not enabled by CI success alone.
+
+Regression tests cover read-only review, company/cashier isolation, original acceptance, pending child, excessive quantity, safe legacy mapping, idempotent partial issuance, accepted separate refund and refund cap, full credit without stay cancellation, default gate, stale preview and HTTP review. Synthetic regulator status is test setup, never sandbox acceptance evidence.

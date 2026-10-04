@@ -32,7 +32,7 @@ class HotelCreditNotePolicy
         }
         $pending = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
             ->where('parent_transaction_id', $bill->id)->where('transaction_type', 'return')
-            ->where(fn ($q) => $q->whereNull('pra_status')->orWhere('pra_status', '!=', 'submitted'))->exists();
+            ->where(fn ($q) => $q->whereNull('pra_status')->orWhere('pra_status', '!=', 'submitted')->orWhereNull('pra_invoice_number')->orWhere('pra_invoice_number', ''))->exists();
         if ($pending) {
             throw new HotelStayException('Resolve the existing credit note before another adjustment.');
         }
@@ -74,13 +74,20 @@ class HotelCreditNotePolicy
         if ($lines === []) {
             throw new HotelStayException('No remaining quantity selected.');
         }
+        $mappingComplete = $bill->items->every(fn ($item) => $item->hotel_folio_entry_id
+            && $charges->contains(fn ($entry) => (int) $entry->id === (int) $item->hotel_folio_entry_id))
+            && $bill->items->pluck('hotel_folio_entry_id')->unique()->count() === $bill->items->count()
+            && $charges->count() === $bill->items->count();
         return [
+            'fingerprint' => hash('sha256', json_encode([$bill->getAttributes(), $bill->items->toArray(), $charges->toArray(), $lines], JSON_THROW_ON_ERROR)),
+            'folio_mapping_complete' => $mappingComplete,
             'kind' => $full ? 'full_remaining' : 'partial', 'bill_id' => (int) $bill->id,
             'original_usin' => $bill->invoice_number, 'original_fiscal_number' => $bill->pra_invoice_number,
             'lines' => $lines, 'tax_inclusive' => (bool) $bill->tax_inclusive,
+            'estimated_total' => round(array_sum(array_column($lines, 'original_subtotal_share')) + ($bill->tax_inclusive ? 0 : array_sum(array_column($lines, 'original_tax_share'))), 0),
             'original_bill_discount' => (float) $bill->discount_amount,
             // Shares are inputs for reconciliation, not an authorized credit total or refund.
-            'issuance_enabled' => false, 'refund_amount' => null, 'stay_action' => 'unchanged',
+            'issuance_enabled' => (bool) config('hotel_credit_notes.enabled', false) && $mappingComplete && (float) $bill->discount_amount === 0.0, 'refund_amount' => null, 'stay_action' => 'unchanged',
         ];
     }
 }

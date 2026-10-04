@@ -699,8 +699,8 @@ class HotelStayService
         $rooms = HotelRoom::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->where('is_active', true)
-            ->orderBy('room_number')
-            ->get();
+            ->orderBy('id')
+            ->get()->sortBy('room_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $open = HotelStay::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->whereIn('status', HotelStay::OPEN_STATUSES)
@@ -877,8 +877,8 @@ class HotelStayService
         $rooms = HotelRoom::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->where('is_active', true)
-            ->orderBy('room_number')
-            ->get();
+            ->orderBy('id')
+            ->get()->sortBy('room_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $open = HotelStay::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->whereIn('status', HotelStay::OPEN_STATUSES)

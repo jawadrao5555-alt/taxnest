@@ -95,8 +95,8 @@ class HotelController extends Controller
         $branchId = $this->branches->getActiveBranchId();
         $rooms = HotelRoom::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->orderBy('room_number')
-            ->get();
+            ->orderBy('id')
+            ->get()->sortBy('room_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $activeRooms = $rooms->where('is_active', true);
         $removedRooms = $rooms->where('is_active', false);
         $editRoomId = (int) request()->query('edit_room', 0);
@@ -256,8 +256,8 @@ class HotelController extends Controller
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->where('is_active', true)
             ->where('service_state', HotelRoom::SERVICE_IN)
-            ->orderBy('room_number')
-            ->get();
+            ->orderBy('id')
+            ->get()->sortBy('room_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $customers = [];
         if (Schema::hasTable('pos_customers')) {
             $customers = PosCustomer::where('company_id', $companyId)
@@ -330,8 +330,8 @@ class HotelController extends Controller
         $rooms = HotelRoom::where('company_id', $companyId)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->where('is_active', true)
-            ->orderBy('room_number')
-            ->get();
+            ->orderBy('id')
+            ->get()->sortBy('room_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $catalogBranchId = $stay->branch_id ? (int) $stay->branch_id : $branchId;
         $products = HotelFolioCatalog::products($companyId, $catalogBranchId);
         $services = HotelFolioCatalog::services($companyId, $catalogBranchId);

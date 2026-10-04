@@ -311,6 +311,9 @@ class PraIntegrationService
                     ->find($transaction->parent_transaction_id)
                 : null;
             $refUsin = $parent?->invoice_number;
+            if ($transaction->payment_method === 'hotel_credit_note') {
+                $paymentMode = self::PAYMENT_MODE_MAP[$parent?->payment_method] ?? 1;
+            }
             // Amounts remain positive; only InvoiceType and RefUSIN are set per line.
             foreach ($items as $i => $ln) {
                 $items[$i]['InvoiceType'] = 3;

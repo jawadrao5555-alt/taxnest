@@ -42,7 +42,25 @@
         </div>
         @endforeach
     </div>
-    @if(in_array($stay->status, ['checked_in', 'checked_out'], true))
+    @if($issuedBills->isNotEmpty())
+    <section class="mb-4 rounded-xl border bg-white dark:bg-gray-900 p-4" data-hotel-issued-bills="1">
+        <h2 class="font-semibold">{{ __('hotel_bill.bill_action') }}</h2>
+        @foreach($issuedBills as $bill)
+        @php
+            $accepted = $bill->pra_status === 'submitted' && !empty($bill->pra_invoice_number);
+            $billState = $accepted ? 'submitted' : ($bill->pra_status ?: 'local');
+        @endphp
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2" data-hotel-bill-id="{{ $bill->id }}" data-hotel-bill-state="{{ $billState }}">
+            <div>
+                <strong>{{ $bill->invoice_number }}</strong>
+                <p class="text-xs">{{ $accepted ? __('pos.hotel_fiscal_bill').' · '.$bill->pra_invoice_number : __('hotel_preview.status_'.$billState) }}</p>
+            </div>
+            <a href="{{ route('pos.receipt', $bill->id) }}" target="_blank" rel="noopener" class="rounded-lg border px-3 py-2 text-sm">{{ __('hotel_bill.issued_receipt') }}</a>
+        </div>
+        @endforeach
+    </section>
+    @endif
+    @if(in_array($stay->status, ['checked_in', 'checked_out'], true) && ($totals['uninvoiced_charges'] ?? 0) > 0.009)
             <form method="POST" action="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-hotel-confirm-flow="settle" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
                 @csrf
             <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">

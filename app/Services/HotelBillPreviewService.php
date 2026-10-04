@@ -32,6 +32,7 @@ class HotelBillPreviewService
             $willIssue = $remaining <= 0.009 && $open->isNotEmpty();
         } else {
             if (!in_array($stay->status, [HotelStay::STATUS_CHECKED_IN, HotelStay::STATUS_CHECKED_OUT], true)) throw new HotelStayException(__('pos.hotel_transition_blocked'));
+            if ($open->isEmpty()) throw new HotelStayException(__('pos.hotel_nothing_to_invoice'));
             [$picked] = app(HotelFolioInvoiceService::class)->coveredCharges($stay, $company, $open, $method);
             $willIssue = (bool) $picked;
             if (!$picked) throw new HotelStayException(__('pos.hotel_tax_coverage_needed'));

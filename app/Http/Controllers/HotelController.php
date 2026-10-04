@@ -339,8 +339,11 @@ class HotelController extends Controller
         $checkoutPolicy = HotelCheckoutPolicy::forCompany(\App\Models\Company::find($companyId));
         $timeline = $this->stays->stayTimeline($stay);
         $deskSummary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
+        $issuedBills = \App\Models\PosTransaction::where('company_id', $companyId)
+            ->whereIn('id', $stay->folioEntries->pluck('pos_transaction_id')->filter()->unique())
+            ->orderBy('id')->get();
 
-        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline', 'deskSummary'));
+        return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline', 'deskSummary', 'issuedBills'));
     }
 
     public function statement(Request $request, int $id)

@@ -353,8 +353,18 @@ class HotelGuestHouseFinalDeliveryTest extends TestCase
         $this->actingAs($user, 'pos')
             ->get('/pos/hotel/stays/' . $stay->id)
             ->assertOk()
-            ->assertSee(__('pos.hotel_fiscal_bill'), false)
+            ->assertSee('data-hotel-issued-bills="1"', false)
+            ->assertSee('data-hotel-bill-id="'.$invoiceId.'"', false)
+            ->assertSee('data-hotel-bill-state="local"', false)
+            ->assertSee(__('hotel_preview.status_local'), false)
+            ->assertSee(route('pos.receipt', $invoiceId), false)
             ->assertSee((string) $settled['transaction']->invoice_number, false);
+        $settled['transaction']->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-HOTEL-FISCAL']);
+        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()
+            ->assertSee('data-hotel-bill-state="submitted"', false)
+            ->assertSee(__('pos.hotel_fiscal_bill'), false)
+            ->assertSee('SYNTHETIC-HOTEL-FISCAL', false)
+            ->assertSee(route('pos.receipt', $invoiceId), false);
         $this->assertSame($invoiceId, \App\Models\HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'charge')->whereNotNull('pos_transaction_id')->value('pos_transaction_id'));
     }
 

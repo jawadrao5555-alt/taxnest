@@ -517,7 +517,7 @@ async function cashierHandoffWorkflow(page,t,v) {
   await waitForOperationalSurface(cashierPage); await dismiss(cashierPage);
   await cashierPage.locator('[data-video="counter-dine-in"]').click();
   const [claim]=await Promise.all([
-    cashierPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST').then(async r=>({ok:r.ok(),data:await r.json()})),
+    cashierPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'),
     cashierPage.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click(),
   ]);
   if(!claim.ok())throw new Error('Transferred table still cannot open');

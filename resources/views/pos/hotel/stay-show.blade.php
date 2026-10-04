@@ -42,6 +42,18 @@
         </div>
         @endforeach
     </div>
+    @if(in_array($stay->status, ['checked_in', 'checked_out'], true))
+            <form method="POST" action="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-hotel-confirm-flow="settle" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
+                @csrf
+            <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
+                <h3 class="text-sm font-semibold">{{ __('hotel_preview.title') }}</h3>
+                <p class="text-xs text-gray-500">{{ __('pos.hotel_issue_bill_hint') }}</p>
+                <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+                    @include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])
+                </select>
+                <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('hotel_preview.title') }}</button>
+            </form>
+    @endif
     @if(($deskSummary['balance'] ?? 0) > 0.009)
     <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{{ __('hotel_simplify.payment_pending') }} · {{ __('hotel_simplify.cash_estimate') }}. {{ __('hotel_simplify.method_changes_tax') }} <a href="#hotel-payment" class="font-semibold underline">{{ __('pos.hotel_collect_now') }}</a></p>
     @endif
@@ -211,16 +223,7 @@
             </form>
             </details>
             @endif
-            <form method="POST" action="{{ route('pos.hotel.folio.settle', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
-                @csrf
-            <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
-                <h3 class="text-sm font-semibold">{{ __('pos.hotel_issue_bill') }}</h3>
-                <p class="text-xs text-gray-500">{{ __('pos.hotel_issue_bill_hint') }}</p>
-                <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
-                    @include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])
-                </select>
-                <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_issue_bill') }}</button>
-            </form>
+
             </details>
         </div>
     </div>

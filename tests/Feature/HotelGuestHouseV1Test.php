@@ -46,6 +46,85 @@ class HotelGuestHouseV1Test extends TestCase
         }
     }
 
+    private function previewStay(bool $reporting = false): array
+    {
+        $company = $this->company('hotel', ['pra_reporting_enabled' => false, 'pra_connection_mode' => 'fiscal_device']);
+        $owner = $this->owner($company);
+        $owner->forceFill(['pra_reporting_enabled' => $reporting])->save();
+        $service = app(HotelStayService::class);
+        $room = $this->room($service, $company, 'P-101', 1000);
+        $stay = $service->book((int) $company->id, (int) $owner->id, [
+            'room_id' => $room->id, 'check_in_date' => now()->toDateString(),
+            'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Preview Guest',
+            'rate_amount' => 1000, 'discount_type' => 'amount', 'discount_value' => 100, 'walk_in' => true,
+        ]);
+        $total = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['total'];
+        app(HotelFolioService::class)->postPayment($stay, ['amount' => $total, 'payment_method' => 'cash', 'idempotency_key' => 'preview-pay'], (int) $owner->id);
+        return [$company, $owner, $stay];
+    }
+
+    public function test_bill_preview_is_read_only_and_confirmation_is_idempotent(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        $data = ['flow' => 'settle', 'payment_method' => 'cash'];
+        $url = route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data);
+        $count = HotelFolioEntry::count();
+        $preview = $this->actingAs($owner, 'pos')->getJson($url)->assertOk()->json();
+        $this->assertSame(100.0, (float) $preview['discount']);
+        $this->assertFalse($preview['reporting']);
+        $this->assertDatabaseCount('pos_transactions', 0);
+        $this->assertSame($count, HotelFolioEntry::count());
+        $this->get(route('pos.hotel.stays.show', $stay->id))->assertOk()->assertSee('data-hotel-confirm-flow="settle"', false);
+        $payload = $data + ['preview_token' => $preview['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $result = $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('status', 'local')->assertJsonPath('fiscal_number', null)->json();
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $result['bill_id']);
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $this->assertSame($count, HotelFolioEntry::count());
+        $this->assertNull(\App\Models\PosTransaction::first()->pra_status);
+        $this->assertStringStartsWith('L', \App\Models\PosTransaction::first()->invoice_number);
+        $this->getJson($result['status_url'])->assertOk()->assertJsonPath('status', 'local')->assertJsonPath('qr', null);
+    }
+
+    public function test_bill_preview_rejects_changed_reporting_folio_tampering_and_foreign_tenant(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        $data = ['flow' => 'settle', 'payment_method' => 'cash'];
+        $url = route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data);
+        $preview = $this->actingAs($owner, 'pos')->getJson($url)->assertOk()->json();
+        $payload = $data + ['preview_token' => $preview['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $owner->forceFill(['pra_reporting_enabled' => true])->save();
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertStatus(409);
+        $owner->forceFill(['pra_reporting_enabled' => false])->save();
+        HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'charge')->update(['description' => 'Changed charge']);
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertStatus(409);
+        $payload['preview_token'] = 'tampered';
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertStatus(409);
+        $this->assertDatabaseCount('pos_transactions', 0);
+        $other = $this->company('hotel');
+        $this->actingAs($this->owner($other), 'pos')->getJson($url)->assertNotFound();
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertNotFound();
+    }
+
+    public function test_bill_preview_pra_pending_is_not_accepted_and_checkout_repeats_once(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay(true);
+        $data = ['flow' => 'checkout', 'payment_method' => 'cash', 'amount' => 0];
+        $preview = $this->actingAs($owner, 'pos')->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('reporting', true)->json();
+        $payload = $data + ['preview_token' => $preview['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $result = $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('status', 'pending')->assertJsonPath('qr', null)->assertJsonPath('fiscal_number', null)->json();
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $result['bill_id']);
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $this->assertSame('checked_out', $stay->fresh()->status);
+        $bill = \App\Models\PosTransaction::findOrFail($result['bill_id']);
+        // Fictional acceptance fixture only; no external PRA request.
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-PRA-123']);
+        $this->getJson($result['status_url'])->assertOk()->assertJsonPath('status', 'submitted')->assertJsonPath('fiscal_number', 'SYNTHETIC-PRA-123')->assertJsonStructure(['qr', 'receipt_url']);
+        $bill->update(['pra_status' => 'failed', 'pra_invoice_number' => null]);
+        $this->getJson($result['status_url'])->assertOk()->assertJsonPath('status', 'failed')->assertJsonPath('qr', null);
+        $other = $this->company('hotel');
+        $this->actingAs($this->owner($other), 'pos')->getJson($result['status_url'])->assertNotFound();
+    }
+
     private function company(string $category, array $overrides = []): Company
     {
         $defaults = PosFeatureService::defaultsForCategory($category);

@@ -440,6 +440,72 @@ class HotelController extends Controller
         }
     }
 
+    private function billPreviewData(Request $request): array
+    {
+        $data = $request->validate([
+            'flow' => 'required|in:settle,checkout',
+            'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
+            'amount' => 'required_if:flow,checkout|nullable|numeric|min:0|max:10000000',
+            'leave_balance' => 'nullable|boolean',
+        ]);
+        return ['flow' => $data['flow'], 'payment_method' => $data['payment_method'],
+            'amount' => $data['flow'] === 'checkout' ? round((float) $data['amount'], 2) : 0,
+            'leave_balance' => $request->boolean('leave_balance')];
+    }
+
+    public function billPreview(Request $request, int $id)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        try {
+            $preview = app(\App\Services\HotelBillPreviewService::class)->preview($this->stay($id), auth('pos')->user()->fresh(), $this->billPreviewData($request));
+            return response()->json($preview);
+        } catch (HotelStayException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+    }
+
+    public function billConfirm(Request $request, int $id)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $stay = $this->stay($id);
+        $data = $this->billPreviewData($request);
+        $validated = $request->validate(['preview_token' => 'required|string|max:4096', 'idempotency_key' => 'required|uuid']);
+        $user = auth('pos')->user()->fresh();
+        $key = hash('sha256', 'hotel-confirm|'.$stay->company_id.'|'.$stay->id.'|'.$user->id.'|'.$data['flow'].'|'.$validated['idempotency_key']);
+        $billKey = $data['flow'] === 'checkout' ? hash('sha256', 'checkout-bill|'.$stay->id.'|'.$key) : $key;
+        try {
+            $bill = DB::transaction(function () use ($stay, $data, $validated, $user, $key, $billKey) {
+                $locked = HotelStay::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($stay->id);
+                $user = \App\Models\User::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($user->id);
+                $existing = \App\Models\PosTransaction::where('company_id', $stay->company_id)->where('offline_uuid', $billKey)->first();
+                if ($existing) return $existing;
+                if ($data['flow'] === 'checkout' && $locked->status === HotelStay::STATUS_CHECKED_OUT) {
+                    throw new HotelStayException(__('pos.hotel_transition_blocked'));
+                }
+                app(\App\Services\HotelBillPreviewService::class)->verify($locked, $user, $data, $validated['preview_token']);
+                if ($data['flow'] === 'checkout') {
+                    app(\App\Services\HotelDeskService::class)->checkout($locked, (int) $user->id, $data + ['idempotency_key' => $key]);
+                    return \App\Models\PosTransaction::where('company_id', $stay->company_id)->where('offline_uuid', $billKey)->first();
+                }
+                return $this->folio->settleCoveredCharges($locked, (int) $user->id, $data['payment_method'], $key)['transaction'];
+            });
+            $result = app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill?->fresh());
+            if ($bill) $result['status_url'] = route('pos.hotel.bill-status', [$stay->id, $bill->id]);
+            return response()->json($result);
+        } catch (HotelStayException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+    }
+
+    public function billStatus(int $id, int $billId)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $stay = $this->stay($id);
+        abort_unless(\App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->where('pos_transaction_id', $billId)->exists(), 404);
+        $bill = \App\Models\PosTransaction::where('company_id', $stay->company_id)->findOrFail($billId);
+        return response()->json(app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill));
+    }
+
     public function showCheckout(int $id)
     {
         $stay = $this->stay($id)->load(['room', 'folioEntries']);

@@ -356,12 +356,14 @@ class RestaurantTableController extends Controller
                 'floor:id,name',
                 'activeOrders' => function ($q) {
                     $columns = ['id', 'table_id', 'order_number', 'total_amount', 'created_by', 'source', 'order_type', 'kot_sent_at', 'status', 'created_at'];
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'assigned_cashier_id')) $columns[] = 'assigned_cashier_id';
                     if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
                         $columns[] = 'online_payment_awaited_at';
                     }
                     $q->select($columns);
                 },
                 'activeOrders.creator:id,name',
+                'activeOrders.assignedCashier:id,name',
             ])
             ->get()
             ->map(function ($t) {
@@ -384,6 +386,8 @@ class RestaurantTableController extends Controller
                         'order_number' => $active->order_number,
                         'total_amount' => (float) $active->total_amount,
                         'staff_name' => $active->creator?->name,
+                        'assigned_cashier_id' => $active->assigned_cashier_id,
+                        'assigned_cashier' => $active->assignedCashier?->name,
                         'source' => $active->source,
                         'order_type' => $active->order_type,
                         'kot_sent_at' => $active->kot_sent_at,
@@ -421,17 +425,19 @@ class RestaurantTableController extends Controller
             ->orderBy('id')
             ->get(['id', 'status', 'updated_at', 'locked_by_user_id', 'occupied_since']);
 
+        $orderColumns = ['id', 'table_id', 'status', 'updated_at'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'assigned_cashier_id')) $orderColumns[] = 'assigned_cashier_id';
         $orderRows = $DB::table('restaurant_orders')
             ->where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])
             ->whereNotNull('table_id')
             ->orderBy('id')
-            ->get(['id', 'table_id', 'status', 'updated_at']);
+            ->get($orderColumns);
 
         $payload =
             $tableRows->map(fn ($r) => $r->id . ':' . $r->status . ':' . $r->updated_at . ':' . $r->locked_by_user_id . ':' . $r->occupied_since)->join(',')
             . '|'
-            . $orderRows->map(fn ($r) => $r->id . ':' . $r->table_id . ':' . $r->status . ':' . $r->updated_at)->join(',');
+            . $orderRows->map(fn ($r) => $r->id . ':' . $r->table_id . ':' . $r->status . ':' . $r->updated_at . ':' . ($r->assigned_cashier_id ?? ''))->join(',');
 
         return '"tbl-' . $companyId . '-' . md5($payload) . '"';
     }

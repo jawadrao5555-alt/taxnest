@@ -250,6 +250,9 @@ class HotelFolioService
     {
         return DB::transaction(function () use ($stay, $data, $userId) {
             $stay = HotelStay::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($stay->id);
+            if ($stay->status === HotelStay::STATUS_CANCELLED && in_array($data['entry_type'] ?? '', [HotelFolioEntry::TYPE_CHARGE, HotelFolioEntry::TYPE_PAYMENT, HotelFolioEntry::TYPE_DEPOSIT], true)) {
+                throw new HotelStayException(__('hotel_correction.closed'));
+            }
             $key = trim((string) ($data['idempotency_key'] ?? ''));
             if ($key !== '') {
                 $key = substr($key, 0, 64);

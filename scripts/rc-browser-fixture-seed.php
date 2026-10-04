@@ -137,6 +137,9 @@ $tableCashier = $user($tableShop, 'Synthetic Table Cashier', 'table-orders@rc-br
 $tableWaiter = $user($tableShop, 'Synthetic Table Waiter', 'table-waiter@rc-browser.invalid', 'user', 'pos_waiter');
 $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);
 $tableCases = [];
+$handoffCases = [];
+$tableOwner = $user($tableShop, 'Synthetic Table Owner', 'table-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
 $printEvidenceShop = $company('Synthetic Print Evidence', 'print-evidence@rc-browser.invalid', 'RCBROWSERPRINT', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
@@ -167,6 +170,18 @@ foreach (['held', 'preparing', 'ready'] as $index => $status) {
     ]);
     $tableCases[] = ['tableId' => $table->id, 'number' => $table->table_number,
         'orderId' => $order->id, 'itemName' => 'Synthetic '.$status.' dish', 'status' => $status];
+}
+foreach (['desktop', 'mobile'] as $viewport) {
+    $table = RestaurantTable::create(['company_id' => $tableShop->id, 'floor_id' => $tableFloor->id,
+        'table_number' => 'HANDOFF-'.$viewport, 'seats' => 4, 'status' => 'occupied', 'occupied_since' => $now, 'is_active' => true]);
+    $order = RestaurantOrder::create(['company_id' => $tableShop->id, 'table_id' => $table->id,
+        'order_number' => 'RC-HANDOFF-'.$viewport, 'order_type' => 'dine_in', 'source' => 'waiter',
+        'status' => 'held', 'created_by' => $tableWaiter->id, 'assigned_cashier_id' => $tableOwner->id,
+        'subtotal' => 500, 'total_amount' => 500]);
+    RestaurantOrderItem::create(['order_id' => $order->id, 'item_type' => 'manual',
+        'item_name' => 'Synthetic handoff '.$viewport, 'quantity' => 1, 'unit_price' => 500, 'subtotal' => 500]);
+    $handoffCases[$viewport] = ['tableId' => $table->id, 'number' => $table->table_number, 'orderId' => $order->id,
+        'itemName' => 'Synthetic handoff '.$viewport];
 }
 $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
@@ -338,7 +353,8 @@ $fixture = [
     'transactionalJourneys' => [
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
-            'tableOrderWorkflow' => $tableCases],
+            'tableOrderWorkflow' => $tableCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
+                'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
         ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],

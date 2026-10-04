@@ -78,14 +78,17 @@
     }, true);
     el('confirm').addEventListener('click', async () => {
         if (busy || !context || context.result) return;
-        busy = true; el('confirm').disabled = true; el('back').disabled = true; el('error').textContent = '';
+        busy = true; let refused = false; el('confirm').disabled = true; el('back').disabled = true; el('error').textContent = '';
         // On an uncertain response retain this UUID/payload; never manufacture a new bill.
         try {
             const response = await fetch(context.url, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': context.payload._token}, body: JSON.stringify(context.payload)});
             const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.message || labels.failed);
+            if (!response.ok || !result.success) {
+                refused = response.status >= 400 && response.status < 500;
+                throw new Error(result.message || result.error || labels.failed);
+            }
             context.statusUrl = result.status_url; renderResult(result);
-        } catch (error) { el('error').textContent = (error.message || labels.failed) + ' ' + labels.retry_same; }
-        finally { busy = false; el('confirm').disabled = false; el('back').disabled = false; }
+        } catch (error) { el('error').textContent = (error.message || labels.failed) + (refused ? '' : ' ' + labels.retry_same); }
+        finally { busy = false; el('confirm').disabled = refused; el('back').disabled = false; }
     });
 })();

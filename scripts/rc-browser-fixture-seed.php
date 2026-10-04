@@ -372,6 +372,7 @@ $fixture = [
     ], $categoryJourneys),
     'transactionalJourneys' => [
         ['name' => 'hotel-credit-review', 'login' => $creditOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
+            'paths' => ['/pos/hotel/stays/'.$creditStay->id.'/credit-notes'],
             'hotelCreditReview' => ['path' => '/pos/hotel/stays/'.$creditStay->id.'/credit-notes']],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],

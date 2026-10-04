@@ -380,4 +380,85 @@ class PosCounterOrderOpenStatusesTest extends TestCase
         $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, false, 1));
         $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $cashier, false, 2));
     }
+
+    public function test_assigned_table_returns_actionable_conflict_without_leaking_items(): void
+    {
+        $owner = $this->makeUser('pos_admin');
+        $this->actAs($this->makeUser('pos_cashier'));
+        $id = $this->order(['table_id' => $this->table(), 'assigned_cashier_id' => $owner->id]);
+        $controller = app(RestaurantWaiterController::class);
+        $response = $controller->claimIncoming(Request::create('/', 'POST', ['allow_reassign' => false]), $id);
+        $data = $response->getData(true);
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame('cashier_assignment_conflict', $data['code']);
+        $this->assertSame($owner->name, $data['assigned_cashier']);
+        $this->assertSame([], $data['cashiers']);
+        $this->assertArrayNotHasKey('items', $data);
+        $this->actAs($this->makeUser('pos_manager'));
+        $response = $controller->claimIncoming(Request::create('/', 'POST', ['allow_reassign' => false]), $id);
+        $this->assertSame(409, $response->getStatusCode(), 'New UI never silently steals an assigned order');
+        $this->assertSame($owner->id, DB::table('restaurant_orders')->find($id)->assigned_cashier_id);
+        $this->assertNotEmpty($response->getData(true)['cashiers']);
+    }
+
+    private function handoffSchema(): void
+    {
+        Schema::table('restaurant_orders', fn (Blueprint $t) => $t->unsignedInteger('edit_revision')->default(0));
+        Schema::create('audit_logs', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->unsignedBigInteger('user_id');
+            $t->string('action'); $t->string('entity_type'); $t->unsignedBigInteger('entity_id');
+            $t->text('old_values'); $t->text('new_values'); $t->string('ip_address')->nullable();
+            $t->string('sha256_hash'); $t->timestamp('created_at');
+        });
+    }
+
+    public function test_manager_handoff_is_audited_and_fences_stale_carts_and_repeat_requests(): void
+    {
+        $this->handoffSchema();
+        $old = $this->makeUser('pos_cashier'); $target = $this->makeUser('pos_cashier');
+        $manager = $this->actAs($this->makeUser('pos_manager'));
+        $id = $this->order(['table_id' => $this->table(), 'assigned_cashier_id' => $old->id]);
+        $request = Request::create('/', 'POST', ['cashier_id' => $target->id, 'assigned_cashier_id' => $old->id, 'revision' => 0]);
+        $controller = app(RestaurantWaiterController::class);
+        $this->assertSame(200, $controller->transferIncoming($request, $id)->getStatusCode());
+        $this->assertSame(409, $controller->transferIncoming($request, $id)->getStatusCode());
+        $row = DB::table('restaurant_orders')->find($id);
+        $this->assertSame($target->id, $row->assigned_cashier_id); $this->assertSame(1, $row->edit_revision);
+        $this->assertSame('held', $row->status);
+        $this->assertSame(1, DB::table('audit_logs')->where('action', 'waiter_order_cashier_transferred')->count());
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $old, false, 0));
+        $this->assertFalse(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $manager, false, 0));
+        $this->actAs($target);
+        $this->assertSame(200, $controller->claimIncoming(Request::create('/', 'POST', ['allow_reassign' => false]), $id)->getStatusCode());
+        $this->assertTrue(RestaurantWaiterController::settleWaiterOrder($this->companyId, $id, $this->makeTxn(), $target, false, 1));
+    }
+
+    public function test_cashier_cannot_transfer_an_order(): void
+    {
+        $this->actAs($this->makeUser('pos_cashier'));
+        try {
+            app(RestaurantWaiterController::class)->transferIncoming(Request::create('/', 'POST'), $this->order());
+            $this->fail('Cashier transfer must be forbidden');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+    }
+
+    public function test_manager_cannot_transfer_to_a_foreign_cashier_or_a_closed_order(): void
+    {
+        $this->handoffSchema();
+        $old = $this->makeUser('pos_cashier'); $target = $this->makeUser('pos_cashier');
+        $this->actAs($this->makeUser('pos_manager'));
+        $id = $this->order(['assigned_cashier_id' => $old->id, 'status' => 'completed']);
+        $request = Request::create('/', 'POST', ['cashier_id' => $target->id, 'assigned_cashier_id' => $old->id, 'revision' => 0]);
+        $this->assertSame(409, app(RestaurantWaiterController::class)->transferIncoming($request, $id)->getStatusCode());
+        DB::table('users')->where('id', $target->id)->update(['company_id' => 99999]);
+        try {
+            app(RestaurantWaiterController::class)->transferIncoming($request, $id);
+            $this->fail('Foreign cashier must be rejected');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(422, $e->getStatusCode());
+        }
+        $this->assertSame(0, DB::table('audit_logs')->count());
+    }
 }

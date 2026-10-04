@@ -5666,7 +5666,8 @@ function restaurantPos() {
                         if (same) return;
                         const userChanged = String(cur.u) !== String(fresh.u) || String(cur.c) !== String(fresh.c);
                         // Never yank an in-progress sale for a content update.
-                        const busy = (this.cart && this.cart.length > 0) || this.editingBillId || this.showPayModal || this.showReceipt || this.submitting;
+                        const saleBusy = () => (this.cart && this.cart.length > 0) || this.editingBillId || this.showPayModal || this.showReceipt || this.submitting || this._claimBusy || this.cashierConflict || this.showTablePicker || this.boardMenuTable;
+                        const busy = saleBusy();
                         if (!userChanged && busy) return;
                         // One-shot guard: never reload twice for the same server fingerprint
                         // (protects against a reload loop if the cache update races us).
@@ -5706,6 +5707,10 @@ function restaurantPos() {
                                 try { navigator.serviceWorker?.controller?.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (e) {}
                                 await new Promise(r => setTimeout(r, 300));
                             }
+                            // The network/cache refresh above is asynchronous. A cashier may
+                            // have opened a table or received an assignment conflict meanwhile.
+                            // Keep that interaction intact; identity changes still force reload.
+                            if (!userChanged && saleBusy()) return;
                             try { sessionStorage.setItem('tnBootFpReloaded', sig); } catch (e) {}
                             window.location.reload();
                         })();

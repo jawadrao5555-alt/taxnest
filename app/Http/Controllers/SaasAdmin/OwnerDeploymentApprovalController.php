@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Exceptions\DeploymentGitHubUnavailable;
 use App\Models\OwnerDeploymentApprovalRequest;
 use App\Services\EligibleDeploymentPullRequestService;
 use App\Services\GitHubActionsOidcVerifier;
@@ -142,7 +143,22 @@ class OwnerDeploymentApprovalController extends Controller
             'expected_head_sha' => ['required', 'regex:/^[0-9a-fA-F]{40}$/'],
         ]);
 
-        return response()->json($service->claimForMerge($input, $claims));
+        try {
+            return response()->json($service->claimForMerge($input, $claims));
+        } catch (DeploymentGitHubUnavailable $exception) {
+            return response()->json([
+                'code' => 'github_validation_unavailable',
+                'message' => $exception->getMessage(),
+                'stage' => $exception->stage,
+                'upstream_status' => $exception->upstreamStatus,
+                'retry_after' => $exception->retryAfter,
+            ], 503)->header('Retry-After', (string) $exception->retryAfter);
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json([
+                'code' => 'deployment_ineligible',
+                'message' => $exception->getMessage(),
+            ], 409);
+        }
     }
 
     public function mergeComplete(

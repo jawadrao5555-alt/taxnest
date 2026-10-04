@@ -11813,7 +11813,16 @@ function restaurantPos() {
                     // bill that never comes out of the printer (30 Jul 2026 incident).
                     if (_retry && res.status >= 500) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
                     // 4xx or exhausted retry: the job did NOT reach the queue.
-                    this.printBeacon('silent-print-http-fail', { type: payload.type, transaction_id: payload.transaction_id, order_id: payload.restaurant_order_id, http_status: res.status });
+                    const rejected = await res.json().catch(() => null);
+                    const reasons = {
+                        disabled: @json(__('pos.print_reject_disabled')),
+                        agent_offline: @json(__('pos.print_reject_agent_offline')),
+                        counter_unavailable: @json(__('pos.print_reject_counter_unavailable')),
+                        no_printer: @json(__('pos.print_reject_no_printer')),
+                    };
+                    const reason = Object.hasOwn(reasons, rejected?.reason || '') ? rejected.reason : null;
+                    this.printBeacon('silent-print-http-fail', { type: payload.type, transaction_id: payload.transaction_id, order_id: payload.restaurant_order_id, http_status: res.status, reason, request_id: rejected?.request_id });
+                    if (reason) this.showToast(reasons[reason], 'warning');
                     return false;
                 }
                 const d = await res.json().catch(() => null);

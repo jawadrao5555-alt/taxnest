@@ -13,6 +13,13 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Bounded diagnostic retention; no print jobs or customer data are modified.
+Schedule::call(function () {
+    if (\Illuminate\Support\Facades\Schema::hasTable('pos_print_evidence')) {
+        \Illuminate\Support\Facades\DB::table('pos_print_evidence')->where('received_at', '<', now()->subDays(30))->delete();
+    }
+})->dailyAt('04:55')->name('print-evidence-retention')->withoutOverlapping();
+
 // Scheduler heartbeat: records the last time the cron actually fired so the
 // admin System Control page can show whether background jobs run on prod.
 Schedule::call(function () {

@@ -385,6 +385,30 @@ class PosCounterKotDeltaSnapshotTest extends TestCase
 
     // ── 5. Full mode: both jobs render the WHOLE order ────────────────────
 
+    public function test_delayed_job_with_removed_items_records_no_document_instead_of_claiming_paper_printed(): void
+    {
+        (require database_path('migrations/2026_10_03_170000_add_print_job_evidence.php'))->up();
+        $this->makePosUser();
+        $orderId = $this->makeOrder(['Synthetic removed item']);
+        $this->enqueue($orderId, false);
+        [$kitchen] = $this->jobsFor($orderId);
+        // Reproduce a queued document whose live order content changed before fetch.
+        DB::table('restaurant_order_items')->where('order_id', $orderId)->delete();
+        $content = $this->agentGetContent($kitchen->id);
+        $content->assertStatus(204)->assertHeader('X-Print-No-Document-Reason', 'order_has_no_kitchen_lines');
+        $this->agentReportSuccess($kitchen->id); // Supported legacy agent omits outcome.
+        $row = DB::table('pos_print_jobs')->find($kitchen->id);
+        $this->assertSame('done', $row->status);
+        $this->assertSame('no_document', $row->result_outcome);
+        $this->assertNotNull($row->result_received_at);
+        $this->assertSame('no_document', \App\Support\KotPrintState::forJob($row)['key']);
+        $this->assertSame(1, DB::table('pos_print_evidence')->where('job_id', $kitchen->id)->where('event', 'no_document')->count());
+        $terminalAt = $row->result_received_at;
+        $this->agentReportSuccess($kitchen->id);
+        $this->assertSame($terminalAt, DB::table('pos_print_jobs')->find($kitchen->id)->result_received_at);
+        $this->assertSame(1, DB::table('pos_print_evidence')->where('job_id', $kitchen->id)->where('event', 'result_received')->count());
+    }
+
     public function test_full_mode_both_jobs_render_whole_order(): void
     {
         DB::table('companies')->where('id', 1)->update(['pos_kot_full_mode' => true]);

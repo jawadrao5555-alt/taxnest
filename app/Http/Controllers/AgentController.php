@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Company;
 use App\Models\PosTransaction;
 use App\Models\FbrPosTransaction;
@@ -181,6 +182,19 @@ class AgentController extends Controller
             $pcName = trim((string) $request->input('pc_name', ''));
             if ($pcName !== '') {
                 $attrs['name'] = mb_substr($pcName, 0, 60);
+            }
+            $previous = \App\Models\PosAgentDevice::where('company_id', $company->id)->where('device_uid', $uid)->first();
+            if ($previous?->last_seen_at && $previous->last_seen_at->lt(now()->subSeconds(120))) {
+                \App\Services\PrintJobEvidence::record($company->id, 'device_seen_after_gap', null, null,
+                    ['device_uid' => $uid, 'gap_seconds' => (int) $previous->last_seen_at->diffInSeconds(now()), 'agent_version' => $attrs['agent_version'] ?? $previous->agent_version]);
+            }
+            if (isset($attrs['printers']) && json_encode($attrs['printers']) !== json_encode($previous?->printers)) {
+                \App\Services\PrintJobEvidence::record($company->id, 'device_printer_list_changed', null, null,
+                    ['device_uid' => $uid, 'printer_names' => collect($attrs['printers'])->pluck('name')->all()]);
+            }
+            if (isset($attrs['agent_version']) && $attrs['agent_version'] !== $previous?->agent_version) {
+                \App\Services\PrintJobEvidence::record($company->id, 'device_version_changed', null, null,
+                    ['device_uid' => $uid, 'agent_version' => $attrs['agent_version']]);
             }
             \App\Models\PosAgentDevice::updateOrCreate(
                 ['company_id' => $company->id, 'device_uid' => $uid],
@@ -1655,16 +1669,16 @@ class AgentController extends Controller
         if ($claimIds === []) {
             return response()->json(['ok' => true, 'jobs' => [], 'count' => 0, 'held' => $held]);
         }
+        $claimFields = ['status' => 'printing', 'claim_token' => $token,
+            'attempts' => DB::raw('attempts + 1'), 'updated_at' => now()];
+        if (Schema::hasColumn('pos_print_jobs', 'result_outcome')) {
+            $claimFields += ['result_outcome' => null, 'result_received_at' => null, 'no_document_reason' => null];
+        }
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
             ->whereIn('id', $claimIds)
-            ->update([
-                'status' => 'printing',
-                'claim_token' => $token,
-                'attempts' => DB::raw('attempts + 1'),
-                'updated_at' => now(),
-            ]);
+            ->update($claimFields);
 
         $jobs = DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
@@ -1672,8 +1686,14 @@ class AgentController extends Controller
             ->orderBy('id')
             ->get([
                 'id', 'type', 'target_printer', 'transaction_id',
-                'restaurant_order_id', 'render_query', 'printed_item_ids', 'created_at', 'claim_token',
+                'restaurant_order_id', 'render_query', 'printed_item_ids', 'created_at', 'claim_token', 'attempts',
             ]);
+
+        foreach ($jobs as $claimedJob) {
+            \App\Services\PrintJobEvidence::record($company->id, 'claimed', $claimedJob->id, $claimedJob->attempts,
+                ['device_uid' => $deviceUid, 'agent_version' => $request->input('version'),
+                    'target_printer' => $claimedJob->target_printer, 'type' => $claimedJob->type]);
+        }
 
         return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count(), 'held' => $held]);
     }
@@ -2006,6 +2026,18 @@ class AgentController extends Controller
      * Reuses the exact same blade templates as the popup flow. Never accepts
      * arbitrary URLs — only job-id lookups scoped to the agent key's company.
      */
+    private function noPrintDocument($job, string $reason)
+    {
+        if (Schema::hasColumn('pos_print_jobs', 'no_document_reason')) {
+            DB::table('pos_print_jobs')->where('company_id', $job->company_id)->where('id', $job->id)
+                ->where('status', 'printing')->where('claim_token', $job->claim_token)
+                ->update(['no_document_reason' => $reason]);
+        }
+        \App\Services\PrintJobEvidence::record($job->company_id, 'no_document', $job->id, $job->attempts,
+            ['reason' => $reason, 'type' => $job->type, 'target_printer' => $job->target_printer]);
+        return response('', 204)->header('X-Print-No-Document-Reason', $reason);
+    }
+
     public function printJobContent(Request $request, $id)
     {
         $company = $request->attributes->get('agent_company');
@@ -2054,6 +2086,8 @@ class AgentController extends Controller
         }
 
         // Views + nested render logic may read the container binding.
+        \App\Services\PrintJobEvidence::record($company->id, 'content_requested', $job->id, $job->attempts,
+            ['device_uid' => $this->requestDeviceUid($request), 'agent_version' => $request->input('version')]);
         app()->instance('currentCompanyId', $company->id);
 
         // Test slip: prints the QUEUE'S OWN NAME. A shop whose Windows carries
@@ -2136,7 +2170,7 @@ class AgentController extends Controller
             if (!$job->restaurant_order_id && $job->transaction_id) {
                 $html = \App\Http\Controllers\RestaurantPosController::renderTransactionKot($company->id, (int) $job->transaction_id);
                 if ($html === null) {
-                    return response('', 204); // nothing to print — agent marks done
+                    return $this->noPrintDocument($job, 'transaction_has_no_kitchen_lines');
                 }
                 return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
             }
@@ -2222,7 +2256,8 @@ class AgentController extends Controller
             // this station has no rows) — 204 tells the agent to mark the job
             // done WITHOUT printing a blank.
             if ($ticketItems->isEmpty()) {
-                return response('', 204);
+                return $this->noPrintDocument($job, $order->items->isEmpty() ? 'order_has_no_kitchen_lines'
+                    : ($unprinted->isEmpty() && $delta ? 'delta_has_no_eligible_lines' : 'station_has_no_eligible_lines'));
             }
 
             $kotBatchNo = $ticketItems->max('kot_batch_no');
@@ -2254,7 +2289,7 @@ class AgentController extends Controller
                 ->with(['table', 'creator'])
                 ->find($job->restaurant_order_id);
             if (!$order) {
-                return response('', 204); // order gone — nothing to void-print
+                return $this->noPrintDocument($job, 'void_order_missing');
             }
             $this->setPrintLocale($order->creator?->language, $job, $company);
             $voidItems = collect();
@@ -2265,7 +2300,7 @@ class AgentController extends Controller
                 }
             }
             if ($voidItems->isEmpty()) {
-                return response('', 204); // no payload — never print a blank slip
+                return $this->noPrintDocument($job, 'void_payload_empty');
             }
             return response(view('pos.restaurant.kitchen-ticket', [
                 'order'        => $order,
@@ -2311,7 +2346,7 @@ class AgentController extends Controller
             // downgrade) must still not print. 204 = nothing to print, the
             // agent marks the job done instead of retrying forever.
             if (!\App\Services\PosFeatureService::fbrStoreSlipOn($company)) {
-                return response('', 204);
+                return $this->noPrintDocument($job, 'store_slip_disabled');
             }
             $notesOn = \App\Services\PosFeatureService::fbrStoreNotesOn($company);
             $this->setPrintLocale(null, $job, $company);
@@ -2319,7 +2354,7 @@ class AgentController extends Controller
                 $held = \App\Models\FbrPosHeldSale::where('company_id', $company->id)
                     ->find($job->restaurant_order_id);
                 if (!$held) {
-                    return response('', 204); // hold recalled/billed — nothing to print
+                    return $this->noPrintDocument($job, 'held_sale_missing');
                 }
                 $cartData  = $held->cart_data ?? [];
                 $items     = is_array($cartData['items'] ?? null) ? $cartData['items'] : [];
@@ -2449,6 +2484,11 @@ class AgentController extends Controller
         $validated = $request->validate([
             'success' => 'required|boolean',
             'error' => 'nullable|string|max:2000',
+            'outcome' => 'nullable|in:no_document,spool_accepted,pre_spool_failed,output_unknown',
+            'stage' => 'nullable|in:content_fetch,content_received,print_call,result_report',
+            'content_ms' => 'nullable|integer|min:0|max:300000',
+            'content_attempts' => 'nullable|integer|min:1|max:2',
+            'print_ms' => 'nullable|integer|min:0|max:300000',
         ]);
 
         // Task 1166: result reports also carry the device identity (throttled
@@ -2473,6 +2513,14 @@ class AgentController extends Controller
             }
 
             $error = $validated['error'] ?? 'Print failed';
+            $outcome = $validated['success']
+                ? ($job->no_document_reason || ($validated['outcome'] ?? '') === 'no_document' ? 'no_document' : (($validated['outcome'] ?? '') === 'spool_accepted' ? 'spool_accepted' : 'agent_acknowledged'))
+                : (($validated['outcome'] ?? '') === 'pre_spool_failed' ? 'pre_spool_failed' : 'output_unknown');
+            \App\Services\PrintJobEvidence::record($company->id, 'result_received', $job->id, $job->attempts,
+                ['device_uid' => $this->requestDeviceUid($request), 'outcome' => $outcome,
+                    'stage' => $validated['stage'] ?? null, 'content_ms' => $validated['content_ms'] ?? null,
+                    'content_attempts' => $validated['content_attempts'] ?? null,
+                    'print_ms' => $validated['print_ms'] ?? null]);
             $failoverDevice = !$validated['success'] && $this->isDefinitelyBeforeSpoolFailure($error)
                 ? $this->safePrintFailoverDevice($company, $job, $this->requestDeviceUid($request))
                 : null;
@@ -2508,18 +2556,22 @@ class AgentController extends Controller
                 ]);
             }
 
-            $job->update([
+            $resultFields = [
                 'status' => $validated['success'] ? 'done' : 'failed',
                 'error' => $validated['success'] ? null : $error,
                 'claim_token' => null,
-            ]);
+            ];
+            if (Schema::hasColumn('pos_print_jobs', 'result_outcome')) {
+                $resultFields += ['result_outcome' => $outcome, 'result_received_at' => now()];
+            }
+            $job->update($resultFields);
 
             // KOT actually reached paper — NOW stamp the rendered items so delta
             // tickets stay correct. Failed prints leave items NULL, so the KDS
             // delta cycle (or a retry) naturally re-prints them. Stamp kot_batch_no
             // in the SAME update (was missing — agent-printed rows showed batch NULL
             // and reprint/"KOT #" headers lost their numbering).
-            if ($validated['success'] && $job->type === 'kot' && !empty($job->printed_item_ids)) {
+            if ($validated['success'] && $outcome !== 'no_document' && $job->type === 'kot' && !empty($job->printed_item_ids)) {
                 $nextBatch = ((int) \App\Models\RestaurantOrderItem::where('order_id', $job->restaurant_order_id)->max('kot_batch_no')) + 1;
                 \App\Models\RestaurantOrderItem::whereIn('id', $job->printed_item_ids)
                     ->where('order_id', $job->restaurant_order_id)

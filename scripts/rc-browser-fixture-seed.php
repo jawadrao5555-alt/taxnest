@@ -140,6 +140,18 @@ $tableCases = [];
 $handoffCases = [];
 $tableOwner = $user($tableShop, 'Synthetic Table Owner', 'table-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
+$printEvidenceShop = $company('Synthetic Print Evidence', 'print-evidence@rc-browser.invalid', 'RCBROWSERPRINT', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
+]);
+$printEvidenceOwner = $user($printEvidenceShop, 'Synthetic Print Owner', 'print-evidence-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+\App\Models\PosPrintJob::forceCreate(['company_id' => $printEvidenceShop->id, 'type' => 'proof',
+    'target_printer' => 'Synthetic delayed queue', 'status' => 'pending', 'created_at' => $now->copy()->subHours(3)]);
+\App\Models\PosPrintJob::forceCreate(['company_id' => $printEvidenceShop->id, 'type' => 'proof',
+    'target_printer' => 'Synthetic no-document queue', 'status' => 'done', 'result_outcome' => 'no_document',
+    'no_document_reason' => 'station_has_no_eligible_lines', 'result_received_at' => $now]);
+\App\Models\PosPrintJob::forceCreate(['company_id' => $printEvidenceShop->id, 'type' => 'proof',
+    'target_printer' => 'Synthetic Windows queue', 'status' => 'done', 'result_outcome' => 'spool_accepted', 'result_received_at' => $now]);
 foreach (['held', 'preparing', 'ready'] as $index => $status) {
     $table = RestaurantTable::create([
         'company_id' => $tableShop->id, 'floor_id' => $tableFloor->id,
@@ -319,6 +331,8 @@ if (User::withoutGlobalScopes()->whereIn('email', $expectedCategoryEmails)->coun
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name' => 'print-evidence-status', 'login' => $printEvidenceOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
+            'paths' => ['/pos/printer-settings'], 'markers' => ['Delayed print queue', 'Synthetic delayed queue', 'No document; no print submitted', 'Accepted by Windows; paper not verified']],
         ['name' => 'hotel-owner', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk'], 'usableSelectors' => ['[data-hotel-desk-menu="1"] a[data-hotel-desk-link="checkin"]', '[data-hotel-reception-summary="1"]', '[data-hotel-room-check-in]']],
         ['name' => 'pra-topnav', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'pra', 'topNavFactory' => 'restaurantPos'],
         ['name' => 'pra-inventory-navigation', 'login' => $inventoryOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/inventory'], 'markers' => ['Inventory Dashboard']],

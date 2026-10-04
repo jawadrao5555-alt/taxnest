@@ -32,18 +32,8 @@ class OwnerDeploymentApprovalService
             throw new \InvalidArgumentException('HEAD SHA must be exactly 40 hexadecimal characters.');
         }
 
-        $headers = [
-            'Accept' => 'application/vnd.github+json',
-            'User-Agent' => 'TaxNest-owner-approval-relay',
-            'X-GitHub-Api-Version' => '2022-11-28',
-        ];
-        $pr = Http::withHeaders($headers)
-            ->timeout(10)
-            ->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls/'.$number);
-
-        if (!$pr->successful()) {
-            throw new \InvalidArgumentException('GitHub pull request could not be validated.');
-        }
+        $github = app(DeploymentGitHubReader::class);
+        $pr = $github->get('pulls/'.$number, 'pull_request');
 
         $data = $pr->json();
 
@@ -64,9 +54,7 @@ class OwnerDeploymentApprovalService
         }
 
         if ($expectedMergeSha) {
-            $main = Http::withHeaders($headers)
-                ->timeout(10)
-                ->get('https://api.github.com/repos/'.self::REPOSITORY.'/commits/main');
+            $main = $github->get('commits/main', 'main_tip');
             if (
                 !$main->successful()
                 || !hash_equals(strtolower($expectedMergeSha), strtolower((string) $main->json('sha', '')))
@@ -75,9 +63,7 @@ class OwnerDeploymentApprovalService
             }
         }
 
-        $checks = Http::withHeaders($headers)
-            ->timeout(10)
-            ->get('https://api.github.com/repos/'.self::REPOSITORY.'/commits/'.$sha.'/check-runs?per_page=100');
+        $checks = $github->get('commits/'.$sha.'/check-runs?per_page=100', 'check_runs');
         $runs = collect($checks->json('check_runs', []));
 
         $validate = $runs->firstWhere('name', 'validate');

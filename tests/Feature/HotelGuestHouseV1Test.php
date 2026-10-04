@@ -849,4 +849,85 @@ class HotelGuestHouseV1Test extends TestCase
         $plan = app(\App\Services\HotelCorrectionService::class)->preview($stay->fresh(), $owner);
         $this->assertNotNull($plan['blocked']);
     }
+    public function test_owner_correction_locks_fiscal_and_ambiguous_bills_without_mutation(): void
+    {
+        $company = $this->company('hotel', ['pos_tax_rate_cash' => 0]);
+        $owner = $this->owner($company);
+        $stays = app(HotelStayService::class);
+        $folio = app(HotelFolioService::class);
+        $service = app(\App\Services\HotelCorrectionService::class);
+        foreach (['pending', 'submitted', 'offline', 'failed', null] as $state) {
+            $room = $this->room($stays, $company, 'LOCK-'.($state ?? 'legacy'), 1000);
+            $stay = $stays->book((int) $company->id, (int) $owner->id, [
+                'room_id' => $room->id, 'check_in_date' => '2026-10-04', 'check_out_date' => '2026-10-05',
+                'guest_name' => 'Synthetic locked bill', 'walk_in' => true,
+            ]);
+            $folio->postPayment($stay, ['amount' => 1000, 'payment_method' => 'cash'], (int) $owner->id);
+            $bill = $folio->settleCoveredCharges($stay, (int) $owner->id, 'cash')['transaction'];
+            $bill->update(['invoice_mode' => 'pra', 'pra_status' => $state, 'invoice_number' => 'P-LOCK-'.($state ?? 'legacy'), 'pra_invoice_number' => $state === 'submitted' ? 'SYNTHETIC-FISCAL' : null]);
+            $before = $bill->fresh()->getAttributes();
+            $entries = HotelFolioEntry::where('stay_id', $stay->id)->count();
+            $plan = $service->preview($stay->fresh(), $owner);
+            $this->assertSame(__('hotel_correction.fiscal_locked'), $plan['blocked']);
+            $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/'.$stay->id.'/correction')->assertOk()->assertDontSee('name="confirmed"', false);
+            try {
+                $service->correct($stay, $owner, $plan['fingerprint'], 'Synthetic wrong entry', 'cash');
+                $this->fail('Fiscal correction accepted');
+            } catch (HotelStayException $e) {
+                $this->assertSame(__('hotel_correction.fiscal_locked'), $e->getMessage());
+            }
+            $this->assertSame($before, $bill->fresh()->getAttributes());
+            $this->assertSame($entries, HotelFolioEntry::where('stay_id', $stay->id)->count());
+            $this->assertSame('checked_in', $stay->fresh()->status);
+            $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
+        }
+    }
+
+
+    public function test_room_boards_use_natural_sequence_and_keep_other_tenants_out(): void
+    {
+        $company = $this->company('hotel');
+        $stays = app(HotelStayService::class);
+        foreach (['10', '2', '1', 'A10', 'A2'] as $number) {
+            $this->room($stays, $company, $number, 1000);
+        }
+        $foreign = $this->company('hotel');
+        $this->room($stays, $foreign, '3', 1000);
+        $this->assertSame(['1', '2', '10', 'A2', 'A10'], $stays->board((int) $company->id)['available']->pluck('room_number')->all());
+        $cards = $stays->roomCards((int) $company->id);
+        $this->assertSame(['1', '2', '10', 'A2', 'A10'], array_map(fn ($c) => $c['room']->room_number, $cards));
+    }
+
+    public function test_hotel_reporting_header_uses_saved_account_mode_and_existing_toggle(): void
+    {
+        $company = $this->company('hotel', ['pra_reporting_enabled' => false]);
+        $owner = $this->owner($company);
+        $owner->update(['pra_reporting_enabled' => false, 'pos_billing_scope' => 'both']);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()
+            ->assertSee('data-hotel-pra-status', false)->assertSee('data-hotel-pra-toggle', false);
+        $this->postJson('/pos/api/toggle-pra')->assertOk()->assertJson(['success' => true, 'enabled' => true]);
+        $this->assertTrue((bool) $owner->fresh()->pra_reporting_enabled);
+        $this->assertFalse((bool) $company->fresh()->pra_reporting_enabled);
+        $this->get('/pos/customize')->assertOk()->assertSee('data-hotel-tax-cards', false)
+            ->assertSee('data-hotel-tax-mode="exclusive"', false)->assertSee('data-hotel-tax-mode="inclusive"', false)
+            ->assertSee('data-hotel-tax-mode="inclusive_card_save"', false);
+        $this->get('/pos/hotel')->assertOk()->assertSee('data-hotel-pra-status', false);
+        $this->postJson('/pos/api/toggle-pra')->assertOk()->assertJson(['success' => true, 'enabled' => false]);
+    }
+
+    public function test_hotel_reporting_cashier_and_standalone_are_status_only(): void
+    {
+        $company = $this->company('hotel');
+        $cashier = $this->owner($company);
+        $cashier->update(['pos_role' => 'pos_cashier', 'role' => 'company_user']);
+        $this->actingAs($cashier, 'pos')->get('/pos/hotel')->assertOk()
+            ->assertSee('data-hotel-pra-status', false)->assertDontSee('data-hotel-pra-toggle', false);
+        $this->postJson('/pos/api/toggle-pra')->assertForbidden();
+        $owner = $this->owner($company);
+        $company->update(['pos_integration_mode' => 'standalone']);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()
+            ->assertSee('data-hotel-pra-status', false)->assertDontSee('data-hotel-pra-toggle', false);
+        $this->postJson('/pos/api/toggle-pra')->assertStatus(422);
+    }
+
 }

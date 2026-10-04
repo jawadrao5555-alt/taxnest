@@ -289,6 +289,36 @@ async function hotelWorkflow(page, t, v) {
   const room = v.width < 768 ? 'RC-202' : 'RC-201';
   await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  const reporting = page.locator('[data-hotel-pra-reporting="1"]');
+  const reportingToggle = reporting.locator('[data-hotel-pra-toggle="1"]');
+  await reportingToggle.waitFor({state:'visible'});
+  const originalMode = await reportingToggle.getAttribute('aria-checked');
+  for (const enabled of [originalMode !== 'true', originalMode === 'true']) {
+    const [response] = await Promise.all([
+      page.waitForResponse(r => r.url() === baseUrl + '/pos/api/toggle-pra' && r.request().method() === 'POST'),
+      reportingToggle.click(),
+    ]);
+    if (!response.ok()) throw new Error('Hotel reporting toggle rejected');
+    await page.waitForFunction(enabled => document.querySelector('[data-hotel-pra-toggle="1"]')?.getAttribute('aria-checked') === String(enabled), enabled);
+  }
+  pass(`${t.name}/${v.width}: real PRA toggle switched and restored this account mode`);
+  await page.goto(baseUrl + '/pos/customize', {waitUntil:'domcontentloaded'});
+  await dismiss(page);
+  const taxCards = page.locator('[data-hotel-tax-cards="1"]');
+  const advanced = taxCards.locator('xpath=ancestor::details[1]');
+  if (!await advanced.evaluate(el => el.open)) await advanced.locator('summary').first().click();
+  const originalTaxMode = await taxCards.locator('[aria-checked="true"]').getAttribute('data-hotel-tax-mode');
+  for (const mode of [...['exclusive','inclusive','inclusive_card_save'].filter(m => m !== originalTaxMode), originalTaxMode]) {
+    const [response] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/settings/tax-pricing-mode') && r.request().method() === 'POST'),
+      taxCards.locator(`[data-hotel-tax-mode="${mode}"]`).click(),
+    ]);
+    if (!response.ok()) throw new Error('Hotel tax card setting rejected');
+    await page.waitForFunction(mode => document.querySelector(`[data-hotel-tax-mode="${mode}"]`)?.getAttribute('aria-checked') === 'true', mode);
+  }
+  pass(`${t.name}/${v.width}: all three real tax cards saved and original mode restored`);
+  await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
   const card = page.locator('[data-hotel-room-state="vacant"]').filter({hasText: room});
   await Promise.all([page.waitForURL(/stays\/create/), card.locator('[data-hotel-room-check-in]').click()]);
   await dismiss(page);
@@ -512,6 +542,67 @@ async function tableOrderWorkflow(page,t,v) {
       await page.locator('[data-video="counter-dine-in"]').waitFor({state:'visible'});
     }
   }
+  if(t.cashierHandoff) await cashierHandoffWorkflow(page,t,v);
+}
+async function cashierHandoffWorkflow(page,t,v) {
+  const h=t.cashierHandoff, expected=h.cases[v.width<768?'mobile':'desktop'];
+  const initialContext=await page.context().browser().newContext({viewport:v});
+  page=await initialContext.newPage(); await login(page,t);
+  const openConflict=async(page)=>{
+    await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    await page.locator('[data-video="counter-dine-in"]').click();
+    const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});
+    const [claim]=await Promise.all([
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'), tile.click(),
+    ]);
+    if(claim.status()!==409)throw new Error('Assigned table conflict expected HTTP409, got '+claim.status());
+    await page.locator('[data-video="cashier-conflict"]').waitFor({state:'visible'});
+    // The application consumes the real JSON response. Inspect that parsed
+    // contract rather than asking CDP to retrieve an already-consumed body
+    // across mobile navigation; do not mock or replay the claim.
+    await page.waitForFunction(({orderId})=>{
+      const c=window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).cashierConflict;
+      return c?.code==='cashier_assignment_conflict'&&Number(c.order_id)===orderId
+        &&Number(c.assigned_cashier_id)>0&&typeof c.assigned_cashier==='string';
+    },{orderId:expected.orderId});
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).cart.length===0);
+  };
+  await openConflict(page);
+  if(await page.locator('[data-video="handoff-confirm"]').count())throw new Error('Cashier received manager handoff control');
+  await initialContext.close();
+  const managerContext=await initialContext.browser().newContext({viewport:v});
+  const managerPage=await managerContext.newPage();
+  await login(managerPage,h.manager); await openConflict(managerPage);
+  await managerPage.locator('[data-video="handoff-cashier"]').selectOption(String(h.cashierId));
+  const [transfer]=await Promise.all([
+    managerPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/transfer'&&r.request().method()==='POST'),
+    managerPage.locator('[data-video="handoff-confirm"]').click(),
+  ]);
+  if(!transfer.ok())throw new Error('Manager transfer failed');
+  await managerPage.locator('[data-video="cashier-conflict"]').waitFor({state:'hidden'});
+  await managerContext.close();
+  const cashierContext=await managerContext.browser().newContext({viewport:v});
+  const cashierPage=await cashierContext.newPage();
+  await login(cashierPage,t);
+  await cashierPage.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(cashierPage); await dismiss(cashierPage);
+  await cashierPage.locator('[data-video="counter-dine-in"]').click();
+  const [claim]=await Promise.all([
+    cashierPage.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'),
+    cashierPage.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click(),
+  ]);
+  if(!claim.ok())throw new Error('Transferred table still cannot open');
+  await cashierPage.waitForFunction(({orderId,itemName})=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    return Number(d.incomingOrderId)===orderId&&d.cart.length===1
+      &&d.cart[0].item_name===itemName&&d.orderType==='dine_in';
+  },{orderId:expected.orderId,itemName:expected.itemName});
+  await openMobileCart(cashierPage,v,['Current Order']);
+  await cashierPage.locator('[data-tn-sale-root]').getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
+  if(!await cashierPage.locator('[data-video="open-payment"]').isEnabled())throw new Error('Transferred table payment disabled');
+  pass(t.name+'/'+v.width+': cashier conflict, explicit manager transfer and exact-order reopen passed');
+  await cashierContext.close();
 }
 async function categoryMismatch(page,t,v) {
   const path=t.categoryCoverage?.mismatchPath; if(!path)return;

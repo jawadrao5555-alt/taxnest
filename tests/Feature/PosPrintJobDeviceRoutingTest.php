@@ -309,6 +309,47 @@ class PosPrintJobDeviceRoutingTest extends TestCase
 
     // ── 1. Device registry ─────────────────────────────────────────────────
 
+    public function test_proof_rejection_reasons_have_server_correlation_and_do_not_enqueue(): void
+    {
+        (require database_path('migrations/2026_10_03_170000_add_print_job_evidence.php'))->up();
+        $user = \App\Models\User::find($this->adminId);
+        $this->actingAs($user, 'pos');
+        foreach (['disabled', 'agent_offline', 'counter_unavailable', 'no_printer'] as $reason) {
+            DB::table('users')->where('id', $user->id)->update(['pos_device_uid' => $reason === 'counter_unavailable' ? 'missing-counter' : null]);
+            $this->actingAs($user->fresh(), 'pos');
+            DB::table('companies')->where('id', $this->companyId)->update([
+                'agent_last_seen' => $reason === 'agent_offline' ? now()->subDay() : now(),
+                'pos_printer_settings' => json_encode(['silent_print_enabled' => $reason !== 'disabled', 'receipt_printer' => $reason === 'no_printer' ? null : 'Synthetic receipt']),
+            ]);
+            $response = $this->postJson('/pos/api/print-jobs', ['type' => 'proof', 'restaurant_order_id' => 999]);
+            $response->assertStatus(409)->assertJson(['reason' => $reason]);
+            $this->assertTrue(\Illuminate\Support\Str::isUuid($response->json('request_id')));
+            $event = DB::table('pos_print_evidence')->where('event', 'enqueue_rejected')->latest('id')->first();
+            $this->assertSame($this->companyId, $event->company_id);
+            $this->assertSame($reason, json_decode($event->context, true)['reason']);
+            $this->assertSame($response->json('request_id'), json_decode($event->context, true)['request_id']);
+        }
+        $this->assertSame(0, DB::table('pos_print_jobs')->count());
+    }
+
+    public function test_claim_and_result_evidence_remain_attempt_bound_and_ignore_stale_callbacks(): void
+    {
+        (require database_path('migrations/2026_10_03_170000_add_print_job_evidence.php'))->up();
+        $this->seedDevice('evidence-device');
+        $id = $this->seedJob(['device_uid' => 'evidence-device']);
+        $response = $this->agentGet('/api/agent/print-jobs?device_uid=evidence-device&version=1.13.16');
+        $response->assertOk();
+        $claim = DB::table('pos_print_jobs')->find($id);
+        $this->assertSame(1, DB::table('pos_print_evidence')->where('job_id', $id)->where('event', 'claimed')->where('attempt', 1)->count());
+        $this->postJson('/api/agent/print-jobs/'.$id.'/result', ['success' => true, 'outcome' => 'spool_accepted', 'stage' => 'print_call', 'device_uid' => 'evidence-device'],
+            ['Authorization' => 'Bearer '.$this->agentKey, 'X-Print-Claim-Token' => 'stale-token'])->assertJson(['ignored_stale_result' => true]);
+        $this->assertNull(DB::table('pos_print_jobs')->find($id)->result_received_at);
+        $this->postJson('/api/agent/print-jobs/'.$id.'/result', ['success' => true, 'outcome' => 'spool_accepted', 'stage' => 'print_call', 'device_uid' => 'evidence-device'],
+            ['Authorization' => 'Bearer '.$this->agentKey, 'X-Print-Claim-Token' => $claim->claim_token])->assertOk();
+        $this->assertSame('spool_accepted', DB::table('pos_print_jobs')->find($id)->result_outcome);
+        $this->assertSame(1, DB::table('pos_print_evidence')->where('job_id', $id)->where('event', 'result_received')->count());
+    }
+
     public function test_heartbeat_with_device_uid_registers_device_row(): void
     {
         $response = $this->agentPost('/api/agent/heartbeat', [

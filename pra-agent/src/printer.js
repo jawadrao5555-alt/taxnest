@@ -19,6 +19,8 @@ const path = require('path');
 const WebSocket = require('ws');
 const { printerLaneKey, processPrintSchedule } = require('./printer-queue');
 const { nextPollDelay } = require('./printer-poll-policy');
+const { processCloudPrintJob } = require('./printer-job');
+const agentVersion = require('../package.json').version;
 const { RealtimeWakeClient, realtimeUrl } = require('./realtime-wake');
 
 let printersInterval = null;
@@ -37,6 +39,7 @@ const printStatus = {
   jobsPrinted: 0,
   jobsFailed: 0,
   lastPrintError: null,
+  lastPollAt: null, lastPollSuccessAt: null, lastPollError: null,
 };
 
 function plog(...args) {
@@ -203,7 +206,7 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
   });
 }
 
-async function reportJobResult(job, success, error, sessionCfg) {
+async function reportJobResult(job, success, error, sessionCfg, evidence = {}) {
   try {
     await axios.post(
       `${sessionCfg.serverUrl}/print-jobs/${job.id}/result`,
@@ -211,6 +214,8 @@ async function reportJobResult(job, success, error, sessionCfg) {
         success,
         error: error ? String(error).slice(0, 500) : null,
         device_uid: sessionCfg.deviceUid || null,
+        version: agentVersion,
+        ...evidence,
       },
       { headers: { Authorization: `Bearer ${sessionCfg.apiKey}`, ...(job.claim_token ? { 'X-Print-Claim-Token': job.claim_token } : {}) }, timeout: 10000 }
     );
@@ -222,35 +227,28 @@ async function reportJobResult(job, success, error, sessionCfg) {
 }
 
 async function processPrintJob(job, sessionCfg) {
-  try {
-    const contentRes = await axios.get(
+    const result = await processCloudPrintJob(job, {
+      fetchContent: () => axios.get(
       `${sessionCfg.serverUrl}/print-jobs/${job.id}/content`,
-      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}`, ...(job.claim_token ? { 'X-Print-Claim-Token': job.claim_token } : {}) }, timeout: 15000, responseType: 'text' }
-    );
-    // 204 = nothing left to print (e.g. delta items already covered by an
-    // earlier ticket) — mark done WITHOUT feeding a blank page to the printer.
-    if (contentRes.status === 204 || !contentRes.data) {
-      plog(`Job ${job.id}: nothing to print (already covered) — marking done`);
-      await reportJobResult(job, true, null, sessionCfg);
-      return;
-    }
-    const { success, error } = await printHtml(contentRes.data, job.target_printer, job.type);
-    if (success) {
+      { params: {device_uid: sessionCfg.deviceUid || undefined, version: agentVersion}, headers: { Authorization: `Bearer ${sessionCfg.apiKey}`, ...(job.claim_token ? { 'X-Print-Claim-Token': job.claim_token } : {}) }, timeout: 15000, responseType: 'text' }
+      ),
+      printHtml,
+      report: (job, evidence) => {
+        const {success, error, ...details} = evidence;
+        return reportJobResult(job, success, error, sessionCfg, details);
+      },
+    });
+    if (result.outcome === 'no_document') {
+      plog(`Job ${job.id}: no document; no print submitted`);
+    } else if (result.success) {
       printStatus.jobsPrinted += 1;
       printStatus.lastPrintError = null;
-      plog(`✅ Printed job ${job.id} (${job.type}) on "${job.target_printer}"`);
+      plog(`Job ${job.id} (${job.type}) accepted by Windows on "${job.target_printer}"`);
     } else {
       printStatus.jobsFailed += 1;
-      printStatus.lastPrintError = error;
-      plog(`❌ Job ${job.id} failed: ${error}`);
+      printStatus.lastPrintError = result.error;
+      plog(`Job ${job.id} failed at ${result.stage}: ${result.error}`);
     }
-    await reportJobResult(job, success, error, sessionCfg);
-  } catch (e) {
-    printStatus.jobsFailed += 1;
-    printStatus.lastPrintError = e.message;
-    plog(`❌ Job ${job.id} error:`, e.message);
-    await reportJobResult(job, false, e.message, sessionCfg);
-  }
 }
 
 // Long-poll (v1.6.2, ZFC "instant print" request Aug 2026): ?wait=8 asks the
@@ -266,6 +264,7 @@ async function pollPrintJobs() {
   const sessionCfg = cfg;
   if (!sessionCfg || printing) return 1500; // one batch at a time — receipts must not interleave
   printing = true;
+  printStatus.lastPollAt = new Date().toISOString();
   let nextDelay = 1500;
   try {
     // timeout must comfortably exceed the server's max hold (8s).
@@ -273,10 +272,14 @@ async function pollPrintJobs() {
     // plus unstamped company-wide jobs; another counter's jobs are never ours.
     const deviceParam = sessionCfg.deviceUid ? `&device_uid=${encodeURIComponent(sessionCfg.deviceUid)}` : '';
     const res = await axios.get(`${sessionCfg.serverUrl}/print-jobs?wait=8${deviceParam}`, {
+      params: {version: agentVersion},
       headers: { Authorization: `Bearer ${sessionCfg.apiKey}` },
       timeout: 15000,
     });
     const jobs = (res.data && res.data.jobs) || [];
+    if (printStatus.lastPollError) plog('Cloud print polling recovered');
+    printStatus.lastPollSuccessAt = new Date().toISOString();
+    printStatus.lastPollError = null;
     if (jobs.length > 0 || (res.data && res.data.held)) {
       nextDelay = 0;
     }
@@ -286,7 +289,8 @@ async function pollPrintJobs() {
     // race after an offline backlog. Unrelated orders remain concurrent.
     await processPrintSchedule(jobs, (job) => processPrintJob(job, sessionCfg));
   } catch (e) {
-    // Poll failure is quiet — heartbeat already tracks connectivity.
+    if (!printStatus.lastPollError) plog('Cloud print polling failed:', e.code || 'request_failed');
+    printStatus.lastPollError = e.code || 'request_failed';
     nextDelay = 3000;
   } finally {
     printing = false;

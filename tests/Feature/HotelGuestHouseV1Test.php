@@ -819,4 +819,36 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertSame(['1', '2', '10', 'A2', 'A10'], array_map(fn ($c) => $c['room']->room_number, $cards));
     }
 
+    public function test_hotel_reporting_header_uses_saved_account_mode_and_existing_toggle(): void
+    {
+        $company = $this->company('hotel', ['pra_reporting_enabled' => false]);
+        $owner = $this->owner($company);
+        $owner->update(['pra_reporting_enabled' => false, 'pos_billing_scope' => 'both']);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()
+            ->assertSee('data-hotel-pra-status', false)->assertSee('data-hotel-pra-toggle', false);
+        $this->postJson('/pos/api/toggle-pra')->assertOk()->assertJson(['success' => true, 'enabled' => true]);
+        $this->assertTrue((bool) $owner->fresh()->pra_reporting_enabled);
+        $this->assertFalse((bool) $company->fresh()->pra_reporting_enabled);
+        $this->get('/pos/customize')->assertOk()->assertSee('data-hotel-tax-cards', false)
+            ->assertSee('data-hotel-tax-mode="exclusive"', false)->assertSee('data-hotel-tax-mode="inclusive"', false)
+            ->assertSee('data-hotel-tax-mode="inclusive_card_save"', false);
+        $this->get('/pos/hotel')->assertOk()->assertSee('data-hotel-pra-status', false);
+        $this->postJson('/pos/api/toggle-pra')->assertOk()->assertJson(['success' => true, 'enabled' => false]);
+    }
+
+    public function test_hotel_reporting_cashier_and_standalone_are_status_only(): void
+    {
+        $company = $this->company('hotel');
+        $cashier = $this->owner($company);
+        $cashier->update(['pos_role' => 'pos_cashier', 'role' => 'company_user']);
+        $this->actingAs($cashier, 'pos')->get('/pos/hotel')->assertOk()
+            ->assertSee('data-hotel-pra-status', false)->assertDontSee('data-hotel-pra-toggle', false);
+        $this->postJson('/pos/api/toggle-pra')->assertForbidden();
+        $owner = $this->owner($company);
+        $company->update(['pos_integration_mode' => 'standalone']);
+        $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()
+            ->assertSee('data-hotel-pra-status', false)->assertDontSee('data-hotel-pra-toggle', false);
+        $this->postJson('/pos/api/toggle-pra')->assertStatus(422);
+    }
+
 }

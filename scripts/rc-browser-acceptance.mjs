@@ -289,6 +289,36 @@ async function hotelWorkflow(page, t, v) {
   const room = v.width < 768 ? 'RC-202' : 'RC-201';
   await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  const reporting = page.locator('[data-hotel-pra-reporting="1"]');
+  const reportingToggle = reporting.locator('[data-hotel-pra-toggle="1"]');
+  await reportingToggle.waitFor({state:'visible'});
+  const originalMode = await reportingToggle.getAttribute('aria-checked');
+  for (const enabled of [originalMode !== 'true', originalMode === 'true']) {
+    const [response] = await Promise.all([
+      page.waitForResponse(r => r.url() === baseUrl + '/pos/api/toggle-pra' && r.request().method() === 'POST'),
+      reportingToggle.click(),
+    ]);
+    if (!response.ok()) throw new Error('Hotel reporting toggle rejected');
+    await page.waitForFunction(enabled => document.querySelector('[data-hotel-pra-toggle="1"]')?.getAttribute('aria-checked') === String(enabled), enabled);
+  }
+  pass(`${t.name}/${v.width}: real PRA toggle switched and restored this account mode`);
+  await page.goto(baseUrl + '/pos/customize', {waitUntil:'domcontentloaded'});
+  await dismiss(page);
+  const taxCards = page.locator('[data-hotel-tax-cards="1"]');
+  const advanced = taxCards.locator('xpath=ancestor::details[1]');
+  if (!await advanced.evaluate(el => el.open)) await advanced.locator('summary').first().click();
+  const originalTaxMode = await taxCards.locator('[aria-checked="true"]').getAttribute('data-hotel-tax-mode');
+  for (const mode of [...['exclusive','inclusive','inclusive_card_save'].filter(m => m !== originalTaxMode), originalTaxMode]) {
+    const [response] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/settings/tax-pricing-mode') && r.request().method() === 'POST'),
+      taxCards.locator(`[data-hotel-tax-mode="${mode}"]`).click(),
+    ]);
+    if (!response.ok()) throw new Error('Hotel tax card setting rejected');
+    await page.waitForFunction(mode => document.querySelector(`[data-hotel-tax-mode="${mode}"]`)?.getAttribute('aria-checked') === 'true', mode);
+  }
+  pass(`${t.name}/${v.width}: all three real tax cards saved and original mode restored`);
+  await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
   const card = page.locator('[data-hotel-room-state="vacant"]').filter({hasText: room});
   await Promise.all([page.waitForURL(/stays\/create/), card.locator('[data-hotel-room-check-in]').click()]);
   await dismiss(page);

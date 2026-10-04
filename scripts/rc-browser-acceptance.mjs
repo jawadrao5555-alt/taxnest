@@ -482,10 +482,10 @@ async function cashierHandoffWorkflow(page,t,v) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});
     const [claim]=await Promise.all([
-      page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'), tile.click(),
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST').then(async r=>({status:r.status(),data:await r.json()})), tile.click(),
     ]);
-    const rejected=await claim.json().catch(()=>null);
-    if(claim.status()!==409||rejected?.code!=='cashier_assignment_conflict')throw new Error('Assigned table conflict: HTTP '+claim.status()+', code='+rejected?.code+', message='+rejected?.message);
+    const rejected=claim.data;
+    if(claim.status!==409||rejected?.code!=='cashier_assignment_conflict')throw new Error('Assigned table conflict: HTTP '+claim.status+', code='+rejected?.code+', message='+rejected?.message);
     await page.locator('[data-video="cashier-conflict"]').waitFor({state:'visible'});
     await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).cart.length===0);
   };

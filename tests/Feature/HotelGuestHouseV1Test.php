@@ -206,7 +206,43 @@ class HotelGuestHouseV1Test extends TestCase
         $closed = app(PosController::class)->performDayClose($company->id, '2026-10-06', $owner->id)['report'];
         $this->assertNotNull($closed);
         $this->assertEquals($balance, $closed->card_amount);
+        $this->assertEquals($balance, $closed->stream_summary['local']['card']);
+        $this->assertEquals(0, $closed->stream_summary['pra']['card']);
         $this->assertEquals(0, $closed->total_amount);
+        $this->travelBack();
+    }
+
+    public function test_hotel_money_uses_local_or_pra_stream_without_changing_sales_or_double_counting(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-05 14:00:00', 'Asia/Karachi'));
+        [$company, $owner, $stay] = $this->previewStay();
+        HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'payment')->delete();
+        $stay->update(['hotel_money_from_folio' => true]);
+        $folio = app(HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 200, 'payment_method' => 'cash'], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash', 'stream-local-bill')['transaction'];
+        $date = \App\Services\PosBusinessDay::forMoment($company->id, now());
+        $money = \App\Services\HotelCreditNoteRefundReporting::buckets($company->id, $date);
+        $method = new \ReflectionMethod(PosController::class, 'buildDayCloseStreamSplit');
+        $local = $method->invoke(app(PosController::class), collect([$bill]), $money);
+        $this->assertEquals(200, $local['local']['cash']);
+        $this->assertEquals(0, $local['pra']['cash']);
+        $this->assertEquals($bill->total_amount, $local['local']['sales']);
+        // A toggle does not rewrite an already issued bill's settlement stream.
+        $owner->update(['pra_reporting_enabled' => true]);
+        $folio->postPayment($stay, ['amount' => 100, 'payment_method' => 'card'], $owner->id);
+        $this->assertSame('local', HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'payment')->latest('id')->first()->settlement_invoice_mode);
+        // An accepted/PRA-stream parent retains its stream even if reporting is later OFF.
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-STREAM-FISCAL']);
+        $owner->update(['pra_reporting_enabled' => false]);
+        $folio->postPayment($stay, ['amount' => 50, 'payment_method' => 'card'], $owner->id);
+        $money = \App\Services\HotelCreditNoteRefundReporting::buckets($company->id, $date);
+        $split = $method->invoke(app(PosController::class), collect([$bill->fresh()]), $money);
+        $this->assertEquals(200, $split['local']['cash']);
+        $this->assertEquals(100, $split['local']['card']);
+        $this->assertEquals(50, $split['pra']['card']);
+        $this->assertEquals(350, $split['summary_payments']['cash'] + $split['summary_payments']['card']);
+        $this->assertEquals($bill->total_amount, $split['pra']['sales']);
         $this->travelBack();
     }
 

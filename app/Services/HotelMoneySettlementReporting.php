@@ -31,9 +31,16 @@ class HotelMoneySettlementReporting
             || (($data['payment_method'] ?? 'cash') === 'cash' && PosCounterDrawer::isClosed((int) $stay->company_id, $terminal, $date))) {
             throw new HotelStayException('This payment day or drawer is closed.');
         }
-        // Hotel invoice mode is PRA even when reporting is OFF; preserve that contract.
+        $billIds = HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->whereNotNull('pos_transaction_id')->select('pos_transaction_id');
+        $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+            ->whereIn('id', $billIds)->where('transaction_type', 'sale')->latest('id')->first();
+        $company = \App\Models\Company::findOrFail($stay->company_id);
+        $actor = \App\Models\User::find($userId);
+        $pra = $bill ? (!empty($bill->pra_invoice_number) || !in_array($bill->pra_status, [null, 'local'], true))
+            : ($company->pos_integration_mode !== 'standalone' && (bool) $actor?->praReportingEnabled($company));
+        // Settlement stream is distinct from the legacy Hotel invoice_mode='pra' contract.
         return ['settlement_business_date' => $date, 'settlement_branch_id' => $stay->branch_id,
-            'settlement_terminal_id' => $terminal, 'settlement_invoice_mode' => 'pra'];
+            'settlement_terminal_id' => $terminal, 'settlement_invoice_mode' => $pra ? 'pra' : 'local'];
     }
 
     public static function rows(int $companyId, string $date, ?int $branchId = null, ?int $creator = null): Collection
@@ -57,11 +64,17 @@ class HotelMoneySettlementReporting
     {
         $sums = [];
         $online = array_merge(\App\Support\PosPaymentLabels::ONLINE_ALIASES, ['bank_transfer']);
-        foreach (self::rows($companyId, $date, $branchId, $creator) as $row) {
+        $rows = self::rows($companyId, $date, $branchId, $creator);
+        if ($rows->isNotEmpty()) $sums['_movements'] = $rows->count();
+        foreach ($rows as $row) {
             $method = $row->payment_method ?: 'cash';
             $amount = (float) $row->amount * ($row->entry_type === 'payment' ? -1 : 1);
             $bucket = PosPaymentBuckets::bucket($method);
             $sums[$bucket] = ($sums[$bucket] ?? 0) + $amount;
+            if ($row->settlement_invoice_mode === 'local') {
+                $key = 'local_'.$bucket;
+                $sums[$key] = ($sums[$key] ?? 0) + $amount;
+            }
             if (in_array($method, $online, true)) $sums['online'] = ($sums['online'] ?? 0) + $amount;
         }
         return $sums;

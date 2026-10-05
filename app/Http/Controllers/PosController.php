@@ -16745,7 +16745,11 @@ class PosController extends Controller
             );
         }
 
-        foreach (['cash', 'card', 'other'] as $bucket) $split['pra'][$bucket] = round($split['pra'][$bucket] - ($hotelRefunds[$bucket] ?? 0), 2);
+        foreach (['cash', 'card', 'other'] as $bucket) {
+            $localMoney = (float) ($hotelRefunds['local_'.$bucket] ?? 0);
+            $split['pra'][$bucket] = round($split['pra'][$bucket] - ($hotelRefunds[$bucket] ?? 0) + $localMoney, 2);
+            $split['local'][$bucket] = round($split['local'][$bucket] - $localMoney, 2);
+        }
 
         // Exempt detail: value = stored exempt_amount (post-discount, PosTaxMath
         // — the same figure the tax report uses, covers exempt shares on mixed

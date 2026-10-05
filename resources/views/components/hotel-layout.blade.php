@@ -10,6 +10,7 @@
         <main class="min-w-0">
             @include('pos.hotel._pra-reporting')
             {{ $slot }}
+            @include('pos.hotel._bill-preview')
         </main>
     </div>
 </div>

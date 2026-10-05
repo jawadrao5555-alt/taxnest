@@ -36,7 +36,8 @@ class HotelCreditNoteController extends Controller
         $notes = HotelCreditNote::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->get();
         $credits = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
             ->whereIn('id', $notes->pluck('credit_transaction_id'))->get()->keyBy('id');
-        return view('pos.hotel.credit-notes', compact('stay', 'bills', 'notes', 'credits'));
+        $terminals = \App\Models\PosTerminal::where('company_id', $stay->company_id)->where('is_active', true)->get();
+        return view('pos.hotel.credit-notes', compact('stay', 'bills', 'notes', 'credits', 'terminals'));
     }
 
     private function selection(Request $request): ?array
@@ -80,10 +81,10 @@ class HotelCreditNoteController extends Controller
     {
         $stay = $this->stay($id);
         $data = $request->validate(['amount' => 'required|numeric|gt:0', 'method' => 'required|in:cash,card',
-            'request_key' => 'required|string|min:16|max:64', 'confirmed' => 'accepted']);
+            'request_key' => 'required|string|min:16|max:64', 'terminal_id' => 'nullable|integer|min:0', 'confirmed' => 'accepted']);
         try {
             app(HotelCreditNoteService::class)->refund($stay, auth('pos')->user(), $note,
-                (float) $data['amount'], $data['method'], $data['request_key']);
+                (float) $data['amount'], $data['method'], $data['request_key'], (int) ($data['terminal_id'] ?? 0));
         } catch (HotelStayException $e) {
             return back()->with('error', $e->getMessage());
         }

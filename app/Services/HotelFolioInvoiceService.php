@@ -54,19 +54,7 @@ class HotelFolioInvoiceService
             ->lockForUpdate()
             ->get();
 
-        $available = $this->availableTowardFiscal($stay);
-        $picked = [];
-        $running = 0.0;
-        $allCovered = $this->fiscalTotalFor($company, (float) $charges->sum('amount'), $paymentMethod) - $available <= 0.009;
-        foreach ($charges as $line) {
-            $next = round($running + (float) $line->amount, 2);
-            $fiscal = $this->fiscalTotalFor($company, $next, $paymentMethod);
-            if (!$allCovered && $fiscal - $available > 0.009) {
-                break;
-            }
-            $picked[] = $line;
-            $running = $next;
-        }
+        [$picked, $running] = $this->coveredCharges($stay, $company, $charges, $paymentMethod);
         if ($picked === []) {
             if ($charges->isNotEmpty()) {
                 throw new HotelStayException(__('pos.hotel_tax_coverage_needed'));
@@ -80,7 +68,7 @@ class HotelFolioInvoiceService
         }
 
         $user = \App\Models\User::find($userId);
-        $praEnabled = (bool) $user?->praReportingEnabled($company);
+        $praEnabled = $company->pos_integration_mode !== 'standalone' && (bool) $user?->praReportingEnabled($company);
         if ($praEnabled) {
             $invoiceMode = 'pra';
             $initialPraStatus = 'pending';
@@ -247,6 +235,25 @@ class HotelFolioInvoiceService
         $taxAmount = (float) round($chargeAmount * $taxRate / 100);
 
         return (float) round($chargeAmount + $taxAmount);
+    }
+
+    /** Shared by the read-only preview and the actual invoice write. */
+    public function coveredCharges(HotelStay $stay, Company $company, $charges, string $paymentMethod): array
+    {
+        $available = $this->availableTowardFiscal($stay);
+        $picked = [];
+        $running = 0.0;
+        $allCovered = $this->fiscalTotalFor($company, (float) $charges->sum('amount'), $paymentMethod) - $available <= 0.009;
+        foreach ($charges as $line) {
+            $next = round($running + (float) $line->amount, 2);
+            $fiscal = $this->fiscalTotalFor($company, $next, $paymentMethod);
+            if (!$allCovered && $fiscal - $available > 0.009) {
+                break;
+            }
+            $picked[] = $line;
+            $running = $next;
+        }
+        return [$picked, $running];
     }
 
     public function availableTowardFiscal(HotelStay $stay): float

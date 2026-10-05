@@ -1,6 +1,6 @@
 # Hotel fiscal credit notes — draft implementation and evidence
 
-Status: Draft; fiscal issuance and linked money refunds are deliberately disabled in `config/hotel_credit_notes.php`. Owner review screens are available. The implementation now includes issuance and separate refund services, but sandbox and cash-report reconciliation evidence are still required before enabling the feature. The fiscal lock from PR #153 remains in force.
+Status: Draft; fiscal issuance and linked money refunds are deliberately disabled in `config/hotel_credit_notes.php`. Owner review screens are available. The implementation now includes issuance and separate refund services, but sandbox and final-head runtime reconciliation evidence are still required before enabling the feature. The fiscal lock from PR #153 remains in force.
 
 ## Legal and technical evidence (4 October 2026)
 
@@ -41,11 +41,13 @@ Credit issuance creates an audited fiscal return and negative charge adjustments
 
 A separately confirmed money refund requires accepted credit status/fiscal number, a unique request key, two-decimal cash/card amount, and both remaining document credit and available guest funds. It posts an audited folio refund; it cannot create another fiscal note. Deposits stay separate. Receipt uses the existing POS receipt route.
 
+Linked credit refunds stamp their settlement business date, branch and selected cash drawer. Day-close, X reports and payment summaries deduct the actual cash/card settlement on that date; drawer expected cash deducts cash refunds only. Sales and tax change only through the credit document. Refund-only days can be closed, closed days/drawers reject new refunds, and retries of an already posted request remain idempotent. Historical refunds are not assigned guessed settlement dates.
+
 ## Remaining release gates
 
 1. Run canonical PHPUnit, native MariaDB and desktop/390px browser CI on the final head. Local PHP/Composer are unavailable; local diff checks are not runtime verification.
 2. Complete actual Hotel full/partial credit-note sandbox acceptance, original RefUSIN matching, duplicate/retry recovery and legacy-agent compatibility evidence. No production credential or live invoice experiment.
-3. Reconcile actual folio money refunds with drawer/day-close payment reports. Excluding a sales credit from payment buckets is implemented; folio refund settlement reporting must also be proven before enabling either write action.
+3. Verify final-head refund reporting regressions: selected drawer, settlement date, tenant/branch/user scope, refund-only day close and retry after close. The integration is implemented; runtime evidence is required before enabling either write action.
 4. Verify monthly-return/Annexure I procedure and applicable consolidated adjustment rules independently; API acceptance is not monthly-return completion.
 5. Browser evidence for enabled issuance/refund and translated desktop/mobile flows; the default gate is not enabled by CI success alone.
 

@@ -339,11 +339,35 @@ async function hotelWorkflow(page, t, v) {
   await saveEvidenceScreenshot(page, `hotel-simple-desk-${v.width}-stay.png`);
   await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).click();
   await dismiss(page);
-  const checkout = page.locator('form[action$="/checkout"]');
+  const checkout = page.locator('form[data-hotel-confirm-flow="checkout"]');
   await checkout.locator('[name="payment_method"]').selectOption('card');
-  await page.waitForFunction(() => { const f = document.querySelector('form[action$="/checkout"]'); return f && !f.querySelector('button').disabled && Number(f.querySelector('[name="amount"]').value) === 2500; });
+  await page.waitForFunction(() => { const f = document.querySelector('form[data-hotel-confirm-flow="checkout"]'); return f && !f.querySelector('button').disabled && Number(f.querySelector('[name="amount"]').value) === 2500; });
   await saveEvidenceScreenshot(page, `hotel-simple-desk-${v.width}-checkout.png`);
-  await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000}), checkout.locator('button').click()]);
+  let billConfirmPosts = 0;
+  const countConfirm = request => { if (request.method() === 'POST' && request.url().endsWith(stayPath + '/bill-confirm')) ++billConfirmPosts; };
+  page.on('request', countConfirm);
+  const previewModal = page.locator('[data-hotel-bill-preview="1"]');
+  await checkout.locator('button').click();
+  await previewModal.waitFor({state:'visible'});
+  if (!(await previewModal.locator('[data-preview-lines]').innerText()).trim()) throw new Error('Bill preview omitted actual folio lines');
+  await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-draft.png`);
+  await previewModal.locator('[data-preview-back]').click();
+  await previewModal.waitFor({state:'hidden'});
+  if (billConfirmPosts !== 0) throw new Error('Closing preview created/reported a bill');
+  if (await checkout.locator('[name="payment_method"]').inputValue() !== 'card' || Number(await checkout.locator('[name="amount"]').inputValue()) !== 2500) throw new Error('Preview close lost payment edits');
+  await checkout.locator('button').click();
+  await previewModal.waitFor({state:'visible'});
+  const [confirmed] = await Promise.all([
+    page.waitForResponse(r => r.url().endsWith(stayPath + '/bill-confirm') && r.request().method() === 'POST'),
+    previewModal.locator('[data-preview-confirm]').click(),
+  ]);
+  if (!confirmed.ok()) throw new Error('Real bill confirmation failed');
+  await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
+  if (billConfirmPosts !== 1) throw new Error('Bill confirmation submitted more than once');
+  if (await previewModal.locator('[data-preview-qr]').isVisible()) throw new Error('Unreported local bill advertised a PRA QR');
+  await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-confirmed.png`);
+  page.off('request', countConfirm);
+  await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000}), previewModal.locator('[data-preview-stay]').click()]);
   await dismiss(page);
   if (!await page.locator('a[href*="/pos/transaction/"]').count()) throw new Error('Checkout must expose the issued receipt');
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');

@@ -13429,6 +13429,9 @@ class PosController extends Controller
         // 'card' would report Rs 0 card sales (and dump them into "Other").
         $payBuckets = PosPaymentBuckets::split($dcSaleRows);
         $refundBuckets = PosPaymentBuckets::split($dcReturnRows);
+        $hotelRefunds = $dayCloseScope === 'local' ? [] : \App\Services\HotelCreditNoteRefundReporting::buckets(
+            $companyId, $date, $dcBranchId, $dayCloseIso ? (int) $dayCloseUser->id : null);
+        foreach (['cash', 'card'] as $bucket) $refundBuckets[$bucket] += $hotelRefunds[$bucket] ?? 0;
 
         // Returns detail (Task 678): the day-close page lists each return with
         // WHO processed it (owner audits cashier-made returns). Own query —
@@ -13664,7 +13667,7 @@ class PosController extends Controller
         // summary — their preview recomputes live from the own-bills set.
         $streamSplit = ($existingReport && is_array($existingReport->stream_summary ?? null) && !$dayCloseIso)
             ? $existingReport->stream_summary
-            : $this->buildDayCloseStreamSplit($streamTransactions);
+            : $this->buildDayCloseStreamSplit($streamTransactions, $hotelRefunds);
         // New reports freeze the tax split inside the existing stream snapshot,
         // so historical screen/PDF/thermal values survive a local-bill wash.
         $frozenTaxSplit = $streamSplit['tax_split'] ?? null;
@@ -13758,7 +13761,7 @@ class PosController extends Controller
              $showLocalStream,
              $existingReport,
              $counterCashTotals,
-             $this->buildDayCloseSummaryPaymentSplit($dcSaleRows, $dcReturnRows),
+             $this->buildDayCloseSummaryPaymentSplit($dcSaleRows, $dcReturnRows, $hotelRefunds),
              $existingReport !== null
          );
          // X/open-day reconciliation has an opening float but no counted cash
@@ -15903,7 +15906,8 @@ class PosController extends Controller
         // rows, yet nothing is left to wash). Task 516: $allowEmpty lets those
         // days get a zero-figure Z-report so they finally leave the banner —
         // the "close one, another appears" whack-a-mole ender.
-        if ($transactions->isEmpty() && !$hasLocalBills && !$allowEmpty) {
+        $hotelRefunds = \App\Services\HotelCreditNoteRefundReporting::buckets($companyId, $date, $branchId);
+        if ($transactions->isEmpty() && !$hasLocalBills && array_sum($hotelRefunds) <= 0 && !$allowEmpty) {
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 
@@ -15932,7 +15936,7 @@ class PosController extends Controller
 
         // Shared figure builder (Task 660): the SAME code path the X-Report
         // uses, so Z-Report and X-Report numbers can never diverge.
-        $data = array_merge($this->buildDayCloseFigureData($saleRows, $returnRows), [
+        $data = array_merge($this->buildDayCloseFigureData($saleRows, $returnRows, $hotelRefunds), [
             'company_id' => $companyId,
             'report_date' => $date,
             'report_number' => $reportNumber,
@@ -15960,11 +15964,11 @@ class PosController extends Controller
             // stays computed from the PRA set, and PRA-reporting logic is
             // untouched (compliance boundary).
              $streamSummary = $this->buildDayCloseStreamSplit(
-                $this->withLocalStreamRows($transactions, $companyId, $date, null, $branchId, false)
+                $this->withLocalStreamRows($transactions, $companyId, $date, null, $branchId, false), $hotelRefunds
             );
              // The compact payment split follows the report's PRA figure set,
              // not the extra local rows included in stream_summary.
-             $streamSummary['summary_payments'] = $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows);
+             $streamSummary['summary_payments'] = $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows, $hotelRefunds);
              $data['stream_summary'] = $streamSummary;
         }
 
@@ -16389,7 +16393,7 @@ class PosController extends Controller
         // OLD reports = best-effort recompute from surviving historical rows.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
-            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId), \App\Services\HotelCreditNoteRefundReporting::buckets((int) $report->company_id, $report->report_date->toDateString(), $rptBranchId));
         $taxSplit = is_array($streamSplit['tax_split'] ?? null)
             ? $streamSplit['tax_split']
             : $this->dayCloseTaxSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
@@ -16413,7 +16417,8 @@ class PosController extends Controller
              $counterCashTotals,
              $this->buildDayCloseSummaryPaymentSplit(
                  $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return'),
-                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')
+                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return'),
+                 \App\Services\HotelCreditNoteRefundReporting::buckets((int) $report->company_id, $report->report_date->toDateString(), $rptBranchId)
              ),
              true
          );
@@ -16493,7 +16498,7 @@ class PosController extends Controller
         // Per-stream split (Task 660) — same frozen-first logic as the PDF.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
-            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId), \App\Services\HotelCreditNoteRefundReporting::buckets((int) $report->company_id, $report->report_date->toDateString(), $rptBranchId));
         $taxSplit = is_array($streamSplit['tax_split'] ?? null)
             ? $streamSplit['tax_split']
             : $this->dayCloseTaxSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
@@ -16513,7 +16518,8 @@ class PosController extends Controller
              $counterCashTotals,
              $this->buildDayCloseSummaryPaymentSplit(
                  $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return'),
-                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')
+                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return'),
+                 \App\Services\HotelCreditNoteRefundReporting::buckets((int) $report->company_id, $report->report_date->toDateString(), $rptBranchId)
              ),
              true
          );
@@ -16574,10 +16580,11 @@ class PosController extends Controller
      * is stored as 'debit_card'; ='card' matching reported Rs 0 card sales on
      * the Z-report, live incident Jul 2026).
      */
-    private function buildDayCloseFigureData($saleRows, $returnRows): array
+    private function buildDayCloseFigureData($saleRows, $returnRows, array $hotelRefunds = []): array
     {
         $payBuckets = PosPaymentBuckets::split($saleRows);
         $refundBuckets = PosPaymentBuckets::split($returnRows);
+        foreach (['cash', 'card'] as $bucket) $refundBuckets[$bucket] += $hotelRefunds[$bucket] ?? 0;
 
         $data = [
             'total_invoices' => $saleRows->count(),
@@ -16694,7 +16701,7 @@ class PosController extends Controller
         return $transactions->concat($locals->reject(fn ($t) => isset($seen[$t->id])))->values();
     }
 
-    private function buildDayCloseStreamSplit($transactions): array
+    private function buildDayCloseStreamSplit($transactions, array $hotelRefunds = []): array
     {
         $typeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
         $returnRows = $typeReady
@@ -16738,6 +16745,8 @@ class PosController extends Controller
             );
         }
 
+        foreach (['cash', 'card'] as $bucket) $split['pra'][$bucket] = round($split['pra'][$bucket] - ($hotelRefunds[$bucket] ?? 0), 2);
+
         // Exempt detail: value = stored exempt_amount (post-discount, PosTaxMath
         // — the same figure the tax report uses, covers exempt shares on mixed
         // bills too); items = which exempt items sold today (sales-only,
@@ -16779,7 +16788,7 @@ class PosController extends Controller
          // Compact reports need the online bucket separately. Keep the existing
          // detailed cash/card/other split unchanged; this extra frozen snapshot
          // lets a later Z print stay truthful after the wash removes rows.
-         $split['summary_payments'] = $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows);
+         $split['summary_payments'] = $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows, $hotelRefunds);
 
         return $split;
     }
@@ -16790,7 +16799,7 @@ class PosController extends Controller
       * the detailed report; this is only the additional compact presentation
       * bucket and is frozen inside stream_summary with the Z-report.
       */
-     private function buildDayCloseSummaryPaymentSplit($saleRows, $returnRows): array
+     private function buildDayCloseSummaryPaymentSplit($saleRows, $returnRows, array $hotelRefunds = []): array
      {
          $onlineAliases = array_merge(
              \App\Support\PosPaymentLabels::ONLINE_ALIASES,
@@ -16823,6 +16832,7 @@ class PosController extends Controller
              $sums[$bucket] -= (float) ($transaction->total_amount ?? 0);
          }
 
+         foreach (['cash', 'card'] as $bucket) $sums[$bucket] -= $hotelRefunds[$bucket] ?? 0;
          return array_map(fn ($value) => round($value, 2), $sums);
      }
 
@@ -16891,7 +16901,9 @@ class PosController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        if ($transactions->isEmpty()) {
+        $hotelRefunds = ($user?->posBillingScope() === 'local') ? [] : \App\Services\HotelCreditNoteRefundReporting::buckets(
+            $companyId, $date, $xBranchId, $xIso ? (int) $user->id : null);
+        if ($transactions->isEmpty() && array_sum($hotelRefunds) <= 0) {
             return redirect()->route('pos.day-close', ['date' => $date])
                 ->with('error', __('pos.no_transactions_for_date', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]));
         }
@@ -16907,7 +16919,7 @@ class PosController extends Controller
         // TRANSIENT report object — NEVER saved. Same field shapes the Z views
         // read, so both PDF/thermal templates work unchanged.
         $report = new PosDayCloseReport(array_merge(
-            $this->buildDayCloseFigureData($saleRows, $returnRows),
+            $this->buildDayCloseFigureData($saleRows, $returnRows, $hotelRefunds),
             [
                 'company_id' => $companyId,
                 'report_date' => $date,
@@ -16924,7 +16936,7 @@ class PosController extends Controller
             $report->rider_summary = $riderFigures;
         }
 
-         $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId, false));
+         $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId, false), $hotelRefunds);
 
         // Task 705: X display mode-gating (same rule as the Z page/PDF).
         $showLocalStream = (bool) session('pos_local_check')
@@ -16955,7 +16967,7 @@ class PosController extends Controller
         $taxSplit = $streamSplit['tax_split'] ?? $this->dayCloseTaxSplit($transactions);
         $isXReport = true;
          $isSummaryReport = $this->dayCloseReportMode($request) === 'summary';
-         $summary = $this->buildDayCloseSummary($report, $streamSplit, $showLocalStream, null, null, $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows));
+         $summary = $this->buildDayCloseSummary($report, $streamSplit, $showLocalStream, null, null, $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows, $hotelRefunds));
          $openingFloat = \App\Models\PosDayOpening::totalForDate($companyId, $date, $xBranchId);
          if ($openingFloat !== null) {
              $summary['cash_recon'] = [

@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'drawer' => 'Refund ka cash drawer',
     'title' => 'Credit notes',
     'help' => 'Ghalat ya extra billed charge kam karein. Paisay alag wapas karein; stay aur room wahi rahenge.',
     'verification' => 'Credit note issue karne se pehle verification ya original bill ka review chahiye.',

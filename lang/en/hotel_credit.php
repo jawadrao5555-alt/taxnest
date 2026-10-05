@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'drawer' => 'Refund drawer',
     'title' => 'Credit notes',
     'help' => 'Reduce a genuine billed charge. Refund money separately; the stay and room remain unchanged.',
     'verification' => 'Issuance requires verification or review of the original bill.',

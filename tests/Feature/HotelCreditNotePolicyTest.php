@@ -281,6 +281,90 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertDatabaseMissing('hotel_credit_notes', ['stay_id' => $stay->id]);
     }
 
+    private function acceptedPartialCredit(): array
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        config(['hotel_credit_notes.enabled' => true]);
+        $owner->update(['pra_reporting_enabled' => true]);
+        $selection = [$bill->items->first()->id => 1.0];
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id, $selection);
+        $service = app(\App\Services\HotelCreditNoteService::class);
+        $note = $service->issue($stay, $owner, (int) $bill->id, $selection,
+            'Synthetic reporting adjustment', 'reporting-credit-request-001', $plan['fingerprint']);
+        $credit = PosTransaction::findOrFail($note->credit_transaction_id);
+        $credit->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'TEST-ACCEPTED-REPORTING']);
+        return [$stay, $owner, $bill, $note, $credit, $service];
+    }
+
+    public function test_money_refund_nets_reports_and_selected_drawer_without_another_sales_credit(): void
+    {
+        [$stay, $owner, $bill, $note, $credit, $service] = $this->acceptedPartialCredit();
+        $drawer = \App\Models\PosTerminal::create(['company_id' => $stay->company_id,
+            'terminal_name' => 'Synthetic refund drawer', 'is_active' => true]);
+        $bill->update(['terminal_id' => $drawer->id]);
+        $credit->update(['terminal_id' => $drawer->id]);
+        $refund = $service->refund($stay, $owner, (int) $note->id, 500, 'cash', 'reporting-cash-refund-001', (int) $drawer->id);
+        $date = $refund->refund_business_date->toDateString();
+        $buckets = \App\Services\HotelCreditNoteRefundReporting::buckets((int) $stay->company_id, $date);
+        $this->assertEquals(['cash' => 500, 'card' => 0, 'other' => 0], $buckets);
+        $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
+        $controller = app(PosController::class);
+        $figures = (new \ReflectionMethod($controller, 'buildDayCloseFigureData'))->invoke($controller,
+            collect([$bill->fresh()]), collect([$credit->fresh()]), $buckets);
+        $this->assertEquals(1000, $figures['total_amount']);
+        $this->assertEquals(1500, $figures['cash_amount']);
+        $this->assertEquals(0, $figures['total_tax']);
+        $split = (new \ReflectionMethod($controller, 'buildDayCloseStreamSplit'))->invoke($controller,
+            collect([$bill->fresh(), $credit->fresh()]), $buckets);
+        $this->assertEquals(1000, $split['pra']['sales']);
+        $this->assertEquals(1500, $split['pra']['cash']);
+        $this->assertEquals(1500, $split['summary_payments']['cash']);
+        $drawers = \App\Services\PosCounterDrawer::rows((int) $stay->company_id, null, $date,
+            collect([$bill->fresh(), $credit->fresh()]));
+        $row = $drawers->firstWhere('terminal_id', $drawer->id);
+        $this->assertEquals(1500, $row['cash_sales']);
+        $this->assertEquals(1500, $row['expected']);
+        $this->assertSame('checked_in', $stay->fresh()->status);
+    }
+
+    public function test_refund_reporting_is_scoped_and_uses_settlement_day_not_original_day(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-05 14:00:00', 'Asia/Karachi'));
+        [$stay, $owner, $bill, $note, $credit, $service] = $this->acceptedPartialCredit();
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-06 14:00:00', 'Asia/Karachi'));
+        $refund = $service->refund($stay, $owner, (int) $note->id, 200, 'card', 'reporting-next-day-001');
+        $refund->update(['refund_branch_id' => 123]);
+        $reporting = \App\Services\HotelCreditNoteRefundReporting::class;
+        $this->assertEquals(0, $reporting::buckets((int) $stay->company_id, '2026-10-05')['card']);
+        $this->assertEquals(200, $reporting::buckets((int) $stay->company_id, '2026-10-06', 123, (int) $owner->id)['card']);
+        $this->assertEquals(0, $reporting::buckets((int) $stay->company_id, '2026-10-06', 456)['card']);
+        $this->assertEquals(0, $reporting::buckets((int) $stay->company_id + 1000, '2026-10-06')['card']);
+        $this->assertEquals(0, $reporting::buckets((int) $stay->company_id, '2026-10-06', 123, (int) $owner->id + 1000)['card']);
+        $this->travelBack();
+    }
+
+    public function test_refund_only_day_can_be_frozen_once_and_repeat_request_remains_idempotent(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-05 14:00:00', 'Asia/Karachi'));
+        [$stay, $owner, $bill, $note, $credit, $service] = $this->acceptedPartialCredit();
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-06 14:00:00', 'Asia/Karachi'));
+        $refund = $service->refund($stay, $owner, (int) $note->id, 500, 'cash', 'reporting-frozen-refund-001');
+        $result = app(PosController::class)->performDayClose((int) $stay->company_id, '2026-10-06', (int) $owner->id);
+        $this->assertNotNull($result['report']);
+        $this->assertEquals(0, $result['report']->total_amount);
+        $this->assertEquals(-500, $result['report']->cash_amount);
+        $this->assertEquals(-500, $result['report']->stream_summary['pra']['cash']);
+        $same = $service->refund($stay, $owner, (int) $note->id, 500, 'cash', 'reporting-frozen-refund-001');
+        $this->assertSame($refund->id, $same->id);
+        try {
+            $service->refund($stay, $owner, (int) $note->id, 100, 'cash', 'reporting-closed-refund-002');
+            $this->fail('Closed settlement day must reject new money movement.');
+        } catch (HotelStayException $e) {
+            $this->assertEquals(500, app(HotelFolioService::class)->totals($stay)['refunds']);
+        }
+        $this->travelBack();
+    }
+
     private function company(string $category, array $overrides = []): Company
     {
         $defaults = PosFeatureService::defaultsForCategory($category);

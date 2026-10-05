@@ -106,7 +106,7 @@ class HotelCreditNoteService
             return $note;
         });
     }
-    public function refund(HotelStay $stay, User $actor, int $noteId, float $amount, string $method, string $key): HotelFolioEntry
+    public function refund(HotelStay $stay, User $actor, int $noteId, float $amount, string $method, string $key, int $terminalId = 0): HotelFolioEntry
     {
         abort_unless((int) $actor->company_id === (int) $stay->company_id && $actor->isPosAdmin(), 403);
         if (!config('hotel_credit_notes.enabled', false)) {
@@ -114,7 +114,7 @@ class HotelCreditNoteService
         }
         abort_unless(abs($amount - round($amount, 2)) < 0.0000001 && in_array($method, ['cash', 'card'], true) && is_finite($amount) && $amount > 0
             && preg_match('/^[a-zA-Z0-9-]{16,64}$/', $key), 422);
-        return DB::transaction(function () use ($stay, $actor, $noteId, $amount, $method, $key) {
+        return DB::transaction(function () use ($stay, $actor, $noteId, $amount, $method, $key, $terminalId) {
             $stay = HotelStay::where('company_id', $actor->company_id)->lockForUpdate()->findOrFail($stay->id);
             $note = HotelCreditNote::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->findOrFail($noteId);
             $credit = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
@@ -126,10 +126,22 @@ class HotelCreditNoteService
             $existing = HotelFolioEntry::where('company_id', $stay->company_id)->where('idempotency_key', $refundKey)->first();
             if ($existing) {
                 if ((int) $existing->stay_id !== (int) $stay->id || (int) $existing->pos_transaction_id !== (int) $credit->id
-                    || abs((float) $existing->amount - $amount) > 0.009 || $existing->payment_method !== $method) {
+                    || abs((float) $existing->amount - $amount) > 0.009 || $existing->payment_method !== $method
+                    || (int) $existing->refund_terminal_id !== $terminalId) {
                     throw new HotelStayException('Request key already belongs to another refund.');
                 }
                 return $existing;
+            }
+            if (!Schema::hasColumn('hotel_folio_entries', 'refund_business_date')) {
+                throw new HotelStayException('Refund settlement migration is required.');
+            }
+            abort_unless($terminalId >= 0 && ($terminalId === 0 || \App\Models\PosTerminal::where('company_id', $stay->company_id)
+                ->where('is_active', true)->whereKey($terminalId)->exists()), 422);
+            $date = PosBusinessDay::forMoment((int) $stay->company_id, now());
+            $closed = \App\Models\PosDayCloseReport::where('company_id', $stay->company_id)
+                ->whereDate('report_date', $date)->whereIn('branch_id', [0, (int) ($stay->branch_id ?? 0)])->exists();
+            if ($closed || ($method === 'cash' && PosCounterDrawer::isClosed((int) $stay->company_id, $terminalId, $date))) {
+                throw new HotelStayException('This refund day or drawer is closed.');
             }
             $already = (float) HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)
                 ->where('entry_type', HotelFolioEntry::TYPE_REFUND)->where('pos_transaction_id', $credit->id)->sum('amount');
@@ -138,7 +150,8 @@ class HotelCreditNoteService
                 throw new HotelStayException('Refund exceeds the remaining guest credit.');
             }
             $refund = app(HotelFolioService::class)->refundPayment($stay, $amount, (int) $actor->id, $method, $refundKey);
-            $refund->update(['pos_transaction_id' => $credit->id]);
+            $refund->update(['pos_transaction_id' => $credit->id, 'refund_business_date' => $date,
+                'refund_branch_id' => $stay->branch_id, 'refund_terminal_id' => $terminalId]);
             AuditLogService::log('hotel_credit_note_refunded', 'hotel_stay', $stay->id, null,
                 ['note_id' => $note->id, 'refund_entry_id' => $refund->id, 'amount' => $amount, 'method' => $method],
                 (int) $stay->company_id, (int) $actor->id);

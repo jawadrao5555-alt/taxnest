@@ -8,7 +8,7 @@
     <p class="text-sm text-gray-500 mb-5">{{ __('pos.hotel_room') }} {{ $stay->room?->room_number }} · {{ $stay->check_in_date->format('d M') }} – {{ $stay->check_out_date->format('d M Y') }}</p>
     @if(session('error'))<p role="alert" class="mb-4 rounded-lg bg-red-50 text-red-700 p-3">{{ session('error') }}</p>@endif
     @if($errors->any())<p role="alert" class="mb-4 text-red-700">{{ $errors->first() }}</p>@endif
-    <form x-data="hotelCheckoutForm(@js($config))" x-init="refresh()" method="POST" action="{{ route('pos.hotel.checkout.complete', $stay->id) }}" @submit="if (busy || error) { $event.preventDefault(); } else { submitting = true; }" class="rounded-xl border bg-white dark:bg-gray-900 p-5 space-y-5">
+    <form x-data="hotelCheckoutForm(@js($config))" x-init="refresh()" method="POST" action="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-hotel-confirm-flow="checkout" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" @submit="if (busy || error) { $event.preventDefault(); } else { submitting = true; }" class="rounded-xl border bg-white dark:bg-gray-900 p-5 space-y-5">
         @csrf
         <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) Illuminate\Support\Str::uuid()) }}">
         <div class="grid grid-cols-2 gap-3 text-sm" aria-live="polite">

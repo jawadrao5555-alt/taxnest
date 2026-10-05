@@ -25,6 +25,7 @@
 @csrf<input type="hidden" name="request_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
 <label class="block">{{ __('hotel_credit.refund') }} <input type="number" name="amount" min="0.01" step="0.01" max="{{ $credit->total_amount }}" required class="border rounded p-2"></label>
 <label class="block">{{ __('hotel_credit.method') }} <select name="method" class="border rounded p-2"><option value="cash">{{ __('hotel_correction.cash') }}</option><option value="card">{{ __('hotel_correction.card') }}</option></select></label>
+<label class="block">{{ __('hotel_credit.drawer') }} <select name="terminal_id" class="border rounded p-2"><option value="0">{{ __('pos.counter_not_set') }}</option>@foreach($terminals as $terminal)<option value="{{ $terminal->id }}">{{ $terminal->terminal_name }}</option>@endforeach</select></label>
 <label class="block"><input type="checkbox" name="confirmed" value="1" required> {{ __('hotel_credit.refund_confirm') }}</label>
 <button class="border rounded px-4 py-2">{{ __('hotel_credit.refund') }}</button>
 </form>

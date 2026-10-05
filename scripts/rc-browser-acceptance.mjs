@@ -445,7 +445,7 @@ async function hotelWorkflow(page, t, v) {
   const removal = page.locator(`form[action$="/guests/${stayId}"]`);
   page.once('dialog', dialog => dialog.accept());
   await Promise.all([page.waitForResponse(r => r.url().endsWith(`/guests/${stayId}`) && r.request().method() === 'POST'), removal.locator('button').click()]);
-  await page.waitForURL(baseUrl + '/pos/hotel/guests');
+  await page.locator('tbody tr').filter({hasText:editedGuest}).waitFor({state:'detached'});
   if (await page.locator('tbody tr').filter({hasText:editedGuest}).count()) throw new Error('Deleted directory profile reappeared');
   await saveEvidenceScreenshot(page, `hotel-guests-${v.width}-removed.png`);
   await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});

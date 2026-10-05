@@ -63,7 +63,7 @@
                 <strong>{{ $bill->invoice_number }}</strong>
                 <p class="text-xs">{{ $accepted ? __('pos.hotel_fiscal_bill').' · '.$bill->pra_invoice_number : __('hotel_preview.status_'.$billState) }}</p>
             </div>
-            <a href="{{ route('pos.receipt', $bill->id) }}" target="_blank" rel="noopener" class="rounded-lg border px-3 py-2 text-sm">{{ __('hotel_bill.issued_receipt') }}</a>
+            <a href="{{ route('pos.hotel.bill-receipt', [$stay->id, $bill->id]) }}" target="_blank" rel="noopener" class="rounded-lg border px-3 py-2 text-sm">{{ __('hotel_bill.issued_receipt') }}</a>
         </div>
         @endforeach
     </section>
@@ -275,7 +275,7 @@
                         <p>{{ $entry->description }}</p>
                         @if($entry->discount_amount > 0)<p class="text-xs text-teal-700">{{ __($entry->category === 'room' ? 'pos.hotel_room_discount' : 'pos.hotel_extra_discount') }}: Rs {{ number_format($entry->discount_amount, 2) }}</p>@endif
                         @if($entry->pos_transaction_id)
-                        <a class="text-xs text-teal-800" href="{{ route('pos.receipt', $entry->pos_transaction_id) }}" target="_blank" rel="noopener">{{ __('hotel_bill.issued_receipt') }}</a>
+                        <a class="text-xs text-teal-800" href="{{ route('pos.hotel.bill-receipt', [$stay->id, $entry->pos_transaction_id]) }}" target="_blank" rel="noopener">{{ __('hotel_bill.issued_receipt') }}</a>
                         @endif
                     </td>
                     <td class="px-4 py-3">{{ rtrim(rtrim(number_format($entry->quantity, 3), '0'), '.') }} {{ \App\Services\PosUnitCatalog::label($entry->uom) }}</td>

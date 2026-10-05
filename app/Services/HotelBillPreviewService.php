@@ -88,7 +88,7 @@ class HotelBillPreviewService
             'status' => !$bill ? 'no_bill' : ($accepted ? 'submitted' : ($bill->pra_status ?: 'local')),
             'fiscal_number' => $accepted ? $bill->pra_invoice_number : null,
             'qr' => $accepted ? \App\Support\QrImage::dataUri($bill->pra_invoice_number) : null,
-            'receipt_url' => $bill ? route('pos.receipt', $bill->id) : null,
+            'receipt_url' => $bill ? route('pos.hotel.bill-receipt', [$stay->id, $bill->id]) : null,
             'credit_note_url' => auth('pos')->user()?->isPosAdmin() ? route('pos.hotel.credit-notes', $stay->id) : null,
             'stay_url' => route('pos.hotel.stays.show', $stay->id),
         ];

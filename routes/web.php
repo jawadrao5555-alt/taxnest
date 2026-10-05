@@ -1147,6 +1147,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/stays/{id}/checkout', [HotelController::class, 'completeCheckout'])->whereNumber('id')->name('pos.hotel.checkout.complete');
         Route::post('/stays/{id}/discount', [HotelController::class, 'discount'])->whereNumber('id')->name('pos.hotel.stays.discount');
         Route::get('/stays/{id}', [HotelController::class, 'showStay'])->whereNumber('id')->name('pos.hotel.stays.show');
+        Route::get('/stays/{id}/bills/{billId}/receipt', [HotelController::class, 'billReceipt'])->whereNumber(['id', 'billId'])->name('pos.hotel.bill-receipt');
         Route::get('/stays/{id}/statement', [HotelController::class, 'statement'])->whereNumber('id')->name('pos.hotel.stays.statement');
         Route::post('/stays/{id}/statement/silent-print', [HotelController::class, 'silentStatement'])
             ->middleware('throttle:20,1')->whereNumber('id')->name('pos.hotel.stays.statement.silent-print');

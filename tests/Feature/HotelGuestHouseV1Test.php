@@ -276,6 +276,29 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertDatabaseCount('hotel_folio_entries', 3);
     }
 
+    public function test_archived_hotel_fiscal_receipt_is_stay_scoped_and_checkout_reuses_it(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        $bill = app(HotelFolioService::class)->settleCoveredCharges($stay, $owner->id, 'cash', 'archived-hotel-source')['transaction'];
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ARCHIVED-FISCAL', 'is_archived' => true]);
+        $url = route('pos.hotel.bill-receipt', [$stay->id, $bill->id]);
+        $this->actingAs($owner, 'pos')->get($url)->assertOk()->assertSee($bill->invoice_number)->assertSee('SYNTHETIC-ARCHIVED-FISCAL');
+        $this->getJson(route('pos.receipt', $bill->id))->assertNotFound();
+        $this->getJson(route('pos.hotel.bill-status', [$stay->id, $bill->id]))->assertOk()->assertJsonPath('receipt_url', $url)->assertJsonPath('status', 'submitted');
+        $data = ['flow' => 'checkout', 'payment_method' => 'cash', 'amount' => 0];
+        $preview = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->json();
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $data + ['preview_token' => $preview['preview_token'],
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid()])->assertOk()->assertJsonPath('bill_id', $bill->id)->assertJsonPath('receipt_url', $url);
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $this->assertTrue((bool) $bill->fresh()->is_archived);
+        $cashier = $this->owner($company);
+        $cashier->update(['role' => 'company_user', 'pos_role' => 'pos_cashier', 'pos_billing_scope' => 'local']);
+        $this->actingAs($cashier, 'pos')->getJson($url)->assertForbidden();
+        $other = $this->company('hotel');
+        $this->actingAs($this->owner($other), 'pos')->getJson($url)->assertNotFound();
+        $this->actingAs($owner, 'pos')->getJson(route('pos.hotel.bill-receipt', [$stay->id, $bill->id + 999]))->assertNotFound();
+    }
+
     public function test_guest_directory_edit_and_delete_preserve_stay_and_invoice_history(): void
     {
         [$company, $owner, $stay] = $this->previewStay();

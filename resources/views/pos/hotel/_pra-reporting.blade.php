@@ -11,6 +11,9 @@
     $lastAccepted = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $reportCompany?->id ?? 0)
         ->whereIn('id', $hotelBillIds)->where('pra_status', 'submitted')->whereNotNull('pra_invoice_number')
         ->where('pra_invoice_number', '!=', '')->latest('id')->first();
+    $lastAcceptedStayId = $lastAccepted ? \App\Models\HotelFolioEntry::where('company_id', $reportCompany->id)
+        ->where('pos_transaction_id', $lastAccepted->id)->whereIn('stay_id', \App\Models\HotelStay::where('company_id', $reportCompany->id)
+            ->when($connectionBranch, fn ($q) => $q->where('branch_id', $connectionBranch))->select('id'))->value('stay_id') : null;
     $reportReadOnly = (bool) data_get(session('impersonation'), 'readonly', false);
     $reportCanToggle = $reportAvailable && $reportUser?->isPosAdmin() && !$reportUser?->isPosCashier()
         && $reportUser?->posBillingScopeExplicit() === 'both' && !$reportReadOnly;
@@ -55,7 +58,7 @@
         <p>{{ __('hotel_reporting.agent') }}: {{ $reportCompany->agentOnline() ? __('hotel_reporting.agent_online') : __('hotel_reporting.agent_offline') }}</p>
         @endif
         @if($lastAccepted)
-        <p>{{ __('hotel_reporting.last_accepted') }}: <a class="underline" target="_blank" rel="noopener" href="{{ route('pos.receipt', $lastAccepted->id) }}">{{ $lastAccepted->pra_invoice_number }}</a> · {{ $lastAccepted->created_at?->format('d M Y H:i') }}</p>
+        <p>{{ __('hotel_reporting.last_accepted') }}: <a class="underline" target="_blank" rel="noopener" href="{{ route('pos.hotel.bill-receipt', [$lastAcceptedStayId ?? 0, $lastAccepted->id]) }}">{{ $lastAccepted->pra_invoice_number }}</a> · {{ $lastAccepted->created_at?->format('d M Y H:i') }}</p>
         @else
         <p>{{ __('hotel_reporting.no_acceptance') }}</p>
         @endif

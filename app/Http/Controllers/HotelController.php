@@ -533,8 +533,23 @@ class HotelController extends Controller
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $stay = $this->stay($id);
         abort_unless(\App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->where('pos_transaction_id', $billId)->exists(), 404);
-        $bill = \App\Models\PosTransaction::where('company_id', $stay->company_id)->findOrFail($billId);
+        $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)->findOrFail($billId);
         return response()->json(app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill));
+    }
+
+    public function billReceipt(int $id, int $billId)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $stay = $this->stay($id);
+        abort_unless(\App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)
+            ->where('pos_transaction_id', $billId)->exists(), 404);
+        $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+            ->with(['items', 'payments', 'creator', 'terminal', 'rider'])->findOrFail($billId);
+        $viewer = auth('pos')->user();
+        abort_unless($transaction->allowedForBillingScopeOf($viewer) && $transaction->allowedForCashierIsolationOf($viewer), 403);
+        $company = Company::findOrFail($stay->company_id);
+        $view = ($company->receipt_printer_size ?? '80mm') === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
+        return view($view, compact('transaction', 'company'));
     }
 
     public function showCheckout(int $id)

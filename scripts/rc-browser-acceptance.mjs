@@ -383,6 +383,14 @@ async function hotelWorkflow(page, t, v) {
   if (!firstBill.bill_id) throw new Error('Partial advance did not issue full bill');
   if (!await previewModal.locator('[data-preview-credit-note]').isVisible()) throw new Error('Credit note missing from shared popup');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-advance-invoice.png`);
+  const receiptPagePromise = page.context().waitForEvent('page');
+  await previewModal.locator('[data-preview-receipt]').click();
+  const receiptPage = await receiptPagePromise;
+  await receiptPage.waitForLoadState('domcontentloaded');
+  if (!(await receiptPage.locator('body').innerText()).includes(firstBill.invoice_number)) throw new Error('Scoped Hotel receipt did not render the original bill');
+  await saveEvidenceScreenshot(receiptPage, `hotel-receipt-${v.width}-advance.png`);
+  await receiptPage.close();
+
   await previewModal.locator('[data-preview-checkout]').click();
   await page.waitForFunction(() => { const d = document.querySelector('[data-hotel-bill-preview]'); return d && !d.querySelector('[data-preview-confirm]').disabled && Number(d.querySelector('[data-desk-amount]').value) === 2500; });
   const [confirmed] = await Promise.all([
@@ -399,7 +407,7 @@ async function hotelWorkflow(page, t, v) {
   page.off('request', countConfirm);
   await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000}), previewModal.locator('[data-preview-stay]').click()]);
   await dismiss(page);
-  if (!await page.locator('a[href*="/pos/transaction/"]').count()) throw new Error('Checkout must expose the issued receipt');
+  if (!await page.locator('a[href*="/bills/"][href$="/receipt"]').count()) throw new Error('Checkout must expose the issued receipt');
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
   pass(`${t.name}/${v.width}: room check-in, edited rate, discount, advance, card checkout and receipt passed`);
   // Correct the actual fictional issued stay through the owner UI, not mocks.
@@ -412,7 +420,7 @@ async function hotelWorkflow(page, t, v) {
   await saveEvidenceScreenshot(page, `hotel-correction-${v.width}-preview.png`);
   await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000,waitUntil:'domcontentloaded'}), correction.locator('button').click()]);
   await dismiss(page);
-  if (!await page.locator('a[href*="/pos/transaction/"]').count()) throw new Error('Correction erased the source receipt');
+  if (!await page.locator('a[href*="/bills/"][href$="/receipt"]').count()) throw new Error('Correction erased the source receipt');
   await page.goto(baseUrl + stayPath + '/correction', {waitUntil:'domcontentloaded'});
   await dismiss(page);
   await page.locator('[data-hotel-correction="1"] [role="alert"]').waitFor({state:'visible'});

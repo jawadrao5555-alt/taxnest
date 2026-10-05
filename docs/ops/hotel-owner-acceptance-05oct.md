@@ -24,3 +24,5 @@ One Hotel bill dialog handles check-in review, explicit full-bill confirmation, 
 Guest profile edits/removal affect the directory and future-booking selector; original stays and invoices are preserved. Corporate/customer billing is an optional nested section. PRA status separates reporting permission, cloud/device route, recent agent heartbeat and last accepted branch-scoped Hotel fiscal invoice. Historical acceptance is not a claim of current connectivity.
 
 Credit-note navigation is present in the dialog, while PR159 issuance/refund enablement gates remain explicit. No production testing or credentials were used.
+
+After day close, Hotel receipt access verifies the company, active branch, actual stay/bill ledger link, billing scope and cashier isolation. The existing receipt templates and printer sizes render the original archived document; the bill remains archived. Checkout/status reuse that original document. Actual settlements are classified into their own Local/PRA stream; later reporting toggles preserve an already issued bill's stream. No source sale/tax is counted again.

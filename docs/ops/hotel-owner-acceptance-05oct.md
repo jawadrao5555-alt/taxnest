@@ -11,3 +11,11 @@ PR #159 credit adjustments/refund settlement and the check-in popup correction a
 
 6. Transactions → New Invoice opens /pos/invoice/create while Hotel Restaurant Outlet is OFF, leading to the sale recovery screen. Use the Hotel check-in entry for this configuration; preserve the sale entry when Outlet is ON and for other categories.
 7. Guests page has no Edit/Delete actions. Implement a guest directory profile separately from stay/fiscal records, so edits and directory deletion preserve original bookings and receipts.
+
+## Final implementation scope (pending final-head CI)
+
+One Hotel bill dialog handles check-in review, explicit full-bill confirmation, remaining collection, checkout and receipt printing. New UI bookings stamp actual folio collections/refunds by business date and drawer; full fiscal invoices do not pretend an unpaid balance was received. Legacy stays keep existing accounting behavior. Already-issued bills are reused at checkout without another fiscal document.
+
+Guest profile edits/removal affect the directory and future-booking selector; original stays and invoices are preserved. Corporate/customer billing is an optional nested section. PRA status separates reporting permission, cloud/device route, recent agent heartbeat and last accepted branch-scoped Hotel fiscal invoice. Historical acceptance is not a claim of current connectivity.
+
+Credit-note navigation is present in the dialog, while PR159 issuance/refund enablement gates remain explicit. No production testing or credentials were used.

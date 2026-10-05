@@ -54,7 +54,9 @@ class HotelFolioInvoiceService
             ->lockForUpdate()
             ->get();
 
-        [$picked, $running] = $this->coveredCharges($stay, $company, $charges, $paymentMethod);
+        [$picked, $running] = $stay->hotel_money_from_folio
+            ? [$charges->all(), (float) $charges->sum('amount')]
+            : $this->coveredCharges($stay, $company, $charges, $paymentMethod);
         if ($picked === []) {
             if ($charges->isNotEmpty()) {
                 throw new HotelStayException(__('pos.hotel_tax_coverage_needed'));
@@ -149,6 +151,10 @@ class HotelFolioInvoiceService
             'created_by' => $userId,
             'notes' => __('pos.hotel_invoice_note', ['stay' => $stay->stay_number]),
         ];
+        if ($stay->hotel_money_from_folio) {
+            $txnData['hotel_money_from_folio'] = true;
+            $txnData['cash_received'] = $paymentMethod === 'cash' ? min($totalAmount, max(0, $this->availableTowardFiscal($stay))) : null;
+        }
         if ($branchId && Schema::hasColumn('pos_transactions', 'branch_id')) {
             $txnData['branch_id'] = $branchId;
         }
@@ -169,7 +175,7 @@ class HotelFolioInvoiceService
             $itemTax = $taxInclusive
                 ? PosTaxMath::inclusiveLineTax((float) $row['line_total'], $taxRate, $menuRate)
                 : round($row['line_total'] * $taxRate / 100, 2);
-            PosTransactionItem::create([
+            $itemData = [
                 'transaction_id' => $transaction->id,
                 'item_type' => 'product',
                 'item_id' => $line->product_id,
@@ -183,7 +189,11 @@ class HotelFolioInvoiceService
                 'is_tax_exempt' => false,
                 'tax_rate' => $taxRate,
                 'tax_amount' => $itemTax,
-            ]);
+            ];
+            if (Schema::hasColumn('pos_transaction_items', 'hotel_folio_entry_id')) {
+                $itemData['hotel_folio_entry_id'] = (int) $line->id;
+            }
+            PosTransactionItem::create($itemData);
             $line->pos_transaction_id = $transaction->id;
             $line->save();
         }
@@ -272,9 +282,9 @@ class HotelFolioInvoiceService
         }
         $prior = 0.0;
         if ($txnIds !== []) {
-            $prior = (float) PosTransaction::where('company_id', $stay->company_id)
+            $prior = (float) PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
                 ->whereIn('id', array_keys($txnIds))
-                ->sum('total_amount');
+                ->selectRaw("SUM(CASE WHEN transaction_type = 'return' THEN -total_amount ELSE total_amount END) AS net_total")->value('net_total');
         }
 
         return round($payments - $refunds - $prior, 2);

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class PosTransaction extends Model
 {
     protected $fillable = [
+        'hotel_money_from_folio',
         'company_id', 'branch_id', 'terminal_id', 'invoice_number', 'invoice_mode', 'customer_id', 'customer_name', 'customer_phone',
         'delivery_address',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
@@ -124,6 +125,7 @@ class PosTransaction extends Model
     }
 
     protected $casts = [
+        'hotel_money_from_folio' => 'boolean',
         'subtotal' => 'decimal:2',
         'discount_value' => 'decimal:2',
         'discount_amount' => 'decimal:2',

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class PosTransactionItem extends Model
 {
     protected $fillable = [
-        'transaction_id', 'item_type', 'item_id', 'item_name',
+        'transaction_id', 'item_type', 'item_id', 'item_name', 'hotel_folio_entry_id',
         // Kitchen ki parchi par na chhapne wali line (Delivery Charges) — dekho
         // RestaurantOrderItem par isi naam ka field.
         'skip_kitchen',
@@ -21,6 +21,7 @@ class PosTransactionItem extends Model
     ];
 
     protected $casts = [
+        'hotel_folio_entry_id' => 'integer',
         'deal_snapshot' => 'array',
         'quantity' => 'decimal:3',
         'returned_quantity' => 'decimal:3',

@@ -37,7 +37,7 @@ class HotelCorrectionService
         }
         foreach ($bills as $bill) {
             $bill->load('items');
-            if (PosReturnService::returnableReason($bill) !== null || $bill->items->isEmpty()
+            if (PosReturnService::returnableReason($bill, (bool) $bill->hotel_money_from_folio) !== null || $bill->items->isEmpty()
                 || $bill->items->contains(fn ($i) => (float) $i->returned_quantity > 0)
                 || HotelFolioEntry::where('company_id', $stay->company_id)->where('pos_transaction_id', $bill->id)->where('stay_id', '!=', $stay->id)->exists()) {
                 $blocked = __('hotel_correction.review');
@@ -82,7 +82,7 @@ class HotelCorrectionService
             }
             $results = [];
             foreach ($plan['bills'] as $bill) {
-                $result = PosReturnService::createReturn((int) $stay->company_id, (int) $bill->id, null, $method, (int) $actor->id);
+                $result = PosReturnService::createReturn((int) $stay->company_id, (int) $bill->id, null, $method, (int) $actor->id, ['hotel_credit_note' => (bool) $bill->hotel_money_from_folio]);
                 if (isset($result['error']) || empty($result['return'])) {
                     throw new HotelStayException($result['error'] ?? __('hotel_correction.review'));
                 }

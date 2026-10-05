@@ -331,8 +331,9 @@ class HotelFolioService
                 throw new HotelStayException(__('pos.hotel_amount_required'));
             }
 
+            $settlement = HotelMoneySettlementReporting::stamp($stay, $data, $userId);
             try {
-                $entry = HotelFolioEntry::create([
+                $entry = HotelFolioEntry::create(array_merge($settlement, [
                     'company_id' => $stay->company_id,
                     'stay_id' => $stay->id,
                     'entry_type' => $data['entry_type'],
@@ -353,7 +354,7 @@ class HotelFolioService
                     'reverses_entry_id' => $data['reverses_entry_id'] ?? null,
                     'idempotency_key' => $key,
                     'created_by' => $userId ?: null,
-                ]);
+                ]));
             } catch (QueryException $e) {
                 if ($key) {
                     $existing = HotelFolioEntry::where('company_id', $stay->company_id)

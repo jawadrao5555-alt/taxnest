@@ -1123,6 +1123,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/reservations', [HotelController::class, 'reservations'])->name('pos.hotel.reservations');
         Route::get('/housekeeping', [HotelController::class, 'housekeepingBoard'])->name('pos.hotel.housekeeping');
         Route::get('/guests', [HotelController::class, 'guests'])->name('pos.hotel.guests');
+        Route::get('/guests/{id}/edit', [HotelController::class, 'editGuest'])->whereNumber('id')->name('pos.hotel.guests.edit');
+        Route::patch('/guests/{id}', [HotelController::class, 'updateGuest'])->whereNumber('id')->name('pos.hotel.guests.update');
+        Route::delete('/guests/{id}', [HotelController::class, 'deleteGuest'])->whereNumber('id')->name('pos.hotel.guests.delete');
         Route::get('/folios', [HotelController::class, 'folios'])->name('pos.hotel.folios');
         Route::get('/reports', [HotelController::class, 'reports'])->name('pos.hotel.reports');
         // Separated Restaurant Outlet (saved restaurant_mode ON only).
@@ -1152,6 +1155,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/stays/{id}/extend', [HotelController::class, 'extend'])->whereNumber('id')->name('pos.hotel.stays.extend');
         Route::post('/stays/{id}/move', [HotelController::class, 'move'])->whereNumber('id')->name('pos.hotel.stays.move');
         Route::post('/stays/{id}/cancel', [HotelController::class, 'cancel'])->whereNumber('id')->name('pos.hotel.stays.cancel');
+        Route::get('/stays/{id}/credit-notes', [\App\Http\Controllers\HotelCreditNoteController::class, 'index'])->whereNumber('id')->name('pos.hotel.credit-notes');
+        Route::post('/stays/{id}/credit-notes/{bill}/review', [\App\Http\Controllers\HotelCreditNoteController::class, 'review'])->whereNumber('id')->whereNumber('bill')->name('pos.hotel.credit-notes.review');
+        Route::post('/stays/{id}/credit-notes/{bill}/issue', [\App\Http\Controllers\HotelCreditNoteController::class, 'issue'])->whereNumber('id')->whereNumber('bill')->name('pos.hotel.credit-notes.issue');
+        Route::post('/stays/{id}/credit-notes/{note}/refund', [\App\Http\Controllers\HotelCreditNoteController::class, 'refund'])->whereNumber('id')->whereNumber('note')->name('pos.hotel.credit-notes.refund');
         Route::get('/stays/{id}/correction', [HotelController::class, 'correctionPreview'])->whereNumber('id')->name('pos.hotel.stays.correction');
         Route::post('/stays/{id}/correction', [HotelController::class, 'correctStay'])->whereNumber('id')->name('pos.hotel.stays.correct');
         Route::post('/stays/{id}/void-error', [HotelController::class, 'voidErroneousStay'])->whereNumber('id')->name('pos.hotel.stays.void-error');

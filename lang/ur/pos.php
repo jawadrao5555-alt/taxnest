@@ -7166,5 +7166,6 @@ return [
     'print_no_document_reason_void_payload_empty' => 'پرنٹ کے لیے منسوخ آئٹم نہیں',
     'print_no_document_reason_store_slip_disabled' => 'اسٹور سلپ بند ہے',
     'print_no_document_reason_held_sale_missing' => 'ہولڈ سیل اب دستیاب نہیں',
+    'return_not_allowed_hotel_credit_required' => 'اس بل کے لیے ہوٹل واپسی / کریڈٹ نوٹ استعمال کریں۔ رقم کی واپسی الگ ہے۔',
 ];
 

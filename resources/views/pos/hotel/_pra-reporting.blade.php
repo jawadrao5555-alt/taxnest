@@ -3,6 +3,14 @@
     $reportCompany = $reportUser?->company;
     $reportAvailable = ($reportCompany?->pos_integration_mode ?? 'pra') !== 'standalone';
     $reportOn = $reportAvailable && $reportUser?->praReportingEnabled($reportCompany);
+    $connectionBranch = app(\App\Services\BranchContextService::class)->getActiveBranchId();
+    $hotelBillIds = \App\Models\HotelFolioEntry::where('company_id', $reportCompany?->id ?? 0)
+        ->whereIn('stay_id', \App\Models\HotelStay::where('company_id', $reportCompany?->id ?? 0)
+            ->when($connectionBranch, fn ($q) => $q->where('branch_id', $connectionBranch))->select('id'))
+        ->where('entry_type', 'charge')->whereNotNull('pos_transaction_id')->select('pos_transaction_id');
+    $lastAccepted = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $reportCompany?->id ?? 0)
+        ->whereIn('id', $hotelBillIds)->where('pra_status', 'submitted')->whereNotNull('pra_invoice_number')
+        ->where('pra_invoice_number', '!=', '')->latest('id')->first();
     $reportReadOnly = (bool) data_get(session('impersonation'), 'readonly', false);
     $reportCanToggle = $reportAvailable && $reportUser?->isPosAdmin() && !$reportUser?->isPosCashier()
         && $reportUser?->posBillingScopeExplicit() === 'both' && !$reportReadOnly;
@@ -41,4 +49,16 @@
     </div>
     <p x-show="error" x-cloak x-text="error" role="alert" class="mt-2 text-sm text-red-600"></p>
     <p class="mt-1 text-xs text-slate-500">{{ __('hotel_reporting.note') }}</p>
+    <div data-hotel-pra-connection class="mt-3 border-t pt-2 text-xs space-y-1">
+        <p>{{ __('hotel_reporting.connection') }}: {{ $reportCompany?->agentHandlesPra() ? __('hotel_reporting.device') : __('hotel_reporting.cloud') }}</p>
+        @if($reportCompany?->agentHandlesPra())
+        <p>{{ __('hotel_reporting.agent') }}: {{ $reportCompany->agentOnline() ? __('hotel_reporting.agent_online') : __('hotel_reporting.agent_offline') }}</p>
+        @endif
+        @if($lastAccepted)
+        <p>{{ __('hotel_reporting.last_accepted') }}: <a class="underline" target="_blank" rel="noopener" href="{{ route('pos.receipt', $lastAccepted->id) }}">{{ $lastAccepted->pra_invoice_number }}</a></p>
+        @else
+        <p>{{ __('hotel_reporting.no_acceptance') }}</p>
+        @endif
+        <p>{{ __('hotel_reporting.proof') }}</p>
+    </div>
 </div>

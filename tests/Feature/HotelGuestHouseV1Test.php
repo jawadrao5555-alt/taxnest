@@ -171,6 +171,64 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertDatabaseCount('pos_transactions', 1);
     }
 
+    public function test_full_unpaid_hotel_invoice_and_later_checkout_record_only_actual_money(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-05 14:00:00', 'Asia/Karachi'));
+        [$company, $owner, $stay] = $this->previewStay();
+        HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'payment')->delete();
+        $stay->update(['hotel_money_from_folio' => true]);
+        $this->actingAs($owner, 'pos');
+        $data = ['flow' => 'collect', 'payment_method' => 'cash', 'amount' => 200];
+        $preview = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', true)->json();
+        $payload = $data + ['preview_token' => $preview['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $billId = $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->json('bill_id');
+        $bill = \App\Models\PosTransaction::findOrFail($billId);
+        $this->assertGreaterThan(200, (float) $bill->total_amount);
+        $this->assertTrue($bill->hotel_money_from_folio);
+        $this->assertEquals(0, \App\Support\PosPaymentBuckets::split(collect([$bill]))['cash']);
+        $this->assertEquals(-200, \App\Services\HotelCreditNoteRefundReporting::buckets($company->id, '2026-10-05')['cash']);
+        $this->assertSame('hotel_credit_required', \App\Services\PosReturnService::returnableReason($bill));
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $billId);
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-06 14:00:00', 'Asia/Karachi'));
+        $balance = app(\App\Services\HotelDeskService::class)->summary($stay->fresh(), 'card')['balance'];
+        $this->assertEquals((float) $bill->total_amount - 200, $balance);
+        $data = ['flow' => 'checkout', 'payment_method' => 'card', 'amount' => $balance];
+        $preview = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', false)->json();
+        $payload = $data + ['preview_token' => $preview['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $billId);
+        $this->assertSame('checked_out', $stay->fresh()->status);
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $money = \App\Services\HotelCreditNoteRefundReporting::buckets($company->id, '2026-10-06');
+        $this->assertEquals(-$balance, $money['card']);
+        $this->assertEquals(0, $money['cash']);
+        $this->assertEquals(0, \App\Services\HotelCreditNoteRefundReporting::buckets($company->id + 999, '2026-10-06')['card']);
+        $closed = app(PosController::class)->performDayClose($company->id, '2026-10-06', $owner->id)['report'];
+        $this->assertNotNull($closed);
+        $this->assertEquals($balance, $closed->card_amount);
+        $this->assertEquals(0, $closed->total_amount);
+        $this->travelBack();
+    }
+
+    public function test_guest_directory_edit_and_delete_preserve_stay_and_invoice_history(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        $name = $stay->guest_name;
+        $this->actingAs($owner, 'pos')->get(route('pos.hotel.guests.edit', $stay->id))->assertOk();
+        $this->patch(route('pos.hotel.guests.update', $stay->id), ['guest_name' => 'Updated Guest', 'guest_phone' => '03000000000', 'guest_cnic' => '1234567890123'])->assertRedirect(route('pos.hotel.guests'));
+        $this->assertSame($name, $stay->fresh()->guest_name);
+        $this->get(route('pos.hotel.guests'))->assertOk()->assertSee('Updated Guest');
+        $this->get(route('pos.hotel.stays.create'))->assertOk()->assertSee('Updated Guest');
+        $this->get(route('pos.hotel.stays.show', $stay->id))->assertOk()->assertSee($name);
+        $other = $this->company('hotel');
+        $this->actingAs($this->owner($other), 'pos')->patchJson(route('pos.hotel.guests.update', $stay->id), ['guest_name' => 'Foreign'])->assertNotFound();
+        $this->deleteJson(route('pos.hotel.guests.delete', $stay->id))->assertNotFound();
+        $this->actingAs($owner, 'pos')->delete(route('pos.hotel.guests.delete', $stay->id))->assertRedirect(route('pos.hotel.guests'));
+        $this->get(route('pos.hotel.guests'))->assertOk()->assertDontSee('Updated Guest');
+        $this->assertDatabaseHas('hotel_stays', ['id' => $stay->id, 'guest_name' => $name]);
+        $this->assertGreaterThan(0, HotelFolioEntry::where('stay_id', $stay->id)->count());
+    }
+
     private function company(string $category, array $overrides = []): Company
     {
         $defaults = PosFeatureService::defaultsForCategory($category);

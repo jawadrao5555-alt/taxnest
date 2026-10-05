@@ -1,7 +1,7 @@
 <x-hotel-layout>
 <div class="tn-page tn-hotel-page max-w-6xl mx-auto">
     @if($stay->status === 'checked_in')
-    <form hidden data-hotel-bill-desk="1" data-hotel-confirm-flow="collect" data-auto-open="{{ (int) session('hotel_checkin_preview') === (int) $stay->id ? 1 : 0 }}" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-quote-url="{{ route('pos.hotel.checkout-quote', $stay->id) }}">
+    <form hidden data-hotel-bill-desk="1" data-initial-flow="{{ request('bill_action') === 'checkout' ? 'checkout' : 'collect' }}" data-hotel-confirm-flow="collect" data-auto-open="{{ ((int) session('hotel_checkin_preview') === (int) $stay->id || request('bill_action') === 'checkout') ? 1 : 0 }}" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-quote-url="{{ route('pos.hotel.checkout-quote', $stay->id) }}">
         @csrf
         <input name="payment_method" value="cash">
         <input name="amount" value="{{ $deskSummary['balance'] }}">
@@ -161,6 +161,9 @@
     </details>
     @endif
 
+    @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
+    <a class="block mb-4 underline" href="{{ route('pos.hotel.credit-notes', $stay->id) }}">{{ __('hotel_credit.title') }}</a>
+    @endif
     @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true) && !\App\Services\HotelCorrectionService::fiscalLocked($issuedBills))
     <a href="{{ route('pos.hotel.stays.correction', $stay->id) }}" class="block mb-6 text-red-700 underline font-semibold">{{ __('hotel_correction.title') }}</a>
     @endif

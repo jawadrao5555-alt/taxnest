@@ -140,5 +140,6 @@
         } catch (error) { el('error').textContent = (error.message || labels.failed) + (refused ? '' : ' ' + labels.retry_same); if (refused) lockDesk(false); }
         finally { busy = false; el('confirm').disabled = refused; el('back').disabled = false; }
     });
-    if (document.querySelector('[data-hotel-bill-desk][data-auto-open="1"]')) deskPreview(true);
+    const autoDesk = document.querySelector('[data-hotel-bill-desk][data-auto-open="1"]');
+    if (autoDesk) { field('flow').value = autoDesk.dataset.initialFlow || 'collect'; deskPreview(true); }
 })();

@@ -29,11 +29,11 @@ class HotelBillPreviewService
                 throw new HotelStayException(__('pos.hotel_checkout_due_blocked', ['amount' => number_format($remaining, 2)]));
             }
             $picked = $open->all();
-            $willIssue = $remaining <= 0.009 && $open->isNotEmpty();
+            $willIssue = ($stay->hotel_money_from_folio || $remaining <= 0.009) && $open->isNotEmpty();
         } else {
             if (!in_array($stay->status, [HotelStay::STATUS_CHECKED_IN, HotelStay::STATUS_CHECKED_OUT], true)) throw new HotelStayException(__('pos.hotel_transition_blocked'));
             if ($open->isEmpty()) throw new HotelStayException(__('pos.hotel_nothing_to_invoice'));
-            [$picked] = app(HotelFolioInvoiceService::class)->coveredCharges($stay, $company, $open, $method);
+            [$picked] = $stay->hotel_money_from_folio ? [$open->all()] : app(HotelFolioInvoiceService::class)->coveredCharges($stay, $company, $open, $method);
             $willIssue = (bool) $picked;
             if (!$picked) throw new HotelStayException(__('pos.hotel_tax_coverage_needed'));
         }

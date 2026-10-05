@@ -267,10 +267,7 @@ class HotelController extends Controller
                 ->get(['id', 'name', 'phone']);
         }
 
-        $recentGuests = HotelStay::where('company_id', $companyId)
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->orderByDesc('id')->limit(200)->get(['id', 'guest_name', 'guest_phone', 'guest_cnic'])
-            ->unique(fn ($stay) => mb_strtolower(trim($stay->guest_name)).'|'.$stay->guest_phone)->values();
+        $recentGuests = \App\Services\HotelGuestDirectory::rows($companyId, $branchId)->take(200);
 
         $walkIn = request()->boolean('walk_in');
         // Only preselect a room from this tenant's active branch and active rooms.
@@ -307,6 +304,7 @@ class HotelController extends Controller
             'idempotency_key' => 'nullable|string|max:64',
         ]);
         $data['walk_in'] = $request->boolean('walk_in');
+        $data['hotel_money_from_folio'] = true;
         try {
             $this->room((int) $data['room_id']);
             $stay = $this->stays->book((int) app('currentCompanyId'), (int) auth('pos')->id(), $data);
@@ -510,7 +508,7 @@ class HotelController extends Controller
                         $this->folio->postPayment($locked, ['amount' => $data['amount'], 'payment_method' => $data['payment_method'],
                             'description' => __('pos.hotel_advance_payment'), 'idempotency_key' => hash('sha256', 'collect-pay|'.$key)], (int) $user->id);
                     }
-                    if ($summary['balance'] - $data['amount'] > 0.009) {
+                    if (!$locked->hotel_money_from_folio && $summary['balance'] - $data['amount'] > 0.009) {
                         if ($data['amount'] <= 0) throw new HotelStayException(__('pos.hotel_tax_coverage_needed'));
                         DB::table('hotel_bill_confirmations')->insert(['company_id' => $stay->company_id, 'stay_id' => $stay->id, 'request_key' => $key,
                             'fingerprint' => $requestFingerprint, 'bill_id' => null, 'created_at' => now(), 'updated_at' => now()]);
@@ -543,9 +541,7 @@ class HotelController extends Controller
     {
         $stay = $this->stay($id)->load(['room', 'folioEntries']);
         abort_unless($stay->status === HotelStay::STATUS_CHECKED_IN, 409);
-        $summary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
-        $allowBalance = HotelCheckoutPolicy::allowsOutstandingCheckout(Company::find($stay->company_id));
-        return view('pos.hotel.checkout', compact('stay', 'summary', 'allowBalance'));
+        return redirect()->route('pos.hotel.stays.show', [$id, 'bill_action' => 'checkout']);
     }
 
     public function checkoutQuote(Request $request, int $id)
@@ -873,14 +869,35 @@ class HotelController extends Controller
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $companyId = (int) app('currentCompanyId');
         $branchId = $this->branches->getActiveBranchId();
-        $guests = HotelStay::where('company_id', $companyId)
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->orderByDesc('id')
-            ->get(['id', 'guest_name', 'guest_phone', 'stay_number', 'status', 'check_in_date', 'check_out_date', 'room_id'])
-            ->unique(fn ($stay) => mb_strtolower(trim((string) $stay->guest_name).'|'.(string) $stay->guest_phone))
-            ->values();
+        $guests = \App\Services\HotelGuestDirectory::rows($companyId, $branchId);
 
         return view('pos.hotel.guests', compact('guests'));
+    }
+
+    public function editGuest(int $id)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $source = $this->stay($id);
+        $profile = \App\Services\HotelGuestDirectory::profile($source);
+        return view('pos.hotel.guest-edit', compact('source', 'profile'));
+    }
+
+    public function updateGuest(Request $request, int $id)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $source = $this->stay($id);
+        $data = $request->validate(['guest_name' => 'required|string|max:160', 'guest_phone' => 'nullable|string|max:40', 'guest_cnic' => 'nullable|string|max:20']);
+        \App\Services\HotelGuestDirectory::save($source, $data, (int) auth('pos')->id());
+        return redirect()->route('pos.hotel.guests')->with('success', __('hotel_guests.saved'));
+    }
+
+    public function deleteGuest(int $id)
+    {
+        abort_unless(auth('pos')->user()?->isPosAdmin(), 403);
+        $source = $this->stay($id);
+        $profile = \App\Services\HotelGuestDirectory::profile($source);
+        \App\Services\HotelGuestDirectory::save($source, (array) ($profile ?? $source->only(['guest_name', 'guest_phone', 'guest_cnic'])), (int) auth('pos')->id(), true);
+        return redirect()->route('pos.hotel.guests')->with('success', __('hotel_guests.removed'));
     }
 
     public function folios(Request $request)

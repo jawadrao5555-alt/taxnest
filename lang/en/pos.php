@@ -7181,5 +7181,6 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'print_no_document_reason_void_payload_empty' => 'No cancelled items to print',
     'print_no_document_reason_store_slip_disabled' => 'Store slip is switched off',
     'print_no_document_reason_held_sale_missing' => 'Held sale is no longer available',
+    'return_not_allowed_hotel_credit_required' => 'Use the Hotel Return / Credit Note screen for this bill. Payment refunds are separate.',
 ];
 

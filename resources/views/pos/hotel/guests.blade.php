@@ -8,7 +8,7 @@
                     <th class="px-4 py-3">{{ __('pos.hotel_guest') }}</th>
                     <th class="px-4 py-3">{{ __('pos.hotel_phone') }}</th>
                     <th class="px-4 py-3">{{ __('pos.hotel_stay_no') }}</th>
-                    <th class="px-4 py-3">{{ __('pos.status_col') }}</th>
+                    <th class="px-4 py-3">{{ __('pos.status_col') }}</th><th class="px-4 py-3">{{ __('hotel_guests.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -18,9 +18,11 @@
                     <td class="px-4 py-3">{{ $stay->guest_phone }}</td>
                     <td class="px-4 py-3">{{ $stay->stay_number }}</td>
                     <td class="px-4 py-3">{{ \App\Services\HotelShell::statusLabel($stay->status) }}</td>
+                    <td class="px-4 py-3"><a href="{{ route('pos.hotel.guests.edit', $stay->id) }}" class="underline">{{ __('hotel_guests.edit') }}</a>
+                    @if(auth('pos')->user()->isPosAdmin())<form method="POST" action="{{ route('pos.hotel.guests.delete', $stay->id) }}" class="inline" onsubmit="return confirm(@js(__('hotel_guests.confirm')))">@csrf @method('DELETE')<button class="ml-3 text-red-700">{{ __('hotel_guests.delete') }}</button></form>@endif</td>
                 </tr>
                 @empty
-                <tr><td colspan="4" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_stays') }}</td></tr>
+                <tr><td colspan="5" class="px-4 py-6 text-gray-500">{{ __('pos.hotel_no_stays') }}</td></tr>
                 @endforelse
             </tbody>
         </table>

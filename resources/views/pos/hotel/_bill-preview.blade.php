@@ -19,6 +19,9 @@
         <a data-preview-receipt hidden target="_blank" rel="noopener" class="block rounded-lg bg-teal-700 p-3 text-center text-white">{{ __('hotel_preview.print') }}</a>
         <button type="button" data-preview-refresh class="underline">{{ __('hotel_preview.refresh') }}</button>
     </div>
+    @if(isset($stay) && auth('pos')->user()?->isPosAdmin() && in_array($stay->status, ['checked_in', 'checked_out'], true))
+    <a data-preview-credit-note href="{{ route('pos.hotel.credit-notes', $stay->id) }}" class="block mt-3 underline">{{ __('hotel_credit.title') }}</a>
+    @endif
     <div class="mt-4 flex flex-wrap gap-2">
         <button type="button" data-preview-back class="rounded-lg border p-3">{{ __('hotel_preview.back') }}</button>
         <button type="button" data-preview-confirm class="rounded-lg bg-teal-700 text-white p-3 disabled:opacity-50"></button>

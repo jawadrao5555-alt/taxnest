@@ -177,6 +177,7 @@ final class PosCounterDrawer
             return collect();
         }
 
+        $hotelCashOut = HotelCreditNoteRefundReporting::cashByDrawer($companyId, $date, $branchId, $onlyCreatedBy);
         $txns = collect($transactions);
         $byDrawer = $txns->groupBy(fn ($t) => (int) ($t->terminal_id ?? 0));
         $counters = self::counters($companyId);
@@ -202,11 +203,12 @@ final class PosCounterDrawer
             ->merge($closes->keys())
             ->merge($openings->keys())
             ->merge(array_keys($riderOut))
+            ->merge(array_keys($hotelCashOut))
             ->map(fn ($k) => (int) $k)
             ->unique();
 
         // The shop drawer only earns a row when something actually sits in it.
-        if ($shopCashIn <= 0.0
+        if (abs($hotelCashOut[self::SHOP_DRAWER] ?? 0) < 0.009 && $shopCashIn <= 0.0
             && ($byDrawer[self::SHOP_DRAWER] ?? collect())->isEmpty()
             && !$closes->has(self::SHOP_DRAWER)
             && !$openings->has(self::SHOP_DRAWER)) {
@@ -214,13 +216,13 @@ final class PosCounterDrawer
         }
 
         $rows = $keys->sort()->values()->map(function (int $key) use (
-            $byDrawer, $closes, $openings, $names, $riderOut, $shopCashIn, $counters
+            $byDrawer, $closes, $openings, $names, $riderOut, $shopCashIn, $counters, $hotelCashOut
         ) {
             $group = $byDrawer[$key] ?? collect();
             $sales = $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return');
             $returns = $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return');
             // Returns hand cash BACK across the counter, so they net out of it.
-            $cash = round(PosPaymentBuckets::split($sales)['cash'] - PosPaymentBuckets::split($returns)['cash'], 2);
+            $cash = round(PosPaymentBuckets::split($sales)['cash'] - PosPaymentBuckets::split($returns)['cash'] - ($hotelCashOut[$key] ?? 0), 2);
 
             $opening = $openings->has($key) ? round((float) $openings[$key], 2) : null;
             $out = round((float) ($riderOut[$key] ?? 0), 2);

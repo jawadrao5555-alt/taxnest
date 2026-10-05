@@ -12,8 +12,13 @@
     dialog.addEventListener('close', stop);
     dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
     el('back').addEventListener('click', () => { if (!busy) dialog.close(); });
+    function creditLink(url) {
+        const link = el('credit-note'); link.hidden = !url;
+        if (url) link.href = url; else link.removeAttribute('href');
+    }
     function renderResult(result) {
         context.result = result;
+        creditLink(result.credit_note_url);
         el('desk-controls').hidden = true;
         el('result').hidden = false;
         el('note').textContent = labels.saved;
@@ -46,6 +51,7 @@
     function renderQuote(quote, payload, form, desk) {
         context = {payload: {...payload, preview_token: quote.preview_token}, url: form.dataset.confirmUrl, desk, form};
         stop(); polls = 0;
+        creditLink(quote.credit_note_url);
         el('meta').textContent = [quote.stay_number, quote.guest_name, quote.room_number].filter(Boolean).join(' · ');
         el('lines').replaceChildren();
         for (const line of quote.lines) {

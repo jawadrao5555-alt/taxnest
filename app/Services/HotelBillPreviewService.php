@@ -57,6 +57,7 @@ class HotelBillPreviewService
         return array_merge($quote, [
             'stay_total' => app(HotelDeskService::class)->summary($stay, $method)['total_stay'],
             'discount' => $discount, 'gross' => round($net + $discount, 2),
+            'credit_note_url' => $user->isPosAdmin() && in_array($stay->status, ['checked_in', 'checked_out'], true) ? route('pos.hotel.credit-notes', $stay->id) : null,
             'stay_number' => $stay->stay_number, 'guest_name' => $stay->guest_name, 'room_number' => $stay->room?->room_number,
             'lines' => $lines->map(fn ($r) => ['description' => $r->description, 'amount' => (float) $r->amount])->values()->all(),
             'paid' => round((float) $rows->where('entry_type', 'payment')->sum('amount') - (float) $rows->where('entry_type', 'refund')->sum('amount'), 2),
@@ -88,6 +89,7 @@ class HotelBillPreviewService
             'fiscal_number' => $accepted ? $bill->pra_invoice_number : null,
             'qr' => $accepted ? \App\Support\QrImage::dataUri($bill->pra_invoice_number) : null,
             'receipt_url' => $bill ? route('pos.receipt', $bill->id) : null,
+            'credit_note_url' => auth('pos')->user()?->isPosAdmin() ? route('pos.hotel.credit-notes', $stay->id) : null,
             'stay_url' => route('pos.hotel.stays.show', $stay->id),
         ];
     }

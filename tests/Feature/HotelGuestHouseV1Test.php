@@ -141,7 +141,7 @@ class HotelGuestHouseV1Test extends TestCase
         $changed = $payload; $changed['amount'] = 101;
         $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $changed)->assertStatus(409);
         $data['amount'] = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance'];
-        $quote = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', true)->json();
+        $quote = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', true)->assertJsonPath('credit_note_url', route('pos.hotel.credit-notes', $stay->id))->json();
         $payload = $data + ['preview_token' => $quote['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
         $bill = $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->json();
         $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $bill['bill_id']);
@@ -181,7 +181,7 @@ class HotelGuestHouseV1Test extends TestCase
         $data = ['flow' => 'collect', 'payment_method' => 'cash', 'amount' => 200];
         $preview = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', true)->json();
         $payload = $data + ['preview_token' => $preview['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
-        $billId = $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->json('bill_id');
+        $billId = $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('credit_note_url', route('pos.hotel.credit-notes', $stay->id))->json('bill_id');
         $bill = \App\Models\PosTransaction::findOrFail($billId);
         $this->assertGreaterThan(200, (float) $bill->total_amount);
         $this->assertTrue($bill->hotel_money_from_folio);

@@ -154,6 +154,7 @@
     @endif
 
     @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
+    <a class="block mb-4 underline" href="{{ route('pos.hotel.credit-notes', $stay->id) }}">{{ __('hotel_credit.title') }}</a>
     <a href="{{ route('pos.hotel.stays.correction', $stay->id) }}" class="block mb-6 text-red-700 underline font-semibold">{{ __('hotel_correction.title') }}</a>
     @endif
     <div class="mb-6" x-data="{ action: window.location.hash === '#hotel-charge' ? 'charge' : (window.location.hash === '#hotel-payment' ? 'payment' : '') }">

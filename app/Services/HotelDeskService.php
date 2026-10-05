@@ -29,7 +29,9 @@ class HotelDeskService
         $quote['paid'] = round((float) $rows->where('entry_type', 'payment')->sum('amount') - (float) $rows->where('entry_type', 'refund')->sum('amount'), 2);
         $quote['deposit'] = round((float) $rows->where('entry_type', 'deposit')->sum('amount') - (float) $rows->where('entry_type', 'deposit_refund')->sum('amount'), 2);
         $priorIds = $rows->pluck('pos_transaction_id')->filter()->unique();
-        $quote['total_stay'] = round($quote['total'] + (float) \App\Models\PosTransaction::where('company_id', $stay->company_id)->whereIn('id', $priorIds)->sum('total_amount'), 2);
+        $quote['total_stay'] = round($quote['total'] + (float) \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $stay->company_id)->whereIn('id', $priorIds)
+            ->selectRaw("SUM(CASE WHEN transaction_type = 'return' THEN -total_amount ELSE total_amount END) AS net_total")->value('net_total'), 2);
         $quote['room_gross'] = (float) $open->where('category', 'room')->sum(fn ($r) => $r->gross_amount ?? $r->amount);
         if ($stay->status === 'reserved' && $open->isEmpty()) $quote['room_gross'] = $net + $discount;
         $quote['extras'] = (float) $open->where('category', '!=', 'room')->sum(fn ($r) => $r->gross_amount ?? $r->amount);

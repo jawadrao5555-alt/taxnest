@@ -328,6 +328,26 @@ if (User::withoutGlobalScopes()->whereIn('email', $expectedCategoryEmails)->coun
     $fail('fresh category actor matrix was not persisted.');
 }
 
+// Dedicated fictional accepted invoice; no external regulator request.
+$creditCompany = $company('Synthetic Credit Review Hotel', 'credit-hotel@rc-browser.invalid', 'RCBRCREDIT01', 'pos', [
+    'business_category' => 'hotel', 'pos_type' => 'hotel', 'feature_flags' => PosFeatureService::defaultsForCategory('hotel'),
+    'pos_integration_mode' => 'pra', 'pos_setup_completed' => true, 'pra_reporting_enabled' => false,
+    'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
+]);
+$creditOwner = $user($creditCompany, 'Synthetic Credit Review Owner', 'credit-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$creditOwner->update(['pra_reporting_enabled' => false]);
+$creditStays = app(\App\Services\HotelStayService::class);
+$creditRoom = $creditStays->createRoom((int) $creditCompany->id, ['room_number' => 'CREDIT-1', 'room_type' => 'Standard',
+    'capacity' => 2, 'rate_amount' => 1000, 'rate_unit' => 'NGT', 'branch_id' => null]);
+$creditStay = $creditStays->book((int) $creditCompany->id, (int) $creditOwner->id, [
+    'room_id' => $creditRoom->id, 'check_in_date' => $now->toDateString(), 'check_out_date' => $now->copy()->addDays(2)->toDateString(),
+    'guest_name' => 'Synthetic credit review guest', 'walk_in' => true,
+]);
+$creditFolio = app(\App\Services\HotelFolioService::class);
+$creditFolio->postPayment($creditStay, ['amount' => 2000, 'payment_method' => 'cash'], (int) $creditOwner->id);
+$creditBill = $creditFolio->settleCoveredCharges($creditStay, (int) $creditOwner->id, 'cash')['transaction'];
+$creditBill->update(['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-CREDIT-ORIGINAL']);
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -351,6 +371,9 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
     'transactionalJourneys' => [
+        ['name' => 'hotel-credit-review', 'login' => $creditOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
+            'paths' => ['/pos/hotel/stays/'.$creditStay->id.'/credit-notes'],
+            'hotelCreditReview' => ['path' => '/pos/hotel/stays/'.$creditStay->id.'/credit-notes']],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
             'tableOrderWorkflow' => $tableCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,

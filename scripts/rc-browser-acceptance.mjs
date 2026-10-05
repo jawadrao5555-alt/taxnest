@@ -391,6 +391,28 @@ async function hotelWorkflow(page, t, v) {
   pass(`${t.name}/${v.width}: actual owner correction preserved source bill and prevented repeated reversal`);
 
 }
+async function hotelCreditReview(page, t, v) {
+  const path = t.hotelCreditReview.path;
+  for (const mode of ['full', 'partial']) {
+    await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    const screen = page.locator('[data-hotel-credit-notes="1"]');
+    await screen.waitFor({state:'visible'});
+    await screen.locator('[role="alert"]').waitFor({state:'visible'});
+    const form = screen.locator('form[action$="/review"]').first();
+    await form.locator('[name="mode"]').selectOption(mode);
+    if (mode === 'partial') await form.locator('input[type="number"]').first().fill('1');
+    await Promise.all([page.waitForURL(/\/credit-notes\/\d+\/review$/), form.locator('button').click()]);
+    const review = page.locator('[data-hotel-credit-review="1"]');
+    await review.waitFor({state:'visible'});
+    if (await review.locator('form').count()) throw new Error('Unverified credit issuance became actionable');
+    if (!await review.locator('[role="alert"]').count()) throw new Error('Verification gate missing from credit review');
+    if (!(await review.innerText()).includes(mode === 'full' ? '2,000.00' : '1,000.00')) throw new Error('Original quantity review total is wrong');
+    await saveEvidenceScreenshot(page, `hotel-credit-${mode}-${v.width}.png`);
+  }
+  pass(`${t.name}/${v.width}: original full/partial review and default fiscal gate passed`);
+}
+
 async function notificationWorkflow(page, t, v, diagnostics) {
   const panel=t.notificationWorkflow, prefix=panel==='fbr'?'/fbr-pos':'/pos';
   await page.goto(baseUrl+prefix+'/my-profile',{waitUntil:'domcontentloaded'});
@@ -496,6 +518,7 @@ async function workflow(page,t,v,diagnostics) {
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v);
+  if (t.hotelCreditReview) return hotelCreditReview(page,t,v);
   const f=t.serviceWorkflow; if(!f)return;
   await page.goto(baseUrl+f.createPath,{waitUntil:'domcontentloaded',timeout:30000});
   await waitForOperationalSurface(page); await dismiss(page);

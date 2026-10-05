@@ -50,8 +50,9 @@ class PosReturnService
      * bills keep their existing delete flow.
      * (Single source of truth — PosReturnController::returnableReason delegates here.)
      */
-    public static function returnableReason(PosTransaction $txn): ?string
+    public static function returnableReason(PosTransaction $txn, bool $hotelCredit = false): ?string
     {
+        if ($txn->hotel_money_from_folio && !$hotelCredit) return 'hotel_credit_required';
         if (($txn->transaction_type ?? 'sale') === 'return') {
             return 'return_of_return';
         }
@@ -144,7 +145,7 @@ class PosReturnService
                 ->lockForUpdate()->findOrFail($originalId);
             $original->load('items');
 
-            $reason = self::returnableReason($original);
+            $reason = self::returnableReason($original, $hotelCredit);
             if ($reason !== null) {
                 return ['error' => __('pos.return_not_allowed_' . $reason)];
             }
@@ -364,6 +365,9 @@ class PosReturnService
                         ($it['return_disposition'] ?? null) === RecipeInventoryService::DISPOSITION_WASTAGE);
             }
 
+            if (Schema::hasColumn('pos_transactions', 'hotel_money_from_folio')) {
+                $data['hotel_money_from_folio'] = (bool) $original->hotel_money_from_folio;
+            }
             $return = PosTransaction::create($data);
 
             foreach ($returnItems as $it) {

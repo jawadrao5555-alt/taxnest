@@ -320,7 +320,7 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create?walk_in=1&room_id='.$room->id)->assertOk()->assertSee('name="rate_amount"', false)->assertSee('name="discount_value"', false)->assertSee('data-hotel-desk-menu="1"', false);
         $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
         $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee('/checkout', false);
-        $this->get('/pos/hotel/stays/'.$stay->id.'/checkout')->assertOk()->assertSee(__('pos.hotel_complete_checkout'));
+        $this->get('/pos/hotel/stays/'.$stay->id.'/checkout')->assertRedirect(route('pos.hotel.stays.show', ['id' => $stay->id, 'bill_action' => 'checkout']));
     }
     public function test_extra_discount_stays_on_its_own_charge_and_guest_picker_is_tenant_scoped(): void
     {

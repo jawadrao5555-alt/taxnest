@@ -17,6 +17,7 @@ class HotelStay extends Model
     public const OPEN_STATUSES = [self::STATUS_RESERVED, self::STATUS_CHECKED_IN];
 
     protected $fillable = [
+        'hotel_money_from_folio',
         'company_id', 'branch_id', 'stay_number', 'status', 'room_id',
         'guest_customer_id', 'payer_customer_id', 'guest_name', 'guest_phone',
         'guest_cnic', 'check_in_date', 'check_out_date', 'actual_check_in_at',
@@ -26,6 +27,7 @@ class HotelStay extends Model
     ];
 
     protected $casts = [
+        'hotel_money_from_folio' => 'boolean',
         'check_in_date' => 'date',
         'check_out_date' => 'date',
         'actual_check_in_at' => 'datetime',

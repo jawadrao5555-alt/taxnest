@@ -23,7 +23,7 @@ class HotelCreditNotePolicy
             ->where('stay_id', '!=', $stay->id)->exists(), 422);
         $bill = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
             ->with('items')->findOrFail($billId);
-        if (PosReturnService::returnableReason($bill) !== null) {
+        if (PosReturnService::returnableReason($bill, true) !== null) {
             throw new HotelStayException('This bill requires review before a credit note.');
         }
         if ($bill->pra_status !== 'submitted' || empty($bill->pra_invoice_number)

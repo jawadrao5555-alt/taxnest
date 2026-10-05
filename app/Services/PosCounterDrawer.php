@@ -208,7 +208,7 @@ final class PosCounterDrawer
             ->unique();
 
         // The shop drawer only earns a row when something actually sits in it.
-        if (($hotelCashOut[self::SHOP_DRAWER] ?? 0) <= 0.0 && $shopCashIn <= 0.0
+        if (abs($hotelCashOut[self::SHOP_DRAWER] ?? 0) < 0.009 && $shopCashIn <= 0.0
             && ($byDrawer[self::SHOP_DRAWER] ?? collect())->isEmpty()
             && !$closes->has(self::SHOP_DRAWER)
             && !$openings->has(self::SHOP_DRAWER)) {

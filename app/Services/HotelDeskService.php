@@ -67,7 +67,7 @@ class HotelDeskService
             }
             // Issue fully covered charges. Unpaid charges remain on the folio
             // when the existing owner policy permits outstanding checkout.
-            if ($remaining <= 0.009) {
+            if ($stay->hotel_money_from_folio || $remaining <= 0.009) {
                 $folio->settleCoveredCharges($stay, $userId, $method, hash('sha256', 'checkout-bill|'.$stay->id.'|'.$data['idempotency_key']));
             }
             return app(HotelStayService::class)->checkOut($stay, $userId, $method);

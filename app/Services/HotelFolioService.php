@@ -76,6 +76,10 @@ class HotelFolioService
             $fiscalOutstanding = max(0, round($fiscalForOpen - max(0, $available), 2));
         }
 
+        if ($stay->hotel_money_from_folio) {
+            $fiscalOutstanding = app(HotelDeskService::class)->summary($stay, $paymentMethod)['balance'];
+        }
+
         return [
             'charges' => round($charges, 2),
             'payments' => round($payments, 2),
@@ -130,6 +134,12 @@ class HotelFolioService
             $out[$id] = max(0, round($value, 2));
         }
 
+        if (Schema::hasColumn('hotel_stays', 'hotel_money_from_folio')) {
+            foreach (HotelStay::where('company_id', $companyId)->whereIn('id', $stayIds)->where('hotel_money_from_folio', true)->get() as $stay) {
+                $out[$stay->id] = app(HotelDeskService::class)->summary($stay, 'cash')['balance'];
+            }
+        }
+
         return $out;
     }
 
@@ -159,7 +169,7 @@ class HotelFolioService
         ]), $userId);
     }
 
-    public function refundPayment(HotelStay $stay, float $amount, int $userId, ?string $method = null, ?string $idempotencyKey = null): HotelFolioEntry
+    public function refundPayment(HotelStay $stay, float $amount, int $userId, ?string $method = null, ?string $idempotencyKey = null, int $terminalId = 0): HotelFolioEntry
     {
         $totals = $this->totals($stay);
         $refundable = round($totals['payments'] - $totals['refunds'], 2);
@@ -171,6 +181,7 @@ class HotelFolioService
             'entry_type' => HotelFolioEntry::TYPE_REFUND,
             'category' => 'other',
             'description' => __('pos.hotel_payment_refund'),
+            'terminal_id' => $terminalId,
             'quantity' => 1,
             'uom' => 'NOS',
             'unit_amount' => $amount,
@@ -231,9 +242,9 @@ class HotelFolioService
     }
 
     /**
-     * Issue a fiscal invoice for uninvoiced charges that are already covered
-     * by folio payments (advances apply here — they are not a second sale).
-     * Unpaid charges stay on the folio. Deposits never count as revenue.
+     * Issue charges using the stay accounting contract. New UI stays invoice
+     * all charges and report money separately; legacy stays invoice covered
+     * charges. Advances are not another sale. Deposits are not revenue.
      *
      * @return array{transaction:?\App\Models\PosTransaction, totals:array, invoiced_amount:float}
      */
@@ -331,8 +342,9 @@ class HotelFolioService
                 throw new HotelStayException(__('pos.hotel_amount_required'));
             }
 
+            $settlement = HotelMoneySettlementReporting::stamp($stay, $data, $userId);
             try {
-                $entry = HotelFolioEntry::create([
+                $entry = HotelFolioEntry::create(array_merge($settlement, [
                     'company_id' => $stay->company_id,
                     'stay_id' => $stay->id,
                     'entry_type' => $data['entry_type'],
@@ -353,7 +365,7 @@ class HotelFolioService
                     'reverses_entry_id' => $data['reverses_entry_id'] ?? null,
                     'idempotency_key' => $key,
                     'created_by' => $userId ?: null,
-                ]);
+                ]));
             } catch (QueryException $e) {
                 if ($key) {
                     $existing = HotelFolioEntry::where('company_id', $stay->company_id)

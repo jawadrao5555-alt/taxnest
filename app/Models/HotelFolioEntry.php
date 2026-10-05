@@ -15,6 +15,7 @@ class HotelFolioEntry extends Model
     public const TYPE_ADJUSTMENT = 'adjustment';
 
     protected $fillable = [
+        'settlement_business_date', 'settlement_branch_id', 'settlement_terminal_id', 'settlement_invoice_mode',
         'company_id', 'stay_id', 'entry_type', 'category', 'description',
         'refund_business_date', 'refund_branch_id', 'refund_terminal_id',
         'quantity', 'uom', 'unit_amount', 'amount', 'pos_transaction_id',
@@ -23,6 +24,7 @@ class HotelFolioEntry extends Model
     ];
 
     protected $casts = [
+        'settlement_business_date' => 'date', 'settlement_branch_id' => 'integer', 'settlement_terminal_id' => 'integer',
         'refund_business_date' => 'date', 'refund_branch_id' => 'integer', 'refund_terminal_id' => 'integer',
         'quantity' => 'decimal:3',
         'unit_amount' => 'decimal:2',

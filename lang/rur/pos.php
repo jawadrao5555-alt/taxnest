@@ -7169,5 +7169,6 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_no_document_reason_void_payload_empty' => 'Print ke liye cancelled items nahi',
     'print_no_document_reason_store_slip_disabled' => 'Store slip band hai',
     'print_no_document_reason_held_sale_missing' => 'Held sale ab dastiyab nahi',
+    'return_not_allowed_hotel_credit_required' => 'Is bill ke liye Hotel Return / Credit Note screen use karein. Payment refund alag hai.',
 ];
 

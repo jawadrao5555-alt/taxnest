@@ -24,9 +24,9 @@
                     <td class="px-4 py-3">
                         <a class="font-semibold text-teal-700" href="{{ route('pos.hotel.stays.statement', $stay->id) }}" data-hotel-bill-reprint="1">{{ __('hotel_bill.bill_action') }}</a>
                         @if($receiptId = $stay->folioEntries->pluck('pos_transaction_id')->filter()->first())
-                        <a class="block text-xs text-teal-700 mt-1" href="{{ route('pos.receipt', $receiptId) }}" target="_blank" rel="noopener">{{ __('hotel_bill.issued_receipt') }}</a>
+                        <a class="block text-xs text-teal-700 mt-1" href="{{ route('pos.hotel.bill-receipt', [$stay->id, $receiptId]) }}" target="_blank" rel="noopener">{{ __('hotel_bill.issued_receipt') }}</a>
                         @endif
-                        @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
+                        @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true) && !($fiscalLocked[$stay->id] ?? true))
                         <a class="block text-xs text-red-700 mt-1" href="{{ route('pos.hotel.stays.correction', $stay->id) }}">{{ __('hotel_correction.title') }}</a>
                         @endif
                         @if(($dues[$stay->id] ?? 0) > 0.009)

@@ -25,13 +25,21 @@ class HotelCreditNoteRefundReporting
 
     public static function buckets(int $companyId, string $date, ?int $branchId = null, ?int $onlyCreatedBy = null): array
     {
-        return PosPaymentBuckets::split(self::rows($companyId, $date, $branchId, $onlyCreatedBy), 'amount');
+        $sums = PosPaymentBuckets::split(self::rows($companyId, $date, $branchId, $onlyCreatedBy), 'amount');
+        foreach (HotelMoneySettlementReporting::outflows($companyId, $date, $branchId, $onlyCreatedBy) as $bucket => $amount) {
+            $sums[$bucket] = ($sums[$bucket] ?? 0) + $amount;
+        }
+        return $sums;
     }
 
     public static function cashByDrawer(int $companyId, string $date, ?int $branchId = null, ?int $onlyCreatedBy = null): array
     {
-        return self::rows($companyId, $date, $branchId, $onlyCreatedBy)->where('payment_method', 'cash')
+        $cash = self::rows($companyId, $date, $branchId, $onlyCreatedBy)->where('payment_method', 'cash')
             ->groupBy(fn ($r) => (int) ($r->refund_terminal_id ?? 0))
             ->map(fn ($r) => round((float) $r->sum('amount'), 2))->all();
+        foreach (HotelMoneySettlementReporting::cashByDrawer($companyId, $date, $branchId, $onlyCreatedBy) as $drawer => $amount) {
+            $cash[$drawer] = ($cash[$drawer] ?? 0) + $amount;
+        }
+        return $cash;
     }
 }

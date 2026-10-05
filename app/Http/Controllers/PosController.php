@@ -13431,7 +13431,7 @@ class PosController extends Controller
         $refundBuckets = PosPaymentBuckets::split($dcReturnRows);
         $hotelRefunds = $dayCloseScope === 'local' ? [] : \App\Services\HotelCreditNoteRefundReporting::buckets(
             $companyId, $date, $dcBranchId, $dayCloseIso ? (int) $dayCloseUser->id : null);
-        foreach (['cash', 'card'] as $bucket) $refundBuckets[$bucket] += $hotelRefunds[$bucket] ?? 0;
+        foreach (['cash', 'card', 'other'] as $bucket) $refundBuckets[$bucket] += $hotelRefunds[$bucket] ?? 0;
 
         // Returns detail (Task 678): the day-close page lists each return with
         // WHO processed it (owner audits cashier-made returns). Own query —
@@ -15907,7 +15907,7 @@ class PosController extends Controller
         // days get a zero-figure Z-report so they finally leave the banner —
         // the "close one, another appears" whack-a-mole ender.
         $hotelRefunds = \App\Services\HotelCreditNoteRefundReporting::buckets($companyId, $date, $branchId);
-        if ($transactions->isEmpty() && !$hasLocalBills && array_sum($hotelRefunds) <= 0 && !$allowEmpty) {
+        if ($transactions->isEmpty() && !$hasLocalBills && array_sum(array_map('abs', $hotelRefunds)) < 0.009 && !$allowEmpty) {
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 
@@ -16584,7 +16584,7 @@ class PosController extends Controller
     {
         $payBuckets = PosPaymentBuckets::split($saleRows);
         $refundBuckets = PosPaymentBuckets::split($returnRows);
-        foreach (['cash', 'card'] as $bucket) $refundBuckets[$bucket] += $hotelRefunds[$bucket] ?? 0;
+        foreach (['cash', 'card', 'other'] as $bucket) $refundBuckets[$bucket] += $hotelRefunds[$bucket] ?? 0;
 
         $data = [
             'total_invoices' => $saleRows->count(),
@@ -16745,7 +16745,11 @@ class PosController extends Controller
             );
         }
 
-        foreach (['cash', 'card'] as $bucket) $split['pra'][$bucket] = round($split['pra'][$bucket] - ($hotelRefunds[$bucket] ?? 0), 2);
+        foreach (['cash', 'card', 'other'] as $bucket) {
+            $localMoney = (float) ($hotelRefunds['local_'.$bucket] ?? 0);
+            $split['pra'][$bucket] = round($split['pra'][$bucket] - ($hotelRefunds[$bucket] ?? 0) + $localMoney, 2);
+            $split['local'][$bucket] = round($split['local'][$bucket] - $localMoney, 2);
+        }
 
         // Exempt detail: value = stored exempt_amount (post-discount, PosTaxMath
         // — the same figure the tax report uses, covers exempt shares on mixed
@@ -16808,7 +16812,7 @@ class PosController extends Controller
          $sums = ['cash' => 0.0, 'card' => 0.0, 'online' => 0.0, 'other' => 0.0];
 
          foreach ($saleRows as $transaction) {
-             if ($transaction->payment_method === 'hotel_credit_note') {
+             if ($transaction->payment_method === 'hotel_credit_note' || ($transaction->hotel_money_from_folio ?? false)) {
                  continue; // Accounting credit has no payment movement.
              }
              $method = strtolower(trim((string) ($transaction->payment_method ?? '')));
@@ -16820,7 +16824,7 @@ class PosController extends Controller
              $sums[$bucket] += (float) ($transaction->total_amount ?? 0);
          }
          foreach ($returnRows as $transaction) {
-             if ($transaction->payment_method === 'hotel_credit_note') {
+             if ($transaction->payment_method === 'hotel_credit_note' || ($transaction->hotel_money_from_folio ?? false)) {
                  continue; // Accounting credit has no payment movement.
              }
              $method = strtolower(trim((string) ($transaction->payment_method ?? '')));
@@ -16832,7 +16836,9 @@ class PosController extends Controller
              $sums[$bucket] -= (float) ($transaction->total_amount ?? 0);
          }
 
-         foreach (['cash', 'card'] as $bucket) $sums[$bucket] -= $hotelRefunds[$bucket] ?? 0;
+         foreach (['cash', 'card', 'other'] as $bucket) $sums[$bucket] -= $hotelRefunds[$bucket] ?? 0;
+         $sums['online'] -= $hotelRefunds['online'] ?? 0;
+         $sums['other'] += $hotelRefunds['online'] ?? 0;
          return array_map(fn ($value) => round($value, 2), $sums);
      }
 
@@ -16903,7 +16909,7 @@ class PosController extends Controller
 
         $hotelRefunds = ($user?->posBillingScope() === 'local') ? [] : \App\Services\HotelCreditNoteRefundReporting::buckets(
             $companyId, $date, $xBranchId, $xIso ? (int) $user->id : null);
-        if ($transactions->isEmpty() && array_sum($hotelRefunds) <= 0) {
+        if ($transactions->isEmpty() && array_sum(array_map('abs', $hotelRefunds)) < 0.009) {
             return redirect()->route('pos.day-close', ['date' => $date])
                 ->with('error', __('pos.no_transactions_for_date', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]));
         }

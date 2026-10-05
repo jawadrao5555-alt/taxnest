@@ -19,7 +19,7 @@
 @foreach($notes as $note)
 @php($credit = $credits->get($note->credit_transaction_id))
 @if($credit)
-<div class="border rounded p-4 space-y-2"><p>{{ $credit->invoice_number }} · Rs {{ number_format($credit->total_amount, 2) }} · {{ $credit->pra_status }} · {{ $credit->pra_invoice_number }}</p><p>{{ $note->reason }}</p><a class="underline" href="{{ route('pos.receipt', $credit->id) }}">{{ $credit->invoice_number }}</a>
+<div class="border rounded p-4 space-y-2"><p>{{ $credit->invoice_number }} · Rs {{ number_format($credit->total_amount, 2) }} · {{ $credit->pra_status }} · {{ $credit->pra_invoice_number }}</p><p>{{ $note->reason }}</p><a class="underline" href="{{ route('pos.hotel.bill-receipt', [$stay->id, $credit->id]) }}">{{ $credit->invoice_number }}</a>
 @if(config('hotel_credit_notes.enabled') && $credit->pra_status === 'submitted' && $credit->pra_invoice_number)
 <form method="POST" action="{{ route('pos.hotel.credit-notes.refund', [$stay->id, $note->id]) }}" class="space-y-2">
 @csrf<input type="hidden" name="request_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">

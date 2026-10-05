@@ -54,7 +54,9 @@ class HotelFolioInvoiceService
             ->lockForUpdate()
             ->get();
 
-        [$picked, $running] = $this->coveredCharges($stay, $company, $charges, $paymentMethod);
+        [$picked, $running] = $stay->hotel_money_from_folio
+            ? [$charges->all(), (float) $charges->sum('amount')]
+            : $this->coveredCharges($stay, $company, $charges, $paymentMethod);
         if ($picked === []) {
             if ($charges->isNotEmpty()) {
                 throw new HotelStayException(__('pos.hotel_tax_coverage_needed'));
@@ -149,6 +151,10 @@ class HotelFolioInvoiceService
             'created_by' => $userId,
             'notes' => __('pos.hotel_invoice_note', ['stay' => $stay->stay_number]),
         ];
+        if ($stay->hotel_money_from_folio) {
+            $txnData['hotel_money_from_folio'] = true;
+            $txnData['cash_received'] = $paymentMethod === 'cash' ? min($totalAmount, max(0, $this->availableTowardFiscal($stay))) : null;
+        }
         if ($branchId && Schema::hasColumn('pos_transactions', 'branch_id')) {
             $txnData['branch_id'] = $branchId;
         }

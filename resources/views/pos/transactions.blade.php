@@ -5,6 +5,9 @@
         $__company = \App\Models\Company::find(app('currentCompanyId'));
         // Sync-trust banner cares about SUBMISSION mode (agentHandlesPra), not raw agent_enabled —
         // Direct Production shops submit server-side, so no agent-sync banner for them.
+        $__hotelFrontDesk = \App\Services\HotelShell::isNativeCategory($__company)
+            && !\App\Services\HotelShell::restaurantOutletOn($__company)
+            && \App\Services\HotelAccessService::canFrontDesk(auth('pos')->user());
         $__agentEnabled = $__company && $__company->agentHandlesPra();
         $__agentLastSeen = $__company?->agent_last_seen;
         // Liveness = canonical agentOnline() (2-min window — same verdict the
@@ -71,9 +74,9 @@
                 </button>
             </form>
             @endif
-            <a href="{{ route('pos.invoice.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">
+            <a data-pos-new-invoice="1" href="{{ $__hotelFrontDesk ? route('pos.hotel.stays.create', ['walk_in' => 1]) : route('pos.invoice.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                {{ __("pos.new_invoice") }}
+                {{ $__hotelFrontDesk ? __('pos.hotel_check_in_btn') : __('pos.new_invoice') }}
             </a>
         </div>
     </div>

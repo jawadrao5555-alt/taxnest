@@ -104,7 +104,7 @@
 @if($receiptIds->isNotEmpty())
 <div class="toolbar">
     @foreach($receiptIds as $receiptId)
-        <a href="{{ route('pos.receipt', $receiptId) }}" target="_blank" rel="noopener">{{ __('hotel_bill.issued_receipt') }} #{{ $loop->iteration }}</a>
+        <a href="{{ route('pos.hotel.bill-receipt', [$stay->id, $receiptId]) }}" target="_blank" rel="noopener">{{ __('hotel_bill.issued_receipt') }} #{{ $loop->iteration }}</a>
     @endforeach
 </div>
 @endif

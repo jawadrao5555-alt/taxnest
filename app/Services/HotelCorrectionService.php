@@ -13,6 +13,14 @@ use Illuminate\Support\Facades\DB;
 /** Full erroneous-stay correction; retains source bills and ledger entries. */
 class HotelCorrectionService
 {
+    public static function fiscalLocked(\Illuminate\Support\Collection $bills): bool
+    {
+        return $bills->contains(fn ($bill) => !empty($bill->pra_invoice_number)
+            || !in_array($bill->pra_status, [null, 'local'], true)
+            || !($bill->invoice_mode === 'local' || $bill->pra_status === 'local'
+                || ($bill->pra_status === null && PosLocalSeries::isSeriesSerial($bill->invoice_number))));
+    }
+
     public function preview(HotelStay $stay, User $actor): array
     {
         abort_unless((int) $actor->company_id === (int) $stay->company_id && $actor->isPosAdmin(), 403);
@@ -29,7 +37,7 @@ class HotelCorrectionService
         }
         foreach ($bills as $bill) {
             $bill->load('items');
-            if (PosReturnService::returnableReason($bill) !== null || $bill->items->isEmpty()
+            if (PosReturnService::returnableReason($bill, (bool) $bill->hotel_money_from_folio) !== null || $bill->items->isEmpty()
                 || $bill->items->contains(fn ($i) => (float) $i->returned_quantity > 0)
                 || HotelFolioEntry::where('company_id', $stay->company_id)->where('pos_transaction_id', $bill->id)->where('stay_id', '!=', $stay->id)->exists()) {
                 $blocked = __('hotel_correction.review');
@@ -37,10 +45,7 @@ class HotelCorrectionService
         }
         // Fiscal documents are preserved while category-specific credit notes are deferred.
         // Fail closed for ambiguous/legacy modes as well as pending/submitted bills.
-        if ($bills->contains(fn ($bill) => !empty($bill->pra_invoice_number)
-            || !in_array($bill->pra_status, [null, 'local'], true)
-            || !($bill->invoice_mode === 'local' || $bill->pra_status === 'local'
-                || ($bill->pra_status === null && PosLocalSeries::isSeriesSerial($bill->invoice_number))))) {
+        if (self::fiscalLocked($bills)) {
             $blocked = __('hotel_correction.fiscal_locked');
         }
         $totals = app(HotelFolioService::class)->totals($stay);
@@ -77,7 +82,7 @@ class HotelCorrectionService
             }
             $results = [];
             foreach ($plan['bills'] as $bill) {
-                $result = PosReturnService::createReturn((int) $stay->company_id, (int) $bill->id, null, $method, (int) $actor->id);
+                $result = PosReturnService::createReturn((int) $stay->company_id, (int) $bill->id, null, $method, (int) $actor->id, ['hotel_credit_note' => (bool) $bill->hotel_money_from_folio]);
                 if (isset($result['error']) || empty($result['return'])) {
                     throw new HotelStayException($result['error'] ?? __('hotel_correction.review'));
                 }

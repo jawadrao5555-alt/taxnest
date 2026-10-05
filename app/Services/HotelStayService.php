@@ -274,6 +274,9 @@ class HotelStayService
                 'idempotency_key' => $key,
                 'created_by' => $userId,
             ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('hotel_stays', 'hotel_money_from_folio')) {
+                $payload['hotel_money_from_folio'] = (bool) ($data['hotel_money_from_folio'] ?? false);
+            }
             try {
                 $stay = HotelStay::create($payload);
             } catch (QueryException $e) {

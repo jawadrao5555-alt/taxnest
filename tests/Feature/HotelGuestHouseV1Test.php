@@ -125,6 +125,52 @@ class HotelGuestHouseV1Test extends TestCase
         $this->actingAs($this->owner($other), 'pos')->getJson($result['status_url'])->assertNotFound();
     }
 
+    public function test_one_dialog_collection_and_already_billed_checkout_are_idempotent(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'payment')->delete();
+        $this->actingAs($owner, 'pos');
+        $data = ['flow' => 'collect', 'payment_method' => 'cash', 'amount' => 100];
+        $quote = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', false)->json();
+        $payload = $data + ['preview_token' => $quote['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->assertDatabaseCount('pos_transactions', 0);
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', null);
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', null);
+        $this->assertEquals(100, HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'payment')->sum('amount'));
+        $this->assertSame('checked_in', $stay->fresh()->status);
+        $changed = $payload; $changed['amount'] = 101;
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $changed)->assertStatus(409);
+        $data['amount'] = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance'];
+        $quote = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', true)->json();
+        $payload = $data + ['preview_token' => $quote['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $bill = $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->json();
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $bill['bill_id']);
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $this->assertSame('checked_in', $stay->fresh()->status);
+        $data = ['flow' => 'checkout', 'payment_method' => 'cash', 'amount' => 0];
+        $quote = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()->json();
+        $payload = $data + ['preview_token' => $quote['preview_token'], 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $bill['bill_id'])->assertJsonPath('stay_status', 'checked_out');
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $payload)->assertOk()->assertJsonPath('bill_id', $bill['bill_id']);
+        $this->assertDatabaseCount('pos_transactions', 1);
+    }
+
+    public function test_reported_bill_hides_correction_and_direct_request_stays_blocked(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay(true);
+        $bill = app(HotelFolioService::class)->settleCoveredCharges($stay, (int) $owner->id, 'cash')['transaction'];
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-FISCAL-UI']);
+        $this->actingAs($owner, 'pos');
+        $this->get(route('pos.hotel.folios'))->assertOk()->assertDontSee(route('pos.hotel.stays.correction', $stay->id), false);
+        $this->get(route('pos.hotel.stays.show', $stay->id))->assertOk()->assertDontSee(route('pos.hotel.stays.correction', $stay->id), false)->assertDontSee('data-hotel-void-error="1"', false);
+        $policy = app(\App\Services\HotelCorrectionService::class)->preview($stay, $owner);
+        $this->assertNotEmpty($policy['blocked']);
+        $this->post(route('pos.hotel.stays.correct', $stay->id), ['reason' => 'Synthetic cancellation attempt',
+            'fingerprint' => $policy['fingerprint'], 'payment_method' => 'cash', 'confirmed' => 1])->assertSessionHas('error');
+        $this->assertSame('checked_in', $stay->fresh()->status);
+        $this->assertDatabaseCount('pos_transactions', 1);
+    }
+
     private function company(string $category, array $overrides = []): Company
     {
         $defaults = PosFeatureService::defaultsForCategory($category);

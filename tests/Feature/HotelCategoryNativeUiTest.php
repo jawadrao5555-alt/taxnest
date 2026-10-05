@@ -199,7 +199,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringNotContainsString('>checked_in<', $html);
     }
 
-    public function test_walk_in_opens_printable_statement_and_bills_allow_reprint_without_exposing_other_tenants(): void
+    public function test_walk_in_opens_review_popup_and_bills_allow_explicit_reprint_without_exposing_other_tenants(): void
     {
         $company = $this->company();
         $other = $this->company();
@@ -213,7 +213,13 @@ class HotelCategoryNativeUiTest extends TestCase
             'walk_in' => 1, 'rate_amount' => 5000,
         ]);
         $stay = HotelStay::where('company_id', $company->id)->latest('id')->firstOrFail();
-        $response->assertRedirect(route('pos.hotel.stays.statement', [$stay->id, 'print' => 1]));
+        $response->assertRedirect(route('pos.hotel.stays.show', $stay->id));
+        $this->get(route('pos.hotel.stays.show', $stay->id))->assertOk()
+            ->assertSee('data-auto-open="1"', false)
+            ->assertSee('data-hotel-bill-desk="1"', false);
+        $this->assertDatabaseMissing('pos_transactions', ['company_id' => $company->id]);
+        $this->get(route('pos.hotel.stays.show', $stay->id))->assertOk()
+            ->assertDontSee('data-auto-open="1"', false);
         $this->get(route('pos.hotel.stays.statement', [$stay->id, 'print' => 1]))
             ->assertOk()->assertSee('data-hotel-statement="1"', false)
             ->assertSee($stay->stay_number)->assertSee(__('hotel_bill.not_fiscal'))
@@ -229,7 +235,9 @@ class HotelCategoryNativeUiTest extends TestCase
             'check_out_date' => now()->addDay()->toDateString(), 'guest_name' => 'Reserved guest',
         ]);
         $this->post(route('pos.hotel.stays.check-in', $reserved->id))
-            ->assertRedirect(route('pos.hotel.stays.statement', [$reserved->id, 'print' => 1]));
+            ->assertRedirect(route('pos.hotel.stays.show', $reserved->id));
+        $this->get(route('pos.hotel.stays.show', $reserved->id))->assertOk()
+            ->assertSee('data-auto-open="1"', false);
         $foreign = $this->company();
         $foreignRoom = app(HotelStayService::class)->createRoom((int) $foreign->id, [
             'room_number' => '118', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
@@ -443,6 +451,7 @@ class HotelCategoryNativeUiTest extends TestCase
         $company = $this->company('hotel', ['restaurant_mode' => false]);
         $owner = $this->owner($company);
         $this->assertFalse(HotelShell::restaurantOutletOn($company));
+        $this->actingAs($owner, 'pos')->get('/pos/transactions')->assertOk()->assertSee(route('pos.hotel.stays.create', ['walk_in' => 1]), false);
         $html = $this->actingAs($owner, 'pos')->get('/pos/hotel')->assertOk()->getContent();
         $this->assertStringNotContainsString('data-hotel-restaurant-outlet="1"', $html);
         $this->actingAs($owner, 'pos')->get('/pos/hotel/restaurant')
@@ -451,6 +460,14 @@ class HotelCategoryNativeUiTest extends TestCase
             ->assertRedirect('/pos/hotel');
         $this->actingAs($owner, 'pos')->get('/pos/v2/invoice/create')
             ->assertRedirect('/pos/hotel');
+    }
+
+    public function test_transactions_preserve_sale_entry_with_restaurant_outlet_on(): void
+    {
+        $company = $this->company('hotel', ['restaurant_mode' => true]);
+        $owner = $this->owner($company);
+        $this->actingAs($owner, 'pos')->get('/pos/transactions')->assertOk()
+            ->assertSee('data-pos-new-invoice="1" href="'.route('pos.invoice.create').'"', false);
     }
 
     public function test_rooms_off_does_not_rewrite_saved_flags_or_open_hotel(): void

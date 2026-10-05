@@ -1,5 +1,12 @@
 <x-hotel-layout>
 <div class="tn-page tn-hotel-page max-w-6xl mx-auto">
+    @if($stay->status === 'checked_in')
+    <form hidden data-hotel-bill-desk="1" data-hotel-confirm-flow="collect" data-auto-open="{{ (int) session('hotel_checkin_preview') === (int) $stay->id ? 1 : 0 }}" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-quote-url="{{ route('pos.hotel.checkout-quote', $stay->id) }}">
+        @csrf
+        <input name="payment_method" value="cash">
+        <input name="amount" value="{{ $deskSummary['balance'] }}">
+    </form>
+    @endif
     <a href="{{ route('pos.hotel.stays.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-teal-700 mb-3">{{ __('pos.hotel_back_stays') }}</a>
     @if(session('success'))
     <div class="mb-4 p-3 rounded-lg bg-emerald-50 text-emerald-700 text-sm">{{ session('success') }}</div>
@@ -20,6 +27,7 @@
             @endif
         </div>
         <div class="flex flex-wrap gap-2">
+            @if($stay->status === 'checked_in')<button type="button" data-hotel-open-desk="1" class="rounded-lg bg-teal-700 text-white px-3 py-2 text-sm">{{ __('hotel_preview.title') }}</button>@endif
             <a href="{{ route('pos.hotel.stays.statement', $stay->id) }}" class="px-3 py-2 rounded-lg border border-teal-300 text-teal-800 text-xs font-semibold" data-hotel-print-bill="1">{{ __('hotel_bill.bill_action') }}</a>
             @if($stay->status === 'reserved')
             <form method="POST" action="{{ route('pos.hotel.stays.check-in', $stay->id) }}">@csrf<button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_check_in_btn') }}</button></form>
@@ -139,7 +147,7 @@
     </details>
     @endif
 
-    @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
+    @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true) && !\App\Services\HotelCorrectionService::fiscalLocked($issuedBills))
     <details class="mb-6 rounded-xl border border-red-200 p-3" data-hotel-void-error="1">
         <summary class="cursor-pointer text-sm font-semibold text-red-700">{{ __('pos.hotel_void_error_title') }}</summary>
         <p class="mt-2 text-xs text-gray-600">{{ __('pos.hotel_void_error_hint') }}</p>
@@ -153,12 +161,12 @@
     </details>
     @endif
 
-    @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true))
+    @if(\App\Services\HotelAccessService::canManageRooms(auth('pos')->user()) && in_array($stay->status, ['checked_in', 'checked_out'], true) && !\App\Services\HotelCorrectionService::fiscalLocked($issuedBills))
     <a href="{{ route('pos.hotel.stays.correction', $stay->id) }}" class="block mb-6 text-red-700 underline font-semibold">{{ __('hotel_correction.title') }}</a>
     @endif
     <div class="mb-6" x-data="{ action: window.location.hash === '#hotel-charge' ? 'charge' : (window.location.hash === '#hotel-payment' ? 'payment' : '') }">
         <div class="flex flex-wrap gap-3 mb-4">
-            <button type="button" @click="action = action === 'payment' ? '' : 'payment'" :aria-expanded="action === 'payment'" class="rounded-lg bg-teal-700 px-4 py-2 text-white text-sm font-semibold">{{ __('pos.hotel_take_money') }}</button>
+            <button type="button" data-hotel-take-payment="1" @click="action = action === 'payment' ? '' : 'payment'" :aria-expanded="action === 'payment'" class="rounded-lg bg-teal-700 px-4 py-2 text-white text-sm font-semibold">{{ __('pos.hotel_take_money') }}</button>
             @if($stay->isOpen())<button type="button" @click="action = action === 'charge' ? '' : 'charge'" :aria-expanded="action === 'charge'" class="rounded-lg border border-teal-300 px-4 py-2 text-teal-800 dark:text-teal-200 text-sm font-semibold">{{ __('pos.hotel_action_charge') }}</button>@endif
         </div>
         <form method="POST" action="{{ route('pos.hotel.folio.charge', $stay->id) }}" id="hotel-charge" x-data="{ price: '', product: '', service: '' }" x-show="action === 'charge'" x-cloak class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">

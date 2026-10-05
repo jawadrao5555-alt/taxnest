@@ -19,13 +19,13 @@ class HotelBillPreviewService
         $rows = HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->orderBy('id')->get();
         $open = $rows->whereIn('entry_type', ['charge', 'adjustment'])->whereNull('pos_transaction_id');
         $method = $data['payment_method'];
-        if ($data['flow'] === 'checkout') {
+        if (in_array($data['flow'], ['checkout', 'collect'], true)) {
             if ($stay->status !== HotelStay::STATUS_CHECKED_IN) throw new HotelStayException(__('pos.hotel_transition_blocked'));
             $quote = app(HotelDeskService::class)->summary($stay, $method);
             $amount = round((float) $data['amount'], 2);
             if ($amount > $quote['balance'] + 0.009) throw new HotelStayException(__('pos.hotel_checkout_amount_changed'));
             $remaining = max(0, round($quote['balance'] - $amount, 2));
-            if ($remaining > 0.009 && (!HotelCheckoutPolicy::allowsOutstandingCheckout($company) || empty($data['leave_balance']))) {
+            if ($data['flow'] === 'checkout' && $remaining > 0.009 && (!HotelCheckoutPolicy::allowsOutstandingCheckout($company) || empty($data['leave_balance']))) {
                 throw new HotelStayException(__('pos.hotel_checkout_due_blocked', ['amount' => number_format($remaining, 2)]));
             }
             $picked = $open->all();
@@ -59,8 +59,9 @@ class HotelBillPreviewService
             'stay_number' => $stay->stay_number, 'guest_name' => $stay->guest_name, 'room_number' => $stay->room?->room_number,
             'lines' => $lines->map(fn ($r) => ['description' => $r->description, 'amount' => (float) $r->amount])->values()->all(),
             'paid' => round((float) $rows->where('entry_type', 'payment')->sum('amount') - (float) $rows->where('entry_type', 'refund')->sum('amount'), 2),
-            'collect_now' => $data['flow'] === 'checkout' ? (float) $data['amount'] : 0,
+            'collect_now' => in_array($data['flow'], ['checkout', 'collect'], true) ? (float) $data['amount'] : 0,
             'remaining' => $remaining ?? 0, 'will_issue' => $willIssue,
+            'allow_balance' => HotelCheckoutPolicy::allowsOutstandingCheckout($company),
             'reporting' => $reporting, 'fingerprint' => $fingerprint,
             'preview_token' => Crypt::encryptString(json_encode(['fingerprint' => $fingerprint, 'expires' => now()->addMinutes(10)->timestamp])),
         ]);

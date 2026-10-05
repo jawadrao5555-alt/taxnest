@@ -1,6 +1,13 @@
 <?php
 
 return [
+    'confirm_checkout_pra' => 'Check out confirm aur PRA ko report karein',
+    'confirm_checkout_action' => 'Check out confirm karein',
+    'status_no_bill' => 'Kaam save ho gaya; naya bill issue nahi hua. Baaqi charges folio mein hain.',
+    'confirm_payment' => 'Payment confirm karein',
+    'update' => 'Preview update karein',
+    'collect_bill' => 'Payment lein / Bill banayein',
+    'action' => 'Kaam',
     'title' => 'Bill check karein',
     'draft' => 'Yeh draft preview hai. Band karne se bill ya PRA report nahi banegi. Booking aur recorded payment save rahegi.',
     'draft_pra' => 'Pehle bill check karein. Confirm karne par bill lock hoga aur PRA reporting queue mein jayega.',
@@ -29,5 +36,4 @@ return [
     'status_pending' => 'PRA pending — acceptance confirm nahi. Status check karein; naya bill na bhejein.',
     'status_offline' => 'PRA waiting / connection issue — acceptance confirm nahi. Saved reporting queue isi bill ko handle karegi.',
     'status_failed' => 'PRA reporting failed — acceptance confirm nahi. Saved bill dekhein; doosra bill na banayein.',
-    'status_no_bill' => 'Checkout saved. Unpaid charges folio par hain; naya bill issue nahi hua.',
 ];

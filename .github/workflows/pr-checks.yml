@@ -113,6 +113,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelSettingsCategoryTest.php
       - name: Check occupied waiter table regressions before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosCounterOrderOpenStatusesTest.php tests/Feature/PosWaiterOrderSettleAuthTest.php tests/Feature/WaiterCashierEditBehaviorTest.php
+      - name: Check Hotel bill dialog and fiscal cancellation regressions before the full suite
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelGuestHouseV1Test.php tests/Feature/HotelCategoryNativeUiTest.php
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence

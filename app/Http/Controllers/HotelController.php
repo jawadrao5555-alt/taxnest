@@ -314,8 +314,8 @@ class HotelController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route($data['walk_in'] ? 'pos.hotel.stays.statement' : 'pos.hotel.stays.show',
-            $data['walk_in'] ? [$stay->id, 'print' => 1] : [$stay->id])
+        return redirect()->route('pos.hotel.stays.show', $stay->id)
+            ->with('hotel_checkin_preview', $data['walk_in'] ? (int) $stay->id : null)
             ->with('success', $data['walk_in'] ? __('pos.hotel_checked_in') : __('pos.hotel_reserved'));
     }
 
@@ -339,7 +339,7 @@ class HotelController extends Controller
         $checkoutPolicy = HotelCheckoutPolicy::forCompany(\App\Models\Company::find($companyId));
         $timeline = $this->stays->stayTimeline($stay);
         $deskSummary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
-        $issuedBills = \App\Models\PosTransaction::where('company_id', $companyId)
+        $issuedBills = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)
             ->whereIn('id', $stay->folioEntries->pluck('pos_transaction_id')->filter()->unique())
             ->orderBy('id')->get();
 
@@ -446,13 +446,13 @@ class HotelController extends Controller
     private function billPreviewData(Request $request): array
     {
         $data = $request->validate([
-            'flow' => 'required|in:settle,checkout',
+            'flow' => 'required|in:settle,checkout,collect',
             'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
-            'amount' => 'required_if:flow,checkout|nullable|numeric|min:0|max:10000000',
+            'amount' => 'required_if:flow,checkout,collect|nullable|numeric|min:0|max:10000000',
             'leave_balance' => 'nullable|boolean',
         ]);
         return ['flow' => $data['flow'], 'payment_method' => $data['payment_method'],
-            'amount' => $data['flow'] === 'checkout' ? round((float) $data['amount'], 2) : 0,
+            'amount' => in_array($data['flow'], ['checkout', 'collect'], true) ? round((float) $data['amount'], 2) : 0,
             'leave_balance' => $request->boolean('leave_balance')];
     }
 
@@ -480,6 +480,12 @@ class HotelController extends Controller
             $bill = DB::transaction(function () use ($stay, $data, $validated, $user, $key, $billKey) {
                 $locked = HotelStay::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($stay->id);
                 $user = \App\Models\User::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($user->id);
+                $requestFingerprint = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
+                $confirmed = DB::table('hotel_bill_confirmations')->where('company_id', $stay->company_id)->where('request_key', $key)->first();
+                if ($confirmed) {
+                    if (!hash_equals($confirmed->fingerprint, $requestFingerprint)) throw new HotelStayException(__('hotel_preview.changed'));
+                    return $confirmed->bill_id ? \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)->findOrFail($confirmed->bill_id) : null;
+                }
                 $existing = \App\Models\PosTransaction::where('company_id', $stay->company_id)->where('offline_uuid', $billKey)->first();
                 if ($existing) return $existing;
                 if ($data['flow'] === 'checkout' && $locked->status === HotelStay::STATUS_CHECKED_OUT) {
@@ -488,9 +494,33 @@ class HotelController extends Controller
                 app(\App\Services\HotelBillPreviewService::class)->verify($locked, $user, $data, $validated['preview_token']);
                 if ($data['flow'] === 'checkout') {
                     app(\App\Services\HotelDeskService::class)->checkout($locked, (int) $user->id, $data + ['idempotency_key' => $key]);
-                    return \App\Models\PosTransaction::where('company_id', $stay->company_id)->where('offline_uuid', $billKey)->first();
+                    $bill = \App\Models\PosTransaction::where('company_id', $stay->company_id)->where('offline_uuid', $billKey)->first();
+                    if (!$bill) {
+                        $ids = \App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->pluck('pos_transaction_id')->filter();
+                        $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)->whereIn('id', $ids)
+                            ->where('transaction_type', 'sale')->latest('id')->first();
+                    }
+                    DB::table('hotel_bill_confirmations')->insert(['company_id' => $stay->company_id, 'stay_id' => $stay->id, 'request_key' => $key,
+                        'fingerprint' => $requestFingerprint, 'bill_id' => $bill?->id, 'created_at' => now(), 'updated_at' => now()]);
+                    return $bill;
                 }
-                return $this->folio->settleCoveredCharges($locked, (int) $user->id, $data['payment_method'], $key)['transaction'];
+                if ($data['flow'] === 'collect') {
+                    $summary = app(\App\Services\HotelDeskService::class)->summary($locked, $data['payment_method']);
+                    if ($data['amount'] > 0) {
+                        $this->folio->postPayment($locked, ['amount' => $data['amount'], 'payment_method' => $data['payment_method'],
+                            'description' => __('pos.hotel_advance_payment'), 'idempotency_key' => hash('sha256', 'collect-pay|'.$key)], (int) $user->id);
+                    }
+                    if ($summary['balance'] - $data['amount'] > 0.009) {
+                        if ($data['amount'] <= 0) throw new HotelStayException(__('pos.hotel_tax_coverage_needed'));
+                        DB::table('hotel_bill_confirmations')->insert(['company_id' => $stay->company_id, 'stay_id' => $stay->id, 'request_key' => $key,
+                            'fingerprint' => $requestFingerprint, 'bill_id' => null, 'created_at' => now(), 'updated_at' => now()]);
+                        return null;
+                    }
+                }
+                $bill = $this->folio->settleCoveredCharges($locked, (int) $user->id, $data['payment_method'], $key)['transaction'];
+                DB::table('hotel_bill_confirmations')->insert(['company_id' => $stay->company_id, 'stay_id' => $stay->id, 'request_key' => $key,
+                    'fingerprint' => $requestFingerprint, 'bill_id' => $bill?->id, 'created_at' => now(), 'updated_at' => now()]);
+                return $bill;
             });
             $result = app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill?->fresh());
             if ($bill) $result['status_url'] = route('pos.hotel.bill-status', [$stay->id, $bill->id]);
@@ -560,7 +590,8 @@ class HotelController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('pos.hotel.stays.statement', [$id, 'print' => 1])
+        return redirect()->route('pos.hotel.stays.show', $id)
+            ->with('hotel_checkin_preview', $id)
             ->with('success', __('pos.hotel_checked_in'));
     }
 
@@ -866,7 +897,15 @@ class HotelController extends Controller
         $dues = [];
         foreach ($stays as $stay) $dues[$stay->id] = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance'];
 
-        return view('pos.hotel.folios', compact('stays', 'dues'));
+        $ids = $stays->getCollection()->flatMap(fn ($stay) => $stay->folioEntries->pluck('pos_transaction_id'))->filter()->unique();
+        $bills = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)->whereIn('id', $ids)->get()->keyBy('id');
+        $fiscalLocked = [];
+        foreach ($stays as $stay) {
+            $linked = $stay->folioEntries->pluck('pos_transaction_id')->filter()->unique();
+            $documents = $linked->map(fn ($id) => $bills->get($id))->filter();
+            $fiscalLocked[$stay->id] = $documents->count() !== $linked->count() || \App\Services\HotelCorrectionService::fiscalLocked($documents);
+        }
+        return view('pos.hotel.folios', compact('stays', 'dues', 'fiscalLocked'));
     }
 
     public function reports()

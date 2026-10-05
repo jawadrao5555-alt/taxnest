@@ -13,6 +13,14 @@ use Illuminate\Support\Facades\DB;
 /** Full erroneous-stay correction; retains source bills and ledger entries. */
 class HotelCorrectionService
 {
+    public static function fiscalLocked(\Illuminate\Support\Collection $bills): bool
+    {
+        return $bills->contains(fn ($bill) => !empty($bill->pra_invoice_number)
+            || !in_array($bill->pra_status, [null, 'local'], true)
+            || !($bill->invoice_mode === 'local' || $bill->pra_status === 'local'
+                || ($bill->pra_status === null && PosLocalSeries::isSeriesSerial($bill->invoice_number))));
+    }
+
     public function preview(HotelStay $stay, User $actor): array
     {
         abort_unless((int) $actor->company_id === (int) $stay->company_id && $actor->isPosAdmin(), 403);
@@ -37,10 +45,7 @@ class HotelCorrectionService
         }
         // Fiscal documents are preserved while category-specific credit notes are deferred.
         // Fail closed for ambiguous/legacy modes as well as pending/submitted bills.
-        if ($bills->contains(fn ($bill) => !empty($bill->pra_invoice_number)
-            || !in_array($bill->pra_status, [null, 'local'], true)
-            || !($bill->invoice_mode === 'local' || $bill->pra_status === 'local'
-                || ($bill->pra_status === null && PosLocalSeries::isSeriesSerial($bill->invoice_number))))) {
+        if (self::fiscalLocked($bills)) {
             $blocked = __('hotel_correction.fiscal_locked');
         }
         $totals = app(HotelFolioService::class)->totals($stay);

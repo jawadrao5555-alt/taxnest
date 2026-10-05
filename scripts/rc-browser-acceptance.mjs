@@ -391,6 +391,19 @@ async function hotelWorkflow(page, t, v) {
   await saveEvidenceScreenshot(receiptPage, `hotel-receipt-${v.width}-advance.png`);
   await receiptPage.close();
 
+  // Reproduce the owner transactions-list Return click; it must open Hotel review.
+  const returnPage = await page.context().newPage();
+  await returnPage.goto(baseUrl + '/pos/transactions?tab=local', {waitUntil:'domcontentloaded'});
+  await dismiss(returnPage);
+  const hotelReturn = returnPage.locator(`[data-hotel-return-entry="${firstBill.bill_id}"]`);
+  await hotelReturn.click();
+  await returnPage.waitForURL(baseUrl + stayPath + '/credit-notes#bill-' + firstBill.bill_id);
+  await returnPage.locator(`[data-hotel-credit-notes] #bill-${firstBill.bill_id}`).waitFor({state:'visible'});
+  if ((await returnPage.locator('body').innerText()).includes('Use the Hotel Return / Credit Note screen for this bill.')) throw new Error('Hotel Return still redirects to the generic guard error');
+  await saveEvidenceScreenshot(returnPage, `hotel-return-entry-${v.width}.png`);
+  await returnPage.close();
+  pass(`${t.name}/${v.width}: transactions Return opens the original Hotel bill credit-review screen`);
+
   await previewModal.locator('[data-preview-checkout]').click();
   await page.waitForFunction(() => { const d = document.querySelector('[data-hotel-bill-preview]'); return d && !d.querySelector('[data-preview-confirm]').disabled && Number(d.querySelector('[data-desk-amount]').value) === 2500; });
   const [confirmed] = await Promise.all([

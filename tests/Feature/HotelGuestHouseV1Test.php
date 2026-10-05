@@ -244,12 +244,16 @@ class HotelGuestHouseV1Test extends TestCase
     {
         [$company, $owner, $stay] = $this->previewStay();
         $name = $stay->guest_name;
+        $stay->update(['guest_phone' => '03001111111', 'guest_cnic' => '1111111111111']);
         $this->actingAs($owner, 'pos')->get(route('pos.hotel.guests.edit', $stay->id))->assertOk();
         $this->patch(route('pos.hotel.guests.update', $stay->id), ['guest_name' => 'Updated Guest', 'guest_phone' => '03000000000', 'guest_cnic' => '1234567890123'])->assertRedirect(route('pos.hotel.guests'));
         $this->assertSame($name, $stay->fresh()->guest_name);
         $this->get(route('pos.hotel.guests'))->assertOk()->assertSee('Updated Guest');
         $this->get(route('pos.hotel.stays.create'))->assertOk()->assertSee('Updated Guest');
         $this->get(route('pos.hotel.stays.show', $stay->id))->assertOk()->assertSee($name);
+        $this->patch(route('pos.hotel.guests.update', $stay->id), ['guest_name' => 'Updated Guest', 'guest_phone' => null, 'guest_cnic' => null])->assertRedirect();
+        $this->get(route('pos.hotel.guests.edit', $stay->id))->assertOk()->assertDontSee('03001111111')->assertDontSee('1111111111111');
+        $this->assertSame('03001111111', $stay->fresh()->guest_phone);
         $other = $this->company('hotel');
         $this->actingAs($this->owner($other), 'pos')->patchJson(route('pos.hotel.guests.update', $stay->id), ['guest_name' => 'Foreign'])->assertNotFound();
         $this->deleteJson(route('pos.hotel.guests.delete', $stay->id))->assertNotFound();

@@ -1,10 +1,11 @@
 <?php
 
 return [
+    'entry' => 'Return / Credit Note',
     'drawer' => 'Refund drawer',
     'title' => 'Credit notes',
     'help' => 'Reduce a genuine billed charge. Refund money separately; the stay and room remain unchanged.',
-    'verification' => 'Issuance requires verification or review of the original bill.',
+    'verification' => 'Credit-note issuance and payment refunds are currently disabled pending fiscal verification. You can review the adjustment.',
     'mode' => 'Adjustment',
     'partial' => 'Selected quantities',
     'full' => 'All remaining quantities',

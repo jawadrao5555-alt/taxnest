@@ -1,10 +1,11 @@
 <?php
 
 return [
+    'entry' => 'Return / Credit Note',
     'drawer' => 'Refund ka cash drawer',
     'title' => 'Credit notes',
     'help' => 'Ghalat ya extra billed charge kam karein. Paisay alag wapas karein; stay aur room wahi rahenge.',
-    'verification' => 'Credit note issue karne se pehle verification ya original bill ka review chahiye.',
+    'verification' => 'Fiscal verification tak credit note banana aur payment refund OFF hain. Filhal adjustment ka review kar sakte hain.',
     'mode' => 'Adjustment',
     'partial' => 'Chuni hui quantity',
     'full' => 'Tamam baqi quantity',

@@ -276,6 +276,62 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertDatabaseCount('hotel_folio_entries', 3);
     }
 
+    public function test_hotel_return_entries_navigate_to_credit_review_without_writes(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        $stay->update(['hotel_money_from_folio' => true]);
+        $bill = app(HotelFolioService::class)->settleCoveredCharges($stay, $owner->id, 'cash', 'hotel-return-entry')['transaction'];
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-RETURN-ENTRY']);
+        $target = route('pos.hotel.credit-notes', $stay->id).'#bill-'.$bill->id;
+        $snapshot = [$bill->total_amount, $bill->tax_amount, HotelFolioEntry::where('stay_id', $stay->id)->count()];
+        $this->actingAs($owner, 'pos')->get(route('pos.transaction.return-form', $bill->id))
+            ->assertRedirect($target)->assertSessionMissing('error');
+        $this->get(route('pos.hotel.credit-notes', $stay->id))->assertOk()->assertSee('bill-'.$bill->id)->assertSee(__('hotel_credit.verification'));
+        $this->get(route('pos.transactions'))->assertOk()->assertSee('data-hotel-return-entry="'.$bill->id.'"', false);
+        $this->get(route('pos.transaction.show', $bill->id))->assertOk()->assertSee(__('hotel_credit.entry'));
+        $this->getJson(route('pos.return.lookup', ['q' => $bill->invoice_number]))->assertOk()
+            ->assertJsonPath('url', route('pos.hotel.credit-notes', $stay->id, false).'#bill-'.$bill->id);
+        // An old POST/bookmark cannot bypass the separate issuance/refund gate.
+        $item = $bill->items()->first();
+        $this->post(route('pos.transaction.return', $bill->id), ['items' => [['item_id' => $item->id, 'return_qty' => 1]],
+            'refund_method' => 'cash'])->assertSessionHas('error');
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $this->assertDatabaseCount('hotel_credit_notes', 0);
+        $bill->refresh();
+        $this->assertEquals($snapshot, [$bill->total_amount, $bill->tax_amount, HotelFolioEntry::where('stay_id', $stay->id)->count()]);
+        $this->assertFalse(config('hotel_credit_notes.enabled'));
+        $cashier = $this->owner($company);
+        $cashier->update(['role' => 'company_user', 'pos_role' => 'pos_cashier', 'pos_custom_access' => json_encode(['returns', 'hotel'])]);
+        $this->actingAs($cashier, 'pos')->getJson(route('pos.transaction.return-form', $bill->id))->assertForbidden();
+        $this->getJson(route('pos.return.lookup', ['q' => $bill->invoice_number]))->assertForbidden();
+        $localOwner = $this->owner($company);
+        $localOwner->update(['pos_billing_scope' => 'local']);
+        $this->actingAs($localOwner, 'pos')->getJson(route('pos.transaction.return-form', $bill->id))->assertForbidden();
+        $this->actingAs($owner, 'pos');
+        $bill->update(['is_archived' => true]);
+        $this->get(route('pos.transaction.return-form', $bill->id))->assertRedirect($target);
+        $this->actingAs($this->owner($this->company('hotel')), 'pos')
+            ->getJson(route('pos.transaction.return-form', $bill->id))->assertNotFound();
+    }
+
+    public function test_hotel_return_navigation_enforces_branch_scope_and_preserves_legacy_return_form(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        $bill = app(HotelFolioService::class)->settleCoveredCharges($stay, $owner->id, 'cash', 'legacy-return-entry')['transaction'];
+        $this->actingAs($owner, 'pos')->get(route('pos.transaction.return-form', $bill->id))
+            ->assertOk()->assertSee('refund_method');
+        $branchA = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'A', 'code' => 'A', 'is_active' => true]);
+        $branchB = \App\Models\Branch::create(['company_id' => $company->id, 'name' => 'B', 'code' => 'B', 'is_active' => true]);
+        $stay->update(['branch_id' => $branchA->id]);
+        $bill->update(['hotel_money_from_folio' => true, 'branch_id' => $branchA->id]);
+        $this->withSession(['active_branch_id' => $branchB->id])->getJson(route('pos.transaction.return-form', $bill->id))->assertNotFound();
+        $this->withSession(['active_branch_id' => $branchA->id])->get(route('pos.transaction.return-form', $bill->id))
+            ->assertRedirect(route('pos.hotel.credit-notes', $stay->id).'#bill-'.$bill->id);
+        HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'charge')->update(['pos_transaction_id' => null]);
+        $this->getJson(route('pos.transaction.return-form', $bill->id))->assertNotFound();
+        $this->assertDatabaseCount('hotel_credit_notes', 0);
+    }
+
     public function test_archived_hotel_fiscal_receipt_is_stay_scoped_and_checkout_reuses_it(): void
     {
         [$company, $owner, $stay] = $this->previewStay();

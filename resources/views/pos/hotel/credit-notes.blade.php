@@ -4,7 +4,7 @@
 <p>{{ __('hotel_credit.help') }}</p>
 @if(!config('hotel_credit_notes.enabled'))<p role="alert" class="border rounded p-3">{{ __('hotel_credit.verification') }}</p>@endif
 @foreach($bills as $bill)
-<form method="POST" action="{{ route('pos.hotel.credit-notes.review', [$stay->id, $bill->id]) }}" class="border rounded p-4 space-y-3">
+<form id="bill-{{ $bill->id }}" method="POST" action="{{ route('pos.hotel.credit-notes.review', [$stay->id, $bill->id]) }}" class="border rounded p-4 space-y-3 scroll-mt-4">
 @csrf
 <p class="font-semibold">{{ $bill->invoice_number }} · Rs {{ number_format($bill->total_amount, 2) }}</p>
 <p>{{ $bill->pra_invoice_number }} · {{ $bill->pra_status }}</p>

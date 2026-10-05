@@ -82,6 +82,29 @@ class PosReturnController extends Controller
         return PosReturnService::returnableReason($txn);
     }
 
+    /** Navigate only; Hotel adjustment/refund writes keep their own gates. */
+    private function hotelCreditUrl(PosTransaction $txn, bool $absolute = true): ?string
+    {
+        if (!$txn->hotel_money_from_folio || ($txn->transaction_type ?? 'sale') === 'return') {
+            return null;
+        }
+        \App\Services\HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        $companyId = (int) app('currentCompanyId');
+        $query = \App\Models\HotelFolioEntry::query()
+            ->join('hotel_stays', 'hotel_stays.id', '=', 'hotel_folio_entries.stay_id')
+            ->where('hotel_folio_entries.company_id', $companyId)
+            ->where('hotel_stays.company_id', $companyId)
+            ->where('hotel_folio_entries.entry_type', 'charge')
+            ->where('hotel_folio_entries.pos_transaction_id', $txn->id);
+        $branch = app(\App\Services\BranchContextService::class)->getActiveBranchId();
+        if ($branch) {
+            $query->where('hotel_stays.branch_id', $branch);
+        }
+        $stayId = $query->value('hotel_stays.id');
+        abort_unless($stayId, 404);
+        return route('pos.hotel.credit-notes', $stayId, $absolute) . '#bill-' . $txn->id;
+    }
+
     public function returnForm($id)
     {
         $this->gate();
@@ -92,6 +115,10 @@ class PosReturnController extends Controller
             ->with('items')->where('company_id', $companyId)->findOrFail($id);
 
         $this->assertScopeAllows($original);
+
+        if ($url = $this->hotelCreditUrl($original)) {
+            return redirect()->to($url);
+        }
 
         if ($reason = self::returnableReason($original)) {
             return redirect()->route('pos.transaction.show', $original->id)
@@ -218,6 +245,10 @@ class PosReturnController extends Controller
         if (!$txn->allowedForBillingScopeOf($viewer)
             || !$txn->allowedForCashierIsolationOf($viewer)) {
             return response()->json(['error' => __('pos.return_manager_only')], 403);
+        }
+
+        if ($url = $this->hotelCreditUrl($txn, false)) {
+            return response()->json(['url' => $url, 'invoice_number' => $txn->invoice_number]);
         }
 
         if ($reason = self::returnableReason($txn)) {

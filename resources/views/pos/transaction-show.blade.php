@@ -26,17 +26,20 @@
         // stream lock + remaining returnable quantity — BOTH streams.
         $__remainingQty = $transaction->items->sum(fn ($it) => max(0, (float) $it->quantity - (float) ($it->returned_quantity ?? 0)));
         // Task 1186: effective scope + own-bill exemption (derived only).
+        $__hotelCredit = (bool) $transaction->hotel_money_from_folio && !$isReturnBill;
+        $__hotelCreditAllowed = $__hotelCredit && \App\Services\HotelAccessService::canManageRooms(auth('pos')->user());
         $canReturnHere = \App\Services\PosAccessService::returnsAllowed(auth('pos')->user())
             && $transaction->allowedForBillingScopeOf(auth('pos')->user())
+            && $transaction->allowedForCashierIsolationOf(auth('pos')->user())
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
-            && \App\Http\Controllers\PosReturnController::returnableReason($transaction) === null
+            && ($__hotelCredit ? $__hotelCreditAllowed : \App\Http\Controllers\PosReturnController::returnableReason($transaction) === null)
             && $__remainingQty > 0;
         // Task 1154: compute the disabled reason for the two silent suppression
         // cases (no permission / day-closed) so we can show a muted hint
         // instead of silently hiding the button.
         $__returnBlockReason = null;
         if (!$canReturnHere && !$isReturnBill && $__remainingQty > 0) {
-            if (!\App\Services\PosAccessService::returnsAllowed(auth('pos')->user())) {
+            if (!\App\Services\PosAccessService::returnsAllowed(auth('pos')->user()) || ($__hotelCredit && !$__hotelCreditAllowed)) {
                 $__returnBlockReason = 'no_permission';
             } elseif (\App\Http\Controllers\PosReturnController::returnableReason($transaction) === 'day_closed') {
                 $__returnBlockReason = 'day_closed';
@@ -86,7 +89,7 @@
             @if($canReturnHere)
             <a href="{{ route('pos.transaction.return-form', $transaction->id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white text-sm font-semibold rounded-lg hover:bg-rose-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
-                {{ __('pos.return_refund') }}
+                {{ __($__hotelCredit ? 'hotel_credit.entry' : 'pos.return_refund') }}
             </a>
             @elseif($__returnBlockReason === 'no_permission')
             {{-- Task 1154: cashier lacks Custom Access tick — show disabled hint with reason --}}

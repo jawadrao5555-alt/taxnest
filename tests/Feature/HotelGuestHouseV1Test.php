@@ -210,6 +210,36 @@ class HotelGuestHouseV1Test extends TestCase
         $this->travelBack();
     }
 
+    public function test_full_invoice_unpaid_tax_remains_due_on_board_and_blocks_direct_checkout(): void
+    {
+        [$company, $owner, $stay] = $this->previewStay();
+        $company->update(['pos_tax_rate_cash' => 16, 'pos_tax_pricing_mode' => 'exclusive', 'hotel_checkout_outstanding' => 'block']);
+        HotelFolioEntry::where('stay_id', $stay->id)->where('entry_type', 'payment')->delete();
+        $stay->update(['hotel_money_from_folio' => true]);
+        app(HotelFolioService::class)->postPayment($stay, ['amount' => 900, 'payment_method' => 'cash'], $owner->id);
+        $bill = app(HotelFolioService::class)->settleCoveredCharges($stay, $owner->id, 'cash', 'unpaid-tax-invoice')['transaction'];
+        $this->assertEquals(1044, $bill->total_amount);
+        $this->assertEquals(144, app(HotelFolioService::class)->totals($stay)['outstanding']);
+        $dues = app(HotelFolioService::class)->chargeDuesForStayIds($company->id, [$stay->id]);
+        $this->assertEquals(144, $dues[$stay->id]);
+        try {
+            app(HotelStayService::class)->checkOut($stay, $owner->id);
+            $this->fail('Unpaid fiscal tax must prevent direct checkout.');
+        } catch (HotelStayException $e) {
+            $this->assertSame('checked_in', $stay->fresh()->status);
+        }
+        app(HotelFolioService::class)->postPayment($stay, ['amount' => 144, 'payment_method' => 'card'], $owner->id);
+        $this->actingAs($owner, 'pos');
+        $data = ['flow' => 'checkout', 'payment_method' => 'card', 'amount' => 0];
+        $preview = $this->getJson(route('pos.hotel.bill-preview', $stay->id).'?'.http_build_query($data))->assertOk()
+            ->assertJsonPath('will_issue', false)->assertJsonPath('remaining', fn ($amount) => abs((float) $amount) < 0.009)->json();
+        $this->postJson(route('pos.hotel.bill-confirm', $stay->id), $data + ['preview_token' => $preview['preview_token'],
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid()])->assertOk()->assertJsonPath('bill_id', $bill->id);
+        $this->assertDatabaseCount('pos_transactions', 1);
+        $this->assertSame('checked_out', $stay->fresh()->status);
+        $this->assertDatabaseCount('hotel_folio_entries', 3);
+    }
+
     public function test_guest_directory_edit_and_delete_preserve_stay_and_invoice_history(): void
     {
         [$company, $owner, $stay] = $this->previewStay();

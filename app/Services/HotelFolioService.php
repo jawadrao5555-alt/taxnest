@@ -134,6 +134,12 @@ class HotelFolioService
             $out[$id] = max(0, round($value, 2));
         }
 
+        if (Schema::hasColumn('hotel_stays', 'hotel_money_from_folio')) {
+            foreach (HotelStay::where('company_id', $companyId)->whereIn('id', $stayIds)->where('hotel_money_from_folio', true)->get() as $stay) {
+                $out[$stay->id] = app(HotelDeskService::class)->summary($stay, 'cash')['balance'];
+            }
+        }
+
         return $out;
     }
 

@@ -436,7 +436,7 @@ async function hotelWorkflow(page, t, v) {
   await saveEvidenceScreenshot(page, `hotel-guests-${v.width}-edited.png`);
   await page.goto(baseUrl + '/pos/hotel/stays/create', {waitUntil:'domcontentloaded'});
   if (!await page.locator('option').filter({hasText:editedGuest}).count()) throw new Error('Returning guest selector lost edited profile');
-  const accountSection = page.locator('details').filter({has:page.locator('[name="payer_customer_id"]')});
+  const accountSection = page.locator('[data-hotel-account-billing]');
   if (await accountSection.getAttribute('open') !== null) throw new Error('Corporate payer section must be optional and collapsed');
   await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   if (!(await page.locator('body').innerText()).includes(originalGuest)) throw new Error('Guest edit rewrote historical stay');

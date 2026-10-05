@@ -78,7 +78,7 @@
             <input x-ref="cnic" name="guest_cnic" value="{{ old('guest_cnic') }}" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
             <p class="text-[10px] text-gray-400 mt-1">{{ __('pos.hotel_cnic_staff_only') }}</p>
         </div>
-        <details class="sm:col-span-2 rounded-lg border p-3" @if(old('payer_customer_id') || old('guest_customer_id')) open @endif>
+        <details data-hotel-account-billing class="sm:col-span-2 rounded-lg border p-3" @if(old('payer_customer_id') || old('guest_customer_id')) open @endif>
             <summary class="cursor-pointer text-sm font-semibold">{{ __('hotel_guests.account_billing') }}</summary>
             <p class="mt-2 text-xs text-gray-500">{{ __('hotel_guests.account_hint') }}</p>
             <div class="mt-3 grid sm:grid-cols-2 gap-4">

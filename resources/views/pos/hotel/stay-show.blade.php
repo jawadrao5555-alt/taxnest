@@ -42,6 +42,36 @@
         </div>
         @endforeach
     </div>
+    @if($issuedBills->isNotEmpty())
+    <section class="mb-4 rounded-xl border bg-white dark:bg-gray-900 p-4" data-hotel-issued-bills="1">
+        <h2 class="font-semibold">{{ __('hotel_bill.bill_action') }}</h2>
+        @foreach($issuedBills as $bill)
+        @php
+            $accepted = $bill->pra_status === 'submitted' && !empty($bill->pra_invoice_number);
+            $billState = $accepted ? 'submitted' : ($bill->pra_status ?: 'local');
+        @endphp
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2" data-hotel-bill-id="{{ $bill->id }}" data-hotel-bill-state="{{ $billState }}">
+            <div>
+                <strong>{{ $bill->invoice_number }}</strong>
+                <p class="text-xs">{{ $accepted ? __('pos.hotel_fiscal_bill').' · '.$bill->pra_invoice_number : __('hotel_preview.status_'.$billState) }}</p>
+            </div>
+            <a href="{{ route('pos.receipt', $bill->id) }}" target="_blank" rel="noopener" class="rounded-lg border px-3 py-2 text-sm">{{ __('hotel_bill.issued_receipt') }}</a>
+        </div>
+        @endforeach
+    </section>
+    @endif
+    @if(in_array($stay->status, ['checked_in', 'checked_out'], true) && ($totals['uninvoiced_charges'] ?? 0) > 0.009)
+            <form method="POST" action="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-hotel-confirm-flow="settle" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
+                @csrf
+            <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
+                <h3 class="text-sm font-semibold">{{ __('hotel_preview.title') }}</h3>
+                <p class="text-xs text-gray-500">{{ __('pos.hotel_issue_bill_hint') }}</p>
+                <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
+                    @include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])
+                </select>
+                <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('hotel_preview.title') }}</button>
+            </form>
+    @endif
     @if(($deskSummary['balance'] ?? 0) > 0.009)
     <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{{ __('hotel_simplify.payment_pending') }} · {{ __('hotel_simplify.cash_estimate') }}. {{ __('hotel_simplify.method_changes_tax') }} <a href="#hotel-payment" class="font-semibold underline">{{ __('pos.hotel_collect_now') }}</a></p>
     @endif
@@ -211,16 +241,7 @@
             </form>
             </details>
             @endif
-            <form method="POST" action="{{ route('pos.hotel.folio.settle', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
-                @csrf
-            <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
-                <h3 class="text-sm font-semibold">{{ __('pos.hotel_issue_bill') }}</h3>
-                <p class="text-xs text-gray-500">{{ __('pos.hotel_issue_bill_hint') }}</p>
-                <select name="payment_method" class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
-                    @include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])
-                </select>
-                <button class="px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_issue_bill') }}</button>
-            </form>
+
             </details>
         </div>
     </div>

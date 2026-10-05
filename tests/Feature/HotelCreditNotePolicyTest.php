@@ -300,7 +300,7 @@ class HotelCreditNotePolicyTest extends TestCase
     {
         [$stay, $owner, $bill, $note, $credit, $service] = $this->acceptedPartialCredit();
         $drawer = \App\Models\PosTerminal::create(['company_id' => $stay->company_id,
-            'terminal_name' => 'Synthetic refund drawer', 'is_active' => true]);
+            'terminal_name' => 'Synthetic refund drawer', 'terminal_code' => 'CN-REFUND-1', 'is_active' => true]);
         $bill->update(['terminal_id' => $drawer->id]);
         $credit->update(['terminal_id' => $drawer->id]);
         $refund = $service->refund($stay, $owner, (int) $note->id, 500, 'cash', 'reporting-cash-refund-001', (int) $drawer->id);

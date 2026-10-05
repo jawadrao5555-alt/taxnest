@@ -54,7 +54,7 @@
             text.textContent = line.description; amount.textContent = money(line.amount); row.append(text, amount); el('lines').append(row);
         }
         el('totals').replaceChildren();
-        for (const key of ['gross', 'discount', 'tax', 'total', 'paid', 'collect_now', 'remaining']) {
+        for (const key of ['gross', 'discount', 'tax', 'total', 'stay_total', 'paid', 'collect_now', 'remaining']) {
             const label = document.createElement('dt'), value = document.createElement('dd');
             label.textContent = labels[key]; value.textContent = money(quote[key]); value.className = 'text-right font-semibold'; el('totals').append(label, value);
         }

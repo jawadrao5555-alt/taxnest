@@ -26,7 +26,6 @@ return [
     'gross' => 'Charges before discount',
     'discount' => 'Discount',
     'tax' => 'Tax',
-    'total' => 'Bill total',
     'paid' => 'Already collected',
     'collect_now' => 'Collect now',
     'remaining' => 'Remaining balance',
@@ -36,4 +35,8 @@ return [
     'status_pending' => 'PRA pending — acceptance not confirmed. Use Check reporting status; do not submit another bill.',
     'status_offline' => 'PRA waiting / connection issue — acceptance not confirmed. Existing reporting queue will handle this bill.',
     'status_failed' => 'PRA reporting failed — acceptance not confirmed. Check the saved bill; do not create another bill.',
+    'total' => 'New bill total',
+    'stay_total' => 'Full stay bill total',
+    'stay_paid' => 'Current stay paid',
+    'stay_balance' => 'Current stay balance',
 ];

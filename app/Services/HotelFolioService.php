@@ -159,7 +159,7 @@ class HotelFolioService
         ]), $userId);
     }
 
-    public function refundPayment(HotelStay $stay, float $amount, int $userId, ?string $method = null, ?string $idempotencyKey = null): HotelFolioEntry
+    public function refundPayment(HotelStay $stay, float $amount, int $userId, ?string $method = null, ?string $idempotencyKey = null, int $terminalId = 0): HotelFolioEntry
     {
         $totals = $this->totals($stay);
         $refundable = round($totals['payments'] - $totals['refunds'], 2);
@@ -171,6 +171,7 @@ class HotelFolioService
             'entry_type' => HotelFolioEntry::TYPE_REFUND,
             'category' => 'other',
             'description' => __('pos.hotel_payment_refund'),
+            'terminal_id' => $terminalId,
             'quantity' => 1,
             'uom' => 'NOS',
             'unit_amount' => $amount,
@@ -231,9 +232,9 @@ class HotelFolioService
     }
 
     /**
-     * Issue a fiscal invoice for uninvoiced charges that are already covered
-     * by folio payments (advances apply here — they are not a second sale).
-     * Unpaid charges stay on the folio. Deposits never count as revenue.
+     * Issue charges using the stay accounting contract. New UI stays invoice
+     * all charges and report money separately; legacy stays invoice covered
+     * charges. Advances are not another sale. Deposits are not revenue.
      *
      * @return array{transaction:?\App\Models\PosTransaction, totals:array, invoiced_amount:float}
      */

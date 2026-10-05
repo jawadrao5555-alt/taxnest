@@ -55,7 +55,7 @@
         <p>{{ __('hotel_reporting.agent') }}: {{ $reportCompany->agentOnline() ? __('hotel_reporting.agent_online') : __('hotel_reporting.agent_offline') }}</p>
         @endif
         @if($lastAccepted)
-        <p>{{ __('hotel_reporting.last_accepted') }}: <a class="underline" target="_blank" rel="noopener" href="{{ route('pos.receipt', $lastAccepted->id) }}">{{ $lastAccepted->pra_invoice_number }}</a></p>
+        <p>{{ __('hotel_reporting.last_accepted') }}: <a class="underline" target="_blank" rel="noopener" href="{{ route('pos.receipt', $lastAccepted->id) }}">{{ $lastAccepted->pra_invoice_number }}</a> · {{ $lastAccepted->created_at?->format('d M Y H:i') }}</p>
         @else
         <p>{{ __('hotel_reporting.no_acceptance') }}</p>
         @endif

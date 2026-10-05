@@ -367,13 +367,33 @@ async function hotelWorkflow(page, t, v) {
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
   await deskModal.locator('[data-desk-flow]').selectOption('checkout');
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
+  // Report the full card-priced bill with only the recorded advance received.
+  await deskModal.locator('[data-desk-flow]').selectOption('collect');
+  await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
+  await deskModal.locator('[data-desk-amount]').fill('0');
+  await deskModal.locator('[data-desk-update]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
+  const [issued] = await Promise.all([
+    page.waitForResponse(r => r.url().endsWith(stayPath + '/bill-confirm') && r.request().method() === 'POST'),
+    previewModal.locator('[data-preview-confirm]').click(),
+  ]);
+  if (!issued.ok()) throw new Error('Full bill with partial advance failed');
+  const firstBill = await issued.json();
+  await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
+  if (!firstBill.bill_id) throw new Error('Partial advance did not issue full bill');
+  if (!await previewModal.locator('[data-preview-credit-note]').isVisible()) throw new Error('Credit note missing from shared popup');
+  await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-advance-invoice.png`);
+  await previewModal.locator('[data-preview-checkout]').click();
+  await page.waitForFunction(() => { const d = document.querySelector('[data-hotel-bill-preview]'); return d && !d.querySelector('[data-preview-confirm]').disabled && Number(d.querySelector('[data-desk-amount]').value) === 2500; });
   const [confirmed] = await Promise.all([
     page.waitForResponse(r => r.url().endsWith(stayPath + '/bill-confirm') && r.request().method() === 'POST'),
     previewModal.locator('[data-preview-confirm]').click(),
   ]);
-  if (!confirmed.ok()) throw new Error('Real bill confirmation failed');
+  if (!confirmed.ok()) throw new Error('Remaining payment checkout failed');
+  const checkoutResult = await confirmed.json();
+  if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
   await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
-  if (billConfirmPosts !== 1) throw new Error('Bill confirmation submitted more than once');
+  if (billConfirmPosts !== 2) throw new Error('Shared dialog posted an unexpected number of actions');
   if (await previewModal.locator('[data-preview-qr]').isVisible()) throw new Error('Unreported local bill advertised a PRA QR');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-confirmed.png`);
   page.off('request', countConfirm);
@@ -399,6 +419,38 @@ async function hotelWorkflow(page, t, v) {
   if (await page.locator('[data-hotel-correction="1"] form').count()) throw new Error('Corrected stay can be reversed twice');
   if (!(await page.locator('[data-hotel-correction="1"]').innerText()).includes('Rs 0.00')) throw new Error('Corrected charges/money did not become zero');
   pass(`${t.name}/${v.width}: actual owner correction preserved source bill and prevented repeated reversal`);
+
+  const stayId = stayPath.split('/').pop();
+  const originalGuest = 'Synthetic Simple Desk ' + room;
+  const editedGuest = 'Synthetic Edited Guest ' + room;
+  await page.goto(baseUrl + '/pos/hotel/guests', {waitUntil:'domcontentloaded'});
+  await dismiss(page);
+  const guestRow = page.locator('tbody tr').filter({hasText:originalGuest});
+  await Promise.all([page.waitForURL(/guests\/\d+\/edit$/), guestRow.locator(`a[href$="/guests/${stayId}/edit"]`).click()]);
+  const guestForm = page.locator(`form[action$="/guests/${stayId}"]`);
+  await guestForm.locator('[name="guest_name"]').fill(editedGuest);
+  await guestForm.locator('[name="guest_phone"]').fill('03110000000');
+  await Promise.all([page.waitForURL(baseUrl + '/pos/hotel/guests'), guestForm.locator('button').click()]);
+  await dismiss(page);
+  if (!await page.locator('tbody tr').filter({hasText:editedGuest}).count()) throw new Error('Guest edit was not reflected in directory');
+  await saveEvidenceScreenshot(page, `hotel-guests-${v.width}-edited.png`);
+  await page.goto(baseUrl + '/pos/hotel/stays/create', {waitUntil:'domcontentloaded'});
+  if (!await page.locator('option').filter({hasText:editedGuest}).count()) throw new Error('Returning guest selector lost edited profile');
+  const accountSection = page.locator('details').filter({has:page.locator('[name="payer_customer_id"]')});
+  if (await accountSection.getAttribute('open') !== null) throw new Error('Corporate payer section must be optional and collapsed');
+  await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
+  if (!(await page.locator('body').innerText()).includes(originalGuest)) throw new Error('Guest edit rewrote historical stay');
+  await page.goto(baseUrl + '/pos/hotel/guests', {waitUntil:'domcontentloaded'});
+  await dismiss(page);
+  const removal = page.locator(`form[action$="/guests/${stayId}"]`);
+  page.once('dialog', dialog => dialog.accept());
+  await Promise.all([page.waitForResponse(r => r.url().endsWith(`/guests/${stayId}`) && r.request().method() === 'POST'), removal.locator('button').click()]);
+  await page.waitForURL(baseUrl + '/pos/hotel/guests');
+  if (await page.locator('tbody tr').filter({hasText:editedGuest}).count()) throw new Error('Deleted directory profile reappeared');
+  await saveEvidenceScreenshot(page, `hotel-guests-${v.width}-removed.png`);
+  await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
+  if (!(await page.locator('body').innerText()).includes(originalGuest)) throw new Error('Guest deletion erased historical stay');
+  pass(`${t.name}/${v.width}: guest edit/removal and returning selector preserve historical stays; account billing stays optional`);
 
 }
 async function hotelCreditReview(page, t, v) {

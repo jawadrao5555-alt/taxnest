@@ -55,6 +55,7 @@ class HotelBillPreviewService
         ];
         $fingerprint = hash('sha256', json_encode($context, JSON_THROW_ON_ERROR));
         return array_merge($quote, [
+            'stay_total' => app(HotelDeskService::class)->summary($stay, $method)['total_stay'],
             'discount' => $discount, 'gross' => round($net + $discount, 2),
             'stay_number' => $stay->stay_number, 'guest_name' => $stay->guest_name, 'room_number' => $stay->room?->room_number,
             'lines' => $lines->map(fn ($r) => ['description' => $r->description, 'amount' => (float) $r->amount])->values()->all(),

@@ -674,6 +674,7 @@
             <td class="tot-value">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</td>
         </tr>
         {{-- Cash Received / Wapsi (owner request, Jul 2026) — mirrors receipt_80mm; keep in sync. --}}
+        @include('pos.hotel._receipt-settlement')
         @if(strtolower((string) $transaction->payment_method) === 'cash' && (float) ($transaction->cash_received ?? 0) > 0 && (float) ($transaction->change_due ?? 0) > 0.001)
         <tr>
             <td class="tot-label">{{ __('pos.receipt_cash') }}:</td>

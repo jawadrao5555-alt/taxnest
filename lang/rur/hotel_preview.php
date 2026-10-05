@@ -26,7 +26,6 @@ return [
     'gross' => 'Discount se pehle charges',
     'discount' => 'Discount',
     'tax' => 'Tax',
-    'total' => 'Bill total',
     'paid' => 'Pehle received',
     'collect_now' => 'Ab receive',
     'remaining' => 'Baqaya balance',
@@ -36,4 +35,8 @@ return [
     'status_pending' => 'PRA pending — acceptance confirm nahi. Status check karein; naya bill na bhejein.',
     'status_offline' => 'PRA waiting / connection issue — acceptance confirm nahi. Saved reporting queue isi bill ko handle karegi.',
     'status_failed' => 'PRA reporting failed — acceptance confirm nahi. Saved bill dekhein; doosra bill na banayein.',
+    'total' => 'Naya bill total',
+    'stay_total' => 'Poray stay ka bill total',
+    'stay_paid' => 'Stay ki received payment',
+    'stay_balance' => 'Stay ka remaining balance',
 ];

@@ -149,7 +149,7 @@ class HotelCreditNoteService
             if ($amount > (float) $credit->total_amount - $already + 0.009 || $amount > $available + 0.009) {
                 throw new HotelStayException('Refund exceeds the remaining guest credit.');
             }
-            $refund = app(HotelFolioService::class)->refundPayment($stay, $amount, (int) $actor->id, $method, $refundKey);
+            $refund = app(HotelFolioService::class)->refundPayment($stay, $amount, (int) $actor->id, $method, $refundKey, $terminalId);
             $refund->update(['pos_transaction_id' => $credit->id, 'refund_business_date' => $date,
                 'refund_branch_id' => $stay->branch_id, 'refund_terminal_id' => $terminalId]);
             AuditLogService::log('hotel_credit_note_refunded', 'hotel_stay', $stay->id, null,

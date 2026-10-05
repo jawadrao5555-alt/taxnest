@@ -12,6 +12,11 @@ PR #159 credit adjustments/refund settlement and the check-in popup correction a
 6. Transactions → New Invoice opens /pos/invoice/create while Hotel Restaurant Outlet is OFF, leading to the sale recovery screen. Use the Hotel check-in entry for this configuration; preserve the sale entry when Outlet is ON and for other categories.
 7. Guests page has no Edit/Delete actions. Implement a guest directory profile separately from stay/fiscal records, so edits and directory deletion preserve original bookings and receipts.
 
+8. Booking screenshot: normal guest booking should be simple; corporate payer belongs in an optional account-billing section, preserving saved customer/payer selections.
+9. Checkout list screenshot: entering checkout from this list should open the same bill dialog. Bill confirmation reports the full charge even with an advance; later checkout collects only remaining money, or no money if fully paid, without another fiscal document.
+10. Return/Credit Note must be reachable from the same bill dialog; sales adjustment and money settlement stay separate.
+11. PRA ON screenshot: reporting permission is not connection proof. Show configured cloud/device route, recent agent heartbeat and the last accepted Hotel fiscal invoice within the active branch. Fiscal number/QR verification proves that invoice's acceptance, not current connectivity.
+
 ## Final implementation scope (pending final-head CI)
 
 One Hotel bill dialog handles check-in review, explicit full-bill confirmation, remaining collection, checkout and receipt printing. New UI bookings stamp actual folio collections/refunds by business date and drawer; full fiscal invoices do not pretend an unpaid balance was received. Legacy stays keep existing accounting behavior. Already-issued bills are reused at checkout without another fiscal document.

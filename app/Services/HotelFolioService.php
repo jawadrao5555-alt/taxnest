@@ -76,6 +76,10 @@ class HotelFolioService
             $fiscalOutstanding = max(0, round($fiscalForOpen - max(0, $available), 2));
         }
 
+        if ($stay->hotel_money_from_folio) {
+            $fiscalOutstanding = app(HotelDeskService::class)->summary($stay, $paymentMethod)['balance'];
+        }
+
         return [
             'charges' => round($charges, 2),
             'payments' => round($payments, 2),

@@ -305,7 +305,7 @@ class HotelGuestHouseV1Test extends TestCase
         $this->actingAs($cashier, 'pos')->getJson(route('pos.transaction.return-form', $bill->id))->assertForbidden();
         $this->getJson(route('pos.return.lookup', ['q' => $bill->invoice_number]))->assertForbidden();
         $localOwner = $this->owner($company);
-        $localOwner->update(['pos_billing_scope' => 'local']);
+        $localOwner->update(['role' => 'company_user', 'pos_role' => 'pos_manager', 'pos_billing_scope' => 'local']);
         $this->actingAs($localOwner, 'pos')->getJson(route('pos.transaction.return-form', $bill->id))->assertForbidden();
         $this->actingAs($owner, 'pos');
         $bill->update(['is_archived' => true]);

@@ -13,4 +13,12 @@ return [
     'sending' => 'Sending to printer…',
     'queued' => 'Print job queued',
     'unavailable' => 'Silent printing unavailable; use Print bill',
+    'invoices' => 'Linked invoices',
+    'stay_total' => 'Stay total (net)',
+    'paid_net' => 'Paid (net refunds)',
+    'local' => 'Local',
+    'accepted' => 'PRA accepted',
+    'not_accepted' => 'PRA not accepted',
+    'credit_tax' => 'Credit tax (invoice rounding)',
+    'line_tax' => 'Original line tax before invoice rounding',
 ];

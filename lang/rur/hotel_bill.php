@@ -13,4 +13,12 @@ return [
     'sending' => 'Printer ko bhej rahe hain…',
     'queued' => 'Print job queue mein hai',
     'unavailable' => 'Silent print available nahi; Print bill use karein',
+    'invoices' => 'Linked invoices',
+    'stay_total' => 'Stay ka net total',
+    'paid_net' => 'Paid (refund minus)',
+    'local' => 'Local',
+    'accepted' => 'PRA accepted',
+    'not_accepted' => 'PRA accept nahi hua',
+    'credit_tax' => 'Credit tax (invoice rounding)',
+    'line_tax' => 'Original line tax, invoice rounding se pehle',
 ];

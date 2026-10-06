@@ -251,6 +251,9 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    @php
+                        $hotelStayLinks = \App\Services\HotelBillDirectory::stayLinks($transactions->getCollection());
+                    @endphp
                     @forelse($transactions as $t)
                     @php
                         $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;
@@ -267,6 +270,9 @@
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                             <a href="{{ route('pos.transaction.show', $t->id) }}" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 hover:underline">{{ $t->invoice_number }}</a>
+                            @if($hotelLink = $hotelStayLinks[$t->id] ?? null)
+                            <a class="block text-xs underline" data-tax-hotel-stay="{{ $t->id }}" href="{{ route('pos.hotel.stays.show', $hotelLink['id']) }}">{{ $hotelLink['number'] }}</a>
+                            @endif
                             @if($rowIsReturn)
                             <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 uppercase">{{ __('pos.credit_note_badge') }}</span>
                             @endif

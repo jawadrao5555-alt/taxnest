@@ -281,6 +281,58 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertDatabaseMissing('hotel_credit_notes', ['stay_id' => $stay->id]);
     }
 
+    public function test_review_header_rounding_and_residual_match_actual_partial_and_full_credit(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture(['pos_tax_rate_cash' => 16]);
+        $item = $bill->items->first();
+        $item->update(['subtotal' => 90, 'tax_amount' => 14.40, 'unit_price' => 50, 'item_discount_amount' => 10]);
+        $bill->update(['subtotal' => 90, 'tax_amount' => 14, 'total_amount' => 104]);
+        HotelFolioEntry::findOrFail($item->hotel_folio_entry_id)->update(['amount' => 90, 'gross_amount' => 100, 'discount_amount' => 10]);
+        $policy = app(HotelCreditNotePolicy::class);
+        $full = $policy->review($stay, $owner, (int) $bill->id);
+        $this->assertEquals(104, $full['estimated_total']);
+        $this->assertEquals(14, $full['estimated_tax']);
+        $this->assertEquals(14.40, $full['lines'][0]['original_tax_share']);
+        $this->actingAs($owner, 'pos')->post('/pos/hotel/stays/'.$stay->id.'/credit-notes/'.$bill->id.'/review', ['mode' => 'full'])
+            ->assertOk()->assertSee('data-credit-header-tax="14"', false)->assertDontSee('name="confirmed"', false);
+        config(['hotel_credit_notes.enabled' => true]);
+        $owner->update(['pra_reporting_enabled' => true]);
+        $service = app(\App\Services\HotelCreditNoteService::class);
+        $selection = [$item->id => 1.0];
+        $first = $policy->review($stay, $owner, (int) $bill->id, $selection);
+        $note = $service->issue($stay, $owner, (int) $bill->id, $selection,
+            'Synthetic rounding first half', 'rounding-credit-first-001', $first['fingerprint']);
+        $credit = PosTransaction::findOrFail($note->credit_transaction_id);
+        $this->assertEquals($first['estimated_total'], $credit->total_amount);
+        $this->assertEquals($first['estimated_tax'], $credit->tax_amount);
+        $credit->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ROUNDING-1']);
+        $last = $policy->review($stay, $owner, (int) $bill->id);
+        $lastNote = $service->issue($stay, $owner, (int) $bill->id, null,
+            'Synthetic rounding remaining half', 'rounding-credit-final-001', $last['fingerprint']);
+        $lastCredit = PosTransaction::findOrFail($lastNote->credit_transaction_id);
+        $this->assertEquals($last['estimated_total'], $lastCredit->total_amount);
+        $this->assertEquals($last['estimated_tax'], $lastCredit->tax_amount);
+        $this->assertEquals(104, $credit->total_amount + $lastCredit->total_amount);
+        $this->assertEquals(14, $credit->tax_amount + $lastCredit->tax_amount);
+        $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
+    }
+
+    public function test_bills_and_tax_report_link_the_same_original_invoice_without_cross_tenant_links(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/folios')->assertOk()
+            ->assertSee('data-hotel-invoice="'.$bill->id.'"', false)->assertSee($bill->invoice_number)
+            ->assertSee(route('pos.transaction.show', $bill->id), false);
+        $this->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
+            ->assertSee('data-tax-hotel-stay="'.$bill->id.'"', false)->assertSee($stay->stay_number);
+        $other = $this->company('hotel');
+        $otherOwner = $this->owner($other);
+        $this->actingAs($otherOwner, 'pos')->get('/pos/hotel/folios')->assertOk()
+            ->assertDontSee('data-hotel-invoice="'.$bill->id.'"', false);
+        $this->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
+            ->assertDontSee('data-tax-hotel-stay="'.$bill->id.'"', false);
+    }
+
     private function acceptedPartialCredit(): array
     {
         [$stay, $owner, $bill] = $this->fixture();

@@ -3,8 +3,9 @@
 <h1 class="text-xl font-bold">{{ __('hotel_credit.review') }} · {{ $plan['original_usin'] }}</h1>
 <p>{{ __('hotel_credit.no_refund') }}</p>
 @foreach($plan['lines'] as $line)
-<p>{{ $line['name'] }} · {{ $line['quantity'] }} · Rs {{ number_format($line['original_subtotal_share'], 2) }} · {{ __('hotel_credit.tax') }} Rs {{ number_format($line['original_tax_share'], 2) }}</p>
+<p>{{ $line['name'] }} · {{ $line['quantity'] }} · Rs {{ number_format($line['original_subtotal_share'], 2) }} · {{ __('hotel_bill.line_tax') }} Rs {{ number_format($line['original_tax_share'], 2) }}</p>
 @endforeach
+<p data-credit-header-tax="{{ $plan['estimated_tax'] }}">{{ __('hotel_bill.credit_tax') }}: Rs {{ number_format($plan['estimated_tax'], 2) }}</p>
 <p class="font-bold">{{ __('hotel_credit.estimate') }}: Rs {{ number_format($plan['estimated_total'], 2) }}</p>
 @if($plan['issuance_enabled'])
 <form method="POST" action="{{ route('pos.hotel.credit-notes.issue', [$stay->id, $plan['bill_id']]) }}" class="space-y-3">
@@ -21,3 +22,4 @@
 <a class="underline" href="{{ route('pos.hotel.credit-notes', $stay->id) }}">{{ __('hotel_correction.back') }}</a>
 </div>
 </x-hotel-layout>
+

@@ -251,7 +251,9 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    @php($hotelStayLinks = \App\Services\HotelBillDirectory::stayLinks($transactions->getCollection()))
+                    @php
+                        $hotelStayLinks = \App\Services\HotelBillDirectory::stayLinks($transactions->getCollection());
+                    @endphp
                     @forelse($transactions as $t)
                     @php
                         $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;

@@ -272,6 +272,14 @@
                             <a href="{{ route('pos.transaction.show', $t->id) }}" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 hover:underline">{{ $t->invoice_number }}</a>
                             @if($hotelLink = $hotelStayLinks[$t->id] ?? null)
                             <a class="block text-xs underline" data-tax-hotel-stay="{{ $t->id }}" href="{{ route('pos.hotel.stays.show', $hotelLink['id']) }}">{{ $hotelLink['number'] }}</a>
+                            @if(auth('pos')->user()?->isPosAdmin()
+                                && in_array($hotelLink['status'], ['checked_in', 'checked_out'], true)
+                                && ($t->transaction_type ?? 'sale') !== 'return'
+                                && $t->invoice_mode !== 'local' && $t->pra_status === 'submitted' && $t->pra_invoice_number
+                                && \App\Services\PosReturnService::returnableReason($t, true) === null)
+                            <a class="inline-flex mt-1 rounded border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300"
+                               data-tax-credit-note="{{ $t->id }}" href="{{ route('pos.hotel.credit-notes', $hotelLink['id']) }}#bill-{{ $t->id }}">{{ __('hotel_credit.entry') }}</a>
+                            @endif
                             @endif
                             @if($rowIsReturn)
                             <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 uppercase">{{ __('pos.credit_note_badge') }}</span>

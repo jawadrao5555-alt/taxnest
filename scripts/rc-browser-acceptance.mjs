@@ -487,6 +487,15 @@ async function hotelWorkflow(page, t, v) {
 }
 async function hotelCreditReview(page, t, v) {
   const path = t.hotelCreditReview.path;
+  await page.goto(baseUrl + '/pos/tax-reports?period=all&tab=pra', {waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const shortcut = page.locator('a[data-tax-credit-note]').first();
+  await shortcut.waitFor({state:'visible'});
+  await Promise.all([page.waitForURL(/\/credit-notes#bill-\d+$/), shortcut.click()]);
+  if (new URL(page.url()).pathname !== path) throw new Error('Tax Reports credit shortcut opened a different stay');
+  await page.locator('[data-hotel-credit-notes="1"]').waitFor({state:'visible'});
+  await saveEvidenceScreenshot(page, `tax-report-credit-shortcut-${v.width}.png`);
+  pass(`${t.name}/${v.width}: Tax Reports opens original Hotel credit review directly`);
   for (const mode of ['full', 'partial']) {
     await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
     await waitForOperationalSurface(page); await dismiss(page);

@@ -12,7 +12,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Reviewed 6 Oct 2026: source-map-js 1.2.2 and root selector-parser 7.1.6\n// address GHSA-68fv-2mgg-jv7q / GHSA-rj75-hqrm-r3gf. All other\n// graph entries, local-fork hashes and registry/integrity checks stay pinned.\nconst LOCKS = [
+// Reviewed 6 Oct 2026: source-map-js 1.2.2 and root selector-parser 7.1.6
+// address GHSA-68fv-2mgg-jv7q / GHSA-rj75-hqrm-r3gf. All other
+// graph entries, local-fork hashes and registry/integrity checks stay pinned.
+const LOCKS = [
   {
     lock: 'package-lock.json',
     packages: 249,

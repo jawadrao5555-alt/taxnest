@@ -48,7 +48,11 @@ class HotelCreditNotePolicy
                 $selected[(int) $id] = (float) $value;
             }
         }
+        $prior = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+            ->where('parent_transaction_id', $bill->id)->where('transaction_type', 'return')->get();
+        $previousItems = \App\Models\PosTransactionItem::whereIn('transaction_id', $prior->pluck('id'))->get();
         $lines = [];
+        $exemptSum = 0.0;
         $full = true;
         foreach ($bill->items as $item) {
             $remaining = round((float) $item->quantity - (float) $item->returned_quantity, 3);
@@ -63,12 +67,20 @@ class HotelCreditNotePolicy
                 continue;
             }
             $ratio = $qty / max((float) $item->quantity, 0.001);
+            $previous = $previousItems->where('parent_item_id', $item->id);
+            $shares = [];
+            foreach (['subtotal', 'tax_amount', 'item_discount_amount'] as $column) {
+                $residual = max(0, round((float) $item->$column - (float) $previous->sum($column), 2));
+                $shares[$column] = abs($qty - $remaining) < 0.0000001
+                    ? $residual : min(round((float) $item->$column * $ratio, 2), $residual);
+            }
+            if ($item->is_tax_exempt) $exemptSum += $shares['subtotal'];
             $lines[] = [
                 'item_id' => (int) $item->id, 'name' => $item->item_name, 'quantity' => $qty,
                 'remaining_quantity' => $remaining, 'original_tax_rate' => (float) $item->tax_rate,
-                'original_subtotal_share' => round((float) $item->subtotal * $ratio, 2),
-                'original_tax_share' => round((float) $item->tax_amount * $ratio, 2),
-                'original_item_discount_share' => round((float) $item->item_discount_amount * $ratio, 2),
+                'original_subtotal_share' => $shares['subtotal'],
+                'original_tax_share' => $shares['tax_amount'],
+                'original_item_discount_share' => $shares['item_discount_amount'],
             ];
         }
         if ($lines === []) {
@@ -79,21 +91,29 @@ class HotelCreditNotePolicy
             && $bill->items->pluck('hotel_folio_entry_id')->unique()->count() === $bill->items->count()
             && $charges->count() === $bill->items->count();
         $lineTotal = array_sum(array_column($lines, 'original_subtotal_share'));
-        $estimate = round($lineTotal + ($bill->tax_inclusive ? 0 : array_sum(array_column($lines, 'original_tax_share'))));
+        $taxSum = array_sum(array_column($lines, 'original_tax_share'));
+        $estimatedTax = $bill->tax_inclusive ? round($taxSum, 2) : round($taxSum);
+        $estimate = round($lineTotal + ($bill->tax_inclusive ? 0 : $taxSum));
         if ($bill->tax_inclusive && (float) $bill->tax_menu_rate > 0) {
-            $estimate = PosTaxMath::inclusiveHeader($lineTotal, $lineTotal, 0,
+            $estimate = PosTaxMath::inclusiveHeader($lineTotal, $lineTotal - $exemptSum, 0,
                 (float) $bill->tax_rate, (float) $bill->tax_menu_rate)['total_amount'];
         }
+        $remainingTotal = max(0, round((float) $bill->total_amount - (float) $prior->sum('total_amount'), 2));
+        $remainingTax = max(0, round((float) $bill->tax_amount - (float) $prior->sum('tax_amount'), 2));
+        // Match issuance: the final quantities consume the original header residual.
+        $estimate = $full ? $remainingTotal : min($estimate, $remainingTotal);
+        $estimatedTax = $full ? $remainingTax : min($estimatedTax, $remainingTax);
         return [
             'fingerprint' => hash('sha256', json_encode([$bill->getAttributes(), $bill->items->toArray(), $charges->toArray(), $lines], JSON_THROW_ON_ERROR)),
             'folio_mapping_complete' => $mappingComplete,
             'kind' => $full ? 'full_remaining' : 'partial', 'bill_id' => (int) $bill->id,
             'original_usin' => $bill->invoice_number, 'original_fiscal_number' => $bill->pra_invoice_number,
             'lines' => $lines, 'tax_inclusive' => (bool) $bill->tax_inclusive,
-            'estimated_total' => $estimate,
+            'estimated_total' => $estimate, 'estimated_tax' => $estimatedTax,
             'original_bill_discount' => (float) $bill->discount_amount,
             // Shares are inputs for reconciliation, not an authorized credit total or refund.
             'issuance_enabled' => (bool) config('hotel_credit_notes.enabled', false) && $mappingComplete && (float) $bill->discount_amount === 0.0, 'refund_amount' => null, 'stay_action' => 'unchanged',
         ];
     }
 }
+

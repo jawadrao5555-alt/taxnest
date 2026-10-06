@@ -403,6 +403,17 @@ async function hotelWorkflow(page, t, v) {
   await saveEvidenceScreenshot(returnPage, `hotel-return-entry-${v.width}.png`);
   await returnPage.close();
   pass(`${t.name}/${v.width}: transactions Return opens the original Hotel bill credit-review screen`);
+  const billsPage = await page.context().newPage();
+  await billsPage.goto(baseUrl + '/pos/hotel/folios', {waitUntil:'domcontentloaded'});
+  await dismiss(billsPage);
+  const invoiceEntry = billsPage.locator(`[data-hotel-invoice="${firstBill.bill_id}"]`);
+  await invoiceEntry.waitFor({state:'visible'});
+  if (!(await invoiceEntry.innerText()).includes(firstBill.invoice_number)) throw new Error('Hotel Bills lost the original invoice number');
+  await invoiceEntry.locator('a').first().click();
+  await billsPage.waitForURL(baseUrl + '/pos/transaction/' + firstBill.bill_id);
+  await saveEvidenceScreenshot(billsPage, `hotel-bills-original-${v.width}.png`);
+  await billsPage.close();
+  pass(`${t.name}/${v.width}: Hotel Bills links the same original invoice as Transactions`);
 
   await previewModal.locator('[data-preview-checkout]').click();
   await page.waitForFunction(() => { const d = document.querySelector('[data-hotel-bill-preview]'); return d && !d.querySelector('[data-preview-confirm]').disabled && Number(d.querySelector('[data-desk-amount]').value) === 2500; });
@@ -490,6 +501,7 @@ async function hotelCreditReview(page, t, v) {
     await review.waitFor({state:'visible'});
     if (await review.locator('form').count()) throw new Error('Unverified credit issuance became actionable');
     if (!await review.locator('[role="alert"]').count()) throw new Error('Verification gate missing from credit review');
+    await review.locator('[data-credit-header-tax]').waitFor({state:'visible'});
     if (!(await review.innerText()).includes(mode === 'full' ? '2,000.00' : '1,000.00')) throw new Error('Original quantity review total is wrong');
     await saveEvidenceScreenshot(page, `hotel-credit-${mode}-${v.width}.png`);
   }

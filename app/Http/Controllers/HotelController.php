@@ -927,7 +927,11 @@ class HotelController extends Controller
             ->orderByDesc('id')
             ->paginate(30)->withQueryString();
         $dues = [];
-        foreach ($stays as $stay) $dues[$stay->id] = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance'];
+        $money = [];
+        foreach ($stays as $stay) {
+            $money[$stay->id] = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
+            $dues[$stay->id] = $money[$stay->id]['balance'];
+        }
 
         $ids = $stays->getCollection()->flatMap(fn ($stay) => $stay->folioEntries->pluck('pos_transaction_id'))->filter()->unique();
         $bills = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)->whereIn('id', $ids)->get()->keyBy('id');
@@ -937,7 +941,9 @@ class HotelController extends Controller
             $documents = $linked->map(fn ($id) => $bills->get($id))->filter();
             $fiscalLocked[$stay->id] = $documents->count() !== $linked->count() || \App\Services\HotelCorrectionService::fiscalLocked($documents);
         }
-        return view('pos.hotel.folios', compact('stays', 'dues', 'fiscalLocked'));
+        $viewer = auth('pos')->user();
+        $visibleBills = $bills->filter(fn ($bill) => $bill->allowedForBillingScopeOf($viewer) && $bill->allowedForCashierIsolationOf($viewer));
+        return view('pos.hotel.folios', compact('stays', 'dues', 'money', 'visibleBills', 'fiscalLocked'));
     }
 
     public function reports()

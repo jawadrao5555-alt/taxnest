@@ -333,6 +333,27 @@ class HotelCreditNotePolicyTest extends TestCase
             ->assertDontSee('data-tax-hotel-stay="'.$bill->id.'"', false);
     }
 
+    public function test_tax_report_credit_shortcut_opens_original_review_and_excludes_local_and_return_rows(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        $shortcut = 'data-tax-credit-note="'.$bill->id.'"';
+        $this->actingAs($owner, 'pos')->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
+            ->assertSee($shortcut, false)
+            ->assertSee(route('pos.hotel.credit-notes', $stay->id).'#bill-'.$bill->id, false);
+        $this->get(route('pos.hotel.credit-notes', $stay->id))->assertOk()
+            ->assertSee('bill-'.$bill->id, false);
+        $bill->update(['invoice_mode' => 'local', 'pra_status' => 'local', 'pra_invoice_number' => null]);
+        $this->get('/pos/tax-reports?period=all&tab=local')->assertOk()
+            ->assertDontSee($shortcut, false);
+        $bill->update(['invoice_mode' => 'pra', 'pra_status' => 'submitted',
+            'pra_invoice_number' => 'SYNTHETIC-CREDIT-ROW', 'transaction_type' => 'return']);
+        $this->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
+            ->assertDontSee($shortcut, false);
+        $other = $this->company('hotel');
+        $this->actingAs($this->owner($other), 'pos')->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
+            ->assertDontSee($shortcut, false);
+    }
+
     private function acceptedPartialCredit(): array
     {
         [$stay, $owner, $bill] = $this->fixture();

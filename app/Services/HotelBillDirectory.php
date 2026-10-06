@@ -25,7 +25,7 @@ class HotelBillDirectory
         foreach ($rows->groupBy('pos_transaction_id') as $id => $entries) {
             $ids = $entries->pluck('stay_id')->unique();
             if ($ids->count() === 1 && ($stay = $stays->get($ids->first()))) {
-                $links[$id] = ['id' => $stay->id, 'number' => $stay->stay_number];
+                $links[$id] = ['id' => $stay->id, 'number' => $stay->stay_number, 'status' => $stay->status];
             }
         }
         return $links;

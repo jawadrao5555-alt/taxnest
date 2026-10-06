@@ -12,12 +12,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const LOCKS = [
+// Reviewed 6 Oct 2026: source-map-js 1.2.2 and root selector-parser 7.1.6\n// address GHSA-68fv-2mgg-jv7q / GHSA-rj75-hqrm-r3gf. All other\n// graph entries, local-fork hashes and registry/integrity checks stay pinned.\nconst LOCKS = [
   {
     lock: 'package-lock.json',
     packages: 249,
     resolved: 242,
-    graph: 'b6360658696269329155038cf0357422e2dd3b9b056275ec82f0369c844d1e8f',
+    graph: 'd34adad2936199c63faac1e9defe7a56f428afda8bad66b9e5d3d215fd0e8f8b',
   },
   {
     lock: 'agent-realtime-gateway/package-lock.json',
@@ -29,7 +29,7 @@ const LOCKS = [
     lock: 'artifacts/mockup-sandbox/package-lock.json',
     packages: 318,
     resolved: 311,
-    graph: '06d2b71f4cc180a879e77e041310051758d61914cadad77b91b2db7cd9bb944b',
+    graph: '59d62e514361d57322d1c6a6462886b584933ce55728755ccfeb6ffb0e72e56f',
   },
   {
     lock: 'pra-agent/package-lock.json',

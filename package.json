@@ -28,6 +28,7 @@
     "chart.js": "^4.5.1"
   },
   "overrides": {
-    "braces": "$braces"
+    "braces": "$braces",
+    "postcss-selector-parser": "7.1.6"
   }
 }

@@ -491,6 +491,17 @@ async function hotelCreditReview(page, t, v) {
   await waitForOperationalSurface(page); await dismiss(page);
   const shortcut = page.locator('a[data-tax-credit-note]').first();
   await shortcut.waitFor({state:'visible'});
+  const scroll = page.locator('[data-tax-report-scroll="1"]');
+  for (const right of [false, true]) {
+    await scroll.evaluate(async (el, right) => {
+      el.scrollLeft = right ? el.scrollWidth : 0;
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }, right);
+    const bounds = await scroll.boundingBox(), button = await shortcut.boundingBox();
+    if (!bounds || !button || button.x < bounds.x - 1 || button.x + button.width > bounds.x + bounds.width + 1)
+      throw new Error('Credit Note action escaped the visible scrolled table');
+    await saveEvidenceScreenshot(page, `tax-credit-sticky-${right ? 'right' : 'left'}-${v.width}.png`);
+  }
   await Promise.all([page.waitForURL(/\/credit-notes#bill-\d+$/), shortcut.click()]);
   if (new URL(page.url()).pathname !== path) throw new Error('Tax Reports credit shortcut opened a different stay');
   await page.locator('[data-hotel-credit-notes="1"]').waitFor({state:'visible'});

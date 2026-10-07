@@ -112,7 +112,7 @@ class HotelCreditNotePolicyTest extends TestCase
     public function test_partial_credit_is_idempotent_and_refund_is_a_separate_accepted_action(): void
     {
         [$stay, $owner, $bill] = $this->fixture();
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $item = $bill->items->first();
         $selection = [$item->id => (float) $item->quantity / 2];
@@ -170,7 +170,7 @@ class HotelCreditNotePolicyTest extends TestCase
     public function test_full_credit_preserves_original_bill_and_never_cancels_the_stay(): void
     {
         [$stay, $owner, $bill] = $this->fixture();
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $before = $bill->getAttributes();
         $policy = app(HotelCreditNotePolicy::class);
@@ -191,7 +191,7 @@ class HotelCreditNotePolicyTest extends TestCase
     public function test_changed_preview_cannot_issue_and_leaves_no_return(): void
     {
         [$stay, $owner, $bill] = $this->fixture();
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id);
         $bill->update(['notes' => 'Changed after review']);
@@ -208,7 +208,7 @@ class HotelCreditNotePolicyTest extends TestCase
     public function test_credit_payload_references_original_and_keeps_original_tax_snapshot(): void
     {
         [$stay, $owner, $bill] = $this->fixture(['pos_tax_rate_cash' => 16]);
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $company = Company::findOrFail($stay->company_id);
         $company->update(['pos_tax_rate_cash' => 20]);
@@ -233,7 +233,7 @@ class HotelCreditNotePolicyTest extends TestCase
     {
         [$stay, $owner, $bill] = $this->fixture(['pos_tax_pricing_mode' => 'inclusive_card_save',
             'pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 8], 'card');
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $item = $bill->items->first();
         $selection = [$item->id => 1.0];
@@ -254,7 +254,7 @@ class HotelCreditNotePolicyTest extends TestCase
     public function test_item_discount_credit_payload_uses_original_net_line(): void
     {
         [$stay, $owner, $bill] = $this->fixture();
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $item = $bill->items->first();
         $item->update(['subtotal' => 1750, 'item_discount_amount' => 250]);
@@ -295,7 +295,7 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertEquals(14.40, $full['lines'][0]['original_tax_share']);
         $this->actingAs($owner, 'pos')->post('/pos/hotel/stays/'.$stay->id.'/credit-notes/'.$bill->id.'/review', ['mode' => 'full'])
             ->assertOk()->assertSee('data-credit-header-tax="14"', false)->assertDontSee('name="confirmed"', false);
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $service = app(\App\Services\HotelCreditNoteService::class);
         $selection = [$item->id => 1.0];
@@ -359,7 +359,7 @@ class HotelCreditNotePolicyTest extends TestCase
     private function acceptedPartialCredit(): array
     {
         [$stay, $owner, $bill] = $this->fixture();
-        config(['hotel_credit_notes.enabled' => true]);
+        $this->enableFor($stay);
         $owner->update(['pra_reporting_enabled' => true]);
         $selection = [$bill->items->first()->id => 1.0];
         $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id, $selection);
@@ -438,6 +438,98 @@ class HotelCreditNotePolicyTest extends TestCase
             $this->assertEquals(500, app(HotelFolioService::class)->totals($stay)['refunds']);
         }
         $this->travelBack();
+    }
+
+
+    private function enableFor(HotelStay $stay): void
+    {
+        config(['hotel_credit_notes.enabled' => true]);
+        $company = Company::findOrFail($stay->company_id);
+        $company->update(['feature_flags' => array_merge($company->feature_flags ?? [], [
+            'hotel_credit_issuance' => true, 'hotel_credit_refunds' => true,
+        ])]);
+    }
+
+    public function test_owner_activation_preserves_settings_is_scoped_and_requires_confirmation(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        $company = Company::findOrFail($stay->company_id);
+        $company->update(['feature_flags' => array_merge($company->feature_flags ?? [], ['saved_custom_setting' => 'keep'])]);
+        $url = route('pos.hotel.credit-notes.activation', $stay->id);
+        $this->actingAs($owner, 'pos')->post($url, ['issuance' => 1, 'refunds' => 0])->assertSessionHasErrors('confirmed');
+        $this->assertFalse(\App\Services\HotelCreditNoteActivation::issuance((int) $company->id));
+        $this->post($url, ['issuance' => 1, 'refunds' => 0, 'confirmed' => 1])->assertRedirect();
+        $this->assertTrue(\App\Services\HotelCreditNoteActivation::issuance((int) $company->id));
+        $this->assertFalse(\App\Services\HotelCreditNoteActivation::refunds((int) $company->id));
+        $this->assertSame('keep', $company->fresh()->feature_flags['saved_custom_setting']);
+        $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
+        $this->post(route('pos.hotel.credit-notes.review', [$stay->id, $bill->id]), ['mode' => 'full'])
+            ->assertOk()->assertSee('name="confirmed"', false)->assertSee(__('hotel_credit.issue'));
+        $other = $this->company('hotel');
+        $this->assertFalse(\App\Services\HotelCreditNoteActivation::issuance((int) $other->id));
+        $this->actingAs($this->owner($other), 'pos')->post($url, ['issuance' => 0, 'refunds' => 1, 'confirmed' => 1])->assertNotFound();
+        $this->assertTrue(\App\Services\HotelCreditNoteActivation::issuance((int) $company->id));
+        $owner->update(['role' => 'company_user', 'pos_role' => 'pos_cashier']);
+        $this->actingAs($owner, 'pos')->post($url, ['issuance' => 0, 'refunds' => 1, 'confirmed' => 1])->assertForbidden();
+    }
+
+    public function test_platform_switch_blocks_activation_and_writes_even_after_owner_opt_in(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        $this->enableFor($stay);
+        config(['hotel_credit_notes.enabled' => false]);
+        $this->assertFalse(\App\Services\HotelCreditNoteActivation::issuance((int) $stay->company_id));
+        $this->assertFalse(\App\Services\HotelCreditNoteActivation::refunds((int) $stay->company_id));
+        $this->actingAs($owner, 'pos')->post(route('pos.hotel.credit-notes.activation', $stay->id),
+            ['issuance' => 1, 'refunds' => 1, 'confirmed' => 1])->assertStatus(422);
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id);
+        $this->assertFalse($plan['issuance_enabled']);
+        try {
+            app(\App\Services\HotelCreditNoteService::class)->issue($stay, $owner, (int) $bill->id, null,
+                'Synthetic disabled capability', 'platform-disabled-credit-001', $plan['fingerprint']);
+            $this->fail('Platform switch must block writes.');
+        } catch (HotelStayException $e) {
+            $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
+        }
+    }
+
+    public function test_http_issue_is_idempotent_and_does_not_refund_or_cancel(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture(['pos_tax_rate_cash' => 16]);
+        $this->enableFor($stay);
+        $owner->update(['pra_reporting_enabled' => true]);
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id);
+        $data = ['mode' => 'full', 'reason' => 'Synthetic owner verified adjustment',
+            'request_key' => 'http-owner-credit-001', 'fingerprint' => $plan['fingerprint'], 'confirmed' => 1];
+        $url = route('pos.hotel.credit-notes.issue', [$stay->id, $bill->id]);
+        $this->actingAs($owner, 'pos')->post($url, $data)->assertRedirect()->assertSessionHas('success');
+        $this->post($url, $data)->assertRedirect()->assertSessionHas('success');
+        $this->assertEquals(1, \App\Models\HotelCreditNote::where('stay_id', $stay->id)->count());
+        $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
+        $this->assertSame('checked_in', $stay->fresh()->status);
+        $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
+    }
+
+    public function test_refund_switch_is_independent_and_requires_accepted_credit(): void
+    {
+        [$stay, $owner, $bill, $note, $credit, $service] = $this->acceptedPartialCredit();
+        $company = Company::findOrFail($stay->company_id);
+        $company->update(['feature_flags' => array_merge($company->feature_flags ?? [], ['hotel_credit_refunds' => false])]);
+        $this->actingAs($owner, 'pos')->get(route('pos.hotel.credit-notes', $stay->id))->assertOk()
+            ->assertDontSee('action="'.route('pos.hotel.credit-notes.refund', [$stay->id, $note->id]).'"', false);
+        try {
+            $service->refund($stay, $owner, (int) $note->id, 100, 'cash', 'disabled-refund-001');
+            $this->fail('Refund opt-in is required.');
+        } catch (HotelStayException $e) {
+            $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
+        }
+        $company->update(['feature_flags' => array_merge($company->fresh()->feature_flags, [
+            'hotel_credit_issuance' => false, 'hotel_credit_refunds' => true,
+        ])]);
+        $this->assertFalse(\App\Services\HotelCreditNoteActivation::issuance((int) $company->id));
+        $refund = $service->refund($stay, $owner, (int) $note->id, 100, 'cash', 'enabled-refund-001');
+        $this->assertEquals(100, $refund->amount);
+        $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
     }
 
     private function company(string $category, array $overrides = []): Company

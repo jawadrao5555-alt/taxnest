@@ -526,6 +526,38 @@ async function hotelCreditReview(page, t, v) {
     await saveEvidenceScreenshot(page, `hotel-credit-${mode}-${v.width}.png`);
   }
   pass(`${t.name}/${v.width}: original full/partial review and default fiscal gate passed`);
+  await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const activation = page.locator('[data-credit-activation="1"]');
+  await activation.locator('[name="issuance"]').selectOption('1');
+  await activation.locator('[name="refunds"]').selectOption('0');
+  await activation.locator('[name="confirmed"]').check();
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), activation.locator('button').click()]);
+  for (const mode of ['full', 'partial']) {
+    await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    const form = page.locator('form[action$="/review"]').first();
+    await form.locator('[name="mode"]').selectOption(mode);
+    if (mode === 'partial') await form.locator('input[type="number"]').first().fill('1');
+    await Promise.all([page.waitForURL(/\/credit-notes\/\d+\/review$/), form.locator('button').click()]);
+    const issue = page.locator('[data-hotel-credit-review="1"] form[action$="/issue"]');
+    await issue.waitFor({state:'visible'});
+    await issue.locator('[name="reason"]').fill('Synthetic original bill adjustment');
+    await issue.locator('[name="confirmed"]').check();
+    await saveEvidenceScreenshot(page, `hotel-credit-enabled-${mode}-${v.width}.png`);
+  }
+  // No fiscal API calls: backend regressions exercise posting with synthetic acceptance.
+  // Restore this fixture so the next viewport must also prove default-OFF behavior.
+  await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  await activation.locator('[name="issuance"]').selectOption('0');
+  await activation.locator('[name="refunds"]').selectOption('0');
+  await activation.locator('[name="confirmed"]').check();
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), activation.locator('button').click()]);
+  await activation.locator('[name="issuance"] option:checked').waitFor();
+  if (await activation.locator('[name="issuance"]').inputValue() !== '0') throw new Error('Owner deactivation did not persist');
+  pass(`${t.name}/${v.width}: scoped owner activation opens full/partial issuance and deactivation persists`);
+
 }
 
 async function notificationWorkflow(page, t, v, diagnostics) {

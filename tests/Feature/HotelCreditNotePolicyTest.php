@@ -527,8 +527,12 @@ class HotelCreditNotePolicyTest extends TestCase
             'hotel_credit_issuance' => false, 'hotel_credit_refunds' => true,
         ])]);
         $this->assertFalse(\App\Services\HotelCreditNoteActivation::issuance((int) $company->id));
-        $refund = $service->refund($stay, $owner, (int) $note->id, 100, 'cash', 'enabled-refund-001');
-        $this->assertEquals(100, $refund->amount);
+        $url = route('pos.hotel.credit-notes.refund', [$stay->id, $note->id]);
+        $this->get(route('pos.hotel.credit-notes', $stay->id))->assertOk()->assertSee('action="'.$url.'"', false);
+        $data = ['amount' => 100, 'method' => 'cash', 'request_key' => 'enabled-refund-001', 'confirmed' => 1];
+        $this->post($url, $data)->assertRedirect()->assertSessionHas('success');
+        $this->post($url, $data)->assertRedirect()->assertSessionHas('success');
+        $this->assertEquals(100, app(HotelFolioService::class)->totals($stay)['refunds']);
         $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
     }
 

@@ -546,6 +546,19 @@ async function hotelCreditReview(page, t, v) {
     await issue.locator('[name="confirmed"]').check();
     await saveEvidenceScreenshot(page, `hotel-credit-enabled-${mode}-${v.width}.png`);
   }
+  await page.goto(baseUrl + t.hotelCreditReview.refundPath, {waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  if (await page.locator('form[action$="/refund"]').count()) throw new Error('Refund appeared before its separate opt-in');
+  await activation.locator('[name="issuance"]').selectOption('0');
+  await activation.locator('[name="refunds"]').selectOption('1');
+  await activation.locator('[name="confirmed"]').check();
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), activation.locator('button').click()]);
+  const refund = page.locator('form[action$="/refund"]').first();
+  await refund.waitFor({state:'visible'});
+  await refund.locator('[name="amount"]').fill('100');
+  await refund.locator('[name="method"]').selectOption('card');
+  await refund.locator('[name="confirmed"]').check();
+  await saveEvidenceScreenshot(page, `hotel-credit-enabled-refund-${v.width}.png`);
   // No fiscal API calls: backend regressions exercise posting with synthetic acceptance.
   // Restore this fixture so the next viewport must also prove default-OFF behavior.
   await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});

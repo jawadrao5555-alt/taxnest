@@ -489,7 +489,7 @@ async function hotelCreditReview(page, t, v) {
   const path = t.hotelCreditReview.path;
   await page.goto(baseUrl + '/pos/tax-reports?period=all&tab=pra', {waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
-  const shortcut = page.locator('a[data-tax-credit-note]').first();
+  const shortcut = page.locator(`a[data-tax-credit-note="${t.hotelCreditReview.billId}"]`);
   await shortcut.waitFor({state:'visible'});
   const scroll = page.locator('[data-tax-report-scroll="1"]');
   for (const right of [false, true]) {

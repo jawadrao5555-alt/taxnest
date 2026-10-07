@@ -16,8 +16,8 @@ class HotelCreditNoteService
     public function issue(HotelStay $stay, User $actor, int $billId, ?array $quantities, string $reason, string $key, string $fingerprint): HotelCreditNote
     {
         abort_unless((int) $actor->company_id === (int) $stay->company_id && $actor->isPosAdmin(), 403);
-        if (!config('hotel_credit_notes.enabled', false)) {
-            throw new HotelStayException('Hotel fiscal credit-note issuance is awaiting verification.');
+        if (!HotelCreditNoteActivation::issuance((int) $stay->company_id)) {
+            throw new HotelStayException('Enable credit-note issuance for this company first.');
         }
         if (mb_strlen(trim($reason)) < 5 || mb_strlen($reason) > 255 || !preg_match('/^[a-zA-Z0-9-]{16,64}$/', $key)) {
             throw new HotelStayException('A reason and valid unique request key are required.');
@@ -109,8 +109,8 @@ class HotelCreditNoteService
     public function refund(HotelStay $stay, User $actor, int $noteId, float $amount, string $method, string $key, int $terminalId = 0): HotelFolioEntry
     {
         abort_unless((int) $actor->company_id === (int) $stay->company_id && $actor->isPosAdmin(), 403);
-        if (!config('hotel_credit_notes.enabled', false)) {
-            throw new HotelStayException('Hotel credit-note refunds are awaiting verification.');
+        if (!HotelCreditNoteActivation::refunds((int) $stay->company_id)) {
+            throw new HotelStayException('Enable money refunds for this company first.');
         }
         abort_unless(abs($amount - round($amount, 2)) < 0.0000001 && in_array($method, ['cash', 'card'], true) && is_finite($amount) && $amount > 0
             && preg_match('/^[a-zA-Z0-9-]{16,64}$/', $key), 422);

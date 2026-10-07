@@ -18,7 +18,7 @@ class HotelCreditNoteController extends Controller
     private function stay(int $id): HotelStay
     {
         HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
-        $query = HotelStay::where('company_id', (int) app('currentCompanyId'));
+        $query = HotelStay::where('company_id', (int) auth('pos')->user()->company_id);
         $branch = app(BranchContextService::class)->getActiveBranchId();
         if ($branch) {
             $query->where('branch_id', $branch);
@@ -38,6 +38,32 @@ class HotelCreditNoteController extends Controller
             ->whereIn('id', $notes->pluck('credit_transaction_id'))->get()->keyBy('id');
         $terminals = \App\Models\PosTerminal::where('company_id', $stay->company_id)->where('is_active', true)->get();
         return view('pos.hotel.credit-notes', compact('stay', 'bills', 'notes', 'credits', 'terminals'));
+    }
+
+    public function activation(Request $request, int $id)
+    {
+        $stay = $this->stay($id);
+        $data = $request->validate([
+            'issuance' => 'required|boolean', 'refunds' => 'required|boolean',
+            'confirmed' => 'accepted',
+        ]);
+        abort_unless(config('hotel_credit_notes.enabled', false), 422);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($stay, $data) {
+            $company = \App\Models\Company::whereKey($stay->company_id)->lockForUpdate()->firstOrFail();
+            $flags = $company->feature_flags ?? [];
+            $before = [
+                'hotel_credit_issuance' => $flags['hotel_credit_issuance'] ?? false,
+                'hotel_credit_refunds' => $flags['hotel_credit_refunds'] ?? false,
+            ];
+            $after = [
+                'hotel_credit_issuance' => (bool) $data['issuance'],
+                'hotel_credit_refunds' => (bool) $data['refunds'],
+            ];
+            $company->update(['feature_flags' => array_merge($flags, $after)]);
+            \App\Services\AuditLogService::log('hotel_credit_activation_changed', 'company', $company->id,
+                $before, $after, (int) $company->id, (int) auth('pos')->id());
+        });
+        return redirect()->route('pos.hotel.credit-notes', $stay->id)->with('success', __('hotel_credit.activation_saved'));
     }
 
     private function selection(Request $request): ?array

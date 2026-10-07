@@ -1,6 +1,6 @@
 <?php
 
 return [
-    // Keep issuance closed until Hotel-specific sandbox and reconciliation evidence exists.
-    'enabled' => false,
+    // Platform kill switch. Each company must separately opt in through its Hotel owner screen.
+    'enabled' => env('HOTEL_CREDIT_NOTES_ENABLED', true),
 ];

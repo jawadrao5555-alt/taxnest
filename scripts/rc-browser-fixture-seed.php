@@ -348,6 +348,35 @@ $creditFolio->postPayment($creditStay, ['amount' => 2000, 'payment_method' => 'c
 $creditBill = $creditFolio->settleCoveredCharges($creditStay, (int) $creditOwner->id, 'cash')['transaction'];
 $creditBill->update(['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-CREDIT-ORIGINAL']);
 
+// Separate, explicitly synthetic accepted credit for refund form rendering only.
+// No API call is made and no real acceptance is represented by this fixture.
+$refundRoom = $creditStays->createRoom((int) $creditCompany->id, [
+    'room_number' => 'CREDIT-REFUND', 'room_type' => 'Standard', 'capacity' => 2,
+    'rate_amount' => 1000, 'rate_unit' => 'NGT', 'branch_id' => null,
+]);
+$refundStay = $creditStays->book((int) $creditCompany->id, (int) $creditOwner->id, [
+    'room_id' => $refundRoom->id, 'check_in_date' => $now->toDateString(),
+    'check_out_date' => $now->copy()->addDays(2)->toDateString(),
+    'guest_name' => 'Synthetic accepted credit guest', 'walk_in' => true,
+]);
+$creditFolio->postPayment($refundStay, ['amount' => 2000, 'payment_method' => 'cash'], (int) $creditOwner->id);
+$refundOriginal = $creditFolio->settleCoveredCharges($refundStay, (int) $creditOwner->id, 'cash')['transaction'];
+$refundOriginal->update(['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-REFUND-ORIGINAL']);
+$acceptedCredit = $refundOriginal->replicate();
+$acceptedCredit->fill([
+    'invoice_number' => 'SYNTHETIC-ACCEPTED-CREDIT', 'parent_transaction_id' => $refundOriginal->id,
+    'transaction_type' => 'return', 'total_amount' => 1000, 'subtotal' => 1000,
+    'payment_method' => 'hotel_credit_note', 'cash_received' => 0, 'change_due' => 0,
+    'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ACCEPTED-CREDIT-FISCAL',
+]);
+$acceptedCredit->save();
+\App\Models\HotelCreditNote::create([
+    'company_id' => $creditCompany->id, 'stay_id' => $refundStay->id,
+    'original_transaction_id' => $refundOriginal->id, 'credit_transaction_id' => $acceptedCredit->id,
+    'created_by' => $creditOwner->id, 'request_key' => 'synthetic-browser-refund-001',
+    'reason' => 'Synthetic accepted-credit form fixture', 'selection' => null,
+]);
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -373,7 +402,8 @@ $fixture = [
     'transactionalJourneys' => [
         ['name' => 'hotel-credit-review', 'login' => $creditOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/hotel/stays/'.$creditStay->id.'/credit-notes'],
-            'hotelCreditReview' => ['path' => '/pos/hotel/stays/'.$creditStay->id.'/credit-notes']],
+            'hotelCreditReview' => ['billId' => $creditBill->id, 'path' => '/pos/hotel/stays/'.$creditStay->id.'/credit-notes',
+                'refundPath' => '/pos/hotel/stays/'.$refundStay->id.'/credit-notes']],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
             'tableOrderWorkflow' => $tableCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,

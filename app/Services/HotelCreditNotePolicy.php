@@ -112,7 +112,7 @@ class HotelCreditNotePolicy
             'estimated_total' => $estimate, 'estimated_tax' => $estimatedTax,
             'original_bill_discount' => (float) $bill->discount_amount,
             // Shares are inputs for reconciliation, not an authorized credit total or refund.
-            'issuance_enabled' => (bool) config('hotel_credit_notes.enabled', false) && $mappingComplete && (float) $bill->discount_amount === 0.0, 'refund_amount' => null, 'stay_action' => 'unchanged',
+            'issuance_enabled' => HotelCreditNoteActivation::issuance((int) $stay->company_id) && $mappingComplete && (float) $bill->discount_amount === 0.0, 'refund_amount' => null, 'stay_action' => 'unchanged',
         ];
     }
 }

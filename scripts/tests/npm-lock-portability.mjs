@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 7 Oct 2026: root shell-quote 1.11.0 addresses GHSA-pqg4-j6r4-53mv.
 // Reviewed 6 Oct 2026: source-map-js 1.2.2 and root selector-parser 7.1.6
 // address GHSA-68fv-2mgg-jv7q / GHSA-rj75-hqrm-r3gf. All other
 // graph entries, local-fork hashes and registry/integrity checks stay pinned.
@@ -20,7 +21,7 @@ const LOCKS = [
     lock: 'package-lock.json',
     packages: 249,
     resolved: 242,
-    graph: 'd34adad2936199c63faac1e9defe7a56f428afda8bad66b9e5d3d215fd0e8f8b',
+    graph: '3fa4dad8472f652b66bdfde685d509bd0facde0ae06521559748ece7b09b35c8',
   },
   {
     lock: 'agent-realtime-gateway/package-lock.json',

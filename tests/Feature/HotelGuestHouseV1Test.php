@@ -299,7 +299,7 @@ class HotelGuestHouseV1Test extends TestCase
         $this->assertDatabaseCount('hotel_credit_notes', 0);
         $bill->refresh();
         $this->assertEquals($snapshot, [$bill->total_amount, $bill->tax_amount, HotelFolioEntry::where('stay_id', $stay->id)->count()]);
-        $this->assertFalse(config('hotel_credit_notes.enabled'));
+        $this->assertFalse(\App\Services\HotelCreditNoteActivation::issuance((int) $company->id));
         $cashier = $this->owner($company);
         $cashier->update(['role' => 'company_user', 'pos_role' => 'pos_cashier', 'pos_custom_access' => json_encode(['returns', 'hotel'])]);
         $this->actingAs($cashier, 'pos')->getJson(route('pos.transaction.return-form', $bill->id))->assertForbidden();

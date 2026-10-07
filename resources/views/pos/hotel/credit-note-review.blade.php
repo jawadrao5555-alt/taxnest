@@ -17,7 +17,7 @@
 <button class="border rounded px-4 py-2">{{ __('hotel_credit.issue') }}</button>
 </form>
 @else
-<p role="alert" class="border rounded p-3">{{ __('hotel_credit.verification') }}</p>
+<p role="alert" class="border rounded p-3">{{ \App\Services\HotelCreditNoteActivation::issuance((int) $stay->company_id) ? __('hotel_credit.manual_review') : __('hotel_credit.verification') }}</p>
 @endif
 <a class="underline" href="{{ route('pos.hotel.credit-notes', $stay->id) }}">{{ __('hotel_correction.back') }}</a>
 </div>

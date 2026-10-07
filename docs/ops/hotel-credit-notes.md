@@ -1,6 +1,6 @@
 # Hotel fiscal credit notes — draft implementation and evidence
 
-Status: Draft; fiscal issuance and linked money refunds are deliberately disabled in `config/hotel_credit_notes.php`. Owner review screens are available. The implementation now includes issuance and separate refund services, but sandbox and final-head runtime reconciliation evidence are still required before enabling the feature. The fiscal lock from PR #153 remains in force.
+Status: Owner-controlled activation. Issuance and linked money refunds default OFF per company. The Hotel owner can independently enable/disable both on the credit-notes screen after explicit confirmation. The owner elected to perform live fiscal verification; actual PRA full/partial acceptance is not claimed by this PR.
 
 ## Legal and technical evidence (4 October 2026)
 
@@ -43,7 +43,7 @@ A separately confirmed money refund requires accepted credit status/fiscal numbe
 
 Linked credit refunds stamp their settlement business date, branch and selected cash drawer. Day-close, X reports and payment summaries deduct the actual cash/card settlement on that date; drawer expected cash deducts cash refunds only. Sales and tax change only through the credit document. Refund-only days can be closed, closed days/drawers reject new refunds, and retries of an already posted request remain idempotent. Historical refunds are not assigned guessed settlement dates.
 
-## Remaining release gates
+## Verification still requiring owner evidence
 
 1. Run canonical PHPUnit, native MariaDB and desktop/390px browser CI on the final head. Local PHP/Composer are unavailable; local diff checks are not runtime verification.
 2. Complete actual Hotel full/partial credit-note sandbox acceptance, original RefUSIN matching, duplicate/retry recovery and legacy-agent compatibility evidence. No production credential or live invoice experiment.
@@ -52,3 +52,13 @@ Linked credit refunds stamp their settlement business date, branch and selected 
 5. Browser evidence for enabled issuance/refund and translated desktop/mobile flows; the default gate is not enabled by CI success alone.
 
 Regression tests cover read-only review, company/cashier isolation, original acceptance, pending child, excessive quantity, safe legacy mapping, idempotent partial issuance, accepted separate refund and refund cap, full credit without stay cancellation, default gate, stale preview and HTTP review. Synthetic regulator status is test setup, never sandbox acceptance evidence.
+
+## Owner activation and verification
+
+The platform `HOTEL_CREDIT_NOTES_ENABLED` switch defaults to true (capability available); set false and refresh Laravel configuration to suspend both write actions. Existing companies stay OFF because neither `feature_flags.hotel_credit_issuance` nor `hotel_credit_refunds` is enabled by default. Owner settings merge only these two keys under a company lock, preserve all other configuration, and record an audit event. POS cashiers/foreign companies cannot change them.
+
+On Hotel → Credit notes, confirm and save Create credit notes ON. Enable refund separately when needed. Review full remaining or selected original quantities, supply a business reason, confirm, then create once. Check the new credit's fiscal status and verify its fiscal number through PRA; pending/failed credits must be resolved before another credit or linked refund. Credit creation does not pay money or cancel the stay. Only an accepted note can receive a separate money refund. Disabling new issuance does not prevent settlement of an already accepted note when refunds remain enabled.
+
+Missing/ambiguous historical item mapping and bill-level discounts remain review-only, even after activation. No live data is backfilled by guessing. API acceptance does not itself complete monthly-return/Annexure I adjustment; applicable legal period/procedure still needs owner verification.
+
+Automated coverage uses fictional invoices and synthetic regulator status only. No actual PRA acceptance, production fiscal writes, refund, or live-browser experiment is represented as completed by the agent.

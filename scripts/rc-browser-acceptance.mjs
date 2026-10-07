@@ -567,7 +567,7 @@ async function hotelCreditReview(page, t, v) {
   await activation.locator('[name="refunds"]').selectOption('0');
   await activation.locator('[name="confirmed"]').check();
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), activation.locator('button').click()]);
-  await activation.locator('[name="issuance"] option:checked').waitFor();
+  await activation.locator('[name="issuance"]').waitFor({state:'visible'});
   if (await activation.locator('[name="issuance"]').inputValue() !== '0') throw new Error('Owner deactivation did not persist');
   pass(`${t.name}/${v.width}: scoped owner activation opens full/partial issuance and deactivation persists`);
 

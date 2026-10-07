@@ -224,7 +224,11 @@
     @endif
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
-        <div class="overflow-x-auto">
+        @php
+            $hotelStayLinks = \App\Services\HotelBillDirectory::stayLinks($transactions->getCollection());
+            $showHotelCreditActions = auth('pos')->user()?->isPosAdmin() && count($hotelStayLinks) > 0;
+        @endphp
+        <div class="overflow-x-auto" data-tax-report-scroll="1">
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -248,12 +252,12 @@
                         @endif
                         <th class="px-4 py-3">{{ __('pos.th_terminal') }}</th>
                         <th class="px-4 py-3">{{ __('pos.pra_word') }}</th>
+                        @if($showHotelCreditActions)
+                        <th class="sticky right-0 z-20 min-w-36 px-4 py-3 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">{{ __('pos.action_col') }}</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    @php
-                        $hotelStayLinks = \App\Services\HotelBillDirectory::stayLinks($transactions->getCollection());
-                    @endphp
                     @forelse($transactions as $t)
                     @php
                         $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;
@@ -272,14 +276,7 @@
                             <a href="{{ route('pos.transaction.show', $t->id) }}" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 hover:underline">{{ $t->invoice_number }}</a>
                             @if($hotelLink = $hotelStayLinks[$t->id] ?? null)
                             <a class="block text-xs underline" data-tax-hotel-stay="{{ $t->id }}" href="{{ route('pos.hotel.stays.show', $hotelLink['id']) }}">{{ $hotelLink['number'] }}</a>
-                            @if(auth('pos')->user()?->isPosAdmin()
-                                && in_array($hotelLink['status'], ['checked_in', 'checked_out'], true)
-                                && ($t->transaction_type ?? 'sale') !== 'return'
-                                && $t->invoice_mode !== 'local' && $t->pra_status === 'submitted' && $t->pra_invoice_number
-                                && \App\Services\PosReturnService::returnableReason($t, true) === null)
-                            <a class="inline-flex mt-1 rounded border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300"
-                               data-tax-credit-note="{{ $t->id }}" href="{{ route('pos.hotel.credit-notes', $hotelLink['id']) }}#bill-{{ $t->id }}">{{ __('hotel_credit.entry') }}</a>
-                            @endif
+
                             @endif
                             @if($rowIsReturn)
                             <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 uppercase">{{ __('pos.credit_note_badge') }}</span>
@@ -327,10 +324,22 @@
                                 {{ ucfirst($t->pra_status ?? 'N/A') }}
                             </span>
                         </td>
+                        @if($showHotelCreditActions)
+                        <td class="sticky right-0 z-10 px-4 py-3 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap" data-tax-credit-actions="{{ $t->id }}">
+                            @if($hotelLink && auth('pos')->user()?->isPosAdmin()
+                                && in_array($hotelLink['status'], ['checked_in', 'checked_out'], true)
+                                && ($t->transaction_type ?? 'sale') !== 'return'
+                                && $t->invoice_mode !== 'local' && $t->pra_status === 'submitted' && $t->pra_invoice_number
+                                && \App\Services\PosReturnService::returnableReason($t, true) === null)
+                            <a class="inline-flex mt-1 rounded border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300"
+                               data-tax-credit-note="{{ $t->id }}" href="{{ route('pos.hotel.credit-notes', $hotelLink['id']) }}#bill-{{ $t->id }}">{{ __('hotel_credit.entry') }}</a>
+                            @endif
+                        </td>
+                        @endif
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="{{ ($taxRateFilter ?? false) ? 10 : 14 }}" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                        <td colspan="{{ (($taxRateFilter ?? false) ? 10 : 14) + ($showHotelCreditActions ? 1 : 0) }}" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
                             <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             <p class="text-sm">{{ __('pos.no_transactions_for_filters') }}</p>
                         </td>
@@ -345,7 +354,7 @@
                         <td class="px-4 py-3 text-right text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</td>
                         <td class="px-4 py-3 text-right text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</td>
                         <td class="px-4 py-3 text-right text-gray-900 dark:text-white">PKR {{ number_format($summary->total_sales + $summary->total_tax, 2) }}</td>
-                        <td class="px-4 py-3" colspan="2"></td>
+                        <td class="px-4 py-3" colspan="{{ $showHotelCreditActions ? 3 : 2 }}"></td>
                     </tr>
                     @else
                     <tr class="bg-gray-50 dark:bg-gray-800/50 border-t-2 border-gray-300 dark:border-gray-600 font-bold text-sm">
@@ -357,7 +366,7 @@
                         <td class="px-4 py-3 text-right text-gray-900 dark:text-white">—</td>
                         <td class="px-4 py-3 text-right text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</td>
                         <td class="px-4 py-3 text-right text-emerald-600">PKR {{ number_format($summary->total_sales, 2) }}</td>
-                        <td class="px-4 py-3" colspan="2"></td>
+                        <td class="px-4 py-3" colspan="{{ $showHotelCreditActions ? 3 : 2 }}"></td>
                     </tr>
                     @endif
                 </tfoot>

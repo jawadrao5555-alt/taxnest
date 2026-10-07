@@ -339,6 +339,8 @@ class HotelCreditNotePolicyTest extends TestCase
         $shortcut = 'data-tax-credit-note="'.$bill->id.'"';
         $this->actingAs($owner, 'pos')->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
             ->assertSee($shortcut, false)
+            ->assertSee('data-tax-credit-actions="'.$bill->id.'"', false)
+            ->assertSee('data-tax-report-scroll="1"', false)
             ->assertSee(route('pos.hotel.credit-notes', $stay->id).'#bill-'.$bill->id, false);
         $this->get(route('pos.hotel.credit-notes', $stay->id))->assertOk()
             ->assertSee('bill-'.$bill->id, false);

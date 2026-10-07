@@ -467,7 +467,7 @@ class HotelCreditNotePolicyTest extends TestCase
             ->assertOk()->assertSee('name="confirmed"', false)->assertSee(__('hotel_credit.issue'));
         $other = $this->company('hotel');
         $this->assertFalse(\App\Services\HotelCreditNoteActivation::issuance((int) $other->id));
-        $this->actingAs($this->owner($other), 'pos')->post($url, ['issuance' => 0, 'refunds' => 1, 'confirmed' => 1])->assertNotFound();
+        $this->actingAs($this->owner($other), 'pos')->postJson($url, ['issuance' => 0, 'refunds' => 1, 'confirmed' => 1])->assertNotFound();
         $this->assertTrue(\App\Services\HotelCreditNoteActivation::issuance((int) $company->id));
         $owner->update(['role' => 'company_user', 'pos_role' => 'pos_cashier']);
         $this->actingAs($owner, 'pos')->post($url, ['issuance' => 0, 'refunds' => 1, 'confirmed' => 1])->assertForbidden();

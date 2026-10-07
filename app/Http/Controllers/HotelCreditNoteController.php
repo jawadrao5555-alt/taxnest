@@ -18,7 +18,7 @@ class HotelCreditNoteController extends Controller
     private function stay(int $id): HotelStay
     {
         HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
-        $query = HotelStay::where('company_id', (int) app('currentCompanyId'));
+        $query = HotelStay::where('company_id', (int) auth('pos')->user()->company_id);
         $branch = app(BranchContextService::class)->getActiveBranchId();
         if ($branch) {
             $query->where('branch_id', $branch);

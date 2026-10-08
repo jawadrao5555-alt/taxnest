@@ -285,7 +285,7 @@ async function surface(page,t,path,v) {
   pass(`${t.name}/${v.width}: ${path} rendered at its exact native destination`);
   await checkUsability(page,t,path,v);
 }
-async function hotelWorkflow(page, t, v) {
+async function hotelWorkflow(page, t, v, diagnostics) {
   const room = v.width < 768 ? 'RC-202' : 'RC-201';
   await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
@@ -317,10 +317,33 @@ async function hotelWorkflow(page, t, v) {
     await page.waitForFunction(mode => document.querySelector(`[data-hotel-tax-mode="${mode}"]`)?.getAttribute('aria-checked') === 'true', mode);
   }
   pass(`${t.name}/${v.width}: all three real tax cards saved and original mode restored`);
+  // Save paper once in Settings, preserve it across navigation, then restore.
+  const printingCard = page.locator('[data-hotel-settings-card="printing"]');
+  await printingCard.locator('summary').click();
+  const paperForm = printingCard.locator('[data-hotel-receipt-settings]');
+  const originalPaper = await paperForm.locator('[name="paper"]').inputValue();
+  for (const paper of ['58mm','a4','80mm',originalPaper]) {
+    const cardNow = page.locator('[data-hotel-settings-card="printing"]');
+    if (!await cardNow.evaluate(el => el.open)) await cardNow.locator('summary').click();
+    const paperFormNow = cardNow.locator('[data-hotel-receipt-settings]');
+    await paperFormNow.locator('[name="paper"]').selectOption(paper);
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), paperFormNow.locator('button').click()]);
+    await page.locator('[data-hotel-settings]').waitFor({state:'visible'});
+    await page.locator('[data-hotel-settings-card="printing"] summary').click();
+    if (await page.locator('[data-hotel-receipt-settings] [name="paper"]').inputValue() !== paper) throw new Error('Saved paper choice was not retained');
+    await page.goto(baseUrl + '/pos/customize', {waitUntil:'domcontentloaded'});
+    await dismiss(page);
+  }
+  pass(`${t.name}/${v.width}: real saved 58mm/A4/80mm preferences restored`);
+
   await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const card = page.locator('[data-hotel-room-state="vacant"]').filter({hasText: room});
-  await Promise.all([page.waitForURL(/stays\/create/), card.locator('[data-hotel-room-check-in]').click()]);
+  await card.locator('[data-hotel-room-check-in]').click();
+  const bookingPopup = page.locator('[data-hotel-checkin-popup]');
+  await bookingPopup.waitFor({state:'visible'});
+  if (new URL(page.url()).pathname !== '/pos/hotel') throw new Error('Check-in left the front desk instead of opening a popup');
+  await saveEvidenceScreenshot(page, `hotel-checkin-form-${v.width}.png`);
   await dismiss(page);
   const form = page.locator('form[action$="/pos/hotel/stays"]');
   await form.locator('[name="guest_name"]').fill('Synthetic Simple Desk ' + room);
@@ -379,17 +402,65 @@ async function hotelWorkflow(page, t, v) {
   ]);
   if (!issued.ok()) throw new Error('Full bill with partial advance failed');
   const firstBill = await issued.json();
-  await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
   if (!firstBill.bill_id) throw new Error('Partial advance did not issue full bill');
+  const receiptPopup = page.locator('[data-hotel-receipt-popup]');
+  await receiptPopup.waitFor({state:'visible'});
+  const receiptFrame = page.frameLocator('[data-receipt-frame]');
+  await receiptFrame.locator('#receiptActions').waitFor({state:'attached'});
+  await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
+  if (!(await receiptFrame.locator('body').innerText()).includes(firstBill.invoice_number)) throw new Error('Receipt popup did not show the issued invoice');
+  if (await receiptPopup.locator('[name="paper"],[name="receipt_printer"]').count()) throw new Error('Receipt popup exposed printer settings');
+  const frame = page.frames().find(frame => frame.url().includes('/bills/' + firstBill.bill_id + '/receipt'));
+  if (!frame) throw new Error('Scoped receipt frame missing');
+  await receiptPopup.locator('[data-receipt-print]').click();
+  if (await frame.evaluate(() => window.__hotelPrintCalls) !== 1) throw new Error('Print did not invoke the receipt frame print');
+  await saveEvidenceScreenshot(page, `hotel-receipt-popup-${v.width}.png`);
+  await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'visible'});
   if (!await previewModal.locator('[data-preview-credit-note]').isVisible()) throw new Error('Credit note missing from shared popup');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-advance-invoice.png`);
-  const receiptPagePromise = page.context().waitForEvent('page');
+  pass(`${t.name}/${v.width}: check-in stayed in popup; actual invoice preview and Print invoked without a new tab or settings`);
+
+  // Controlled transport faults test the client retry path; real enqueue/dedupe is covered by HTTP tests.
+  const previewRoute = baseUrl + stayPath + '/receipt-preview';
+  const printRoute = baseUrl + stayPath + '/bills/' + firstBill.bill_id + '/print';
+  const attempts = [];
+  await page.route(previewRoute, async route => {
+    const response = await route.fetch(); const data = await response.json();
+    await route.fulfill({response, json:{...data,silent:true}});
+  });
+  await page.route(printRoute, async route => {
+    attempts.push(route.request().postDataJSON().print_attempt_uuid);
+    await route.fulfill({status:attempts.length === 1 ? 503 : 409, contentType:'application/json',
+      body:JSON.stringify(attempts.length === 1 ? {success:false,message:'Synthetic lost response'} : {success:false,reason:'agent_offline'})});
+  });
   await previewModal.locator('[data-preview-receipt]').click();
-  const receiptPage = await receiptPagePromise;
-  await receiptPage.waitForLoadState('domcontentloaded');
-  if (!(await receiptPage.locator('body').innerText()).includes(firstBill.invoice_number)) throw new Error('Scoped Hotel receipt did not render the original bill');
-  await saveEvidenceScreenshot(receiptPage, `hotel-receipt-${v.width}-advance.png`);
-  await receiptPage.close();
+  await receiptPopup.waitFor({state:'visible'});
+  await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
+  await receiptPopup.locator('[data-receipt-print]').click();
+  await page.waitForFunction(() => document.querySelector('[data-receipt-status]').textContent.includes('Synthetic lost response'));
+  if (await receiptPopup.locator('[data-receipt-browser]').isVisible()) throw new Error('Uncertain print silently enabled duplicate browser fallback');
+  await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'visible'});
+  await previewModal.locator('[data-preview-receipt]').click();
+  await receiptPopup.waitFor({state:'visible'});
+  await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
+  await receiptPopup.locator('[data-receipt-print]').click();
+  await receiptPopup.locator('[data-receipt-browser]').waitFor({state:'visible'});
+  if (attempts.length !== 2 || attempts[0] !== attempts[1]) throw new Error('Lost enqueue retry changed its UUID after close/reopen');
+  await receiptPopup.locator('[data-receipt-browser]').click();
+  await saveEvidenceScreenshot(page, `hotel-print-safe-fallback-${v.width}.png`);
+  await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'visible'});
+  await page.unroute(previewRoute); await page.unroute(printRoute);
+  for (const status of [503,409]) {
+    const http = diagnostics.httpErrors.findIndex(x => x.url === printRoute && x.method === 'POST' && x.status === status);
+    if (http < 0) throw new Error('Expected injected print response missing: ' + status);
+    diagnostics.httpErrors.splice(http,1);
+    const consoleError = diagnostics.consoleErrors.findIndex(x => x.includes(printRoute) && x.includes(String(status)) && x.includes('Failed to load resource'));
+    if (consoleError >= 0) diagnostics.consoleErrors.splice(consoleError,1);
+  }
+  pass(`${t.name}/${v.width}: uncertain response retained UUID through close/reopen; explicit rejected-enqueue browser fallback`);
 
   // Reproduce the owner transactions-list Return click; it must open Hotel review.
   const returnPage = await page.context().newPage();
@@ -423,6 +494,9 @@ async function hotelWorkflow(page, t, v) {
   ]);
   if (!confirmed.ok()) throw new Error('Remaining payment checkout failed');
   const checkoutResult = await confirmed.json();
+  await receiptPopup.waitFor({state:'visible'});
+  await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'visible'});
   if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
   await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
   if (billConfirmPosts !== 2) throw new Error('Shared dialog posted an unexpected number of actions');
@@ -550,11 +624,15 @@ async function hotelCreditReview(page, t, v) {
   await result.waitFor({state:'visible'});
   const printLink=result.locator('a[href*="/receipt"]');
   await printLink.waitFor({state:'visible'});
-  const [receipt]=await Promise.all([page.context().waitForEvent('page'),printLink.click()]);
-  await receipt.waitForLoadState('domcontentloaded');
-  if (!(await receipt.locator('body').innerText()).includes('SYNTHETIC-ACCEPTED-CREDIT')) throw new Error('Print opened a different or missing credit receipt');
-  await saveEvidenceScreenshot(receipt,'hotel-credit-print-'+v.width+'.png');
-  await receipt.close();
+  await printLink.click();
+  const creditReceiptPopup=page.locator('[data-hotel-receipt-popup]');
+  await creditReceiptPopup.waitFor({state:'visible'});
+  const creditReceiptFrame=page.frameLocator('[data-receipt-frame]');
+  await creditReceiptFrame.locator('#receiptActions').waitFor({state:'attached'});
+  if (!(await creditReceiptFrame.locator('body').innerText()).includes('SYNTHETIC-ACCEPTED-CREDIT')) throw new Error('Print opened a different or missing credit receipt');
+  await saveEvidenceScreenshot(page,'hotel-credit-print-'+v.width+'.png');
+  await creditReceiptPopup.locator('[data-receipt-close]').click();
+  await result.waitFor({state:'visible'});
   await saveEvidenceScreenshot(page,'hotel-credit-view-existing-'+v.width+'.png');
   await page.keyboard.press('Escape');
   await settings('0','1',t.hotelCreditReview.refundPath);
@@ -678,7 +756,7 @@ async function workflow(page,t,v,diagnostics) {
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
-  if (t.hotelWorkflow) return hotelWorkflow(page,t,v);
+  if (t.hotelWorkflow) return hotelWorkflow(page,t,v,diagnostics);
   if (t.hotelCreditReview) return hotelCreditReview(page,t,v);
   const f=t.serviceWorkflow; if(!f)return;
   await page.goto(baseUrl+f.createPath,{waitUntil:'domcontentloaded',timeout:30000});

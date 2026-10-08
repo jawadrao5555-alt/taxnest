@@ -11,6 +11,7 @@
             @include('pos.hotel._pra-reporting')
             {{ $slot }}
             @include('pos.hotel._bill-preview')
+            @include('pos.hotel._desk-popups')
         </main>
     </div>
 </div>

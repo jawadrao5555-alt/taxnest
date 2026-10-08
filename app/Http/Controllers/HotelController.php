@@ -277,7 +277,7 @@ class HotelController extends Controller
             $selectedRoomId = null;
         }
 
-        return view('pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId', 'recentGuests'));
+        return view(request()->boolean('modal') ? 'pos.hotel._stay-form' : 'pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId', 'recentGuests'));
     }
 
     public function storeStay(Request $request)
@@ -309,9 +309,14 @@ class HotelController extends Controller
             $this->room((int) $data['room_id']);
             $stay = $this->stays->book((int) app('currentCompanyId'), (int) auth('pos')->id(), $data);
         } catch (HotelStayException $e) {
+            if ($request->expectsJson()) return response()->json(['message' => $e->getMessage()], 409);
             return back()->withInput()->with('error', $e->getMessage());
         }
 
+        if ($request->expectsJson()) {
+            session()->flash('hotel_checkin_preview', $data['walk_in'] ? (int) $stay->id : null);
+            return response()->json(['stay_url' => route('pos.hotel.stays.show', $stay->id)]);
+        }
         return redirect()->route('pos.hotel.stays.show', $stay->id)
             ->with('hotel_checkin_preview', $data['walk_in'] ? (int) $stay->id : null)
             ->with('success', $data['walk_in'] ? __('pos.hotel_checked_in') : __('pos.hotel_reserved'));
@@ -350,7 +355,7 @@ class HotelController extends Controller
         $summary = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
         $totals = $this->folio->totals($stay);
         $company = Company::findOrFail((int) app('currentCompanyId'));
-        $paper = $request->query('paper', $company->receipt_printer_size === '58mm' ? '58mm' : '80mm');
+        $paper = $request->query('paper', $this->receiptPaper($company));
         abort_unless(in_array($paper, ['a4', '58mm', '80mm'], true), 422);
 
         return view('pos.hotel.statement', compact('stay', 'summary', 'totals', 'paper', 'company'));
@@ -537,7 +542,7 @@ class HotelController extends Controller
         return response()->json(app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill));
     }
 
-    public function billReceipt(int $id, int $billId)
+    public function billReceipt(Request $request, int $id, int $billId)
     {
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $stay = $this->stay($id);
@@ -548,8 +553,83 @@ class HotelController extends Controller
         $viewer = auth('pos')->user();
         abort_unless($transaction->allowedForBillingScopeOf($viewer) && $transaction->allowedForCashierIsolationOf($viewer), 403);
         $company = Company::findOrFail($stay->company_id);
-        $view = ($company->receipt_printer_size ?? '80mm') === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
-        return view($view, compact('transaction', 'company'));
+        $hotelPaper = $this->receiptPaper($company);
+        $view = $hotelPaper === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
+        return view($view, compact('transaction', 'company', 'hotelPaper'));
+    }
+
+
+    private function receiptPaper(Company $company): string
+    {
+        return ($company->feature_flags['hotel_receipt_a4'] ?? false) === true
+            ? 'a4' : ($company->receipt_printer_size === '58mm' ? '58mm' : '80mm');
+    }
+
+    /** Explicit owner save; leave all routing, device and unrelated flags unchanged. */
+    public function saveReceiptPaper(Request $request)
+    {
+        HotelAccessService::abortUnlessManageRooms(auth('pos')->user());
+        $data = $request->validate(['paper' => 'required|in:a4,58mm,80mm']);
+        DB::transaction(function () use ($data) {
+            $company = Company::whereKey((int) auth('pos')->user()->company_id)->lockForUpdate()->firstOrFail();
+            $flags = $company->feature_flags ?? [];
+            $flags['hotel_receipt_a4'] = $data['paper'] === 'a4';
+            $updates = ['feature_flags' => $flags];
+            if ($data['paper'] !== 'a4') $updates['receipt_printer_size'] = $data['paper'];
+            $company->update($updates);
+        });
+        return redirect()->route('pos.customize')->with('success', __('pos.hotel_settings_saved'));
+    }
+
+    public function receiptPreview(int $id)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $stay = $this->stay($id);
+        $company = Company::findOrFail($stay->company_id);
+        $viewer = auth('pos')->user();
+        $ids = $stay->folioEntries()->pluck('pos_transaction_id')->filter()->unique();
+        $bills = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $stay->company_id)->whereIn('id', $ids)->orderByDesc('id')->get()
+            ->filter(fn ($bill) => $bill->allowedForBillingScopeOf($viewer) && $bill->allowedForCashierIsolationOf($viewer));
+        $documents = $bills->map(fn ($bill) => [
+            'bill_id' => $bill->id, 'label' => $bill->invoice_number,
+            'url' => route('pos.hotel.bill-receipt', [$stay->id, $bill->id]),
+            'print_url' => route('pos.hotel.bill-print', [$stay->id, $bill->id]),
+        ])->values();
+        // Statement is an explicitly labelled alternative, never an issued receipt.
+        $documents->push([
+            'bill_id' => null, 'label' => __('hotel_bill.statement'),
+            'url' => route('pos.hotel.stays.statement', [$stay->id, 'embed' => 1]),
+            'print_url' => route('pos.hotel.stays.statement.silent-print', $stay->id),
+        ]);
+        return response()->json([
+            'documents' => $documents, 'paper' => $this->receiptPaper($company),
+            'silent' => $company->printerSettings()['silent_print_enabled'] && $this->receiptPaper($company) !== 'a4',
+            'csrf' => csrf_token(),
+        ]);
+    }
+
+    /** Use the existing receipt enqueue engine, including counter routing and UUID dedupe. */
+    public function billPrint(Request $request, int $id, int $billId)
+    {
+        $this->billReceipt($request, $id, $billId); // Same scoped authorization as the rendered receipt.
+        $request->validate(['print_attempt_uuid' => 'required|uuid']);
+        $request->merge(['type' => 'bill', 'transaction_id' => $billId]);
+        return app(PosController::class)->apiCreatePrintJob($request);
+    }
+
+    public function receiptPrintStatus(int $id, int $jobId)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $stay = $this->stay($id);
+        $job = PosPrintJob::where('company_id', $stay->company_id)->whereKey($jobId)->firstOrFail();
+        abort_unless((int) $job->created_by === (int) auth('pos')->id(), 404);
+        if ($job->type === 'bill') {
+            $this->billReceipt(request(), $id, (int) $job->transaction_id);
+        } else {
+            abort_unless($job->type === 'hotel_bill' && (int) $job->hotel_stay_id === (int) $stay->id, 404);
+        }
+        return response()->json(['status' => $job->status, 'outcome' => $job->result_outcome, 'error' => $job->error]);
     }
 
     public function showCheckout(int $id)

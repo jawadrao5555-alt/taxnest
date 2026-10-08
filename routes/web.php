@@ -1148,6 +1148,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/stays/{id}/discount', [HotelController::class, 'discount'])->whereNumber('id')->name('pos.hotel.stays.discount');
         Route::get('/stays/{id}', [HotelController::class, 'showStay'])->whereNumber('id')->name('pos.hotel.stays.show');
         Route::get('/stays/{id}/bills/{billId}/receipt', [HotelController::class, 'billReceipt'])->whereNumber(['id', 'billId'])->name('pos.hotel.bill-receipt');
+        Route::post('/receipt-paper', [HotelController::class, 'saveReceiptPaper'])->name('pos.hotel.receipt-paper');
+        Route::get('/stays/{id}/receipt-preview', [HotelController::class, 'receiptPreview'])->whereNumber('id')->name('pos.hotel.receipt-preview');
+        Route::post('/stays/{id}/bills/{billId}/print', [HotelController::class, 'billPrint'])->whereNumber(['id', 'billId'])->middleware('throttle:20,1')->name('pos.hotel.bill-print');
+        Route::get('/stays/{id}/print-jobs/{jobId}', [HotelController::class, 'receiptPrintStatus'])->whereNumber(['id', 'jobId'])->name('pos.hotel.print-status');
         Route::get('/stays/{id}/statement', [HotelController::class, 'statement'])->whereNumber('id')->name('pos.hotel.stays.statement');
         Route::post('/stays/{id}/statement/silent-print', [HotelController::class, 'silentStatement'])
             ->middleware('throttle:20,1')->whereNumber('id')->name('pos.hotel.stays.statement.silent-print');

@@ -341,4 +341,90 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertSame(HotelStay::STATUS_CHECKED_IN, $foreign->fresh()->status);
     }
 
+
+    public function test_popup_form_and_json_checkin_retain_actual_booking_and_preview(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create?walk_in=1&modal=1&room_id='.$room->id)
+            ->assertOk()->assertSee('name="guest_name"', false)->assertDontSee('data-hotel-desk-menu', false);
+        $response = $this->postJson('/pos/hotel/stays', $this->booking($room, [
+            'rate_amount' => 5000, 'idempotency_key' => 'popup-checkin-one',
+        ]))->assertOk();
+        $stay = HotelStay::where('company_id', $company->id)->firstOrFail();
+        $response->assertJsonPath('stay_url', route('pos.hotel.stays.show', $stay->id));
+        $this->get($response->json('stay_url'))->assertOk()
+            ->assertSee('data-auto-open="1"', false)->assertSee('data-hotel-receipt-popup', false);
+        $this->postJson('/pos/hotel/stays', $this->booking($room, [
+            'rate_amount' => 5000, 'idempotency_key' => 'popup-checkin-one',
+        ]))->assertOk();
+        $this->assertSame(1, HotelStay::where('company_id', $company->id)->count());
+    }
+
+    public function test_saved_paper_and_invoice_popup_preserve_other_tenant_routing_and_bills(): void
+    {
+        [$company, $owner, $room] = $this->fixture([
+            'receipt_printer_size' => '58mm',
+            'pos_printer_settings' => ['silent_print_enabled' => true, 'receipt_printer' => 'Saved Queue', 'kot_printer' => 'Kitchen'],
+        ]);
+        [$otherCompany, $otherOwner, $otherRoom] = $this->fixture(['receipt_printer_size' => '80mm']);
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $routing = $company->pos_printer_settings;
+        $flags = $company->feature_flags;
+        $this->actingAs($owner, 'pos')->getJson(route('pos.hotel.receipt-preview', $stay->id))
+            ->assertOk()->assertJsonPath('paper', '58mm')->assertJsonPath('silent', true)
+            ->assertJsonPath('documents.0.bill_id', $bill->id)
+            ->assertJsonPath('documents.0.url', route('pos.hotel.bill-receipt', [$stay->id, $bill->id]));
+        $this->post(route('pos.hotel.receipt-paper'), ['paper' => 'a4'])->assertRedirect(route('pos.customize'));
+        $this->assertSame($routing, $company->fresh()->pos_printer_settings);
+        $this->assertSame($flags, array_diff_key($company->fresh()->feature_flags, ['hotel_receipt_a4' => true]));
+        $this->assertSame('58mm', $company->fresh()->receipt_printer_size);
+        $this->assertSame('80mm', $otherCompany->fresh()->receipt_printer_size);
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $bill->id]))
+            ->assertOk()->assertSee('size: A4', false)->assertSee($bill->invoice_number);
+        $this->getJson(route('pos.hotel.receipt-preview', $stay->id))->assertJsonPath('silent', false);
+        $this->post(route('pos.hotel.receipt-paper'), ['paper' => '80mm'])->assertRedirect();
+        $this->assertSame('80mm', $company->fresh()->receipt_printer_size);
+        $this->assertSame($routing, $company->fresh()->pos_printer_settings);
+        $this->actingAs($otherOwner, 'pos')->getJson(route('pos.hotel.receipt-preview', $stay->id))->assertNotFound();
+        $this->assertEquals(10000, $bill->fresh()->total_amount);
+    }
+
+    public function test_receipt_print_uses_existing_uuid_and_counter_rules_with_scoped_status(): void
+    {
+        [$company, $owner, $room] = $this->fixture([
+            'agent_enabled' => true, 'agent_last_seen' => now(),
+            'pos_printer_settings' => ['silent_print_enabled' => true, 'receipt_printer' => 'Default Receipt'],
+        ]);
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $url = route('pos.hotel.bill-print', [$stay->id, $bill->id]);
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        $first = $this->actingAs($owner, 'pos')->postJson($url, ['print_attempt_uuid' => $uuid])->assertOk()->assertJsonPath('success', true);
+        $jobId = $first->json('job_id');
+        $this->postJson($url, ['print_attempt_uuid' => $uuid])->assertOk()->assertJsonPath('job_id', $jobId)->assertJsonPath('deduped', true);
+        $this->assertDatabaseHas('pos_print_jobs', ['id' => $jobId, 'transaction_id' => $bill->id, 'type' => 'bill', 'target_printer' => 'Default Receipt']);
+        $this->getJson(route('pos.hotel.print-status', [$stay->id, $jobId]))->assertOk()->assertJsonPath('status', 'pending');
+        \App\Models\PosPrintJob::findOrFail($jobId)->update(['status' => 'done', 'result_outcome' => 'printed']);
+        $this->getJson(route('pos.hotel.print-status', [$stay->id, $jobId]))->assertOk()->assertJsonPath('status', 'done');
+        $device = \App\Models\PosAgentDevice::create([
+            'company_id' => $company->id, 'device_uid' => 'hotel-counter-two',
+            'receipt_printer' => 'Counter Two Receipt', 'last_seen_at' => now(),
+        ]);
+        $owner->update(['pos_device_uid' => $device->device_uid]);
+        $second = $this->postJson($url, ['print_attempt_uuid' => (string) \Illuminate\Support\Str::uuid()])->assertOk();
+        $this->assertDatabaseHas('pos_print_jobs', ['id' => $second->json('job_id'), 'device_uid' => $device->device_uid, 'target_printer' => 'Counter Two Receipt']);
+        $device->update(['last_seen_at' => now()->subHour()]);
+        $this->postJson($url, ['print_attempt_uuid' => (string) \Illuminate\Support\Str::uuid()])
+            ->assertStatus(409)->assertJsonPath('reason', 'counter_unavailable');
+        [$foreign, $foreignOwner, $foreignRoom] = $this->fixture();
+        $this->actingAs($foreignOwner, 'pos')->postJson($url, ['print_attempt_uuid' => $uuid])->assertNotFound();
+        $this->getJson(route('pos.hotel.print-status', [$stay->id, $jobId]))->assertNotFound();
+        $this->assertSame(2, \App\Models\PosPrintJob::where('company_id', $company->id)->where('type', 'bill')->count());
+    }
+
 }

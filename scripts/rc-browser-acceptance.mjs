@@ -424,23 +424,32 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   // Controlled transport faults test the client retry path; real enqueue/dedupe is covered by HTTP tests.
   const previewRoute = baseUrl + stayPath + '/receipt-preview';
   const printRoute = baseUrl + stayPath + '/bills/' + firstBill.bill_id + '/print';
-  const attempts = [];
-  await page.route(previewRoute, async route => {
-    const response = await route.fetch(); const data = await response.json();
-    await route.fulfill({response, json:{...data,silent:true}});
-  });
-  await page.route(printRoute, async route => {
-    attempts.push(route.request().postDataJSON().print_attempt_uuid);
-    await route.fulfill({status:attempts.length === 1 ? 503 : 409, contentType:'application/json',
-      body:JSON.stringify(attempts.length === 1 ? {success:false,message:'Synthetic lost response'} : {success:false,reason:'agent_offline'})});
-  });
+  // The operational service worker stays enabled. Inject only these two fetches in the page,
+  // since Playwright network routes cannot intercept requests fulfilled by that worker.
+  await page.evaluate(({previewRoute,printRoute}) => {
+    window.__hotelFetchOriginal = window.fetch;
+    window.__hotelPrintAttempts = [];
+    window.fetch = async (...args) => {
+      const url = new URL(String(args[0]), location.href).href;
+      if (url === printRoute) {
+        window.__hotelPrintAttempts.push(JSON.parse(args[1].body).print_attempt_uuid);
+        const first = window.__hotelPrintAttempts.length === 1;
+        return new Response(JSON.stringify(first ? {success:false,message:'Synthetic lost response'} : {success:false,reason:'agent_offline'}),
+          {status:first ? 503 : 409,headers:{'Content-Type':'application/json'}});
+      }
+      const response = await window.__hotelFetchOriginal(...args);
+      if (url !== previewRoute) return response;
+      const data = await response.json();
+      return new Response(JSON.stringify({...data,silent:true}),{status:response.status,headers:{'Content-Type':'application/json'}});
+    };
+  }, {previewRoute,printRoute});
   await previewModal.locator('[data-preview-receipt]').click();
   await receiptPopup.waitFor({state:'visible'});
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   await receiptPopup.locator('[data-receipt-print]').click();
   await page.waitForFunction(() => document.querySelector('[data-receipt-status]').textContent.includes('Synthetic lost response'), null, {timeout:10000}).catch(async error => {
     const state = await receiptPopup.evaluate(el => ({status:el.querySelector('[data-receipt-status]').textContent,disabled:el.querySelector('[data-receipt-print]').disabled,frame:el.querySelector('iframe').src}));
-    throw new Error('Lost-response probe: ' + JSON.stringify({state,attempts,http:diagnostics.httpErrors}) + ' ' + error.message);
+    throw new Error('Lost-response probe: ' + JSON.stringify({state,attempts:await page.evaluate(()=>window.__hotelPrintAttempts),http:diagnostics.httpErrors}) + ' ' + error.message);
   });
   if (await receiptPopup.locator('[data-receipt-browser]').isVisible()) throw new Error('Uncertain print silently enabled duplicate browser fallback');
   await receiptPopup.locator('[data-receipt-close]').click();
@@ -450,19 +459,13 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   await receiptPopup.locator('[data-receipt-print]').click();
   await receiptPopup.locator('[data-receipt-browser]').waitFor({state:'visible'});
+  const attempts = await page.evaluate(() => window.__hotelPrintAttempts);
   if (attempts.length !== 2 || attempts[0] !== attempts[1]) throw new Error('Lost enqueue retry changed its UUID after close/reopen');
   await receiptPopup.locator('[data-receipt-browser]').click();
   await saveEvidenceScreenshot(page, `hotel-print-safe-fallback-${v.width}.png`);
   await receiptPopup.locator('[data-receipt-close]').click();
   await previewModal.waitFor({state:'visible'});
-  await page.unroute(previewRoute); await page.unroute(printRoute);
-  for (const status of [503,409]) {
-    const http = diagnostics.httpErrors.findIndex(x => x.url === printRoute && x.method === 'POST' && x.status === status);
-    if (http < 0) throw new Error('Expected injected print response missing: ' + status);
-    diagnostics.httpErrors.splice(http,1);
-    const consoleError = diagnostics.consoleErrors.findIndex(x => x.includes(printRoute) && x.includes(String(status)) && x.includes('Failed to load resource'));
-    if (consoleError >= 0) diagnostics.consoleErrors.splice(consoleError,1);
-  }
+  await page.evaluate(() => { window.fetch = window.__hotelFetchOriginal; delete window.__hotelFetchOriginal; delete window.__hotelPrintAttempts; });
   pass(`${t.name}/${v.width}: uncertain response retained UUID through close/reopen; explicit rejected-enqueue browser fallback`);
 
   // Reproduce the owner transactions-list Return click; it must open Hotel review.

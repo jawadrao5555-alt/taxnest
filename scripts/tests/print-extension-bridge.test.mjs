@@ -62,7 +62,7 @@ test('new credit receipt waits for later popup script and opens exact receipt on
   const events={}, calls=[];
   const dialog={open:false,matches:()=>true,showModal(){this.open=true;}};
   const window={hotelDeskPopupConfig:{autoReceipt:'https://taxnest.pk/pos/hotel/stays/1/bills/9/receipt'},addEventListener(){}};
-  const document={readyState:'loading',getElementById:()=>dialog,querySelectorAll:()=>[],
+  const document={readyState:'interactive',getElementById:()=>dialog,querySelectorAll:()=>[],
     addEventListener:(name,fn)=>{events[name]=fn;}};
   const ctx=vm.createContext({window,document,location:{hash:'#note-4'}});
   vm.runInContext(readFileSync(new URL('public/js/hotel-credit-notes.js',root),'utf8'),ctx);

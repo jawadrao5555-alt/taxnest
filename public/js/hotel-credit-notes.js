@@ -42,6 +42,6 @@
         });
     });
     // The receipt popup script appears after this slot; wait for every deferred script.
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fromHash, {once:true});
-    else fromHash();
+    if (document.readyState === 'complete' || window.hotelDeskPopups) fromHash();
+    else document.addEventListener('DOMContentLoaded', fromHash, {once:true});
 })();

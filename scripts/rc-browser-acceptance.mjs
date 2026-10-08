@@ -507,69 +507,64 @@ async function hotelCreditReview(page, t, v) {
   await page.locator('[data-hotel-credit-notes="1"]').waitFor({state:'visible'});
   await saveEvidenceScreenshot(page, `tax-report-credit-shortcut-${v.width}.png`);
   pass(`${t.name}/${v.width}: Tax Reports opens original Hotel credit review directly`);
-  for (const mode of ['full', 'partial']) {
-    await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
+
+  const dialog = page.locator('dialog[data-credit-bill="'+t.hotelCreditReview.billId+'"]');
+  await dialog.waitFor({state:'visible'});
+  if (await dialog.locator('form').count()) throw new Error('Default-OFF credit issuance became actionable');
+  if (!(await dialog.innerText()).includes('2,000.00')) throw new Error('Whole invoice total missing');
+  await dialog.locator('[data-credit-close]').click();
+  await dialog.waitFor({state:'hidden'});
+  if (await page.locator('[data-credit-activation]').count()) throw new Error('Everyday flow exposed activation settings');
+  const settings = async (issuance, refunds, settingsPath=path) => {
+    await page.goto(baseUrl+settingsPath+'?settings=1',{waitUntil:'domcontentloaded'});
     await waitForOperationalSurface(page); await dismiss(page);
-    const screen = page.locator('[data-hotel-credit-notes="1"]');
-    await screen.waitFor({state:'visible'});
-    await screen.locator('[role="alert"]').waitFor({state:'visible'});
-    const form = screen.locator('form[action$="/review"]').first();
-    await form.locator('[name="mode"]').selectOption(mode);
-    if (mode === 'partial') await form.locator('input[type="number"]').first().fill('1');
-    await Promise.all([page.waitForURL(/\/credit-notes\/\d+\/review$/), form.locator('button').click()]);
-    const review = page.locator('[data-hotel-credit-review="1"]');
-    await review.waitFor({state:'visible'});
-    if (await review.locator('form').count()) throw new Error('Unverified credit issuance became actionable');
-    if (!await review.locator('[role="alert"]').count()) throw new Error('Verification gate missing from credit review');
-    await review.locator('[data-credit-header-tax]').waitFor({state:'visible'});
-    if (!(await review.innerText()).includes(mode === 'full' ? '2,000.00' : '1,000.00')) throw new Error('Original quantity review total is wrong');
-    await saveEvidenceScreenshot(page, `hotel-credit-${mode}-${v.width}.png`);
-  }
-  pass(`${t.name}/${v.width}: original full/partial review and default fiscal gate passed`);
-  await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
+    const activation=page.locator('[data-credit-activation="1"]');
+    await activation.locator('[name="issuance"]').selectOption(issuance);
+    await activation.locator('[name="refunds"]').selectOption(refunds);
+    await activation.locator('[name="confirmed"]').check();
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),activation.locator('button').click()]);
+    await activation.locator('[name="issuance"]').waitFor({state:'visible'});
+    if (await activation.locator('[name="issuance"]').inputValue()!==issuance) throw new Error('Owner setting did not persist');
+  };
+  await settings('1','0');
+  await page.goto(baseUrl+path+'#bill-'+t.hotelCreditReview.billId,{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
-  const activation = page.locator('[data-credit-activation="1"]');
-  await activation.locator('[name="issuance"]').selectOption('1');
-  await activation.locator('[name="refunds"]').selectOption('0');
-  await activation.locator('[name="confirmed"]').check();
-  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), activation.locator('button').click()]);
-  for (const mode of ['full', 'partial']) {
-    await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
-    await waitForOperationalSurface(page); await dismiss(page);
-    const form = page.locator('form[action$="/review"]').first();
-    await form.locator('[name="mode"]').selectOption(mode);
-    if (mode === 'partial') await form.locator('input[type="number"]').first().fill('1');
-    await Promise.all([page.waitForURL(/\/credit-notes\/\d+\/review$/), form.locator('button').click()]);
-    const issue = page.locator('[data-hotel-credit-review="1"] form[action$="/issue"]');
-    await issue.waitFor({state:'visible'});
-    await issue.locator('[name="reason"]').fill('Synthetic original bill adjustment');
-    await issue.locator('[name="confirmed"]').check();
-    await saveEvidenceScreenshot(page, `hotel-credit-enabled-${mode}-${v.width}.png`);
-  }
-  await page.goto(baseUrl + t.hotelCreditReview.refundPath, {waitUntil:'domcontentloaded'});
+  await dialog.waitFor({state:'visible'});
+  const issue=dialog.locator('form[data-credit-simple="1"]');
+  await issue.waitFor({state:'visible'});
+  if (await issue.locator('[name="mode"]').inputValue()!=='full') throw new Error('Simple flow did not use whole invoice');
+  if (await issue.locator('[name="reason"],input[type="number"],select').count()) throw new Error('Simple flow retained manual entry controls');
+  if (await issue.locator('button[type="submit"]').count()!==1) throw new Error('Single confirmation action missing');
+  await saveEvidenceScreenshot(page,'hotel-credit-simple-full-'+v.width+'.png');
+  // No fiscal POST in browser: real controller POST/idempotency is exercised with synthetic backend fixtures.
+  await dialog.locator('[data-credit-close]').click();
+  await page.locator('#bill-'+t.hotelCreditReview.billId+' [data-credit-open]').click();
+  await dialog.waitFor({state:'visible'});
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({state:'hidden'});
+  await page.goto(baseUrl+t.hotelCreditReview.refundPath,{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
-  if (await page.locator('form[action$="/refund"]').count()) throw new Error('Refund appeared before its separate opt-in');
-  await activation.locator('[name="issuance"]').selectOption('0');
-  await activation.locator('[name="refunds"]').selectOption('1');
-  await activation.locator('[name="confirmed"]').check();
-  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), activation.locator('button').click()]);
-  const refund = page.locator('form[action$="/refund"]').first();
+  if (await page.locator('form[action$="/refund"]').count()) throw new Error('Refund appeared before separate opt-in');
+  await page.locator('[data-credit-open^="credit-result-"]').first().click();
+  const result=page.locator('dialog[open][id^="credit-result-"]');
+  await result.waitFor({state:'visible'});
+  await result.locator('a[href*="/receipt"]').waitFor({state:'visible'});
+  await saveEvidenceScreenshot(page,'hotel-credit-view-existing-'+v.width+'.png');
+  await page.keyboard.press('Escape');
+  await settings('0','1',t.hotelCreditReview.refundPath);
+  await page.goto(baseUrl+t.hotelCreditReview.refundPath,{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const refund=page.locator('form[action$="/refund"]').first();
   await refund.waitFor({state:'visible'});
   await refund.locator('[name="amount"]').fill('100');
   await refund.locator('[name="method"]').selectOption('card');
   await refund.locator('[name="confirmed"]').check();
-  await saveEvidenceScreenshot(page, `hotel-credit-enabled-refund-${v.width}.png`);
-  // No fiscal API calls: backend regressions exercise posting with synthetic acceptance.
-  // Restore this fixture so the next viewport must also prove default-OFF behavior.
-  await page.goto(baseUrl + path, {waitUntil:'domcontentloaded'});
+  await saveEvidenceScreenshot(page,'hotel-credit-separate-refund-'+v.width+'.png');
+  await settings('0','0');
+  await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
-  await activation.locator('[name="issuance"]').selectOption('0');
-  await activation.locator('[name="refunds"]').selectOption('0');
-  await activation.locator('[name="confirmed"]').check();
-  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), activation.locator('button').click()]);
-  await activation.locator('[name="issuance"]').waitFor({state:'visible'});
-  if (await activation.locator('[name="issuance"]').inputValue() !== '0') throw new Error('Owner deactivation did not persist');
-  pass(`${t.name}/${v.width}: scoped owner activation opens full/partial issuance and deactivation persists`);
+  await page.locator('[data-hotel-credit-notes] [role="alert"]').waitFor({state:'visible'});
+  pass(t.name+'/'+v.width+': single full-invoice popup, separate settings/refund, existing-note view and default-OFF restoration passed');
 
 }
 

@@ -548,7 +548,13 @@ async function hotelCreditReview(page, t, v) {
   await page.locator('[data-credit-open^="credit-result-"]').first().click();
   const result=page.locator('dialog[open][id^="credit-result-"]');
   await result.waitFor({state:'visible'});
-  await result.locator('a[href*="/receipt"]').waitFor({state:'visible'});
+  const printLink=result.locator('a[href*="/receipt"]');
+  await printLink.waitFor({state:'visible'});
+  const [receipt]=await Promise.all([page.context().waitForEvent('page'),printLink.click()]);
+  await receipt.waitForLoadState('domcontentloaded');
+  if (!(await receipt.locator('body').innerText()).includes('SYNTHETIC-ACCEPTED-CREDIT')) throw new Error('Print opened a different or missing credit receipt');
+  await saveEvidenceScreenshot(receipt,'hotel-credit-print-'+v.width+'.png');
+  await receipt.close();
   await saveEvidenceScreenshot(page,'hotel-credit-view-existing-'+v.width+'.png');
   await page.keyboard.press('Escape');
   await settings('0','1',t.hotelCreditReview.refundPath);

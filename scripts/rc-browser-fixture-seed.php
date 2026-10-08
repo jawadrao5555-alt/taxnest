@@ -370,6 +370,15 @@ $acceptedCredit->fill([
     'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ACCEPTED-CREDIT-FISCAL',
 ]);
 $acceptedCredit->save();
+// Link the fictional credit to its folio so the actual protected Print route is exercised.
+$refundCharge = \App\Models\HotelFolioEntry::where('stay_id', $refundStay->id)->where('entry_type', 'charge')->firstOrFail();
+$refundAdjustment = $refundCharge->replicate();
+$refundAdjustment->fill([
+    'entry_type' => 'adjustment', 'pos_transaction_id' => $acceptedCredit->id,
+    'reverses_entry_id' => $refundCharge->id, 'description' => 'Synthetic accepted credit for receipt rendering',
+    'quantity' => 1, 'unit_amount' => -1000, 'amount' => -1000, 'gross_amount' => -1000,
+]);
+$refundAdjustment->save();
 \App\Models\HotelCreditNote::create([
     'company_id' => $creditCompany->id, 'stay_id' => $refundStay->id,
     'original_transaction_id' => $refundOriginal->id, 'credit_transaction_id' => $acceptedCredit->id,

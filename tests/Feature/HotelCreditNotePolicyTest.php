@@ -578,6 +578,8 @@ class HotelCreditNotePolicyTest extends TestCase
             ->assertSee('data-credit-open="credit-result-'.$note->id.'"', false)
             ->assertDontSee('data-credit-simple="1"', false)
             ->assertSee(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]), false);
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]))->assertOk()
+            ->assertSee($credit->invoice_number);
         $data['request_key'] = 'simple-full-credit-request-002';
         $this->post($url, $data)->assertRedirect()->assertSessionHas('error');
         $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());

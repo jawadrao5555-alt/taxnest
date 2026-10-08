@@ -143,6 +143,7 @@
                 throw new Error(result.message || result.error || labels.failed);
             }
             context.statusUrl = result.status_url; renderResult(result);
+            if (result.receipt_url && window.hotelDeskPopups) await window.hotelDeskPopups.receipt(result.receipt_url, dialog);
         } catch (error) { el('error').textContent = (error.message || labels.failed) + (refused ? '' : ' ' + labels.retry_same); if (refused) lockDesk(false); }
         finally { busy = false; el('confirm').disabled = refused; el('back').disabled = false; }
     });

@@ -192,6 +192,13 @@
         body, td, th, p, span, div, h1, strong { font-weight: bold !important; }
     </style>
     @endif
+@if(($hotelPaper ?? null) === 'a4')
+<style>
+@page { size: A4; margin: 14mm; }
+html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
+@media print { html body { width: auto; max-width: 180mm; margin: 0; padding: 0; } }
+</style>
+@endif
 </head>
 <body>
     <div class="no-print" id="receiptActions">

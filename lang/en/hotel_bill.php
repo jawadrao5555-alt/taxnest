@@ -1,5 +1,7 @@
 <?php
 return [
+    'extension_present' => "Print extension detected. The selected online Agent is preferred; silent printing requires an Agent.",
+    'extension_absent' => "Print extension not detected. The existing Agent or browser Print remains available.",
     'statement' => 'Stay bill / statement',
     'print' => 'Print bill',
     'back' => 'Back to stay',
@@ -21,4 +23,14 @@ return [
     'not_accepted' => 'PRA not accepted',
     'credit_tax' => 'Credit tax (invoice rounding)',
     'line_tax' => 'Original line tax before invoice rounding',
+    'saved_print_hint' => 'Saved for every Hotel bill. Thermal size also applies to the shared receipt printer; A4 uses browser printing. Printer and Agent choices stay in Printer Settings.',
+    'browser_print' => 'Print using browser',
+    'loading' => 'Loading receipt…',
+    'browser_dialog' => 'Browser print dialog opened. Choose the saved printer and print.',
+    'agent_done' => 'Agent reported print success.',
+    'agent_failed' => 'Agent reported a printing failure',
+    'awaiting_agent' => 'Waiting for Agent confirmation; do not print another copy yet.',
+    'possible_duplicate' => 'A print attempt may already have reached the printer. Printing again can produce a duplicate. Continue?',
+    'agent_unavailable' => 'Agent printing is unavailable. Use Print using browser.',
+    'retry_print' => 'The result is uncertain. Press Print again to retry the same attempt; no new copy is queued.',
 ];

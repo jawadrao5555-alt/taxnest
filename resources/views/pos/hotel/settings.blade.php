@@ -60,6 +60,19 @@
             <details data-hotel-settings-card="printing" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
                 <summary class="cursor-pointer font-bold dark:text-white">{{ __('pos.hotel_settings_printing') }}<span class="block mt-1 text-xs font-normal text-gray-500">{{ __('pos.hotel_settings_printing_hint') }}</span></summary>
                 <div class="mt-4 space-y-3 text-sm dark:text-gray-200">
+                    <form method="POST" action="{{ route('pos.hotel.receipt-paper') }}" data-hotel-receipt-settings class="space-y-2">
+                        @csrf
+                        <label class="block font-semibold">{{ __('hotel_bill.paper_size') }}</label>
+                        <select name="paper" class="w-full rounded-lg border p-2">
+                            @foreach(['80mm' => '80mm', '58mm' => '58mm', 'a4' => 'A4'] as $value => $label)
+                            <option value="{{ $value }}" @selected((($company->feature_flags['hotel_receipt_a4'] ?? false) ? 'a4' : ($company->receipt_printer_size === '58mm' ? '58mm' : '80mm')) === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-gray-500">{{ __('hotel_bill.saved_print_hint') }}</p>
+                        <button class="rounded-lg border px-3 py-2">{{ __('pos.hotel_checkout_policy_save') }}</button>
+                    </form>
+                    <a href="{{ asset('downloads/NestPOS-Print-Extension.zip') }}" download class="block underline">NestPOS Print Extension · Chrome / Edge</a>
+                    <p data-hotel-extension-status data-present="{{ __('hotel_bill.extension_present') }}" data-absent="{{ __('hotel_bill.extension_absent') }}" class="text-xs"></p>
                     <a href="{{ route('pos.printer-settings') }}" class="block underline">{{ __('pos.printer_settings') }}</a>
                     <a href="{{ route('pos.receipt-settings') }}" class="block underline">{{ __('pos.card_receipt_display') }}</a>
                     <p class="text-xs text-gray-500">{{ __('pos.hotel_settings_printer_scope') }}</p>

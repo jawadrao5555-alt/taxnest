@@ -1,5 +1,7 @@
 <?php
 return [
+    'extension_present' => "Print extension mil gayi. Online selected Agent pehli priority hai; silent print ke liye Agent chahiye.",
+    'extension_absent' => "Print extension nahi mili. Existing Agent ya browser Print use kar sakte hain.",
     'statement' => 'Stay bill / statement',
     'print' => 'Bill print karein',
     'back' => 'Stay par wapas',
@@ -21,4 +23,14 @@ return [
     'not_accepted' => 'PRA accept nahi hua',
     'credit_tax' => 'Credit tax (invoice rounding)',
     'line_tax' => 'Original line tax, invoice rounding se pehle',
+    'saved_print_hint' => 'Har Hotel bill par saved size lagay ga. Thermal size shared receipt printer par bhi lagta hai; A4 browser se print hoga. Printer aur Agent ki choice Printer Settings mein hai.',
+    'browser_print' => 'Browser se print',
+    'loading' => 'Receipt load ho rahi hai…',
+    'browser_dialog' => 'Browser print dialog khul gaya. Printer chun kar print karein.',
+    'agent_done' => 'Agent nay print success report ki hai.',
+    'agent_failed' => 'Agent nay printing failure report ki',
+    'awaiting_agent' => 'Agent ki confirmation ka wait hai; abhi dosri copy print na karein.',
+    'possible_duplicate' => 'Print attempt printer tak pohanch chuki ho sakti hai. Dobara print say duplicate aa sakta hai. Continue?',
+    'agent_unavailable' => 'Agent printing available nahi. Browser se print karein.',
+    'retry_print' => 'Result confirm nahi. Print dobara dabayein; wohi attempt retry hogi.',
 ];

@@ -284,7 +284,7 @@ jobs:
           mapfile -t tests < <(find pra-agent/test -maxdepth 1 -type f -name '*.test.js' ! -name 'local-core-internet-cut.test.js' -printf '%p\n' | sort)
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs
-          bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs
+          bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/print-extension-bridge.test.mjs
       - name: Run realtime gateway tests with egress blocked
         run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
       - name: Sanitize CI evidence

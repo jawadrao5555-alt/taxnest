@@ -575,7 +575,9 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
         $this->assertSame('checked_in', $stay->fresh()->status);
         $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
+        $this->assertSame(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]), session('hotel_credit_receipt'));
         $this->get(route('pos.hotel.credit-notes', $stay->id))->assertOk()
+            ->assertSee('autoReceipt', false)
             ->assertSee('data-credit-open="credit-result-'.$note->id.'"', false)
             ->assertDontSee('data-credit-simple="1"', false)
             ->assertSee(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]), false);

@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('hotel_bill.statement') }} · {{ $stay->stay_number }}</title>
-    @if(empty($agentPrint))
+    @if(empty($agentPrint) && !request()->boolean('embed'))
         @include('partials.urdu-font')
     @endif
     <style>
@@ -55,13 +55,9 @@
     </style>
 </head>
 <body>
-@if(empty($agentPrint))
+@if(empty($agentPrint) && !request()->boolean('embed'))
 <nav class="toolbar actions" aria-label="{{ __('hotel_bill.paper_size') }}">
     <a href="{{ route('pos.hotel.stays.show', $stay->id) }}">{{ __('hotel_bill.back') }}</a>
-    <span>{{ __('hotel_bill.paper_size') }}:</span>
-    @foreach(['a4' => 'A4', '80mm' => '80mm', '58mm' => '58mm'] as $value => $label)
-        <a class="{{ $paper === $value ? 'selected' : '' }}" href="{{ route('pos.hotel.stays.statement', ['id' => $stay->id, 'paper' => $value]) }}">{{ $label }}</a>
-    @endforeach
     <button type="button" class="primary" onclick="window.print()">{{ __('hotel_bill.print') }}</button>
     @if($paper !== 'a4')
         <button type="button" id="silent-print">{{ __('hotel_bill.silent_print') }}</button>
@@ -99,7 +95,7 @@
     </section>
     <footer class="note">{{ __('hotel_bill.not_fiscal') }} {{ __('hotel_bill.cash_estimate') }}</footer>
 </main>
-@if(empty($agentPrint))
+@if(empty($agentPrint) && !request()->boolean('embed'))
 @php $receiptIds = $stay->folioEntries->pluck('pos_transaction_id')->filter()->unique(); @endphp
 @if($receiptIds->isNotEmpty())
 <div class="toolbar">

@@ -14,10 +14,13 @@
         <button type="button" data-receipt-close class="rounded-lg border px-4 py-2">{{ __('hotel_preview.close') }}</button>
     </div>
 </dialog>
-<script>
-window.hotelDeskPopupConfig = @json([
+@php
+$hotelDeskPopupConfig = [
     'labels' => __('hotel_bill'), 'failed' => __('hotel_preview.failed'),
     'create' => route('pos.hotel.stays.create'), 'base' => url('/pos/hotel/stays'),
-]);
+];
+@endphp
+<script>
+window.hotelDeskPopupConfig = @json($hotelDeskPopupConfig);
 </script>
 <script src="{{ asset('js/hotel-desk-popups.js') }}?v={{ filemtime(public_path('js/hotel-desk-popups.js')) }}" defer></script>

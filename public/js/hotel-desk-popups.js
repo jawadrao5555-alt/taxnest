@@ -134,10 +134,12 @@
     async function pollJob() {
         stop();
         if (!active?.job || !receipt.open) return;
+        const snapshot = active;
         try {
             const response = await fetch(config.base + '/' + active.stay + '/print-jobs/' + active.job, {credentials:'same-origin', headers:{Accept:'application/json'}});
             if (!response.ok) throw new Error(config.failed);
             const result = await response.json();
+            if (active !== snapshot || !receipt.open) return;
             if (result.status === 'done') {
                 status(labels.agent_done); attempts.delete(active.document.url); active.attempt = null; active.job = null; setBusy(false); q('browser').hidden = true; return;
             }
@@ -149,7 +151,7 @@
             status(labels.queued + ' #' + active.job + ' — ' + labels.awaiting_agent);
             if (++active.polls < 20) poll = setTimeout(pollJob, 1500);
             else { status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
-        } catch (_) { status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
+        } catch (_) { if (active !== snapshot || !receipt.open) return; status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
     }
     q('print').addEventListener('click', async () => {
         if (!active?.ready || loading || active.job) return;

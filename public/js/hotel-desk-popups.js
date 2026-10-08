@@ -107,8 +107,8 @@
             const model = await response.json();
             active = {...model, stay: match[1], ready:false};
             q('picker').replaceChildren();
-            for (const [index, document] of model.documents.entries()) {
-                const option = document.createElement('option'); option.value = index; option.textContent = document.label; q('picker').append(option);
+            for (const [index, entry] of model.documents.entries()) {
+                const option = document.createElement('option'); option.value = index; option.textContent = entry.label; q('picker').append(option);
             }
             const requested = match[2] ? model.documents.findIndex(document => String(document.bill_id) === match[2]) : 0;
             if (requested < 0) throw new Error(config.failed);

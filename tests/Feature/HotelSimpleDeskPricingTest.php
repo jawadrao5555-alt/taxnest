@@ -415,7 +415,7 @@ class HotelSimpleDeskPricingTest extends TestCase
             'company_id' => $company->id, 'device_uid' => 'hotel-counter-two',
             'receipt_printer' => 'Counter Two Receipt', 'last_seen_at' => now(),
         ]);
-        $owner->update(['pos_device_uid' => $device->device_uid]);
+        $owner->forceFill(['pos_device_uid' => $device->device_uid])->save();
         $second = $this->postJson($url, ['print_attempt_uuid' => (string) \Illuminate\Support\Str::uuid()])->assertOk();
         $this->assertDatabaseHas('pos_print_jobs', ['id' => $second->json('job_id'), 'device_uid' => $device->device_uid, 'target_printer' => 'Counter Two Receipt']);
         $device->update(['last_seen_at' => now()->subHour()]);

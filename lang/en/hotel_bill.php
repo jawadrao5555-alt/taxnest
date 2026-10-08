@@ -1,5 +1,7 @@
 <?php
 return [
+    'extension_present' => "Print extension detected. The selected online Agent is preferred; silent printing requires an Agent.",
+    'extension_absent' => "Print extension not detected. The existing Agent or browser Print remains available.",
     'statement' => 'Stay bill / statement',
     'print' => 'Print bill',
     'back' => 'Back to stay',

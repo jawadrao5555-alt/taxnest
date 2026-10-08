@@ -160,9 +160,10 @@
         try {
             const body = {print_attempt_uuid: active.attempt};
             if (!active.document.bill_id) body.paper = active.paper;
-            const response = await fetch(sameOrigin(active.document.print_url), {
-                method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json', Accept:'application/json', 'X-CSRF-TOKEN':active.csrf}, body:JSON.stringify(body),
-            });
+            const url = sameOrigin(active.document.print_url).href;
+            const response = window.nestposPrintBridge
+                ? await window.nestposPrintBridge.enqueue(url, body, active.csrf, active.agent_online)
+                : await fetch(url, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json', Accept:'application/json', 'X-CSRF-TOKEN':active.csrf}, body:JSON.stringify(body)});
             const result = await response.json();
             if (!response.ok || !result.success) {
                 // These replies prove no job was created; fallback cannot duplicate it.

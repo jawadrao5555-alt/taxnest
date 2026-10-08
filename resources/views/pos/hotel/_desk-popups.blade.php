@@ -24,4 +24,5 @@ $hotelDeskPopupConfig = [
 <script>
 window.hotelDeskPopupConfig = @json($hotelDeskPopupConfig);
 </script>
+<script src="{{ asset('js/nestpos-print-bridge.js') }}?v={{ filemtime(public_path('js/nestpos-print-bridge.js')) }}" defer></script>
 <script src="{{ asset('js/hotel-desk-popups.js') }}?v={{ filemtime(public_path('js/hotel-desk-popups.js')) }}" defer></script>

@@ -21,3 +21,10 @@ Compatibility matrix:
 | Lost enqueue response | Same UUID retained within page, including popup close/reopen; no blind fallback |
 
 Local PHP/Composer are unavailable in this sparse workspace. Owner screenshots and code established the pre-change flow; canonical disposable CI provides real Laravel, MariaDB and Chromium verification. Physical printer/PRA production behaviour remains owner verification; no live access is used.
+
+## Browser extension addition
+Owner chose the existing Agent instead of a new native Print Helper. `browser-print-extension/` is a permission-free MV3 bridge for the exact first-party Hotel routes. Its installed status is shown in Hotel printing settings. A healthy selected Agent is preferred; a detected extension can submit the same authenticated queue request but cannot silently drive Windows printers without an Agent. All scopes and printer decisions remain enforced by the existing enqueue engine. No automatic transport switch follows an uncertain response. A4 remains browser print.
+
+Local Node VM tests cover installed detection, Agent preference, bridge dedupe, route rejection, explicit rejection and uncertain retry. These tests do not establish an installed Chrome/Edge extension or a physical printer result; those require owner verification after deployment. The pre-existing CI browser journey remains extension-absent and verifies normal printing.
+
+Credit creation now flashes the exact credit receipt URL into the protected next-page popup configuration; the successful note dialog automatically opens that receipt preview with Print/Close. Refund is unchanged and separate.

@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "NestPOS Print Bridge",
+  "version": "1.0.0",
+  "description": "Detect NestPOS printing support and use the existing scoped Agent queue. Requires an online Agent for silent Windows printing.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://taxnest.pk/pos/*",
+        "https://www.taxnest.pk/pos/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

@@ -604,6 +604,9 @@ class HotelController extends Controller
         ]);
         return response()->json([
             'documents' => $documents, 'paper' => $this->receiptPaper($company),
+            'agent_online' => ($viewer->pos_device_uid && \App\Http\Controllers\AgentController::deviceRoutingReady())
+                ? (bool) PosAgentDevice::where('company_id', $company->id)->where('device_uid', $viewer->pos_device_uid)->first()?->isOnline()
+                : $company->agentOnline(),
             'silent' => $company->printerSettings()['silent_print_enabled'] && $this->receiptPaper($company) !== 'a4',
             'csrf' => csrf_token(),
         ]);

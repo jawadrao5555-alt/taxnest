@@ -1,5 +1,7 @@
 <?php
 return [
+    'extension_present' => "Print extension mil gayi. Online selected Agent pehli priority hai; silent print ke liye Agent chahiye.",
+    'extension_absent' => "Print extension nahi mili. Existing Agent ya browser Print use kar sakte hain.",
     'statement' => 'Stay bill / statement',
     'print' => 'Bill print karein',
     'back' => 'Stay par wapas',

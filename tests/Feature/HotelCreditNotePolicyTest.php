@@ -545,6 +545,7 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->actingAs($owner, 'pos')->get($url)->assertOk()
             ->assertSee('data-credit-bill="'.$bill->id.'"', false)
             ->assertSee('data-credit-simple="1"', false)
+            ->assertSee('data-credit-settings-link="1"', false)
             ->assertSee('name="mode" value="full"', false)
             ->assertSee(number_format($bill->total_amount, 2))
             ->assertDontSee('name="quantities[', false)

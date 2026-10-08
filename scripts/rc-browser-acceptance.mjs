@@ -569,7 +569,7 @@ async function hotelCreditReview(page, t, v) {
   await settings('0','0');
   await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
-  await page.locator('[data-hotel-credit-notes] [role="alert"]').waitFor({state:'visible'});
+  await page.locator('[data-hotel-credit-notes] > [role="alert"]').waitFor({state:'visible'});
   pass(t.name+'/'+v.width+': single full-invoice popup, separate settings/refund, existing-note view and default-OFF restoration passed');
 
 }

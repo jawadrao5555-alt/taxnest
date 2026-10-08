@@ -26,7 +26,7 @@ class HotelCreditNoteController extends Controller
         return $query->findOrFail($id);
     }
 
-    public function index(int $id)
+    public function index(Request $request, int $id)
     {
         $stay = $this->stay($id);
         $ids = HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)
@@ -37,7 +37,27 @@ class HotelCreditNoteController extends Controller
         $credits = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
             ->whereIn('id', $notes->pluck('credit_transaction_id'))->get()->keyBy('id');
         $terminals = \App\Models\PosTerminal::where('company_id', $stay->company_id)->where('is_active', true)->get();
-        return view('pos.hotel.credit-notes', compact('stay', 'bills', 'notes', 'credits', 'terminals'));
+        $plans = [];
+        $blocked = [];
+        foreach ($bills as $bill) {
+            if ($notes->contains('original_transaction_id', $bill->id)) {
+                continue;
+            }
+            try {
+                if ($bill->items->contains(fn ($item) => (float) $item->returned_quantity > 0)
+                    || PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+                        ->where('parent_transaction_id', $bill->id)->where('transaction_type', 'return')->exists()) {
+                    throw new HotelStayException(__('hotel_credit.existing'));
+                }
+                $plans[$bill->id] = app(HotelCreditNotePolicy::class)->review($stay, auth('pos')->user(), (int) $bill->id);
+            } catch (HotelStayException $e) {
+                $blocked[$bill->id] = $e->getMessage();
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                $blocked[$bill->id] = __('hotel_credit.manual_review');
+            }
+        }
+        return view($request->boolean('settings') ? 'pos.hotel.credit-note-settings' : 'pos.hotel.credit-notes',
+            compact('stay', 'bills', 'notes', 'credits', 'terminals', 'plans', 'blocked'));
     }
 
     public function activation(Request $request, int $id)
@@ -63,7 +83,7 @@ class HotelCreditNoteController extends Controller
             \App\Services\AuditLogService::log('hotel_credit_activation_changed', 'company', $company->id,
                 $before, $after, (int) $company->id, (int) auth('pos')->id());
         });
-        return redirect()->route('pos.hotel.credit-notes', $stay->id)->with('success', __('hotel_credit.activation_saved'));
+        return redirect()->route('pos.hotel.credit-notes', ['id' => $stay->id, 'settings' => 1])->with('success', __('hotel_credit.activation_saved'));
     }
 
     private function selection(Request $request): ?array
@@ -91,16 +111,27 @@ class HotelCreditNoteController extends Controller
     public function issue(Request $request, int $id, int $bill)
     {
         $stay = $this->stay($id);
+        // The simple Hotel form confirms a complete invoice, without editable quantities or an invented correction reason.
+        $simple = $request->boolean('simple_full');
+        if ($simple) {
+            $request->validate(['mode' => 'required|in:full', 'quantities' => 'prohibited']);
+            $request->merge(['reason' => 'Full invoice credit confirmed by owner.']);
+        }
         $data = $request->validate(['reason' => 'required|string|min:5|max:255', 'request_key' => 'required|string|min:16|max:64',
             'fingerprint' => 'required|string|size:64', 'confirmed' => 'accepted']);
         $selection = $this->selection($request);
         try {
-            app(HotelCreditNoteService::class)->issue($stay, auth('pos')->user(), $bill, $selection,
+            if ($simple && !\App\Models\HotelCreditNote::where('company_id', $stay->company_id)->where('request_key', $data['request_key'])->exists()
+                && PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+                    ->where('parent_transaction_id', $bill)->where('transaction_type', 'return')->exists()) {
+                throw new HotelStayException(__('hotel_credit.existing'));
+            }
+            $note = app(HotelCreditNoteService::class)->issue($stay, auth('pos')->user(), $bill, $selection,
                 $data['reason'], $data['request_key'], $data['fingerprint']);
         } catch (HotelStayException $e) {
             return back()->with('error', $e->getMessage());
         }
-        return redirect()->route('pos.hotel.credit-notes', $id)->with('success', __('hotel_credit.created'));
+        return redirect(route('pos.hotel.credit-notes', $id).'#note-'.$note->id)->with('success', __('hotel_credit.created'));
     }
 
     public function refund(Request $request, int $id, int $note)

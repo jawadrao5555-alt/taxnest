@@ -536,6 +536,71 @@ class HotelCreditNotePolicyTest extends TestCase
         $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
     }
 
+
+    public function test_simple_credit_popup_shows_whole_invoice_and_settings_are_separate(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture(['pos_tax_rate_cash' => 16]);
+        $this->enableFor($stay);
+        $url = route('pos.hotel.credit-notes', $stay->id);
+        $this->actingAs($owner, 'pos')->get($url)->assertOk()
+            ->assertSee('data-credit-bill="'.$bill->id.'"', false)
+            ->assertSee('data-credit-simple="1"', false)
+            ->assertSee('data-credit-settings-link="1"', false)
+            ->assertSee('name="mode" value="full"', false)
+            ->assertSee(number_format($bill->total_amount, 2))
+            ->assertDontSee('name="quantities[', false)
+            ->assertDontSee('name="reason"', false)
+            ->assertDontSee('data-credit-activation="1"', false);
+        $this->get($url.'?settings=1')->assertOk()->assertSee('data-credit-activation="1"', false);
+        $other = $this->company('hotel');
+        $this->actingAs($this->owner($other), 'pos')->getJson($url.'?settings=1')->assertNotFound();
+    }
+
+    public function test_simple_confirm_creates_one_full_credit_without_refunding_and_then_shows_view(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture(['pos_tax_rate_cash' => 16]);
+        $this->enableFor($stay);
+        $owner->update(['pra_reporting_enabled' => true]);
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id);
+        $data = ['simple_full' => 1, 'mode' => 'full', 'confirmed' => 1,
+            'request_key' => 'simple-full-credit-request-001', 'fingerprint' => $plan['fingerprint']];
+        $url = route('pos.hotel.credit-notes.issue', [$stay->id, $bill->id]);
+        $this->actingAs($owner, 'pos')->post($url, $data)->assertRedirect()->assertSessionHas('success');
+        $note = \App\Models\HotelCreditNote::where('stay_id', $stay->id)->sole();
+        $credit = PosTransaction::findOrFail($note->credit_transaction_id);
+        $this->assertEquals($bill->total_amount, $credit->total_amount);
+        $this->assertEquals($bill->tax_amount, $credit->tax_amount);
+        $this->assertSame('Full invoice credit confirmed by owner.', $note->reason);
+        $this->post($url, $data)->assertRedirect()->assertSessionHas('success');
+        $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
+        $this->assertSame('checked_in', $stay->fresh()->status);
+        $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);
+        $this->get(route('pos.hotel.credit-notes', $stay->id))->assertOk()
+            ->assertSee('data-credit-open="credit-result-'.$note->id.'"', false)
+            ->assertDontSee('data-credit-simple="1"', false)
+            ->assertSee(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]), false);
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]))->assertOk()
+            ->assertSee($credit->invoice_number);
+        $data['request_key'] = 'simple-full-credit-request-002';
+        $this->post($url, $data)->assertRedirect()->assertSessionHas('error');
+        $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
+    }
+
+    public function test_simple_credit_rejects_quantities_and_partial_mode_without_writes(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        $this->enableFor($stay);
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id);
+        $data = ['simple_full' => 1, 'mode' => 'partial', 'confirmed' => 1,
+            'request_key' => 'simple-tampered-credit-001', 'fingerprint' => $plan['fingerprint']];
+        $url = route('pos.hotel.credit-notes.issue', [$stay->id, $bill->id]);
+        $this->actingAs($owner, 'pos')->post($url, $data)->assertSessionHasErrors('mode');
+        $data['mode'] = 'full';
+        $data['quantities'] = [$bill->items->first()->id => 1];
+        $this->post($url, $data)->assertSessionHasErrors('quantities');
+        $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
+    }
+
     private function company(string $category, array $overrides = []): Company
     {
         $defaults = PosFeatureService::defaultsForCategory($category);

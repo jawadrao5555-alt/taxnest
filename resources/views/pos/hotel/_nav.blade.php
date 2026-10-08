@@ -28,6 +28,9 @@
         <a href="{{ route('pos.hotel.rooms') }}" data-hotel-desk-link="rooms" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_rooms') }}</a>
         <a href="{{ route('pos.hotel.housekeeping') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_housekeeping') }}</a>
         <a href="{{ route('pos.customize') }}" data-hotel-desk-link="settings" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.hotel_settings_title') }}</a>
+        @if(request()->routeIs('pos.hotel.credit-notes', 'pos.hotel.stays.show'))
+        <a href="{{ route('pos.hotel.credit-notes', ['id' => request()->route('id'), 'settings' => 1]) }}" data-credit-settings-link="1" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('hotel_credit.activation') }}</a>
+        @endif
         <a href="{{ route('pos.hotel.reports') }}" class="rounded-lg px-3 py-2 hover:bg-teal-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ __('pos.nav_hotel_reports') }}</a>
     </nav>
 </details>

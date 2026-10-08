@@ -1,6 +1,6 @@
 # Hotel fiscal credit notes — draft implementation and evidence
 
-Status: Owner-controlled activation. Issuance and linked money refunds default OFF per company. The Hotel owner can independently enable/disable both on the credit-notes screen after explicit confirmation. The owner elected to perform live fiscal verification; actual PRA full/partial acceptance is not claimed by this PR.
+Status: Owner-controlled activation. Issuance and linked money refunds default OFF per company. The Hotel owner can independently enable/disable both on the separate Credit-note settings screen after explicit confirmation. The owner elected to perform live fiscal verification; actual PRA full/partial acceptance is not claimed by this PR.
 
 ## Legal and technical evidence (4 October 2026)
 
@@ -31,7 +31,26 @@ FAQ: https://e.pra.punjab.gov.pk/templates/PRA_Iris_Sales_Tax_Return_FAQs.pdf
 | Legacy agent | Preserve existing PRA queue contract; no new payload fields without compatibility proof |
 | Day closed | Preserve current return policy; no automatic bypass |
 
-## Implemented workflow
+## Simple full-invoice Hotel workflow (8 October 2026)
+
+Owner requested whole-invoice-only Hotel UI: Credit Note → original invoice popup → Confirm & Create.
+The popup displays original items, fiscal reference, total and rounded tax. There are no quantity inputs,
+reason textarea or second review screen. The server records the factual audit description
+"Full invoice credit confirmed by owner."; it does not invent a cancellation/error reason.
+
+The company owner settings are on a separate screen (?settings=1), reachable from Management
+when a stay is open and from the credit-note page. Existing ON/OFF flags are unchanged.
+A successful create redirects to the result popup with actual fiscal status/number and a Print link.
+Existing notes get View credit note, not another create action. Refund remains a separate action,
+subject to its existing opt-in, accepted fiscal child, drawer, balance and closed-day checks.
+
+Compatibility: existing full/partial notes and legacy review/service endpoints remain readable and
+retain their accounting contracts; the new simple UI never submits partial quantities. Historical
+partial or pending credits must be viewed/reconciled rather than labelled as a new whole-invoice credit.
+CSRF, role/tenant/branch gates, fingerprint validation, locked/idempotent writes and fiscal snapshots
+are unchanged. Client submit locking supplements durable server idempotency.
+
+## Existing accounting/service workflow
 
 Owner-only, company/active-branch scoped Hotel screens review full remaining bills or selected original item quantities. Review does not write. Issuance requires an explicit reason, confirmation, unique request key and unchanged review fingerprint. Stay and original invoice/item locks serialize attempts. Durable request identity handles repeats, including JSON numeric representation/order differences.
 

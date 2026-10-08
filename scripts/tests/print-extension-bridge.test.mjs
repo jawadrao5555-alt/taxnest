@@ -57,3 +57,19 @@ test('uncertain extension enqueue does not automatically fall back to Agent',asy
   await assert.rejects(h.window.nestposPrintBridge.enqueue(...args),/enqueue_uncertain/);
   assert.equal(h.calls.length,2);
 });
+
+test('new credit receipt waits for later popup script and opens exact receipt once',()=>{
+  const events={}, calls=[];
+  const dialog={open:false,matches:()=>true,showModal(){this.open=true;}};
+  const window={hotelDeskPopupConfig:{autoReceipt:'https://taxnest.pk/pos/hotel/stays/1/bills/9/receipt'},addEventListener(){}};
+  const document={readyState:'loading',getElementById:()=>dialog,querySelectorAll:()=>[],
+    addEventListener:(name,fn)=>{events[name]=fn;}};
+  const ctx=vm.createContext({window,document,location:{hash:'#note-4'}});
+  vm.runInContext(readFileSync(new URL('public/js/hotel-credit-notes.js',root),'utf8'),ctx);
+  assert.equal(dialog.open,false);
+  window.hotelDeskPopups={receipt:(url,previous)=>calls.push({url,previous})};
+  document.readyState='interactive';events.DOMContentLoaded();
+  assert.equal(calls.length,1);assert.equal(calls[0].url,'https://taxnest.pk/pos/hotel/stays/1/bills/9/receipt');
+  assert.equal(calls[0].previous,dialog);assert.equal(window.hotelDeskPopupConfig.autoReceipt,null);
+  events.DOMContentLoaded();assert.equal(calls.length,1);
+});

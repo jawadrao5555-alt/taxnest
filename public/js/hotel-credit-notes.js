@@ -41,5 +41,7 @@
             form.querySelector('button[type="submit"]').disabled = false;
         });
     });
-    fromHash();
+    // The receipt popup script appears after this slot; wait for every deferred script.
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fromHash, {once:true});
+    else fromHash();
 })();

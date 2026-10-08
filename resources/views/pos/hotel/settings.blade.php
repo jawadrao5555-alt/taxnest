@@ -71,6 +71,7 @@
                         <p class="text-xs text-gray-500">{{ __('hotel_bill.saved_print_hint') }}</p>
                         <button class="rounded-lg border px-3 py-2">{{ __('pos.hotel_checkout_policy_save') }}</button>
                     </form>
+                    <a href="{{ asset('downloads/NestPOS-Print-Extension.zip') }}" download class="block underline">NestPOS Print Extension · Chrome / Edge</a>
                     <p data-hotel-extension-status data-present="{{ __('hotel_bill.extension_present') }}" data-absent="{{ __('hotel_bill.extension_absent') }}" class="text-xs"></p>
                     <a href="{{ route('pos.printer-settings') }}" class="block underline">{{ __('pos.printer_settings') }}</a>
                     <a href="{{ route('pos.receipt-settings') }}" class="block underline">{{ __('pos.card_receipt_display') }}</a>

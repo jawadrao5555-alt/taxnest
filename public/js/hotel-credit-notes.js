@@ -20,7 +20,15 @@
     function fromHash() {
         const match = location.hash.match(/^#(bill|note)-(\d+)$/);
         if (!match) return;
-        if (match[1] === 'note') open('credit-result-' + match[2]);
+        if (match[1] === 'note') {
+            const id = 'credit-result-' + match[2];
+            open(id);
+            const url = window.hotelDeskPopupConfig?.autoReceipt;
+            if (url && window.hotelDeskPopups) {
+                window.hotelDeskPopupConfig.autoReceipt = null;
+                window.hotelDeskPopups.receipt(url, document.getElementById(id));
+            }
+        }
         else {
             const trigger = document.getElementById('bill-' + match[2])?.querySelector('[data-credit-open]');
             if (trigger) open(trigger.dataset.creditOpen);

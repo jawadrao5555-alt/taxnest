@@ -17,6 +17,7 @@
 @php
 $hotelDeskPopupConfig = [
     'labels' => __('hotel_bill'), 'failed' => __('hotel_preview.failed'),
+    'autoReceipt' => session('hotel_credit_receipt'),
     'create' => route('pos.hotel.stays.create'), 'base' => url('/pos/hotel/stays'),
 ];
 @endphp

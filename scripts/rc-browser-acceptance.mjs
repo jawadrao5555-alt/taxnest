@@ -438,7 +438,10 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await receiptPopup.waitFor({state:'visible'});
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   await receiptPopup.locator('[data-receipt-print]').click();
-  await page.waitForFunction(() => document.querySelector('[data-receipt-status]').textContent.includes('Synthetic lost response'));
+  await page.waitForFunction(() => document.querySelector('[data-receipt-status]').textContent.includes('Synthetic lost response'), null, {timeout:10000}).catch(async error => {
+    const state = await receiptPopup.evaluate(el => ({status:el.querySelector('[data-receipt-status]').textContent,disabled:el.querySelector('[data-receipt-print]').disabled,frame:el.querySelector('iframe').src}));
+    throw new Error('Lost-response probe: ' + JSON.stringify({state,attempts,http:diagnostics.httpErrors}) + ' ' + error.message);
+  });
   if (await receiptPopup.locator('[data-receipt-browser]').isVisible()) throw new Error('Uncertain print silently enabled duplicate browser fallback');
   await receiptPopup.locator('[data-receipt-close]').click();
   await previewModal.waitFor({state:'visible'});

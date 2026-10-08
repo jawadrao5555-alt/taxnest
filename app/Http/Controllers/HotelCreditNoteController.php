@@ -131,7 +131,8 @@ class HotelCreditNoteController extends Controller
         } catch (HotelStayException $e) {
             return back()->with('error', $e->getMessage());
         }
-        return redirect(route('pos.hotel.credit-notes', $id).'#note-'.$note->id)->with('success', __('hotel_credit.created'));
+        return redirect(route('pos.hotel.credit-notes', $id).'#note-'.$note->id)->with('success', __('hotel_credit.created'))
+            ->with('hotel_credit_receipt', route('pos.hotel.bill-receipt', [$stay->id, $note->credit_transaction_id]));
     }
 
     public function refund(Request $request, int $id, int $note)

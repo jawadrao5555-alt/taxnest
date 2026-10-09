@@ -4,7 +4,8 @@
     const booking = document.querySelector('[data-hotel-checkin-popup]');
     const receipt = document.querySelector('[data-hotel-receipt-popup]');
     if (!config || !booking || !receipt) return;
-    const q = name => receipt.querySelector('[data-receipt-' + name + ']');
+    let receiptHost = receipt, inlineDialog = null;
+    const q = name => receiptHost.querySelector('[data-receipt-' + name + ']');
     const labels = config.labels;
     const status = text => { q('status').textContent = text; };
     let active = null, opening = false, loading = false, restore = null, poll = null;
@@ -27,7 +28,14 @@
         if (restore && !restore.open) restore.showModal();
         restore = null;
     });
-    q('close').addEventListener('click', () => { if (!loading) receipt.close(); });
+    function unmountInline() {
+        if (receiptHost !== receipt) {
+            stop();
+            while (receiptHost.firstChild) receipt.append(receiptHost.firstChild);
+            receiptHost.hidden = true; receiptHost = receipt; inlineDialog = null;
+        }
+    }
+    q('close').addEventListener('click', () => { if (!loading) (inlineDialog || receipt).close(); });
     booking.querySelector('[data-checkin-close]').addEventListener('click', () => booking.close());
     booking.addEventListener('cancel', event => { if (booking.dataset.busy === '1') event.preventDefault(); });
 
@@ -99,6 +107,16 @@
         if (opening || loading) return;
         opening = true;
         try {
+            if (previous?.matches('[data-hotel-bill-preview]')) {
+                const host = previous.querySelector('[data-preview-issued]');
+                if (inlineDialog !== previous) {
+                    unmountInline(); receiptHost = host; inlineDialog = previous;
+                    while (receipt.firstChild) host.append(receipt.firstChild);
+                    previous.addEventListener('close', unmountInline, {once:true});
+                    previous.addEventListener('cancel', event => event.preventDefault(), {once:true});
+                }
+                host.hidden = false;
+            } else unmountInline();
             const target = sameOrigin(url);
             const match = target.pathname.match(/\/pos\/hotel\/stays\/(\d+)\/(?:bills\/(\d+)\/receipt|statement)$/);
             if (!match) throw new Error(config.failed);
@@ -115,9 +133,12 @@
             q('picker').value = String(requested);
             q('picker-label').hidden = model.documents.length < 2;
             selectDocument(requested);
-            if (previous?.open) { restore = previous; previous.close(); }
-            if (!receipt.open) receipt.showModal();
-        } catch (failure) { status(failure.message); if (!receipt.open) receipt.showModal(); }
+            if (inlineDialog) { if (!inlineDialog.open) inlineDialog.showModal(); }
+            else {
+                if (previous?.open) { restore = previous; previous.close(); }
+                if (!receipt.open) receipt.showModal();
+            }
+        } catch (failure) { status(failure.message); if (!inlineDialog && !receipt.open) receipt.showModal(); }
         finally { opening = false; }
     }
     q('picker').addEventListener('change', () => {

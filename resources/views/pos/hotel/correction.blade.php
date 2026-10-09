@@ -1,4 +1,4 @@
-<x-hotel-layout>
+<x-dynamic-component :component="request()->boolean('modal') ? 'pos-layout' : 'hotel-layout'">
 <div class="tn-page tn-hotel-page max-w-2xl mx-auto space-y-5" data-hotel-correction="1">
     <h1 class="text-2xl font-bold">{{ __('hotel_correction.title') }} · {{ $stay->stay_number }}</h1>
     <p>{{ __('hotel_correction.help') }}</p>
@@ -32,4 +32,4 @@
     @endif
     <a href="{{ route('pos.hotel.stays.show', $stay->id) }}" class="block underline">{{ __('hotel_correction.back') }}</a>
 </div>
-</x-hotel-layout>
+</x-dynamic-component>

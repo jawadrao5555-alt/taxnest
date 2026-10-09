@@ -129,6 +129,7 @@
                 }
                 host.hidden = false;
             } else unmountInline();
+            setBusy(true);
             const target = sameOrigin(url);
             const match = target.pathname.match(/\/pos\/hotel\/stays\/(\d+)\/(?:bills\/(\d+)\/receipt|statement)$/);
             if (!match) throw new Error(config.failed);

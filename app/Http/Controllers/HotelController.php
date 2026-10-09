@@ -347,7 +347,8 @@ class HotelController extends Controller
             ->orderBy('id')->get();
 
         if (request()->boolean('modal_edit')) {
-            abort_unless($stay->status === 'checked_in' && $issuedBills->isEmpty(), 409);
+            abort_unless($stay->status === 'checked_in' && !\App\Models\HotelFolioEntry::where('company_id', $stay->company_id)
+                ->where('stay_id', $stay->id)->whereNotNull('pos_transaction_id')->exists(), 409);
             return view('pos.hotel.draft-editor', compact('stay', 'rooms'));
         }
         return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline', 'deskSummary', 'issuedBills'));

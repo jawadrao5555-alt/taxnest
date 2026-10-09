@@ -549,9 +549,12 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertStringContainsString($bill->invoice_number, $csv);
         $this->assertStringNotContainsString('PRIVATE-OTHER-CASHIER', $csv);
         $this->get('/pos/hotel/folios/pdf?period=all')->assertOk();
+        $bill->update(['hotel_money_from_folio' => true]);
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $bill->id]))->assertOk()->assertDontSee('data-hotel-receipt-money', false);
         $this->getJson(route('pos.hotel.bill-status', [$stay->id, $bill->id]))->assertOk()->assertJsonPath('bill_id', $bill->id);
         $this->getJson(route('pos.hotel.bill-status', [$stay->id, $private->id]))->assertForbidden()->assertDontSee('SYNTHETIC-OTHER');
         $this->actingAs($owner, 'pos')->get('/pos/hotel/folios?period=all')->assertOk()->assertSee('PRIVATE-OTHER-CASHIER');
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $bill->id]))->assertOk()->assertSee('data-hotel-receipt-money', false);
     }
 
     public function test_native_hotel_combined_tax_report_keeps_standalone_outlet_sales_and_returns(): void

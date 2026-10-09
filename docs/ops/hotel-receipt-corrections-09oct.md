@@ -21,7 +21,7 @@ The compiled production CSS also gives `.grid` / `.block` the same specificity a
 | Print / Agent acknowledgement | Existing saved routing and attempt UUIDs retained; refresh displayed fiscal receipt only when safe from pending print jobs | Existing real enqueue/dedupe HTTP tests and Chrome print/lost-response/polling scenarios |
 | Dashboard Back | Existing Hotel Bills/reports Dashboard targets retained | HTTP Hotel-vs-retail navigation; Chrome actual Dashboard Back |
 | Filtered CSV / PDF | Existing calculations and filters retained; verify actual downloads from the filtered Hotel screen | Existing HTTP exports; Chrome invoice filter, downloaded CSV and PDF signature |
-| Outlet / returns / money isolation | Preserve signed credit netting, deposits/refunds separation and unique stay balances; status polling now applies the same invoice access checks as receipt rendering | Existing HTTP native outlet/returns/tenant/branch/cashier tests plus authorized vs denied bill-status calls |
+| Outlet / returns / money isolation | Preserve signed credit netting, deposits/refunds separation and unique stay balances; status polling applies receipt-equivalent invoice access; an authorized partial-scope receipt hides the other cashier/stream's aggregate stay money | Existing HTTP native outlet/returns/tenant/branch/cashier tests plus authorized vs denied bill-status calls and partial-cashier vs owner receipt balances |
 
 ## Scope / compatibility
 

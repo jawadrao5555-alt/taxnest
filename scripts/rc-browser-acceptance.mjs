@@ -634,7 +634,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
   await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
-  if (billConfirmPosts !== 2) throw new Error('Shared dialog posted an unexpected number of actions');
+  if (billConfirmPosts !== 3) throw new Error('Expected initial confirmation, same-UUID retry and one checkout');
   if (await previewModal.locator('[data-preview-qr]').isVisible()) throw new Error('Unreported local bill advertised a PRA QR');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-confirmed.png`);
   page.off('request', countConfirm);

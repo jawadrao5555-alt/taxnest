@@ -18,7 +18,7 @@
     </section>
     <div data-preview-issued hidden class="mt-3"></div>
     <div data-preview-editor hidden class="mt-3">
-        <iframe data-preview-editor-frame title="{{ __('hotel_billing.edit_draft') }}" class="w-full h-[55vh] border rounded-lg"></iframe>
+        <iframe data-preview-editor-frame style="display: block; width: 100%; height: 55vh;" title="{{ __('hotel_billing.edit_draft') }}" class="w-full h-[55vh] border rounded-lg"></iframe>
         <button type="button" data-preview-editor-done class="rounded-lg border p-3 mt-2">{{ __('hotel_billing.update_receipt') }}</button>
     </div>
     <p data-preview-error role="alert" class="mt-3 text-red-700"></p>

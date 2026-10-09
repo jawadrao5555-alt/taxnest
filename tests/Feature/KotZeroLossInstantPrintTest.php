@@ -544,4 +544,38 @@ class KotZeroLossInstantPrintTest extends TestCase
         $right = $this->claim('dev-kitchen');
         $this->assertCount(1, $right);
     }
+    public function test_twenty_five_orders_drain_across_two_capable_devices_without_loss_or_double_claim(): void
+    {
+        $this->seedDevice('dev-first', [['name' => 'Kitchen Printer']]);
+        $this->seedDevice('dev-second', [['name' => 'kitchen  printer']]);
+        $foreign = $this->holdOrder($this->companyB, 'ZL-FOREIGN-BURST');
+        KotPrintService::enqueueForOrder(Company::findOrFail($this->companyB), $foreign, null, true);
+        $expected = [];
+        foreach (range(1, 25) as $n) {
+            $user = $n % 2 === 0 ? $this->cashierA : $this->cashierB;
+            $order = $this->holdOrder($this->companyA, 'ZL-LARGE-'.$n, $user);
+            $first = KotPrintService::enqueueForOrder($this->companyA(), $order, $user, true);
+            $again = KotPrintService::enqueueForOrder($this->companyA(), $order, $user, true);
+            $this->assertSame($first['job_ids'], $again['job_ids']);
+            $expected = array_merge($expected, $first['job_ids']);
+        }
+
+        $claimed = [];
+        foreach (['dev-first' => 10, 'dev-second' => 10] as $device => $count) {
+            $batch = $this->claim($device);
+            $this->assertCount($count, $batch);
+            $claimed = array_merge($claimed, collect($batch)->pluck('id')->all());
+        }
+        $last = $this->claim('dev-first');
+        $this->assertCount(5, $last);
+        $claimed = array_merge($claimed, collect($last)->pluck('id')->all());
+        $this->assertCount(25, array_unique($claimed), 'capable agents never claim the same live job twice');
+        sort($expected);
+        sort($claimed);
+        $this->assertSame($expected, $claimed, 'every kitchen intent survives multiple claim batches');
+        $this->assertSame([], $this->claim('dev-second'));
+        $this->assertSame(25, PosPrintJob::where('company_id', $this->companyA)->where('status', 'printing')->count());
+        $this->assertSame(1, PosPrintJob::where('company_id', $this->companyB)->where('status', 'pending')->count());
+    }
+
 }

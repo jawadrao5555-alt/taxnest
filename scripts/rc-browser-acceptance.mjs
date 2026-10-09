@@ -494,6 +494,23 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   if (attempts.length !== 2 || attempts[0] !== attempts[1]) throw new Error('Lost enqueue retry changed its UUID after close/reopen');
   await receiptPopup.locator('[data-receipt-browser]').click();
   await saveEvidenceScreenshot(page, `hotel-print-safe-fallback-${v.width}.png`);
+  // Controlled terminal Agent acknowledgement proves that polling follows the inline dialog.
+  await page.evaluate(({printRoute,stayPath}) => {
+    const previousFetch = window.fetch;
+    window.__hotelInlineStatusReads = 0;
+    window.fetch = async (...args) => {
+      const url = new URL(String(args[0]), location.href).href;
+      if (url === printRoute) return new Response(JSON.stringify({success:true,job_id:987654}), {status:200,headers:{'Content-Type':'application/json'}});
+      if (url.endsWith(stayPath + '/print-jobs/987654')) {
+        ++window.__hotelInlineStatusReads;
+        return new Response(JSON.stringify({status:'done'}), {status:200,headers:{'Content-Type':'application/json'}});
+      }
+      return previousFetch(...args);
+    };
+  }, {printRoute,stayPath});
+  await receiptPopup.locator('[data-receipt-print]').click();
+  await page.waitForFunction(() => window.__hotelInlineStatusReads > 0 && document.querySelector('[data-receipt-status]').textContent.includes(window.hotelDeskPopupConfig.labels.agent_done), null, {timeout:10000});
+  if (await receiptPopup.locator('[data-receipt-browser]').isVisible()) throw new Error('Acknowledged inline job offered duplicate fallback');
   await receiptPopup.locator('[data-receipt-close]').click();
   await previewModal.waitFor({state:'hidden'});
   await page.locator('[data-hotel-open-desk]').first().click();

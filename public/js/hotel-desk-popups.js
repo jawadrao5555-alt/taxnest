@@ -22,6 +22,10 @@
         q('print').disabled = value || !active?.ready;
         q('picker').disabled = value;
         q('close').disabled = value;
+        if (inlineDialog) {
+            inlineDialog.querySelector('[data-preview-back]').disabled = value;
+            inlineDialog.querySelector('[data-preview-checkout]').disabled = value;
+        }
     };
     receipt.addEventListener('cancel', event => { if (loading) event.preventDefault(); });
     receipt.addEventListener('close', () => {
@@ -177,7 +181,7 @@
             status(labels.queued + ' #' + active.job + ' — ' + labels.awaiting_agent);
             if (++active.polls < 20) poll = setTimeout(pollJob, 1500);
             else { status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
-        } catch (_) { if (active !== snapshot || !receipt.open) return; status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
+        } catch (_) { if (active !== snapshot || !receiptIsOpen()) return; status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
     }
     q('print').addEventListener('click', async () => {
         if (!active?.ready || loading || active.job) return;

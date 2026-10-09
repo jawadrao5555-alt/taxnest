@@ -29,7 +29,7 @@
         el('editor').hidden = true;
         el('draft-receipt').hidden = false;
         if (context?.result) return;
-        await deskPreview(true);
+        await deskPreview(false);
     });
     function renderResult(result) {
         context.result = result;

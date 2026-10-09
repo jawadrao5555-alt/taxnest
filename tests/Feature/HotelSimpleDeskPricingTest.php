@@ -515,4 +515,38 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->get('/pos/hotel/stays/'.$stay->id.'/correction')->assertOk()->assertDontSee('name="confirmed"', false);
     }
 
+    public function test_combined_cashier_scope_hides_other_invoice_and_partial_stay_money_in_exports(): void
+    {
+        [$company, $owner, $room] = $this->fixture(['pos_cashier_own_sales_only' => true]);
+        $cashier = $this->staff($company, 'pos_cashier');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $bill->update(['created_by' => $cashier->id, 'invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-OWN']);
+        $private = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'PRIVATE-OTHER-CASHIER',
+            'status' => 'completed', 'invoice_mode' => 'pra', 'pra_status' => 'submitted',
+            'pra_invoice_number' => 'SYNTHETIC-OTHER', 'subtotal' => 300, 'total_amount' => 300,
+            'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        \App\Models\HotelFolioEntry::create([
+            'company_id' => $company->id, 'stay_id' => $stay->id, 'entry_type' => 'charge',
+            'category' => 'other', 'description' => 'Other cashier charge', 'quantity' => 1,
+            'unit_amount' => 300, 'amount' => 300, 'pos_transaction_id' => $private->id,
+            'created_by' => $owner->id,
+        ]);
+        $response = $this->actingAs($cashier, 'pos')->get('/pos/hotel/folios?period=all&stream=all')->assertOk()
+            ->assertViewHas('stream', 'pra')->assertSee($bill->invoice_number)
+            ->assertDontSee('PRIVATE-OTHER-CASHIER')->assertDontSee('data-tax-credit-note', false);
+        $this->assertSame([$bill->id], $response->viewData('transactions')->pluck('id')->all());
+        $this->assertNull($response->viewData('directory')['rows'][$bill->id]['money']);
+        $this->assertTrue($response->viewData('directory')['restricted']);
+        $csv = $this->get('/pos/hotel/folios/csv?period=all&stream=all')->assertOk()->streamedContent();
+        $this->assertStringContainsString($bill->invoice_number, $csv);
+        $this->assertStringNotContainsString('PRIVATE-OTHER-CASHIER', $csv);
+        $this->get('/pos/hotel/folios/pdf?period=all')->assertOk();
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/folios?period=all')->assertOk()->assertSee('PRIVATE-OTHER-CASHIER');
+    }
+
 }

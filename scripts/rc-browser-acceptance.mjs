@@ -996,6 +996,47 @@ async function sameProductCategorySurface(page,t,v) {
   if(status>=400||finalPath!==path||!await main.count())fail(`${t.name}/${v.width}: same-product category surface ${path} did not render`);
   else pass(`CATEGORY NATIVE PASS: ${t.name}/${v.width}: ${t.categoryCoverage.category} rendered ${path}`);
 }
+
+async function customerAmountAudit(page,t,v) {
+  const f=t.customerAmountAudit, history='/pos/customers/'+f.customerId+'/history';
+  for(const bill of f.cases) {
+    await page.goto(baseUrl+history,{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    const root=page.locator('[x-data="historyBills()"]');
+    if(!(await root.innerText()).includes('PKR '+f.spent))throw new Error('customer lifetime spend differs from persisted payable sum');
+    const row=root.locator('tr[role="button"]').filter({hasText:bill.invoice});
+    if(!await row.count()||!(await row.innerText()).includes('PKR '+bill.payable))throw new Error(bill.invoice+' history row has the wrong payable');
+    await row.click();
+    await page.waitForFunction(expected=>{
+      const d=window.Alpine.$data(document.querySelector('[x-data="historyBills()"]'));
+      return d.open&&!d.loading&&!d.error&&Number(d.bill.total)===expected;
+    },bill.payable);
+    const modal=root.locator('[x-show="open"]');
+    if(!(await modal.innerText()).includes('PKR '+bill.payable))throw new Error('quick-view total does not match history');
+    await modal.locator('button').first().click();
+    await page.goto(baseUrl+'/pos/transaction/'+bill.id+'/receipt',{waitUntil:'domcontentloaded'});
+    if(!(await page.locator('body').innerText()).includes('PKR '+bill.payable+'.00'))throw new Error('actual receipt payable differs from history');
+    await page.goto(baseUrl+'/pos/transactions?tab=local',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    const transactionRow=page.locator('tr').filter({has:page.locator('a[href$="/pos/transaction/'+bill.id+'"]')});
+    if(!await transactionRow.count()||!(await transactionRow.innerText()).includes('PKR '+bill.payable))throw new Error('Transactions row differs from the receipt');
+  }
+  await page.goto(baseUrl+history,{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const [csvDownload]=await Promise.all([page.waitForEvent('download'),page.locator('a[href$="'+history+'/export"]').click()]);
+  const stream=await csvDownload.createReadStream();if(!stream)throw new Error('CSV download stream is unavailable');
+  let csv='';for await(const chunk of stream)csv+=chunk.toString();
+  for(const bill of f.cases) {
+    const line=csv.split(/\r?\n/).find(line=>line.includes(bill.invoice));
+    if(!line||!line.endsWith(','+bill.payable+'.00'))throw new Error('downloaded CSV does not use persisted payable for '+bill.invoice);
+  }
+  const [pdfDownload]=await Promise.all([page.waitForEvent('download'),page.locator('a[href$="'+history+'/pdf"]').click()]);
+  const pdfStream=await pdfDownload.createReadStream();if(!pdfStream)throw new Error('PDF download stream is unavailable');
+  let magic='';for await(const chunk of pdfStream){if(magic.length<5)magic+=chunk.toString('ascii');}
+  if(!magic.startsWith('%PDF'))throw new Error('customer history PDF did not render');
+  pass(t.name+'/'+v.width+': discounted QR and unchanged cash receipt/history/Transactions/CSV agree; PDF renders');
+}
+
 async function healthIsolation(browser,label,v,iso) {
   if(!iso?.branchUser||!iso.ownPatient||!iso.otherBranchPatient||!iso.foreignTenantPatient)throw new Error('health isolation fixture is incomplete');
   const c=await browser.newContext({viewport:v}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(),d=attachDiagnostics(p);
@@ -1018,7 +1059,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v,serviceWorkers:'allow'}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

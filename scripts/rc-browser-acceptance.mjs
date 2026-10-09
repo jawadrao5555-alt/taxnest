@@ -343,6 +343,8 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   const bookingPopup = page.locator('[data-hotel-checkin-popup]');
   await bookingPopup.waitFor({state:'visible'});
   if (new URL(page.url()).pathname !== '/pos/hotel') throw new Error('Check-in left the front desk instead of opening a popup');
+  const bookingBounds = await bookingPopup.boundingBox();
+  if (!bookingBounds || bookingBounds.width < Math.min(700, v.width - 50)) throw new Error('Check-in popup remained cramped');
   await saveEvidenceScreenshot(page, `hotel-checkin-form-${v.width}.png`);
   await dismiss(page);
   const form = page.locator('form[action$="/pos/hotel/stays"]');
@@ -357,6 +359,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, {timeout:30000,waitUntil:'domcontentloaded'}), form.locator('button').click()]);
   const checkinPreview = page.locator('[data-hotel-bill-preview="1"]');
   await checkinPreview.waitFor({state:'visible'});
+  await page.waitForFunction(()=>!document.querySelector('[data-preview-confirm]').disabled && document.querySelector('[data-preview-lines]').childElementCount > 0);
   if (await page.evaluate(() => window.__hotelPrintCalls) !== 0) throw new Error('Check-in automatically opened native print');
   if (!(await checkinPreview.locator('[data-preview-lines]').innerText()).trim()) throw new Error('Check-in popup omitted room charges');
   await saveEvidenceScreenshot(page, `hotel-checkin-preview-${v.width}.png`);
@@ -386,6 +389,22 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   const editFrame = page.frameLocator('[data-preview-editor-frame]');
   await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
   if (await editFrame.locator('[name="rate_amount"]').count() !== 2) throw new Error('Existing scoped rate/date/room editing missing from popup');
+  for (const rate of ['3900','4000']) {
+    const rateForm = editFrame.locator('form[action$="/move"]');
+    await rateForm.locator('[name="rate_amount"]').fill(rate);
+    await rateForm.locator('button[type="button"]').click();
+    const rateSave = rateForm.locator('button:not([type="button"])');
+    await rateSave.waitFor({state:'visible'});
+    await page.waitForFunction(() => {
+      const frame=document.querySelector('[data-preview-editor-frame]');
+      return frame?.contentDocument?.querySelector('form[action$="/move"] button:not([type="button"])')?.disabled === false;
+    });
+    const [savedRate] = await Promise.all([page.waitForResponse(r=>r.url().endsWith(stayPath+'/move')&&r.request().method()==='POST'),rateSave.click()]);
+    if (!savedRate.ok() && savedRate.status() !== 302) throw new Error('Same-room draft rate save failed');
+    await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
+    await page.waitForFunction(rate => document.querySelector('[data-preview-editor-frame]')?.contentDocument?.querySelector('form[action$="/move"] [name="rate_amount"]')?.value === rate, rate);
+  }
+
   const discountForm = editFrame.locator('form[action$="/discount"]');
   const originalDiscount = await discountForm.locator('[name="discount_value"]').inputValue();
   const [edited] = await Promise.all([
@@ -405,6 +424,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   if (await deskModal.locator('[data-desk-method]').inputValue() !== 'card' || Number(await deskModal.locator('[data-desk-amount]').inputValue()) !== 2500) throw new Error('Preview close lost payment edits');
   await page.locator('[data-hotel-open-desk="1"]').click();
   await previewModal.waitFor({state:'visible'});
+  if (await deskModal.locator('[data-desk-flow]').inputValue() !== 'checkout' || await deskModal.locator('[data-desk-method]').inputValue() !== 'card' || Number(await deskModal.locator('[data-desk-amount]').inputValue()) !== 2500) throw new Error('Reopening receipt reset the cashier payment/action');
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
   await deskModal.locator('[data-desk-flow]').selectOption('checkout');
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
@@ -414,20 +434,46 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await deskModal.locator('[data-desk-amount]').fill('0');
   await deskModal.locator('[data-desk-update]').click();
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
+  // Lose the response AFTER the real disposable server commits. Closing/reopening
+  // must retry that same operation, not collect/report it again with a new UUID.
+  await page.evaluate(() => {
+    window.__hotelConfirmOriginal = window.fetch;
+    window.__hotelConfirmPayloads = [];
+    window.fetch = async (...args) => {
+      const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+      const confirmation = url.endsWith('/bill-confirm') && args[1]?.method === 'POST';
+      if (confirmation) window.__hotelConfirmPayloads.push(JSON.parse(args[1].body));
+      const response = await window.__hotelConfirmOriginal(...args);
+      if (confirmation && window.__hotelConfirmPayloads.length === 1 && response.ok) throw new Error('Synthetic committed response lost');
+      return response;
+    };
+  });
+  await previewModal.locator('[data-preview-confirm]').click();
+  await previewModal.locator('[data-preview-error]').filter({hasText:'Synthetic committed response lost'}).waitFor({state:'visible'});
+  await previewModal.locator('[data-preview-back]').click();
+  await page.locator('[data-hotel-open-desk]').first().click();
+  await previewModal.waitFor({state:'visible'});
+  if (!(await previewModal.locator('[data-desk-amount]').isDisabled())) throw new Error('Uncertain payment allowed a new edited operation');
   const [issued] = await Promise.all([
     page.waitForResponse(r => r.url().endsWith(stayPath + '/bill-confirm') && r.request().method() === 'POST'),
     previewModal.locator('[data-preview-confirm]').click(),
   ]);
+  const confirmPayloads = await page.evaluate(() => window.__hotelConfirmPayloads);
+  if (confirmPayloads.length !== 2 || JSON.stringify(confirmPayloads[0]) !== JSON.stringify(confirmPayloads[1])) throw new Error('Lost confirmation generated a new payment/bill attempt');
+  await page.evaluate(() => {window.fetch=window.__hotelConfirmOriginal;delete window.__hotelConfirmOriginal;delete window.__hotelConfirmPayloads;});
   if (!issued.ok()) throw new Error('Full bill with partial advance failed');
   const firstBill = await issued.json();
   if (!firstBill.bill_id) throw new Error('Partial advance did not issue full bill');
   if (!await previewModal.isVisible()) throw new Error('Confirm closed the original receipt dialog');
   if(await previewModal.locator('[data-preview-edit]').isVisible() || await previewModal.locator('[data-preview-delete]').isVisible()) throw new Error('Issued receipt exposed draft edit/delete');
+  if (await previewModal.locator('[data-preview-desk-controls]').isVisible()) throw new Error('Issued receipt still showed payment/action controls through display utilities');
   const receiptPopup = previewModal.locator('[data-preview-issued]');
   await receiptPopup.waitFor({state:'visible'});
   const receiptFrame = page.frameLocator('[data-receipt-frame]');
   await receiptFrame.locator('#receiptActions').waitFor({state:'attached'});
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
+  await page.keyboard.press('Escape');
+  if (!await previewModal.isVisible()) throw new Error('Issued receipt closed on Escape');
   if (!(await receiptFrame.locator('body').innerText()).includes(firstBill.invoice_number)) throw new Error('Receipt popup did not show the issued invoice');
   const receiptFrameBounds = await receiptPopup.locator('[data-receipt-frame]').boundingBox();
   const viewport = page.viewportSize();
@@ -551,6 +597,20 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await invoiceEntry.locator('a').first().click();
   await billsPage.waitForURL(baseUrl + '/pos/transaction/' + firstBill.bill_id);
   await saveEvidenceScreenshot(billsPage, `hotel-bills-original-${v.width}.png`);
+  await billsPage.goto(baseUrl + '/pos/hotel/folios', {waitUntil:'domcontentloaded'});
+  const filterForm = billsPage.locator('[data-hotel-billing-filters]');
+  await filterForm.locator('[name="period"]').selectOption('all');
+  await filterForm.locator('[name="invoice"]').fill(firstBill.invoice_number);
+  await Promise.all([billsPage.waitForNavigation({waitUntil:'domcontentloaded'}),filterForm.locator('button').click()]);
+  if (await billsPage.locator('[data-hotel-invoice]').count() !== 1) throw new Error('Invoice filter did not match one real bill');
+  const [csvDownload] = await Promise.all([billsPage.waitForEvent('download'),billsPage.locator('a[href*="/folios/csv"]').click()]);
+  const csvPath = await csvDownload.path();
+  const csvText = readFileSync(csvPath,'utf8');
+  if (!csvText.includes(firstBill.invoice_number)) throw new Error('Filtered Hotel CSV omitted the invoice');
+  const [pdfDownload] = await Promise.all([billsPage.waitForEvent('download'),billsPage.locator('a[href*="/folios/pdf"]').click()]);
+  if (!readFileSync(await pdfDownload.path()).subarray(0,4).equals(Buffer.from('%PDF'))) throw new Error('Filtered Hotel PDF failed');
+  await saveEvidenceScreenshot(billsPage, `hotel-filtered-exports-${v.width}.png`);
+
   await billsPage.close();
   pass(`${t.name}/${v.width}: Hotel Bills links the same original invoice as Transactions`);
 
@@ -574,7 +634,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
   await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
-  if (billConfirmPosts !== 2) throw new Error('Shared dialog posted an unexpected number of actions');
+  if (billConfirmPosts !== 3) throw new Error('Expected initial confirmation, same-UUID retry and one checkout');
   if (await previewModal.locator('[data-preview-qr]').isVisible()) throw new Error('Unreported local bill advertised a PRA QR');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-confirmed.png`);
   page.off('request', countConfirm);
@@ -632,6 +692,43 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   if (!(await page.locator('body').innerText()).includes(originalGuest)) throw new Error('Guest deletion erased historical stay');
   pass(`${t.name}/${v.width}: guest edit/removal and returning selector preserve historical stays; account billing stays optional`);
+
+  // Second real UI booking: full advance, original receipt, zero-money checkout.
+  await page.goto(baseUrl + '/pos/hotel', {waitUntil:'domcontentloaded'}); await dismiss(page);
+  const dirtyPrepaidRoom = page.locator('[data-hotel-room-state="dirty"]').filter({hasText:room});
+  if (await dirtyPrepaidRoom.count()) {
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),dirtyPrepaidRoom.locator('form[action$="/housekeeping"] button').click()]);
+    await dismiss(page);
+  }
+  const prepaidRoom = page.locator('[data-hotel-room-state="vacant"]').filter({hasText:room});
+  await prepaidRoom.locator('[data-hotel-room-check-in]').click();
+  await bookingPopup.waitFor({state:'visible'});
+  const prepaidForm = bookingPopup.locator('form');
+  await prepaidForm.locator('[name="guest_name"]').fill('Synthetic prepaid ' + room);
+  await prepaidForm.locator('[name="rate_amount"]').fill('4000');
+  await prepaidForm.locator('[name="discount_type"]').selectOption('amount');
+  await prepaidForm.locator('[name="discount_value"]').fill('500');
+  await prepaidForm.locator('details').filter({has:page.locator('[name="advance_amount"]')}).locator('summary').click();
+  await prepaidForm.locator('[name="advance_amount"]').fill('3500');
+  await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/,{waitUntil:'domcontentloaded'}),prepaidForm.locator('button').click()]);
+  const prepaidReview = page.locator('[data-hotel-bill-preview]');
+  await prepaidReview.waitFor({state:'visible'});
+  await page.waitForFunction(()=>!document.querySelector('[data-preview-confirm]').disabled);
+  if (await prepaidReview.locator('[data-desk-amount]').isVisible()) throw new Error('Fully prepaid receipt requested another amount');
+  const [prepaidIssued] = await Promise.all([page.waitForResponse(r=>r.url().endsWith('/bill-confirm')&&r.request().method()==='POST'),prepaidReview.locator('[data-preview-confirm]').click()]);
+  if (!prepaidIssued.ok()) throw new Error('Fully prepaid bill confirmation failed');
+  const prepaidBill = await prepaidIssued.json();
+  await page.waitForFunction(()=>!document.querySelector('[data-receipt-print]').disabled);
+  await prepaidReview.locator('[data-preview-checkout]').click();
+  await page.waitForFunction(()=>!document.querySelector('[data-preview-confirm]').disabled);
+  if (await prepaidReview.locator('[data-desk-amount]').isVisible() || Number(await prepaidReview.locator('[data-desk-amount]').inputValue()) !== 0) throw new Error('Paid checkout did not suppress payment');
+  const [prepaidCheckedOut] = await Promise.all([page.waitForResponse(r=>r.url().endsWith('/bill-confirm')&&r.request().method()==='POST'),prepaidReview.locator('[data-preview-confirm]').click()]);
+  if (!prepaidCheckedOut.ok()) throw new Error('Zero-money checkout failed');
+  const prepaidResult = await prepaidCheckedOut.json();
+  if (prepaidResult.stay_status !== 'checked_out' || prepaidResult.bill_id !== prepaidBill.bill_id) throw new Error('Paid checkout changed the original invoice');
+  await saveEvidenceScreenshot(page, `hotel-paid-checkout-${v.width}.png`);
+  pass(`${t.name}/${v.width}: full advance hides amount; checkout reuses original invoice without another payment`);
+
 
 }
 async function hotelCreditReview(page, t, v) {
@@ -1024,3 +1121,4 @@ async function one(browser,label,v,t) {
 const {browser}=await launchLocalBrowser();
 try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
+

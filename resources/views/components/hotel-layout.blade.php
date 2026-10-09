@@ -1,4 +1,8 @@
 <x-pos-layout>
+<style>
+/* Explicit HTML visibility beats display utilities in production's compiled CSS. */
+.tn-hotel-shell [hidden] { display: none !important; }
+</style>
 <script src="{{ asset('js/hotel-desk.js') }}?v={{ filemtime(public_path('js/hotel-desk.js')) }}"></script>
 <div class="tn-hotel-shell mx-auto px-3 sm:px-6 py-5">
     <div class="tn-hotel-shell-grid">
@@ -16,3 +20,4 @@
     </div>
 </div>
 </x-pos-layout>
+

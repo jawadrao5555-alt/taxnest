@@ -27,7 +27,7 @@
             inlineDialog.querySelector('[data-preview-checkout]').disabled = value;
         }
     };
-    receipt.addEventListener('cancel', event => { if (loading) event.preventDefault(); });
+    receipt.addEventListener('cancel', event => event.preventDefault());
     receipt.addEventListener('close', () => {
         stop();
         if (restore && !restore.open) restore.showModal();
@@ -227,5 +227,9 @@
             event.preventDefault(); openReceipt(target.href, link.closest('dialog'));
         }
     });
-    window.hotelDeskPopups = {receipt: openReceipt};
+    window.hotelDeskPopups = {receipt: openReceipt, refresh: (url, previous) => {
+        if (active?.job || loading || opening || !receiptIsOpen()) return;
+        return openReceipt(url, previous);
+    }};
 })();
+

@@ -112,6 +112,7 @@
         if (opening || loading) return;
         opening = true;
         active = null;
+        q('frame').src = 'about:blank';
         setBusy(true);
         q('print').disabled = true; q('picker').disabled = true; q('browser').hidden = true;
         status(labels.loading);

@@ -134,7 +134,7 @@ class HotelDeskService
             $quote = $this->changeQuote($stay, $userId, $data);
             $oldRate = (float) $stay->rate_amount;
             $rate = $quote['rate'];
-            if ($data['kind'] === 'move' && (int) $data['room_id'] === (int) $stay->room_id) {
+            if ($data['kind'] === 'move' && (int) $data['room_id'] === (int) $stay->room_id && abs($oldRate - $rate) <= 0.009) {
                 return $stay;
             }
             if ($data['kind'] === 'move' && $stay->status === 'checked_in' && abs($oldRate - $rate) > 0.009) {
@@ -232,3 +232,4 @@ class HotelDeskService
         });
     }
 }
+

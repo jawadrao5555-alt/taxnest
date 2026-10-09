@@ -72,3 +72,24 @@ test('closing during an outstanding quote cannot reopen the receipt when its res
     ui.dialog.close();resolvePreview(response(quote));await opening;
     assert.equal(ui.dialog.open,false);
 });
+test('a refused or cancelled draft cannot leave its old edit/delete receipt actionable',async()=>{
+    let closed=false;
+    const ui=desk(async url=>closed?{ok:false,status:409,json:async()=>({message:'Stay cancelled'})}:response(quote));
+    await ui.open.click();closed=true;await ui.field('update').click();
+    assert.equal(ui.el('confirm').disabled,true);assert.equal(ui.el('draft-receipt').hidden,true);
+    assert.equal(ui.el('edit').hidden,true);assert.equal(ui.el('delete').hidden,true);
+    assert.match(ui.el('error').textContent,/Stay cancelled/);
+});
+test('a definite confirmation refusal requires explicit refreshed review before a new attempt',async()=>{
+    const posts=[];
+    const ui=desk(async(url,options)=>{
+        if(url!=='/confirm')return response(quote);
+        posts.push(JSON.parse(options.body));
+        if(posts.length===1)return {ok:false,status:409,json:async()=>({message:'Quote changed'})};
+        return response({success:true,status:'no_bill',stay_status:'checked_in',stay_url:'/stay'});
+    });
+    await ui.open.click();await ui.el('confirm').click();
+    assert.equal(ui.el('confirm').disabled,true);assert.equal(ui.field('amount').disabled,false);
+    await ui.field('update').click();await ui.el('confirm').click();
+    assert.equal(posts.length,2);assert.notEqual(posts[0].idempotency_key,posts[1].idempotency_key);
+});

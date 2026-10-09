@@ -660,5 +660,30 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertSame('cancelled', $stay->fresh()->status);
     }
 
+    public function test_draft_same_room_rate_edit_changes_only_unissued_nights_and_preserves_room_master_and_assignments(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $assignments = $stay->assignments()->count();
+        $this->get('/pos/hotel/stays/'.$stay->id.'?modal_edit=1')->assertOk()
+            ->assertSee('value="'.$room->id.'" selected', false);
+        $data = ['room_id' => $room->id, 'rate_amount' => 4500];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', $data)->assertRedirect()->assertSessionHas('success');
+        $this->assertEquals(4500, $stay->fresh()->rate_amount);
+        $this->assertEquals(9000, $stay->folioEntries()->where('entry_type', 'charge')->sum('amount'));
+        $this->assertEquals(5000, $room->fresh()->rate_amount);
+        $this->assertSame($assignments, $stay->assignments()->count());
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', $data)->assertRedirect();
+        $this->assertSame($assignments, $stay->assignments()->count());
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 9000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', ['room_id' => $room->id, 'rate_amount' => 4000])
+            ->assertRedirect()->assertSessionHas('error');
+        $this->assertEquals(4500, $stay->fresh()->rate_amount);
+        $this->assertEquals(9000, $bill->fresh()->total_amount);
+    }
+
 }
 

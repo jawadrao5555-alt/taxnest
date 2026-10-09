@@ -388,6 +388,22 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   const editFrame = page.frameLocator('[data-preview-editor-frame]');
   await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
   if (await editFrame.locator('[name="rate_amount"]').count() !== 2) throw new Error('Existing scoped rate/date/room editing missing from popup');
+  for (const rate of ['3900','4000']) {
+    const rateForm = editFrame.locator('form[action$="/move"]');
+    await rateForm.locator('[name="rate_amount"]').fill(rate);
+    await rateForm.locator('button[type="button"]').click();
+    const rateSave = rateForm.locator('button:not([type="button"])');
+    await rateSave.waitFor({state:'visible'});
+    await page.waitForFunction(() => {
+      const frame=document.querySelector('[data-preview-editor-frame]');
+      return frame?.contentDocument?.querySelector('form[action$="/move"] button:not([type="button"])')?.disabled === false;
+    });
+    const [savedRate] = await Promise.all([page.waitForResponse(r=>r.url().endsWith(stayPath+'/move')&&r.request().method()==='POST'),rateSave.click()]);
+    if (!savedRate.ok() && savedRate.status() !== 302) throw new Error('Same-room draft rate save failed');
+    await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
+    await page.waitForFunction(rate => document.querySelector('[data-preview-editor-frame]')?.contentDocument?.querySelector('form[action$="/move"] [name="rate_amount"]')?.value === rate, rate);
+  }
+
   const discountForm = editFrame.locator('form[action$="/discount"]');
   const originalDiscount = await discountForm.locator('[name="discount_value"]').inputValue();
   const [edited] = await Promise.all([

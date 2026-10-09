@@ -280,5 +280,57 @@ function hold(engine, orderId, orderType, withKot) {
     assert.deepStrictEqual(recovered.interruptedLocalPrints(), [{ id: 'kot:o-after-transport', order_id: 'o-after-transport' }],
         'interrupted claim remains visible on repeated heartbeat inspection');
     recovered.close();
+
+    // Two overlapping timer/wake drains share the durable queue. A burst larger
+    // than the cloud claim batch must still print every kitchen intent once.
+    const burst = engineWith({ print: { kot_printer: 'Kitchen-80', silent_print_enabled: true } });
+    for (let n = 0; n < 16; n++) hold(burst, 'overlap-' + n, 'takeaway', true);
+    const seen = new Map();
+    const overlapDeps = {
+        deviceId: 'dev-1', now: () => clock, log: () => {}, scope,
+        printHtml: async (html, printer) => {
+            const label = html.match(/L-overlap-\d+/)?.[0];
+            assert.ok(label, 'the real rendered slip identifies the queued order');
+            assert.strictEqual(printer, 'Kitchen-80');
+            seen.set(label, (seen.get(label) || 0) + 1);
+            await new Promise(resolve => setTimeout(resolve, 2));
+            return { success: true };
+        },
+    };
+    const overlapping = await Promise.all([
+        drainLocalKotQueue(burst, overlapDeps), drainLocalKotQueue(burst, overlapDeps),
+    ]);
+    assert.strictEqual(overlapping.reduce((n, x) => n + x.printed, 0), 16);
+    assert.strictEqual(seen.size, 16);
+    assert.ok([...seen.values()].every(n => n === 1), 'overlapping drains never duplicate an intent');
+    assert.strictEqual(burst.localPrintJobs(clock).length, 0);
+    assert.strictEqual(kotEvents(burst).length, 16, 'each physical success has one durable acknowledgement');
+    await drainLocalKotQueue(burst, overlapDeps);
+    assert.strictEqual([...seen.values()].reduce((a, b) => a + b, 0), 16);
+    burst.close();
+
+    // A failed optional counter copy must not make a successfully printed
+    // kitchen ticket retry. This is the previously-working two-printer layout.
+    const copyFailure = engineWith({ print: {
+        kot_printer: 'Kitchen-80', counter_kot_enabled: true,
+        counter_kot_printer: 'Counter-80', silent_print_enabled: true,
+    } });
+    hold(copyFailure, 'counter-copy-failed', 'dine_in', true);
+    const copyCalls = [];
+    const copyDeps = { deviceId: 'dev-1', now: () => clock, log: () => {}, scope,
+        printHtml: async (_, printer) => {
+            copyCalls.push(printer);
+            return printer === 'Kitchen-80' ? { success: true } : { success: false, error: 'Counter offline' };
+        },
+    };
+    const copyResult = await drainLocalKotQueue(copyFailure, copyDeps);
+    assert.deepStrictEqual([copyResult.printed, copyResult.acked, copyResult.handed_back], [1, 1, 0]);
+    clock += 10 * 60 * 1000;
+    await drainLocalKotQueue(copyFailure, copyDeps);
+    assert.deepStrictEqual(copyCalls, ['Kitchen-80', 'Counter-80']);
+    assert.strictEqual(kotEvents(copyFailure).length, 1);
+    assert.strictEqual(copyFailure.snapshot().print_queue['kot:counter-copy-failed'].status, 'completed');
+    copyFailure.close();
+
     console.log('local-kot tests passed');
 })().catch((e) => { console.error(e); process.exit(1); });

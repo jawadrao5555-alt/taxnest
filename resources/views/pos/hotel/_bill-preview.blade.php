@@ -2,8 +2,8 @@
     <h2 class="text-xl font-bold">{{ __('hotel_preview.title') }}</h2>
     <div data-preview-desk-controls hidden class="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
         <label>{{ __('hotel_preview.action') }}<select data-desk-flow class="block w-full rounded border p-2"><option value="collect">{{ __('hotel_preview.collect_bill') }}</option><option value="checkout">{{ __('pos.hotel_check_out_btn') }}</option></select></label>
-        <label>{{ __('pos.hotel_payment_method') }}<select data-desk-method class="block w-full rounded border p-2">@include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])</select></label>
-        <label>{{ __('pos.hotel_collect_now') }}<input data-desk-amount type="number" min="0" step="0.01" class="block w-full rounded border p-2"></label>
+        <label data-desk-method-label>{{ __('pos.hotel_payment_method') }}<select data-desk-method class="block w-full rounded border p-2">@include('pos.hotel._payment-methods', ['hotelPayMethods' => ['cash', 'card', 'qr_payment']])</select></label>
+        <label data-desk-amount-label>{{ __('pos.hotel_collect_now') }}<input data-desk-amount type="number" min="0" step="0.01" class="block w-full rounded border p-2"></label>
         <label data-desk-balance-label hidden><input data-desk-balance type="checkbox"> {{ __('pos.hotel_leave_balance') }}</label>
         <button type="button" data-desk-update class="rounded-lg border p-2">{{ __('hotel_preview.update') }}</button>
     </div>
@@ -43,3 +43,4 @@
 window.hotelBillPreviewLabels = @json(__('hotel_preview'));
 </script>
 <script src="{{ asset('js/hotel-bill-preview.js') }}?v={{ filemtime(public_path('js/hotel-bill-preview.js')) }}" defer></script>
+

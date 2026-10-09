@@ -10,14 +10,32 @@
     const stop = () => { clearTimeout(timer); timer = null; };
     const lockDesk = lock => el('desk-controls').querySelectorAll('input,select,button').forEach(node => { node.disabled = lock; });
     dialog.addEventListener('close', stop);
-    dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
+    dialog.addEventListener('cancel', event => event.preventDefault());
     el('back').addEventListener('click', () => { if (!busy) dialog.close(); });
     function creditLink(url) {
         const link = el('credit-note'); link.hidden = !url;
         if (url) link.href = url; else link.removeAttribute('href');
     }
+    function openEditor(url) {
+        if (busy || !url) return;
+        el('confirm').disabled = true;
+        el('editor').hidden = false;
+        el('editor-frame').src = url;
+        el('draft-receipt').hidden = true;
+    }
+    el('edit').addEventListener('click', () => openEditor(context?.quote?.edit_url));
+    el('delete').addEventListener('click', () => openEditor(context?.quote?.delete_url));
+    el('editor-done').addEventListener('click', async () => {
+        el('editor').hidden = true;
+        el('draft-receipt').hidden = false;
+        if (context?.result) return;
+        await deskPreview(false);
+    });
     function renderResult(result) {
         context.result = result;
+        el('edit').hidden = true; el('delete').hidden = true;
+        el('editor').hidden = true;
+        el('draft-receipt').hidden = !!result.receipt_url;
         creditLink(result.credit_note_url);
         el('desk-controls').hidden = true;
         el('result').hidden = false;
@@ -49,7 +67,11 @@
     }
     el('refresh').addEventListener('click', refresh);
     function renderQuote(quote, payload, form, desk) {
-        context = {payload: {...payload, preview_token: quote.preview_token}, url: form.dataset.confirmUrl, desk, form};
+        context = {payload: {...payload, preview_token: quote.preview_token}, url: form.dataset.confirmUrl, desk, form, quote};
+        el('company').textContent = quote.company_name || '';
+        el('date').textContent = quote.receipt_date || '';
+        el('draft-receipt').hidden = false; el('issued').hidden = true; el('editor').hidden = true;
+        el('edit').hidden = !quote.edit_url; el('delete').hidden = !quote.delete_url;
         stop(); polls = 0;
         creditLink(quote.credit_note_url);
         el('meta').textContent = [quote.stay_number, quote.guest_name, quote.room_number].filter(Boolean).join(' · ');
@@ -69,7 +91,7 @@
         el('confirm').textContent = confirmLabel;
         el('confirm').hidden = false;
         el('confirm').disabled = payload.flow === 'collect' && !quote.will_issue && Number(quote.collect_now) <= 0;
-        el('back').textContent = labels.back; el('error').textContent = ''; el('result').hidden = true; el('stay').hidden = true; el('checkout').hidden = true;
+        el('back').textContent = labels.close; el('error').textContent = ''; el('result').hidden = true; el('stay').hidden = true; el('checkout').hidden = true;
         el('desk-controls').hidden = !desk;
         if (desk) {
             field('balance-label').hidden = payload.flow !== 'checkout' || !quote.allow_balance;
@@ -129,7 +151,14 @@
     field('flow').addEventListener('change', () => deskPreview());
     field('amount').addEventListener('input', () => { el('confirm').disabled = true; });
     field('balance').addEventListener('change', () => deskPreview());
-    document.querySelectorAll('[data-hotel-open-desk]').forEach(button => button.addEventListener('click', () => { field('flow').value = 'collect'; deskPreview(true); }));
+    document.querySelectorAll('[data-hotel-open-desk]').forEach(button => button.addEventListener('click', async () => {
+        if (context?.result) {
+            renderResult(context.result); if (!dialog.open) dialog.showModal();
+            if(context.result.receipt_url && window.hotelDeskPopups) await window.hotelDeskPopups.receipt(context.result.receipt_url, dialog);
+            return;
+        }
+        field('flow').value = 'collect'; deskPreview(true);
+    }));
     el('checkout').addEventListener('click', () => { stop(); field('flow').value = 'checkout'; deskPreview(true); });
     el('confirm').addEventListener('click', async () => {
         if (busy || !context || context.result || el('confirm').disabled) return;

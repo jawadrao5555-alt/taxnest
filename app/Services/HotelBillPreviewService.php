@@ -58,6 +58,13 @@ class HotelBillPreviewService
             'stay_total' => app(HotelDeskService::class)->summary($stay, $method)['total_stay'],
             'discount' => $discount, 'gross' => round($net + $discount, 2),
             'credit_note_url' => $user->isPosAdmin() && in_array($stay->status, ['checked_in', 'checked_out'], true) ? route('pos.hotel.credit-notes', $stay->id) : null,
+            'company_name' => $company->name, 'receipt_date' => now()->format('d M Y H:i'),
+            'edit_url' => $open->isNotEmpty() && $rows->pluck('pos_transaction_id')->filter()->isEmpty()
+                ? route('pos.hotel.stays.show', ['id' => $stay->id, 'modal_edit' => 1]) : null,
+            'delete_url' => $user->isPosAdmin() && !HotelCorrectionService::fiscalLocked(
+                PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+                    ->whereIn('id', $rows->pluck('pos_transaction_id')->filter())->get())
+                ? route('pos.hotel.stays.correction', ['id' => $stay->id, 'modal' => 1]) : null,
             'stay_number' => $stay->stay_number, 'guest_name' => $stay->guest_name, 'room_number' => $stay->room?->room_number,
             'lines' => $lines->map(fn ($r) => ['description' => $r->description, 'amount' => (float) $r->amount])->values()->all(),
             'paid' => round((float) $rows->where('entry_type', 'payment')->sum('amount') - (float) $rows->where('entry_type', 'refund')->sum('amount'), 2),

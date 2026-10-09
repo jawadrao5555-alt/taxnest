@@ -379,6 +379,24 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   page.on('request', countConfirm);
   const previewModal = page.locator('[data-hotel-bill-preview="1"]');
   await previewModal.waitFor({state:'visible'});
+  if (!(await previewModal.locator('[data-preview-draft-receipt]').innerText()).includes('Draft receipt')) throw new Error('Check-in did not render a draft receipt');
+  await page.keyboard.press('Escape');
+  if (!await previewModal.isVisible()) throw new Error('Receipt review closed without explicit Close');
+  await previewModal.locator('[data-preview-edit]').click();
+  const editFrame = page.frameLocator('[data-preview-editor-frame]');
+  await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
+  if (await editFrame.locator('[name="rate_amount"]').count() !== 2) throw new Error('Existing scoped rate/date/room editing missing from popup');
+  const discountForm = editFrame.locator('form[action$="/discount"]');
+  const originalDiscount = await discountForm.locator('[name="discount_value"]').inputValue();
+  const [edited] = await Promise.all([
+    page.waitForResponse(r => r.url().endsWith(stayPath + '/discount') && r.request().method() === 'POST'),
+    discountForm.locator('button').click(),
+  ]);
+  if (edited.status() >= 400) throw new Error('Scoped draft edit failed');
+  await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
+  if (await editFrame.locator('[name="discount_value"]').inputValue() !== originalDiscount) throw new Error('Draft edit changed saved discount unexpectedly');
+  await previewModal.locator('[data-preview-editor-done]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
   if (!(await previewModal.locator('[data-preview-lines]').innerText()).trim()) throw new Error('Bill preview omitted actual folio lines');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-draft.png`);
   await previewModal.locator('[data-preview-back]').click();
@@ -403,12 +421,17 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   if (!issued.ok()) throw new Error('Full bill with partial advance failed');
   const firstBill = await issued.json();
   if (!firstBill.bill_id) throw new Error('Partial advance did not issue full bill');
-  const receiptPopup = page.locator('[data-hotel-receipt-popup]');
+  if (!await previewModal.isVisible()) throw new Error('Confirm closed the original receipt dialog');
+  if(await previewModal.locator('[data-preview-edit]').isVisible() || await previewModal.locator('[data-preview-delete]').isVisible()) throw new Error('Issued receipt exposed draft edit/delete');
+  const receiptPopup = previewModal.locator('[data-preview-issued]');
   await receiptPopup.waitFor({state:'visible'});
   const receiptFrame = page.frameLocator('[data-receipt-frame]');
   await receiptFrame.locator('#receiptActions').waitFor({state:'attached'});
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (!(await receiptFrame.locator('body').innerText()).includes(firstBill.invoice_number)) throw new Error('Receipt popup did not show the issued invoice');
+  const receiptFrameBounds = await receiptPopup.locator('[data-receipt-frame]').boundingBox();
+  const viewport = page.viewportSize();
+  if (!receiptFrameBounds || receiptFrameBounds.width < Math.min(500, viewport.width - 90) || receiptFrameBounds.height < Math.min(288, viewport.height * .45)) throw new Error('Receipt popup is too small to read');
   if (await receiptPopup.locator('[name="paper"],[name="receipt_printer"]').count()) throw new Error('Receipt popup exposed printer settings');
   const frame = page.frames().find(frame => frame.url().includes('/bills/' + firstBill.bill_id + '/receipt'));
   if (!frame) throw new Error('Scoped receipt frame missing');
@@ -416,7 +439,11 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   if (await frame.evaluate(() => window.__hotelPrintCalls) !== 1) throw new Error('Print did not invoke the receipt frame print');
   await saveEvidenceScreenshot(page, `hotel-receipt-popup-${v.width}.png`);
   await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'hidden'});
+  await page.locator('[data-hotel-open-desk]').first().click();
   await previewModal.waitFor({state:'visible'});
+  await receiptPopup.waitFor({state:'visible'});
+  await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (!await previewModal.locator('[data-preview-credit-note]').isVisible()) throw new Error('Credit note missing from shared popup');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-advance-invoice.png`);
   pass(`${t.name}/${v.width}: check-in stayed in popup; actual invoice preview and Print invoked without a new tab or settings`);
@@ -453,7 +480,11 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   });
   if (await receiptPopup.locator('[data-receipt-browser]').isVisible()) throw new Error('Uncertain print silently enabled duplicate browser fallback');
   await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'hidden'});
+  await page.locator('[data-hotel-open-desk]').first().click();
   await previewModal.waitFor({state:'visible'});
+  await receiptPopup.waitFor({state:'visible'});
+  await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   await previewModal.locator('[data-preview-receipt]').click();
   await receiptPopup.waitFor({state:'visible'});
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
@@ -463,8 +494,29 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   if (attempts.length !== 2 || attempts[0] !== attempts[1]) throw new Error('Lost enqueue retry changed its UUID after close/reopen');
   await receiptPopup.locator('[data-receipt-browser]').click();
   await saveEvidenceScreenshot(page, `hotel-print-safe-fallback-${v.width}.png`);
+  // Controlled terminal Agent acknowledgement proves that polling follows the inline dialog.
+  await page.evaluate(({printRoute,stayPath}) => {
+    const previousFetch = window.fetch;
+    window.__hotelInlineStatusReads = 0;
+    window.fetch = async (...args) => {
+      const url = new URL(String(args[0]), location.href).href;
+      if (url === printRoute) return new Response(JSON.stringify({success:true,job_id:987654}), {status:200,headers:{'Content-Type':'application/json'}});
+      if (url.endsWith(stayPath + '/print-jobs/987654')) {
+        ++window.__hotelInlineStatusReads;
+        return new Response(JSON.stringify({status:'done'}), {status:200,headers:{'Content-Type':'application/json'}});
+      }
+      return previousFetch(...args);
+    };
+  }, {printRoute,stayPath});
+  await receiptPopup.locator('[data-receipt-print]').click();
+  await page.waitForFunction(() => window.__hotelInlineStatusReads > 0 && document.querySelector('[data-receipt-status]').textContent.includes(window.hotelDeskPopupConfig.labels.agent_done), null, {timeout:10000});
+  if (await receiptPopup.locator('[data-receipt-browser]').isVisible()) throw new Error('Acknowledged inline job offered duplicate fallback');
   await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'hidden'});
+  await page.locator('[data-hotel-open-desk]').first().click();
   await previewModal.waitFor({state:'visible'});
+  await receiptPopup.waitFor({state:'visible'});
+  await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   await page.evaluate(() => { window.fetch = window.__hotelFetchOriginal; delete window.__hotelFetchOriginal; delete window.__hotelPrintAttempts; });
   pass(`${t.name}/${v.width}: uncertain response retained UUID through close/reopen; explicit rejected-enqueue browser fallback`);
 
@@ -483,6 +535,16 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   const billsPage = await page.context().newPage();
   await billsPage.goto(baseUrl + '/pos/hotel/folios', {waitUntil:'domcontentloaded'});
   await dismiss(billsPage);
+  await billsPage.locator('[data-hotel-billing]').waitFor({state:'visible'});
+  const backLink = billsPage.locator('[data-hotel-report-back]');
+  if(new URL(await backLink.getAttribute('href'), baseUrl).pathname !== '/pos/hotel') throw new Error('Bills Back missed Hotel Dashboard');
+  await billsPage.locator('[data-hotel-tax-toggle]').click();
+  if(await billsPage.locator('[data-hotel-tax-detail]').first().isHidden()) throw new Error('Tax details did not expand');
+  await billsPage.locator('[data-hotel-tax-toggle]').click();
+  await backLink.click(); await billsPage.waitForURL(baseUrl + '/pos/hotel');
+  await billsPage.goto(baseUrl + '/pos/reports', {waitUntil:'domcontentloaded'});
+  await billsPage.locator('[data-hotel-report-back]').click(); await billsPage.waitForURL(baseUrl + '/pos/hotel');
+  await billsPage.goto(baseUrl + '/pos/hotel/folios', {waitUntil:'domcontentloaded'});
   const invoiceEntry = billsPage.locator(`[data-hotel-invoice="${firstBill.bill_id}"]`);
   await invoiceEntry.waitFor({state:'visible'});
   if (!(await invoiceEntry.innerText()).includes(firstBill.invoice_number)) throw new Error('Hotel Bills lost the original invoice number');
@@ -500,9 +562,16 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   ]);
   if (!confirmed.ok()) throw new Error('Remaining payment checkout failed');
   const checkoutResult = await confirmed.json();
-  await receiptPopup.waitFor({state:'visible'});
+  await receiptPopup.waitFor({state:'visible'}).catch(async error => {
+    const state = await previewModal.evaluate(el => ({open:el.open,error:el.querySelector('[data-preview-error]').textContent,issuedHidden:el.querySelector('[data-preview-issued]').hidden,issuedChildren:el.querySelector('[data-preview-issued]').childElementCount,receiptUrl:el.querySelector('[data-preview-receipt]').href}));
+    throw new Error('Checkout receipt: ' + JSON.stringify({checkoutResult,state}) + ' ' + error.message);
+  });
   await receiptPopup.locator('[data-receipt-close]').click();
+  await previewModal.waitFor({state:'hidden'});
+  await page.locator('[data-hotel-open-desk]').first().click();
   await previewModal.waitFor({state:'visible'});
+  await receiptPopup.waitFor({state:'visible'});
+  await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
   await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
   if (billConfirmPosts !== 2) throw new Error('Shared dialog posted an unexpected number of actions');
@@ -579,7 +648,7 @@ async function hotelCreditReview(page, t, v) {
     }, right);
     const bounds = await scroll.boundingBox(), button = await shortcut.boundingBox();
     if (!bounds || !button || button.x < bounds.x - 1 || button.x + button.width > bounds.x + bounds.width + 1)
-      throw new Error('Credit Note action escaped the visible scrolled table');
+      throw new Error('Credit Note action escaped the visible scrolled table: ' + JSON.stringify({right,bounds,button,layout:await scroll.evaluate(el=>({scrollLeft:el.scrollLeft,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,tableDisplay:getComputedStyle(el.querySelector('table')).display,tableOverflow:getComputedStyle(el.querySelector('table')).overflowX}))}));
     await saveEvidenceScreenshot(page, `tax-credit-sticky-${right ? 'right' : 'left'}-${v.width}.png`);
   }
   await Promise.all([page.waitForURL(/\/credit-notes#bill-\d+$/), shortcut.click()]);

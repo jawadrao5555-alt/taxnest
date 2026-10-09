@@ -346,6 +346,11 @@ class HotelController extends Controller
             ->whereIn('id', $stay->folioEntries->pluck('pos_transaction_id')->filter()->unique())
             ->orderBy('id')->get();
 
+        if (request()->boolean('modal_edit')) {
+            abort_unless($stay->status === 'checked_in' && !\App\Models\HotelFolioEntry::where('company_id', $stay->company_id)
+                ->where('stay_id', $stay->id)->whereNotNull('pos_transaction_id')->exists(), 409);
+            return view('pos.hotel.draft-editor', compact('stay', 'rooms'));
+        }
         return view('pos.hotel.stay-show', compact('stay', 'totals', 'rooms', 'products', 'services', 'uomGroups', 'checkoutPolicy', 'timeline', 'deskSummary', 'issuedBills'));
     }
 
@@ -1000,33 +1005,7 @@ class HotelController extends Controller
 
     public function folios(Request $request)
     {
-        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
-        $companyId = (int) app('currentCompanyId');
-        $branchId = $this->branches->getActiveBranchId();
-        $stays = HotelStay::where('company_id', $companyId)
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->whereIn('status', ['reserved', 'checked_in', 'checked_out'])
-            ->with(['room', 'folioEntries' => fn ($q) => $q->whereNotNull('pos_transaction_id')])
-            ->orderByDesc('id')
-            ->paginate(30)->withQueryString();
-        $dues = [];
-        $money = [];
-        foreach ($stays as $stay) {
-            $money[$stay->id] = app(\App\Services\HotelDeskService::class)->summary($stay, 'cash');
-            $dues[$stay->id] = $money[$stay->id]['balance'];
-        }
-
-        $ids = $stays->getCollection()->flatMap(fn ($stay) => $stay->folioEntries->pluck('pos_transaction_id'))->filter()->unique();
-        $bills = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)->whereIn('id', $ids)->get()->keyBy('id');
-        $fiscalLocked = [];
-        foreach ($stays as $stay) {
-            $linked = $stay->folioEntries->pluck('pos_transaction_id')->filter()->unique();
-            $documents = $linked->map(fn ($id) => $bills->get($id))->filter();
-            $fiscalLocked[$stay->id] = $documents->count() !== $linked->count() || \App\Services\HotelCorrectionService::fiscalLocked($documents);
-        }
-        $viewer = auth('pos')->user();
-        $visibleBills = $bills->filter(fn ($bill) => $bill->allowedForBillingScopeOf($viewer) && $bill->allowedForCashierIsolationOf($viewer));
-        return view('pos.hotel.folios', compact('stays', 'dues', 'money', 'visibleBills', 'fiscalLocked'));
+        return app(HotelBillingController::class)->index($request);
     }
 
     public function reports()

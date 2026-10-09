@@ -4,8 +4,10 @@
     const booking = document.querySelector('[data-hotel-checkin-popup]');
     const receipt = document.querySelector('[data-hotel-receipt-popup]');
     if (!config || !booking || !receipt) return;
-    const q = name => receipt.querySelector('[data-receipt-' + name + ']');
+    let receiptHost = receipt, inlineDialog = null;
+    const q = name => receiptHost.querySelector('[data-receipt-' + name + ']');
     const labels = config.labels;
+    const receiptIsOpen = () => (inlineDialog || receipt).open;
     const status = text => { q('status').textContent = text; };
     let active = null, opening = false, loading = false, restore = null, poll = null;
     const attempts = new Map();
@@ -20,6 +22,10 @@
         q('print').disabled = value || !active?.ready;
         q('picker').disabled = value;
         q('close').disabled = value;
+        if (inlineDialog) {
+            inlineDialog.querySelector('[data-preview-back]').disabled = value;
+            inlineDialog.querySelector('[data-preview-checkout]').disabled = value;
+        }
     };
     receipt.addEventListener('cancel', event => { if (loading) event.preventDefault(); });
     receipt.addEventListener('close', () => {
@@ -27,7 +33,14 @@
         if (restore && !restore.open) restore.showModal();
         restore = null;
     });
-    q('close').addEventListener('click', () => { if (!loading) receipt.close(); });
+    function unmountInline() {
+        if (receiptHost !== receipt) {
+            stop();
+            while (receiptHost.firstChild) receipt.append(receiptHost.firstChild);
+            receiptHost.hidden = true; receiptHost = receipt; inlineDialog = null;
+        }
+    }
+    q('close').addEventListener('click', () => { if (!loading) (inlineDialog || receipt).close(); });
     booking.querySelector('[data-checkin-close]').addEventListener('click', () => booking.close());
     booking.addEventListener('cancel', event => { if (booking.dataset.busy === '1') event.preventDefault(); });
 
@@ -98,13 +111,33 @@
     async function openReceipt(url, previous = null) {
         if (opening || loading) return;
         opening = true;
+        active = null;
+        q('frame').src = 'about:blank';
+        setBusy(true);
+        q('print').disabled = true; q('picker').disabled = true; q('browser').hidden = true;
+        status(labels.loading);
         try {
+            if (previous?.matches('[data-hotel-bill-preview]')) {
+                const host = previous.querySelector('[data-preview-issued]');
+                if (inlineDialog !== previous) {
+                    unmountInline(); receiptHost = host; inlineDialog = previous;
+                    while (receipt.firstChild) host.append(receipt.firstChild);
+                    if (!previous.dataset.receiptCloseBound) {
+                        previous.addEventListener('close', () => { if (!previous.open && inlineDialog === previous) unmountInline(); });
+                        previous.addEventListener('cancel', event => event.preventDefault());
+                        previous.dataset.receiptCloseBound = '1';
+                    }
+                }
+                host.hidden = false;
+            } else unmountInline();
+            setBusy(true);
             const target = sameOrigin(url);
             const match = target.pathname.match(/\/pos\/hotel\/stays\/(\d+)\/(?:bills\/(\d+)\/receipt|statement)$/);
             if (!match) throw new Error(config.failed);
             const response = await fetch(config.base + '/' + match[1] + '/receipt-preview', {credentials:'same-origin', headers:{Accept:'application/json'}});
             if (!response.ok) throw new Error(config.failed);
             const model = await response.json();
+            if (previous?.matches('[data-hotel-bill-preview]') && (!previous.open || inlineDialog !== previous)) return;
             active = {...model, stay: match[1], ready:false};
             q('picker').replaceChildren();
             for (const [index, entry] of model.documents.entries()) {
@@ -115,10 +148,13 @@
             q('picker').value = String(requested);
             q('picker-label').hidden = model.documents.length < 2;
             selectDocument(requested);
-            if (previous?.open) { restore = previous; previous.close(); }
-            if (!receipt.open) receipt.showModal();
-        } catch (failure) { status(failure.message); if (!receipt.open) receipt.showModal(); }
-        finally { opening = false; }
+            if (inlineDialog) { if (!inlineDialog.open) inlineDialog.showModal(); }
+            else {
+                if (previous?.open) { restore = previous; previous.close(); }
+                if (!receipt.open) receipt.showModal();
+            }
+        } catch (failure) { status(failure.message); if (!inlineDialog && !receipt.open) receipt.showModal(); }
+        finally { opening = false; setBusy(false); q('print').disabled = loading || !active?.ready || !!active?.job; q('picker').disabled = loading || !!active?.job; }
     }
     q('picker').addEventListener('change', () => {
         if (active?.job && !confirm(labels.possible_duplicate)) { q('picker').value = String(active.documents.indexOf(active.document)); return; }
@@ -133,13 +169,13 @@
     q('browser').addEventListener('click', browserPrint);
     async function pollJob() {
         stop();
-        if (!active?.job || !receipt.open) return;
+        if (!active?.job || !receiptIsOpen()) return;
         const snapshot = active;
         try {
             const response = await fetch(config.base + '/' + active.stay + '/print-jobs/' + active.job, {credentials:'same-origin', headers:{Accept:'application/json'}});
             if (!response.ok) throw new Error(config.failed);
             const result = await response.json();
-            if (active !== snapshot || !receipt.open) return;
+            if (active !== snapshot || !receiptIsOpen()) return;
             if (result.status === 'done') {
                 status(labels.agent_done); attempts.delete(active.document.url); active.attempt = null; active.job = null; setBusy(false); q('browser').hidden = true; return;
             }
@@ -151,7 +187,7 @@
             status(labels.queued + ' #' + active.job + ' — ' + labels.awaiting_agent);
             if (++active.polls < 20) poll = setTimeout(pollJob, 1500);
             else { status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
-        } catch (_) { if (active !== snapshot || !receipt.open) return; status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
+        } catch (_) { if (active !== snapshot || !receiptIsOpen()) return; status(labels.awaiting_agent); setBusy(false); q('print').disabled = true; q('browser').hidden = false; }
     }
     q('print').addEventListener('click', async () => {
         if (!active?.ready || loading || active.job) return;

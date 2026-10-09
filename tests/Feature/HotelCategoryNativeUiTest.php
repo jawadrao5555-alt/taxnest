@@ -224,8 +224,9 @@ class HotelCategoryNativeUiTest extends TestCase
             ->assertOk()->assertSee('data-hotel-statement="1"', false)
             ->assertSee($stay->stay_number)->assertSee(__('hotel_bill.not_fiscal'))
             ->assertDontSee('guest_cnic');
-        $this->get(route('pos.hotel.folios'))->assertOk()
-            ->assertSee('data-hotel-bill-reprint="1"', false)
+        $this->get(route('pos.hotel.folios'))->assertOk()->assertViewIs('pos.hotel.bills')
+            ->assertSee(route('pos.hotel.stays.index'));
+        $this->get(route('pos.hotel.stays.index'))->assertOk()
             ->assertSee(route('pos.hotel.stays.statement', $stay->id));
         $reservedRoom = app(HotelStayService::class)->createRoom((int) $company->id, [
             'room_number' => '119', 'room_type' => 'Standard', 'capacity' => 2, 'rate_amount' => 5000,
@@ -503,7 +504,9 @@ class HotelCategoryNativeUiTest extends TestCase
         ]);
 
         $this->actingAs($desk, 'pos')->get('/pos/hotel')->assertOk();
-        $this->actingAs($desk, 'pos')->get('/pos/hotel/folios')->assertOk()->assertSee('Native Guest', false);
+        $this->actingAs($desk, 'pos')->get('/pos/hotel/folios')->assertOk()->assertViewIs('pos.hotel.bills')
+            ->assertSee(route('pos.hotel.stays.index'));
+        $this->get('/pos/hotel/stays')->assertOk()->assertSee('Native Guest', false);
         $this->actingAs($hk, 'pos')->get('/pos/hotel')->assertRedirect();
         $this->actingAs($hk, 'pos')->get('/pos/hotel/housekeeping')->assertOk()->assertSee('data-hotel-room-board', false);
         $this->actingAs($hk, 'pos')->get('/pos/hotel/reservations')->assertRedirect();

@@ -6724,7 +6724,7 @@ class PosController extends Controller
      * On mPDF failure the method logs a warning and falls back to DomPDF Roman
      * Urdu (applyPdfSafeLocale) — no 500 is ever returned.
      */
-    private function renderReportPdf(
+    protected function renderReportPdf(
         string $view,
         array $data,
         string $filename,
@@ -6964,7 +6964,7 @@ class PosController extends Controller
         return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
     }
 
-    private function applyReportFilters($query, $tab, $cashierFilter = null, $forUser = null)
+    protected function applyReportFilters($query, $tab, $cashierFilter = null, $forUser = null)
     {
         // Multi-branch v1 (Task 1347): SINGLE choke point for branch scoping —
         // transactions list, sales reports, tax reports, exports and the
@@ -7343,7 +7343,7 @@ class PosController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    private function buildTaxReportQuery(Request $request, $tab = 'pra', $skipTaxRateFilter = false)
+    protected function buildTaxReportQuery(Request $request, $tab = 'pra', $skipTaxRateFilter = false)
     {
         $companyId = app('currentCompanyId');
         $query = PosTransaction::where('company_id', $companyId)
@@ -7636,6 +7636,10 @@ class PosController extends Controller
 
     public function taxReports(Request $request)
     {
+        $native = \App\Services\HotelShell::isNativeCategory(Company::find(app('currentCompanyId')));
+        if (get_class($this) === self::class && $native && \App\Services\HotelAccessService::canFrontDesk(auth('pos')->user())) {
+            return app(HotelBillingController::class)->index($request);
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
@@ -8080,7 +8084,7 @@ class PosController extends Controller
      * Plan gate (Aug 2026 package matrix). Returns a redirect (pages) or
      * aborts 403 (JSON) when the company's plan lacks the premium column.
      */
-    private function planGate(string $planColumn)
+    protected function planGate(string $planColumn)
     {
         $company = Company::find(app('currentCompanyId'));
         // Category profile (Task 1582): a module that does not belong to this

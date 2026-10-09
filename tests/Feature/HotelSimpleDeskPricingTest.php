@@ -250,10 +250,11 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertSame('checked_out', $stay->fresh()->status);
         $this->assertEquals(9900, app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance']);
         $billPage = $this->actingAs($owner, 'pos')->get('/pos/hotel/folios')->assertOk()->getContent();
-        $this->assertStringContainsString(__('hotel_simplify.payment_pending'), $billPage);
-        $this->assertStringContainsString('/pos/hotel/stays/'.$stay->id.'#hotel-payment', $billPage);
-        $this->assertStringContainsString(__('hotel_simplify.cash_estimate'), $billPage);
-        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee(__('pos.hotel_collect_now'));
+        $this->assertStringContainsString(route('pos.hotel.stays.index'), $billPage);
+        $this->get('/pos/hotel/stays')->assertOk()->assertSee($stay->stay_number);
+        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee(__('pos.hotel_collect_now'))
+            ->assertSee(__('hotel_simplify.payment_pending'))->assertSee(__('hotel_simplify.cash_estimate'))
+            ->assertSee('href="#hotel-payment"', false);
     }
 
     public function test_checked_out_collection_preview_uses_the_selected_payment_method(): void
@@ -425,6 +426,193 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->actingAs($foreignOwner, 'pos')->postJson($url, ['print_attempt_uuid' => $uuid])->assertNotFound();
         $this->getJson(route('pos.hotel.print-status', [$stay->id, $jobId]))->assertNotFound();
         $this->assertSame(2, \App\Models\PosPrintJob::where('company_id', $company->id)->where('type', 'bill')->count());
+    }
+
+
+    public function test_combined_bills_net_credit_once_and_keep_stay_money_separate_from_refund(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $folio->postDeposit($stay, ['amount' => 500], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $credit = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'RET-BILL-DIRECTORY',
+            'transaction_type' => 'return', 'status' => 'completed', 'invoice_mode' => 'pra',
+            'subtotal' => 2000, 'discount_amount' => 0, 'tax_rate' => 0, 'tax_amount' => 0,
+            'total_amount' => 2000, 'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        \App\Models\HotelFolioEntry::create([
+            'company_id' => $company->id, 'stay_id' => $stay->id, 'entry_type' => 'adjustment',
+            'category' => 'other', 'description' => 'Synthetic credit', 'quantity' => 1, 'unit_amount' => -2000,
+            'amount' => -2000, 'pos_transaction_id' => $credit->id, 'created_by' => $owner->id,
+        ]);
+        $response = $this->actingAs($owner, 'pos')->get('/pos/hotel/folios?period=all')->assertOk()
+            ->assertViewIs('pos.hotel.bills')->assertSee('data-hotel-invoice="'.$bill->id.'"', false)
+            ->assertSee('data-hotel-invoice="'.$credit->id.'"', false);
+        $this->assertEquals(8000, $response->viewData('summary')->total_sales);
+        $this->assertEquals(1, $response->viewData('summary')->return_count);
+        $this->assertEquals(10000, $response->viewData('directory')['paid']); // credit note does NOT refund money.
+        $this->assertEquals(0, $response->viewData('directory')['due']);
+        $this->assertSame(0, $stay->folioEntries()->where('entry_type', 'refund')->count());
+        $csv = $this->get('/pos/hotel/folios/csv?period=all')->assertOk()->streamedContent();
+        $this->assertStringContainsString($bill->invoice_number, $csv);
+        $this->assertStringContainsString('RET-BILL-DIRECTORY', $csv);
+        $this->assertStringContainsString('8000.00', $csv);
+        $this->get('/pos/hotel/folios/pdf?period=all')->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $filtered = $this->get('/pos/hotel/folios?period=all&bill_type=returns')->assertOk();
+        $this->assertEquals(2000, $filtered->viewData('summary')->total_sales);
+        $this->assertSame([$credit->id], $filtered->viewData('transactions')->pluck('id')->all());
+    }
+
+    public function test_combined_filters_exports_and_back_links_preserve_generic_reports_and_foreign_tenant(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        [$otherCompany, $otherOwner, $otherRoom] = $this->fixture();
+        $service = app(HotelStayService::class);
+        $folio = app(\App\Services\HotelFolioService::class);
+        $stay = $service->book($company->id, $owner->id, $this->booking($room));
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        // SQLite's legacy fixture index is globally unique; give the first synthetic bill an explicit name.
+        $bill->update(['invoice_number' => 'OWN-TENANT-DIRECTORY']);
+        $foreign = $service->book($otherCompany->id, $otherOwner->id, $this->booking($otherRoom, ['guest_name' => 'Private other tenant']));
+        $folio->postPayment($foreign, ['amount' => 10000], $otherOwner->id);
+        $foreignBill = $folio->settleCoveredCharges($foreign, $otherOwner->id, 'cash')['transaction'];
+        $this->actingAs($owner, 'pos')->get('/pos/tax-reports?period=all&tab=local')->assertOk()->assertViewIs('pos.hotel.bills')->assertViewHas('stream', 'local');
+        $this->get('/pos/hotel/folios?period=all&room=101&payment_state=paid')->assertOk()
+            ->assertSee('data-hotel-report-back="1"', false)->assertDontSee('Private other tenant')
+            ->assertSee('data-hotel-invoice="'.$bill->id.'"', false)->assertDontSee('data-hotel-invoice="'.$foreignBill->id.'"', false);
+        $this->get('/pos/hotel/folios?period=all&invoice=NO-MATCH')->assertOk()->assertViewHas('transactions', fn ($ts) => $ts->isEmpty());
+        $csv = $this->get('/pos/hotel/folios/csv?period=all&invoice=NO-MATCH')->assertOk()->streamedContent();
+        $this->assertStringNotContainsString($bill->invoice_number, $csv);
+        $this->get('/pos/reports')->assertOk()->assertSee('data-hotel-report-back="1"', false);
+        $retail = $this->company('retail');
+        $retailOwner = $this->owner($retail);
+        $this->actingAs($retailOwner, 'pos')->get('/pos/tax-reports')->assertOk()->assertViewIs('pos.tax-reports')
+            ->assertDontSee('data-hotel-report-back="1"', false);
+        $this->get('/pos/reports')->assertOk()->assertDontSee('data-hotel-report-back="1"', false);
+    }
+
+    public function test_draft_receipt_has_edit_cancel_actions_but_issued_fiscal_bill_does_not(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $this->actingAs($owner, 'pos');
+        $preview = $this->getJson('/pos/hotel/stays/'.$stay->id.'/bill-preview?flow=collect&payment_method=cash&amount=0')->assertOk();
+        $this->assertSame($company->name, $preview->json('company_name'));
+        $this->assertNotNull($preview->json('edit_url'));
+        $this->assertNotNull($preview->json('delete_url'));
+        $this->get($preview->json('edit_url'))->assertOk()->assertViewIs('pos.hotel.draft-editor')
+            ->assertSee('name="rate_amount"', false)->assertSee('name="discount_value"', false)
+            ->assertDontSee('data-hotel-bill-preview', false);
+        $this->assertSame(0, \App\Models\PosTransaction::where('company_id', $company->id)->count());
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ONLY-FISCAL']);
+        $new = $this->getJson('/pos/hotel/stays/'.$stay->id.'/bill-preview?flow=checkout&payment_method=cash&amount=0')->assertOk();
+        $new->assertJsonPath('edit_url', null)->assertJsonPath('delete_url', null);
+        $this->getJson('/pos/hotel/stays/'.$stay->id.'?modal_edit=1')->assertStatus(409);
+        $this->get('/pos/hotel/stays/'.$stay->id.'/correction')->assertOk()->assertDontSee('name="confirmed"', false);
+    }
+
+    public function test_combined_cashier_scope_hides_other_invoice_and_partial_stay_money_in_exports(): void
+    {
+        [$company, $owner, $room] = $this->fixture(['pos_cashier_own_sales_only' => true]);
+        $cashier = $this->staff($company, 'pos_cashier');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $bill->update(['created_by' => $cashier->id, 'invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-OWN']);
+        $private = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'PRIVATE-OTHER-CASHIER',
+            'status' => 'completed', 'invoice_mode' => 'pra', 'pra_status' => 'submitted',
+            'pra_invoice_number' => 'SYNTHETIC-OTHER', 'subtotal' => 300, 'total_amount' => 300,
+            'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        \App\Models\HotelFolioEntry::create([
+            'company_id' => $company->id, 'stay_id' => $stay->id, 'entry_type' => 'charge',
+            'category' => 'other', 'description' => 'Other cashier charge', 'quantity' => 1,
+            'unit_amount' => 300, 'amount' => 300, 'pos_transaction_id' => $private->id,
+            'created_by' => $owner->id,
+        ]);
+        $response = $this->actingAs($cashier, 'pos')->get('/pos/hotel/folios?period=all&stream=all')->assertOk()
+            ->assertViewHas('stream', 'pra')->assertSee($bill->invoice_number)
+            ->assertDontSee('PRIVATE-OTHER-CASHIER')->assertDontSee('data-tax-credit-note', false);
+        $this->assertSame([$bill->id], $response->viewData('transactions')->pluck('id')->all());
+        $this->assertNull($response->viewData('directory')['rows'][$bill->id]['money']);
+        $this->assertTrue($response->viewData('directory')['restricted']);
+        $csv = $this->get('/pos/hotel/folios/csv?period=all&stream=all')->assertOk()->streamedContent();
+        $this->assertStringContainsString($bill->invoice_number, $csv);
+        $this->assertStringNotContainsString('PRIVATE-OTHER-CASHIER', $csv);
+        $this->get('/pos/hotel/folios/pdf?period=all')->assertOk();
+        $this->actingAs($owner, 'pos')->get('/pos/hotel/folios?period=all')->assertOk()->assertSee('PRIVATE-OTHER-CASHIER');
+    }
+
+    public function test_native_hotel_combined_tax_report_keeps_standalone_outlet_sales_and_returns(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ROOM']);
+        $outlet = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'DIRECT-OUTLET-SALE',
+            'transaction_type' => 'sale', 'status' => 'completed', 'invoice_mode' => 'pra',
+            'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-OUTLET',
+            'customer_name' => 'Walk-in outlet guest', 'subtotal' => 840, 'discount_amount' => 0,
+            'tax_rate' => 16, 'tax_amount' => 160, 'total_amount' => 1000,
+            'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        $return = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'DIRECT-OUTLET-CREDIT',
+            'transaction_type' => 'return', 'status' => 'completed', 'invoice_mode' => 'pra',
+            'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-OUTLET-CREDIT',
+            'subtotal' => 168, 'discount_amount' => 0, 'tax_rate' => 16, 'tax_amount' => 32,
+            'total_amount' => 200, 'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'LOCAL-OUTLET-UNREPORTED',
+            'transaction_type' => 'sale', 'status' => 'completed', 'invoice_mode' => 'local',
+            'subtotal' => 500, 'discount_amount' => 0, 'tax_amount' => 0, 'total_amount' => 500,
+            'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        $response = $this->actingAs($owner, 'pos')->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
+            ->assertSee('DIRECT-OUTLET-SALE')->assertSee('DIRECT-OUTLET-CREDIT')
+            ->assertSee(route('pos.receipt', $outlet->id), false);
+        $default = $this->get('/pos/tax-reports?period=all')->assertOk()->assertViewHas('stream', 'pra')
+            ->assertDontSee('LOCAL-OUTLET-UNREPORTED');
+        preg_match('/href="([^"]*\/pos\/hotel\/folios\/csv[^"]*)"/', $default->getContent(), $link);
+        $this->assertNotEmpty($link);
+        $download = $this->get(html_entity_decode($link[1], ENT_QUOTES, 'UTF-8'))->assertOk()->streamedContent();
+        $this->assertStringContainsString('10800.00', $download);
+        $this->assertStringNotContainsString('LOCAL-OUTLET-UNREPORTED', $download);
+        $this->assertEquals(10800, $response->viewData('summary')->total_sales);
+        $this->assertEquals(128, $response->viewData('summary')->total_tax);
+        $this->assertEquals(10000, $response->viewData('directory')['paid']);
+        $csv = $this->get('/pos/hotel/folios/csv?period=all&stream=pra')->assertOk()->streamedContent();
+        $this->assertStringContainsString('DIRECT-OUTLET-SALE', $csv);
+        $this->assertStringContainsString('DIRECT-OUTLET-CREDIT', $csv);
+        $this->assertStringContainsString('10800.00', $csv);
+        $this->get('/pos/hotel/folios?period=all&room=101')->assertOk()
+            ->assertSee($bill->invoice_number)->assertDontSee('DIRECT-OUTLET-SALE')->assertDontSee('DIRECT-OUTLET-CREDIT');
+
+        $a = Branch::create(['company_id' => $company->id, 'name' => 'Branch A', 'code' => 'A', 'is_active' => true, 'is_head_office' => true]);
+        $b = Branch::create(['company_id' => $company->id, 'name' => 'Branch B', 'code' => 'B', 'is_active' => true]);
+        // A legacy NULL invoice branch must not reveal a linked stay from Branch B.
+        $stay->update(['branch_id' => $b->id]);
+        $bill->update(['branch_id' => null]);
+        $outlet->update(['branch_id' => $a->id]);
+        $return->update(['branch_id' => $a->id]);
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $scoped = $this->withSession(['active_branch_id' => $a->id])->get('/pos/hotel/folios?period=all&stream=pra')->assertOk()
+            ->assertDontSee('data-hotel-invoice="'.$bill->id.'"', false)->assertSee('DIRECT-OUTLET-SALE');
+        $this->assertEquals(800, $scoped->viewData('summary')->total_sales);
+        $this->assertEquals(128, $scoped->viewData('summary')->total_tax);
     }
 
 }

@@ -1127,6 +1127,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::patch('/guests/{id}', [HotelController::class, 'updateGuest'])->whereNumber('id')->name('pos.hotel.guests.update');
         Route::delete('/guests/{id}', [HotelController::class, 'deleteGuest'])->whereNumber('id')->name('pos.hotel.guests.delete');
         Route::get('/folios', [HotelController::class, 'folios'])->name('pos.hotel.folios');
+        Route::get('/folios/csv', [\App\Http\Controllers\HotelBillingController::class, 'csv'])->name('pos.hotel.folios.csv');
+        Route::get('/folios/pdf', [\App\Http\Controllers\HotelBillingController::class, 'pdf'])->name('pos.hotel.folios.pdf');
         Route::get('/reports', [HotelController::class, 'reports'])->name('pos.hotel.reports');
         // Separated Restaurant Outlet (saved restaurant_mode ON only).
         Route::get('/restaurant', [HotelController::class, 'restaurantOutlet'])->name('pos.hotel.restaurant-outlet');

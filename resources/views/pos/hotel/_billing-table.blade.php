@@ -60,6 +60,8 @@
                 @elseif($row['can_credit'])
                 <a class="inline-flex mt-2 rounded border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700" data-tax-credit-note="{{ $t->id }}" href="{{ route('pos.hotel.credit-notes', $stay->id) }}#bill-{{ $t->id }}">{{ __('hotel_credit.entry') }}</a>
                 @endif
+                @else
+                <a class="block rounded-lg border px-2 py-1 text-xs font-semibold text-blue-700" href="{{ route('pos.receipt', $t->id) }}">{{ __('hotel_bill.issued_receipt') }}</a>
                 @endif
             </td>
             @endif

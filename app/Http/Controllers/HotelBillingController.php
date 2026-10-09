@@ -68,7 +68,7 @@ class HotelBillingController extends PosController
         $companyId = (int) app('currentCompanyId');
         $branchId = app(BranchContextService::class)->getActiveBranchId();
         // EXISTS avoids multiplying an invoice by its folio lines.
-        $query->whereExists(function ($q) use ($companyId, $branchId, $request) {
+        $hotelInvoice = function ($q) use ($companyId, $branchId, $request) {
             $q->selectRaw('1')->from('hotel_folio_entries as hfe')
                 ->join('hotel_stays as hs', 'hs.id', '=', 'hfe.stay_id')
                 ->whereColumn('hfe.pos_transaction_id', 'pos_transactions.id')
@@ -80,7 +80,22 @@ class HotelBillingController extends PosController
                     ->whereColumn('hr.id', 'hs.room_id')->where('hr.company_id', $companyId)
                     ->where('hr.room_number', \App\Helpers\DbCompat::like(), '%'.$request->room.'%'));
             }
-        });
+        };
+        if (\App\Services\HotelShell::isNativeCategory(Company::find($companyId)) && !$request->filled('room')) {
+            // Tax Reports must retain standalone outlet/counter bills in a Hotel company.
+            // Linked Hotel invoices still obey the stay's branch; never turn a hidden
+            // other-branch stay invoice into an apparently standalone POS invoice.
+            $query->where(function ($scope) use ($hotelInvoice, $companyId) {
+                $scope->whereExists($hotelInvoice)->orWhereNotExists(function ($q) use ($companyId) {
+                    $q->selectRaw('1')->from('hotel_folio_entries as linked_folio')
+                        ->whereColumn('linked_folio.pos_transaction_id', 'pos_transactions.id')
+                        ->where('linked_folio.company_id', $companyId)
+                        ->whereIn('linked_folio.entry_type', ['charge', 'adjustment']);
+                });
+            });
+        } else {
+            $query->whereExists($hotelInvoice);
+        }
         if ($request->filled('invoice')) {
             $query->where('invoice_number', \App\Helpers\DbCompat::like(), '%'.$request->invoice.'%');
         }

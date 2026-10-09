@@ -1,16 +1,18 @@
 # Hotel unified billing and persistent receipt review
 
 ## Intended behavior
-Native Hotel Bills and Tax Reports now render one invoice directory (including credit notes), with filters, tax details, CSV/PDF and dashboard Back links. Retail/restaurant report layouts retain their existing behavior. Unbilled stays remain available through Stays.
+Native Hotel Bills and Tax Reports now render one invoice directory (including credit notes and standalone restaurant/counter bills for a native Hotel company), with filters, tax details, CSV/PDF and dashboard Back links. Retail/restaurant report layouts retain their existing behavior. Unbilled stays remain available through Stays.
 
 Check-in and checkout review use a draft receipt before issuance. Edit uses existing scoped date/rate/room and discount forms. Delete/Cancel uses the existing audited stay-correction flow; it is not a database hard delete. Fiscal-locked bills cannot be edited or cancelled through these actions. Confirm mounts the actual issued receipt inside the same review dialog. Only explicit Close dismisses it.
+
+The invoice table opts out of the generic mobile inner-table scroller; the outer wrapper is the single horizontal scroller, keeping Credit Note actions pinned at both scroll edges.
 
 Receipt dialogs have explicit responsive dimensions independent of generated utility CSS, including the credit-note reprint dialog. Saved paper, printer/Agent routing, durable print UUIDs and extension preference remain unchanged.
 
 ## Compatibility and isolation matrix
 | Flow | Expected behavior |
 | --- | --- |
-| Native Hotel admin | One table, authorized all/PRA/local streams, signed credit netting |
+| Native Hotel admin | One table, authorized all/PRA/local streams, signed credit netting; standalone outlet invoices remain in company tax totals |
 | Cashier / hidden local | Existing billing and cashier scope; local stream unavailable |
 | Partially visible stay | Hidden aggregate payment balance instead of leaking another stream/cashier |
 | Other tenant / active branch | Transactions and stays scoped independently; receipt routes stay protected |

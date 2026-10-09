@@ -552,4 +552,54 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->actingAs($owner, 'pos')->get('/pos/hotel/folios?period=all')->assertOk()->assertSee('PRIVATE-OTHER-CASHIER');
     }
 
+    public function test_native_hotel_combined_tax_report_keeps_standalone_outlet_sales_and_returns(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 10000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $bill->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ROOM']);
+        $outlet = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'DIRECT-OUTLET-SALE',
+            'transaction_type' => 'sale', 'status' => 'completed', 'invoice_mode' => 'pra',
+            'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-OUTLET',
+            'customer_name' => 'Walk-in outlet guest', 'subtotal' => 840, 'discount_amount' => 0,
+            'tax_rate' => 16, 'tax_amount' => 160, 'total_amount' => 1000,
+            'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        $return = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'DIRECT-OUTLET-CREDIT',
+            'transaction_type' => 'return', 'status' => 'completed', 'invoice_mode' => 'pra',
+            'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-OUTLET-CREDIT',
+            'subtotal' => 168, 'discount_amount' => 0, 'tax_rate' => 16, 'tax_amount' => 32,
+            'total_amount' => 200, 'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
+        $response = $this->actingAs($owner, 'pos')->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
+            ->assertSee('DIRECT-OUTLET-SALE')->assertSee('DIRECT-OUTLET-CREDIT')
+            ->assertSee(route('pos.receipt', $outlet->id), false);
+        $this->assertEquals(10800, $response->viewData('summary')->total_sales);
+        $this->assertEquals(128, $response->viewData('summary')->total_tax);
+        $this->assertEquals(10000, $response->viewData('directory')['paid']);
+        $csv = $this->get('/pos/hotel/folios/csv?period=all&stream=pra')->assertOk()->streamedContent();
+        $this->assertStringContainsString('DIRECT-OUTLET-SALE', $csv);
+        $this->assertStringContainsString('DIRECT-OUTLET-CREDIT', $csv);
+        $this->assertStringContainsString('10800.00', $csv);
+        $this->get('/pos/hotel/folios?period=all&room=101')->assertOk()
+            ->assertSee($bill->invoice_number)->assertDontSee('DIRECT-OUTLET-SALE')->assertDontSee('DIRECT-OUTLET-CREDIT');
+
+        $a = Branch::create(['company_id' => $company->id, 'name' => 'Branch A', 'code' => 'A', 'is_active' => true, 'is_head_office' => true]);
+        $b = Branch::create(['company_id' => $company->id, 'name' => 'Branch B', 'code' => 'B', 'is_active' => true]);
+        // A legacy NULL invoice branch must not reveal a linked stay from Branch B.
+        $stay->update(['branch_id' => $b->id]);
+        $bill->update(['branch_id' => null]);
+        $outlet->update(['branch_id' => $a->id]);
+        $return->update(['branch_id' => $a->id]);
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $scoped = $this->withSession(['active_branch_id' => $a->id])->get('/pos/hotel/folios?period=all&stream=pra')->assertOk()
+            ->assertDontSee('data-hotel-invoice="'.$bill->id.'"', false)->assertSee('DIRECT-OUTLET-SALE');
+        $this->assertEquals(800, $scoped->viewData('summary')->total_sales);
+        $this->assertEquals(128, $scoped->viewData('summary')->total_tax);
+    }
+
 }

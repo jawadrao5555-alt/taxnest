@@ -14,7 +14,7 @@ The original 50 pcs example has a different valid outcome from an unused ingredi
 | Zero stock with recipe dependency | Unit change refused; recipe quantity preserved |
 | Invalid client unit | Server validation is visible and no success flash/DB change occurs |
 | Existing stocked ingredient, same units | Ordinary name/cost metadata edits still work without changing stock |
-| Other tenant | Foreign ingredient PUT returns 404 and preserves that row |
+| Other tenant | Foreign JSON PUT returns 404; HTML PUT follows the native Dashboard missing-row redirect with an error; both preserve that row |
 | Branch-stock-only ingredient | Existing IngredientUnitEditTest retains branch-stock guard coverage |
 
 ## Evidence and limits

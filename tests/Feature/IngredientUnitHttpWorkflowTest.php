@@ -115,8 +115,14 @@ class IngredientUnitHttpWorkflowTest extends TestCase
         [$theirs] = $this->kitchen();
         $foreign = $this->ingredient($theirs, 50);
         $mineIngredient = $this->ingredient($mine, 50);
+        // JSON clients receive 404; the native HTML panel's central missing-row
+        // handler redirects to its Dashboard. Assert both exact contracts.
         $this->actingAs($owner, 'pos')
-            ->put('/pos/restaurant/ingredients/'.$foreign->id, $this->payload('pcs', 'pcs'))->assertNotFound();
+            ->putJson('/pos/restaurant/ingredients/'.$foreign->id, $this->payload('pcs', 'pcs'))
+            ->assertNotFound()->assertJson(['error' => 'Resource not found.']);
+        $this->put('/pos/restaurant/ingredients/'.$foreign->id, $this->payload('pcs', 'pcs'))
+            ->assertRedirect('/pos/dashboard')->assertSessionHas('error', fn ($message) => str_contains($message, 'not found'))
+            ->assertSessionMissing('success');
         $this->assertEquals(50, (float) $foreign->fresh()->current_stock);
         $this->assertSame('pcs', $foreign->fresh()->unit);
         $payload = array_merge($this->payload('pcs', 'pcs'), ['name' => 'Chicken Revised', 'cost_per_unit' => '125']);

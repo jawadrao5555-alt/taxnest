@@ -1,4 +1,4 @@
-<table style="{{ $billingPdf ? 'width: 100%; table-layout: fixed;' : 'min-width: 65rem;' }}" class="w-full min-w-[65rem] text-sm" data-hotel-billing-table="1">
+<table style="{{ $billingPdf ? 'width: 100%; table-layout: fixed;' : 'min-width: 65rem;' }}" class="table-static w-full min-w-[65rem] text-sm" data-hotel-billing-table="1">
     <thead><tr class="text-left text-xs uppercase bg-gray-50 dark:bg-gray-800 text-gray-500">
         <th class="px-3 py-3">{{ __('pos.th_pos_invoice_no') }}</th>
         <th class="px-3 py-3">{{ __('pos.th_date') }}</th>

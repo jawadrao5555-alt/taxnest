@@ -648,7 +648,7 @@ async function hotelCreditReview(page, t, v) {
     }, right);
     const bounds = await scroll.boundingBox(), button = await shortcut.boundingBox();
     if (!bounds || !button || button.x < bounds.x - 1 || button.x + button.width > bounds.x + bounds.width + 1)
-      throw new Error('Credit Note action escaped the visible scrolled table');
+      throw new Error('Credit Note action escaped the visible scrolled table: ' + JSON.stringify({right,bounds,button,layout:await scroll.evaluate(el=>({scrollLeft:el.scrollLeft,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,tableDisplay:getComputedStyle(el.querySelector('table')).display,tableOverflow:getComputedStyle(el.querySelector('table')).overflowX}))}));
     await saveEvidenceScreenshot(page, `tax-credit-sticky-${right ? 'right' : 'left'}-${v.width}.png`);
   }
   await Promise.all([page.waitForURL(/\/credit-notes#bill-\d+$/), shortcut.click()]);

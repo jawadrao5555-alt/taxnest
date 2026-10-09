@@ -4,8 +4,8 @@
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div><h1 class="text-2xl font-bold">{{ __('hotel_billing.title') }}</h1><p class="text-sm text-gray-500 mt-1">{{ $dateLabel }}</p></div>
         <div class="flex gap-2">
-            <a class="rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold" href="{{ route('pos.hotel.folios.csv', request()->query()) }}">{{ __('pos.download_csv') }}</a>
-            <a class="rounded-lg bg-red-600 text-white px-4 py-2 text-sm font-semibold" href="{{ route('pos.hotel.folios.pdf', request()->query()) }}">{{ __('pos.download_pdf') }}</a>
+            <a class="rounded-lg bg-emerald-600 text-white px-4 py-2 text-sm font-semibold" href="{{ route('pos.hotel.folios.csv', array_merge(request()->query(), ['stream' => $stream])) }}">{{ __('pos.download_csv') }}</a>
+            <a class="rounded-lg bg-red-600 text-white px-4 py-2 text-sm font-semibold" href="{{ route('pos.hotel.folios.pdf', array_merge(request()->query(), ['stream' => $stream])) }}">{{ __('pos.download_pdf') }}</a>
         </div>
     </div>
     <form method="GET" action="{{ route('pos.hotel.folios') }}" class="rounded-xl border bg-white dark:bg-gray-900 shadow-md p-4 mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" data-hotel-billing-filters="1">

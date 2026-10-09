@@ -575,10 +575,22 @@ class HotelSimpleDeskPricingTest extends TestCase
             'subtotal' => 168, 'discount_amount' => 0, 'tax_rate' => 16, 'tax_amount' => 32,
             'total_amount' => 200, 'payment_method' => 'cash', 'created_by' => $owner->id,
         ]);
+        \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'invoice_number' => 'LOCAL-OUTLET-UNREPORTED',
+            'transaction_type' => 'sale', 'status' => 'completed', 'invoice_mode' => 'local',
+            'subtotal' => 500, 'discount_amount' => 0, 'tax_amount' => 0, 'total_amount' => 500,
+            'payment_method' => 'cash', 'created_by' => $owner->id,
+        ]);
         $response = $this->actingAs($owner, 'pos')->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
             ->assertSee('DIRECT-OUTLET-SALE')->assertSee('DIRECT-OUTLET-CREDIT')
             ->assertSee(route('pos.receipt', $outlet->id), false);
-        $this->get('/pos/tax-reports?period=all')->assertOk()->assertViewHas('stream', 'pra');
+        $default = $this->get('/pos/tax-reports?period=all')->assertOk()->assertViewHas('stream', 'pra')
+            ->assertDontSee('LOCAL-OUTLET-UNREPORTED');
+        preg_match('/href="([^"]*\/pos\/hotel\/folios\/csv[^"]*)"/', $default->getContent(), $link);
+        $this->assertNotEmpty($link);
+        $download = $this->get(html_entity_decode($link[1], ENT_QUOTES, 'UTF-8'))->assertOk()->streamedContent();
+        $this->assertStringContainsString('10800.00', $download);
+        $this->assertStringNotContainsString('LOCAL-OUTLET-UNREPORTED', $download);
         $this->assertEquals(10800, $response->viewData('summary')->total_sales);
         $this->assertEquals(128, $response->viewData('summary')->total_tax);
         $this->assertEquals(10000, $response->viewData('directory')['paid']);

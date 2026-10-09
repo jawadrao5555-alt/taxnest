@@ -562,7 +562,10 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   ]);
   if (!confirmed.ok()) throw new Error('Remaining payment checkout failed');
   const checkoutResult = await confirmed.json();
-  await receiptPopup.waitFor({state:'visible'});
+  await receiptPopup.waitFor({state:'visible'}).catch(async error => {
+    const state = await previewModal.evaluate(el => ({open:el.open,error:el.querySelector('[data-preview-error]').textContent,issuedHidden:el.querySelector('[data-preview-issued]').hidden,issuedChildren:el.querySelector('[data-preview-issued]').childElementCount,receiptUrl:el.querySelector('[data-preview-receipt]').href}));
+    throw new Error('Checkout receipt: ' + JSON.stringify({checkoutResult,state}) + ' ' + error.message);
+  });
   await receiptPopup.locator('[data-receipt-close]').click();
   await previewModal.waitFor({state:'hidden'});
   await page.locator('[data-hotel-open-desk]').first().click();

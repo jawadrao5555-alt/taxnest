@@ -40,9 +40,9 @@
             <td class="px-3 py-3 whitespace-nowrap">{{ $t->created_at->format('d M Y H:i') }}</td>
             <td class="px-3 py-3">{{ $stay?->guest_name ?? $t->customer_name }}<span class="block text-xs">{{ $stay?->room?->room_number }}</span></td>
             <td class="px-3 py-3">{{ \App\Support\PosPaymentLabels::label($t->payment_method) }}</td>
-            <td class="px-3 py-3 text-right whitespace-nowrap" data-hotel-tax-detail @if(!$billingPdf) hidden @endif>{{ number_format($sign * $t->subtotal, 2) }}</td>
-            <td class="px-3 py-3 text-right whitespace-nowrap" data-hotel-tax-detail @if(!$billingPdf) hidden @endif>{{ number_format($sign * $t->discount_amount, 2) }}</td>
-            <td class="px-3 py-3 text-right whitespace-nowrap" data-hotel-tax-detail @if(!$billingPdf) hidden @endif>{{ number_format($t->tax_rate, 2) }}%</td>
+            <td class="px-3 py-3 text-right whitespace-nowrap" data-hotel-tax-detail @if(!$billingPdf) hidden @endif>{{ number_format($sign * ($taxRateFilter ? ($iv['item_subtotal'] ?? 0) : $t->subtotal), 2) }}</td>
+            <td class="px-3 py-3 text-right whitespace-nowrap" data-hotel-tax-detail @if(!$billingPdf) hidden @endif>{{ number_format($taxRateFilter ? 0 : $sign * $t->discount_amount, 2) }}</td>
+            <td class="px-3 py-3 text-right whitespace-nowrap" data-hotel-tax-detail @if(!$billingPdf) hidden @endif>{{ number_format($taxRateFilter ? ($taxRateFilter === 'exempt' ? 0 : (float) $taxRateFilter) : $t->tax_rate, 2) }}%</td>
             <td class="px-3 py-3 text-right whitespace-nowrap">{{ number_format($sign * $rowTax, 2) }}</td>
             <td class="px-3 py-3 text-right font-bold whitespace-nowrap">{{ number_format($sign * $rowTotal, 2) }}</td>
             <td class="px-3 py-3 text-right whitespace-nowrap">{{ $row && $row['money'] !== null ? number_format($row['money']['paid'], 2) : '—' }}</td>

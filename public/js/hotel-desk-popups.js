@@ -120,8 +120,11 @@
                 if (inlineDialog !== previous) {
                     unmountInline(); receiptHost = host; inlineDialog = previous;
                     while (receipt.firstChild) host.append(receipt.firstChild);
-                    previous.addEventListener('close', unmountInline, {once:true});
-                    previous.addEventListener('cancel', event => event.preventDefault(), {once:true});
+                    if (!previous.dataset.receiptCloseBound) {
+                        previous.addEventListener('close', () => { if (!previous.open && inlineDialog === previous) unmountInline(); });
+                        previous.addEventListener('cancel', event => event.preventDefault());
+                        previous.dataset.receiptCloseBound = '1';
+                    }
                 }
                 host.hidden = false;
             } else unmountInline();

@@ -250,10 +250,11 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertSame('checked_out', $stay->fresh()->status);
         $this->assertEquals(9900, app(\App\Services\HotelDeskService::class)->summary($stay, 'cash')['balance']);
         $billPage = $this->actingAs($owner, 'pos')->get('/pos/hotel/folios')->assertOk()->getContent();
-        $this->assertStringContainsString(__('hotel_simplify.payment_pending'), $billPage);
-        $this->assertStringContainsString('/pos/hotel/stays/'.$stay->id.'#hotel-payment', $billPage);
-        $this->assertStringContainsString(__('hotel_simplify.cash_estimate'), $billPage);
-        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee(__('pos.hotel_collect_now'));
+        $this->assertStringContainsString(route('pos.hotel.stays.index'), $billPage);
+        $this->get('/pos/hotel/stays')->assertOk()->assertSee($stay->stay_number);
+        $this->get('/pos/hotel/stays/'.$stay->id)->assertOk()->assertSee(__('pos.hotel_collect_now'))
+            ->assertSee(__('hotel_simplify.payment_pending'))->assertSee(__('hotel_simplify.cash_estimate'))
+            ->assertSee('href="#hotel-payment"', false);
     }
 
     public function test_checked_out_collection_preview_uses_the_selected_payment_method(): void
@@ -474,6 +475,8 @@ class HotelSimpleDeskPricingTest extends TestCase
         $stay = $service->book($company->id, $owner->id, $this->booking($room));
         $folio->postPayment($stay, ['amount' => 10000], $owner->id);
         $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        // SQLite's legacy fixture index is globally unique; give the first synthetic bill an explicit name.
+        $bill->update(['invoice_number' => 'OWN-TENANT-DIRECTORY']);
         $foreign = $service->book($otherCompany->id, $otherOwner->id, $this->booking($otherRoom, ['guest_name' => 'Private other tenant']));
         $folio->postPayment($foreign, ['amount' => 10000], $otherOwner->id);
         $foreignBill = $folio->settleCoveredCharges($foreign, $otherOwner->id, 'cash')['transaction'];

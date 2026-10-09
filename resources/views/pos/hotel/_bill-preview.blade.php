@@ -1,4 +1,5 @@
 <dialog id="hotel-bill-preview" data-hotel-bill-preview="1" style="width: min(48rem, calc(100vw - 2rem)); max-width: none; max-height: 90vh; overflow-y: auto;" class="w-[calc(100%_-_2rem)] max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border p-5 dark:bg-gray-900 dark:text-white backdrop:bg-black/50">
+    <p data-preview-loading role="status" aria-live="polite" hidden>{{ __('pos.hotel_calculating') }}</p>
     <h2 class="text-xl font-bold">{{ __('hotel_preview.title') }}</h2>
     <div data-preview-desk-controls hidden class="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
         <label>{{ __('hotel_preview.action') }}<select data-desk-flow class="block w-full rounded border p-2"><option value="collect">{{ __('hotel_preview.collect_bill') }}</option><option value="checkout">{{ __('pos.hotel_check_out_btn') }}</option></select></label>

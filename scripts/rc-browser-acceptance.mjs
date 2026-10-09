@@ -359,6 +359,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, {timeout:30000,waitUntil:'domcontentloaded'}), form.locator('button').click()]);
   const checkinPreview = page.locator('[data-hotel-bill-preview="1"]');
   await checkinPreview.waitFor({state:'visible'});
+  await page.waitForFunction(()=>!document.querySelector('[data-preview-confirm]').disabled && document.querySelector('[data-preview-lines]').childElementCount > 0);
   if (await page.evaluate(() => window.__hotelPrintCalls) !== 0) throw new Error('Check-in automatically opened native print');
   if (!(await checkinPreview.locator('[data-preview-lines]').innerText()).trim()) throw new Error('Check-in popup omitted room charges');
   await saveEvidenceScreenshot(page, `hotel-checkin-preview-${v.width}.png`);

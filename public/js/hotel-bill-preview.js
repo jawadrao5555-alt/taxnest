@@ -110,7 +110,7 @@
         if (busy || uncertain) return;
         const requestRevision = revision;
         if (!dialog.open) dialog.showModal();
-        busy = true; el('confirm').disabled = true;
+        busy = true; el('confirm').disabled = true; lockDesk(true); el('loading').hidden = false; el('draft-receipt').hidden = true;
         try {
             payload.idempotency_key = crypto.randomUUID();
             const query = new URLSearchParams(payload); query.delete('_token'); query.delete('idempotency_key');
@@ -124,7 +124,7 @@
             el('desk-controls').hidden = !desk;
             el('draft-receipt').hidden = true; el('edit').hidden = true; el('delete').hidden = true;
             el('error').textContent = error.message || labels.failed;
-        } finally { busy = false; }
+        } finally { busy = false; el('loading').hidden = true; if (!uncertain) lockDesk(false); }
     }
     async function deskPreview(resetAmount = false) {
         if (busy || uncertain) return;
@@ -137,7 +137,7 @@
         payload.leave_balance = field('balance').checked ? 1 : 0;
         el('confirm').disabled = true;
         if (resetAmount) {
-            busy = true;
+            busy = true; lockDesk(true); el('loading').hidden = false;
             try {
                 const response = await fetch(form.dataset.quoteUrl + '?payment_method=' + encodeURIComponent(payload.payment_method), {credentials: 'same-origin', headers: {Accept: 'application/json'}});
                 const quote = await response.json();
@@ -145,7 +145,7 @@
                 if (!response.ok) throw new Error(labels.failed);
                 field('amount').value = Number(quote.balance || 0).toFixed(2);
                 if (Number(quote.balance) <= 0 && Number(quote.total) <= 0) { field('flow').value = 'checkout'; payload.flow = 'checkout'; }
-            } catch (error) { if (revision === requestRevision && dialog.open) el('error').textContent = error.message || labels.failed; return; }
+            } catch (error) { el('loading').hidden = true; lockDesk(false); if (revision === requestRevision && dialog.open) el('error').textContent = error.message || labels.failed; return; }
             finally { busy = false; }
         }
         payload.amount = field('amount').value;

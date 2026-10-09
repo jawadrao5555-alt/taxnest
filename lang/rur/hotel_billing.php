@@ -13,8 +13,7 @@ return [
     'balance_help' => 'Bill aur tax totals selected invoices kay hain. Paid aur due linked stays kay current balances hain; cards mein har stay aik dafa count hota hai. Yeh invoice-wise payment allocation nhe. Security deposits shamil nhe. Credit note aur payment refund alag hain.',
     'unbilled' => 'Stays / unbilled charges',
     'tax_details' => 'Tax ki details',
-    'view_credit' => 'Credit Note dekhein'
-,
+    'view_credit' => 'Credit Note dekhein',
     'edit_draft' => 'Edit',
     'delete_draft' => 'Delete / Cancel',
     'update_receipt' => 'Receipt pe wapas / Update',

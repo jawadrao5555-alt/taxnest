@@ -386,6 +386,15 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   const editFrame = page.frameLocator('[data-preview-editor-frame]');
   await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
   if (await editFrame.locator('[name="rate_amount"]').count() !== 2) throw new Error('Existing scoped rate/date/room editing missing from popup');
+  const discountForm = editFrame.locator('form[action$="/discount"]');
+  const originalDiscount = await discountForm.locator('[name="discount_value"]').inputValue();
+  const [edited] = await Promise.all([
+    page.waitForResponse(r => r.url().endsWith(stayPath + '/discount') && r.request().method() === 'POST'),
+    discountForm.locator('button').click(),
+  ]);
+  if (edited.status() >= 400) throw new Error('Scoped draft edit failed');
+  await editFrame.locator('[data-hotel-draft-editor]').waitFor({state:'visible'});
+  if (await editFrame.locator('[name="discount_value"]').inputValue() !== originalDiscount) throw new Error('Draft edit changed saved discount unexpectedly');
   await previewModal.locator('[data-preview-editor-done]').click();
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
   if (!(await previewModal.locator('[data-preview-lines]').innerText()).trim()) throw new Error('Bill preview omitted actual folio lines');

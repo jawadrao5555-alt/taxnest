@@ -112,6 +112,7 @@
         if (opening || loading) return;
         opening = true;
         active = null;
+        setBusy(true);
         q('print').disabled = true; q('picker').disabled = true; q('browser').hidden = true;
         status(labels.loading);
         try {
@@ -151,7 +152,7 @@
                 if (!receipt.open) receipt.showModal();
             }
         } catch (failure) { status(failure.message); if (!inlineDialog && !receipt.open) receipt.showModal(); }
-        finally { opening = false; q('print').disabled = loading || !active?.ready || !!active?.job; q('picker').disabled = loading || !!active?.job; }
+        finally { opening = false; setBusy(false); q('print').disabled = loading || !active?.ready || !!active?.job; q('picker').disabled = loading || !!active?.job; }
     }
     q('picker').addEventListener('change', () => {
         if (active?.job && !confirm(labels.possible_duplicate)) { q('picker').value = String(active.documents.indexOf(active.document)); return; }

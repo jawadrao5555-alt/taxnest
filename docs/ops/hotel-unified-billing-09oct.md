@@ -1,7 +1,7 @@
 # Hotel unified billing and persistent receipt review
 
 ## Intended behavior
-Native Hotel Bills and Tax Reports now render one invoice directory (including credit notes and standalone restaurant/counter bills for a native Hotel company), with filters, tax details, CSV/PDF and dashboard Back links. Retail/restaurant report layouts retain their existing behavior. Unbilled stays remain available through Stays.
+Native Hotel Bills and Tax Reports now render one invoice directory (including credit notes and standalone restaurant/counter bills for a native Hotel company), with filters, tax details, CSV/PDF and dashboard Back links. The legacy Tax Reports entry retains its PRA default; Bills starts with all authorized streams. Retail/restaurant report layouts retain their existing behavior. Unbilled stays remain available through Stays.
 
 Check-in and checkout review use a draft receipt before issuance. Edit uses existing scoped date/rate/room and discount forms. Delete/Cancel uses the existing audited stay-correction flow; it is not a database hard delete. Fiscal-locked bills cannot be edited or cancelled through these actions. Confirm mounts the actual issued receipt inside the same review dialog. Only explicit Close dismisses it.
 

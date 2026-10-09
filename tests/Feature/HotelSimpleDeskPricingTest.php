@@ -578,6 +578,7 @@ class HotelSimpleDeskPricingTest extends TestCase
         $response = $this->actingAs($owner, 'pos')->get('/pos/tax-reports?period=all&tab=pra')->assertOk()
             ->assertSee('DIRECT-OUTLET-SALE')->assertSee('DIRECT-OUTLET-CREDIT')
             ->assertSee(route('pos.receipt', $outlet->id), false);
+        $this->get('/pos/tax-reports?period=all')->assertOk()->assertViewHas('stream', 'pra');
         $this->assertEquals(10800, $response->viewData('summary')->total_sales);
         $this->assertEquals(128, $response->viewData('summary')->total_tax);
         $this->assertEquals(10000, $response->viewData('directory')['paid']);

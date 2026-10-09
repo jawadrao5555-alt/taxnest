@@ -20,7 +20,8 @@ class HotelBillingController extends PosController
     {
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $actor = auth('pos')->user();
-        $requested = $request->query('stream', $request->query('tab', 'all'));
+        $defaultStream = $request->routeIs('pos.tax-reports') ? 'pra' : 'all';
+        $requested = $request->query('stream', $request->query('tab', $defaultStream));
         $this->stream = in_array($requested, ['all', 'pra', 'local'], true) ? $requested : 'all';
         // Local stream stays owner/admin-only and honors the saved hide-local switch.
         if ((!$actor->isPosAdmin() || $actor->posHidesLocalStream()) && $this->stream !== 'pra') {

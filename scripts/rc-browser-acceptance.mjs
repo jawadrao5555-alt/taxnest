@@ -366,6 +366,13 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await checkinPreview.locator('[data-preview-back]').click();
   await checkinPreview.waitFor({state:'hidden'});
   const stayPath = new URL(page.url()).pathname;
+  await page.goto(baseUrl + '/pos/hotel/stays/create?walk_in=1', {waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>{const form=document.querySelector('form[x-data^="hotelBookingForm"]');return form && window.Alpine.$data(form).busy === false;});
+  const checkinOptions = await page.locator('[name="room_id"] option').allTextContents();
+  if (checkinOptions.some(text => text.startsWith(room + ' · '))) throw new Error('Occupied room still appeared in the direct check-in picker');
+  await saveEvidenceScreenshot(page, `hotel-available-rooms-${v.width}.png`);
+  pass(`${t.name}/${v.width}: occupied room removed from real check-in dropdown`);
+  await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   await dismiss(page);
   if (await page.locator('#hotel-charge').isVisible() || await page.locator('#hotel-payment').isVisible()) throw new Error('Hotel action forms must start collapsed');
   await saveEvidenceScreenshot(page, `hotel-simple-desk-${v.width}-stay.png`);
@@ -626,19 +633,16 @@ async function hotelWorkflow(page, t, v, diagnostics) {
     const state = await previewModal.evaluate(el => ({open:el.open,error:el.querySelector('[data-preview-error]').textContent,issuedHidden:el.querySelector('[data-preview-issued]').hidden,issuedChildren:el.querySelector('[data-preview-issued]').childElementCount,receiptUrl:el.querySelector('[data-preview-receipt]').href}));
     throw new Error('Checkout receipt: ' + JSON.stringify({checkoutResult,state}) + ' ' + error.message);
   });
-  await receiptPopup.locator('[data-receipt-close]').click();
-  await previewModal.waitFor({state:'hidden'});
-  await page.locator('[data-hotel-open-desk]').first().click();
-  await previewModal.waitFor({state:'visible'});
-  await receiptPopup.waitFor({state:'visible'});
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
-  await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
   if (billConfirmPosts !== 3) throw new Error('Expected initial confirmation, same-UUID retry and one checkout');
   if (await previewModal.locator('[data-preview-qr]').isVisible()) throw new Error('Unreported local bill advertised a PRA QR');
+  if (new URL(page.url()).pathname !== stayPath) throw new Error('Checkout automatically left the receipt before Close');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-confirmed.png`);
   page.off('request', countConfirm);
-  await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000}), previewModal.locator('[data-preview-stay]').click()]);
+  await Promise.all([page.waitForURL(baseUrl + '/pos/hotel', {timeout:30000}), receiptPopup.locator('[data-receipt-close]').click()]);
+  pass(`${t.name}/${v.width}: completed checkout Close returned to Hotel Dashboard`);
+  await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   await dismiss(page);
   if (!await page.locator('a[href*="/bills/"][href$="/receipt"]').count()) throw new Error('Checkout must expose the issued receipt');
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
@@ -1121,4 +1125,3 @@ async function one(browser,label,v,t) {
 const {browser}=await launchLocalBrowser();
 try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
-

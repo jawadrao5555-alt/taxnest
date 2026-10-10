@@ -9,7 +9,12 @@
     let context = null, busy = false, confirming = false, uncertain = false, revision = 0, timer = null, polls = 0;
     const stop = () => { clearTimeout(timer); timer = null; };
     const lockDesk = lock => el('desk-controls').querySelectorAll('input,select,button').forEach(node => { node.disabled = lock; });
-    dialog.addEventListener('close', () => { stop(); ++revision; });
+    dialog.addEventListener('close', () => {
+        stop(); ++revision;
+        if (context?.payload?.flow === 'checkout' && context.result?.stay_status === 'checked_out' && dialog.dataset.dashboardUrl) {
+            window.location.assign(dialog.dataset.dashboardUrl);
+        }
+    });
     dialog.addEventListener('cancel', event => event.preventDefault());
     el('back').addEventListener('click', () => { if (!confirming) dialog.close(); });
     function creditLink(url) {
@@ -195,4 +200,3 @@
     const autoDesk = document.querySelector('[data-hotel-bill-desk][data-auto-open="1"]');
     if (autoDesk) { field('flow').value = autoDesk.dataset.initialFlow || 'collect'; deskPreview(true); }
 })();
-

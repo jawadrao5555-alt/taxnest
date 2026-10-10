@@ -36,7 +36,7 @@ try {
   assert.equal(await amount.inputValue(),'500.25');
  }
  await saveEvidenceScreenshot(page,'di-'+mode+'-draft-form');
- await page.getByRole('button',{name:/Save Draft/i}).first().click();
+ await page.getByRole('button',{name:/Create Invoice/i}).first().click();
  await page.waitForURL(/\/invoice\/\d+/);
  assert.deepEqual(errors,[]);
  console.log('DI '+mode+' real form interaction and draft save passed.');

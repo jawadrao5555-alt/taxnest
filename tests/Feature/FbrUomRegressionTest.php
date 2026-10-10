@@ -35,13 +35,30 @@ class FbrUomRegressionTest extends TestCase
         ];
     }
 
+    public function test_explicit_converted_unit_and_case_alias_keep_their_meaning(): void
+    {
+        Http::fake(['https://gw.fbr.gov.pk/pdi/v2/HS_UOM*' => Http::response($this->referenceResponse(), 200)]);
+        $service = new FbrService();
+        $this->assertSame('Thousand Unit', $service->resolveUomForHsCode('2402.2000', 'thousand unit', $this->company()));
+        $this->assertSame('KG', $service->resolveUomForHsCode('2402.2000', 'kg', $this->company()));
+        $this->assertSame('Numbers, pieces, units', $service->resolveUomForHsCode('2402.2000', 'U', $this->company()));
+    }
+
+    public function test_reference_failure_does_not_relabel_liters_or_kilograms(): void
+    {
+        Http::fake(['*' => Http::response([], 503)]);
+        $service = new FbrService();
+        $this->assertSame('KG', $service->resolveUomForHsCode('2202.1000', 'KG', $this->company()));
+        $this->assertSame('Liter', $service->resolveUomForHsCode('3101.0000', 'Liter', $this->company()));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
         Cache::flush();
     }
 
-    public function test_generic_cigarette_uom_resolves_to_thousand_unit_from_fbr_reference(): void
+    public function test_generic_cigarette_uom_is_not_silently_changed_to_thousand_unit(): void
     {
         Http::fake([
             'https://gw.fbr.gov.pk/pdi/v2/HS_UOM*' => Http::response($this->referenceResponse(), 200),
@@ -53,7 +70,7 @@ class FbrUomRegressionTest extends TestCase
             $this->company()
         );
 
-        $this->assertSame('Thousand Unit', $resolved);
+        $this->assertSame('Numbers, pieces, units', $resolved);
         Http::assertSent(function ($request) {
             return str_contains($request->url(), '/pdi/v2/HS_UOM')
                 && $request['hs_code'] === '2402.2000'
@@ -98,7 +115,7 @@ class FbrUomRegressionTest extends TestCase
         });
     }
 
-    public function test_unavailable_reference_api_is_non_blocking_and_uses_cigarette_fallback(): void
+    public function test_unavailable_reference_api_preserves_the_original_quantity_dimension(): void
     {
         Http::fake([
             'https://gw.fbr.gov.pk/pdi/v2/HS_UOM*' => Http::response([], 503),
@@ -110,7 +127,7 @@ class FbrUomRegressionTest extends TestCase
             $this->company()
         );
 
-        $this->assertSame('Thousand Unit', $resolved);
+        $this->assertSame('Numbers, pieces, units', $resolved);
         Http::assertSentCount(1);
     }
 }

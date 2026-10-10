@@ -451,41 +451,43 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
   await deskModal.locator('[data-desk-flow]').selectOption('checkout');
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
-  // Report the full card-priced bill with only the recorded advance received.
+  // Lose a real NONZERO payment confirmation after disposable Laravel commits,
+  // then reload the page. Recovery must use GET only, not a second payment POST.
   await deskModal.locator('[data-desk-flow]').selectOption('collect');
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
-  await deskModal.locator('[data-desk-amount]').fill('0');
+  await deskModal.locator('[data-desk-amount]').fill('100');
   await deskModal.locator('[data-desk-update]').click();
   await page.waitForFunction(() => !document.querySelector('[data-preview-confirm]').disabled);
-  // Lose the response AFTER the real disposable server commits. Closing/reopening
-  // must retry that same operation, not collect/report it again with a new UUID.
   await page.evaluate(() => {
-    window.__hotelConfirmOriginal = window.fetch;
-    window.__hotelConfirmPayloads = [];
+    const original = window.fetch;
     window.fetch = async (...args) => {
       const url = typeof args[0] === 'string' ? args[0] : args[0].url;
-      const confirmation = url.endsWith('/bill-confirm') && args[1]?.method === 'POST';
-      if (confirmation) window.__hotelConfirmPayloads.push(JSON.parse(args[1].body));
-      const response = await window.__hotelConfirmOriginal(...args);
-      if (confirmation && window.__hotelConfirmPayloads.length === 1 && response.ok) throw new Error('Synthetic committed response lost');
+      const response = await original(...args);
+      if (url.endsWith('/bill-confirm') && args[1]?.method === 'POST' && response.ok) {
+        window.__hotelCommittedResult = await response.clone().json();
+        throw new Error('Synthetic committed response lost');
+      }
       return response;
     };
   });
   await previewModal.locator('[data-preview-confirm]').click();
   await previewModal.locator('[data-preview-error]').filter({hasText:'Synthetic committed response lost'}).waitFor({state:'visible'});
-  await previewModal.locator('[data-preview-back]').click();
-  await page.locator('[data-hotel-open-desk]').first().click();
-  await previewModal.waitFor({state:'visible'});
-  if (!(await previewModal.locator('[data-desk-amount]').isDisabled())) throw new Error('Uncertain payment allowed a new edited operation');
-  const [issued] = await Promise.all([
-    page.waitForResponse(r => r.url().endsWith(stayPath + '/bill-confirm') && r.request().method() === 'POST'),
-    previewModal.locator('[data-preview-confirm]').click(),
-  ]);
-  const confirmPayloads = await page.evaluate(() => window.__hotelConfirmPayloads);
-  if (confirmPayloads.length !== 2 || JSON.stringify(confirmPayloads[0]) !== JSON.stringify(confirmPayloads[1])) throw new Error('Lost confirmation generated a new payment/bill attempt');
-  await page.evaluate(() => {window.fetch=window.__hotelConfirmOriginal;delete window.__hotelConfirmOriginal;delete window.__hotelConfirmPayloads;});
-  if (!issued.ok()) throw new Error('Full bill with partial advance failed');
-  const firstBill = await issued.json();
+  const firstBill = await page.evaluate(() => window.__hotelCommittedResult);
+  const pendingAttempt = await page.evaluate(() => {
+    const key = document.querySelector('[data-hotel-recovery-form]').dataset.recoveryKey;
+    return JSON.parse(localStorage.getItem(key)).payload;
+  });
+  if (Number(pendingAttempt.amount) !== 100) throw new Error('Nonzero operation was not persisted before send');
+  const recoveredResponse = page.waitForResponse(r => r.url().includes(stayPath + '/bill-recovery?') && r.request().method() === 'GET');
+  await page.reload({waitUntil:'domcontentloaded'});
+  const recovered = await recoveredResponse;
+  if (!recovered.ok() || (await recovered.json()).result?.bill_id !== firstBill.bill_id) throw new Error('Reload did not reconcile the original bill');
+  await previewModal.locator('[data-preview-result]').waitFor({state:'visible'});
+  if (billConfirmPosts !== 1) throw new Error('Reload automatically repeated a monetary POST');
+  const afterReload = await page.request.get(baseUrl + stayPath + '/checkout-quote?payment_method=card');
+  if (!afterReload.ok() || Number((await afterReload.json()).balance) !== 2400) throw new Error('Nonzero payment was not recorded exactly once');
+  if (await page.evaluate(() => localStorage.getItem(document.querySelector('[data-hotel-recovery-form]').dataset.recoveryKey)) !== null) throw new Error('Confirmed operation remained pending');
+  pass(`${t.name}/${v.width}: real nonzero commit, lost response and reload recovered original invoice with GET only`);
   if (!firstBill.bill_id) throw new Error('Partial advance did not issue full bill');
   if (!await previewModal.isVisible()) throw new Error('Confirm closed the original receipt dialog');
   if(await previewModal.locator('[data-preview-edit]').isVisible() || await previewModal.locator('[data-preview-delete]').isVisible()) throw new Error('Issued receipt exposed draft edit/delete');
@@ -638,7 +640,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   pass(`${t.name}/${v.width}: Hotel Bills links the same original invoice as Transactions`);
 
   await previewModal.locator('[data-preview-checkout]').click();
-  await page.waitForFunction(() => { const d = document.querySelector('[data-hotel-bill-preview]'); return d && !d.querySelector('[data-preview-confirm]').disabled && Number(d.querySelector('[data-desk-amount]').value) === 2500; });
+  await page.waitForFunction(() => { const d = document.querySelector('[data-hotel-bill-preview]'); return d && !d.querySelector('[data-preview-confirm]').disabled && Number(d.querySelector('[data-desk-amount]').value) === 2400; });
   const [confirmed] = await Promise.all([
     page.waitForResponse(r => r.url().endsWith(stayPath + '/bill-confirm') && r.request().method() === 'POST'),
     previewModal.locator('[data-preview-confirm]').click(),
@@ -651,7 +653,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   });
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
-  if (billConfirmPosts !== 3) throw new Error('Expected initial confirmation, same-UUID retry and one checkout');
+  if (billConfirmPosts !== 2) throw new Error('Expected one initial payment and one checkout; reload must not pay again');
   if (await previewModal.locator('[data-preview-qr]').isVisible()) throw new Error('Unreported local bill advertised a PRA QR');
   if (new URL(page.url()).pathname !== stayPath) throw new Error('Checkout automatically left the receipt before Close');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-confirmed.png`);

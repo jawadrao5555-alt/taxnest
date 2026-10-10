@@ -1145,6 +1145,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/stays/{id}/checkout', [HotelController::class, 'showCheckout'])->whereNumber('id')->name('pos.hotel.checkout');
         Route::get('/stays/{id}/bill-preview', [HotelController::class, 'billPreview'])->whereNumber('id')->name('pos.hotel.bill-preview');
         Route::post('/stays/{id}/bill-confirm', [HotelController::class, 'billConfirm'])->whereNumber('id')->name('pos.hotel.bill-confirm');
+        Route::get('/stays/{id}/bill-recovery', [HotelController::class, 'billRecovery'])->whereNumber('id')->name('pos.hotel.bill-recovery');
         Route::get('/stays/{id}/bills/{billId}/status', [HotelController::class, 'billStatus'])->whereNumber('id')->whereNumber('billId')->name('pos.hotel.bill-status');
         Route::get('/stays/{id}/checkout-quote', [HotelController::class, 'checkoutQuote'])->whereNumber('id')->name('pos.hotel.checkout-quote');
         Route::post('/stays/{id}/checkout', [HotelController::class, 'completeCheckout'])->whereNumber('id')->name('pos.hotel.checkout.complete');

@@ -7,6 +7,77 @@
     const field = name => dialog.querySelector('[data-desk-' + name + ']');
     const money = value => 'Rs ' + Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
     let context = null, busy = false, confirming = false, uncertain = false, revision = 0, timer = null, polls = 0;
+    const recoveryForm = document.querySelector('[data-hotel-recovery-form]');
+    const recoveryKey = recoveryForm?.dataset.recoveryKey || dialog.dataset.recoveryKey;
+    const recoveryUrl = recoveryForm?.dataset.recoveryUrl || dialog.dataset.recoveryUrl;
+    function pending() {
+        if (!recoveryKey) throw new Error(labels.recovery_storage);
+        const raw = window.localStorage.getItem(recoveryKey);
+        if (!raw) return null;
+        const saved = JSON.parse(raw), p = saved.payload;
+        if (saved.version !== 1 || !p || !['collect', 'checkout', 'settle'].includes(p.flow)
+            || !['cash', 'card', 'debit_card', 'credit_card', 'qr_payment'].includes(p.payment_method)
+            || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.idempotency_key)
+            || typeof p.preview_token !== 'string' || !p.preview_token || p.preview_token.length > 4096
+            || !Number.isFinite(Number(p.amount)) || Number(p.amount) < 0 || Number(p.amount) > 10000000
+            || ![false, true, 0, 1, '0', '1'].includes(p.leave_balance)) throw new Error(labels.recovery_storage);
+        return saved;
+    }
+    function savePending() {
+        const {_token, ...payload} = context.payload;
+        const current = pending();
+        if (current && current.payload.idempotency_key !== payload.idempotency_key) throw new Error(labels.recovery_pending);
+        const record = JSON.stringify({version: 1, payload});
+        window.localStorage.setItem(recoveryKey, record);
+        if (window.localStorage.getItem(recoveryKey) !== record) throw new Error(labels.recovery_storage);
+    }
+    function clearPending() {
+        // Never clear another tab's attempt. Failed deletion leaves a safely replayable record.
+        try {
+            if (pending()?.payload.idempotency_key === context?.payload?.idempotency_key) window.localStorage.removeItem(recoveryKey);
+        } catch (_) {}
+    }
+    async function recover(form, desk) {
+        let saved;
+        try { saved = pending(); }
+        catch (_) {
+            uncertain = true; el('confirm').disabled = true; lockDesk(true);
+            el('error').textContent = labels.recovery_storage;
+            if (!dialog.open) dialog.showModal();
+            return true;
+        }
+        if (!saved) return false;
+        const csrf = Object.fromEntries(new FormData(form))._token;
+        context = {payload: {...saved.payload, _token: csrf}, url: form.dataset.confirmUrl, desk, form};
+        uncertain = true; busy = true; stop();
+        field('flow').value = saved.payload.flow; field('method').value = saved.payload.payment_method;
+        field('amount').value = saved.payload.amount; field('balance').checked = Boolean(Number(saved.payload.leave_balance));
+        lockDesk(true); el('confirm').hidden = false; el('confirm').disabled = true;
+        el('confirm').textContent = labels.recovery_retry;
+        el('draft-receipt').hidden = true; el('issued').hidden = true; el('result').hidden = true;
+        el('edit').hidden = true; el('delete').hidden = true; el('editor').hidden = true;
+        el('checkout').hidden = true; el('desk-controls').hidden = !desk;
+        el('error').textContent = labels.recovery_pending; el('loading').hidden = false;
+        if (!dialog.open) dialog.showModal();
+        try {
+            const query = new URLSearchParams(saved.payload); query.delete('preview_token');
+            query.set('leave_balance', Number(saved.payload.leave_balance) ? '1' : '0');
+            const response = await fetch(recoveryUrl + '?' + query, {credentials: 'same-origin', headers: {Accept: 'application/json'}});
+            const state = await response.json();
+            if (!response.ok) throw new Error(state.message || labels.failed);
+            if (state.state === 'confirmed' && state.result?.success) {
+                clearPending(); uncertain = false; context.statusUrl = state.result.status_url; renderResult(state.result);
+                el('error').textContent = '';
+                if (state.result.receipt_url && dialog.open) await window.hotelDeskPopups?.receipt(state.result.receipt_url, dialog);
+            } else if (state.state === 'not_found') {
+                // Only an explicit click may retry the original operation; never create a new UUID.
+                el('confirm').disabled = false; el('error').textContent = labels.retry_same;
+            } else throw new Error(labels.failed);
+        } catch (error) {
+            el('error').textContent = (error.message || labels.failed) + ' ' + labels.recovery_pending;
+        } finally { busy = false; el('loading').hidden = true; }
+        return true;
+    }
     const stop = () => { clearTimeout(timer); timer = null; };
     const lockDesk = lock => el('desk-controls').querySelectorAll('input,select,button').forEach(node => { node.disabled = lock; });
     dialog.addEventListener('close', () => {
@@ -113,11 +184,14 @@
     }
     async function preview(form, payload, desk = false) {
         if (busy || uncertain) return;
+        if (await recover(form, desk)) return;
         const requestRevision = revision;
         if (!dialog.open) dialog.showModal();
         busy = true; el('confirm').disabled = true; lockDesk(true); el('loading').hidden = false; el('draft-receipt').hidden = true;
         try {
-            payload.idempotency_key = crypto.randomUUID();
+            payload = {_token: payload._token, flow: payload.flow, payment_method: payload.payment_method,
+                amount: payload.flow === 'settle' ? 0 : payload.amount, leave_balance: payload.leave_balance ?? 0,
+                idempotency_key: crypto.randomUUID()};
             const query = new URLSearchParams(payload); query.delete('_token'); query.delete('idempotency_key');
             const response = await fetch(form.dataset.previewUrl + '?' + query, {credentials: 'same-origin', headers: {Accept: 'application/json'}});
             const quote = await response.json();
@@ -137,6 +211,7 @@
         if (!dialog.open) dialog.showModal();
         const form = document.querySelector('[data-hotel-bill-desk]');
         if (!form) return;
+        if (await recover(form, true)) return;
         const payload = Object.fromEntries(new FormData(form));
         payload.flow = field('flow').value; payload.payment_method = field('method').value;
         payload.leave_balance = field('balance').checked ? 1 : 0;
@@ -170,7 +245,7 @@
     field('balance').addEventListener('change', () => deskPreview());
     document.querySelectorAll('[data-hotel-open-desk]').forEach(button => button.addEventListener('click', async () => {
         if (busy) return;
-        if (uncertain) { if (!dialog.open) dialog.showModal(); return; }
+        if (uncertain) { await recover(context?.form || document.querySelector('[data-hotel-bill-desk]'), true); return; }
         if (context?.result) {
             renderResult(context.result); if (!dialog.open) dialog.showModal();
             if(context.result.receipt_url && window.hotelDeskPopups) await window.hotelDeskPopups.receipt(context.result.receipt_url, dialog);
@@ -182,21 +257,29 @@
     el('checkout').addEventListener('click', () => { stop(); field('flow').value = 'checkout'; deskPreview(true); });
     el('confirm').addEventListener('click', async () => {
         if (busy || !context || context.result || el('confirm').disabled) return;
+        try { savePending(); }
+        catch (error) { el('confirm').disabled = true; el('error').textContent = error.message || labels.recovery_storage; return; }
         busy = true; confirming = true; uncertain = true; let refused = false; el('confirm').disabled = true; el('back').disabled = true; el('error').textContent = ''; lockDesk(true);
         // Freeze this payload/UUID on an uncertain response; retry the same attempt.
         try {
             const response = await fetch(context.url, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': context.payload._token}, body: JSON.stringify(context.payload)});
-            refused = response.status >= 400 && response.status < 500;
+            refused = [409, 422].includes(response.status);
             const result = await response.json();
             if (!response.ok || !result.success) {
-                refused = response.status >= 400 && response.status < 500;
+                refused = [409, 422].includes(response.status);
                 throw new Error(result.message || result.error || labels.failed);
             }
-            uncertain = false; context.statusUrl = result.status_url; renderResult(result);
+            clearPending(); uncertain = false; context.statusUrl = result.status_url; renderResult(result);
             if (result.receipt_url && window.hotelDeskPopups) await window.hotelDeskPopups.receipt(result.receipt_url, dialog);
-        } catch (error) { el('error').textContent = (error.message || labels.failed) + (refused ? '' : ' ' + labels.retry_same); if (refused) { uncertain = false; lockDesk(false); } }
+        } catch (error) { el('error').textContent = (error.message || labels.failed) + (refused ? '' : ' ' + labels.retry_same); if (refused) { clearPending(); uncertain = false; lockDesk(false); } }
         finally { busy = false; confirming = false; el('confirm').disabled = refused || !!context?.result; el('back').disabled = false; }
     });
     const autoDesk = document.querySelector('[data-hotel-bill-desk][data-auto-open="1"]');
-    if (autoDesk) { field('flow').value = autoDesk.dataset.initialFlow || 'collect'; deskPreview(true); }
+    if (recoveryKey && recoveryForm) {
+        // Also recover on a checked-out stay, where normal collection buttons are absent.
+        (async () => {
+            if (await recover(recoveryForm, !!document.querySelector('[data-hotel-bill-desk]'))) return;
+            if (autoDesk) { field('flow').value = autoDesk.dataset.initialFlow || 'collect'; deskPreview(true); }
+        })();
+    } else if (autoDesk) { field('flow').value = autoDesk.dataset.initialFlow || 'collect'; deskPreview(true); }
 })();

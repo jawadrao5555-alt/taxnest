@@ -554,21 +554,51 @@ class HotelController extends Controller
                     'fingerprint' => $requestFingerprint, 'bill_id' => $bill?->id, 'created_at' => now(), 'updated_at' => now()]);
                 return $bill;
             });
-            if (!$bill) {
-                // A payment on an already issued bill changes the folio money,
-                // not the fiscal document. Keep that original receipt available.
-                $ids = \App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)
-                    ->whereIn('entry_type', ['charge', 'adjustment'])->pluck('pos_transaction_id')->filter();
-                $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
-                    ->whereIn('id', $ids)->where('transaction_type', 'sale')->latest('id')->get()
-                    ->first(fn ($invoice) => $invoice->allowedForBillingScopeOf($user) && $invoice->allowedForCashierIsolationOf($user));
-            }
-            $result = app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill?->fresh());
-            if ($bill) $result['status_url'] = route('pos.hotel.bill-status', [$stay->id, $bill->id]);
-            return response()->json($result);
+            return response()->json($this->confirmationResult($stay, $bill, $user));
         } catch (HotelStayException $e) {
             return response()->json(['message' => $e->getMessage()], 409);
         }
+    }
+
+    /** Read-only reconciliation. Locking the stay waits for an in-flight confirmation. */
+    public function billRecovery(Request $request, int $id)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $stay = $this->stay($id);
+        $data = $this->billPreviewData($request);
+        $validated = $request->validate(['idempotency_key' => 'required|uuid']);
+        $user = auth('pos')->user()->fresh();
+        $key = hash('sha256', 'hotel-confirm|'.$stay->company_id.'|'.$stay->id.'|'.$user->id.'|'.$data['flow'].'|'.$validated['idempotency_key']);
+        return DB::transaction(function () use ($stay, $data, $user, $key) {
+            HotelStay::where('company_id', $stay->company_id)->lockForUpdate()->findOrFail($stay->id);
+            $confirmed = DB::table('hotel_bill_confirmations')->where('company_id', $stay->company_id)
+                ->where('stay_id', $stay->id)->where('request_key', $key)->first();
+            if (!$confirmed) return response()->json(['state' => 'not_found']);
+            $fingerprint = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
+            if (!hash_equals($confirmed->fingerprint, $fingerprint)) {
+                return response()->json(['message' => __('hotel_preview.changed')], 409);
+            }
+            $bill = $confirmed->bill_id ? \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $stay->company_id)->findOrFail($confirmed->bill_id) : null;
+            return response()->json(['state' => 'confirmed', 'result' => $this->confirmationResult($stay, $bill, $user)]);
+        });
+    }
+
+    private function confirmationResult(HotelStay $stay, ?\App\Models\PosTransaction $bill, \App\Models\User $user): array
+    {
+        if (!$bill) {
+            // A payment on an already issued bill changes the folio money,
+            // not the fiscal document. Keep that original receipt available.
+            $ids = \App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)
+                ->whereIn('entry_type', ['charge', 'adjustment'])->pluck('pos_transaction_id')->filter();
+            $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+                ->whereIn('id', $ids)->where('transaction_type', 'sale')->latest('id')->get()
+                ->first(fn ($invoice) => $invoice->allowedForBillingScopeOf($user) && $invoice->allowedForCashierIsolationOf($user));
+        }
+        if ($bill) abort_unless($bill->allowedForBillingScopeOf($user) && $bill->allowedForCashierIsolationOf($user), 403);
+        $result = app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill?->fresh());
+        if ($bill) $result['status_url'] = route('pos.hotel.bill-status', [$stay->id, $bill->id]);
+        return $result;
     }
 
     public function billStatus(int $id, int $billId)

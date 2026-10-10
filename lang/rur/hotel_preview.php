@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'recovery_pending' => 'Pichli payment ka result check karna zaroori hai. Isi attempt ko rakhein; nayi payment shuru na karein.',
+    'recovery_retry' => 'Original payment retry karein',
+    'recovery_storage' => 'Safe payment recovery available nahi. Browser storage enable karke confirm se pehle page dobara kholein.',
     'confirm_checkout_pra' => 'Check out confirm aur PRA ko report karein',
     'confirm_checkout_action' => 'Check out confirm karein',
     'status_no_bill' => 'Kaam save ho gaya; naya bill issue nahi hua. Baaqi charges folio mein hain.',

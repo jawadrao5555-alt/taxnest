@@ -37,7 +37,8 @@ try {
  }
  await saveEvidenceScreenshot(page,'di-'+mode+'-draft-form');
  await page.getByRole('button',{name:/Create Invoice/i}).first().click();
- await page.waitForURL(/\/invoice\/\d+/);
+ await page.waitForURL(url=>url.pathname==='/invoices');
+ await assert.doesNotReject(()=>page.getByText('Invoice created successfully.',{exact:true}).waitFor({state:'visible'}));
  assert.deepEqual(errors,[]);
  console.log('DI '+mode+' real form interaction and draft save passed.');
 } finally {await browser.close();}

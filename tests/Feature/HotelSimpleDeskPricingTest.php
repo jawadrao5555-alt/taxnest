@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\HotelRoom;
+
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\HotelStay;

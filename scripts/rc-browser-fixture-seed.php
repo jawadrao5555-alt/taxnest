@@ -415,6 +415,30 @@ $refundAdjustment->save();
     'reason' => 'Synthetic accepted-credit form fixture', 'selection' => null,
 ]);
 
+
+ // Separate unused rows make each viewport repeat the original pcs-to-kg edit.
+$unitFlags = array_merge(PosFeatureService::defaultsForCategory('restaurant'), ['recipes' => true]);
+$unitCompany = $company('Synthetic Ingredient Unit Audit', 'unit-company@rc-browser.invalid', 'RCBUNIT01', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'feature_flags' => $unitFlags,
+    'restaurant_mode' => true, 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
+    'pra_reporting_enabled' => false,
+]);
+$unitOwner = $user($unitCompany, 'Synthetic Unit Owner', 'unit-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$unitCases = [];
+foreach ([1366, 390] as $width) {
+    $unused = \App\Models\Ingredient::create([
+        'company_id' => $unitCompany->id, 'name' => 'Synthetic Unused Chicken '.$width,
+        'unit' => 'pcs', 'base_unit' => 'pcs', 'conversion_factor' => 1,
+        'current_stock' => 0, 'cost_per_unit' => 100, 'min_stock_level' => 0, 'is_active' => true,
+    ]);
+    $unitCases[$width] = ['id' => $unused->id, 'name' => $unused->name];
+}
+$unitStocked = \App\Models\Ingredient::create([
+    'company_id' => $unitCompany->id, 'name' => 'Synthetic Stocked Chicken',
+    'unit' => 'pcs', 'base_unit' => 'pcs', 'conversion_factor' => 1,
+    'current_stock' => 50, 'cost_per_unit' => 100, 'min_stock_level' => 0, 'is_active' => true,
+]);
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -441,6 +465,9 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
     'transactionalJourneys' => [
+        ['name' => 'ingredient-unit-audit', 'login' => $unitOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
+            'paths' => ['/pos/restaurant/ingredients'], 'markers' => ['Synthetic Stocked Chicken'],
+            'ingredientUnitAudit' => ['unused' => $unitCases, 'stocked' => ['id' => $unitStocked->id, 'name' => $unitStocked->name]]],
         ['name' => 'hotel-credit-review', 'login' => $creditOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/hotel/stays/'.$creditStay->id.'/credit-notes'],
             'hotelCreditReview' => ['billId' => $creditBill->id, 'path' => '/pos/hotel/stays/'.$creditStay->id.'/credit-notes',
@@ -481,3 +508,4 @@ if (file_put_contents($temporary, json_encode($fixture, JSON_PRETTY_PRINT | JSON
 }
 chmod($fixturePath, 0600);
 fwrite(STDOUT, "RC browser fresh synthetic fixture ready.\n");
+

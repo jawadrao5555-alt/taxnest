@@ -945,6 +945,7 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
@@ -960,6 +961,42 @@ async function workflow(page,t,v,diagnostics) {
   for(const s of f.transitions){const b=page.locator(`button[name="to_status"][value="${s}"]`).first();if(!await b.count())throw new Error(`${t.name}: transition ${s} unavailable`);await b.click();await page.waitForLoadState('domcontentloaded');await dismiss(page);}
   const invoice=page.locator('form[action$="/invoice"] button[type="submit"],form[action$="/invoice"] button').first(); await Promise.all([page.waitForURL(/\/pos\/transaction\/\d+$/,{timeout:30000}),invoice.click()]); await dismiss(page);
   await page.goto(baseUrl+order,{waitUntil:'domcontentloaded',timeout:30000}); if(!(await page.locator('body').innerText()).includes(f.invoiceMarker))throw new Error(`${t.name}: invoice linkage marker missing`); pass(`${t.name}/${v.width}: actual service create, transitions, and invoice linked`);
+}
+
+
+async function ingredientUnitAudit(page,t,v) {
+  const f=t.ingredientUnitAudit, unused=f.unused[v.width], path='/pos/restaurant/ingredients';
+  const card=name=>page.locator('[data-search]').filter({has:page.getByRole('heading',{name,exact:true})});
+  const edit=async item=>{
+    await card(item.name).getByRole('button',{name:'Edit',exact:true}).click();
+    const modal=page.locator('[x-show="showEditModal"]');
+    await modal.waitFor({state:'visible'});
+    const form=modal.locator('form');
+    await form.locator('[name="unit"]').selectOption('kg');
+    await form.locator('[name="base_unit"]').selectOption('kg');
+    return form;
+  };
+  const save=async form=>{
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),form.locator('button[type="submit"]').click()]);
+    await waitForOperationalSurface(page); await dismiss(page);
+  };
+  await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  if(!(await card(unused.name).innerText()).includes('0.0000 pcs'))throw new Error('unused fixture did not start in pcs');
+  await save(await edit(unused));
+  if(!(await card(unused.name).innerText()).includes('0.0000 kg'))throw new Error('real unit edit was not persisted on the reloaded card');
+  await save(await edit(f.stocked));
+  const text=await page.locator('main').innerText();
+  if(!text.includes('stock ya recipes')||!(await card(f.stocked.name).innerText()).includes('50.0000 pcs'))throw new Error('stocked unit change failed silently or relabelled the stock');
+  const invalid=await edit(unused);
+  await invalid.locator('[name="unit"]').evaluate(select=>{
+    const option=document.createElement('option');option.value='stones';option.textContent='Invalid test value';select.append(option);
+  });
+  await invalid.locator('[name="unit"]').selectOption('stones');
+  await save(invalid);
+  const alert=page.locator('[role="alert"]').filter({hasText:'Ingredient save nahi hua:'});
+  if(!await alert.isVisible()||!(await card(unused.name).innerText()).includes('0.0000 kg'))throw new Error('invalid unit lacks visible validation feedback or changed persisted unit');
+  pass(t.name+'/'+v.width+': real unused pcs-to-kg edit, visible stocked-unit refusal and invalid-unit rejection');
 }
 
 async function tableOrderWorkflow(page,t,v) {
@@ -1181,3 +1218,4 @@ async function one(browser,label,v,t) {
 const {browser}=await launchLocalBrowser();
 try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
+

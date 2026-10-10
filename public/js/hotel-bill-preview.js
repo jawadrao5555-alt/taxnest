@@ -6,12 +6,17 @@
     const el = name => dialog.querySelector('[data-preview-' + name + ']');
     const field = name => dialog.querySelector('[data-desk-' + name + ']');
     const money = value => 'Rs ' + Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    let context = null, busy = false, timer = null, polls = 0;
+    let context = null, busy = false, confirming = false, uncertain = false, revision = 0, timer = null, polls = 0;
     const stop = () => { clearTimeout(timer); timer = null; };
     const lockDesk = lock => el('desk-controls').querySelectorAll('input,select,button').forEach(node => { node.disabled = lock; });
-    dialog.addEventListener('close', stop);
+    dialog.addEventListener('close', () => {
+        stop(); ++revision;
+        if (context?.payload?.flow === 'checkout' && context.result?.stay_status === 'checked_out' && dialog.dataset.dashboardUrl) {
+            window.location.assign(dialog.dataset.dashboardUrl);
+        }
+    });
     dialog.addEventListener('cancel', event => event.preventDefault());
-    el('back').addEventListener('click', () => { if (!busy) dialog.close(); });
+    el('back').addEventListener('click', () => { if (!confirming) dialog.close(); });
     function creditLink(url) {
         const link = el('credit-note'); link.hidden = !url;
         if (url) link.href = url; else link.removeAttribute('href');
@@ -61,7 +66,9 @@
             const response = await fetch(context.statusUrl, {credentials: 'same-origin', headers: {Accept: 'application/json'}});
             const result = await response.json();
             if (!response.ok) throw new Error(labels.failed);
-            renderResult(result); el('error').textContent = '';
+            const changedFiscal = context.result?.fiscal_number !== result.fiscal_number;
+            renderResult(result);
+            if (changedFiscal && result.receipt_url && dialog.open) await window.hotelDeskPopups?.refresh(result.receipt_url, dialog); el('error').textContent = '';
         } catch (_) { el('error').textContent = labels.failed; }
         finally { busy = false; el('refresh').disabled = false; }
     }
@@ -95,30 +102,39 @@
         el('desk-controls').hidden = !desk;
         if (desk) {
             field('balance-label').hidden = payload.flow !== 'checkout' || !quote.allow_balance;
-            field('amount').max = Number(quote.collect_now) + Number(quote.remaining);
+            const balance = Number(quote.collect_now) + Number(quote.remaining);
+            field('amount').max = balance;
+            field('amount-label').hidden = balance <= 0;
+            field('method-label').hidden = !quote.will_issue && balance <= 0;
             lockDesk(false);
         }
         if (!dialog.open) dialog.showModal();
         el('back').focus();
     }
     async function preview(form, payload, desk = false) {
-        if (busy) return;
-        busy = true; el('confirm').disabled = true;
+        if (busy || uncertain) return;
+        const requestRevision = revision;
+        if (!dialog.open) dialog.showModal();
+        busy = true; el('confirm').disabled = true; lockDesk(true); el('loading').hidden = false; el('draft-receipt').hidden = true;
         try {
             payload.idempotency_key = crypto.randomUUID();
             const query = new URLSearchParams(payload); query.delete('_token'); query.delete('idempotency_key');
             const response = await fetch(form.dataset.previewUrl + '?' + query, {credentials: 'same-origin', headers: {Accept: 'application/json'}});
             const quote = await response.json();
+            if (revision !== requestRevision || !dialog.open) return;
             if (!response.ok) throw new Error(quote.message || labels.failed);
             renderQuote(quote, payload, form, desk);
         } catch (error) {
-            if (!dialog.open) dialog.showModal();
+            if (revision !== requestRevision || !dialog.open) return;
             el('desk-controls').hidden = !desk;
+            el('draft-receipt').hidden = true; el('edit').hidden = true; el('delete').hidden = true;
             el('error').textContent = error.message || labels.failed;
-        } finally { busy = false; }
+        } finally { busy = false; el('loading').hidden = true; if (!uncertain) lockDesk(false); }
     }
     async function deskPreview(resetAmount = false) {
-        if (busy) return;
+        if (busy || uncertain) return;
+        const requestRevision = revision;
+        if (!dialog.open) dialog.showModal();
         const form = document.querySelector('[data-hotel-bill-desk]');
         if (!form) return;
         const payload = Object.fromEntries(new FormData(form));
@@ -126,14 +142,15 @@
         payload.leave_balance = field('balance').checked ? 1 : 0;
         el('confirm').disabled = true;
         if (resetAmount) {
-            busy = true;
+            busy = true; lockDesk(true); el('loading').hidden = false;
             try {
                 const response = await fetch(form.dataset.quoteUrl + '?payment_method=' + encodeURIComponent(payload.payment_method), {credentials: 'same-origin', headers: {Accept: 'application/json'}});
                 const quote = await response.json();
+                if (revision !== requestRevision || !dialog.open) return;
                 if (!response.ok) throw new Error(labels.failed);
                 field('amount').value = Number(quote.balance || 0).toFixed(2);
                 if (Number(quote.balance) <= 0 && Number(quote.total) <= 0) { field('flow').value = 'checkout'; payload.flow = 'checkout'; }
-            } catch (error) { el('error').textContent = error.message || labels.failed; return; }
+            } catch (error) { el('loading').hidden = true; lockDesk(false); if (revision === requestRevision && dialog.open) el('error').textContent = error.message || labels.failed; return; }
             finally { busy = false; }
         }
         payload.amount = field('amount').value;
@@ -152,29 +169,33 @@
     field('amount').addEventListener('input', () => { el('confirm').disabled = true; });
     field('balance').addEventListener('change', () => deskPreview());
     document.querySelectorAll('[data-hotel-open-desk]').forEach(button => button.addEventListener('click', async () => {
+        if (busy) return;
+        if (uncertain) { if (!dialog.open) dialog.showModal(); return; }
         if (context?.result) {
             renderResult(context.result); if (!dialog.open) dialog.showModal();
             if(context.result.receipt_url && window.hotelDeskPopups) await window.hotelDeskPopups.receipt(context.result.receipt_url, dialog);
             return;
         }
-        field('flow').value = 'collect'; deskPreview(true);
+        if (!context?.desk) field('flow').value = 'collect';
+        await deskPreview(!context?.desk);
     }));
     el('checkout').addEventListener('click', () => { stop(); field('flow').value = 'checkout'; deskPreview(true); });
     el('confirm').addEventListener('click', async () => {
         if (busy || !context || context.result || el('confirm').disabled) return;
-        busy = true; let refused = false; el('confirm').disabled = true; el('back').disabled = true; el('error').textContent = ''; lockDesk(true);
+        busy = true; confirming = true; uncertain = true; let refused = false; el('confirm').disabled = true; el('back').disabled = true; el('error').textContent = ''; lockDesk(true);
         // Freeze this payload/UUID on an uncertain response; retry the same attempt.
         try {
             const response = await fetch(context.url, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': context.payload._token}, body: JSON.stringify(context.payload)});
+            refused = response.status >= 400 && response.status < 500;
             const result = await response.json();
             if (!response.ok || !result.success) {
                 refused = response.status >= 400 && response.status < 500;
                 throw new Error(result.message || result.error || labels.failed);
             }
-            context.statusUrl = result.status_url; renderResult(result);
+            uncertain = false; context.statusUrl = result.status_url; renderResult(result);
             if (result.receipt_url && window.hotelDeskPopups) await window.hotelDeskPopups.receipt(result.receipt_url, dialog);
-        } catch (error) { el('error').textContent = (error.message || labels.failed) + (refused ? '' : ' ' + labels.retry_same); if (refused) lockDesk(false); }
-        finally { busy = false; el('confirm').disabled = refused; el('back').disabled = false; }
+        } catch (error) { el('error').textContent = (error.message || labels.failed) + (refused ? '' : ' ' + labels.retry_same); if (refused) { uncertain = false; lockDesk(false); } }
+        finally { busy = false; confirming = false; el('confirm').disabled = refused || !!context?.result; el('back').disabled = false; }
     });
     const autoDesk = document.querySelector('[data-hotel-bill-desk][data-auto-open="1"]');
     if (autoDesk) { field('flow').value = autoDesk.dataset.initialFlow || 'collect'; deskPreview(true); }

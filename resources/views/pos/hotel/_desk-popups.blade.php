@@ -1,4 +1,4 @@
-<dialog data-hotel-checkin-popup class="w-[calc(100%_-_2rem)] max-w-4xl max-h-[90dvh] overflow-y-auto rounded-xl border p-4 dark:bg-gray-900 dark:text-white backdrop:bg-black/50">
+<dialog data-hotel-checkin-popup style="width: min(64rem, calc(100vw - 2rem)); max-width: none; max-height: 90vh; overflow-y: auto;" class="w-[calc(100%_-_2rem)] max-w-4xl max-h-[90dvh] overflow-y-auto rounded-xl border p-4 dark:bg-gray-900 dark:text-white backdrop:bg-black/50">
     <button type="button" data-checkin-close class="float-right rounded-lg border px-3 py-2">{{ __('hotel_preview.close') }}</button>
     <p data-checkin-error role="alert" class="clear-both text-red-700"></p>
     <div data-checkin-form></div>
@@ -26,3 +26,4 @@ window.hotelDeskPopupConfig = @json($hotelDeskPopupConfig);
 </script>
 <script src="{{ asset('js/nestpos-print-bridge.js') }}?v={{ filemtime(public_path('js/nestpos-print-bridge.js')) }}" defer></script>
 <script src="{{ asset('js/hotel-desk-popups.js') }}?v={{ filemtime(public_path('js/hotel-desk-popups.js')) }}" defer></script>
+

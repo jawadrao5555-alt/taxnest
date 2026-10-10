@@ -221,6 +221,7 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
             // Card-save uses the discounted menu amount and the card rate.
             ['inclusive_card_save', 'card', 'amount', 14, 21.79, 294],
             ['exclusive', 'cash', 'amount', 0, 33, 363],
+            ['inclusive_card_save', 'qr_payment', 'amount', 14, 21.79, 294],
         ];
 
         foreach ($cases as $index => [$mode, $method, $discountType, $discountValue, $tax, $payable]) {
@@ -269,9 +270,32 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
                 ->assertOk()
                 ->assertViewHas('transactions', fn ($rows) => abs((float) $rows->first()?->total_amount - $payable) < 0.001)
                 ->assertSee('PKR '.number_format($payable));
-            $this->actingAs($owner, 'pos')
-                ->get('/pos/transaction/'.$bill->id.'/receipt')
-                ->assertOk()->assertSee('PKR '.number_format($payable, 2));
+
+            $moneyBefore = $bill->getAttributes();
+            foreach (['80mm', '58mm'] as $paper) {
+                $company->update(['receipt_printer_size' => $paper]);
+                $this->actingAs($owner, 'pos')
+                    ->get('/pos/transaction/'.$bill->id.'/receipt')
+                    ->assertOk()->assertSee('PKR '.number_format($payable, 2));
+            }
+            $csv = $this->actingAs($owner, 'pos')
+                ->get('/pos/customers/'.$customer->id.'/history/export')
+                ->assertOk()->streamedContent();
+            $exported = collect(preg_split('/\\r?\\n/', trim($csv)))
+                ->map(fn ($line) => str_getcsv($line))
+                ->first(fn ($row) => ($row[1] ?? null) === $bill->invoice_number);
+            $this->assertNotNull($exported, 'the actual CSV contains this customer invoice');
+            $this->assertEquals($payable, (float) $exported[7], 'CSV uses settled payable, not menu total');
+
+            $pdf = $this->actingAs($owner, 'pos')
+                ->get('/pos/customers/'.$customer->id.'/history/pdf')
+                ->assertOk();
+            $this->assertStringStartsWith('%PDF', $pdf->getContent(), 'history PDF actually renders');
+            foreach (['subtotal', 'discount_amount', 'tax_rate', 'tax_amount', 'total_amount',
+                'tax_inclusive', 'tax_menu_rate', 'pra_status', 'pra_invoice_number'] as $field) {
+                $this->assertSame($moneyBefore[$field] ?? null, $bill->fresh()->getAttributes()[$field] ?? null,
+                    'view/export reads never rewrite the stored monetary or fiscal snapshot: '.$field);
+            }
         }
     }
 

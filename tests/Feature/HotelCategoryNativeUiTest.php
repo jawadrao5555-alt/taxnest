@@ -336,9 +336,12 @@ class HotelCategoryNativeUiTest extends TestCase
         $this->assertStringNotContainsString('data-hotel-room-check-in="'.$foreign->id.'"', $dashboard);
 
         $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create?walk_in=1&room_id='.$vacant->id)
-            ->assertOk()->assertSee('value="'.$vacant->id.'" selected', false);
+            ->assertOk()->assertViewHas('selectedRoomId', $vacant->id)
+            ->assertViewHas('roomOptions', fn ($options) => in_array((string) $vacant->id, array_column($options, 'id'), true))
+            ->assertSee(':selected="String(room) === option.id"', false);
         $this->actingAs($owner, 'pos')->get('/pos/hotel/stays/create?walk_in=1&room_id='.$foreign->id)
-            ->assertOk()->assertDontSee('value="'.$foreign->id.'"', false);
+            ->assertOk()->assertViewHas('selectedRoomId', fn ($id) => $id === null)
+            ->assertViewHas('rooms', fn ($rooms) => !$rooms->contains('id', $foreign->id));
     }
 
     public function test_dirty_room_has_a_scoped_clean_action_and_returns_to_available_board(): void

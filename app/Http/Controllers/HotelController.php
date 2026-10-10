@@ -252,12 +252,12 @@ class HotelController extends Controller
         HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
         $companyId = (int) app('currentCompanyId');
         $branchId = $this->branches->getActiveBranchId();
-        $rooms = HotelRoom::where('company_id', $companyId)
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->where('is_active', true)
-            ->where('service_state', HotelRoom::SERVICE_IN)
-            ->orderBy('id')
-            ->get()->sortBy('room_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        $walkIn = request()->boolean('walk_in');
+        $from = now()->toDateString();
+        $to = now()->addDay()->toDateString();
+        // Old input can be invalid; leave validation errors visible without parsing it here.
+        $rooms = $this->stays->availableRooms($companyId, $branchId, $from, $to, $walkIn);
+        $roomOptions = $this->bookingRoomOptions($rooms);
         $customers = [];
         if (Schema::hasTable('pos_customers')) {
             $customers = PosCustomer::where('company_id', $companyId)
@@ -269,7 +269,6 @@ class HotelController extends Controller
 
         $recentGuests = \App\Services\HotelGuestDirectory::rows($companyId, $branchId)->take(200);
 
-        $walkIn = request()->boolean('walk_in');
         // Only preselect a room from this tenant's active branch and active rooms.
         // The booking service still checks capacity, overlaps and room state on POST.
         $selectedRoomId = (int) request()->query('room_id', 0);
@@ -277,7 +276,32 @@ class HotelController extends Controller
             $selectedRoomId = null;
         }
 
-        return view(request()->boolean('modal') ? 'pos.hotel._stay-form' : 'pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId', 'recentGuests'));
+        return view(request()->boolean('modal') ? 'pos.hotel._stay-form' : 'pos.hotel.stay-create', compact('rooms', 'customers', 'walkIn', 'selectedRoomId', 'recentGuests', 'roomOptions'));
+    }
+
+    private function bookingRoomOptions(\Illuminate\Support\Collection $rooms): array
+    {
+        return $rooms->map(fn ($room) => [
+            'id' => (string) $room->id,
+            'rate' => (float) $room->rate_amount,
+            'label' => $room->room_number.' · '.$room->room_type.' · '.$room->capacity.' · '.(
+                (float) $room->rate_amount > 0
+                    ? 'Rs '.number_format($room->rate_amount).'/'.\App\Services\PosUnitCatalog::label($room->rate_unit)
+                    : __('hotel_rooms_manage.hotel_rate_at_checkin')),
+        ])->all();
+    }
+
+    public function availableRooms(Request $request)
+    {
+        HotelAccessService::abortUnlessFrontDesk(auth('pos')->user());
+        $data = $request->validate([
+            'check_in_date' => 'required|date',
+            'check_out_date' => 'required|date|after:check_in_date',
+            'walk_in' => 'nullable|boolean',
+        ]);
+        $rooms = $this->stays->availableRooms((int) app('currentCompanyId'), $this->branches->getActiveBranchId(),
+            $data['check_in_date'], $data['check_out_date'], $request->boolean('walk_in'));
+        return response()->json(['rooms' => $this->bookingRoomOptions($rooms)]);
     }
 
     public function storeStay(Request $request)
@@ -443,9 +467,9 @@ class HotelController extends Controller
             $nights = HotelStayService::nights($data['check_in_date'], $data['check_out_date']);
             $discount = \App\Services\HotelPricingService::validateRate((int) $room->company_id, (int) auth('pos')->id(), (float) $room->rate_amount, (float) $data['rate_amount'], $nights, $data['discount_type'], (float) $data['discount_value']);
             $quote = \App\Services\HotelPricingService::quote(Company::findOrFail($room->company_id), round($nights * $data['rate_amount'], 2), $discount, $data['payment_method']);
-            $busy = HotelStay::where('company_id', $room->company_id)->where('room_id', $room->id)->whereIn('status', HotelStay::OPEN_STATUSES)
-                ->whereDate('check_in_date', '<', $data['check_out_date'])->whereDate('check_out_date', '>', $data['check_in_date'])->exists();
-            return response()->json($quote + ['nights' => $nights, 'available' => !$busy && $room->is_active && !$room->isOutOfService(), 'dirty' => $room->housekeeping === HotelRoom::HK_DIRTY]);
+            $available = $this->stays->availableRooms((int) $room->company_id, $this->branches->getActiveBranchId(),
+                $data['check_in_date'], $data['check_out_date'], $request->boolean('walk_in'))->contains('id', $room->id);
+            return response()->json($quote + ['nights' => $nights, 'available' => $available, 'dirty' => $room->housekeeping === HotelRoom::HK_DIRTY]);
         } catch (HotelStayException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -530,6 +554,15 @@ class HotelController extends Controller
                     'fingerprint' => $requestFingerprint, 'bill_id' => $bill?->id, 'created_at' => now(), 'updated_at' => now()]);
                 return $bill;
             });
+            if (!$bill) {
+                // A payment on an already issued bill changes the folio money,
+                // not the fiscal document. Keep that original receipt available.
+                $ids = \App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)
+                    ->whereIn('entry_type', ['charge', 'adjustment'])->pluck('pos_transaction_id')->filter();
+                $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+                    ->whereIn('id', $ids)->where('transaction_type', 'sale')->latest('id')->get()
+                    ->first(fn ($invoice) => $invoice->allowedForBillingScopeOf($user) && $invoice->allowedForCashierIsolationOf($user));
+            }
             $result = app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill?->fresh());
             if ($bill) $result['status_url'] = route('pos.hotel.bill-status', [$stay->id, $bill->id]);
             return response()->json($result);
@@ -544,6 +577,8 @@ class HotelController extends Controller
         $stay = $this->stay($id);
         abort_unless(\App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->where('pos_transaction_id', $billId)->exists(), 404);
         $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)->findOrFail($billId);
+        $viewer = auth('pos')->user();
+        abort_unless($bill->allowedForBillingScopeOf($viewer) && $bill->allowedForCashierIsolationOf($viewer), 403);
         return response()->json(app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill));
     }
 
@@ -777,8 +812,9 @@ class HotelController extends Controller
         try {
             app(\App\Services\HotelCorrectionService::class)->correct($stay, auth('pos')->user(), $data['fingerprint'], $data['reason'], $data['payment_method']);
         } catch (HotelStayException $e) {
-            return redirect()->route('pos.hotel.stays.correction', $stay->id)->with('error', $e->getMessage());
+            return redirect()->route('pos.hotel.stays.correction', ['id' => $stay->id] + ($request->boolean('modal') ? ['modal' => 1] : []))->with('error', $e->getMessage());
         }
+        if ($request->boolean('modal')) return redirect()->route('pos.hotel.stays.correction', ['id' => $stay->id, 'modal' => 1])->with('success', __('hotel_correction.done'));
         return redirect()->route('pos.hotel.stays.show', $stay->id)->with('success', __('hotel_correction.done'));
     }
 
@@ -1048,4 +1084,3 @@ class HotelController extends Controller
         return $query->findOrFail($id);
     }
 }
-

@@ -549,7 +549,12 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertStringContainsString($bill->invoice_number, $csv);
         $this->assertStringNotContainsString('PRIVATE-OTHER-CASHIER', $csv);
         $this->get('/pos/hotel/folios/pdf?period=all')->assertOk();
+        $bill->update(['hotel_money_from_folio' => true]);
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $bill->id]))->assertOk()->assertDontSee('data-hotel-receipt-money', false);
+        $this->getJson(route('pos.hotel.bill-status', [$stay->id, $bill->id]))->assertOk()->assertJsonPath('bill_id', $bill->id);
+        $this->getJson(route('pos.hotel.bill-status', [$stay->id, $private->id]))->assertForbidden()->assertDontSee('SYNTHETIC-OTHER');
         $this->actingAs($owner, 'pos')->get('/pos/hotel/folios?period=all')->assertOk()->assertSee('PRIVATE-OTHER-CASHIER');
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $bill->id]))->assertOk()->assertSee('data-hotel-receipt-money', false);
     }
 
     public function test_native_hotel_combined_tax_report_keeps_standalone_outlet_sales_and_returns(): void
@@ -615,4 +620,142 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertEquals(128, $scoped->viewData('summary')->total_tax);
     }
 
+    public function test_payment_on_an_already_reported_bill_keeps_its_receipt_and_paid_checkout_takes_no_more_money(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id,
+            $this->booking($room, ['hotel_money_from_folio' => true, 'rate_amount' => 5000]));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 2000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $bill->update(['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ACCEPTED-ORIGINAL']);
+        $base = '/pos/hotel/stays/'.$stay->id;
+        $data = ['flow' => 'collect', 'payment_method' => 'cash', 'amount' => 8000, 'leave_balance' => false];
+        $quote = $this->getJson($base.'/bill-preview?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', false);
+        $payload = $data + ['preview_token' => $quote->json('preview_token'), 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('bill_id', $bill->id)
+            ->assertJsonPath('receipt_url', route('pos.hotel.bill-receipt', [$stay->id, $bill->id]));
+        $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('bill_id', $bill->id);
+        $payments = $stay->folioEntries()->where('entry_type', 'payment')->count();
+        $this->assertEquals(10000, $stay->folioEntries()->where('entry_type', 'payment')->sum('amount'));
+        $checkout = ['flow' => 'checkout', 'payment_method' => 'cash', 'amount' => 0, 'leave_balance' => false];
+        $quote = $this->getJson($base.'/bill-preview?'.http_build_query($checkout))->assertOk()
+            ->assertJsonPath('will_issue', false)->assertJsonPath('collect_now', 0);
+        $payload = $checkout + ['preview_token' => $quote->json('preview_token'), 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('stay_status', 'checked_out')->assertJsonPath('bill_id', $bill->id);
+        $this->assertSame($payments, $stay->folioEntries()->where('entry_type', 'payment')->count());
+        $this->assertSame(1, \App\Models\PosTransaction::where('company_id', $company->id)->count());
+        $this->assertSame('SYNTHETIC-ACCEPTED-ORIGINAL', $bill->fresh()->pra_invoice_number);
+    }
+
+    public function test_modal_draft_cancellation_keeps_its_result_in_the_editor_and_displays_validation(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $url = '/pos/hotel/stays/'.$stay->id.'/correction?modal=1';
+        $preview = $this->get($url)->assertOk()->assertSee('name="modal" value="1"', false);
+        $data = ['modal' => 1, 'reason' => 'Synthetic incorrect draft', 'confirmed' => 1, 'payment_method' => 'cash',
+            'fingerprint' => $preview->viewData('plan')['fingerprint']];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/correction', $data)->assertRedirect($url)->assertSessionHas('success');
+        $this->get($url)->assertOk()->assertSee(__('hotel_correction.done'))->assertDontSee('name="fingerprint"', false);
+        $this->assertSame('cancelled', $stay->fresh()->status);
+    }
+
+    public function test_draft_same_room_rate_edit_changes_only_unissued_nights_and_preserves_room_master_and_assignments(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $assignments = $stay->assignments()->count();
+        $this->get('/pos/hotel/stays/'.$stay->id.'?modal_edit=1')->assertOk()
+            ->assertSee('value="'.$room->id.'" selected', false);
+        $data = ['room_id' => $room->id, 'rate_amount' => 4500];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', $data)->assertRedirect()->assertSessionHas('success');
+        $this->assertEquals(4500, $stay->fresh()->rate_amount);
+        $this->assertEquals(9000, $stay->folioEntries()->where('entry_type', 'charge')->sum('amount'));
+        $this->assertEquals(5000, $room->fresh()->rate_amount);
+        $this->assertSame($assignments, $stay->assignments()->count());
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', $data)->assertRedirect();
+        $this->assertSame($assignments, $stay->assignments()->count());
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 9000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', ['room_id' => $room->id, 'rate_amount' => 4000])
+            ->assertRedirect()->assertSessionHas('error');
+        $this->assertEquals(4500, $stay->fresh()->rate_amount);
+        $this->assertEquals(9000, $bill->fresh()->total_amount);
+    }
+
+
+    public function test_checkin_picker_and_api_hide_occupied_and_dirty_rooms_until_checkout_and_cleaning(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $service = app(HotelStayService::class);
+        $free = $service->createRoom($company->id, ['room_number' => '102', 'rate_amount' => 5000, 'capacity' => 3]);
+        $dirty = $service->createRoom($company->id, ['room_number' => '103', 'housekeeping' => 'dirty']);
+        $stay = $service->book($company->id, $owner->id, $this->booking($room, ['rate_amount' => 5000]));
+        $this->actingAs($owner, 'pos');
+        $query = http_build_query(['check_in_date' => now()->toDateString(), 'check_out_date' => now()->addDay()->toDateString(), 'walk_in' => 1]);
+        $this->get('/pos/hotel/stays/create?walk_in=1&modal=1&room_id='.$room->id)->assertOk()
+            ->assertViewHas('rooms', fn ($rooms) => $rooms->contains('id', $free->id) && !$rooms->contains('id', $room->id) && !$rooms->contains('id', $dirty->id))
+            ->assertViewHas('selectedRoomId', null);
+        $ids = array_column($this->getJson('/pos/hotel/available-rooms?'.$query)->assertOk()->json('rooms'), 'id');
+        $this->assertContains((string) $free->id, $ids);
+        $this->assertNotContains((string) $room->id, $ids);
+        $this->assertNotContains((string) $dirty->id, $ids);
+        app(\App\Services\HotelDeskService::class)->checkout($stay, $owner->id, ['payment_method' => 'cash', 'amount' => 10000, 'idempotency_key' => 'picker-checkout']);
+        $this->assertSame('dirty', $room->fresh()->housekeeping);
+        $this->assertNotContains((string) $room->id, array_column($this->getJson('/pos/hotel/available-rooms?'.$query)->assertOk()->json('rooms'), 'id'));
+        $service->setHousekeeping($room->fresh(), 'clean');
+        $this->assertContains((string) $room->id, array_column($this->getJson('/pos/hotel/available-rooms?'.$query)->assertOk()->json('rooms'), 'id'));
+    }
+
+    public function test_room_picker_respects_reservation_dates_assignments_and_tenant_branch_scope(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $service = app(HotelStayService::class);
+        $stay = $service->book($company->id, $owner->id, $this->booking($room, ['walk_in' => false,
+            'check_in_date' => now()->addDays(7)->toDateString(), 'check_out_date' => now()->addDays(9)->toDateString()]));
+        $assignmentRoom = $service->createRoom($company->id, ['room_number' => '102']);
+        \App\Models\HotelStayAssignment::create(['company_id' => $company->id, 'stay_id' => $stay->id, 'room_id' => $assignmentRoom->id,
+            'from_date' => now()->addDays(7)->toDateString(), 'to_date' => now()->addDays(9)->toDateString(), 'rate_amount' => 5000, 'rate_unit' => 'NGT']);
+        $foreign = $this->company('guest_house');
+        $foreignRoom = $service->createRoom($foreign->id, ['room_number' => 'FOREIGN']);
+        $this->actingAs($owner, 'pos');
+        $today = ['check_in_date' => now()->toDateString(), 'check_out_date' => now()->addDay()->toDateString(), 'walk_in' => 1];
+        $ids = array_column($this->getJson('/pos/hotel/available-rooms?'.http_build_query($today))->assertOk()->json('rooms'), 'id');
+        $this->assertContains((string) $room->id, $ids); $this->assertNotContains((string) $foreignRoom->id, $ids);
+        $future = ['check_in_date' => now()->addDays(7)->toDateString(), 'check_out_date' => now()->addDays(8)->toDateString(), 'walk_in' => 0];
+        $ids = array_column($this->getJson('/pos/hotel/available-rooms?'.http_build_query($future))->assertOk()->json('rooms'), 'id');
+        $this->assertNotContains((string) $room->id, $ids); $this->assertNotContains((string) $assignmentRoom->id, $ids);
+        $adjacent = ['check_in_date' => now()->addDays(9)->toDateString(), 'check_out_date' => now()->addDays(10)->toDateString(), 'walk_in' => 0];
+        $this->assertContains((string) $room->id, array_column($this->getJson('/pos/hotel/available-rooms?'.http_build_query($adjacent))->assertOk()->json('rooms'), 'id'));
+        $a = Branch::create(['company_id' => $company->id, 'name' => 'A', 'code' => 'A', 'is_active' => true, 'is_head_office' => true]);
+        $b = Branch::create(['company_id' => $company->id, 'name' => 'B', 'code' => 'B', 'is_active' => true]);
+        $room->update(['branch_id' => $a->id]); $assignmentRoom->update(['branch_id' => $b->id]);
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $ids = array_column($this->withSession(['active_branch_id' => $a->id])->getJson('/pos/hotel/available-rooms?'.http_build_query($today))->assertOk()->json('rooms'), 'id');
+        $this->assertContains((string) $room->id, $ids); $this->assertNotContains((string) $assignmentRoom->id, $ids);
+        $this->getJson('/pos/hotel/available-rooms?check_in_date=invalid&check_out_date=invalid')->assertUnprocessable();
+    }
+
+    public function test_overdue_checked_in_room_cannot_accept_a_walkin_or_reserved_checkin_even_after_scheduled_departure(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $service = app(HotelStayService::class);
+        $occupied = $service->book($company->id, $owner->id, $this->booking($room, ['rate_amount' => 5000,
+            'check_in_date' => now()->subDays(2)->toDateString(), 'check_out_date' => now()->subDay()->toDateString()]));
+        $this->actingAs($owner, 'pos');
+        $data = $this->booking($room, ['rate_amount' => 5000, 'discount_type' => 'amount', 'discount_value' => 0, 'payment_method' => 'cash']);
+        $this->getJson('/pos/hotel/quote?'.http_build_query($data))->assertOk()->assertJsonPath('available', false);
+        $this->postJson('/pos/hotel/stays', $data)->assertConflict();
+        $this->assertSame(1, HotelStay::where('company_id', $company->id)->count());
+        // A non-overlapping reservation is valid, but actual occupancy still blocks its check-in.
+        $reserved = $service->book($company->id, $owner->id, array_merge($data, ['walk_in' => false]));
+        $this->from('/pos/hotel/stays/'.$reserved->id)->post('/pos/hotel/stays/'.$reserved->id.'/check-in')->assertRedirect()->assertSessionHas('error');
+        $this->assertSame('reserved', $reserved->fresh()->status); $this->assertSame('checked_in', $occupied->fresh()->status);
+        $this->assertSame(0, $reserved->folioEntries()->count());
+    }
 }

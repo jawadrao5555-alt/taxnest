@@ -314,6 +314,35 @@ foreach (['pra' => 'pos', 'fbr' => 'fbrpos'] as $panel => $product) {
         ];
     }
 }
+
+ // Synthetic customer amounts: seed persisted snapshots, never submit to PRA.
+$amountCompany = $company('Synthetic Customer Amount Audit', 'amount-company@rc-browser.invalid', 'RCBAMOUNT01', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant',
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
+    'restaurant_mode' => true, 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
+    'pra_reporting_enabled' => false, 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
+]);
+$amountOwner = $user($amountCompany, 'Synthetic Amount Owner', 'amount-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$amountCustomer = \App\Models\PosCustomer::create([
+    'company_id' => $amountCompany->id, 'name' => 'Synthetic Amount Customer', 'phone' => '00000000111',
+]);
+$amountCases = [];
+foreach ([['AMOUNT-QR-316', 'qr_payment', 14, 316], ['AMOUNT-CASH-330', 'cash', 0, 330]] as [$number, $method, $discount, $payable]) {
+    $amountBill = \App\Models\PosTransaction::create([
+        'company_id' => $amountCompany->id, 'created_by' => $amountOwner->id,
+        'customer_id' => $amountCustomer->id, 'customer_name' => $amountCustomer->name,
+        'customer_phone' => $amountCustomer->phone, 'invoice_number' => $number,
+        'invoice_mode' => 'local', 'status' => 'completed', 'transaction_type' => 'sale',
+        'subtotal' => 330, 'discount_amount' => $discount, 'tax_rate' => 0, 'tax_amount' => 0,
+        'total_amount' => $payable, 'tax_inclusive' => false, 'payment_method' => $method,
+    ]);
+    \App\Models\PosTransactionItem::create([
+        'transaction_id' => $amountBill->id, 'item_type' => 'manual', 'item_name' => 'Synthetic Menu Item',
+        'quantity' => 1, 'unit_price' => 330, 'subtotal' => 330, 'tax_rate' => 0, 'tax_amount' => 0,
+    ]);
+    $amountCases[] = ['id' => $amountBill->id, 'invoice' => $number, 'payable' => $payable];
+}
+
 $admin = AdminUser::create([
     'name' => 'Synthetic RC Platform Administrator', 'email' => 'hotel-admin-manage-as@rc-browser.invalid',
     'password' => Hash::make($password), 'role' => 'super_admin',
@@ -413,6 +442,9 @@ $unitStocked = \App\Models\Ingredient::create([
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
+            'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],
+            'customerAmountAudit' => ['customerId' => $amountCustomer->id, 'cases' => $amountCases, 'spent' => 646]],
         ['name' => 'print-evidence-status', 'login' => $printEvidenceOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/printer-settings'], 'markers' => ['Delayed print queue', 'Synthetic delayed queue', 'No document; no print submitted', 'Accepted by Windows; paper not verified']],
         ['name' => 'hotel-owner', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk'], 'usableSelectors' => ['[data-hotel-desk-menu="1"] a[data-hotel-desk-link="checkin"]', '[data-hotel-reception-summary="1"]', '[data-hotel-room-check-in]']],
@@ -476,3 +508,4 @@ if (file_put_contents($temporary, json_encode($fixture, JSON_PRETTY_PRINT | JSON
 }
 chmod($fixturePath, 0600);
 fwrite(STDOUT, "RC browser fresh synthetic fixture ready.\n");
+

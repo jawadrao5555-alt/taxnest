@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class InvoiceItem extends Model
 {
     protected $fillable = [
+        'st_withheld_amount',
         'invoice_id',
         'hs_code',
         'schedule_type',
@@ -27,6 +28,7 @@ class InvoiceItem extends Model
     ];
 
     protected $casts = [
+        'st_withheld_amount' => 'float',
         'st_withheld_at_source' => 'boolean',
         'petroleum_levy' => 'float',
         'further_tax' => 'float',

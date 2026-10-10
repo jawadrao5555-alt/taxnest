@@ -233,6 +233,10 @@ class ScheduleEngine
         $scheduleTypes = [];
 
         foreach ($items as $index => $item) {
+            $money = DiInvoiceMath::line($item);
+            if (isset($item['tax']) && abs((float) $item['tax'] - $money['salesTaxApplicable']) > 0.005) {
+                $errors[] = 'Item #' . ($index + 1) . ': Tax amount does not match the rate and tax base. Recalculate this line.';
+            }
             $scheduleType = $item['schedule_type'] ?? 'standard';
             $scheduleTypes[] = $scheduleType;
             $taxRate = isset($item['tax_rate']) ? floatval($item['tax_rate']) : null;

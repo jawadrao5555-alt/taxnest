@@ -1,0 +1,32 @@
+name: DI financial browser regression
+on:
+  pull_request:
+    paths:
+      - 'app/Services/FbrService.php'
+      - 'app/Services/DiInvoiceMath.php'
+      - 'app/Services/InvoicePdfService.php'
+      - 'app/Http/Controllers/InvoiceController.php'
+      - 'resources/views/invoice/**'
+      - 'scripts/di-local-browser-*'
+      - '.github/workflows/di-financial-browser.yml'
+permissions:
+  contents: read
+jobs:
+  di-financial-browser:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: sqlite3, pdo_sqlite, gd, zip, mbstring, intl, bcmath
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+      - run: npm ci --no-audit --no-fund && npm run build
+      - name: Install Chromium in a disposable explicit cache
+        run: RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} bash scripts/rc-playwright-install.sh
+      - name: Exercise synthetic DI form with external fiscal traffic blocked
+        run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}/playwright-cache bash scripts/di-local-browser-check.sh financial

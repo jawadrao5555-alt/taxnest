@@ -1276,13 +1276,10 @@ class InvoiceImportService
                     $buyerCnic = $first['buyer_cnic'] ?: null;
                     $buyerRegType = \App\Http\Controllers\InvoiceController::detectBuyerRegistrationType($buyerNtn, $buyerCnic);
 
-                    $totalValueExcludingST = 0.0;
-                    $totalSalesTax = 0.0;
-                    foreach ($entries as $entry) {
-                        $totalValueExcludingST += floatval($entry['data']['price']) * floatval($entry['data']['quantity']);
-                        $totalSalesTax += floatval($entry['data']['tax']);
-                    }
-                    $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
+                    $totals = DiInvoiceMath::totals(array_column($entries, 'data'));
+                    $totalValueExcludingST = $totals['value'];
+                    $totalSalesTax = $totals['tax'];
+                    $totalAmount = $totals['amount'];
 
                     $invoiceNumber = InvoiceNumberingService::generateNextNumber($company->id);
 

@@ -106,7 +106,7 @@ class DiInvoiceApiController extends Controller
         // ── FBR schedule rules — same engine as the panel ───────────────────
         $standardTaxRate = $company->getStandardTaxRateValue();
         $itemsWithTaxRate = collect($request->input('items'))->map(function ($item) {
-            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? intval($item['tax_rate']) : null;
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;
         })->toArray();
 
@@ -154,13 +154,10 @@ class DiInvoiceApiController extends Controller
         // ── Create invoice + items (mirrors InvoiceController::store) ───────
         try {
             $invoice = DB::transaction(function () use ($request, $company, $companyId, $selectedBranch, $documentType, $buyerRegType, $clientReference, $standardTaxRate) {
-                $totalValueExcludingST = 0;
-                $totalSalesTax = 0;
-                foreach ($request->input('items') as $item) {
-                    $totalValueExcludingST += floatval($item['price']) * floatval($item['quantity']);
-                    $totalSalesTax += floatval($item['tax']);
-                }
-                $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
+                $totals = \App\Services\DiInvoiceMath::totals($request->input('items'));
+            $totalValueExcludingST = $totals['value'];
+            $totalSalesTax = $totals['tax'];
+            $totalAmount = $totals['amount'];
 
                 $invoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
                 $supplierProvince = $selectedBranch?->province ?? $company->province ?? null;

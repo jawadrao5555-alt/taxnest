@@ -48,8 +48,8 @@ class InvoicePdfService
             $showWatermark = true;
         }
 
-        $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
-        $totalTax = $invoice->items->sum('tax');
+        $subtotal = $invoice->total_value_excluding_st ?? $invoice->items->sum(fn($item) => round($item->price * $item->quantity, 2));
+        $totalTax = $invoice->total_sales_tax ?? $invoice->items->sum('tax');
 
         if ($invoice->status === 'locked' && $invoice->fbr_status === 'production') {
             $whtRate = $invoice->wht_rate ?? 0;
@@ -58,7 +58,7 @@ class InvoicePdfService
         } else {
             $whtRate = floatval($invoice->wht_rate ?? $fallbackWhtRate ?? 0);
             $whtAmount = round($subtotal * ($whtRate / 100), 2);
-            $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
+            $netReceivable = round((float) ($invoice->total_amount ?? ($subtotal + $totalTax)) + $whtAmount, 2);
         }
 
         $qrBase64 = '';

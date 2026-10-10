@@ -1,5 +1,6 @@
 @php
     $formConfig = [
+        'availabilityUrl' => route('pos.hotel.available-rooms'), 'options' => $roomOptions,
         'url' => route('pos.hotel.quote'), 'room' => (string) old('room_id', $selectedRoomId),
         'arrival' => old('check_in_date', now()->toDateString()), 'departure' => old('check_out_date', now()->addDay()->toDateString()),
         'rate' => old('rate_amount', (float) ($rooms->firstWhere('id', $selectedRoomId)?->rate_amount ?? 0) > 0 ? $rooms->firstWhere('id', $selectedRoomId)->rate_amount : ''),
@@ -29,9 +30,9 @@
             <label class="block text-xs font-medium mb-1">{{ __('pos.hotel_room') }}</label>
             <select x-model="room" @change="selectRoom()" name="room_id" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 dark:text-white text-sm">
                 <option value="">{{ __('pos.hotel_select_room') }}</option>
-                @foreach($rooms as $room)
-                <option value="{{ $room->id }}" @selected((int) old('room_id', $selectedRoomId) === (int) $room->id)>{{ $room->room_number }} · {{ $room->room_type }} · {{ $room->capacity }} · {{ (float) $room->rate_amount > 0 ? 'Rs '.number_format($room->rate_amount).'/'.\App\Services\PosUnitCatalog::label($room->rate_unit) : __('hotel_rooms_manage.hotel_rate_at_checkin') }}</option>
-                @endforeach
+                <template x-for="option in options" :key="option.id">
+                    <option :value="option.id" :selected="String(room) === option.id" x-text="option.label"></option>
+                </template>
             </select>
         </div>
         <div>

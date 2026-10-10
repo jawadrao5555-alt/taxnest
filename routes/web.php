@@ -1137,6 +1137,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/rooms/{id}/housekeeping', [HotelController::class, 'housekeeping'])->whereNumber('id')->name('pos.hotel.rooms.housekeeping');
         Route::post('/rooms/{id}/service', [HotelController::class, 'serviceState'])->whereNumber('id')->name('pos.hotel.rooms.service');
         Route::get('/stays', [HotelController::class, 'staysIndex'])->name('pos.hotel.stays.index');
+        Route::get('/available-rooms', [HotelController::class, 'availableRooms'])->name('pos.hotel.available-rooms');
         Route::get('/stays/create', [HotelController::class, 'createStay'])->name('pos.hotel.stays.create');
         Route::post('/stays', [HotelController::class, 'storeStay'])->name('pos.hotel.stays.store');
         Route::get('/quote', [HotelController::class, 'bookingQuote'])->name('pos.hotel.quote');

@@ -23,9 +23,19 @@ window.hotelBookingForm = function (config) {
         async refresh() {
             const revision = ++this.revision;
             this.quote = null; this.error = ''; this.busy = true;
-            if (!this.room || this.rate === '') { this.busy = false; return; }
-            const params = new URLSearchParams({room_id: this.room, check_in_date: this.arrival, check_out_date: this.departure, rate_amount: this.rate, discount_type: this.discountType, discount_value: this.discountValue || 0, payment_method: this.method});
+            const params = new URLSearchParams({room_id: this.room, check_in_date: this.arrival, check_out_date: this.departure, rate_amount: this.rate, discount_type: this.discountType, discount_value: this.discountValue || 0, payment_method: this.method, walk_in: this.walkIn ? 1 : 0});
             try {
+                const availability = await fetch(this.availabilityUrl + '?' + new URLSearchParams({check_in_date:this.arrival, check_out_date:this.departure, walk_in:this.walkIn ? 1 : 0}), {headers:{Accept:'application/json'}, credentials:'same-origin'});
+                const available = await availability.json();
+                if (revision !== this.revision) return;
+                if (!availability.ok) throw new Error(available.message || this.failure);
+                this.options = available.rooms;
+                this.rooms = Object.fromEntries(available.rooms.map(room => [room.id, {rate:room.rate}]));
+                if (this.room && !this.rooms[this.room]) {
+                    this.room = ''; this.rate = ''; this.error = this.unavailable;
+                    return;
+                }
+                if (!this.room || this.rate === '') return;
                 const response = await fetch(this.url + '?' + params, {headers: {Accept: 'application/json'}, credentials: 'same-origin'});
                 const data = await response.json();
                 if (revision !== this.revision) return;

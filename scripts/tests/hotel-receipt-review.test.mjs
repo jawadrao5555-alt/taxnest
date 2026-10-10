@@ -27,12 +27,14 @@ function desk(fetcher) {
         querySelector:s=>s.includes('data-auto-open')?null:form,
         querySelectorAll:()=>[open],addEventListener(){}};
     node('[data-desk-flow]').value='collect'; node('[data-desk-method]').value='cash';
+    dialog.dataset.dashboardUrl='/pos/hotel';
+    const redirects=[];
     let serial=0;
-    const sandbox={document,window:{hotelBillPreviewLabels:new Proxy({}, {get:(_,key)=>String(key)})},
+    const sandbox={document,window:{hotelBillPreviewLabels:new Proxy({}, {get:(_,key)=>String(key)}), location:{assign:url=>redirects.push(url)}},
         fetch:fetcher,URLSearchParams,FormData:class { *[Symbol.iterator](){yield ['_token','synthetic-csrf'];}},
         crypto:{randomUUID:()=> 'attempt-'+(++serial)},setTimeout:()=>1,clearTimeout(){},console};
     vm.runInNewContext(readFileSync(new URL('../../public/js/hotel-bill-preview.js',import.meta.url),'utf8'),sandbox);
-    return {dialog,open,el:k=>node('[data-preview-'+k+']'),field:k=>node('[data-desk-'+k+']')};
+    return {dialog,open,redirects,el:k=>node('[data-preview-'+k+']'),field:k=>node('[data-desk-'+k+']')};
 }
 const quote={preview_token:'token',lines:[],balance:100,total:100,collect_now:100,remaining:0,will_issue:true,allow_balance:false};
 const response=data=>({ok:true,status:200,json:async()=>data});
@@ -92,4 +94,43 @@ test('a definite confirmation refusal requires explicit refreshed review before 
     assert.equal(ui.el('confirm').disabled,true);assert.equal(ui.field('amount').disabled,false);
     await ui.field('update').click();await ui.el('confirm').click();
     assert.equal(posts.length,2);assert.notEqual(posts[0].idempotency_key,posts[1].idempotency_key);
+});
+
+test('only explicitly closing a successful checkout returns to the Hotel dashboard',async()=>{
+    const ui=desk(async url=>response(url==='/confirm'?{success:true,status:'local',stay_status:'checked_out',stay_url:'/stay'}:quote));
+    await ui.open.click();ui.field('flow').value='checkout';await ui.field('update').click();await ui.el('confirm').click();
+    assert.deepEqual(ui.redirects,[]);assert.equal(ui.dialog.open,true);
+    await ui.el('back').click();assert.deepEqual(ui.redirects,['/pos/hotel']);
+});
+test('closing draft or collection receipts retains the current page',async()=>{
+    const ui=desk(async url=>response(url==='/confirm'?{success:true,status:'local',stay_status:'checked_in',stay_url:'/stay'}:quote));
+    await ui.open.click();await ui.el('back').click();assert.deepEqual(ui.redirects,[]);
+    await ui.open.click();await ui.el('confirm').click();await ui.el('back').click();assert.deepEqual(ui.redirects,[]);
+});
+
+function booking(fetcher) {
+    const sandbox={window:{},fetch:fetcher,URLSearchParams,console};
+    vm.runInNewContext(readFileSync(new URL('../../public/js/hotel-desk.js',import.meta.url),'utf8'),sandbox);
+    return sandbox.window.hotelBookingForm({url:'/quote',availabilityUrl:'/available',room:'1',rate:100,rooms:{1:{rate:100}},
+        options:[{id:'1',rate:100,label:'Room 1'}],arrival:'2026-10-10',departure:'2026-10-11',walkIn:true,
+        discountType:'amount',discountValue:0,method:'cash',failure:'Failed',unavailable:'Unavailable'});
+}
+test('booking refresh removes unavailable rooms and clears a stale selected room before quoting',async()=>{
+    const requests=[];
+    const form=booking(async url=>{requests.push(String(url));return response(String(url).startsWith('/available')?{rooms:[{id:'2',rate:200,label:'Room 2'}]}:{available:false});});
+    await form.refresh();
+    assert.equal(form.room,'');assert.equal(form.rate,'');assert.equal(form.quote,null);assert.equal(form.error,'Unavailable');
+    assert.equal(form.options.length,1);assert.equal(form.options[0].id,'2');
+    assert.equal(requests.length,1);
+});
+test('booking availability refresh retains an available selection and quotes with the same walk-in mode',async()=>{
+    const requests=[];
+    const form=booking(async url=>{requests.push(String(url));return response(String(url).startsWith('/available')?{rooms:[{id:'1',rate:100,label:'Room 1'}]}:{available:true,dirty:false,total:100});});
+    await form.refresh();
+    assert.equal(form.room,'1');assert.equal(form.rate,100);assert.equal(form.quote.total,100);assert.equal(form.error,'');
+    assert.match(requests[0],/check_in_date=2026-10-10/);assert.match(requests[1],/walk_in=1/);
+});
+test('failed availability lookup cannot leave an old quote confirmable',async()=>{
+    const form=booking(async()=>({ok:false,json:async()=>({message:'Unavailable now'})}));
+    form.quote={total:100};await form.refresh();assert.equal(form.quote,null);assert.equal(form.error,'Unavailable now');assert.equal(form.busy,false);
 });

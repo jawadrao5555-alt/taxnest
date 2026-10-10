@@ -708,7 +708,7 @@ class HotelSimpleDeskPricingTest extends TestCase
         app(\App\Services\HotelDeskService::class)->checkout($stay, $owner->id, ['payment_method' => 'cash', 'amount' => 10000, 'idempotency_key' => 'picker-checkout']);
         $this->assertSame('dirty', $room->fresh()->housekeeping);
         $this->assertNotContains((string) $room->id, array_column($this->getJson('/pos/hotel/available-rooms?'.$query)->assertOk()->json('rooms'), 'id'));
-        $service->setHousekeeping($room, 'clean');
+        $service->setHousekeeping($room->fresh(), 'clean');
         $this->assertContains((string) $room->id, array_column($this->getJson('/pos/hotel/available-rooms?'.$query)->assertOk()->json('rooms'), 'id'));
     }
 

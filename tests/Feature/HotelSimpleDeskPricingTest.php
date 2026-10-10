@@ -637,6 +637,9 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('bill_id', $bill->id)
             ->assertJsonPath('receipt_url', route('pos.hotel.bill-receipt', [$stay->id, $bill->id]));
         $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('bill_id', $bill->id);
+        $this->getJson($base.'/bill-recovery?'.http_build_query($data + ['idempotency_key' => $payload['idempotency_key']]))
+            ->assertOk()->assertJsonPath('state', 'confirmed')->assertJsonPath('result.bill_id', $bill->id)
+            ->assertJsonPath('result.fiscal_number', 'SYNTHETIC-ACCEPTED-ORIGINAL');
         $payments = $stay->folioEntries()->where('entry_type', 'payment')->count();
         $this->assertEquals(10000, $stay->folioEntries()->where('entry_type', 'payment')->sum('amount'));
         $checkout = ['flow' => 'checkout', 'payment_method' => 'cash', 'amount' => 0, 'leave_balance' => false];
@@ -644,9 +647,46 @@ class HotelSimpleDeskPricingTest extends TestCase
             ->assertJsonPath('will_issue', false)->assertJsonPath('collect_now', 0);
         $payload = $checkout + ['preview_token' => $quote->json('preview_token'), 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
         $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('stay_status', 'checked_out')->assertJsonPath('bill_id', $bill->id);
+        $this->getJson($base.'/bill-recovery?'.http_build_query($checkout + ['idempotency_key' => $payload['idempotency_key']]))
+            ->assertOk()->assertJsonPath('state', 'confirmed')->assertJsonPath('result.stay_status', 'checked_out')
+            ->assertJsonPath('result.bill_id', $bill->id);
         $this->assertSame($payments, $stay->folioEntries()->where('entry_type', 'payment')->count());
         $this->assertSame(1, \App\Models\PosTransaction::where('company_id', $company->id)->count());
         $this->assertSame('SYNTHETIC-ACCEPTED-ORIGINAL', $bill->fresh()->pra_invoice_number);
+    }
+
+    public function test_read_only_recovery_of_nonzero_partial_payment_keeps_one_payment_and_scopes_the_operation(): void
+    {
+        \Illuminate\Support\Facades\Http::fake();
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $base = '/pos/hotel/stays/'.$stay->id;
+        $data = ['flow' => 'collect', 'payment_method' => 'cash', 'amount' => 2500, 'leave_balance' => false];
+        $quote = $this->getJson($base.'/bill-preview?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', false);
+        $uuid = (string) \Illuminate\Support\Str::uuid();
+        $payload = $data + ['preview_token' => $quote->json('preview_token'), 'idempotency_key' => $uuid];
+        $recovery = $base.'/bill-recovery?'.http_build_query($data + ['idempotency_key' => $uuid]);
+        $this->getJson($recovery)->assertOk()->assertJsonPath('state', 'not_found');
+        // Commit a real nonzero payment; a browser may lose this HTTP response.
+        $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('status', 'no_bill');
+        $before = [$stay->folioEntries()->count(), \App\Models\PosTransaction::count(),
+            \Illuminate\Support\Facades\DB::table('hotel_bill_confirmations')->count()];
+        $this->getJson($recovery)->assertOk()->assertJsonPath('state', 'confirmed')->assertJsonPath('result.status', 'no_bill');
+        $this->assertSame($before, [$stay->folioEntries()->count(), \App\Models\PosTransaction::count(),
+            \Illuminate\Support\Facades\DB::table('hotel_bill_confirmations')->count()]);
+        $this->assertEquals(2500, $stay->folioEntries()->where('entry_type', 'payment')->sum('amount'));
+        $this->assertSame(1, $stay->folioEntries()->where('entry_type', 'payment')->count());
+        $this->getJson($base.'/bill-recovery?'.http_build_query(array_replace($data, ['amount' => 2501, 'idempotency_key' => $uuid])))
+            ->assertStatus(409);
+        // An expired preview token cannot prevent replay of a committed operation.
+        $this->postJson($base.'/bill-confirm', array_replace($payload, ['preview_token' => 'expired-token']))
+            ->assertOk()->assertJsonPath('status', 'no_bill');
+        $this->assertEquals(2500, $stay->folioEntries()->where('entry_type', 'payment')->sum('amount'));
+        $this->actingAs($this->owner($company), 'pos')->getJson($recovery)->assertOk()->assertJsonPath('state', 'not_found');
+        $otherCompany = $this->company();
+        $this->actingAs($this->owner($otherCompany), 'pos')->getJson($recovery)->assertNotFound();
+        \Illuminate\Support\Facades\Http::assertNothingSent();
     }
 
     public function test_modal_draft_cancellation_keeps_its_result_in_the_editor_and_displays_validation(): void

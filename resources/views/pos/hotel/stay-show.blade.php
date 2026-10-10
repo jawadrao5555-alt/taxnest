@@ -1,4 +1,5 @@
 <x-hotel-layout>
+    @include('pos.hotel._payment-recovery')
 <div class="tn-page tn-hotel-page max-w-6xl mx-auto">
     @if($stay->status === 'checked_in')
     <form hidden data-hotel-bill-desk="1" data-initial-flow="{{ request('bill_action') === 'checkout' ? 'checkout' : 'collect' }}" data-hotel-confirm-flow="collect" data-auto-open="{{ ((int) session('hotel_checkin_preview') === (int) $stay->id || request('bill_action') === 'checkout') ? 1 : 0 }}" data-preview-url="{{ route('pos.hotel.bill-preview', $stay->id) }}" data-confirm-url="{{ route('pos.hotel.bill-confirm', $stay->id) }}" data-quote-url="{{ route('pos.hotel.checkout-quote', $stay->id) }}">

@@ -1,4 +1,5 @@
 <x-hotel-layout>
+    @include('pos.hotel._payment-recovery')
 @php
     $config = ['url' => route('pos.hotel.checkout-quote', $stay->id), 'quote' => $summary, 'amount' => old('amount', $summary['balance']), 'method' => old('payment_method', 'cash'), 'failure' => __('pos.hotel_quote_failed')];
 @endphp

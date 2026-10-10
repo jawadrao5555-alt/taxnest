@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 
 // Execute the shipped dialog controller; only DOM and HTTP transport are doubles.
-function desk(fetcher) {
+function desk(fetcher, {storage = new Map(), scope = 'hotel-confirm-v1:1:1:1', startup = false, token = 'synthetic-csrf', recovery = async()=>response({state:'not_found'})} = {}) {
     const nodes = new Map();
     function node(key) {
         if (nodes.has(key)) return nodes.get(key);
@@ -22,22 +23,84 @@ function desk(fetcher) {
         nodes.set(key,n); return n;
     }
     const dialog=node('dialog'), open=node('open');
+    dialog.dataset = {recoveryKey:scope, recoveryUrl:'/recovery'};
     const form=node('form'); form.dataset={previewUrl:'/preview',confirmUrl:'/confirm',quoteUrl:'/quote'};
     const document={getElementById:()=>dialog,createElement:()=>node('created-'+nodes.size),
-        querySelector:s=>s.includes('data-auto-open')?null:form,
+        querySelector:s=>s.includes('data-auto-open')?null:(s.includes('data-hotel-recovery-form')&&!startup?null:form),
         querySelectorAll:()=>[open],addEventListener(){}};
     node('[data-desk-flow]').value='collect'; node('[data-desk-method]').value='cash';
     dialog.dataset.dashboardUrl='/pos/hotel';
     const redirects=[];
-    let serial=0;
-    const sandbox={document,window:{hotelBillPreviewLabels:new Proxy({}, {get:(_,key)=>String(key)}), location:{assign:url=>redirects.push(url)}},
-        fetch:fetcher,URLSearchParams,FormData:class { *[Symbol.iterator](){yield ['_token','synthetic-csrf'];}},
-        crypto:{randomUUID:()=> 'attempt-'+(++serial)},setTimeout:()=>1,clearTimeout(){},console};
+    const sandbox={document,window:{localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},hotelBillPreviewLabels:new Proxy({}, {get:(_,key)=>String(key)}), location:{assign:url=>redirects.push(url)}},
+        fetch:(url,options)=>String(url).startsWith('/recovery')?recovery(url,options):fetcher(url,options),URLSearchParams,FormData:class { *[Symbol.iterator](){yield ['_token',token];}},
+        crypto:{randomUUID},setTimeout:()=>1,clearTimeout(){},console};
     vm.runInNewContext(readFileSync(new URL('../../public/js/hotel-bill-preview.js',import.meta.url),'utf8'),sandbox);
     return {dialog,open,redirects,el:k=>node('[data-preview-'+k+']'),field:k=>node('[data-desk-'+k+']')};
 }
 const quote={preview_token:'token',lines:[],balance:100,total:100,collect_now:100,remaining:0,will_issue:true,allow_balance:false};
 const response=data=>({ok:true,status:200,json:async()=>data});
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+test('reload reconciles a committed nonzero payment with GET only and keeps the original receipt',async()=>{
+    const storage=new Map(), posts=[], saved={success:true,status:'local',bill_id:7,invoice_number:'ORIGINAL',receipt_url:'/original',stay_status:'checked_in',stay_url:'/stay'};
+    const transport=async(url,options)=>{
+        if(url!=='/confirm')return response(quote);
+        posts.push(JSON.parse(options.body));throw Error('Lost response after actual operation');
+    };
+    let ui=desk(transport,{storage});
+    await ui.open.click();ui.field('amount').value='25';await ui.field('update').click();await ui.el('confirm').click();
+    const record=[...storage.values()][0];
+    assert.equal(JSON.parse(record).payload._token,undefined,'CSRF must not be persisted');
+    let lookups=0;
+    ui=desk(transport,{storage,startup:true,recovery:async url=>{
+        ++lookups;assert.match(String(url),new RegExp(posts[0].idempotency_key));
+        assert.doesNotMatch(String(url),/preview_token|_token/);
+        return response({state:'confirmed',result:saved});
+    }});
+    await tick();
+    assert.equal(lookups,1);assert.equal(posts.length,1);
+    assert.equal(ui.el('receipt').href,'/original');assert.equal(ui.el('confirm').hidden,true);
+    assert.equal(storage.size,0);assert.equal(ui.dialog.open,true);
+});
+test('reload before commit permits only explicit original-payload retry using the current CSRF',async()=>{
+    const storage=new Map(), posts=[];
+    const transport=async(url,options)=>{
+        if(url!=='/confirm')return response(quote);
+        posts.push(JSON.parse(options.body));
+        if(posts.length===1)throw Error('Connection cut before commit');
+        return response({success:true,status:'no_bill',stay_status:'checked_in',stay_url:'/stay'});
+    };
+    let ui=desk(transport,{storage});
+    await ui.open.click();ui.field('amount').value='25';await ui.field('update').click();await ui.el('confirm').click();
+    ui=desk(transport,{storage,startup:true,token:'renewed-csrf'});await tick();
+    assert.equal(posts.length,1);assert.equal(ui.field('amount').disabled,true);
+    await ui.el('confirm').click();
+    const original={...posts[0],_token:'renewed-csrf'};
+    assert.deepEqual(posts[1],original);assert.equal(storage.size,0);
+});
+test('another tenant or user cannot recover a saved pending payment',async()=>{
+    const storage=new Map(), posts=[];
+    const transport=async(url,options)=>{
+        if(url!=='/confirm')return response(quote);
+        posts.push(JSON.parse(options.body));throw Error('Lost response');
+    };
+    const ui=desk(transport,{storage});await ui.open.click();await ui.el('confirm').click();
+    let lookups=0;
+    const foreign=desk(transport,{storage,scope:'hotel-confirm-v1:2:8:1',startup:true,recovery:async()=>{++lookups;return response({state:'not_found'});}});
+    await tick();assert.equal(lookups,0);assert.equal(posts.length,1);
+    await foreign.open.click();assert.equal(foreign.field('amount').disabled,false);assert.equal(storage.size,1);
+});
+test('blocked storage refuses monetary POST; expired authentication keeps the original pending identity',async()=>{
+    const blocked={get(){throw Error('Storage blocked');},set(){throw Error('Storage blocked');},delete(){}};
+    let posts=0;
+    const ui=desk(async()=>{++posts;return response(quote);},{storage:blocked});
+    await ui.open.click();await ui.el('confirm').click();assert.equal(posts,0);
+    const storage=new Map();
+    const authTransport=async(url)=>url==='/confirm'?{ok:false,status:419,json:async()=>({message:'Expired CSRF'})}:response(quote);
+    const first=desk(authTransport,{storage});await first.open.click();await first.el('confirm').click();
+    assert.equal(storage.size,1);assert.equal(first.field('amount').disabled,true);
+    const restored=desk(authTransport,{storage,startup:true,recovery:async()=>({ok:false,status:401,json:async()=>({message:'Sign in again'})})});
+    await tick();assert.equal(restored.el('confirm').disabled,true);assert.equal(storage.size,1);
+});
 test('closing and reopening an unconfirmed receipt retains method, partial payment and action',async()=>{
     const requests=[];
     const ui=desk(async url=>{requests.push(String(url));return response(quote);});

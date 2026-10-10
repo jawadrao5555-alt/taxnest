@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'recovery_pending' => 'A previous payment needs checking. Keep this attempt; do not start another payment.',
+    'recovery_retry' => 'Retry original payment',
+    'recovery_storage' => 'Safe payment recovery is unavailable. Enable browser storage and reopen this page before confirming.',
     'confirm_checkout_pra' => 'Confirm checkout & Report to PRA',
     'confirm_checkout_action' => 'Confirm checkout',
     'status_no_bill' => 'Action saved; no new bill issued. Unpaid charges remain on the folio.',

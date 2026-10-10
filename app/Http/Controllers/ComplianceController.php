@@ -56,7 +56,7 @@ class ComplianceController extends Controller
         foreach ($sample as $inv) {
             if (!$inv->integrity_hash) {
                 $integrity['missing']++;
-            } elseif ($inv->integrity_hash === IntegrityHashService::generate($inv)) {
+            } elseif (IntegrityHashService::verify($inv)) {
                 $integrity['passed']++;
             } else {
                 $integrity['failed']++;

@@ -355,6 +355,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await form.locator('[name="discount_value"]').fill('500');
   await form.locator('details').filter({has: page.locator('[name="advance_amount"]')}).locator('summary').click();
   await form.locator('[name="advance_amount"]').fill('1000');
+  const bookedRoomId = await form.locator('[name="room_id"]').inputValue();
   await page.addInitScript(() => { window.__hotelPrintCalls = 0; window.print = () => { ++window.__hotelPrintCalls; }; });
   await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, {timeout:30000,waitUntil:'domcontentloaded'}), form.locator('button').click()]);
   const checkinPreview = page.locator('[data-hotel-bill-preview="1"]');
@@ -372,6 +373,21 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   if (checkinOptions.some(text => text.startsWith(room + ' · '))) throw new Error('Occupied room still appeared in the direct check-in picker');
   await saveEvidenceScreenshot(page, `hotel-available-rooms-${v.width}.png`);
   pass(`${t.name}/${v.width}: occupied room removed from real check-in dropdown`);
+  // Future reservation stays available outside occupied dates; changing dates clears conflicts.
+  await page.goto(baseUrl + '/pos/hotel/stays/create', {waitUntil:'domcontentloaded'});
+  const reserveForm = page.locator('form[x-data^="hotelBookingForm"]');
+  const today = await reserveForm.locator('[name="check_in_date"]').inputValue();
+  const shifted = days => { const date=new Date(today+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10); };
+  await reserveForm.locator('[name="check_out_date"]').fill(shifted(8));
+  await reserveForm.locator('[name="check_in_date"]').fill(shifted(7));
+  await page.waitForFunction(id=>{const d=window.Alpine.$data(document.querySelector('form[x-data^="hotelBookingForm"]'));return !d.busy && d.options.some(room=>room.id===id);},bookedRoomId);
+  await reserveForm.locator('[name="room_id"]').selectOption(bookedRoomId);
+  await page.waitForFunction(()=>{const d=window.Alpine.$data(document.querySelector('form[x-data^="hotelBookingForm"]'));return !d.busy && d.quote?.available;});
+  await reserveForm.locator('[name="check_in_date"]').fill(today);
+  await reserveForm.locator('[name="check_out_date"]').fill(shifted(1));
+  await page.waitForFunction(id=>{const d=window.Alpine.$data(document.querySelector('form[x-data^="hotelBookingForm"]'));return !d.busy && !d.room && !d.options.some(room=>room.id===id);},bookedRoomId);
+  if (await reserveForm.locator('[name="room_id"]').inputValue()) throw new Error('Changed dates kept an unavailable room selected');
+  pass(`${t.name}/${v.width}: real reservation dates restore future availability and clear overlapping selection`);
   await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   await dismiss(page);
   if (await page.locator('#hotel-charge').isVisible() || await page.locator('#hotel-payment').isVisible()) throw new Error('Hotel action forms must start collapsed');

@@ -172,7 +172,7 @@ test('closing draft or collection receipts retains the current page',async()=>{
 });
 
 function booking(fetcher) {
-    const sandbox={window:{},fetch:(url,options)=>String(url).startsWith('/recovery')?recovery(url,options):fetcher(url,options),URLSearchParams,console};
+    const sandbox={window:{},fetch:fetcher,URLSearchParams,console};
     vm.runInNewContext(readFileSync(new URL('../../public/js/hotel-desk.js',import.meta.url),'utf8'),sandbox);
     return sandbox.window.hotelBookingForm({url:'/quote',availabilityUrl:'/available',room:'1',rate:100,rooms:{1:{rate:100}},
         options:[{id:'1',rate:100,label:'Room 1'}],arrival:'2026-10-10',departure:'2026-10-11',walkIn:true,

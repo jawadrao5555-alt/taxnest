@@ -530,6 +530,15 @@ class HotelController extends Controller
                     'fingerprint' => $requestFingerprint, 'bill_id' => $bill?->id, 'created_at' => now(), 'updated_at' => now()]);
                 return $bill;
             });
+            if (!$bill) {
+                // A payment on an already issued bill changes the folio money,
+                // not the fiscal document. Keep that original receipt available.
+                $ids = \App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)
+                    ->whereIn('entry_type', ['charge', 'adjustment'])->pluck('pos_transaction_id')->filter();
+                $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)
+                    ->whereIn('id', $ids)->where('transaction_type', 'sale')->latest('id')->get()
+                    ->first(fn ($invoice) => $invoice->allowedForBillingScopeOf($user) && $invoice->allowedForCashierIsolationOf($user));
+            }
             $result = app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill?->fresh());
             if ($bill) $result['status_url'] = route('pos.hotel.bill-status', [$stay->id, $bill->id]);
             return response()->json($result);
@@ -544,6 +553,8 @@ class HotelController extends Controller
         $stay = $this->stay($id);
         abort_unless(\App\Models\HotelFolioEntry::where('company_id', $stay->company_id)->where('stay_id', $stay->id)->where('pos_transaction_id', $billId)->exists(), 404);
         $bill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $stay->company_id)->findOrFail($billId);
+        $viewer = auth('pos')->user();
+        abort_unless($bill->allowedForBillingScopeOf($viewer) && $bill->allowedForCashierIsolationOf($viewer), 403);
         return response()->json(app(\App\Services\HotelBillPreviewService::class)->result($stay, $bill));
     }
 
@@ -777,8 +788,9 @@ class HotelController extends Controller
         try {
             app(\App\Services\HotelCorrectionService::class)->correct($stay, auth('pos')->user(), $data['fingerprint'], $data['reason'], $data['payment_method']);
         } catch (HotelStayException $e) {
-            return redirect()->route('pos.hotel.stays.correction', $stay->id)->with('error', $e->getMessage());
+            return redirect()->route('pos.hotel.stays.correction', ['id' => $stay->id] + ($request->boolean('modal') ? ['modal' => 1] : []))->with('error', $e->getMessage());
         }
+        if ($request->boolean('modal')) return redirect()->route('pos.hotel.stays.correction', ['id' => $stay->id, 'modal' => 1])->with('success', __('hotel_correction.done'));
         return redirect()->route('pos.hotel.stays.show', $stay->id)->with('success', __('hotel_correction.done'));
     }
 
@@ -1048,4 +1060,5 @@ class HotelController extends Controller
         return $query->findOrFail($id);
     }
 }
+
 

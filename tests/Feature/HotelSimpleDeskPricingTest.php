@@ -549,7 +549,12 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertStringContainsString($bill->invoice_number, $csv);
         $this->assertStringNotContainsString('PRIVATE-OTHER-CASHIER', $csv);
         $this->get('/pos/hotel/folios/pdf?period=all')->assertOk();
+        $bill->update(['hotel_money_from_folio' => true]);
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $bill->id]))->assertOk()->assertDontSee('data-hotel-receipt-money', false);
+        $this->getJson(route('pos.hotel.bill-status', [$stay->id, $bill->id]))->assertOk()->assertJsonPath('bill_id', $bill->id);
+        $this->getJson(route('pos.hotel.bill-status', [$stay->id, $private->id]))->assertForbidden()->assertDontSee('SYNTHETIC-OTHER');
         $this->actingAs($owner, 'pos')->get('/pos/hotel/folios?period=all')->assertOk()->assertSee('PRIVATE-OTHER-CASHIER');
+        $this->get(route('pos.hotel.bill-receipt', [$stay->id, $bill->id]))->assertOk()->assertSee('data-hotel-receipt-money', false);
     }
 
     public function test_native_hotel_combined_tax_report_keeps_standalone_outlet_sales_and_returns(): void
@@ -615,4 +620,73 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertEquals(128, $scoped->viewData('summary')->total_tax);
     }
 
+    public function test_payment_on_an_already_reported_bill_keeps_its_receipt_and_paid_checkout_takes_no_more_money(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id,
+            $this->booking($room, ['hotel_money_from_folio' => true, 'rate_amount' => 5000]));
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 2000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $bill->update(['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ACCEPTED-ORIGINAL']);
+        $base = '/pos/hotel/stays/'.$stay->id;
+        $data = ['flow' => 'collect', 'payment_method' => 'cash', 'amount' => 8000, 'leave_balance' => false];
+        $quote = $this->getJson($base.'/bill-preview?'.http_build_query($data))->assertOk()->assertJsonPath('will_issue', false);
+        $payload = $data + ['preview_token' => $quote->json('preview_token'), 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('bill_id', $bill->id)
+            ->assertJsonPath('receipt_url', route('pos.hotel.bill-receipt', [$stay->id, $bill->id]));
+        $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('bill_id', $bill->id);
+        $payments = $stay->folioEntries()->where('entry_type', 'payment')->count();
+        $this->assertEquals(10000, $stay->folioEntries()->where('entry_type', 'payment')->sum('amount'));
+        $checkout = ['flow' => 'checkout', 'payment_method' => 'cash', 'amount' => 0, 'leave_balance' => false];
+        $quote = $this->getJson($base.'/bill-preview?'.http_build_query($checkout))->assertOk()
+            ->assertJsonPath('will_issue', false)->assertJsonPath('collect_now', 0);
+        $payload = $checkout + ['preview_token' => $quote->json('preview_token'), 'idempotency_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->postJson($base.'/bill-confirm', $payload)->assertOk()->assertJsonPath('stay_status', 'checked_out')->assertJsonPath('bill_id', $bill->id);
+        $this->assertSame($payments, $stay->folioEntries()->where('entry_type', 'payment')->count());
+        $this->assertSame(1, \App\Models\PosTransaction::where('company_id', $company->id)->count());
+        $this->assertSame('SYNTHETIC-ACCEPTED-ORIGINAL', $bill->fresh()->pra_invoice_number);
+    }
+
+    public function test_modal_draft_cancellation_keeps_its_result_in_the_editor_and_displays_validation(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $url = '/pos/hotel/stays/'.$stay->id.'/correction?modal=1';
+        $preview = $this->get($url)->assertOk()->assertSee('name="modal" value="1"', false);
+        $data = ['modal' => 1, 'reason' => 'Synthetic incorrect draft', 'confirmed' => 1, 'payment_method' => 'cash',
+            'fingerprint' => $preview->viewData('plan')['fingerprint']];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/correction', $data)->assertRedirect($url)->assertSessionHas('success');
+        $this->get($url)->assertOk()->assertSee(__('hotel_correction.done'))->assertDontSee('name="fingerprint"', false);
+        $this->assertSame('cancelled', $stay->fresh()->status);
+    }
+
+    public function test_draft_same_room_rate_edit_changes_only_unissued_nights_and_preserves_room_master_and_assignments(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $this->actingAs($owner, 'pos');
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $assignments = $stay->assignments()->count();
+        $this->get('/pos/hotel/stays/'.$stay->id.'?modal_edit=1')->assertOk()
+            ->assertSee('value="'.$room->id.'" selected', false);
+        $data = ['room_id' => $room->id, 'rate_amount' => 4500];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', $data)->assertRedirect()->assertSessionHas('success');
+        $this->assertEquals(4500, $stay->fresh()->rate_amount);
+        $this->assertEquals(9000, $stay->folioEntries()->where('entry_type', 'charge')->sum('amount'));
+        $this->assertEquals(5000, $room->fresh()->rate_amount);
+        $this->assertSame($assignments, $stay->assignments()->count());
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', $data)->assertRedirect();
+        $this->assertSame($assignments, $stay->assignments()->count());
+        $folio = app(\App\Services\HotelFolioService::class);
+        $folio->postPayment($stay, ['amount' => 9000], $owner->id);
+        $bill = $folio->settleCoveredCharges($stay, $owner->id, 'cash')['transaction'];
+        $this->post('/pos/hotel/stays/'.$stay->id.'/move', ['room_id' => $room->id, 'rate_amount' => 4000])
+            ->assertRedirect()->assertSessionHas('error');
+        $this->assertEquals(4500, $stay->fresh()->rate_amount);
+        $this->assertEquals(9000, $bill->fresh()->total_amount);
+    }
+
 }
+

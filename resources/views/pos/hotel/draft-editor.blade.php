@@ -21,16 +21,14 @@
             <p class="text-xs text-gray-500">{{ __('pos.hotel_change_hint') }}</p>
             <button :disabled="!quote || busy || !!error" class="disabled:opacity-50 px-3 py-2 bg-teal-700 text-white text-xs rounded-lg font-semibold">{{ __('pos.hotel_extend_btn') }}</button>
         </form>
-        <form x-data="hotelChangeForm(@js($changeConfig + ['kind' => 'move']))" @submit="if (!quote || busy || error) $event.preventDefault()" method="POST" action="{{ route('pos.hotel.stays.move', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
+        <form x-data="hotelChangeForm(@js(array_merge($changeConfig, ['kind' => 'move', 'room' => (string) $stay->room_id])))" @submit="if (!quote || busy || error) $event.preventDefault()" method="POST" action="{{ route('pos.hotel.stays.move', $stay->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border p-4 space-y-2">
             @csrf
             <input type="hidden" name="idempotency_key" value="{{ (string) Illuminate\Support\Str::uuid() }}">
-            <h3 class="text-sm font-semibold">{{ __('pos.hotel_move') }}</h3>
+            <h3 class="text-sm font-semibold">{{ __('pos.hotel_room') }} / {{ __('pos.hotel_agreed_rate') }}</h3>
             <select x-model="room" name="room_id" required class="w-full rounded-lg border-gray-300 dark:bg-gray-800 text-sm">
                 <option value="" selected disabled>{{ __('pos.hotel_select_room') }}</option>
                 @foreach($rooms as $room)
-                @if($room->id !== $stay->room_id)
-                <option value="{{ $room->id }}">{{ $room->room_number }} · {{ $room->room_type }}</option>
-                @endif
+                <option value="{{ $room->id }}" @selected($room->id === $stay->room_id)>{{ $room->room_number }} · {{ $room->room_type }}</option>
                 @endforeach
             </select>
             <label class="block text-xs">{{ __('pos.hotel_agreed_rate') }}<input x-model="rate" name="rate_amount" type="number" min="0" max="10000000" step="0.01" class="block mt-1 w-full rounded-lg border-gray-300 dark:bg-gray-800"></label>
@@ -57,3 +55,4 @@
 
 </div>
 </x-pos-layout>
+

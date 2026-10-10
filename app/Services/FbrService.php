@@ -1584,7 +1584,7 @@ class FbrService
             // A 2xx JSON body that is neither an explicit validation rejection
             // nor an acknowledgement is not evidence of a rejection.  Treat it
             // like callback loss and preserve the submission fingerprint.
-            if (!isset($responseData['validationResponse']) && !isset($responseData['fault'])) {
+            if (!$this->isExplicitFbrRejection($responseData)) {
                 $log->status = 'pending_verification';
                 $log->failure_type = 'malformed_success_response';
                 $log->response_payload = json_encode([
@@ -1670,7 +1670,7 @@ class FbrService
                 "response_time_ms" => $responseTimeMs,
             ];
         }
-        });
+        })();
     }
 
     private function parseFbrResponse(array $responseData): array
@@ -1752,6 +1752,21 @@ class FbrService
             'itemInvoiceNumbers' => [],
             'errors' => ['Unexpected FBR response format: ' . json_encode($responseData)],
         ];
+    }
+
+    /** A missing acknowledgement is not proof that the regulator rejected it. */
+    private function isExplicitFbrRejection(array $responseData): bool
+    {
+        $validation = $responseData['validationResponse'] ?? null;
+        if (!is_array($validation)) return false;
+        // Any reference can indicate partial acceptance. Reconcile, never replay.
+        if (!empty($responseData['invoiceNumber']) || !empty($responseData['InvoiceNumber'])) return false;
+        foreach (($validation['invoiceStatuses'] ?? []) as $item) {
+            if (!is_array($item) || !empty($item['invoiceNumber']) || !empty($item['invoiceNo'])) return false;
+        }
+        return ($validation['statusCode'] ?? null) === '01'
+            && strtolower((string) ($validation['status'] ?? '')) === 'invalid'
+            && (string) ($validation['errorCode'] ?? '') !== '500';
     }
 
     private function extractErrorsFromResponse(string $body): array

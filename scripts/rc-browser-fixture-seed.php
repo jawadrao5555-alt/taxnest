@@ -119,6 +119,18 @@ foreach (['RC-201', 'RC-202'] as $number) {
         'rate_unit' => 'NGT', 'housekeeping' => 'clean', 'is_active' => true,
     ]);
 }
+foreach ([
+    'RC-INACTIVE' => ['is_active' => false],
+    'RC-OUT' => ['service_state' => HotelRoom::SERVICE_OUT],
+    'RC-DIRTY' => ['housekeeping' => HotelRoom::HK_DIRTY],
+] as $number => $state) {
+    HotelRoom::withoutGlobalScopes()->create(array_merge([
+        'company_id' => $hotel->id, 'branch_id' => $hotelBranch, 'room_number' => $number,
+        'room_type' => 'Synthetic Blocked Room', 'capacity' => 2, 'rate_amount' => 5000,
+        'rate_unit' => 'NGT', 'housekeeping' => HotelRoom::HK_CLEAN,
+        'service_state' => HotelRoom::SERVICE_IN, 'is_active' => true,
+    ], $state));
+}
 $settingsHotel = $company('Synthetic Rooms Only Settings', 'settings-hotel@rc-browser.invalid', 'RCBROWSERSETTINGS', 'pos', [
     'business_category' => 'hotel', 'pos_type' => 'hotel',
     'feature_flags' => PosFeatureService::defaultsForCategory('hotel'),

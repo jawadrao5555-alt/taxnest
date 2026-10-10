@@ -26,5 +26,7 @@ jobs:
           node-version: '22.23.2'
       - run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
       - run: npm ci --no-audit --no-fund && npm run build
+      - name: Install Chromium in a disposable explicit cache
+        run: RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} bash scripts/rc-playwright-install.sh
       - name: Exercise synthetic DI form with external fiscal traffic blocked
-        run: bash scripts/rc-safe-run -- bash scripts/di-local-browser-check.sh financial
+        run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}/playwright-cache bash scripts/di-local-browser-check.sh financial

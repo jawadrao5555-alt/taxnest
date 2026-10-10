@@ -270,6 +270,10 @@ class ScheduleEngine
             $rules = self::resolveValidationRules($scheduleType, $taxRate, $standardTaxRate);
             $config = self::getScheduleConfig($scheduleType);
             $itemNum = $index + 1;
+            if (!empty($item['st_withheld_at_source']) && (!isset($item['st_withheld_amount']) || !is_numeric($item['st_withheld_amount']) || (float) $item['st_withheld_amount'] <= 0)) {
+                $errors[] = 'Item #' . ($index + 1) . ': Enter the actual sales-tax withholding amount.';
+            }
+
 
             if ($scheduleType === '3rd_schedule' && $taxRate !== null && $taxRate < $standardTaxRate) {
                 $missing = [];

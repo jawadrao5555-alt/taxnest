@@ -349,7 +349,7 @@ class FbrService
                 "productDescription" => $item->description ?? "",
                 "salesTaxApplicable" => (float) round($salesTaxApplicable, 2),
                 "valueSalesExcludingST" => (float) round($valueSalesExcludingST, 2),
-                "salesTaxWithheldAtSource" => (float) round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
+                "salesTaxWithheldAtSource" => (float) round($item->st_withheld_at_source ? floatval($item->st_withheld_amount ?? 0) : 0, 2),
                 "fixedNotifiedValueOrRetailPrice" => (float) round($retailPrice, 2),
             ];
 
@@ -1326,7 +1326,7 @@ class FbrService
             ];
         }
 
-        $preSubmissionErrors = $this->validatePayloadPreSubmission($payload, $company);
+        $preSubmissionErrors = array_merge($this->validatePayloadPreSubmission($payload, $company), $this->validateWithholdingAmounts($invoice));
         if (!empty($preSubmissionErrors)) {
             $clearHashOnFailure();
             $errorMessages = array_map(
@@ -1780,8 +1780,21 @@ class FbrService
         return $errors ?: [$body];
     }
 
+    public function validateWithholdingAmounts($invoice): array
+    {
+        $errors = [];
+        foreach ($invoice->items as $index => $item) {
+            if ($item->st_withheld_at_source && (!is_numeric($item->st_withheld_amount) || $item->st_withheld_amount <= 0)) {
+                $errors[] = ['code' => 'WITHHOLDING_AMOUNT', 'message' => 'Item #' . ($index + 1) . ': Enter the actual sales-tax withholding amount. A checkbox is not an amount.'];
+            }
+        }
+        return $errors;
+    }
+
     public function validateOnly($invoice): array
     {
+        $withheldErrors = $this->validateWithholdingAmounts($invoice);
+        if ($withheldErrors) return ['status' => 'invalid', 'errors' => array_column($withheldErrors, 'message'), 'payload' => []];
         $payload = $this->buildPayload($invoice);
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';

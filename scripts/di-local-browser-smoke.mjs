@@ -10,7 +10,7 @@ try {
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1' ? route.continue() : route.abort());
  await page.goto(base+'/login');
- await page.locator('input[name=email]').fill(fixture.login);await page.locator('input[name=password]').fill(fixture.password);
+ await page.locator('input[name=login]').fill(fixture.login);await page.locator('input[name=password]').fill(fixture.password);
  await page.locator('button[type=submit]').click();await page.waitForLoadState('networkidle');
  await page.goto(base+'/invoice/create');
  await page.waitForFunction(()=>window.Alpine && document.querySelector('form[x-data]')?._x_dataStack);

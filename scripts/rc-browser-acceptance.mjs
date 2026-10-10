@@ -355,6 +355,7 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await form.locator('[name="discount_value"]').fill('500');
   await form.locator('details').filter({has: page.locator('[name="advance_amount"]')}).locator('summary').click();
   await form.locator('[name="advance_amount"]').fill('1000');
+  const bookedRoomId = await form.locator('[name="room_id"]').inputValue();
   await page.addInitScript(() => { window.__hotelPrintCalls = 0; window.print = () => { ++window.__hotelPrintCalls; }; });
   await Promise.all([page.waitForURL(/\/pos\/hotel\/stays\/\d+$/, {timeout:30000,waitUntil:'domcontentloaded'}), form.locator('button').click()]);
   const checkinPreview = page.locator('[data-hotel-bill-preview="1"]');
@@ -366,6 +367,28 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await checkinPreview.locator('[data-preview-back]').click();
   await checkinPreview.waitFor({state:'hidden'});
   const stayPath = new URL(page.url()).pathname;
+  await page.goto(baseUrl + '/pos/hotel/stays/create?walk_in=1', {waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>{const form=document.querySelector('form[x-data^="hotelBookingForm"]');return form && window.Alpine.$data(form).busy === false;});
+  const checkinOptions = await page.locator('[name="room_id"] option').allTextContents();
+  if (checkinOptions.some(text => text.startsWith(room + ' · '))) throw new Error('Occupied room still appeared in the direct check-in picker');
+  await saveEvidenceScreenshot(page, `hotel-available-rooms-${v.width}.png`);
+  pass(`${t.name}/${v.width}: occupied room removed from real check-in dropdown`);
+  // Future reservation stays available outside occupied dates; changing dates clears conflicts.
+  await page.goto(baseUrl + '/pos/hotel/stays/create', {waitUntil:'domcontentloaded'});
+  const reserveForm = page.locator('form[x-data^="hotelBookingForm"]');
+  const today = await reserveForm.locator('[name="check_in_date"]').inputValue();
+  const shifted = days => { const date=new Date(today+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10); };
+  await reserveForm.locator('[name="check_out_date"]').fill(shifted(8));
+  await reserveForm.locator('[name="check_in_date"]').fill(shifted(7));
+  await page.waitForFunction(id=>{const d=window.Alpine.$data(document.querySelector('form[x-data^="hotelBookingForm"]'));return !d.busy && d.options.some(room=>room.id===id);},bookedRoomId);
+  await reserveForm.locator('[name="room_id"]').selectOption(bookedRoomId);
+  await page.waitForFunction(()=>{const d=window.Alpine.$data(document.querySelector('form[x-data^="hotelBookingForm"]'));return !d.busy && d.quote?.available;});
+  await reserveForm.locator('[name="check_in_date"]').fill(today);
+  await reserveForm.locator('[name="check_out_date"]').fill(shifted(1));
+  await page.waitForFunction(id=>{const d=window.Alpine.$data(document.querySelector('form[x-data^="hotelBookingForm"]'));return !d.busy && !d.room && !d.options.some(room=>room.id===id);},bookedRoomId);
+  if (await reserveForm.locator('[name="room_id"]').inputValue()) throw new Error('Changed dates kept an unavailable room selected');
+  pass(`${t.name}/${v.width}: real reservation dates restore future availability and clear overlapping selection`);
+  await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   await dismiss(page);
   if (await page.locator('#hotel-charge').isVisible() || await page.locator('#hotel-payment').isVisible()) throw new Error('Hotel action forms must start collapsed');
   await saveEvidenceScreenshot(page, `hotel-simple-desk-${v.width}-stay.png`);
@@ -626,19 +649,16 @@ async function hotelWorkflow(page, t, v, diagnostics) {
     const state = await previewModal.evaluate(el => ({open:el.open,error:el.querySelector('[data-preview-error]').textContent,issuedHidden:el.querySelector('[data-preview-issued]').hidden,issuedChildren:el.querySelector('[data-preview-issued]').childElementCount,receiptUrl:el.querySelector('[data-preview-receipt]').href}));
     throw new Error('Checkout receipt: ' + JSON.stringify({checkoutResult,state}) + ' ' + error.message);
   });
-  await receiptPopup.locator('[data-receipt-close]').click();
-  await previewModal.waitFor({state:'hidden'});
-  await page.locator('[data-hotel-open-desk]').first().click();
-  await previewModal.waitFor({state:'visible'});
-  await receiptPopup.waitFor({state:'visible'});
   await page.waitForFunction(() => !document.querySelector('[data-receipt-print]').disabled);
   if (checkoutResult.bill_id !== firstBill.bill_id) throw new Error('Checkout duplicated the existing full bill');
-  await previewModal.locator('[data-preview-receipt]').waitFor({state:'visible'});
   if (billConfirmPosts !== 3) throw new Error('Expected initial confirmation, same-UUID retry and one checkout');
   if (await previewModal.locator('[data-preview-qr]').isVisible()) throw new Error('Unreported local bill advertised a PRA QR');
+  if (new URL(page.url()).pathname !== stayPath) throw new Error('Checkout automatically left the receipt before Close');
   await saveEvidenceScreenshot(page, `hotel-bill-preview-${v.width}-confirmed.png`);
   page.off('request', countConfirm);
-  await Promise.all([page.waitForURL(baseUrl + stayPath, {timeout:30000}), previewModal.locator('[data-preview-stay]').click()]);
+  await Promise.all([page.waitForURL(baseUrl + '/pos/hotel', {timeout:30000}), receiptPopup.locator('[data-receipt-close]').click()]);
+  pass(`${t.name}/${v.width}: completed checkout Close returned to Hotel Dashboard`);
+  await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   await dismiss(page);
   if (!await page.locator('a[href*="/bills/"][href$="/receipt"]').count()) throw new Error('Checkout must expose the issued receipt');
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
@@ -1093,7 +1113,6 @@ async function sameProductCategorySurface(page,t,v) {
   if(status>=400||finalPath!==path||!await main.count())fail(`${t.name}/${v.width}: same-product category surface ${path} did not render`);
   else pass(`CATEGORY NATIVE PASS: ${t.name}/${v.width}: ${t.categoryCoverage.category} rendered ${path}`);
 }
-
 async function customerAmountAudit(page,t,v) {
   const f=t.customerAmountAudit, history='/pos/customers/'+f.customerId+'/history';
   for(const bill of f.cases) {
@@ -1162,5 +1181,3 @@ async function one(browser,label,v,t) {
 const {browser}=await launchLocalBrowser();
 try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
-
-

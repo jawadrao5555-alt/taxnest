@@ -238,6 +238,7 @@ class HotelStayService
             $guest = $this->resolveCustomer($companyId, $data['guest_customer_id'] ?? null);
             $payer = $this->resolveCustomer($companyId, $data['payer_customer_id'] ?? null);
             $walkIn = (bool) ($data['walk_in'] ?? false);
+            if ($walkIn) $this->assertRoomVacantNow($companyId, (int) $room->id);
 
             $rate = isset($data['rate_amount']) ? round((float) $data['rate_amount'], 2) : (float) $room->rate_amount;
             $discountType = $data['discount_type'] ?? 'amount';
@@ -369,6 +370,7 @@ class HotelStayService
             if ($room->housekeeping === HotelRoom::HK_DIRTY) {
                 throw new HotelStayException(__('pos.hotel_room_needs_clean'));
             }
+            $this->assertRoomVacantNow((int) $stay->company_id, (int) $stay->room_id, (int) $stay->id);
             $this->assertRoomFree(
                 (int) $stay->company_id,
                 (int) $stay->room_id,
@@ -733,6 +735,43 @@ class HotelStayService
         $occupancy['available'] = $available->count();
 
         return compact('occupancy', 'available', 'dirty', 'inHouse', 'arrivals', 'departures', 'pending', 'dues');
+    }
+
+    /**
+     * Guest-free room availability shared by the picker and quote.
+     * Future reservations use date overlap; walk-ins also require actual vacancy.
+     */
+    public function availableRooms(int $companyId, ?int $branchId, string $from, string $to, bool $walkIn = false): \Illuminate\Support\Collection
+    {
+        self::nights($from, $to);
+        $blocked = HotelStay::where('company_id', $companyId)
+            ->whereIn('status', HotelStay::OPEN_STATUSES)
+            ->where(function ($q) use ($from, $to, $walkIn) {
+                $q->where(fn ($dates) => $dates->whereDate('check_in_date', '<', $to)->whereDate('check_out_date', '>', $from));
+                if ($walkIn) $q->orWhere('status', HotelStay::STATUS_CHECKED_IN);
+            })->select('room_id');
+        $assignments = HotelStayAssignment::where('company_id', $companyId)
+            ->whereDate('from_date', '<', $to)->whereDate('to_date', '>', $from)
+            ->whereHas('stay', fn ($q) => $q->where('company_id', $companyId)->whereIn('status', HotelStay::OPEN_STATUSES))
+            ->select('room_id');
+
+        return HotelRoom::where('company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->where('is_active', true)->where('service_state', HotelRoom::SERVICE_IN)
+            ->when($walkIn, fn ($q) => $q->where(fn ($hk) => $hk->whereNull('housekeeping')->orWhere('housekeeping', '!=', HotelRoom::HK_DIRTY)))
+            ->whereNotIn('id', $blocked)->whereNotIn('id', $assignments)
+            ->orderBy('id')->get()->sortBy('room_number', SORT_NATURAL | SORT_FLAG_CASE)->values();
+    }
+
+    private function assertRoomVacantNow(int $companyId, int $roomId, ?int $ignoreStayId = null): void
+    {
+        // Called while the booking/check-in room row is locked; see latest committed occupants.
+        $q = HotelStay::where('company_id', $companyId)->where('room_id', $roomId)
+            ->where('status', HotelStay::STATUS_CHECKED_IN);
+        if ($ignoreStayId) $q->where('id', '!=', $ignoreStayId);
+        if ($q->lockForUpdate()->pluck('id')->isNotEmpty()) {
+            throw new HotelStayException(__('pos.hotel_room_overlap'));
+        }
     }
 
     public function assertRoomFree(int $companyId, int $roomId, string $from, string $to, ?int $ignoreStayId = null): void

@@ -100,7 +100,7 @@ class DiInvoiceApiController extends Controller
             ->where('client_reference', $clientReference)
             ->first();
         if ($existing) {
-            return response()->json($this->serialize($existing, true), 200);
+            return $this->duplicateResponse($existing, $request);
         }
 
         // ── FBR schedule rules — same engine as the panel ───────────────────
@@ -166,6 +166,7 @@ class DiInvoiceApiController extends Controller
                 $supplierProvince = $selectedBranch?->province ?? $company->province ?? null;
 
                 $invoice = Invoice::create([
+                    'di_api_request_hash' => \App\Services\DiApiRequestIdentity::fingerprint($request->all()),
                     'company_id' => $companyId,
                     'invoice_number' => $invoiceNumber,
                     'internal_invoice_number' => $invoiceNumber,
@@ -233,7 +234,7 @@ class DiInvoiceApiController extends Controller
                     ->where('client_reference', $clientReference)
                     ->first();
                 if ($winner) {
-                    return response()->json($this->serialize($winner, true), 200);
+                    return $this->duplicateResponse($winner, $request);
                 }
             }
             Log::error("DI API invoice create failed (company {$companyId}): " . $e->getMessage());
@@ -393,6 +394,17 @@ class DiInvoiceApiController extends Controller
                 'source' => $invoice->source,
             ],
         ];
+    }
+
+    private function duplicateResponse(Invoice $invoice, Request $request)
+    {
+        if (!\App\Services\DiApiRequestIdentity::matches($invoice, $request->all())) {
+            return response()->json([
+                'status' => 'error', 'error' => 'client_reference_conflict',
+                'message' => 'This reference belongs to a different invoice request. Retrieve its status; use a new reference for a new bill.',
+            ], 409);
+        }
+        return response()->json($this->serialize($invoice, true), 200);
     }
 
     /** Pull the latest FBR error messages for a failed invoice (for polling callers). */

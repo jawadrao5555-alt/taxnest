@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Invoice extends Model
 {
     protected $fillable = [
+        'di_api_request_hash',
         'company_id',
         'invoice_number',
         'internal_invoice_number',

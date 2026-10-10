@@ -1254,7 +1254,36 @@ class FbrService
             'validation_status' => $validation['status'] ?? null,
             'validation_status_code' => $validation['statusCode'] ?? null,
             'validation_error_code' => $validation['errorCode'] ?? null,
+            'errors' => $this->safeFbrDiagnostics($validation),
         ]);
+    }
+
+    /** Codes and safe next steps survive redaction; regulator text may contain PII. */
+    private function safeFbrDiagnostics(array $validation): array
+    {
+        $messages = [
+            '0001' => 'Check seller registration number.',
+            '0046' => 'Check item tax rate.',
+            '0077' => 'Check SRO or schedule for this rate.',
+            '0099' => 'Select the permitted unit for this HS code.',
+            '0102' => 'Check third-schedule retail price and calculated tax.',
+            '0300' => 'Remove or correct zero-value sale lines.',
+            '500' => 'Regulator outcome needs verification before retry.',
+        ];
+        $errors = [];
+        $rows = [$validation];
+        foreach (($validation['invoiceStatuses'] ?? []) as $row) {
+            if (is_array($row)) $rows[] = $row;
+        }
+        foreach ($rows as $row) {
+            if (empty($row['errorCode']) && empty($row['error']) && (($row['statusCode'] ?? '') !== '01' || !empty($row['invoiceStatuses']))) continue;
+            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', substr((string) ($row['errorCode'] ?? ''), 0, 20));
+            $item = isset($row['itemSNo']) && ctype_digit((string) $row['itemSNo']) ? 'Item ' . (int) $row['itemSNo'] . ': ' : '';
+            $errors[] = $item . ($code !== '' ? "[{$code}] " : '')
+                . ($messages[$code] ?? 'FBR rejected the supplied data. Review this error code and correct the invoice.');
+        }
+        if (!$errors && ($validation['statusCode'] ?? '') === '01') $errors[] = 'FBR rejected the supplied data. Review the invoice details.';
+        return array_values(array_unique($errors));
     }
 
     public function submitInvoice($invoice, int $retryCount = 0)
@@ -1541,7 +1570,7 @@ class FbrService
                     $log->response_payload = json_encode([
                         'note' => 'FBR returned 200 OK with empty body - status unknown, needs manual verification',
                         'http_code' => $httpCode,
-                        'response_headers' => $responseHeaders ?? [],
+                        'response_header_count' => count($responseHeaders ?? []),
                         'server_ip' => $curlInfo['primary_ip'] ?? 'unknown',
                         'total_time_sec' => $curlInfo['total_time'] ?? null,
                     ]);
@@ -1614,7 +1643,7 @@ class FbrService
                 $log->failure_type = 'ambiguous_response';
                 $log->response_payload = json_encode([
                     'note' => 'FBR returned error 500 "Something went wrong" - invoice may be accepted, needs manual verification',
-                    'original_response' => $responseData,
+                    'diagnostics' => json_decode($this->redactedResponseRecord($responseBody), true),
                 ]);
                 $log->save();
 

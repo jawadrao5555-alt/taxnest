@@ -422,7 +422,9 @@ class FbrService
             "buyerBusinessName" => $this->sanitizeForFbr($invoice->buyer_name ?? 'CUSTOMER'),
             "sellerBusinessName" => $this->sanitizeForFbr($company->fbr_business_name ?: ($company->name ?? "")),
             "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
-            "buyerNTNCNIC" => $this->formatNtnCnic($invoice->buyer_ntn ?? ""),
+            "buyerNTNCNIC" => $this->formatNtnCnic(
+                trim((string) $invoice->buyer_ntn) !== '' ? $invoice->buyer_ntn : ($invoice->buyer_cnic ?? '')
+            ),
         ];
 
         if ($env === 'sandbox') {

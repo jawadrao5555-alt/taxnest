@@ -752,6 +752,34 @@ class HotelSimpleDeskPricingTest extends TestCase
         $this->assertContains((string) $room->id, array_column($this->getJson('/pos/hotel/available-rooms?'.$query)->assertOk()->json('rooms'), 'id'));
     }
 
+    public function test_room_picker_excludes_inactive_and_out_of_service_rooms_in_both_booking_modes(): void
+    {
+        [$company, $owner, $room] = $this->fixture();
+        $service = app(HotelStayService::class);
+        $inactive = $service->createRoom($company->id, ['room_number' => 'INACTIVE', 'is_active' => false]);
+        $out = $service->createRoom($company->id, ['room_number' => 'OUT', 'service_state' => HotelRoom::SERVICE_OUT]);
+        $dirty = $service->createRoom($company->id, ['room_number' => 'DIRTY', 'housekeeping' => HotelRoom::HK_DIRTY]);
+        $this->actingAs($owner, 'pos');
+
+        foreach ([1, 0] as $walkIn) {
+            $query = http_build_query(['check_in_date' => now()->toDateString(),
+                'check_out_date' => now()->addDay()->toDateString(), 'walk_in' => $walkIn]);
+            $ids = array_column($this->getJson('/pos/hotel/available-rooms?'.$query)->assertOk()->json('rooms'), 'id');
+            $this->assertContains((string) $room->id, $ids);
+            $this->assertNotContains((string) $inactive->id, $ids);
+            $this->assertNotContains((string) $out->id, $ids);
+            if ($walkIn) $this->assertNotContains((string) $dirty->id, $ids);
+            else $this->assertContains((string) $dirty->id, $ids); // A future reservation can precede cleaning.
+
+            foreach ([$inactive, $out] as $blocked) {
+                $this->get('/pos/hotel/stays/create?walk_in='.$walkIn.'&room_id='.$blocked->id)->assertOk()
+                    ->assertViewHas('selectedRoomId', fn ($id) => $id === null)
+                    ->assertViewHas('rooms', fn ($rooms) => $rooms->contains('id', $room->id)
+                        && !$rooms->contains('id', $inactive->id) && !$rooms->contains('id', $out->id));
+            }
+        }
+    }
+
     public function test_room_picker_respects_reservation_dates_assignments_and_tenant_branch_scope(): void
     {
         [$company, $owner, $room] = $this->fixture();

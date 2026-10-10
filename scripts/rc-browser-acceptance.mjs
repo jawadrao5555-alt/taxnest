@@ -367,12 +367,18 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await checkinPreview.locator('[data-preview-back]').click();
   await checkinPreview.waitFor({state:'hidden'});
   const stayPath = new URL(page.url()).pathname;
+  if (!/\/pos\/hotel\/stays\/\d+$/.test(stayPath)) throw new Error('Draft receipt Close left the stay page');
+  pass(`${t.name}/${v.width}: unconfirmed check-in receipt Close preserved stay page`);
   await page.goto(baseUrl + '/pos/hotel/stays/create?walk_in=1', {waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>{const form=document.querySelector('form[x-data^="hotelBookingForm"]');return form && window.Alpine.$data(form).busy === false;});
   const checkinOptions = await page.locator('[name="room_id"] option').allTextContents();
   if (checkinOptions.some(text => text.startsWith(room + ' · '))) throw new Error('Occupied room still appeared in the direct check-in picker');
+  for (const blocked of ['RC-INACTIVE', 'RC-OUT', 'RC-DIRTY']) {
+    if (checkinOptions.some(text => text.startsWith(blocked + ' · '))) throw new Error(`${blocked} appeared in the direct check-in picker`);
+  }
   await saveEvidenceScreenshot(page, `hotel-available-rooms-${v.width}.png`);
   pass(`${t.name}/${v.width}: occupied room removed from real check-in dropdown`);
+  pass(`${t.name}/${v.width}: inactive, out-of-service and dirty rooms absent from real check-in dropdown`);
   // Future reservation stays available outside occupied dates; changing dates clears conflicts.
   await page.goto(baseUrl + '/pos/hotel/stays/create', {waitUntil:'domcontentloaded'});
   const reserveForm = page.locator('form[x-data^="hotelBookingForm"]');
@@ -663,6 +669,23 @@ async function hotelWorkflow(page, t, v, diagnostics) {
   await page.goto(baseUrl + stayPath, {waitUntil:'domcontentloaded'});
   await dismiss(page);
   if (!await page.locator('a[href*="/bills/"][href$="/receipt"]').count()) throw new Error('Checkout must expose the issued receipt');
+  let historicalMoneyPosts = 0;
+  const countHistoricalMoney = request => {
+    if (request.method() === 'POST' && /\/(?:bill-confirm|payments|checkout|print)$/.test(new URL(request.url()).pathname)) ++historicalMoneyPosts;
+  };
+  page.on('request', countHistoricalMoney);
+  await page.locator(`a[href$="${stayPath}/bills/${firstBill.bill_id}/receipt"]`).first().click();
+  const historicalPopup = page.locator('[data-hotel-receipt-popup]');
+  await historicalPopup.waitFor({state:'visible'});
+  await page.waitForFunction(() => !document.querySelector('[data-hotel-receipt-popup] [data-receipt-print]').disabled);
+  if (new URL(page.url()).pathname !== stayPath) throw new Error('Historical receipt changed the stay page');
+  await saveEvidenceScreenshot(page, `hotel-historical-receipt-${v.width}.png`);
+  await historicalPopup.locator('[data-receipt-close]').click();
+  await historicalPopup.waitFor({state:'hidden'});
+  if (new URL(page.url()).pathname !== stayPath) throw new Error('Historical receipt Close redirected to Dashboard');
+  if (historicalMoneyPosts !== 0) throw new Error('Historical receipt reprint created a money or print request');
+  page.off('request', countHistoricalMoney);
+  pass(`${t.name}/${v.width}: standalone historical receipt Close preserved stay page without payment or print POST`);
   if (await page.locator(`a[href="${baseUrl}${stayPath}/checkout"]`).count()) throw new Error('Checked-out stay must not expose another checkout');
   pass(`${t.name}/${v.width}: room check-in, edited rate, discount, advance, card checkout and receipt passed`);
   // Correct the actual fictional issued stay through the owner UI, not mocks.

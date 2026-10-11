@@ -105,11 +105,15 @@ pilot. **NOT production-ready.**
   Generated build files are excluded from this focused change.
 - Disposable MariaDB 10.11 `taxnest_dev` on loopback: actual controller upload,
   tenant-scoped recommendation and foreign preset rejection pass.
-- `node scripts/tests/smart-di-mapping-browser.mjs`: attempted with downloaded
-  Chrome; environment rejects Chrome's Unix process-singleton socket with
-  `Operation not permitted`. Browser verification remains required; the script
-  serves the real Alpine mapping markup on loopback with fictional fixtures.
-  It is component UI QA, not an authenticated full Laravel browser journey.
+- `node scripts/tests/smart-di-mapping-browser.mjs`: **passes with headless
+  Chrome**, exercising the real Alpine markup on loopback with fictional
+  response fixtures: visible recommended columns/defaults, manual correction,
+  ambiguity and explicit confirmation; no page errors. Standard Chrome was
+  initially blocked by a Unix process-singleton socket. Headless Chrome enabled
+  the real reproduction and exposed an Alpine options-rendering race; explicit
+  selected bindings now keep the dropdown consistent with mapping state.
+  This is component UI QA; authenticated full Laravel browser journey remains
+  outstanding.
 - Full PHPUnit suite is running; current results are recorded in PR metadata.
   Passing earlier HEAD checks does not validate this new integration commit.
 

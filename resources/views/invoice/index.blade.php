@@ -144,7 +144,7 @@
                                                             <select x-model="mappingSel[f.key]" @change="aiPicked[f.key] = false" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
                                                                 <option value="">— no column —</option>
                                                                 <template x-for="(h, headerIndex) in fileHeaders" :key="headerIndex">
-                                                                    <option :value="h" x-text="h"></option>
+                                                                    <option :value="h" :selected="mappingSel[f.key] === h" x-text="h"></option>
                                                                 </template>
                                                             </select>
                                                         </div>
@@ -153,7 +153,7 @@
                                                                 <select x-model="defaultsSel[f.key]" @change="aiPicked[f.key] = false" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
                                                                     <option value="">— none —</option>
                                                                     <template x-for="o in f.options" :key="o">
-                                                                        <option :value="o" x-text="o"></option>
+                                                                        <option :value="o" :selected="defaultsSel[f.key] === o" x-text="o"></option>
                                                                     </template>
                                                                 </select>
                                                             </template>

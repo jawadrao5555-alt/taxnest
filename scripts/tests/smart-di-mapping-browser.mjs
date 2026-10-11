@@ -30,6 +30,7 @@ try {
     await page.getByText('RECOMMENDED', {exact:true}).waitFor();
     const column = page.locator('select').first();
     await page.waitForFunction(()=>document.querySelector('select')?.value==='outlet-name');
+    assert.equal(await page.locator('select').nth(3).inputValue(), 'Sale Invoice', 'Saved fixed value must be visible');
     assert.equal(calls.length,0);
     await column.selectOption('Corrected Outlet');
     await saveEvidenceScreenshot(page,'smart-di-mapping-review.png');

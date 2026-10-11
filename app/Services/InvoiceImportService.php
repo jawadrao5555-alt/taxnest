@@ -305,10 +305,14 @@ class InvoiceImportService
 
         $allFields = array_merge(self::REQUIRED_COLUMNS, self::OPTIONAL_COLUMNS);
 
-        // Normalized header -> column index (first occurrence wins on duplicates).
+        // Reject ambiguous mapped headers instead of silently using the first column.
         $headerIndex = [];
+        $headerCounts = [];
         foreach ($grid[0] ?? [] as $idx => $h) {
             $key = self::normalizeHeaderKey((string) $h);
+            if ($key !== '') {
+                $headerCounts[$key] = ($headerCounts[$key] ?? 0) + 1;
+            }
             if ($key !== '' && !isset($headerIndex[$key])) {
                 $headerIndex[$key] = $idx;
             }
@@ -333,6 +337,9 @@ class InvoiceImportService
             if ($key === '' || !isset($headerIndex[$key])) {
                 $notFound[$field] = $source;
                 continue;
+            }
+            if (($headerCounts[$key] ?? 0) > 1) {
+                return ['error' => "The mapped column '{$source}' has duplicate headers. Rename the duplicate columns and upload again."];
             }
             $columnIndexes[$field] = $headerIndex[$key];
         }

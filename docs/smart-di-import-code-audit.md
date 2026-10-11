@@ -51,3 +51,68 @@ Issue: #185. Branch: `feature/smart-di-import-format-learning`.
 - No silent addition of 18% on top of source VAT or wholesale prices.
 - No automatic FBR posting without explicit approval.
 - No assumption that every report titled `7170.xlsx` is identical.
+
+## PR #186 integration slice (11 October 2026)
+
+The controller now scopes all format candidates and editable preset data to the
+active company. `FEATURE_SMART_DI_IMPORT_MAPPING` is **off by default** and is
+read through `config/features.php`; no tenant settings or saved presets are
+migrated or overwritten. Enable only in disposable QA until owner review.
+
+When enabled, a unique normalized mapped-header match prefills the existing
+mapping screen (including saved defaults). It does not call apply/process or
+FBR. Multiple matches do not select a preset; users choose a preset to review
+or map manually. Missing/duplicate source columns remain unresolved. Preset
+review submits the visible mapping/defaults rather than `preset_id`, so manual
+corrections reach the normal parser and row validation. A saved preset changes
+only when the user explicitly opts to save under that name. Matching is a
+header-compatibility suggestion, **not** proof of sheet layout, tax treatment,
+buyer registration or CCI readiness.
+
+Mapped duplicate normalized headers are rejected by the parser even when a
+legacy client posts a preset ID directly. The held upload remains available on
+mapping errors. Unknown/renamed columns require manual correction; template
+uploads continue to bypass the mapping step. Existing legacy preset-ID clients
+remain supported and tenant-scoped.
+
+| Configuration | Expected behavior / regression |
+| --- | --- |
+| Smart flag off | Existing suggestions and legacy Apply path; no recommendation |
+| One company preset, reordered headers | Editable recommendation; defaults retained; no request until confirmation |
+| Several compatible presets | No automatic selection; explicit review choice |
+| Missing/duplicate mapped headers | No recommendation; duplicate source blocked on parse |
+| Second company preset/token | Not listed, recommended, or applicable across tenants |
+| Manual correction | Visible mapping parsed into existing validated preview; stored preset retained |
+| Template and legacy CSV | Existing parser/validation coverage retained |
+
+Remaining issue #185 work is separate from this slice: CCI repeating invoice
+blocks/grouping; verified SKU/pack-to-litre conversion and buyer mapping;
+packaging/negative-line audit; source gross/discount/VAT/net reconciliation;
+cross-upload source invoice uniqueness and retry-safe draft receipts; FBR
+receipt tracking; multi-sheet/layout-version profiles and the full 73-invoice
+pilot. **NOT production-ready.**
+
+### Verification evidence for this slice
+
+- Baseline real `bulkImport()` component ignored `recommended_preset_id` and
+  left the recommended buyer column unresolved; the updated component prefilled
+  the actual reordered/normalized header while issuing no request.
+- PHP 8.4: `vendor/bin/phpunit tests/Feature/InvoiceBulkImportTest.php
+  tests/Unit/InvoiceImportFormatMatcherTest.php`: **39 tests, 191 assertions pass**.
+- `node scripts/tests/smart-di-mapping-ui.mjs`: pass, including corrected payload,
+  ambiguity, duplicate headings, saved defaults, flag-off and state reset.
+- `npm ci --ignore-scripts --no-audit --no-fund` and `npm run build`: pass.
+  Generated build files are excluded from this focused change.
+- Disposable MariaDB 10.11 `taxnest_dev` on loopback: actual controller upload,
+  tenant-scoped recommendation and foreign preset rejection pass.
+- `node scripts/tests/smart-di-mapping-browser.mjs`: attempted with downloaded
+  Chrome; environment rejects Chrome's Unix process-singleton socket with
+  `Operation not permitted`. Browser verification remains required; the script
+  serves the real Alpine mapping markup on loopback with fictional fixtures.
+  It is component UI QA, not an authenticated full Laravel browser journey.
+- Full PHPUnit suite is running; current results are recorded in PR metadata.
+  Passing earlier HEAD checks does not validate this new integration commit.
+
+No production settings, tenant configuration, FBR tokens, invoices or deploy
+workflows were changed. PR remains draft pending complete validation and owner
+approval.

@@ -88,6 +88,7 @@
                                             <p class="text-xs text-amber-700 dark:text-amber-400 mt-1 font-medium">File: <span x-text="mappingFilename"></span></p>
                                         </div>
 
+                                        <p x-show="smartMappingEnabled" class="text-xs text-amber-700 dark:text-amber-400" x-text="formatMatchNotice"></p>
                                         <div x-show="presets.length > 0" class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                                             <p class="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-2">Saved Mapping Presets</p>
                                             <div class="space-y-1.5">
@@ -96,10 +97,11 @@
                                                         <div class="min-w-0 flex items-center gap-2">
                                                             <span class="font-medium text-gray-800 dark:text-gray-200 truncate" x-text="p.name"></span>
                                                             <span x-show="p.matches" class="px-1.5 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">MATCHES THIS FILE</span>
-                                                            <span x-show="!p.matches" class="px-1.5 py-0.5 rounded text-xs font-bold bg-gray-100 text-gray-500" :title="'Columns not in this file: ' + (p.missing_columns || []).join(', ')">DIFFERENT COLUMNS</span>
+                                                            <span x-show="smartMappingEnabled && p.id === recommendedPresetId" class="text-xs font-bold text-emerald-700">RECOMMENDED</span>
+                                                            <span x-show="!p.matches" class="px-1.5 py-0.5 rounded text-xs font-bold bg-gray-100 text-gray-500" :title="'Columns not in this file: ' + (p.missing_columns || []).join(', ')" x-text="smartMappingEnabled ? 'REVIEW REQUIRED' : 'DIFFERENT COLUMNS'">DIFFERENT COLUMNS</span>
                                                         </div>
                                                         <div class="flex items-center gap-1.5">
-                                                            <button x-show="p.matches" @click="applyMapping(p.id)" :disabled="applyingMapping" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50">Apply</button>
+                                                            <button x-show="p.matches || smartMappingEnabled" @click="smartMappingEnabled ? selectMappingPreset(p.id) : applyMapping(p.id)" :disabled="applyingMapping" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50" x-text="smartMappingEnabled ? 'Review mapping' : 'Apply'">Apply</button>
                                                             <button @click="renamePreset(p)" class="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline">Rename</button>
                                                             <button @click="deletePreset(p)" class="px-2 py-1 text-xs text-red-500 hover:text-red-700 underline">Delete</button>
                                                         </div>
@@ -141,7 +143,7 @@
                                                         <div class="col-span-4">
                                                             <select x-model="mappingSel[f.key]" @change="aiPicked[f.key] = false" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
                                                                 <option value="">— no column —</option>
-                                                                <template x-for="h in fileHeaders" :key="h">
+                                                                <template x-for="(h, headerIndex) in fileHeaders" :key="headerIndex">
                                                                     <option :value="h" x-text="h"></option>
                                                                 </template>
                                                             </select>
@@ -1368,6 +1370,9 @@ function bulkImport() {
         mappingSel: {},
         defaultsSel: {},
         presets: [],
+        smartMappingEnabled: false,
+        recommendedPresetId: null,
+        formatMatchNotice: '',
         savePreset: false,
         presetName: '',
         mappingError: '',
@@ -1429,6 +1434,9 @@ function bulkImport() {
             this.mappingSel = {};
             this.defaultsSel = {};
             this.presets = [];
+            this.smartMappingEnabled = false;
+            this.recommendedPresetId = null;
+            this.formatMatchNotice = '';
             this.savePreset = false;
             this.presetName = '';
             this.mappingError = '';
@@ -1519,6 +1527,9 @@ function bulkImport() {
             this.fileHeaders = data.headers || [];
             this.mappingFields = data.fields || [];
             this.presets = data.presets || [];
+            this.smartMappingEnabled = data.smart_mapping_enabled === true;
+            this.recommendedPresetId = this.smartMappingEnabled ? data.recommended_preset_id : null;
+            this.formatMatchNotice = '';
             this.mappingError = '';
             this.savePreset = false;
             this.presetName = '';
@@ -1533,6 +1544,36 @@ function bulkImport() {
             this.mappingSel = sel;
             this.defaultsSel = defs;
             this.step = 'mapping';
+            if (this.smartMappingEnabled) {
+                if (this.recommendedPresetId != null) {
+                    this.selectMappingPreset(this.recommendedPresetId);
+                } else {
+                    this.formatMatchNotice = data.format_match_reason === 'ambiguous_presets'
+                        ? 'Several saved presets match. Choose one to review, or map the columns manually.'
+                        : 'No unique saved format matched. Review and correct the mapping below.';
+                }
+            }
+        },
+
+        selectMappingPreset(id) {
+            const preset = this.presets.find(p => p.id === id);
+            if (!preset || !preset.mapping) return;
+            const normalize = value => String(value).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            const sel = {}, defs = {};
+            for (const field of this.mappingFields) {
+                const source = preset.mapping[field.key] || '';
+                const headers = source ? this.fileHeaders.filter(h => normalize(h) === normalize(source)) : [];
+                sel[field.key] = headers.length === 1 ? headers[0] : '';
+                // A missing/ambiguous mapped column must be corrected, not silently replaced by a default.
+                defs[field.key] = source ? '' : String((preset.defaults || {})[field.key] ?? '');
+            }
+            this.mappingSel = sel;
+            this.defaultsSel = defs;
+            this.aiPicked = {};
+            this.savePreset = false;
+            this.presetName = '';
+            this.mappingError = '';
+            this.formatMatchNotice = 'Loaded "' + preset.name + '". Review every column and fixed value; correct anything needed, then continue to validation. No invoices have been created or submitted.';
         },
 
         async applyMapping(presetId = null) {

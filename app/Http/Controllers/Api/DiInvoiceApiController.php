@@ -67,7 +67,8 @@ class DiInvoiceApiController extends Controller
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
             'items.*.default_uom' => 'nullable|string|max:100',
-            'items.*.st_withheld_at_source' => 'nullable',
+            'items.*.st_withheld_at_source' => 'nullable|boolean',
+            'items.*.st_withheld_amount' => 'nullable|numeric|min:0',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
             'items.*.further_tax' => 'nullable|numeric|min:0',
         ], [
@@ -106,7 +107,7 @@ class DiInvoiceApiController extends Controller
         // ── FBR schedule rules — same engine as the panel ───────────────────
         $standardTaxRate = $company->getStandardTaxRateValue();
         $itemsWithTaxRate = collect($request->input('items'))->map(function ($item) {
-            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? intval($item['tax_rate']) : null;
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;
         })->toArray();
 
@@ -154,13 +155,10 @@ class DiInvoiceApiController extends Controller
         // ── Create invoice + items (mirrors InvoiceController::store) ───────
         try {
             $invoice = DB::transaction(function () use ($request, $company, $companyId, $selectedBranch, $documentType, $buyerRegType, $clientReference, $standardTaxRate) {
-                $totalValueExcludingST = 0;
-                $totalSalesTax = 0;
-                foreach ($request->input('items') as $item) {
-                    $totalValueExcludingST += floatval($item['price']) * floatval($item['quantity']);
-                    $totalSalesTax += floatval($item['tax']);
-                }
-                $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
+                $totals = \App\Services\DiInvoiceMath::totals($request->input('items'));
+            $totalValueExcludingST = $totals['value'];
+            $totalSalesTax = $totals['tax'];
+            $totalAmount = $totals['amount'];
 
                 $invoiceNumber = InvoiceNumberingService::generateNextNumber($companyId);
                 $supplierProvince = $selectedBranch?->province ?? $company->province ?? null;
@@ -213,6 +211,7 @@ class DiInvoiceApiController extends Controller
                         'default_uom' => $item['default_uom'] ?? ($hsResolved['default_uom'] ?? 'Numbers, pieces, units'),
                         'sale_type' => ScheduleEngine::mapSaleType($scheduleType),
                         'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
+                    'st_withheld_amount' => !empty($item['st_withheld_at_source']) ? ($item['st_withheld_amount'] ?? null) : null,
                         'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
                         'further_tax' => !empty($item['further_tax']) ? floatval($item['further_tax']) : 0,
                         'description' => $item['description'],

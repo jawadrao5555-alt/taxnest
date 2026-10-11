@@ -11,6 +11,7 @@ use App\Services\AiImportAssistService;
 use App\Services\AiInvoiceReaderService;
 use App\Services\DiFeatureService;
 use App\Services\InvoiceImportService;
+use App\Services\InvoiceImportFormatMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -651,9 +652,17 @@ class InvoiceImportController extends Controller
         // Saved presets, flagged by whether every mapped source column exists
         // in THIS file's headers (matching presets apply in one click).
         $headerKeys = array_map([InvoiceImportService::class, 'normalizeHeaderKey'], $headers);
-        $presets = InvoiceImportMapping::where('company_id', $company->id)
+        $companyPresets = InvoiceImportMapping::where('company_id', $company->id)
             ->orderBy('name')
-            ->get()
+            ->get();
+        $formatMatch = (new InvoiceImportFormatMatcher())->match(
+            $headers,
+            $companyPresets->map(fn ($p) => [
+                'id' => (int) $p->id,
+                'mapping' => $p->mappingArray(),
+            ])->all()
+        );
+        $presets = $companyPresets
             ->map(function ($p) use ($headerKeys) {
                 $mapping = $p->mappingArray();
                 $missing = [];
@@ -678,6 +687,9 @@ class InvoiceImportController extends Controller
             'fields' => $this->service->mappingFieldMeta(),
             'suggestions' => $this->service->suggestMapping($headers),
             'presets' => $presets,
+            // Suggestion only: the mapping UI must still require user confirmation.
+            'recommended_preset_id' => $formatMatch['preset_id'],
+            'format_match_reason' => $formatMatch['reason'],
             'company_province' => $this->service->normalizeProvince((string) ($company->province ?? '')) ?? '',
             'original_filename' => substr($file->getClientOriginalName(), 0, 255),
         ]);

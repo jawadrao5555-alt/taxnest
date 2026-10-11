@@ -93,7 +93,7 @@ class InvoiceImportService
     ];
 
     /** Columns that must survive as literal digit/code strings. */
-    private const CODE_COLUMNS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'reference_invoice_number'];
+    private const CODE_COLUMNS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'reference_invoice_number', 'source_invoice_number'];
 
     private const NUMERIC_COLUMNS = ['quantity', 'price', 'tax', 'tax_rate', 'mrp'];
 

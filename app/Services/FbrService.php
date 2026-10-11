@@ -278,51 +278,22 @@ class FbrService
         $items = [];
         foreach ($invoice->items as $item) {
             $scheduleType = $item->schedule_type ?? 'standard';
-            $taxRate = floatval($item->tax_rate ?? 18);
-            $quantity = round(floatval($item->quantity), 4);
-            $unitPrice = floatval($item->price);
-            $valueSalesExcludingST = round($unitPrice * $quantity, 2);
-
             $rawSaleType = $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType);
-            $is3rdSchedule = (stripos($rawSaleType, '3rd Schedule') !== false);
-            $isExempt = (stripos($rawSaleType, 'Exempt') !== false || stripos($rawSaleType, 'exempt') !== false);
-            $isReduced = (stripos($rawSaleType, 'Reduced') !== false || stripos($rawSaleType, 'reduced') !== false);
-
+            $is3rdSchedule = stripos($rawSaleType, '3rd Schedule') !== false;
+            $isExempt = stripos($rawSaleType, 'exempt') !== false;
+            $isReduced = stripos($rawSaleType, 'reduced') !== false;
             $saleTypeNormalized = $this->normalizeSaleType($rawSaleType, $env);
-
-            if ($is3rdSchedule) {
-                $mrpPerUnit = floatval($item->mrp ?? 0);
-                if ($mrpPerUnit <= 0) {
-                    $mrpPerUnit = $unitPrice;
-                }
-                $retailPrice = round($mrpPerUnit * $quantity, 2);
-                $valueSalesExcludingST = $retailPrice;
-                $salesTaxApplicable = round($retailPrice * $taxRate / 100, 2);
-            } elseif ($isExempt) {
-                $retailPrice = round($unitPrice, 2);
-                $salesTaxApplicable = 0.00;
-            } elseif ($isReduced) {
-                $retailPrice = round($unitPrice, 2);
-                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
-            } else {
-                $retailPrice = round($unitPrice, 2);
-                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
-            }
-
-            if ($isExempt) {
-                $salesTaxApplicable = 0.00;
-                $extraTaxVal = 0.00;
-            } elseif ($isReduced) {
-                $extraTaxVal = 0.00;
-            } else {
-                $extraTaxVal = round(floatval($item->extra_tax ?? 0) * $quantity, 2);
-            }
-
-            $furtherTax = round(floatval($item->further_tax ?? 0), 2);
-            $fedPayable = round(floatval($item->fed_payable ?? 0) * $quantity, 2);
-            $discount = round(floatval($item->discount ?? 0) * $quantity, 2);
-
-            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
+            $money = DiInvoiceMath::line($item);
+            $taxRate = $money['taxRate'];
+            $quantity = $money['quantity'];
+            $valueSalesExcludingST = $money['valueSalesExcludingST'];
+            $retailPrice = $money['retailPrice'];
+            $salesTaxApplicable = $money['salesTaxApplicable'];
+            $extraTaxVal = $money['extraTaxVal'];
+            $furtherTax = $money['furtherTax'];
+            $fedPayable = $money['fedPayable'];
+            $discount = $money['discount'];
+            $totalValues = $money['totalValues'];
 
             if ($isExempt) {
                 $rateValue = "Exempt";
@@ -669,7 +640,7 @@ class FbrService
                 }
 
                 if ($valueExclST > 0 && is_numeric($rate)) {
-                    $expectedTax = round(($valueExclST * floatval($rate)) / 100, 2);
+                    $expectedTax = round(($retailPrice * floatval($rate)) / 100, 2);
                     $actualTax = floatval($item['salesTaxApplicable'] ?? 0);
                     if (abs($expectedTax - $actualTax) > 0.02) {
                         $errors[] = ['code' => '0102', 'message' => "Item #{$sn}: Calculated tax ({$actualTax}) doesn't match expected ({$expectedTax}) for 3rd Schedule."];
@@ -1304,7 +1275,7 @@ class FbrService
             $invoice->save();
         };
 
-        $payloadErrors = ScheduleEngine::validateFbrPayload($payload);
+        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
         if (!empty($payloadErrors)) {
             $clearHashOnFailure();
             $log = FbrLog::create([
@@ -1786,7 +1757,7 @@ class FbrService
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';
 
-        $payloadErrors = ScheduleEngine::validateFbrPayload($payload);
+        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
         if (!empty($payloadErrors)) {
             return [
                 'status' => 'invalid',

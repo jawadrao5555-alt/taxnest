@@ -228,7 +228,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate (%)</label>
-                                    <input type="number" step="1" min="0" x-model="item.tax_rate" @input="item.tax_rate = Math.round(item.tax_rate); calcTax(index)" :name="'items[' + index + '][tax_rate]'"
+                                    <input type="number" step="0.01" min="0" max="100" x-model="item.tax_rate" @input="calcTax(index)" :name="'items[' + index + '][tax_rate]'"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
@@ -309,7 +309,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">MRP / Retail Price (PKR)</label>
-                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" @input="item.mrpManual = true" placeholder="0.00"
+                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][mrp]'" x-model="item.mrp" @input="item.mrpManual = true; calcTax(index)" placeholder="0.00"
                                         class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm text-sm focus:ring-emerald-500 focus:border-emerald-500">
                                 </div>
                             </div>
@@ -664,11 +664,11 @@
                         if (data && data.pct_code) {
                             item.pct_code = data.pct_code;
                             item.thirdScheduleRecommended = !!data.third_schedule_recommended;
-                            item.thirdScheduleTaxRate = Math.round(parseFloat(data.tax_rate) || 18);
+                            item.thirdScheduleTaxRate = (parseFloat(data.tax_rate) || 18);
                             const keepChosenStandard = item.thirdScheduleRecommended && item.thirdScheduleOverrideAcknowledged && item.schedule_type === 'standard';
                             if (!keepChosenStandard) {
                                 item.schedule_type = data.schedule_type;
-                                item.tax_rate = Math.round(parseFloat(data.tax_rate) || 0);
+                                item.tax_rate = (parseFloat(data.tax_rate) || 0);
                             }
                             if (data.default_uom) item.default_uom = data.default_uom;
                             item.show_st_withheld = !!data.st_withheld_applicable;
@@ -692,9 +692,12 @@
                 calcTax(index) {
                     let item = this.items[index];
                     let unitPrice = parseFloat(item.price || 0);
-                    let qty = parseFloat(item.quantity || 0);
-                    let subtotal = unitPrice * qty;
-                    item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * subtotal).toFixed(2));
+                    let qty = Number(parseFloat(item.quantity || 0).toFixed(4));
+                    let subtotal = Number((unitPrice * qty).toFixed(2));
+                    if (!item.mrpManual && unitPrice > 0) item.mrp = unitPrice.toFixed(2);
+                    let taxBase = item.schedule_type === '3rd_schedule' && parseFloat(item.mrp || 0) > 0
+                        ? Number((parseFloat(item.mrp) * qty).toFixed(2)) : subtotal;
+                    item.tax = parseFloat(((parseFloat(item.tax_rate || 0) / 100) * taxBase).toFixed(2));
                     if (this.applyFurtherTax) {
                         item.further_tax = parseFloat((subtotal * 0.04).toFixed(2));
                     } else {
@@ -717,7 +720,7 @@
 
                 totalExclST() {
                     return this.items.reduce((total, item) => {
-                        return total + (parseFloat(item.price || 0) * parseFloat(item.quantity || 0));
+                        return total + Number((parseFloat(item.price || 0) * Number(parseFloat(item.quantity || 0).toFixed(4))).toFixed(2));
                     }, 0).toFixed(2);
                 },
                 totalSalesTax() {

@@ -300,7 +300,8 @@ class InvoiceController extends Controller
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
             'items.*.default_uom' => 'nullable|string|max:100',
-            'items.*.st_withheld_at_source' => 'nullable',
+            'items.*.st_withheld_at_source' => 'nullable|boolean',
+            'items.*.st_withheld_amount' => 'nullable|numeric|min:0',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
             'items.*.further_tax' => 'nullable|numeric|min:0',
         ], [
@@ -404,6 +405,7 @@ class InvoiceController extends Controller
                     'default_uom' => $item['default_uom'] ?? ($hsResolved['default_uom'] ?? 'Numbers, pieces, units'),
                     'sale_type' => $saleType,
                     'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
+                    'st_withheld_amount' => !empty($item['st_withheld_at_source']) ? ($item['st_withheld_amount'] ?? null) : null,
                     'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
                     'further_tax' => !empty($item['further_tax']) ? floatval($item['further_tax']) : 0,
                     'description' => $item['description'],
@@ -582,7 +584,8 @@ class InvoiceController extends Controller
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
             'items.*.default_uom' => 'nullable|string|max:100',
-            'items.*.st_withheld_at_source' => 'nullable',
+            'items.*.st_withheld_at_source' => 'nullable|boolean',
+            'items.*.st_withheld_amount' => 'nullable|numeric|min:0',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
             'items.*.further_tax' => 'nullable|numeric|min:0',
         ], [
@@ -706,6 +709,7 @@ class InvoiceController extends Controller
                     'default_uom' => $item['default_uom'] ?? ($hsResolved['default_uom'] ?? 'Numbers, pieces, units'),
                     'sale_type' => $saleType,
                     'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
+                    'st_withheld_amount' => !empty($item['st_withheld_at_source']) ? ($item['st_withheld_amount'] ?? null) : null,
                     'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
                     'further_tax' => !empty($item['further_tax']) ? floatval($item['further_tax']) : 0,
                     'description' => $item['description'],
@@ -2412,6 +2416,7 @@ class InvoiceController extends Controller
                     'default_uom' => $item->default_uom,
                     'sale_type' => $item->sale_type,
                     'st_withheld_at_source' => $item->st_withheld_at_source,
+                    'st_withheld_amount' => $item->st_withheld_amount,
                     'petroleum_levy' => $item->petroleum_levy,
                 ]);
             }

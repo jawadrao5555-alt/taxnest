@@ -444,6 +444,10 @@
                                             class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
                                         ST Withheld at Source
                                     </label>
+                                    <input type="number" step="0.01" min="0.01" :name="'items[' + index + '][st_withheld_amount]'" x-model="item.st_withheld_amount"
+                                        x-show="item.st_withheld_at_source" :disabled="!item.st_withheld_at_source" :required="item.st_withheld_at_source"
+                                        placeholder="Actual withheld amount (PKR)" aria-label="Sales tax withheld amount in PKR"
+                                        class="mt-2 w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
                                 </div>
                                 <div x-show="item.show_petroleum_levy">
                                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Petroleum Levy (PKR)</label>
@@ -682,7 +686,7 @@
                     quantity: 1, price: 0, tax_rate: companyStandardRate, tax: 0, further_tax: 0,
                     schedule_type: 'standard', sro_schedule_no: '', serial_no: '', mrp: '', mrpManual: false, sroSuggestion: null,
                     default_uom: 'Numbers, pieces, units',
-                    st_withheld_at_source: false, petroleum_levy: '',
+                    st_withheld_at_source: false, st_withheld_amount: '', petroleum_levy: '',
                     show_st_withheld: false, show_petroleum_levy: false,
                     requires_sro: false, requires_serial: false, requires_mrp: false,
                     optional_sro: false, optional_serial: false, schedule_hint: '',

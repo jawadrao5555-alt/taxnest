@@ -330,6 +330,48 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertSame(0, \App\Models\InvoiceImportBatch::count());
     }
 
+    public function test_daily_exports_reuse_company_preset_after_header_reordering_and_punctuation_changes(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $preset = $this->mappingPreset($this->company->id, 'Daily export', [
+            'buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'GST',
+            'source_invoice_number' => 'Source Bill', 'invoice_date' => 'Supply Date',
+        ]);
+        $preset->update(['defaults_json' => json_encode([
+            'buyer_address' => 'Local test address', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice',
+        ])]);
+        $upload = $this->mappingUpload("Supply-Date,GST,Rate,HS,Item,Qty,Outlet,Source-Bill\n2026-10-10,36,100,02023000,Beef,2,Alpha,000123\n")
+            ->assertOk()->assertJsonPath('recommended_preset_id', $preset->id);
+        $this->postJson('/_test/import-map', [
+            'mapping_token' => $upload->json('mapping_token'), 'preset_id' => $preset->id,
+        ])->assertOk()->assertJsonPath('total', 1)
+            ->assertJsonPath('preview.0.data.source_invoice_number', '000123')
+            ->assertJsonPath('preview.0.data.invoice_date', '2026-10-10');
+        $this->assertSame(0, Invoice::count());
+        $this->assertSame('Source Bill', $preset->fresh()->mappingArray()['source_invoice_number']);
+    }
+
+    public function test_reused_source_column_blocks_manual_mapping_and_preserves_hold_for_correction(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $upload = $this->mappingUpload()->assertOk();
+        $mapping = ['buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'rate'];
+        $payload = [
+            'mapping_token' => $upload->json('mapping_token'), 'mapping' => $mapping,
+            'defaults' => ['buyer_address' => 'Local test address', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice'],
+        ];
+        $response = $this->postJson('/_test/import-map', $payload)->assertStatus(422);
+        $this->assertStringContainsString('mapped to both price and tax', $response->json('error'));
+        $this->assertSame(0, \App\Models\InvoiceImportBatch::count());
+        $payload['mapping']['tax'] = 'GST';
+        $this->postJson('/_test/import-map', $payload)->assertOk()->assertJsonPath('total', 1);
+        $this->assertSame(0, Invoice::count());
+    }
+
     private function writeXlsx(array $header, array $rows): string
     {
         $spreadsheet = new Spreadsheet();

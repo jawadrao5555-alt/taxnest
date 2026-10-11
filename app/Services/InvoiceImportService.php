@@ -328,6 +328,7 @@ class InvoiceImportService
         // preset keeps working even when the DMS reorders columns).
         $columnIndexes = [];
         $notFound = [];
+        $mappedSources = [];
         foreach ($columnMap as $field => $source) {
             if (!in_array($field, $allFields, true)) {
                 continue;
@@ -344,6 +345,10 @@ class InvoiceImportService
             if (($headerCounts[$key] ?? 0) > 1) {
                 return ['error' => "The mapped column '{$source}' has duplicate headers. Rename the duplicate columns and upload again."];
             }
+            if (isset($mappedSources[$key])) {
+                return ['error' => "The source column '{$source}' is mapped to both {$mappedSources[$key]} and {$field}. Choose a separate column or a fixed value for each field."];
+            }
+            $mappedSources[$key] = $field;
             $columnIndexes[$field] = $headerIndex[$key];
         }
         if (!empty($notFound)) {

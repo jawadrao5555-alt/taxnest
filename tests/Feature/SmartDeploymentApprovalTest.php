@@ -17,6 +17,23 @@ class SmartDeploymentApprovalTest extends TestCase
 
     private const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
+    public function test_owner_sees_check_lookup_failure_instead_of_no_green_pr_message(): void
+    {
+        Http::fake([
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/pulls*' => Http::response([$this->eligiblePr()], 200),
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/commits/*' => Http::response([], 403),
+        ]);
+        $owner = AdminUser::query()->create([
+            'name' => 'Owner', 'email' => 'owner@example.test',
+            'password' => 'secret-password', 'role' => 'super_admin',
+        ]);
+        $this->actingAs($owner, 'admin')->get('/admin/deployment-approval')
+            ->assertOk()
+            ->assertSee('GitHub check verification returned HTTP 403')
+            ->assertSee('PR availability could not be verified')
+            ->assertDontSee('No eligible green cursor/* or replit/* PR is currently available.');
+    }
+
     public function test_owner_password_approval_binds_exact_github_head_sha_in_one_step(): void
     {
         Mail::fake();

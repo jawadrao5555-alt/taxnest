@@ -295,7 +295,7 @@ class InvoiceController extends Controller
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'items.*.pct_code' => 'nullable|string|max:50',
-            'items.*.tax_rate' => 'nullable|integer|min:0|max:100',
+            'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
@@ -312,7 +312,7 @@ class InvoiceController extends Controller
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
-            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? intval($item['tax_rate']) : null;
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;
         })->toArray();
 
@@ -340,14 +340,10 @@ class InvoiceController extends Controller
 
         DB::beginTransaction();
         try {
-            $totalValueExcludingST = 0;
-            $totalSalesTax = 0;
-            foreach ($request->items as $item) {
-                $itemValue = floatval($item['price']) * floatval($item['quantity']);
-                $totalValueExcludingST += $itemValue;
-                $totalSalesTax += floatval($item['tax']);
-            }
-            $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
+            $totals = \App\Services\DiInvoiceMath::totals($request->items);
+            $totalValueExcludingST = $totals['value'];
+            $totalSalesTax = $totals['tax'];
+            $totalAmount = $totals['amount'];
 
             $whtRate = 0;
             $whtAmount = 0;
@@ -581,7 +577,7 @@ class InvoiceController extends Controller
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'items.*.pct_code' => 'nullable|string|max:50',
-            'items.*.tax_rate' => 'nullable|integer|min:0|max:100',
+            'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
@@ -598,7 +594,7 @@ class InvoiceController extends Controller
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
-            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? intval($item['tax_rate']) : null;
+            $item['tax_rate'] = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? floatval($item['tax_rate']) : null;
             return $item;
         })->toArray();
 
@@ -639,14 +635,10 @@ class InvoiceController extends Controller
             }
             $invoice = $lockedInvoice;
 
-            $totalValueExcludingST = 0;
-            $totalSalesTax = 0;
-            foreach ($request->items as $item) {
-                $itemValue = floatval($item['price']) * floatval($item['quantity']);
-                $totalValueExcludingST += $itemValue;
-                $totalSalesTax += floatval($item['tax']);
-            }
-            $totalAmount = round($totalValueExcludingST + $totalSalesTax, 2);
+            $totals = \App\Services\DiInvoiceMath::totals($request->items);
+            $totalValueExcludingST = $totals['value'];
+            $totalSalesTax = $totals['tax'];
+            $totalAmount = $totals['amount'];
 
             $whtRate = 0;
             $whtAmount = 0;
@@ -2491,7 +2483,8 @@ class InvoiceController extends Controller
             return floatval($item['tax_rate']);
         }
         if (isset($item['tax']) && isset($item['price']) && isset($item['quantity'])) {
-            $subtotal = floatval($item['price']) * floatval($item['quantity']);
+            $base = ($item['schedule_type'] ?? 'standard') === '3rd_schedule' && !empty($item['mrp']) ? floatval($item['mrp']) : floatval($item['price']);
+            $subtotal = $base * round(floatval($item['quantity']), 4);
             if ($subtotal > 0) {
                 return round((floatval($item['tax']) / $subtotal) * 100, 2);
             }

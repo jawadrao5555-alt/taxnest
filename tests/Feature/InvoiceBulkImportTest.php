@@ -1336,4 +1336,21 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertSame('216', $batch->rowsArray()[0]['original_data']['source_vat']);
         $this->assertSame(99, $batch->rowsArray()[0]['original_data']['_financial_review']['user_id']);
     }
+
+    public function test_smart_template_parser_retains_unmapped_source_cells_and_rejects_duplicate_headers(): void
+    {
+        $headers = array_merge(InvoiceImportService::REQUIRED_COLUMNS, InvoiceImportService::OPTIONAL_COLUMNS, ['unmapped_evidence']);
+        $data = $this->smartRow(); $data['unmapped_evidence'] = 'Source-only evidence';
+        $path = tempnam(sys_get_temp_dir(), 'smartcsv');
+        $file = fopen($path, 'w'); fputcsv($file, $headers); fputcsv($file, array_map(fn ($h) => $data[$h] ?? '', $headers)); fclose($file);
+        try {
+            $out = $this->service->parseFile($path, 'csv', InvoiceImportService::MAX_ROWS, true, true);
+            $this->assertArrayNotHasKey('error', $out);
+            $this->assertSame('Source-only evidence', end($out['rows'][0]['data']['_source_cells']));
+            $this->assertSame($headers, $out['rows'][0]['data']['_source_headers']);
+            $file = fopen($path, 'w'); fputcsv($file, array_merge($headers, ['source_sku'])); fputcsv($file, array_fill(0, count($headers) + 1, 'x')); fclose($file);
+            $bad = $this->service->parseFile($path, 'csv', InvoiceImportService::MAX_ROWS, true, true);
+            $this->assertStringContainsString('Duplicate source headers', $bad['error']);
+        } finally { @unlink($path); }
+    }
 }

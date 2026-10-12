@@ -94,7 +94,7 @@ class SmartInvoiceImportController extends Controller
     public function review(Request $request, int $batchId)
     {
         $this->batch($batchId);
-        $request->validate(['exclusions' => 'nullable|array', 'exclusions.*' => 'nullable|string|max:500', 'approve' => 'nullable|accepted', 'amounts' => 'nullable|array', 'amounts.*' => 'array', 'amounts.*.discount' => 'nullable|string|max:30', 'amounts.*.vat' => 'nullable|string|max:30', 'amounts.*.net' => 'nullable|string|max:30', 'amounts.*.evidence' => 'nullable|string|max:500']);
+        $request->validate(['exclusions' => 'nullable|array', 'exclusions.*' => 'nullable|string|max:500', 'approve' => 'sometimes|accepted', 'amounts' => 'nullable|array', 'amounts.*' => 'array', 'amounts.*.discount' => 'nullable|string|max:30', 'amounts.*.vat' => 'nullable|string|max:30', 'amounts.*.net' => 'nullable|string|max:30', 'amounts.*.evidence' => 'nullable|string|max:500']);
         DB::transaction(function () use ($request, $batchId) {
             $batch = InvoiceImportBatch::where('company_id', app('currentCompanyId'))->whereKey($batchId)->lockForUpdate()->firstOrFail();
             abort_unless(in_array($batch->status, ['needs_review', 'validated'], true) && !$batch->approved_at, 409, 'Approved/processing source snapshots cannot be edited.');

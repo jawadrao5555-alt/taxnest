@@ -204,7 +204,7 @@ class InvoiceImportService
      *
      * @return array{error?: string, needs_mapping?: bool, headers?: array<int,string>, rows?: array<int, array{row:int, data:array<string,string>}>}
      */
-    public function parseFile(string $path, string $extension, int $maxRows = self::MAX_ROWS, bool $captureHeadersOnMismatch = false): array
+    public function parseFile(string $path, string $extension, int $maxRows = self::MAX_ROWS, bool $captureHeadersOnMismatch = false, bool $smart = false): array
     {
         $extension = strtolower($extension);
 
@@ -226,6 +226,9 @@ class InvoiceImportService
         }
 
         $header = array_map(fn ($h) => strtolower(trim((string) $h)), $grid[0] ?? []);
+        if ($smart && count(array_filter($header)) !== count(array_unique(array_filter($header)))) {
+            return ['error' => 'Duplicate source headers require review before Smart DI import.'];
+        }
         $missing = array_diff(self::REQUIRED_COLUMNS, $header);
         if (!empty($missing)) {
             if ($captureHeadersOnMismatch) {
@@ -273,6 +276,11 @@ class InvoiceImportService
                 continue;
             }
 
+            if ($smart) {
+                $data['_source_cells'] = $raw;
+                $data['_source_headers'] = $grid[0];
+                $data['_source_row'] = $rowNum;
+            }
             $rows[] = ['row' => $rowNum, 'data' => $data];
         }
 

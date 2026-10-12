@@ -80,7 +80,7 @@ class InvoiceImportController extends Controller
                 return response()->json(['error' => 'Could not read the detailed source workbook.'], 422);
             }
         }
-        $parsed ??= $this->service->parseFile($file->getRealPath(), $extension, InvoiceImportService::MAX_ROWS, true);
+        $parsed ??= $this->service->parseFile($file->getRealPath(), $extension, InvoiceImportService::MAX_ROWS, true, (bool) $system);
         if (isset($parsed['error'])) {
             return response()->json(['error' => $parsed['error']], 422);
         }

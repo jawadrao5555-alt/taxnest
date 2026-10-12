@@ -40,6 +40,7 @@ final class CciVoyageInvoiceParser
         $unknownSheets = [];
         foreach ($sheets as $name => $grid) {
             $sheetRecognized = false;
+            $documentType = null;
             $block = null;
             $lines = [];
             $products = false;
@@ -51,7 +52,13 @@ final class CciVoyageInvoiceParser
                 $lines = [];
             };
             foreach ($grid as $index => $cells) {
+                if (($cells[22] ?? '') === 'Outlet Slip Type:') {
+                    $documentType = ($cells[27] ?? '') === 'Sales Invoice' ? 'Sale Invoice' : null;
+                }
                 if (($cells[4] ?? null) === 'Invoice Nr:') {
+                    if ($documentType === null) {
+                        return ['error' => 'Voyage report document type must be explicitly Sales Invoice; other or missing types require review.'];
+                    }
                     $recognized = true;
                     $sheetRecognized = true;
                     if ($block !== null) {
@@ -62,7 +69,7 @@ final class CciVoyageInvoiceParser
                     }
                     $block = ['source_invoice_number' => trim((string) ($cells[5] ?? '')),
                         'invoice_date' => InvoiceImportService::normalizeDate($cells[11] ?? '') ?? '',
-                        'source_outlet' => '', 'document_type' => 'Sale Invoice',
+                        'source_outlet' => '', 'document_type' => $documentType,
                         'invoice_gross' => '', 'invoice_discount' => '', 'invoice_vat' => '', 'invoice_net' => ''];
                     $products = false;
                     continue;

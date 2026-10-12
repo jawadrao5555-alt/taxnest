@@ -1,5 +1,4 @@
-@extends('layouts.app')
-@section('content')
+<x-app-layout>
 <div class="max-w-7xl mx-auto p-6 space-y-6">
     <h1 class="text-2xl font-bold">Source invoice review</h1>
     <p>{{ $batch->original_filename }} · {{ $batch->smart_source_system }} · {{ $batch->status }}</p>
@@ -98,4 +97,4 @@
     @foreach($receipts as $receipt)<tr class="border-b"><td>{{ $receipt->source_invoice_number }}</td><td><a class="text-blue-700" href="/invoice/{{ $receipt->invoice_id }}">{{ $receipt->invoice?->invoice_number }}</a></td><td>{{ $receipt->invoice?->status }} / {{ $receipt->invoice?->fbr_status }}</td><td>{{ $receipt->invoice?->fbr_invoice_number }}</td><td class="max-w-lg break-words">{{ $receipt->invoice?->fbrLogs()->latest('id')->first()?->response_payload }}</td></tr>@endforeach
     </tbody></table>
 </div>
-@endsection
+</x-app-layout>

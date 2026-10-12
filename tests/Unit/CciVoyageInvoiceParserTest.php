@@ -37,6 +37,16 @@ class CciVoyageInvoiceParserTest extends TestCase
         $this->assertArrayHasKey('error', $parser->parseGrids($grid));
     }
 
+    public function test_other_document_types_and_unknown_extra_sheets_require_review(): void
+    {
+        $grid = json_decode(file_get_contents(__DIR__ . '/../Fixtures/smart-di/cci-voyage-sanitized.json'), true);
+        $grid['Unrecognized extra sheet'] = [['Unexpected invoice layout', 'Value']];
+        $this->assertArrayHasKey('error', (new CciVoyageInvoiceParser())->parseGrids($grid));
+        unset($grid['Unrecognized extra sheet']);
+        $grid['Fictional pilot'][5][27] = 'Credit Note';
+        $this->assertArrayHasKey('error', (new CciVoyageInvoiceParser())->parseGrids($grid));
+    }
+
     public function test_money_parser_preserves_paisa_and_rejects_ambiguous_or_overprecise_values(): void
     {
         $this->assertSame(123450, InvoiceImportMoney::cents('1,234.50'));

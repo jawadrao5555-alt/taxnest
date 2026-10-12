@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class InvoiceImportBatch extends Model
 {
     protected $fillable = [
+        'smart_source_system', 'source_hash', 'smart_review', 'approved_by', 'approved_at',
         'company_id',
         'user_id',
         'original_filename',
@@ -28,6 +29,8 @@ class InvoiceImportBatch extends Model
     ];
 
     protected $casts = [
+        'smart_review' => 'array',
+        'approved_at' => 'datetime',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'pruned_at' => 'datetime',

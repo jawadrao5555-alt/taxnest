@@ -330,6 +330,48 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertSame(0, \App\Models\InvoiceImportBatch::count());
     }
 
+    public function test_daily_exports_reuse_company_preset_after_header_reordering_and_punctuation_changes(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $preset = $this->mappingPreset($this->company->id, 'Daily export', [
+            'buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'GST',
+            'source_invoice_number' => 'Source Bill', 'invoice_date' => 'Supply Date',
+        ]);
+        $preset->update(['defaults_json' => json_encode([
+            'buyer_address' => 'Local test address', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice',
+        ])]);
+        $upload = $this->mappingUpload("Supply-Date,GST,Rate,HS,Item,Qty,Outlet,Source-Bill\n2026-10-10,36,100,02023000,Beef,2,Alpha,000123\n")
+            ->assertOk()->assertJsonPath('recommended_preset_id', $preset->id);
+        $this->postJson('/_test/import-map', [
+            'mapping_token' => $upload->json('mapping_token'), 'preset_id' => $preset->id,
+        ])->assertOk()->assertJsonPath('total', 1)
+            ->assertJsonPath('preview.0.data.source_invoice_number', '000123')
+            ->assertJsonPath('preview.0.data.invoice_date', '2026-10-10');
+        $this->assertSame(0, Invoice::count());
+        $this->assertSame('Source Bill', $preset->fresh()->mappingArray()['source_invoice_number']);
+    }
+
+    public function test_reused_source_column_blocks_manual_mapping_and_preserves_hold_for_correction(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $upload = $this->mappingUpload()->assertOk();
+        $mapping = ['buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'rate'];
+        $payload = [
+            'mapping_token' => $upload->json('mapping_token'), 'mapping' => $mapping,
+            'defaults' => ['buyer_address' => 'Local test address', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice'],
+        ];
+        $response = $this->postJson('/_test/import-map', $payload)->assertStatus(422);
+        $this->assertStringContainsString('mapped to both price and tax', $response->json('error'));
+        $this->assertSame(0, \App\Models\InvoiceImportBatch::count());
+        $payload['mapping']['tax'] = 'GST';
+        $this->postJson('/_test/import-map', $payload)->assertOk()->assertJsonPath('total', 1);
+        $this->assertSame(0, Invoice::count());
+    }
+
     private function writeXlsx(array $header, array $rows): string
     {
         $spreadsheet = new Spreadsheet();
@@ -1017,5 +1059,175 @@ class InvoiceBulkImportTest extends TestCase
 
         $this->assertSame([], $errors);
         $this->assertNull($data['_branch_id']);
+    }
+
+    private function smartTables(): void
+    {
+        Schema::create('invoice_import_batches', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->unsignedBigInteger('user_id')->nullable();
+            $t->string('original_filename'); $t->string('source_format'); $t->string('status');
+            foreach (['total_rows', 'valid_rows', 'invalid_rows', 'processed_rows', 'created_invoices', 'failed_rows'] as $field) { $t->integer($field)->default(0); }
+            $t->longText('rows_json')->nullable(); $t->longText('result_json')->nullable(); $t->text('error_message')->nullable();
+            $t->timestamp('started_at')->nullable(); $t->timestamp('finished_at')->nullable(); $t->timestamps();
+        });
+        (require base_path('database/migrations/2026_10_12_000001_create_smart_di_import_safeguards.php'))->up();
+        config(['features.enable_smart_di_import_safeguards' => true]);
+    }
+
+    private function verifiedSmartMappings(int $companyId): void
+    {
+        foreach ([
+            'sku' => ['description' => 'Verified beverage', 'hs_code' => '22021010', 'uom' => 'Liter', 'litres_per_case' => '6', 'schedule_type' => 'standard', 'tax_rate' => '18'],
+            'buyer' => ['buyer_name' => 'Fictional buyer', 'buyer_address' => 'Test address', 'destination_province' => 'Punjab', 'registration_type' => 'Unregistered'],
+        ] as $kind => $details) {
+            \App\Models\InvoiceImportVerifiedMapping::create(['company_id' => $companyId, 'source_system' => 'test-voyage', 'kind' => $kind, 'source_code' => $kind === 'sku' ? 'TEST-SKU' : 'TEST-OUTLET', 'version' => 1, 'details' => $details, 'evidence' => 'Fictional checked test evidence', 'verified_by' => 99, 'verified_at' => now()]);
+        }
+    }
+
+    private function smartRow(array $changes = []): array
+    {
+        return $this->row(array_merge(['source_invoice_number' => 'TEST-BILL-001', 'invoice_date' => '2026-01-01', 'source_sku' => 'TEST-SKU', 'source_outlet' => 'TEST-OUTLET', 'quantity' => '2', 'source_gross' => '1300.00', 'source_discount' => '100.00', 'source_vat' => '216.00', 'source_net' => '1416.00', 'invoice_gross' => '1300.00', 'invoice_discount' => '100.00', 'invoice_vat' => '216.00', 'invoice_net' => '1416.00'], $changes));
+    }
+
+    private function smartReview(array $rows, array $decisions = []): array
+    {
+        return (new \App\Services\SmartInvoiceImportReview())->review($this->parsedRows($rows), $this->company, 'test-voyage', $decisions);
+    }
+
+    private function approvedSmartBatch(array $review): \App\Models\InvoiceImportBatch
+    {
+        $json = json_encode($review['rows']);
+        $review['approved_hash'] = hash('sha256', $json);
+        return \App\Models\InvoiceImportBatch::create(['company_id' => $this->company->id, 'original_filename' => 'fictional.csv', 'source_format' => 'csv', 'smart_source_system' => 'test-voyage', 'status' => 'validated', 'rows_json' => $json, 'smart_review' => $review, 'total_rows' => count($review['rows']), 'valid_rows' => count(array_filter($review['rows'], fn ($r) => $r['valid'])), 'invalid_rows' => 0, 'approved_by' => 99, 'approved_at' => now()]);
+    }
+
+    public function test_smart_verified_conversion_preserves_source_vat_and_original_identity(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow()]);
+        $this->assertSame([], $review['rows'][0]['errors']);
+        $this->assertTrue($review['rows'][0]['valid']);
+        $this->assertEquals(12, $review['rows'][0]['data']['quantity']);
+        $this->assertEquals(100, $review['rows'][0]['data']['price']);
+        $this->assertEquals(216, $review['rows'][0]['data']['tax']);
+        $this->assertSame('Liter', $review['rows'][0]['data']['_default_uom']);
+        $batch = $this->approvedSmartBatch($review);
+        $result = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(1, $result['created_count']);
+        $invoice = Invoice::firstOrFail();
+        $this->assertSame('draft', $invoice->status);
+        $this->assertNull($invoice->fbr_invoice_number);
+        $this->assertSame('Unregistered', $invoice->buyer_registration_type);
+        $this->assertEquals(1416, $invoice->total_amount);
+        $receipt = \App\Models\InvoiceImportSourceReceipt::firstOrFail();
+        $this->assertSame('TEST-BILL-001', $receipt->source_invoice_number);
+        $this->assertSame($this->smartRow(), $receipt->audit[0]['original_data']);
+    }
+
+    public function test_smart_unknown_sku_buyer_and_other_tenant_mapping_block_every_line_of_invoice(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id + 1);
+        $review = $this->smartReview([$this->smartRow()]);
+        $this->assertFalse($review['rows'][0]['valid']);
+        $this->assertStringContainsString('Unknown SKU', implode(' ', $review['rows'][0]['errors']));
+        $this->assertStringContainsString('Unknown outlet', implode(' ', $review['rows'][0]['errors']));
+        $this->assertSame(0, Invoice::count());
+    }
+
+    public function test_smart_one_bad_line_blocks_the_entire_source_invoice(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $good = $this->smartRow(['invoice_gross' => '2600', 'invoice_discount' => '200', 'invoice_vat' => '432', 'invoice_net' => '2832']);
+        $bad = array_merge($good, ['source_sku' => 'UNKNOWN']);
+        $review = $this->smartReview([$good, $bad]);
+        $this->assertFalse($review['rows'][0]['valid']);
+        $this->assertFalse($review['rows'][1]['valid']);
+    }
+
+    public function test_smart_packaging_exclusion_preserves_all_source_totals_and_requires_a_reason(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $good = $this->smartRow(['invoice_gross' => '1400', 'invoice_discount' => '100', 'invoice_vat' => '216', 'invoice_net' => '1516']);
+        $pack = array_merge($good, ['description' => 'Empty bottle deposit', 'source_sku' => 'EMPTY', 'source_gross' => '100', 'source_discount' => '0', 'source_vat' => '0', 'source_net' => '100']);
+        $this->assertFalse($this->smartReview([$good, $pack])['rows'][0]['valid']);
+        $review = $this->smartReview([$good, $pack], ['3' => 'Checked returnable packaging deposit']);
+        $this->assertTrue($review['rows'][0]['valid']);
+        $this->assertTrue($review['rows'][1]['excluded']);
+        $this->assertSame(151600, $review['invoices'][0]['source_totals']['net']);
+        $this->assertSame(141600, $review['invoices'][0]['draft_totals']['net']);
+        $this->assertSame(10000, $review['invoices'][0]['excluded_totals']['net']);
+    }
+
+    public function test_smart_negative_damage_missing_identity_and_invoice_mismatch_cannot_be_approved(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        foreach ([['quantity' => '-2'], ['description' => 'Damaged stock'], ['source_invoice_number' => ''], ['invoice_net' => '1416.01'], ['source_vat' => ''], ['invoice_date' => '']] as $changes) {
+            $review = $this->smartReview([$this->smartRow($changes)]);
+            $this->assertFalse($review['rows'][0]['valid'], json_encode($changes));
+            $this->assertNotEmpty($review['invoices'][0]['errors']);
+        }
+    }
+
+    public function test_smart_draft_retry_reuses_receipt_and_locked_invoice_without_mutation(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow()]); $batch = $this->approvedSmartBatch($review);
+        $create = fn () => $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(1, $create()['created_count']);
+        Invoice::firstOrFail()->update(['status' => 'locked', 'fbr_invoice_number' => 'TEST-FBR-RECEIPT']);
+        $this->assertSame(1, $create()['created_count']);
+        $this->assertSame(1, Invoice::count());
+        $this->assertSame(1, \App\Models\InvoiceImportSourceReceipt::count());
+        $this->assertSame('locked', Invoice::first()->status);
+        $this->assertSame('TEST-FBR-RECEIPT', Invoice::first()->fbr_invoice_number);
+        $duplicate = $this->smartReview([$this->smartRow()]);
+        $this->assertStringContainsString('already imported', implode(' ', $duplicate['rows'][0]['errors']));
+    }
+
+    public function test_smart_unapproved_or_tampered_snapshot_cannot_create_a_draft(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow()]); $batch = $this->approvedSmartBatch($review);
+        $changed = $review['rows']; $changed[0]['data']['price'] = '1';
+        $result = $this->service->createDraftsFromRows($changed, $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(0, $result['created_count']);
+        $this->assertSame(0, Invoice::count());
+        $this->assertSame(0, \App\Models\InvoiceImportSourceReceipt::count());
+        $batch->update(['approved_at' => null]);
+        $result = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(0, $result['created_count']);
+    }
+
+    public function test_smart_same_buyer_same_day_original_bills_remain_separate_and_tenant_scoped(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow(), $this->smartRow(['source_invoice_number' => 'TEST-BILL-002'])]);
+        $this->assertCount(2, $review['invoices']);
+        $batch = $this->approvedSmartBatch($review);
+        $result = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(2, $result['created_count']);
+        $other = Company::create(['name' => 'Second fictional company', 'province' => 'Punjab', 'standard_tax_rate' => 18, 'next_invoice_number' => 1]);
+        $this->verifiedSmartMappings($other->id);
+        $otherReview = (new \App\Services\SmartInvoiceImportReview())->review($this->parsedRows([$this->smartRow()]), $other, 'test-voyage');
+        $this->assertTrue($otherReview['rows'][0]['valid']);
+        $this->assertNotSame($review['rows'][0]['source_fingerprint'], $otherReview['rows'][0]['source_fingerprint']);
+    }
+
+    public function test_smart_receipt_uniqueness_is_database_enforced_and_rolls_back_failed_draft(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow()]); $batch = $this->approvedSmartBatch($review);
+        Schema::drop('invoice_items');
+        $out = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(0, $out['created_count']);
+        $this->assertSame(0, Invoice::count());
+        $this->assertSame(0, \App\Models\InvoiceImportSourceReceipt::count());
+    }
+
+    public function test_smart_lossy_unit_price_conversion_requires_review_instead_of_rounding(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow(['source_gross' => '1300.01', 'source_net' => '1416.01', 'invoice_gross' => '1300.01', 'invoice_net' => '1416.01'])]);
+        $this->assertStringContainsString('price precision', implode(' ', $review['rows'][0]['errors']));
     }
 }

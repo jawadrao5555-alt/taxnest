@@ -54,6 +54,7 @@ class InvoiceImportController extends Controller
     {
         $request->validate([
             'import_file' => 'required|file|max:' . InvoiceImportService::MAX_FILE_KB,
+            'smart_source_system' => 'nullable|string|max:80|regex:/^[a-z0-9][a-z0-9_-]*$/',
         ]);
 
         $file = $request->file('import_file');
@@ -67,7 +68,19 @@ class InvoiceImportController extends Controller
             return response()->json(['error' => 'Company context missing.'], 403);
         }
 
-        $parsed = $this->service->parseFile($file->getRealPath(), $extension, InvoiceImportService::MAX_ROWS, true);
+        $system = $request->input('smart_source_system');
+        if ($system && !config('features.enable_smart_di_import_safeguards')) {
+            return response()->json(['error' => 'Smart import safeguards are disabled.'], 422);
+        }
+        $parsed = null;
+        if ($system && in_array($extension, ['xlsx', 'xls'], true)) {
+            try {
+                $parsed = (new \App\Services\CciVoyageInvoiceParser())->parse($file->getRealPath());
+            } catch (\Throwable $e) {
+                return response()->json(['error' => 'Could not read the detailed source workbook.'], 422);
+            }
+        }
+        $parsed ??= $this->service->parseFile($file->getRealPath(), $extension, InvoiceImportService::MAX_ROWS, true);
         if (isset($parsed['error'])) {
             return response()->json(['error' => $parsed['error']], 422);
         }
@@ -78,6 +91,9 @@ class InvoiceImportController extends Controller
             return $this->mappingNeededResponse($file, $extension, $company, $parsed['headers']);
         }
 
+        if ($system) {
+            return response()->json($this->buildSmartBatch($company, $file->getClientOriginalName(), $extension, $parsed['rows'], $system, (new \App\Services\InvoiceImportSourceIdentity())->fileFingerprint($file->getRealPath())));
+        }
         $result = $this->service->validateRows($parsed['rows'], $company);
 
         return response()->json($this->buildBatchPayload(
@@ -134,12 +150,23 @@ class InvoiceImportController extends Controller
         $mapping = collect($mapping)->map(fn ($v) => is_scalar($v) ? (string) $v : '')->all();
         $defaults = collect($defaults)->map(fn ($v) => is_scalar($v) ? (string) $v : '')->all();
 
-        $parsed = $this->service->parseFileWithMapping($dataPath, $extension, $mapping, $defaults);
+        $system = $meta['smart_source_system'] ?? null;
+        if ($system && !config('features.enable_smart_di_import_safeguards')) {
+            return response()->json(['error' => 'Smart import safeguards are disabled.'], 422);
+        }
+        $parsed = $this->service->parseFileWithMapping($dataPath, $extension, $mapping, $defaults, InvoiceImportService::MAX_ROWS, (bool) $system);
         if (isset($parsed['error'])) {
             // Hold is kept so the user can fix the mapping without re-uploading.
             return response()->json(['error' => $parsed['error']], 422);
         }
 
+        if ($system) {
+            $payload = $this->buildSmartBatch($company, $meta['original_filename'], $extension, $parsed['rows'], $system, (new \App\Services\InvoiceImportSourceIdentity())->fileFingerprint($dataPath));
+            $payload['preset_saved'] = $presetName !== '' ? $this->savePreset($company, $presetName, $mapping, $defaults) : null;
+            @unlink($dataPath);
+            @unlink($metaPath);
+            return response()->json($payload);
+        }
         $result = $this->service->validateRows($parsed['rows'], $company);
 
         $presetSaved = null;
@@ -207,13 +234,19 @@ class InvoiceImportController extends Controller
             return response()->json(['error' => 'Import batch not found.'], 404);
         }
 
+        if ($batch->smart_source_system) {
+            if (!config('features.enable_smart_di_import_safeguards') || !$batch->approved_at || !$batch->approved_by
+                || $batch->invalid_rows > 0 || !hash_equals((string) ($batch->smart_review['approved_hash'] ?? ''), hash('sha256', (string) $batch->rows_json))) {
+                return response()->json(['error' => 'Review every original invoice and explicitly approve drafts first.'], 422);
+            }
+        }
         if ($batch->valid_rows < 1) {
             return response()->json(['error' => 'No valid rows to import. Fix the errors and upload again.'], 422);
         }
 
         // Atomic: only one processing run per batch.
         $moved = InvoiceImportBatch::whereKey($batch->id)
-            ->where('status', 'validated')
+            ->whereIn('status', $batch->smart_source_system ? ['validated', 'failed', 'completed'] : ['validated'])
             ->update(['status' => 'queued', 'updated_at' => now()]);
         if (!$moved) {
             return response()->json(['error' => 'This batch is already being processed (status: ' . $batch->status . ').'], 409);
@@ -248,6 +281,11 @@ class InvoiceImportController extends Controller
             'failed_rows' => $batch->failed_rows,
             'error_message' => $batch->error_message,
             'message' => $result['message'] ?? null,
+            'source_receipts' => $batch->smart_source_system ? \App\Models\InvoiceImportSourceReceipt::where('company_id', $batch->company_id)->where('import_batch_id', $batch->id)->with('invoice')->get()->map(fn ($r) => [
+                'source_invoice_number' => $r->source_invoice_number, 'supply_date' => $r->supply_date, 'invoice_id' => $r->invoice_id,
+                'status' => $r->invoice?->status, 'fbr_status' => $r->invoice?->fbr_status, 'fbr_invoice_number' => $r->invoice?->fbr_invoice_number,
+                'submitted_at' => $r->invoice?->submitted_at,
+            ])->all() : [],
             'created' => array_slice($result['created'] ?? [], 0, 50),
             'created_total' => $result['created_total'] ?? count($result['created'] ?? []),
             'row_errors' => array_slice($result['row_errors'] ?? [], 0, 50),
@@ -468,6 +506,9 @@ class InvoiceImportController extends Controller
         ]);
 
         $batch = $this->findBatch($batchId);
+        if ($batch?->smart_source_system) {
+            return response()->json(['error' => 'Use the source review and verified mappings for this batch.'], 422);
+        }
         if (!$batch) {
             return response()->json(['error' => 'Import batch not found.'], 404);
         }
@@ -596,6 +637,22 @@ class InvoiceImportController extends Controller
     // ------------------------------------------------------------------
 
     /** Create the batch row and build the JSON payload shared by upload() and applyMapping(). */
+    private function buildSmartBatch(Company $company, string $name, string $extension, array $rows, string $system, string $hash): array
+    {
+        $duplicate = InvoiceImportBatch::where('company_id', $company->id)->where('smart_source_system', $system)->where('source_hash', $hash)->first();
+        if ($duplicate) {
+            return ['batch_id' => $duplicate->id, 'smart_review_url' => '/invoices/import/' . $duplicate->id . '/source-review', 'duplicate_file' => true];
+        }
+        $review = (new \App\Services\SmartInvoiceImportReview())->review($rows, $company, $system);
+        $batch = InvoiceImportBatch::create([
+            'company_id' => $company->id, 'user_id' => auth()->id(), 'original_filename' => substr($name, 0, 255),
+            'source_format' => $extension, 'smart_source_system' => $system, 'source_hash' => $hash,
+            'status' => 'needs_review', 'rows_json' => json_encode($review['rows']), 'smart_review' => $review,
+            'total_rows' => count($rows), 'valid_rows' => 0, 'invalid_rows' => count($rows),
+        ]);
+        return ['batch_id' => $batch->id, 'smart_review_url' => '/invoices/import/' . $batch->id . '/source-review'];
+    }
+
     private function buildBatchPayload(Company $company, string $originalFilename, string $extension, array $result): array
     {
         $batch = InvoiceImportBatch::create([
@@ -647,6 +704,7 @@ class InvoiceImportController extends Controller
             'extension' => $extension,
             'headers' => $headers,
             'created_at' => now()->toIso8601String(),
+            'smart_source_system' => request()->input('smart_source_system'),
         ]));
 
         // Saved presets, flagged by whether every mapped source column exists
@@ -692,7 +750,7 @@ class InvoiceImportController extends Controller
             'needs_mapping' => true,
             'mapping_token' => $token,
             'headers' => $headers,
-            'fields' => $this->service->mappingFieldMeta(),
+            'fields' => array_map(fn ($f) => request()->filled('smart_source_system') ? array_merge($f, ['value_required' => in_array($f['key'], InvoiceImportService::SMART_SOURCE_FIELDS, true)]) : $f, $this->service->mappingFieldMeta()),
             'suggestions' => $this->service->suggestMapping($headers),
             'presets' => $presets,
             // Suggestion only: the mapping UI must still require user confirmation.

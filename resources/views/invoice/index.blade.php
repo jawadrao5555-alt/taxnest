@@ -53,6 +53,12 @@
 
                                 <div class="p-6">
                                     <div x-show="step === 'upload'" class="space-y-4">
+                                        @if(config('features.enable_smart_di_import_safeguards'))
+                                        <label class="block text-sm">Smart source system (leave blank for standard import)
+                                            <input x-model="smartSourceSystem" placeholder="cci-voyage" pattern="[a-z0-9_-]+" class="border rounded p-2 w-full">
+                                        </label>
+                                        <p class="text-xs text-gray-600">Smart imports require verified SKU/outlet mappings, original bill ID/date and source financial totals. Every invoice is reviewed before draft creation.</p>
+                                        @endif
                                         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                             <p class="text-sm text-blue-700 dark:text-blue-300 mb-2">Download the Excel template, fill in your invoice data, then upload it here. Each row is one invoice line item — rows with the same buyer name + NTN + document type are grouped into a single draft invoice. Every row is checked against FBR rules (HS code, schedule, SRO, buyer fields) <span class="font-semibold">before</span> anything is created.</p>
                                             <div class="flex flex-wrap items-center gap-4">
@@ -1339,6 +1345,7 @@ function invoiceKeyboardNav() {
 function bulkImport() {
     return {
         showModal: false,
+        smartSourceSystem: '',
         step: 'upload',
         uploading: false,
         processing: false,
@@ -1477,6 +1484,7 @@ function bulkImport() {
 
             const formData = new FormData();
             formData.append('import_file', file);
+            if (this.smartSourceSystem.trim()) formData.append('smart_source_system', this.smartSourceSystem.trim());
 
             try {
                 const response = await fetch('/invoices/import-upload', {
@@ -1510,6 +1518,10 @@ function bulkImport() {
         },
 
         showPreview(data) {
+            if (data.smart_review_url) {
+                window.location.assign(data.smart_review_url);
+                return;
+            }
             this.batchId = data.batch_id;
             this.previewRows = data.preview || [];
             this.hasMore = !!data.has_more;

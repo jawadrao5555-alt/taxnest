@@ -78,6 +78,9 @@ class InvoiceImportService
         'sro_serial_no',
         'reference_invoice_number',
         'source_invoice_number',
+        'source_sku', 'source_outlet',
+        'source_gross', 'source_discount', 'source_vat', 'source_net',
+        'invoice_gross', 'invoice_discount', 'invoice_vat', 'invoice_net',
         'invoice_date',
         'branch',
     ];
@@ -91,6 +94,8 @@ class InvoiceImportService
         'buyer_name', 'buyer_address', 'destination_province', 'document_type',
         'hs_code', 'description', 'quantity', 'price', 'tax',
     ];
+
+    public const SMART_SOURCE_FIELDS = ['source_invoice_number', 'invoice_date', 'source_sku', 'source_outlet', 'description', 'quantity', 'source_gross', 'source_discount', 'source_vat', 'source_net', 'invoice_gross', 'invoice_discount', 'invoice_vat', 'invoice_net'];
 
     /** Columns that must survive as literal digit/code strings. */
     private const CODE_COLUMNS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'reference_invoice_number', 'source_invoice_number'];
@@ -285,7 +290,7 @@ class InvoiceImportService
      * @param array<string,string> $defaults  our field => fixed value for every row (fields with NO mapped column)
      * @return array{error?: string, rows?: array<int, array{row:int, data:array<string,string>}>}
      */
-    public function parseFileWithMapping(string $path, string $extension, array $columnMap, array $defaults = [], int $maxRows = self::MAX_ROWS): array
+    public function parseFileWithMapping(string $path, string $extension, array $columnMap, array $defaults = [], int $maxRows = self::MAX_ROWS, bool $smart = false): array
     {
         $extension = strtolower($extension);
 
@@ -328,6 +333,7 @@ class InvoiceImportService
         // preset keeps working even when the DMS reorders columns).
         $columnIndexes = [];
         $notFound = [];
+        $mappedSources = [];
         foreach ($columnMap as $field => $source) {
             if (!in_array($field, $allFields, true)) {
                 continue;
@@ -344,6 +350,10 @@ class InvoiceImportService
             if (($headerCounts[$key] ?? 0) > 1) {
                 return ['error' => "The mapped column '{$source}' has duplicate headers. Rename the duplicate columns and upload again."];
             }
+            if (isset($mappedSources[$key])) {
+                return ['error' => "The source column '{$source}' is mapped to both {$mappedSources[$key]} and {$field}. Choose a separate column or a fixed value for each field."];
+            }
+            $mappedSources[$key] = $field;
             $columnIndexes[$field] = $headerIndex[$key];
         }
         if (!empty($notFound)) {
@@ -369,8 +379,8 @@ class InvoiceImportService
         }
 
         $missing = [];
-        foreach (self::VALUE_REQUIRED_FIELDS as $field) {
-            if (!isset($columnIndexes[$field]) && !isset($cleanDefaults[$field])) {
+        foreach ($smart ? self::SMART_SOURCE_FIELDS : self::VALUE_REQUIRED_FIELDS as $field) {
+            if (!isset($columnIndexes[$field]) && ($smart || !isset($cleanDefaults[$field]))) {
                 $missing[] = $field;
             }
         }
@@ -409,6 +419,11 @@ class InvoiceImportService
                 }
             }
 
+            if ($smart) {
+                $data['_source_cells'] = $raw;
+                $data['_source_headers'] = $grid[0];
+                $data['_source_row'] = $rowNum;
+            }
             $rows[] = ['row' => $rowNum, 'data' => $data];
         }
 
@@ -812,6 +827,9 @@ class InvoiceImportService
         // to the same buyer from two cities must get one invoice per branch,
         // each carrying its own branch name — not a single merged draft filed
         // under whichever branch happened to come first.
+        if (!empty($data['_source_fingerprint'])) {
+            return 'smart:' . $data['_source_fingerprint'];
+        }
         return ($data['buyer_name'] ?? '') . '|' . ($data['buyer_ntn'] ?? '') . '|'
             . ($data['document_type'] ?? 'Sale Invoice') . '|' . ($data['reference_invoice_number'] ?? '')
             . '|' . ($data['invoice_date'] ?? '')
@@ -1261,6 +1279,7 @@ class InvoiceImportService
         }
 
         $created = [];
+        $newCreatedCount = 0;
         $rowErrors = [];
         $processedRows = 0;
         $failedRows = 0;
@@ -1269,7 +1288,9 @@ class InvoiceImportService
             $rowNums = array_map(fn ($e) => $e['row'], $entries);
             $first = $entries[0]['data'];
 
-            if ($maxInvoices !== null && count($created) >= $maxInvoices) {
+            $alreadyPresent = !empty($first['_smart_source_system']) && \App\Models\InvoiceImportSourceReceipt::where('company_id', $company->id)
+                ->where('import_batch_id', $importBatchId)->where('fingerprint', $first['_source_fingerprint'])->exists();
+            if ($maxInvoices !== null && $newCreatedCount >= $maxInvoices && !$alreadyPresent) {
                 foreach ($rowNums as $rowNum) {
                     $rowErrors[] = ['row' => $rowNum, 'errors' => ['Invoice limit reached — plan allows ' . $maxInvoices . ' more invoice(s); this buyer was skipped. Upgrade your plan or import fewer buyers.']];
                 }
@@ -1283,9 +1304,39 @@ class InvoiceImportService
 
             try {
                 $invoice = DB::transaction(function () use ($entries, $first, $company, $userId, $source, $standardTaxRate, $importBatchId, $stampBatch) {
+                    $receipt = null;
+                    if (!empty($first['_smart_source_system'])) {
+                        $batch = InvoiceImportBatch::where('company_id', $company->id)->whereKey($importBatchId)->first();
+                        if (!$batch || !$batch->approved_at || !$batch->approved_by || !hash_equals((string) ($batch->smart_review['approved_hash'] ?? ''), hash('sha256', (string) $batch->rows_json))) {
+                            throw new \RuntimeException('Smart import requires explicit reviewed batch approval.');
+                        }
+                        $audit = array_values(array_filter($batch->rowsArray(), fn ($r) => ($r['source_fingerprint'] ?? null) === $first['_source_fingerprint']));
+                        $approvedEntries = array_values(array_filter($audit, fn ($r) => !empty($r['valid'])));
+                        if ($approvedEntries !== $entries) {
+                            throw new \RuntimeException('Draft rows do not match the approved source invoice snapshot.');
+                        }
+                        $hash = hash('sha256', json_encode($audit, JSON_THROW_ON_ERROR));
+                        $receipt = \App\Models\InvoiceImportSourceReceipt::where('fingerprint', $first['_source_fingerprint'])->lockForUpdate()->first();
+                        if ($receipt) {
+                            if ((int) $receipt->company_id !== (int) $company->id || (int) $receipt->import_batch_id !== (int) $importBatchId || $receipt->content_hash !== $hash) {
+                                throw new \RuntimeException('Duplicate source invoice belongs to an existing import.');
+                            }
+                            $existing = Invoice::where('company_id', $company->id)->find($receipt->invoice_id);
+                            if (!$existing) {
+                                throw new \RuntimeException('Existing source receipt has no invoice; manual recovery required.');
+                            }
+                            return $existing; // Immutable: never rewrite a submitted/locked invoice.
+                        }
+                        $receipt = \App\Models\InvoiceImportSourceReceipt::create([
+                            'company_id' => $company->id, 'source_system' => $first['_smart_source_system'],
+                            'source_invoice_number' => $first['source_invoice_number'], 'supply_date' => $first['invoice_date'],
+                            'fingerprint' => $first['_source_fingerprint'], 'content_hash' => $hash,
+                            'import_batch_id' => $importBatchId, 'audit' => $audit,
+                        ]); // UNIQUE fingerprint + draft + audit commit or roll back together.
+                    }
                     $buyerNtn = $first['buyer_ntn'] ?: null;
                     $buyerCnic = $first['buyer_cnic'] ?: null;
-                    $buyerRegType = \App\Http\Controllers\InvoiceController::detectBuyerRegistrationType($buyerNtn, $buyerCnic);
+                    $buyerRegType = $first['_buyer_registration_type'] ?? \App\Http\Controllers\InvoiceController::detectBuyerRegistrationType($buyerNtn, $buyerCnic);
 
                     $totalValueExcludingST = 0.0;
                     $totalSalesTax = 0.0;
@@ -1382,9 +1433,15 @@ class InvoiceImportService
                         'source' => $source,
                     ], $company->id, $userId);
 
+                    if ($receipt) {
+                        $receipt->update(['invoice_id' => $invoice->id]);
+                    }
                     return $invoice;
                 });
 
+                if (!$alreadyPresent) {
+                    $newCreatedCount++;
+                }
                 $created[] = [
                     'id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,

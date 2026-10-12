@@ -2,6 +2,8 @@
 
 return [
 
+    'enable_smart_di_import_safeguards' => env('FEATURE_SMART_DI_IMPORT_SAFEGUARDS', false),
+
     // Suggest mappings only; never authorize draft creation or FBR submission.
     'enable_smart_di_import_mapping' => env('FEATURE_SMART_DI_IMPORT_MAPPING', false),
 

@@ -3,7 +3,7 @@ name: PR checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/smart-di-import-format-learning]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -109,6 +109,8 @@ jobs:
           php-version: '8.4'
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Check Smart DI import safeguards and legacy import regression
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/CciVoyageInvoiceParserTest.php tests/Unit/InvoiceImportLineClassifierTest.php tests/Feature/InvoiceBulkImportTest.php
       - name: Check Guest House settings regressions before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelSettingsCategoryTest.php
       - name: Check occupied waiter table regressions before the full suite

@@ -52,13 +52,13 @@
             @endforeach
             </tbody></table>
             @foreach($invoice['errors'] as $error)<p class="text-red-700 text-sm">{{ $error }}</p>@endforeach
-            <div class="overflow-x-auto"><table class="text-sm w-full"><thead><tr><th>Row</th><th>Buyer / outlet</th><th>SKU / description</th><th>Case → litre</th><th>HS / schedule / MRP</th><th>Source net / VAT</th><th>Review</th></tr></thead><tbody>
+            <div class="overflow-x-auto"><table class="text-sm w-full"><thead><tr><th>Row</th><th>Buyer / outlet</th><th>SKU / description</th><th>Case → litre</th><th>HS / schedule / MRP / rate</th><th>Source net / VAT</th><th>Review</th></tr></thead><tbody>
             @foreach($batch->rowsArray() as $row)
             @if(in_array($row['row'], $invoice['rows'], true))
             <tr class="border-b align-top"><td>{{ $row['row'] }}</td><td>{{ $row['original_data']['source_outlet'] ?? '' }}<br>{{ $row['data']['buyer_name'] ?? '' }}<br>{{ $row['data']['_buyer_registration_type'] ?? 'Verification required' }}</td>
             <td>{{ $row['original_data']['source_sku'] ?? '' }}<br>{{ $row['original_data']['description'] ?? '' }}</td>
             <td>{{ $row['original_data']['quantity'] ?? '' }} → {{ $row['data']['quantity'] ?? '' }}</td>
-            <td>{{ $row['data']['hs_code'] ?? '' }} / {{ $row['data']['schedule_type'] ?? '' }} / {{ $row['data']['mrp'] ?? '' }}</td>
+            <td>{{ $row['data']['hs_code'] ?? '' }} / {{ $row['data']['schedule_type'] ?? '' }} / {{ $row['data']['mrp'] ?? '' }}<br>Rate {{ $row['data']['tax_rate'] ?? '' }}% · Unit price {{ $row['data']['price'] ?? '' }} / {{ $row['data']['_default_uom'] ?? '' }}</td>
             <td>{{ $row['original_data']['source_net'] ?? '' }} / {{ $row['original_data']['source_vat'] ?? '' }}</td>
             <td>{{ $row['classification'] }}
                 @if(!$batch->approved_at && auth()->user()?->role === 'company_admin')

@@ -191,6 +191,33 @@ final class SmartInvoiceImportReview
             foreach ($summary['rows'] as $number) {
                 $summary['errors'] = array_values(array_unique(array_merge($summary['errors'], $rows[$byRow[$number]]['errors'])));
             }
+            if (!$summary['errors']) {
+                $includedRows = array_values(array_filter(array_map(fn ($number) => $rows[$byRow[$number]], $summary['rows']), fn ($row) => !$row['excluded']));
+                $first = $includedRows[0]['data'];
+                $preview = new \App\Models\Invoice(array_merge($first, ['company_id' => $company->id, 'internal_invoice_number' => 'IMPORT-PREVIEW', 'buyer_registration_type' => $first['_buyer_registration_type']]));
+                $preview->setRelation('company', $company);
+                $preview->setRelation('items', collect($includedRows)->map(fn ($row) => new \App\Models\InvoiceItem(array_merge($row['data'], [
+                    'default_uom' => $row['data']['_default_uom'], 'sale_type' => $row['data']['_sale_type'], 'serial_no' => $row['data']['sro_serial_no'],
+                ]))));
+                try {
+                    $payload = (new FbrService())->buildPayload($preview, true);
+                    foreach ($includedRows as $n => $row) {
+                        $item = $payload['items'][$n] ?? [];
+                        $expected = ['valueSalesExcludingST' => $row['source_amounts']['gross'] - $row['source_amounts']['discount'],
+                            'salesTaxApplicable' => $row['source_amounts']['vat'], 'totalValues' => $row['source_amounts']['net']];
+                        foreach ($expected as $field => $value) {
+                            if (InvoiceImportMoney::cents(number_format((float) ($item[$field] ?? -1), 2, '.', '')) !== $value) {
+                                $summary['errors'][] = 'Existing DI payload ' . $field . ' differs from reviewed source row ' . $row['row'] . '; review tax/MRP treatment. Source amounts were not changed.';
+                            }
+                        }
+                        if (($item['uoM'] ?? '') !== $row['data']['_default_uom']) {
+                            $summary['errors'][] = 'Existing DI payload UoM differs from verified SKU mapping.';
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $summary['errors'][] = 'Local DI payload preview failed: ' . $e->getMessage();
+                }
+            }
             foreach ($summary['rows'] as $number) {
                 $index = $byRow[$number];
                 $rows[$index]['errors'] = $summary['errors'];

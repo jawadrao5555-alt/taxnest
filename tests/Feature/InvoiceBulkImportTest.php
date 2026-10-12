@@ -1297,4 +1297,21 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertSame(422, $response->status());
         $this->assertSame(0, Invoice::count());
     }
+
+    public function test_smart_local_existing_payload_must_preserve_exact_source_vat_and_third_schedule_value(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+        $review = $this->smartReview([$this->smartRow(['source_vat' => '216.01', 'source_net' => '1416.01', 'invoice_vat' => '216.01', 'invoice_net' => '1416.01'])]);
+        $this->assertFalse($review['rows'][0]['valid']);
+        $this->assertStringContainsString('Existing DI payload salesTaxApplicable', implode(' ', $review['rows'][0]['errors']));
+        $mapping = \App\Models\InvoiceImportVerifiedMapping::where('kind', 'sku')->firstOrFail();
+        $details = $mapping->details; $details['schedule_type'] = '3rd_schedule'; $details['mrp'] = '150';
+        $mapping->update(['details' => $details]);
+        $third = $this->smartReview([$this->smartRow()]);
+        $this->assertFalse($third['rows'][0]['valid']);
+        $this->assertStringContainsString('Existing DI payload valueSalesExcludingST', implode(' ', $third['rows'][0]['errors']));
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+        $this->assertSame(0, Invoice::count());
+    }
 }

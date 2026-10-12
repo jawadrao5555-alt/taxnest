@@ -221,7 +221,9 @@ class FbrService
         return $this->resolveUomForHsCode($hsCode, $defaultUom, $company);
     }
 
-    public function buildPayload($invoice): array
+    // localOnly skips reference-API UoM lookups for reviewed import previews.
+    // Item values must already carry verified UoM; fiscal arithmetic is shared.
+    public function buildPayload($invoice, bool $localOnly = false): array
     {
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';
@@ -333,7 +335,7 @@ class FbrService
             }
 
             $hsCode = $item->hs_code ?? "";
-            $uomCode = $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company);
+            $uomCode = $localOnly ? $this->normalizeUom($item->default_uom) : $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company);
 
             $itemPayload = [
                 "uoM" => $uomCode,

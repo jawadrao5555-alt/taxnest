@@ -246,6 +246,7 @@ jobs:
         run: |
           trap 'bash scripts/rc-browser-fixture.sh stop' EXIT
           bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run
           bash scripts/rc-browser-fixture.sh run
       - name: Sanitize CI evidence
         id: sanitize_evidence

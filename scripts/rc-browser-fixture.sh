@@ -218,7 +218,7 @@ start_server() {
   assert_state_tree
   assert_no_symlink "$SERVER_PID" 'PHP server PID target'
   rm -f "$SERVER_PID"
-  safe_browser php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
+  safe_browser env FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
   for _ in $(seq 1 30); do curl --fail --silent --max-time 1 "http://127.0.0.1:$BROWSER_PORT/" >/dev/null && return; sleep 1; done
   fail 'loopback PHP server did not become ready'
 }

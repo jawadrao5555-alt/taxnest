@@ -1230,4 +1230,71 @@ class InvoiceBulkImportTest extends TestCase
         $review = $this->smartReview([$this->smartRow(['source_gross' => '1300.01', 'source_net' => '1416.01', 'invoice_gross' => '1300.01', 'invoice_net' => '1416.01'])]);
         $this->assertStringContainsString('price precision', implode(' ', $review['rows'][0]['errors']));
     }
+
+    public function test_smart_missing_verified_hs_and_mrp_never_use_source_or_price_fallback(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $mapping = \App\Models\InvoiceImportVerifiedMapping::where('kind', 'sku')->firstOrFail();
+        $d = $mapping->details;
+        unset($d['hs_code']); $d['schedule_type'] = '3rd_schedule';
+        $mapping->update(['details' => $d]);
+        $review = $this->smartReview([$this->smartRow(['mrp' => '500', 'hs_code' => '15179090'])]);
+        $this->assertFalse($review['rows'][0]['valid']);
+        $errors = implode(' ', $review['rows'][0]['errors']);
+        $this->assertStringContainsString('missing hs_code', $errors);
+        $this->assertStringContainsString('mrp required', $errors);
+    }
+
+    public function test_smart_cross_batch_overlap_and_database_unique_receipt_cannot_repeat_drafts(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow()]);
+        $batch = $this->approvedSmartBatch($review);
+        $out = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(1, $out['created_count']);
+        $second = $this->approvedSmartBatch($review);
+        $repeat = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', null, null, $second->id);
+        $this->assertSame(0, $repeat['created_count']);
+        $receipt = \App\Models\InvoiceImportSourceReceipt::firstOrFail();
+        try {
+            \App\Models\InvoiceImportSourceReceipt::create($receipt->only(['company_id', 'source_system', 'source_invoice_number', 'supply_date', 'fingerprint', 'content_hash', 'import_batch_id', 'invoice_id', 'audit']));
+            $this->fail('Database accepted duplicate source fingerprint.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $this->assertStringContainsString('UNIQUE', strtoupper($e->getMessage()));
+        }
+        $this->assertSame(1, Invoice::count());
+        $this->assertSame(1, \App\Models\InvoiceImportSourceReceipt::count());
+    }
+
+    public function test_smart_partial_draft_retry_reuses_completed_groups_even_when_new_invoice_quota_is_zero(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $review = $this->smartReview([$this->smartRow(), $this->smartRow(['source_invoice_number' => 'TEST-BILL-002'])]);
+        $batch = $this->approvedSmartBatch($review);
+        $partial = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', 1, null, $batch->id);
+        $this->assertSame(1, $partial['created_count']);
+        $this->assertSame(1, $partial['failed_rows']);
+        $retry = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', 0, null, $batch->id);
+        $this->assertSame(1, $retry['created_count']);
+        $this->assertSame(1, Invoice::count());
+        $resumed = $this->service->createDraftsFromRows($review['rows'], $this->company, null, 'bulk_import', 1, null, $batch->id);
+        $this->assertSame(2, $resumed['created_count']);
+        $this->assertSame(0, $resumed['failed_rows']);
+        $this->assertSame(2, Invoice::count());
+    }
+
+    public function test_smart_process_rejects_unapproved_batches_and_other_company_context(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $batch = $this->approvedSmartBatch($this->smartReview([$this->smartRow()]));
+        app()->instance('currentCompanyId', $this->company->id + 1);
+        $controller = new \App\Http\Controllers\InvoiceImportController($this->service);
+        $response = $controller->process(\Illuminate\Http\Request::create('/invoices/import/' . $batch->id . '/process', 'POST'), $batch->id);
+        $this->assertSame(404, $response->status());
+        app()->instance('currentCompanyId', $this->company->id);
+        $batch->update(['approved_at' => null]);
+        $response = $controller->process(\Illuminate\Http\Request::create('/invoices/import/' . $batch->id . '/process', 'POST'), $batch->id);
+        $this->assertSame(422, $response->status());
+        $this->assertSame(0, Invoice::count());
+    }
 }

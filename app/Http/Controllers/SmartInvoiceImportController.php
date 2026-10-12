@@ -99,6 +99,27 @@ class SmartInvoiceImportController extends Controller
             $batch = InvoiceImportBatch::where('company_id', app('currentCompanyId'))->whereKey($batchId)->lockForUpdate()->firstOrFail();
             abort_unless(in_array($batch->status, ['needs_review', 'validated'], true) && !$batch->approved_at, 409, 'Approved/processing source snapshots cannot be edited.');
             $raw = array_map(fn ($row) => ['row' => $row['row'], 'data' => $row['original_data'], 'errors' => $row['parse_errors'] ?? []], $batch->rowsArray());
+            foreach ($raw as &$entry) {
+                $override = $request->input('amounts.' . $entry['row'], []);
+                if (array_filter($override, fn ($v) => $v !== null && $v !== '')) {
+                    abort_unless(auth()->user()?->role === 'company_admin', 403);
+                    if (empty($override['evidence'])) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['amounts' => 'Financial allocations require verification evidence.']);
+                    }
+                    $entry['data']['_financial_original'] ??= array_intersect_key($entry['data'], array_flip(['source_discount', 'source_vat', 'source_net']));
+                    foreach (['discount', 'vat', 'net'] as $field) {
+                        $value = $override[$field] ?? '';
+                        try {
+                            \App\Services\InvoiceImportMoney::cents($value);
+                        } catch (\InvalidArgumentException $e) {
+                            throw \Illuminate\Validation\ValidationException::withMessages(['amounts' => $e->getMessage()]);
+                        }
+                        $entry['data']['source_' . $field] = $value;
+                    }
+                    $entry['data']['_financial_review'] = ['evidence' => $override['evidence'], 'user_id' => auth()->id(), 'at' => now()->toIso8601String()];
+                }
+            }
+            unset($entry);
             $review = (new SmartInvoiceImportReview())->review($raw, Company::findOrFail($batch->company_id), $batch->smart_source_system, $request->input('exclusions', []));
             $invalid = count(array_filter($review['rows'], fn ($row) => !empty($row['errors'])));
             $valid = count(array_filter($review['rows'], fn ($row) => $row['valid']));

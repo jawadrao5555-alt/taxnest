@@ -1314,4 +1314,26 @@ class InvoiceBulkImportTest extends TestCase
         \Illuminate\Support\Facades\Http::assertNothingSent();
         $this->assertSame(0, Invoice::count());
     }
+
+    public function test_smart_controller_refresh_resolves_previously_unknown_mappings_and_reviews_financial_allocation(): void
+    {
+        $this->smartTables();
+        $raw = $this->smartRow(['source_vat' => '', 'source_discount' => '', 'source_net' => '']);
+        $initial = $this->smartReview([$raw]);
+        $batch = \App\Models\InvoiceImportBatch::create(['company_id' => $this->company->id, 'original_filename' => 'fictional.csv', 'source_format' => 'csv', 'smart_source_system' => 'test-voyage', 'status' => 'needs_review', 'rows_json' => json_encode($initial['rows']), 'smart_review' => $initial]);
+        $this->verifiedSmartMappings($this->company->id);
+        $user = new \App\Models\User(); $user->forceFill(['id' => 99, 'company_id' => $this->company->id, 'role' => 'company_admin']);
+        $this->actingAs($user);
+        app()->instance('currentCompanyId', $this->company->id);
+        $request = \Illuminate\Http\Request::create('/invoices/import/' . $batch->id . '/source-review', 'POST', ['amounts' => ['2' => ['discount' => '100', 'vat' => '216', 'net' => '1416', 'evidence' => 'Verified synthetic VAT allocation']]]);
+        (new \App\Http\Controllers\SmartInvoiceImportController())->review($request, $batch->id);
+        $batch->refresh();
+        $this->assertSame('validated', $batch->status);
+        $this->assertSame([], $batch->smart_review['invoices'][0]['errors']);
+        $this->assertSame(1, $batch->valid_rows);
+        $this->assertNull($batch->approved_at);
+        $this->assertSame('', $batch->rowsArray()[0]['original_data']['_financial_original']['source_vat']);
+        $this->assertSame('216', $batch->rowsArray()[0]['original_data']['source_vat']);
+        $this->assertSame(99, $batch->rowsArray()[0]['original_data']['_financial_review']['user_id']);
+    }
 }

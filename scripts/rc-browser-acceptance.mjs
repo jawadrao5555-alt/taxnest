@@ -1001,7 +1001,7 @@ async function smartImportWorkflow(page,t,v) {
   await mapping('buyer',{buyer_name:'Verified synthetic buyer',buyer_address:'Fictional verified address',destination_province:'Punjab',registration_type:'Unregistered'});
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Refresh review with current mappings and exclusions'}).click()]);
   await dismiss(page);
-  if((await page.locator('body').innerText()).includes('Unknown SKU'))throw new Error('Verified SKU did not resolve source review');
+  if((await page.locator('body').innerText()).includes('Unknown SKU'))throw new Error('Verified SKU did not resolve source review: '+(await page.locator('body').innerText()).slice(-6000));
   const form=page.locator('form[action$="/source-review"]');
   await form.locator('[name=approve]').check();
   await Promise.all([page.waitForNavigation(),form.getByRole('button',{name:'Review and approve drafts'}).click()]);

@@ -238,16 +238,29 @@ jobs:
           RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} \
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs
-      - name: Seed and exercise isolated browser fixture
+      - name: Seed and verify authenticated Smart DI source import
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: |
+          bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run
+      - name: Exercise general isolated browser acceptance
         env:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           trap 'bash scripts/rc-browser-fixture.sh stop' EXIT
-          bash scripts/rc-browser-fixture.sh setup
-          RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run
           bash scripts/rc-browser-fixture.sh run
+      - name: Stop disposable browser fixture
+        if: always()
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: bash scripts/rc-browser-fixture.sh stop
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()

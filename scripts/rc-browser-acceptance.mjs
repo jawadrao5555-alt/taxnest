@@ -970,7 +970,7 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
 }
 
 async function smartImportWorkflow(page,t,v) {
-  await page.goto(baseUrl+'/invoices?tab=draft',{waitUntil:'domcontentloaded'});
+  await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const importer=page.locator('[x-data="bulkImport()"]');
   await importer.locator('button').first().click();

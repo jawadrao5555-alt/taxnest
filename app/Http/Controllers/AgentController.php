@@ -853,7 +853,9 @@ class AgentController extends Controller
      */
     private function fbrPendingInvoices(Company $company, Request $request)
     {
-        $pending = FbrPosTransaction::where('company_id', $company->id)
+        $identity = app(\App\Services\FbrPosIdentity::class);
+        $deviceUid = $this->requestDeviceUid($request);
+        $pending = $identity->route(FbrPosTransaction::where('company_id', $company->id), (int) $company->id, $deviceUid)
             ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
             ->whereNull('fbr_invoice_number')
             ->where(function ($q) {
@@ -871,6 +873,7 @@ class AgentController extends Controller
             try {
                 $txn->loadMissing(['items', 'company']);
                 $payload = $fbrService->buildFbrPosPayload($txn);
+                if ($txn->fbr_device_uid_snapshot && $txn->fbr_device_uid_snapshot !== $deviceUid) continue;
                 app(FbrPosSubmissionEvidenceService::class)->recordDispatch(
                     $company,
                     $txn,

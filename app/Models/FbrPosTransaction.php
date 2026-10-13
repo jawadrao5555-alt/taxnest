@@ -55,6 +55,11 @@ class FbrPosTransaction extends Model
 
     protected static function booted()
     {
+        static::created(function (self $t) {
+            if ($t->invoice_mode !== 'local' && app(\App\Services\FbrPosIdentity::class)->ready()) {
+                app(\App\Services\FbrPosIdentity::class)->capture($t);
+            }
+        });
         // Business-day stamp (Task 492 — FBR mirror of the PRA rule): set ONCE
         // at creation on EVERY create path (sale, provisional, offline sync).
         // 00:00–05:59 bills belong to the previous day's business while that

@@ -2502,6 +2502,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/fail-queue', [FbrPosController::class, 'failQueue'])->name('fbrpos.failQueue');
     Route::post('/fail-queue/retry-all', [FbrPosController::class, 'failQueueRetryAll'])->name('fbrpos.failQueue.retryAll');
     Route::post('/fail-queue/{id}/retry', [FbrPosController::class, 'failQueueRetryOne'])->name('fbrpos.failQueue.retryOne');
+    Route::match(['get', 'post'], '/settings/identities', [\App\Http\Controllers\FbrPosIdentityController::class, 'index'])->name('fbrpos.identities');
     Route::match(['get', 'post'], '/settings', [FbrPosController::class, 'fbrSettings'])->name('fbrpos.settings');
     // 🖥 Desktop Agent — FBR-owned page (Task 1403). MODE-INDEPENDENT: the
     // agent is what makes silent BILL + STORE SLIP printing work, so a cloud

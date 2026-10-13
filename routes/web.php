@@ -492,6 +492,9 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/invoices/review/{type}/{ref}/export', [\App\Http\Controllers\BulkDraftReviewController::class, 'export'])
             ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.export');
 
+        Route::get('/invoices/import/{batchId}/source-review', [\App\Http\Controllers\SmartInvoiceImportController::class, 'show']);
+        Route::post('/invoices/import/{batchId}/source-review', [\App\Http\Controllers\SmartInvoiceImportController::class, 'review']);
+        Route::post('/invoices/import/{batchId}/verified-mapping', [\App\Http\Controllers\SmartInvoiceImportController::class, 'saveMapping']);
         Route::get('/invoices/import-history', [InvoiceImportController::class, 'history'])->name('invoices.import-history');
         Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');
         Route::get('/invoices/import/{batchId}/error-report', [InvoiceImportController::class, 'errorReport'])->name('invoices.import-error-report');

@@ -67,7 +67,8 @@ class DiInvoiceApiController extends Controller
             'items.*.serial_no' => 'nullable|string|max:100',
             'items.*.mrp' => 'nullable|numeric|min:0',
             'items.*.default_uom' => 'nullable|string|max:100',
-            'items.*.st_withheld_at_source' => 'nullable',
+            'items.*.st_withheld_at_source' => 'nullable|boolean',
+            'items.*.st_withheld_amount' => 'nullable|numeric|min:0',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
             'items.*.further_tax' => 'nullable|numeric|min:0',
         ], [
@@ -100,7 +101,7 @@ class DiInvoiceApiController extends Controller
             ->where('client_reference', $clientReference)
             ->first();
         if ($existing) {
-            return response()->json($this->serialize($existing, true), 200);
+            return $this->duplicateResponse($existing, $request);
         }
 
         // ── FBR schedule rules — same engine as the panel ───────────────────
@@ -163,6 +164,7 @@ class DiInvoiceApiController extends Controller
                 $supplierProvince = $selectedBranch?->province ?? $company->province ?? null;
 
                 $invoice = Invoice::create([
+                    'di_api_request_hash' => \App\Services\DiApiRequestIdentity::fingerprint($request->all()),
                     'company_id' => $companyId,
                     'invoice_number' => $invoiceNumber,
                     'internal_invoice_number' => $invoiceNumber,
@@ -209,6 +211,7 @@ class DiInvoiceApiController extends Controller
                         'default_uom' => $item['default_uom'] ?? ($hsResolved['default_uom'] ?? 'Numbers, pieces, units'),
                         'sale_type' => ScheduleEngine::mapSaleType($scheduleType),
                         'st_withheld_at_source' => !empty($item['st_withheld_at_source']),
+                    'st_withheld_amount' => !empty($item['st_withheld_at_source']) ? ($item['st_withheld_amount'] ?? null) : null,
                         'petroleum_levy' => !empty($item['petroleum_levy']) ? floatval($item['petroleum_levy']) : null,
                         'further_tax' => !empty($item['further_tax']) ? floatval($item['further_tax']) : 0,
                         'description' => $item['description'],
@@ -230,7 +233,7 @@ class DiInvoiceApiController extends Controller
                     ->where('client_reference', $clientReference)
                     ->first();
                 if ($winner) {
-                    return response()->json($this->serialize($winner, true), 200);
+                    return $this->duplicateResponse($winner, $request);
                 }
             }
             Log::error("DI API invoice create failed (company {$companyId}): " . $e->getMessage());
@@ -390,6 +393,17 @@ class DiInvoiceApiController extends Controller
                 'source' => $invoice->source,
             ],
         ];
+    }
+
+    private function duplicateResponse(Invoice $invoice, Request $request)
+    {
+        if (!\App\Services\DiApiRequestIdentity::matches($invoice, $request->all())) {
+            return response()->json([
+                'status' => 'error', 'error' => 'client_reference_conflict',
+                'message' => 'This reference belongs to a different invoice request. Retrieve its status; use a new reference for a new bill.',
+            ], 409);
+        }
+        return response()->json($this->serialize($invoice, true), 200);
     }
 
     /** Pull the latest FBR error messages for a failed invoice (for polling callers). */

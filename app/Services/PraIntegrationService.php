@@ -15,6 +15,7 @@ class PraIntegrationService
 
     private const PAYMENT_MODE_MAP = [
         'cash' => 1,
+        'card' => 2,
         'debit_card' => 2,
         'credit_card' => 2,
         'qr_payment' => 2,
@@ -288,6 +289,28 @@ class PraIntegrationService
                     $totalSaleValue = array_sum(array_column($items, 'SaleValue'));
                     $totalTaxCharged = array_sum(array_column($items, 'TaxCharged'));
                     $totalBillAmount = array_sum(array_column($items, 'TotalAmount'));
+                }
+            }
+        }
+
+        // Hotel folio bills retain a 2dp tax snapshot while the payable total is
+        // rounded to rupees. Keep that receipt tax in PRA too: the residual
+        // belongs to the sale value, rather than changing the reported tax.
+        // Ordinary POS bills keep their established rounding behaviour.
+        $hotelFolioBill = $hotelCredit || (bool) $transaction->hotel_money_from_folio
+            || (\Illuminate\Support\Facades\Schema::hasTable('hotel_folio_entries')
+                && \App\Models\HotelFolioEntry::where('company_id', $transaction->company_id)
+                    ->where('pos_transaction_id', $transaction->id)->exists());
+        $taxDelta = round((float) $transaction->tax_amount - $totalTaxCharged, 2);
+        if ($hotelFolioBill && abs($taxDelta) >= 0.01 && abs($taxDelta) <= 1.00) {
+            foreach ($items as $i => $line) {
+                if ($line['TaxRate'] > 0 && $line['TaxCharged'] + $taxDelta >= 0
+                    && $line['SaleValue'] - $taxDelta >= 0) {
+                    $items[$i]['TaxCharged'] = round($line['TaxCharged'] + $taxDelta, 2);
+                    $items[$i]['SaleValue'] = round($line['SaleValue'] - $taxDelta, 2);
+                    $totalTaxCharged = array_sum(array_column($items, 'TaxCharged'));
+                    $totalSaleValue = array_sum(array_column($items, 'SaleValue'));
+                    break;
                 }
             }
         }

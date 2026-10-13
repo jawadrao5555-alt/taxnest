@@ -2,107 +2,71 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
+use App\Http\Controllers\InvoiceController;
 use App\Models\Invoice;
-use App\Services\FbrService;
+use App\Services\DiFiscalSubmissionState;
+use Illuminate\Console\Command;
 
 class FbrRetrySubmit extends Command
 {
     protected $signature = 'fbr:retry {invoice_id} {--attempts=4} {--interval=30}';
-    protected $description = 'Retry FBR submission for a specific invoice with interval-based retries';
+    protected $description = 'Retry a DI invoice through the canonical fiscal submission flow';
 
-    public function handle()
+    public function handle(): int
     {
-        $invoiceId = $this->argument('invoice_id');
-        $maxAttempts = (int) $this->option('attempts');
-        $intervalMinutes = (int) $this->option('interval');
-
-        $this->info("FBR Retry: Invoice #{$invoiceId}, {$maxAttempts} attempts, {$intervalMinutes} min interval");
-
-        $fbrService = new FbrService();
-
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            if ($attempt > 1) {
-                $this->info("Waiting {$intervalMinutes} minutes before attempt {$attempt}...");
-                $this->info("Next attempt at: " . now()->addMinutes($intervalMinutes)->format('H:i:s'));
-                sleep($intervalMinutes * 60);
-            }
-
-            $invoice = Invoice::with(['company', 'items'])->find($invoiceId);
-            if (!$invoice) {
-                $this->error("Invoice #{$invoiceId} not found!");
-                return 1;
-            }
-
-            if ($invoice->status === 'locked' && $invoice->fbr_status === 'accepted') {
-                $this->info("Invoice already accepted by FBR!");
-                return 0;
-            }
-
-            $this->info("=== Attempt {$attempt}/{$maxAttempts} at " . now()->format('H:i:s') . " ===");
-
-            $this->info("Phase A: Validate-Only...");
-            try {
-                $vResult = $fbrService->validateOnly($invoice);
-                $vStatus = $vResult['status'] ?? 'unknown';
-                $this->info("Validate: {$vStatus}");
-                if ($vStatus === 'valid') {
-                    $this->info("Payload VALID per FBR!");
-                } elseif ($vStatus === 'invalid') {
-                    $errors = $vResult['errors'] ?? [];
-                    $nonEmpty = array_filter($errors, fn($e) => !empty(trim($e)));
-                    if (!empty($nonEmpty)) {
-                        $this->warn("Validate errors: " . implode(', ', $nonEmpty));
-                    } else {
-                        $this->info("Empty response (rate limited)");
-                    }
-                }
-            } catch (\Exception $e) {
-                $this->warn("Validate error: " . $e->getMessage());
-            }
-
-            sleep(5);
-
-            $this->info("Phase B: Production Submit...");
-            try {
-                $sResult = $fbrService->submitInvoice($invoice, $attempt);
-                $sStatus = $sResult['status'] ?? 'unknown';
-
-                if ($sStatus === 'success') {
-                    $fbrNum = $sResult['fbr_invoice_number'] ?? 'N/A';
-                    $this->newLine();
-                    $this->info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                    $this->info("FBR ACCEPTED! Number: {$fbrNum}");
-                    $this->info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-
-                    $invoice->status = 'locked';
-                    $invoice->fbr_status = 'accepted';
-                    $invoice->fbr_invoice_number = $sResult['fbr_invoice_number'] ?? null;
-                    $invoice->fbr_response = json_encode($sResult['fbr_response'] ?? $sResult);
-                    $invoice->submitted_at = now();
-                    $invoice->save();
-
-                    $this->info("Invoice #{$invoiceId} locked. DONE!");
-                    return 0;
-                }
-
-                $failureType = $sResult['failure_type'] ?? 'unknown';
-                $errors = $sResult['errors'] ?? [];
-                $this->warn("Failed: {$failureType}");
-                foreach ($errors as $err) {
-                    $this->warn("  > {$err}");
-                }
-
-                if ($failureType === 'rate_limited') {
-                    $this->info("Rate limited - will retry after wait.");
-                }
-
-            } catch (\Exception $e) {
-                $this->error("Submit error: " . $e->getMessage());
-            }
+        $attempts = (int) $this->option('attempts');
+        $interval = (int) $this->option('interval');
+        if ($attempts < 1 || $attempts > 10 || $interval < 0 || $interval > 1440) {
+            $this->error('Use 1–10 attempts and an interval of 0–1440 minutes.');
+            return self::FAILURE;
         }
 
-        $this->error("All {$maxAttempts} attempts exhausted. Please retry later.");
-        return 1;
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            $invoice = Invoice::withoutGlobalScopes()->with('company')->find($this->argument('invoice_id'));
+            if (!$invoice || !$invoice->company) {
+                $this->error('Invoice or company not found.');
+                return self::FAILURE;
+            }
+            if ($invoice->status === 'locked' && !empty($invoice->fbr_invoice_number)) {
+                $this->info('Invoice already has a regulator reference; no submission was made.');
+                return self::SUCCESS;
+            }
+            $environment = in_array($invoice->company->fbr_environment, ['sandbox', 'production'], true)
+                ? $invoice->company->fbr_environment : 'sandbox';
+            $claimed = DiFiscalSubmissionState::reserve($invoice->id, 'cli_retry', $environment);
+            if (!$claimed) {
+                $this->error('Invoice is accepted, processing, or requires verification. Reconcile it before retry.');
+                return self::FAILURE;
+            }
+            // This path owns acknowledgement, ledger, integrity and audit updates.
+            // Never maintain a second CLI-only accepted-state implementation.
+            try {
+                $result = app(InvoiceController::class)->submitToFbrSync($claimed, $environment);
+            } catch (\Throwable $e) {
+                $fresh = $claimed->fresh();
+                if ($fresh && !$fresh->fbr_invoice_number && $fresh->is_fbr_processing) {
+                    DiFiscalSubmissionState::verificationRequired($fresh, $environment, 'cli_callback_loss');
+                    $fresh->save();
+                }
+                $this->error('Submission ended without a confirmed outcome. Reconcile the invoice before retry.');
+                return self::FAILURE;
+            }
+            $status = $result['status'] ?? 'pending_verification';
+            if ($status === 'success') {
+                $this->info('Canonical submission completed with a regulator acknowledgement.');
+                return self::SUCCESS;
+            }
+            if ($status !== 'failed') {
+                $this->warn('No authoritative acceptance or rejection; review the invoice before another attempt.');
+                return self::FAILURE;
+            }
+            // Permanent data/configuration errors need correction, not repeated POSTs.
+            if (($result['failure_type'] ?? '') !== 'rate_limited' || $attempt === $attempts) {
+                $this->warn('Submission failed. Review fiscal diagnostics and correct the invoice or configuration.');
+                return self::FAILURE;
+            }
+            if ($interval > 0) sleep($interval * 60);
+        }
+        return self::FAILURE;
     }
 }

@@ -8,6 +8,11 @@ class IntegrityHashService
 {
     public static function generate(Invoice $invoice): string
     {
+        return self::generateVersion($invoice, 3);
+    }
+
+    private static function generateVersion(Invoice $invoice, int $version): string
+    {
         $invoice->loadMissing('items');
 
         $items = $invoice->items
@@ -23,13 +28,24 @@ class IntegrityHashService
                 'quantity' => self::amount($item->quantity),
                 'price' => self::amount($item->price),
                 'tax' => self::amount($item->tax),
+                ...($version >= 3 ? [
+                    'default_uom' => (string) $item->default_uom,
+                    'sale_type' => (string) $item->sale_type,
+                    'st_withheld_at_source' => (bool) $item->st_withheld_at_source,
+                    'st_withheld_amount' => self::amount($item->st_withheld_amount),
+                    'petroleum_levy' => self::amount($item->petroleum_levy),
+                    'further_tax' => self::amount($item->further_tax),
+                    'extra_tax' => self::amount($item->extra_tax),
+                    'fed_payable' => self::amount($item->fed_payable),
+                    'discount' => self::amount($item->discount),
+                ] : []),
             ])
             ->sortBy('id')
             ->values()
             ->all();
 
         return hash('sha256', json_encode([
-            'version' => 2,
+            'version' => $version,
             'company_id' => (int) $invoice->company_id,
             'branch_id' => $invoice->branch_id ? (int) $invoice->branch_id : null,
             'invoice_number' => (string) $invoice->invoice_number,
@@ -45,6 +61,12 @@ class IntegrityHashService
             'total_sales_tax' => self::amount($invoice->total_sales_tax),
             'fbr_invoice_number' => (string) $invoice->fbr_invoice_number,
             'fiscal_payload_hash' => (string) $invoice->fiscal_payload_hash,
+            ...($version >= 3 ? [
+                'buyer_name' => (string) $invoice->buyer_name,
+                'buyer_address' => (string) $invoice->buyer_address,
+                'supplier_province' => (string) $invoice->supplier_province,
+                'destination_province' => (string) $invoice->destination_province,
+            ] : []),
             'items' => $items,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION));
     }
@@ -61,6 +83,8 @@ class IntegrityHashService
         }
 
         $invoice->load('items');
-        return $invoice->integrity_hash === self::generate($invoice);
+        return hash_equals((string) $invoice->integrity_hash, self::generate($invoice))
+            // Existing locked invoices keep their original v2 proof; never rewrite history.
+            || hash_equals((string) $invoice->integrity_hash, self::generateVersion($invoice, 2));
     }
 }

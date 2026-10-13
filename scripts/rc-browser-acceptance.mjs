@@ -1044,8 +1044,8 @@ async function reportingConnectorWorkflow(page,t,v) {
   if(exchanged.status()!==200)throw new Error('PKCE token exchange failed');
   const tokens=await exchanged.json();
   const report=async(companyName)=>request.post(baseUrl+'/api/reporting/mcp',{headers:{Authorization:'Bearer '+tokens.access_token},data:{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_company_billing_summary',arguments:{company_name:companyName,date_from:f.date}}}});
-  const own=await (await report(f.companyName)).json();
-  if(own.result?.isError||Number(own.result?.structuredContent?.totals?.net_billing)!==f.billing)throw new Error('Native read-only billing did not match the persisted synthetic invoices');
+  const ownResponse=await report(f.companyName), own=await ownResponse.json();
+  if(own.result?.isError||Number(own.result?.structuredContent?.totals?.net_billing)!==f.billing)throw new Error('Native billing mismatch: '+JSON.stringify({status:ownResponse.status(),rpcError:own.error,toolError:own.result?.isError,content:own.result?.isError?own.result?.content:undefined,totals:own.result?.structuredContent?.totals,period:own.result?.structuredContent?.period}));
   const foreign=await (await report(f.foreignCompanyName)).json();
   if(!foreign.result?.isError)throw new Error('Connection company scope leaked a foreign company report');
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});

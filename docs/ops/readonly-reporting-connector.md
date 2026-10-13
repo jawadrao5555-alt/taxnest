@@ -16,7 +16,7 @@ The default exact callback is `https://chatgpt.com/connector_platform_oauth_redi
 
 | Tool | Supported questions |
 |---|---|
-| `find_companies` | Resolve exact company names within owner-approved scope |
+| `find_companies` | Resolve exact company names/IDs within owner-approved scope; optional scoped ID disambiguates duplicate legal names |
 | `get_company_billing_summary` | Bill count, sales, returns, net billing, stored sales tax, fiscal states, reported/unreported counts and net amounts, item tax classifications |
 | `list_company_bills` | Paginated bills, fiscal number/status, local invoice number, reported/unreported, sale/return and document status filters |
 | `get_bill_details` | A company/date-scoped bill and up to 100 items per page, price/HS/unit/tax evidence where stored |

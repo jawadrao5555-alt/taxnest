@@ -116,7 +116,7 @@ final class McpController extends Controller
             'date_from' => ['type' => 'string', 'format' => 'date', 'description' => 'YYYY-MM-DD; defaults to today in Asia/Karachi.'],
             'date_to' => ['type' => 'string', 'format' => 'date'], 'date_basis' => ['type' => 'string', 'enum' => ['calendar', 'business']]];
 
-        $period += ['branch_id' => ['type' => 'integer', 'minimum' => 1], 'terminal_id' => ['type' => 'integer', 'minimum' => 1], 'payment_method' => ['type' => 'string']];
+        $period += ['company_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional ID from find_companies to disambiguate duplicate names; company_name must match the exact name.'], 'branch_id' => ['type' => 'integer', 'minimum' => 1], 'terminal_id' => ['type' => 'integer', 'minimum' => 1], 'payment_method' => ['type' => 'string']];
         $cursor = ['after_id' => ['type' => 'integer', 'minimum' => 0], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]];
         $defs = [
             ['find_companies', 'Find permitted companies by name; never guess among ambiguous matches.', ['name' => ['type' => 'string', 'minLength' => 2]], ['name']],

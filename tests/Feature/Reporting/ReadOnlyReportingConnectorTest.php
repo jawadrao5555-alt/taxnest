@@ -345,4 +345,13 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period() + ['branch_id' => 3, 'terminal_id' => 8, 'payment_method' => 'cash'])->assertJsonPath('result.structuredContent.totals.completed_documents', 1);
         $this->toolCall($t['access_token'], 'get_company_operational_summary', $this->period())->assertJsonPath('result.structuredContent.branch_inventory_summary.branch_stock_rows', 1);
     }
+
+    public function test_duplicate_legal_names_can_be_selected_by_scoped_id_without_guessing(): void
+    {
+        DB::table('companies')->where('id', 2)->update(['name' => 'Pizza Master Test']);
+        [$p,$t] = $this->connection([1, 2]);
+        $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period())->assertJsonPath('result.isError', true);
+        $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period() + ['company_id' => 2])->assertJsonPath('result.structuredContent.company.id', 2)->assertJsonPath('result.structuredContent.totals.net_billing', 99999);
+        $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period() + ['company_id' => 3])->assertJsonPath('result.isError', true);
+    }
 }

@@ -27,7 +27,7 @@ final class CompanyReadReports
         return $q->orderBy('name')->limit(11)->get(['id', 'name', 'product_type'])->map(fn ($r) => (array) $r)->all();
     }
 
-    public function company(string $name, ?array $allowed): object
+    public function company(string $name, ?array $allowed, ?int $id = null): object
     {
         $q = DB::table('companies')->whereIn('product_type', ['pos', 'fbrpos', 'di'])->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($name))]);
         if (Schema::hasColumn('companies', 'deleted_at')) {
@@ -35,6 +35,14 @@ final class CompanyReadReports
         }
         if ($allowed !== null) {
             $q->whereIn('id', $allowed);
+        }
+        if ($id !== null) {
+            $chosen = $q->where('id', $id)->first(['id', 'name', 'product_type']);
+            if (! $chosen) {
+                throw ValidationException::withMessages(['company_id' => 'Company ID/name do not match or are outside this connection’s scope.']);
+            }
+
+            return $chosen;
         }
         $exact = $q->limit(2)->get(['id', 'name', 'product_type'])->map(fn ($r) => (array) $r)->all();
         $matches = $this->companies($name, $allowed);
@@ -48,7 +56,7 @@ final class CompanyReadReports
 
     public function context(array $args, ?array $allowed): array
     {
-        $v = validator($args, ['company_name' => 'required|string|min:2|max:150', 'date_from' => 'nullable|date_format:Y-m-d', 'date_to' => 'nullable|date_format:Y-m-d', 'date_basis' => 'nullable|in:calendar,business', 'branch_id' => 'nullable|integer|min:1', 'terminal_id' => 'nullable|integer|min:1', 'payment_method' => 'nullable|string|max:32'])->validate();
+        $v = validator($args, ['company_name' => 'required|string|min:2|max:150', 'company_id' => 'nullable|integer|min:1', 'date_from' => 'nullable|date_format:Y-m-d', 'date_to' => 'nullable|date_format:Y-m-d', 'date_basis' => 'nullable|in:calendar,business', 'branch_id' => 'nullable|integer|min:1', 'terminal_id' => 'nullable|integer|min:1', 'payment_method' => 'nullable|string|max:32'])->validate();
         $tz = config('reporting_connector.timezone');
         $today = Carbon::now($tz)->toDateString();
         $from = Carbon::parse($v['date_from'] ?? $today, $tz)->startOfDay();
@@ -56,7 +64,7 @@ final class CompanyReadReports
         if ($from->gt($to) || $from->diffInDays($to) > config('reporting_connector.max_days') - 1) {
             throw ValidationException::withMessages(['date_from' => 'Use an ordered date range of at most 93 days.']);
         }
-        $company = $this->company($v['company_name'], $allowed);
+        $company = $this->company($v['company_name'], $allowed, isset($v['company_id']) ? (int) $v['company_id'] : null);
         $d = match ($company->product_type) {
             'pos' => ['table' => 'pos_transactions', 'items' => 'pos_transaction_items', 'fk' => 'transaction_id', 'fiscal' => 'pra_status', 'number' => 'pra_invoice_number', 'authority' => 'PRA', 'tax' => 'tax_amount'],
             'fbrpos' => ['table' => 'fbr_pos_transactions', 'items' => 'fbr_pos_transaction_items', 'fk' => 'transaction_id', 'fiscal' => 'fbr_status', 'number' => 'fbr_invoice_number', 'authority' => 'FBR POS', 'tax' => 'tax_amount'],

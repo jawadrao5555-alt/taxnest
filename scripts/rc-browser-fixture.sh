@@ -218,7 +218,7 @@ start_server() {
   assert_state_tree
   assert_no_symlink "$SERVER_PID" 'PHP server PID target'
   rm -f "$SERVER_PID"
-  safe_browser env FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 REPORTING_OAUTH_REDIRECT_URIS="http://127.0.0.1:$BROWSER_PORT/admin/reporting/connections" php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
+  safe_browser env FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 APP_URL="http://127.0.0.1:$BROWSER_PORT" REPORTING_OAUTH_REDIRECT_URIS="http://127.0.0.1:$BROWSER_PORT/admin/reporting/connections" php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
   for _ in $(seq 1 30); do curl --fail --silent --max-time 1 "http://127.0.0.1:$BROWSER_PORT/" >/dev/null && return; sleep 1; done
   fail 'loopback PHP server did not become ready'
 }
@@ -233,6 +233,7 @@ setup() {
   "$CLIENT" --protocol=socket --socket="$SOCKET" -uroot -e "DROP DATABASE IF EXISTS \`$DATABASE\`; CREATE DATABASE \`$DATABASE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
   safe_browser env RC_BROWSER_FIXTURE_FRESH=1 php artisan migrate --force --no-interaction
   safe_browser env RC_BROWSER_FIXTURE_FRESH=1 php scripts/rc-browser-fixture-seed.php
+  safe_browser php tests/native/rc_reporting_read_probe.php
   safe_browser php scripts/rc-di-browser-fixture.php
   ensure_fixture_storage_link
   start_server

@@ -19,8 +19,9 @@ final class FbrPosOwnerReconciliation
     {
         if ($bill->invoice_mode === 'local') return false;
         if ($bill->fbr_status === 'verification_pending') return true;
-        return $bill->fbr_status === 'pending' && $bill->fbr_submission_hash && $bill->fbr_agent_claimed_at
-            && \Carbon\Carbon::parse($bill->fbr_agent_claimed_at)->lte(now()->subMinutes(3));
+        return $bill->fbr_status === 'pending' && $bill->fbr_submission_hash
+            && ($bill->fbr_agent_claimed_at || $bill->updated_at)
+            && \Carbon\Carbon::parse($bill->fbr_agent_claimed_at ?: $bill->updated_at)->lte(now()->subMinutes(3));
     }
 
     public static function recoveryQueue(int $companyId): \Illuminate\Database\Eloquent\Builder
@@ -31,7 +32,10 @@ final class FbrPosOwnerReconciliation
                 $q->where('fbr_status', 'verification_pending');
                 if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) {
                     $q->orWhere(fn($q) => $q->where('fbr_status', 'pending')->whereNotNull('fbr_submission_hash')
-                        ->where('fbr_agent_claimed_at', '<=', now()->subMinutes(3)));
+                        ->where(fn($q) => $q->where('fbr_agent_claimed_at', '<=', now()->subMinutes(3))
+                            ->orWhere(fn($q) => $q->whereNull('fbr_agent_claimed_at')->where('updated_at', '<=', now()->subMinutes(3)))));
+                } else {
+                    $q->orWhere(fn($q) => $q->where('fbr_status', 'pending')->whereNotNull('fbr_submission_hash')->where('updated_at', '<=', now()->subMinutes(3)));
                 }
             });
     }

@@ -47,6 +47,17 @@ class FbrPosOwnerReconciliationTest extends TestCase
             'environment' => 'production', 'fiscal_number' => '900000000001', 'confirmed' => '1'], $changes);
     }
 
+    public function test_legacy_pending_claim_has_audited_recovery_without_claim_timestamp(): void
+    {
+        $this->bill->forceFill(['fbr_status'=>'pending','fbr_submission_hash'=>'legacy-dispatch'])->save();
+        $this->assertFalse(FbrPosOwnerReconciliation::eligible($this->bill));
+        $this->travel(4)->minutes();
+        $this->assertTrue(FbrPosOwnerReconciliation::eligible($this->bill->fresh()));
+        $this->assertSame([$this->bill->id],FbrPosOwnerReconciliation::recoveryQueue(91)->pluck('id')->all());
+        app(FbrPosOwnerReconciliation::class)->resolve($this->owner,91,$this->bill->id,$this->data(['decision'=>'not_accepted','fiscal_number'=>null]));
+        $this->assertSame('failed',$this->bill->fresh()->fbr_status);
+    }
+
     public function test_reporting_off_recovery_list_preserves_holds_and_isolates_company_and_provisionals(): void
     {
         $foreign = FbrPosTransaction::create(['company_id'=>92,'invoice_number'=>'FOREIGN','invoice_mode'=>'fbr','fbr_status'=>'verification_pending','total_amount'=>1180]);

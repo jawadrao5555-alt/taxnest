@@ -131,6 +131,16 @@ class FbrPosSubmissionEvidenceTest extends TestCase
         $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill->fresh()));
     }
 
+    public function test_legacy_claim_without_timestamp_cannot_be_cleared_for_blind_retry(): void
+    {
+        (require database_path('migrations/2026_10_12_100002_fbr_pos_agent_claim_timestamp.php'))->up();
+        $bill=$this->bill();$bill->forceFill(['fbr_submission_hash'=>'legacy-dispatch'])->save();
+        $this->assertTrue(\App\Services\FbrPosAgentClaim::active($bill));
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill));
+        $this->travel(4)->minutes();\App\Services\FbrPosAgentClaim::quarantineExpired($this->companyId);
+        $this->assertSame('verification_pending',$bill->fresh()->fbr_status);
+    }
+
     public function test_atomic_claim_rechecks_current_assigned_device_after_rebinding(): void
     {
         Schema::table('fbr_pos_transactions', function (Blueprint $t) { $t->string('fbr_device_uid_snapshot')->nullable(); });

@@ -2361,10 +2361,12 @@ class FbrService
         }
 
         $submissionHash = bin2hex(random_bytes(32));
+        $claimPatch = ['fbr_submission_hash' => $submissionHash, 'fbr_status' => 'pending'];
+        if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) $claimPatch['fbr_agent_claimed_at'] = now();
         $won = \App\Models\FbrPosTransaction::whereKey($transaction->id)->where('company_id', $transaction->company_id)
             ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
             ->whereIn('fbr_status', ['pending', 'failed', 'offline', 'config_error'])
-            ->update(['fbr_submission_hash' => $submissionHash]);
+            ->update($claimPatch);
         if (!$won) return ['status' => 'blocked', 'errors' => ['Another worker owns or resolved this submission.']];
         $transaction->fbr_submission_hash = $submissionHash;
 

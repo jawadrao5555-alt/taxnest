@@ -35,14 +35,16 @@ final class FbrPosAgentClaim
         FbrPosTransaction::where('company_id', $companyId)
             ->whereIn('fbr_status', ['pending', 'failed', 'offline'])
             ->whereNull('fbr_invoice_number')->whereNotNull('fbr_submission_hash')
-            ->where('fbr_agent_claimed_at', '<=', now()->subMinutes(3))
+            ->where(function($q) {
+                $q->where('fbr_agent_claimed_at', '<=', now()->subMinutes(3))
+                  ->orWhere(fn($q) => $q->whereNull('fbr_agent_claimed_at')->where('updated_at', '<=', now()->subMinutes(3)));
+            })
             ->update(['fbr_status' => 'verification_pending', 'updated_at' => now()]);
     }
 
     public static function active(FbrPosTransaction $transaction): bool
     {
-        return Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')
-            && $transaction->fbr_agent_claimed_at !== null && !empty($transaction->fbr_submission_hash);
+        return !empty($transaction->fbr_submission_hash);
     }
 
     public static function prepareRetry(FbrPosTransaction $transaction): bool
@@ -52,11 +54,7 @@ final class FbrPosAgentClaim
         $query = FbrPosTransaction::where('id', $transaction->id)->where('company_id', $transaction->company_id)
             ->whereNull('fbr_invoice_number')->whereIn('fbr_status', ['failed', 'offline', 'pending', 'config_error'])
             ->where(fn ($q) => $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local'));
-        if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) {
-            $query->where(fn ($q) => $q->whereNull('fbr_submission_hash')->orWhereNull('fbr_agent_claimed_at'));
-        } else {
-            $query->whereNull('fbr_submission_hash');
-        }
+        $query->whereNull('fbr_submission_hash');
         $won = $query->update(['fbr_submission_hash' => null, 'fbr_status' => 'pending', 'updated_at' => now()]);
         if ($won) $transaction->refresh();
         return $won === 1;

@@ -2318,6 +2318,9 @@ class FbrService
 
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
+        if ($transaction->fbr_status === 'verification_pending') {
+            return ['status' => 'blocked', 'errors' => ['Reconcile the existing FBR POS USIN before retrying an unknown outcome.']];
+        }
         $company = $transaction->company;
         $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         // Keep code backward-compatible during rolling deploys where the new
@@ -2448,6 +2451,7 @@ class FbrService
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
 
             if ($curlError) {
+                $unknownOutcome = !preg_match('/could not resolve|failed to connect|connection refused/i', $curlError);
                 $clearHashOnFailure();
                 $log->update([
                     'status' => 'failed',
@@ -2456,11 +2460,11 @@ class FbrService
                     'response_code' => '0',
                 ]);
                 $transaction->update(array_merge(
-                    ['fbr_status' => 'failed'],
+                    ['fbr_status' => $unknownOutcome ? 'verification_pending' : 'failed'],
                     self::fbrErrorPatch(self::shortFbrTransportError($curlError))
                 ));
                 return [
-                    'status' => 'failed',
+                    'status' => $unknownOutcome ? 'verification_pending' : 'failed',
                     'errors' => ['FBR connection failed: ' . $curlError],
                 ];
             }
@@ -2477,11 +2481,11 @@ class FbrService
                     'error_message' => implode('; ', $errors),
                 ]);
                 $transaction->update(array_merge(
-                    ['fbr_status' => 'failed'],
+                    ['fbr_status' => $httpCode >= 500 ? 'verification_pending' : 'failed'],
                     self::fbrErrorPatch('FBR HTTP ' . $httpCode . ' — ' . implode('; ', $errors))
                 ));
                 return [
-                    'status' => 'failed',
+                    'status' => $httpCode >= 500 ? 'verification_pending' : 'failed',
                     'errors' => $errors,
                     'http_status' => $httpCode,
                 ];
@@ -2492,16 +2496,16 @@ class FbrService
                     $log->update([
                         'status' => 'failed',
                         'response_code' => '200',
-                        'error_message' => 'FBR returned empty 200 response (WAF challenge). Retry later.',
+                        'error_message' => 'FBR returned empty 200 response (WAF challenge). Reconcile before retry.',
                     ]);
                     $clearHashOnFailure();
                     $transaction->update(array_merge(
-                        ['fbr_status' => 'pending'],
-                        self::fbrErrorPatch('FBR ne khali 200 response bheja (WAF challenge) — auto-retry hoga.')
+                        ['fbr_status' => 'verification_pending'],
+                        self::fbrErrorPatch('FBR ne khali 200 response bheja (WAF challenge) — verification zaroori hai.')
                     ));
                     return [
-                        'status' => 'retry',
-                        'errors' => ['FBR returned empty response. May need retry.'],
+                        'status' => 'verification_pending',
+                        'errors' => ['FBR returned empty response. Reconcile before retry.'],
                     ];
                 }
                 $clearHashOnFailure();
@@ -2511,11 +2515,11 @@ class FbrService
                     'error_message' => 'FBR returned non-JSON: ' . substr($responseBody, 0, 500),
                 ]);
                 $transaction->update(array_merge(
-                    ['fbr_status' => 'failed'],
+                    ['fbr_status' => 'verification_pending'],
                     self::fbrErrorPatch('FBR ne ghair-mutawaqqa (non-JSON) jawab bheja: ' . substr($responseBody, 0, 200))
                 ));
                 return [
-                    'status' => 'failed',
+                    'status' => 'verification_pending',
                     'errors' => ['FBR returned unexpected response format.'],
                 ];
             }
@@ -2556,7 +2560,7 @@ class FbrService
                 'error_message' => implode('; ', $fbrResult['errors']),
             ]);
             $transaction->update(array_merge([
-                'fbr_status' => 'failed',
+                'fbr_status' => (string) ($responseData['Code'] ?? '') === '100' ? 'verification_pending' : 'failed',
                 'fbr_response' => $responseData,
             ], self::fbrErrorPatch('FBR rejection: ' . implode('; ', $fbrResult['errors']))));
 
@@ -2573,7 +2577,7 @@ class FbrService
                 'error_message' => $e->getMessage(),
             ]);
             $transaction->update(array_merge(
-                ['fbr_status' => 'failed'],
+                ['fbr_status' => 'verification_pending'],
                 self::fbrErrorPatch(self::shortFbrTransportError($e->getMessage()))
             ));
 
@@ -2582,7 +2586,7 @@ class FbrService
             ]);
 
             return [
-                'status' => 'failed',
+                'status' => 'verification_pending',
                 'errors' => [$e->getMessage()],
             ];
         }

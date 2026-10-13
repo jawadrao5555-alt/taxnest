@@ -44,7 +44,7 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
             return;
         }
 
-        if ($transaction->fbr_status === 'submitted' || !empty($transaction->fbr_invoice_number)) {
+        if (in_array($transaction->fbr_status, ['submitted', 'verification_pending'], true) || !empty($transaction->fbr_invoice_number)) {
             Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} already submitted, skip");
             return;
         }

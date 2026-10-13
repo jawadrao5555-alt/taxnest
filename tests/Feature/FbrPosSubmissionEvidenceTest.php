@@ -110,8 +110,33 @@ class FbrPosSubmissionEvidenceTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $bill->refresh();
-        $this->assertSame('failed', $bill->fbr_status);
+        $this->assertSame('verification_pending', $bill->fbr_status);
         $this->assertNull($bill->fbr_invoice_number);
+    }
+
+    public function test_unknown_transport_outcome_is_held_while_connection_refusal_remains_retryable(): void
+    {
+        foreach (['timeout of 30000ms exceeded', 'ECONNRESET socket hang up'] as $error) {
+            $bill = $this->bill();
+            $result = $this->submit($bill, ['success' => false, 'offline' => true, 'error' => $error]);
+            $this->assertTrue($result['verification_pending'] ?? false);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+            $this->assertNull($bill->fresh()->fbr_invoice_number);
+            $result = (new \App\Services\FbrService)->submitFbrPosTransaction($bill->fresh());
+            $this->assertSame('blocked', $result['status']);
+        }
+        $bill = $this->bill();
+        $this->submit($bill, ['success' => false, 'offline' => true, 'error' => 'ECONNREFUSED']);
+        $this->assertSame('offline', $bill->fresh()->fbr_status);
+    }
+
+    public function test_new_agent_can_report_an_unknown_outcome_without_error_text(): void
+    {
+        $bill = $this->bill();
+        $result = $this->submit($bill, ['success' => false, 'outcome_unknown' => true]);
+        $this->assertTrue($result['verification_pending'] ?? false);
+        $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+        $this->assertNull($bill->fresh()->fbr_invoice_number);
     }
 
     public function test_safe_dispatch_telemetry_has_no_full_posid_payload_or_local_url(): void

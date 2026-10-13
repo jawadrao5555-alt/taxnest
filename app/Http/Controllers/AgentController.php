@@ -906,6 +906,7 @@ class AgentController extends Controller
             'requested_environment' => $company->fbr_pos_environment ?? 'sandbox',
             'local_ims_environment_proof' => 'unknown',
             'central_verification' => 'unknown',
+            'fiscal_product' => 'fbrpos',
         ]);
     }
 
@@ -925,6 +926,7 @@ class AgentController extends Controller
             // Agent >= Jul 2026: true when the failure was transport-level (IMS service
             // down / no internet / timeout) — the bill stays QUEUED, never 'failed'.
             'offline' => 'nullable|boolean',
+            'outcome_unknown' => 'nullable|boolean',
             // Additive Agent telemetry. Older agents omit it and remain valid.
             'agent_version' => 'nullable|string|max:40',
             // Additive fiscal-device evidence. These fields are diagnostic only
@@ -1238,12 +1240,17 @@ class AgentController extends Controller
                 && $fbrInvoiceNumber !== ''
                 && (!$explicitCode100 || !is_array($response));
 
-            if ($ambiguousSuccess) {
+            $unknownOutcome = $request->boolean('outcome_unknown')
+                || ($explicitCode100 && $fbrInvoiceNumber === '')
+                || preg_match('/timed?\s*out|timeout|ECONNABORTED|ECONNRESET|socket hang up/i', $errMsg);
+
+            if ($ambiguousSuccess || $unknownOutcome) {
                 $reason = !is_array($response)
                     ? 'Agent success callback had a malformed response; explicit FBR IMS Code 100 was not proven.'
                     : ($code === null
                         ? 'Agent success callback omitted the FBR IMS response code; explicit Code 100 was not proven.'
                         : 'Agent success callback carried FBR IMS code ' . mb_substr($code, 0, 40) . ', not Code 100.');
+                if ($unknownOutcome) $reason = 'FBR IMS may have accepted this invoice; reconcile its existing USIN before any retry.';
                 $txn->update(array_merge([
                     'fbr_status' => 'verification_pending',
                     'fbr_response_code' => $code === null ? null : mb_substr($code, 0, 250),

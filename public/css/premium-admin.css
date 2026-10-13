@@ -408,3 +408,15 @@ html.dark body.admin-themed.tn-premium-shell,
 .tn-metric-ledger > div > a:not([data-dashboard-metric]), .tn-channel-ledger > div > a:not([data-dashboard-metric]) {
     position: relative; z-index: 2;
 }
+
+.tn-dashboard-detail { min-width: 0; max-width: 100%; }
+.tn-dashboard-detail > * + * { margin-top: 1.2rem; }
+.tn-dashboard-detail-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .8rem; }
+.tn-dashboard-detail-filters label { display: block; min-width: 0; font-size: .85rem; }
+.tn-dashboard-detail-filters input, .tn-dashboard-detail-filters select { display: block; width: 100%; max-width: 100%; box-sizing: border-box; }
+.tn-dashboard-detail-filters button { padding: .6rem; border: 1px solid var(--tn-admin-line); border-radius: .5rem; }
+.tn-dashboard-detail-scroll { max-width: 100%; min-width: 0; overflow-x: auto; }
+.tn-dashboard-detail-scroll table { width: 100%; min-width: 1050px; }
+.tn-dashboard-detail-scroll td, .tn-dashboard-detail-scroll th { padding: .75rem; text-align: left; vertical-align: top; }
+@media(max-width: 1024px) { .tn-dashboard-detail-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media(max-width: 640px) { .tn-dashboard-detail-filters { grid-template-columns: minmax(0, 1fr); } }

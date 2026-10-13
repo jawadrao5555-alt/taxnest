@@ -237,7 +237,7 @@
         });
     </script>
 
-    <div class="receipt-wrap">
+    <div class="receipt-wrap" role="main">
     <div class="header text-center">
         {{-- Logo placement (Task #286, ported from PRA receipt_80mm):
              'center' = large centered logo above business name (default).

@@ -1084,9 +1084,15 @@ class InvoiceImportService
 
         // --- Tax rate: given, derived from amount, or schedule default ---
         $subtotal = ($quantity !== null && $price !== null) ? $quantity * $price : 0.0;
+        // Match the deployed DI monetary policy: third-schedule sales value
+        // remains the transaction amount, but VAT is based on retail MRP.
+        // Preserve legacy missing-MRP fallback to unit price; Smart review
+        // separately requires an evidence-backed explicit MRP.
+        $taxBase = $scheduleType === '3rd_schedule' && $quantity !== null
+            ? $quantity * ($mrp ?? $price ?? 0.0) : $subtotal;
         if ($taxRate === null) {
-            if ($tax !== null && $subtotal > 0) {
-                $taxRate = round(($tax / $subtotal) * 100, 2);
+            if ($tax !== null && $taxBase > 0) {
+                $taxRate = round(($tax / $taxBase) * 100, 2);
             } else {
                 $taxRate = $scheduleType === 'standard' ? $standardTaxRate : ScheduleEngine::getTaxRate($scheduleType, $company->province ?? null);
             }
@@ -1102,13 +1108,14 @@ class InvoiceImportService
             if ($taxRate != 0.0) {
                 $errors[] = "{$label} items must have tax_rate = 0 (got {$data['tax_rate']})";
             }
-        } elseif ($taxRateGiven && $tax !== null && $subtotal > 0) {
+        } elseif ($taxRateGiven && $tax !== null && $taxBase > 0) {
             // Consistency: FBR item payloads are built from tax_rate; the header
             // totals come from the tax amount. A mismatch means Excel formula errors.
-            $expected = round($subtotal * $taxRate / 100, 2);
+            $expected = round($taxBase * $taxRate / 100, 2);
             $tolerance = max(1.0, $expected * 0.01);
             if (abs($tax - $expected) > $tolerance) {
-                $errors[] = "tax ({$data['tax']}) does not match tax_rate {$data['tax_rate']}% of quantity x price (expected ~" . number_format($expected, 2, '.', '') . ')';
+                $baseLabel = $scheduleType === '3rd_schedule' ? 'quantity x MRP' : 'quantity x price';
+                $errors[] = "tax ({$data['tax']}) does not match tax_rate {$data['tax_rate']}% of {$baseLabel} (expected ~" . number_format($expected, 2, '.', '') . ')';
             }
         }
 

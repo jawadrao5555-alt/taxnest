@@ -624,6 +624,21 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertSame('40000', $row['data']['mrp'], '3rd schedule MRP must default to price');
     }
 
+    public function test_third_schedule_explicit_mrp_controls_supplied_and_derived_tax_rate(): void
+    {
+        foreach (['18', ''] as $rate) {
+            $result = $this->service->validateRows($this->parsedRows([
+                $this->row(['schedule_type' => '3rd_schedule', 'hs_code' => '85171100',
+                    'quantity' => '12', 'price' => '100', 'tax' => '324', 'tax_rate' => $rate, 'mrp' => '150']),
+            ]), $this->company);
+            $row = $result['rows'][0];
+            $this->assertTrue($row['valid'], implode('; ', $row['errors']));
+            $this->assertSame('18', $row['data']['tax_rate']);
+            $this->assertSame('150', $row['data']['mrp']);
+            $this->assertSame('100', $row['data']['price']);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Draft creation
     // ------------------------------------------------------------------
@@ -1310,7 +1325,20 @@ class InvoiceBulkImportTest extends TestCase
         $mapping->update(['details' => $details]);
         $third = $this->smartReview([$this->smartRow()]);
         $this->assertFalse($third['rows'][0]['valid']);
-        $this->assertStringContainsString('Existing DI payload valueSalesExcludingST', implode(' ', $third['rows'][0]['errors']));
+        // Deployed DI uses the transaction sale value as the sales base, with
+        // third-schedule VAT computed from MRP. Source VAT 216 must still be
+        // blocked: 12 converted units x MRP 150 x 18% = 324.
+        $errors = implode(' ', $third['rows'][0]['errors']);
+        $this->assertStringContainsString('quantity x MRP', $errors);
+        $this->assertStringContainsString('expected ~324.00', $errors);
+        $this->assertStringNotContainsString('Existing DI payload valueSalesExcludingST', $errors);
+        $consistent = $this->smartReview([$this->smartRow([
+            'source_vat' => '324.00', 'source_net' => '1524.00',
+            'invoice_vat' => '324.00', 'invoice_net' => '1524.00',
+        ])]);
+        $this->assertTrue($consistent['rows'][0]['valid'], implode(' ', $consistent['rows'][0]['errors']));
+        $this->assertEquals(324, $consistent['rows'][0]['data']['tax']);
+        $this->assertEquals(1200, (float) $consistent['rows'][0]['data']['price'] * (float) $consistent['rows'][0]['data']['quantity']);
         \Illuminate\Support\Facades\Http::assertNothingSent();
         $this->assertSame(0, Invoice::count());
     }

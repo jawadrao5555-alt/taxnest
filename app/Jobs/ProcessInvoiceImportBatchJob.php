@@ -54,6 +54,11 @@ class ProcessInvoiceImportBatchJob implements ShouldQueue
                 return;
             }
 
+            if ($batch->smart_source_system && (!config('features.enable_smart_di_import_safeguards') || !$batch->approved_at || !$batch->approved_by || $batch->invalid_rows > 0
+                || !hash_equals((string) ($batch->smart_review['approved_hash'] ?? ''), hash('sha256', (string) $batch->rows_json)))) {
+                $this->markFailed($batch, 'Smart source snapshot is unapproved or has changed.');
+                return;
+            }
             $validRows = array_values(array_filter($batch->rowsArray(), fn ($r) => !empty($r['valid'])));
             if (empty($validRows)) {
                 $this->markFailed($batch, 'No valid rows to import.');
@@ -70,11 +75,13 @@ class ProcessInvoiceImportBatchJob implements ShouldQueue
             }
             if (!in_array($access['override'] ?? null, ['lifetime', 'temporary', 'grace'], true)) {
                 $check = PlanLimitService::canCreateInvoice($company->id);
-                if (empty($check['allowed'])) {
+                if (empty($check['allowed']) && !$batch->smart_source_system) {
                     $this->markFailed($batch, $check['reason'] ?? 'Invoice limit reached.');
                     return;
                 }
-                if (isset($check['remaining'])) {
+                if (empty($check['allowed']) && $batch->smart_source_system) {
+                    $maxInvoices = 0;
+                } elseif (isset($check['remaining'])) {
                     $maxInvoices = (int) $check['remaining'];
                 }
             }

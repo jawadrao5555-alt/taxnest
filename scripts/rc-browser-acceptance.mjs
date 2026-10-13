@@ -969,7 +969,61 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   pass(t.name+'/'+v.width+': six category-specific groups, no outlet leakage, real failed-save retry and persisted colour');
 }
 
+async function smartImportWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const importer=page.locator('[x-data="bulkImport()"]');
+  await importer.locator('button').first().click();
+  await importer.locator('input[x-model="smartSourceSystem"]').fill('rc-smart-'+v.width+'-'+Date.now());
+  const values={buyer_name:'Unverified source label',buyer_ntn:'',buyer_cnic:'',buyer_address:'Source address',destination_province:'Punjab',document_type:'Sale Invoice',hs_code:'',description:'Synthetic beverage',quantity:'2',price:'',tax:'',schedule_type:'',tax_rate:'',source_invoice_number:'TEST-UI-'+v.width,invoice_date:'2026-01-01',source_sku:'TEST-SKU',source_outlet:'TEST-OUTLET',source_gross:'1300',source_discount:'100',source_vat:'216',source_net:'1416',invoice_gross:'1300',invoice_discount:'100',invoice_vat:'216',invoice_net:'1416'};
+  const csv=Object.keys(values).join(',')+'\n'+Object.values(values).join(',')+'\n';
+  await importer.locator('input[type=file]').setInputFiles({name:'synthetic-smart-'+v.width+'.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.waitForURL(u=>u.pathname.endsWith('/source-review'),{timeout:30000});
+  const reviewPath=new URL(page.url()).pathname;
+  if(!(await page.locator('body').innerText()).includes('Unknown SKU'))throw new Error('Unknown SKU did not require review');
+  if(await page.getByRole('button',{name:'Create / resume drafts'}).count())throw new Error('Unapproved source offered draft creation');
+  async function mapping(kind,fields) {
+    await page.locator('summary').filter({hasText:'Verified company mappings'}).click();
+    const form=page.locator('form[action$="/verified-mapping"]');
+    await form.locator('select[name=kind]').selectOption(kind);
+    await form.locator('[name=source_code]').fill(kind==='sku'?'TEST-SKU':'TEST-OUTLET');
+    for(const [key,value]of Object.entries(fields)) {
+      const field=form.locator('[name="details['+key+']"]');
+      if(await field.evaluate(el=>el.tagName==='SELECT'))await field.selectOption(value); else await field.fill(value);
+    }
+    await form.locator('[name=evidence]').fill('Fictional verification evidence for isolated browser test');
+    await form.locator('[name=verified]').check();
+    await Promise.all([page.waitForNavigation(),form.getByRole('button',{name:'Save verified mapping'}).click()]);
+    await dismiss(page);
+    if(!(await page.locator('body').innerText()).includes('Verified mapping saved'))throw new Error(kind+' mapping was not persisted');
+  }
+  await mapping('sku',{description:'Verified synthetic beverage',hs_code:'22021010',litres_per_case:'6',uom:'Liter',schedule_type:'standard',tax_rate:'18'});
+  await mapping('buyer',{buyer_name:'Verified synthetic buyer',buyer_address:'Fictional verified address',destination_province:'Punjab',registration_type:'Unregistered'});
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Refresh review with current mappings and exclusions'}).click()]);
+  await dismiss(page);
+  if((await page.locator('body').innerText()).includes('Unknown SKU'))throw new Error('Verified SKU did not resolve source review: '+(await page.locator('body').innerText()).slice(-6000));
+  const form=page.locator('form[action$="/source-review"]');
+  await form.locator('[name=approve]').check();
+  await Promise.all([page.waitForNavigation(),form.getByRole('button',{name:'Review and approve drafts'}).click()]);
+  await dismiss(page);
+  if(!(await page.locator('body').innerText()).includes('Approved for draft creation'))throw new Error('Explicit review approval failed');
+  const [process]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/process')&&r.request().method()==='POST'),page.getByRole('button',{name:'Create / resume drafts'}).click()]);
+  if(!process.ok())throw new Error('Reviewed draft creation failed: '+process.status());
+  const statusPath=reviewPath.replace('/source-review','/status');
+  const status=await page.evaluate(async path=>await(await fetch(path,{headers:{Accept:'application/json'}})).json(),statusPath);
+  if(status.created_invoices!==1||status.source_receipts.length!==1||status.source_receipts[0].fbr_invoice_number)throw new Error('Expected one local draft/receipt and no FBR submission');
+  // Resume uses the same source receipt, including immutable existing invoices.
+  const [resume]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/process')&&r.request().method()==='POST'),page.getByRole('button',{name:'Create / resume drafts'}).click()]);
+  if(!resume.ok())throw new Error('Reviewed resume failed');
+  const resumed=await page.evaluate(async path=>await(await fetch(path,{headers:{Accept:'application/json'}})).json(),statusPath);
+  if(resumed.created_invoices!==1||resumed.source_receipts.length!==1||resumed.source_receipts[0].invoice_id!==status.source_receipts[0].invoice_id)throw new Error('Draft resume duplicated original invoice');
+  await page.goto(baseUrl+reviewPath,{waitUntil:'domcontentloaded'});
+  if(!(await page.locator('body').innerText()).includes('TEST-UI-'+v.width))throw new Error('Original source identity disappeared');
+  pass(t.name+'/'+v.width+': authenticated upload, verified mappings, source review, explicit approval and draft receipt; no fiscal posting');
+}
+
 async function workflow(page,t,v,diagnostics) {
+  if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);

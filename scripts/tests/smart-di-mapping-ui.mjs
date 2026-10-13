@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 const blade = readFileSync(new URL('../../resources/views/invoice/index.blade.php', import.meta.url), 'utf8');
 const source = blade.slice(blade.indexOf('function bulkImport()'), blade.indexOf('</script>', blade.indexOf('function bulkImport()'))).replace(/\{\{[^\n]*?\}\}/g, 'false');
 const requests = [];
-const ctx = {setInterval, clearInterval, document: {querySelector: () => ({content: 'local-test'})}, fetch: async (url, options) => {
+let sourceReviewNavigation = null;
+const ctx = {window: {location: {assign: url => {sourceReviewNavigation = url;}}}, setInterval, clearInterval, document: {querySelector: () => ({content: 'local-test'})}, fetch: async (url, options) => {
     requests.push({url, payload: JSON.parse(options.body)});
     return {ok: true, json: async () => ({batch_id: 1, preview: [], total: 1, valid_count: 1, error_count: 0})};
 }};
@@ -39,4 +40,7 @@ component.resetUpload();
 assert.equal(component.recommendedPresetId, null);
 assert.equal(component.smartMappingEnabled, false);
 assert.equal(requests.length, 1);
+component.showPreview({batch_id: 123, smart_review_url: '/invoices/import/123/source-review'});
+assert.equal(sourceReviewNavigation, '/invoices/import/123/source-review');
+assert.equal(requests.length, 1, 'Source review navigation must never auto-process or submit');
 console.log('Smart DI mapping component regressions passed');

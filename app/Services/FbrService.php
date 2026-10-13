@@ -2370,9 +2370,18 @@ class FbrService
         if (!$won) return ['status' => 'blocked', 'errors' => ['Another worker owns or resolved this submission.']];
         $transaction->fbr_submission_hash = $submissionHash;
 
-        $clearHashOnFailure = function () use ($transaction) {
-            $transaction->fbr_submission_hash = null;
-            $transaction->save();
+        $clearHashOnFailure = function () use ($transaction, $submissionHash) {
+            // The claim was written through a query, so this model's original
+            // hash is still null. Assigning null and save() skips that column.
+            // Release only our own failed claim, never another worker's.
+            $patch = ['fbr_submission_hash' => null];
+            if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) $patch['fbr_agent_claimed_at'] = null;
+            \App\Models\FbrPosTransaction::whereKey($transaction->id)
+                ->where('company_id', $transaction->company_id)
+                ->whereNull('fbr_invoice_number')
+                ->where('fbr_submission_hash', $submissionHash)
+                ->update($patch);
+            $transaction->refresh();
         };
 
         $payload = $this->buildFbrPosPayload($transaction);

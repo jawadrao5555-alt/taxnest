@@ -179,8 +179,19 @@ final class CompanyReadReports
             return ['available' => false, 'reason' => 'Stored item tax classification is unavailable.'];
         }
         $ret = $this->returnExpr($c);
-        $groups = $this->itemQuery($c)->selectRaw($f['class']." AS classification, COUNT(*) AS item_rows, SUM(CASE WHEN $ret THEN 0 ELSE 1 END) AS sales_item_rows, SUM(CASE WHEN $ret THEN 1 ELSE 0 END) AS return_item_rows, COALESCE(SUM(i.quantity),0) AS unsigned_quantity,
-    SUM(CASE WHEN i.".$f['tax']." IS NULL THEN 1 ELSE 0 END) AS tax_unknown_rows, COALESCE(SUM(CASE WHEN $ret THEN -i.".$f['tax'].' ELSE i.'.$f['tax'].' END),0) AS net_item_tax')->groupByRaw($f['class'])->get();
+        // Classify scoped rows first; MariaDB ONLY_FULL_GROUP_BY rejects a
+        // repeated CASE expression over ungrouped source columns.
+        $rows = $this->itemQuery($c)->select('i.quantity', 'i.'.$f['tax'].' as stored_item_tax')
+            ->selectRaw($f['class'].' AS classification')
+            ->selectRaw("CASE WHEN $ret THEN 1 ELSE 0 END AS is_return");
+        $groups = DB::query()->fromSub($rows, 'e')->selectRaw('e.classification, COUNT(*) AS item_rows,
+            SUM(CASE WHEN e.is_return=1 THEN 0 ELSE 1 END) AS sales_item_rows,
+            SUM(CASE WHEN e.is_return=1 THEN 1 ELSE 0 END) AS return_item_rows,
+            COALESCE(SUM(e.quantity),0) AS unsigned_quantity,
+            SUM(CASE WHEN e.stored_item_tax IS NULL THEN 1 ELSE 0 END) AS tax_unknown_rows,
+            CASE WHEN SUM(CASE WHEN e.stored_item_tax IS NULL THEN 1 ELSE 0 END)>0 THEN NULL
+            ELSE COALESCE(SUM(CASE WHEN e.is_return=1 THEN -e.stored_item_tax ELSE e.stored_item_tax END),0) END AS net_item_tax')
+            ->groupBy('e.classification')->get();
 
         return ['available' => true, 'groups' => $groups, 'note' => 'Counts are invoice item rows; catalogue item count and mixed unit quantities are not equivalent. Stored tax classifications are used, not guessed from zero tax. Quantities are unsigned and may mix units; use paginated tax item evidence for per-unit inspection.'];
     }

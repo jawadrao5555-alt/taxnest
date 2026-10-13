@@ -158,6 +158,70 @@ class HotelSimpleDeskPricingTest extends TestCase
         return ['inclusive' => ['inclusive'], 'card save' => ['inclusive_card_save']];
     }
 
+    public static function currentPraPaymentCases(): array
+    {
+        $cases = [];
+        foreach (['exclusive', 'inclusive', 'inclusive_card_save'] as $pricing) {
+            foreach (['cash' => 16, 'card' => 8, 'debit_card' => 8, 'credit_card' => 8, 'qr_payment' => 8] as $method => $rate) {
+                $cases[$pricing.' '.$method] = [$pricing, $method, $rate];
+            }
+        }
+        return $cases;
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('currentPraPaymentCases')]
+    public function test_current_hotel_rates_match_quote_saved_invoice_and_pra_payload(string $pricing, string $method, int $rate): void
+    {
+        [$company, $owner, $room] = $this->fixture([
+            'pos_tax_rate_cash' => null, 'pos_tax_rate_card' => null,
+            'pos_tax_pricing_mode' => $pricing,
+        ]);
+        $stay = app(HotelStayService::class)->book($company->id, $owner->id, $this->booking($room));
+        $desk = app(\App\Services\HotelDeskService::class);
+        $quote = $desk->summary($stay, $method);
+        $this->assertEquals($rate, $quote['tax_rate']);
+        $this->actingAs($owner, 'pos')->getJson('/pos/hotel/stays/'.$stay->id.'/checkout-quote?payment_method='.$method)
+            ->assertOk()->assertJson(['tax_rate' => $rate, 'total' => $quote['total']]);
+        $expectedTotal = $pricing === 'exclusive' ? 10000 * (1 + $rate / 100)
+            : ($pricing === 'inclusive_card_save' ? round(10000 * (100 + $rate) / 116) : 10000);
+        $this->assertEquals($expectedTotal, $quote['total']);
+        $desk->checkout($stay, $owner->id, [
+            'payment_method' => $method, 'amount' => $quote['balance'], 'idempotency_key' => 'hotel-current-rates',
+        ]);
+        $bill = \App\Models\PosTransaction::where('company_id', $company->id)->firstOrFail();
+        $this->assertEquals($rate, $bill->tax_rate);
+        $this->assertEquals($quote['tax'], $bill->tax_amount);
+        $this->assertEquals($quote['total'], $bill->total_amount);
+        $payload = app(\App\Services\PraIntegrationService::class, ['company' => $company])->generatePayload($bill);
+        $this->assertSame($method === 'cash' ? 1 : 2, $payload['PaymentMode']);
+        $this->assertEquals($bill->total_amount, $payload['TotalBillAmount']);
+        $this->assertEquals($bill->tax_amount, $payload['TotalTaxCharged']);
+        $this->assertEquals($payload['TotalBillAmount'], array_sum(array_column($payload['Items'], 'TotalAmount')));
+        $this->assertEquals($payload['TotalTaxCharged'], array_sum(array_column($payload['Items'], 'TaxCharged')));
+        $this->assertEquals($payload['TotalBillAmount'], $payload['TotalSaleValue'] + $payload['TotalTaxCharged']);
+        foreach ($payload['Items'] as $line) $this->assertEquals($rate, $line['TaxRate']);
+        $this->assertNull($company->fresh()->pos_tax_rate_cash);
+        $this->assertNull($company->fresh()->pos_tax_rate_card);
+        // Later settings changes must not change an already-issued fiscal snapshot.
+        $company->forceFill(['pos_tax_rate_cash' => 7, 'pos_tax_rate_card' => 4])->save();
+        $laterPayload = app(\App\Services\PraIntegrationService::class, ['company' => $company->fresh()])->generatePayload($bill->fresh());
+        $this->assertSame($payload, $laterPayload);
+    }
+
+    public function test_hotel_rate_overrides_remain_company_scoped(): void
+    {
+        $default = $this->company('hotel', ['pos_tax_rate_cash' => null, 'pos_tax_rate_card' => null]);
+        $custom = $this->company('hotel', ['pos_tax_rate_cash' => 12, 'pos_tax_rate_card' => 5]);
+        foreach (['cash' => 16, 'card' => 8, 'debit_card' => 8, 'credit_card' => 8, 'qr_payment' => 8] as $method => $rate) {
+            $this->assertEquals($rate, \App\Services\HotelPricingService::quote($default, 10000, 0, $method)['tax_rate']);
+            $this->assertEquals($method === 'cash' ? 12 : 5, \App\Services\HotelPricingService::quote($custom, 10000, 0, $method)['tax_rate']);
+        }
+        $this->assertNull($default->fresh()->pos_tax_rate_cash);
+        $this->assertNull($default->fresh()->pos_tax_rate_card);
+        $this->assertEquals(12, $custom->fresh()->pos_tax_rate_cash);
+        $this->assertEquals(5, $custom->fresh()->pos_tax_rate_card);
+    }
+
     #[\PHPUnit\Framework\Attributes\DataProvider('inclusiveModes')]
     public function test_inclusive_and_card_save_quotes_match_saved_bill(string $mode): void
     {

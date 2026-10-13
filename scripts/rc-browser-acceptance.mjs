@@ -1029,7 +1029,7 @@ async function reportingConnectorWorkflow(page,t,v) {
   const f=t.reportingConnector, request=page.context().request;
   const metadata=await (await request.get(baseUrl+'/.well-known/oauth-protected-resource/api/reporting/mcp')).json();
   const callback=baseUrl+'/admin/reporting/connections';
-  const registration=await request.post(baseUrl+'/api/reporting/oauth/register',{data:{client_name:'Synthetic read-only browser '+v.width,redirect_uris:[callback],token_endpoint_auth_method:'none'}});
+  const registration=await request.post(baseUrl+'/api/reporting/oauth/register',{data:{client_name:'Synthetic read-only browser '+v.width+' '+Date.now(),redirect_uris:[callback],token_endpoint_auth_method:'none'}});
   if(registration.status()!==201)throw new Error('OAuth registration did not accept the loopback fixture callback');
   const client=await registration.json(), verifier='a'.repeat(64);
   const params={client_id:client.client_id,redirect_uri:callback,response_type:'code',code_challenge:createHash('sha256').update(verifier).digest('base64url'),code_challenge_method:'S256',resource:metadata.resource,scope:'taxnest.reports.read',state:'browser-'+v.width};

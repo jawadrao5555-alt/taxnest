@@ -47,6 +47,15 @@ class FbrPosOwnerReconciliationTest extends TestCase
             'environment' => 'production', 'fiscal_number' => '900000000001', 'confirmed' => '1'], $changes);
     }
 
+    public function test_reporting_off_recovery_list_preserves_holds_and_isolates_company_and_provisionals(): void
+    {
+        $foreign = FbrPosTransaction::create(['company_id'=>92,'invoice_number'=>'FOREIGN','invoice_mode'=>'fbr','fbr_status'=>'verification_pending','total_amount'=>1180]);
+        FbrPosTransaction::create(['company_id'=>91,'invoice_number'=>'LOCAL','invoice_mode'=>'local','fbr_status'=>'verification_pending','total_amount'=>1180]);
+        FbrPosTransaction::create(['company_id'=>91,'invoice_number'=>'FAILED','invoice_mode'=>'fbr','fbr_status'=>'failed','total_amount'=>1180]);
+        $this->assertSame([$this->bill->id], FbrPosOwnerReconciliation::recoveryQueue(91)->pluck('id')->all());
+        $this->assertSame([$foreign->id], FbrPosOwnerReconciliation::recoveryQueue(92)->pluck('id')->all());
+    }
+
     public function test_accepted_owner_evidence_is_audited_idempotently_without_fabricating_code_100(): void
     {
         $data = $this->data();

@@ -491,7 +491,7 @@ $fixture = [
     'transactionalJourneys' => [
         ['name' => 'fbr-owner-reconciliation', 'login' => $fiscalUser->email, 'password' => $password,
             'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/fail-queue'],
-            'markers' => ['Reconcile evidence'], 'fbrReconciliation' => $reconcileCases],
+            'markers' => ['FBR Fail Queue'], 'fbrReconciliation' => $reconcileCases],
         ['name' => 'ingredient-unit-audit', 'login' => $unitOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/restaurant/ingredients'], 'markers' => ['Synthetic Stocked Chicken'],
             'ingredientUnitAudit' => ['unused' => $unitCases, 'stocked' => ['id' => $unitStocked->id, 'name' => $unitStocked->name]]],

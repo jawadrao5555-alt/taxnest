@@ -27,6 +27,7 @@
         <div>
             <p class="font-bold">{{ __('pos.fbr_queue_reporting_off_title') }}</p>
             <p class="text-xs mt-1">{{ __('pos.fbr_queue_reporting_off_body') }}</p>
+            @if($transactions->total()>0)<p class="mt-2 font-semibold">Previous uncertain submissions remain visible for owner reconciliation. Reporting OFF does not prove IMS rejection.</p>@endif
         </div>
         <a href="{{ route('fbrpos.settings') }}" class="text-xs font-bold text-blue-600 hover:underline whitespace-nowrap">{{ __('pos.fbr_integration_settings') }} →</a>
     </div>

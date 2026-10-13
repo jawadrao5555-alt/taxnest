@@ -1025,7 +1025,10 @@ async function smartImportWorkflow(page,t,v) {
 async function workflow(page,t,v,diagnostics) {
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
-      await page.goto(baseUrl+`/fbr-pos/fail-queue/${id}/reconcile`,{waitUntil:'domcontentloaded'});
+      await page.goto(baseUrl+'/fbr-pos/fail-queue',{waitUntil:'domcontentloaded'});
+      await dismiss(page);
+      await Promise.all([page.waitForURL(`**/fbr-pos/fail-queue/${id}/reconcile`,{waitUntil:'domcontentloaded'}),
+        page.locator(`a[href$="/fbr-pos/fail-queue/${id}/reconcile"]`).click()]);
       await dismiss(page);
       const form=page.locator('[data-fbr-owner-reconcile] form');
       await form.locator('[name=decision]').selectOption(decision);

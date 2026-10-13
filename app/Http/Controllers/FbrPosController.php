@@ -3863,10 +3863,12 @@ class FbrPosController extends Controller
         $fbrCompany = Company::find($companyId);
         $fbrReportingOff = $fbrCompany && !$fbrCompany->fbr_reporting_enabled;
         if ($fbrReportingOff) {
-            $transactions = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20, 1, [
-                'path' => $request->url(), 'query' => $request->query(),
-            ]);
-            $stats = (object) ['failed_count' => 0, 'pending_count' => 0, 'verification_pending_count' => 0, 'submitted_count' => 0, 'failed_amount' => 0, 'config_error_count' => 0];
+            // Reporting OFF does not prove older IMS submissions were rejected.
+            // Retain only reconciliation holds; ordinary retry queues remain hidden.
+            $recovery = \App\Services\FbrPosOwnerReconciliation::recoveryQueue((int) $companyId);
+            $transactions = (clone $recovery)->latest()->paginate(20)->withQueryString();
+            $stats = (object) ['failed_count' => 0, 'pending_count' => 0, 'verification_pending_count' => (clone $recovery)->count(),
+                'submitted_count' => 0, 'failed_amount' => 0, 'config_error_count' => 0];
             return view('fbr-pos.fail-queue', compact('transactions', 'stats', 'fbrReportingOff'));
         }
 

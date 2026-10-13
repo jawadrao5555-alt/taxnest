@@ -23,6 +23,19 @@ final class FbrPosOwnerReconciliation
             && \Carbon\Carbon::parse($bill->fbr_agent_claimed_at)->lte(now()->subMinutes(3));
     }
 
+    public static function recoveryQueue(int $companyId): \Illuminate\Database\Eloquent\Builder
+    {
+        return FbrPosTransaction::withoutGlobalScopes()->where('company_id', $companyId)
+            ->where(fn($q) => $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local'))
+            ->where(function($q) {
+                $q->where('fbr_status', 'verification_pending');
+                if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) {
+                    $q->orWhere(fn($q) => $q->where('fbr_status', 'pending')->whereNotNull('fbr_submission_hash')
+                        ->where('fbr_agent_claimed_at', '<=', now()->subMinutes(3)));
+                }
+            });
+    }
+
     public static function fingerprint(FbrPosTransaction $bill): string
     {
         $company = Company::findOrFail($bill->company_id);

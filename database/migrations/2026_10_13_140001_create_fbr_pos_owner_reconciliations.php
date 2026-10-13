@@ -14,7 +14,7 @@ return new class extends Migration {
             $t->string('decision', 24); $t->string('evidence_source', 24);
             $t->string('evidence_reference', 160); $t->string('environment', 16);
             $t->string('fiscal_number_hash', 64)->nullable();
-            $t->string('before_fingerprint', 64); $t->timestamp('checked_at'); $t->timestamp('created_at');
+            $t->string('before_fingerprint', 64); $t->dateTime('checked_at'); $t->dateTime('created_at');
             $t->unique(['company_id', 'transaction_id', 'request_key'], 'fbr_pos_owner_reconcile_request_unique');
         });
     }

@@ -305,6 +305,9 @@ class HotelCreditNotePolicyTest extends TestCase
         $credit = PosTransaction::findOrFail($note->credit_transaction_id);
         $this->assertEquals($first['estimated_total'], $credit->total_amount);
         $this->assertEquals($first['estimated_tax'], $credit->tax_amount);
+        $payload = (new \App\Services\PraIntegrationService(Company::findOrFail($stay->company_id)))->generatePayload($credit);
+        $this->assertEquals($credit->tax_amount, $payload['TotalTaxCharged']);
+        $this->assertEquals($credit->total_amount, $payload['TotalBillAmount']);
         $credit->update(['pra_status' => 'submitted', 'pra_invoice_number' => 'SYNTHETIC-ROUNDING-1']);
         $last = $policy->review($stay, $owner, (int) $bill->id);
         $lastNote = $service->issue($stay, $owner, (int) $bill->id, null,
@@ -312,6 +315,9 @@ class HotelCreditNotePolicyTest extends TestCase
         $lastCredit = PosTransaction::findOrFail($lastNote->credit_transaction_id);
         $this->assertEquals($last['estimated_total'], $lastCredit->total_amount);
         $this->assertEquals($last['estimated_tax'], $lastCredit->tax_amount);
+        $payload = (new \App\Services\PraIntegrationService(Company::findOrFail($stay->company_id)))->generatePayload($lastCredit);
+        $this->assertEquals($lastCredit->tax_amount, $payload['TotalTaxCharged']);
+        $this->assertEquals($lastCredit->total_amount, $payload['TotalBillAmount']);
         $this->assertEquals(104, $credit->total_amount + $lastCredit->total_amount);
         $this->assertEquals(14, $credit->tax_amount + $lastCredit->tax_amount);
         $this->assertEquals(0, app(HotelFolioService::class)->totals($stay)['refunds']);

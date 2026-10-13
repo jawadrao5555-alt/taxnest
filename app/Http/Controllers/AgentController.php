@@ -873,7 +873,7 @@ class AgentController extends Controller
             try {
                 $txn->loadMissing(['items', 'company']);
                 $payload = $fbrService->buildFbrPosPayload($txn);
-                $claim = \App\Services\FbrPosAgentClaim::acquire($txn);
+                $claim = \App\Services\FbrPosAgentClaim::acquire($txn, $this->requestDeviceUid($request));
                 if ($claim === null) continue;
                 app(FbrPosSubmissionEvidenceService::class)->recordDispatch(
                     $company,

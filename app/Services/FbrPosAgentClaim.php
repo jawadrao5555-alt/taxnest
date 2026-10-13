@@ -7,16 +7,22 @@ use Illuminate\Support\Facades\Schema;
 
 final class FbrPosAgentClaim
 {
-    public static function acquire(FbrPosTransaction $transaction): ?string
+    public static function acquire(FbrPosTransaction $transaction, ?string $deviceUid = null): ?string
     {
         $token = bin2hex(random_bytes(32));
         $update = ['fbr_submission_hash' => $token, 'fbr_status' => 'pending', 'updated_at' => now()];
         if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) $update['fbr_agent_claimed_at'] = now();
-        $won = FbrPosTransaction::where('id', $transaction->id)->where('company_id', $transaction->company_id)
+        $query = FbrPosTransaction::where('id', $transaction->id)->where('company_id', $transaction->company_id)
             ->whereIn('fbr_status', ['pending', 'failed', 'offline'])
             ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
-            ->where(fn ($q) => $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local'))
-            ->update($update);
+            ->where(fn ($q) => $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local'));
+        if (Schema::hasColumn('fbr_pos_transactions', 'fbr_device_uid_snapshot')) {
+            $query->where(function ($q) use ($deviceUid) {
+                $q->whereNull('fbr_device_uid_snapshot');
+                if ($deviceUid) $q->orWhere('fbr_device_uid_snapshot', $deviceUid);
+            });
+        }
+        $won = $query->update($update);
         return $won === 1 ? $token : null;
     }
 

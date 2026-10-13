@@ -2342,7 +2342,11 @@ class FbrService
         // shop PC. This guard sits BEFORE the hash-lock so a stale hash can never strand the bill,
         // and it covers EVERY call site (store, retryFbr, editRetry, retry/sync jobs).
         if ($company && $company->agentServesFbr() && $company->agent_enabled) {
-            $transaction->update(['fbr_status' => 'pending']);
+            $queued = \App\Models\FbrPosTransaction::whereKey($transaction->id)->where('company_id', $transaction->company_id)
+                ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
+                ->whereIn('fbr_status', ['pending', 'failed', 'offline', 'config_error'])
+                ->update(['fbr_status' => 'pending']);
+            if (!$queued) return ['status' => 'blocked', 'errors' => ['Invoice acquired or changed while queuing; do not overwrite it.']];
             return [
                 'status' => 'queued_agent',
                 'message' => 'Queued for Desktop Sync Agent (Fiscal Device mode).',
@@ -2356,9 +2360,13 @@ class FbrService
             ];
         }
 
-        $submissionHash = hash('sha256', $transaction->id . '|' . $transaction->invoice_number . '|' . now()->timestamp);
+        $submissionHash = bin2hex(random_bytes(32));
+        $won = \App\Models\FbrPosTransaction::whereKey($transaction->id)->where('company_id', $transaction->company_id)
+            ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
+            ->whereIn('fbr_status', ['pending', 'failed', 'offline', 'config_error'])
+            ->update(['fbr_submission_hash' => $submissionHash]);
+        if (!$won) return ['status' => 'blocked', 'errors' => ['Another worker owns or resolved this submission.']];
         $transaction->fbr_submission_hash = $submissionHash;
-        $transaction->save();
 
         $clearHashOnFailure = function () use ($transaction) {
             $transaction->fbr_submission_hash = null;

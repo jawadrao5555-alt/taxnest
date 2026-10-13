@@ -131,6 +131,18 @@ class FbrPosSubmissionEvidenceTest extends TestCase
         $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill->fresh()));
     }
 
+    public function test_atomic_claim_rechecks_current_assigned_device_after_rebinding(): void
+    {
+        Schema::table('fbr_pos_transactions', function (Blueprint $t) { $t->string('fbr_device_uid_snapshot')->nullable(); });
+        $bill = $this->bill();
+        $bill->forceFill(['fbr_device_uid_snapshot' => 'OLD-PC'])->save();
+        $stale = $bill->fresh();
+        $bill->forceFill(['fbr_device_uid_snapshot' => 'REPLACEMENT'])->save();
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($stale, 'OLD-PC'));
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($stale));
+        $this->assertNotNull(\App\Services\FbrPosAgentClaim::acquire($stale, 'REPLACEMENT'));
+    }
+
     public function test_claim_scope_excludes_provisionals_submitted_and_other_tenant_expiry(): void
     {
         (require database_path('migrations/2026_10_12_100002_fbr_pos_agent_claim_timestamp.php'))->up();

@@ -178,42 +178,15 @@ class FbrService
         return null;
     }
 
-    /**
-     * Resolve the UoM to send to FBR for an HS code. When the FBR reference list is
-     * available, the item's default is kept only if valid; otherwise it is corrected
-     * to a valid UoM (preferred pick first, else FBR's first allowed). When the list
-     * is unavailable, falls back to the legacy chapter rules.
-     */
+    /** Normalize aliases/casing only. Never change a quantity's dimension. */
     public function resolveUomForHsCode(?string $hsCode, ?string $defaultUom, $company = null): string
     {
-        $normalizedDefault = $this->normalizeUom($defaultUom);
-        if (empty($hsCode)) return $normalizedDefault;
-
-        $validList = $company ? $this->getValidUomsForHsCode($hsCode, $company) : [];
-        if (!empty($validList)) {
-            $match = $this->matchValidUom($validList, $normalizedDefault);
-            if ($match !== null) return $match;
-
-            $preferred = $this->preferredUomForHsCode($hsCode);
-            if ($preferred !== null) {
-                $match = $this->matchValidUom($validList, $preferred);
-                if ($match !== null) return $match;
-            }
-
-            return (string) $validList[0];
-        }
-
-        // Reference list unavailable — legacy static fallbacks.
-        $clean = str_replace('.', '', $hsCode);
-        $chapter = intval(substr($clean, 0, 2));
-        $heading = substr(preg_replace('/[^0-9]/', '', $hsCode), 0, 4);
-
-        if ($chapter === 22) return "Liter";
-        if ($chapter === 27) return "Liter";
-        if ($chapter === 31) return "KG";
-        if ($heading === '2402') return "Thousand Unit"; // cigarettes: FBR 0099 on any count-based UoM
-
-        return $normalizedDefault;
+        $normalized = $this->normalizeUom($defaultUom);
+        if (empty($hsCode)) return $normalized;
+        $valid = $company ? $this->getValidUomsForHsCode($hsCode, $company) : [];
+        // Invalid units stay visible to the pre-submit guard. Picking KG/Liter/
+        // Thousand Unit here silently reinterpreted the unchanged quantity.
+        return $this->matchValidUom($valid, $normalized) ?? $normalized;
     }
 
     private function getUomByHsCode(?string $hsCode, ?string $defaultUom = 'U', $company = null): string
@@ -280,51 +253,22 @@ class FbrService
         $items = [];
         foreach ($invoice->items as $item) {
             $scheduleType = $item->schedule_type ?? 'standard';
-            $taxRate = floatval($item->tax_rate ?? 18);
-            $quantity = round(floatval($item->quantity), 4);
-            $unitPrice = floatval($item->price);
-            $valueSalesExcludingST = round($unitPrice * $quantity, 2);
-
             $rawSaleType = $item->sale_type ?: ScheduleEngine::mapSaleType($scheduleType);
-            $is3rdSchedule = (stripos($rawSaleType, '3rd Schedule') !== false);
-            $isExempt = (stripos($rawSaleType, 'Exempt') !== false || stripos($rawSaleType, 'exempt') !== false);
-            $isReduced = (stripos($rawSaleType, 'Reduced') !== false || stripos($rawSaleType, 'reduced') !== false);
-
+            $is3rdSchedule = stripos($rawSaleType, '3rd Schedule') !== false;
+            $isExempt = stripos($rawSaleType, 'exempt') !== false;
+            $isReduced = stripos($rawSaleType, 'reduced') !== false;
             $saleTypeNormalized = $this->normalizeSaleType($rawSaleType, $env);
-
-            if ($is3rdSchedule) {
-                $mrpPerUnit = floatval($item->mrp ?? 0);
-                if ($mrpPerUnit <= 0) {
-                    $mrpPerUnit = $unitPrice;
-                }
-                $retailPrice = round($mrpPerUnit * $quantity, 2);
-                $valueSalesExcludingST = $retailPrice;
-                $salesTaxApplicable = round($retailPrice * $taxRate / 100, 2);
-            } elseif ($isExempt) {
-                $retailPrice = round($unitPrice, 2);
-                $salesTaxApplicable = 0.00;
-            } elseif ($isReduced) {
-                $retailPrice = round($unitPrice, 2);
-                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
-            } else {
-                $retailPrice = round($unitPrice, 2);
-                $salesTaxApplicable = round(($valueSalesExcludingST * $taxRate) / 100, 2);
-            }
-
-            if ($isExempt) {
-                $salesTaxApplicable = 0.00;
-                $extraTaxVal = 0.00;
-            } elseif ($isReduced) {
-                $extraTaxVal = 0.00;
-            } else {
-                $extraTaxVal = round(floatval($item->extra_tax ?? 0) * $quantity, 2);
-            }
-
-            $furtherTax = round(floatval($item->further_tax ?? 0), 2);
-            $fedPayable = round(floatval($item->fed_payable ?? 0) * $quantity, 2);
-            $discount = round(floatval($item->discount ?? 0) * $quantity, 2);
-
-            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable + floatval($extraTaxVal) + $furtherTax + $fedPayable - $discount, 2);
+            $money = DiInvoiceMath::line($item);
+            $taxRate = $money['taxRate'];
+            $quantity = $money['quantity'];
+            $valueSalesExcludingST = $money['valueSalesExcludingST'];
+            $retailPrice = $money['retailPrice'];
+            $salesTaxApplicable = $money['salesTaxApplicable'];
+            $extraTaxVal = $money['extraTaxVal'];
+            $furtherTax = $money['furtherTax'];
+            $fedPayable = $money['fedPayable'];
+            $discount = $money['discount'];
+            $totalValues = $money['totalValues'];
 
             if ($isExempt) {
                 $rateValue = "Exempt";
@@ -351,7 +295,7 @@ class FbrService
                 "productDescription" => $item->description ?? "",
                 "salesTaxApplicable" => (float) round($salesTaxApplicable, 2),
                 "valueSalesExcludingST" => (float) round($valueSalesExcludingST, 2),
-                "salesTaxWithheldAtSource" => (float) round($item->st_withheld_at_source ? floatval($item->st_withheld_at_source) : 0.00, 2),
+                "salesTaxWithheldAtSource" => (float) round($item->st_withheld_at_source ? floatval($item->st_withheld_amount ?? 0) : 0, 2),
                 "fixedNotifiedValueOrRetailPrice" => (float) round($retailPrice, 2),
             ];
 
@@ -424,7 +368,9 @@ class FbrService
             "buyerBusinessName" => $this->sanitizeForFbr($invoice->buyer_name ?? 'CUSTOMER'),
             "sellerBusinessName" => $this->sanitizeForFbr($company->fbr_business_name ?: ($company->name ?? "")),
             "buyerRegistrationType" => $invoice->buyer_registration_type ?? $this->determineBuyerRegistrationType($invoice->buyer_ntn),
-            "buyerNTNCNIC" => $this->formatNtnCnic($invoice->buyer_ntn ?? ""),
+            "buyerNTNCNIC" => $this->formatNtnCnic(
+                trim((string) $invoice->buyer_ntn) !== '' ? $invoice->buyer_ntn : ($invoice->buyer_cnic ?? '')
+            ),
         ];
 
         if ($env === 'sandbox') {
@@ -671,7 +617,7 @@ class FbrService
                 }
 
                 if ($valueExclST > 0 && is_numeric($rate)) {
-                    $expectedTax = round(($valueExclST * floatval($rate)) / 100, 2);
+                    $expectedTax = round(($retailPrice * floatval($rate)) / 100, 2);
                     $actualTax = floatval($item['salesTaxApplicable'] ?? 0);
                     if (abs($expectedTax - $actualTax) > 0.02) {
                         $errors[] = ['code' => '0102', 'message' => "Item #{$sn}: Calculated tax ({$actualTax}) doesn't match expected ({$expectedTax}) for 3rd Schedule."];
@@ -694,7 +640,7 @@ class FbrService
                     if (!empty($validUoms) && $this->matchValidUom($validUoms, (string) $item['uoM']) === null) {
                         $errors[] = [
                             'code' => '0099',
-                            'message' => "Item #{$sn}: Unit of measurement '{$item['uoM']}' is not allowed by FBR for HS code {$item['hsCode']}. FBR only accepts: " . implode(', ', $validUoms) . ". Change the item's UoM to one of these and resubmit.",
+                            'message' => "Item #{$sn}: Unit of measurement '{$item['uoM']}' is not allowed by FBR for HS code {$item['hsCode']}. FBR only accepts: " . implode(', ', $validUoms) . ". Confirm the correct unit AND quantity conversion before resubmitting; units are never converted automatically.",
                         ];
                     }
                 } catch (\Throwable $e) {
@@ -756,6 +702,7 @@ class FbrService
             'pcs' => 'Pcs',
             'units' => 'Numbers, pieces, units',
             'unit' => 'Numbers, pieces, units',
+            'u' => 'Numbers, pieces, units',
             'nos' => 'Numbers, pieces, units',
             'numbers' => 'Numbers, pieces, units',
             'number' => 'Numbers, pieces, units',
@@ -1256,7 +1203,36 @@ class FbrService
             'validation_status' => $validation['status'] ?? null,
             'validation_status_code' => $validation['statusCode'] ?? null,
             'validation_error_code' => $validation['errorCode'] ?? null,
+            'errors' => $this->safeFbrDiagnostics($validation),
         ]);
+    }
+
+    /** Codes and safe next steps survive redaction; regulator text may contain PII. */
+    private function safeFbrDiagnostics(array $validation): array
+    {
+        $messages = [
+            '0001' => 'Check seller registration number.',
+            '0046' => 'Check item tax rate.',
+            '0077' => 'Check SRO or schedule for this rate.',
+            '0099' => 'Select the permitted unit for this HS code.',
+            '0102' => 'Check third-schedule retail price and calculated tax.',
+            '0300' => 'Remove or correct zero-value sale lines.',
+            '500' => 'Regulator outcome needs verification before retry.',
+        ];
+        $errors = [];
+        $rows = [$validation];
+        foreach (($validation['invoiceStatuses'] ?? []) as $row) {
+            if (is_array($row)) $rows[] = $row;
+        }
+        foreach ($rows as $row) {
+            if (empty($row['errorCode']) && empty($row['error']) && (($row['statusCode'] ?? '') !== '01' || !empty($row['invoiceStatuses']))) continue;
+            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', substr((string) ($row['errorCode'] ?? ''), 0, 20));
+            $item = isset($row['itemSNo']) && ctype_digit((string) $row['itemSNo']) ? 'Item ' . (int) $row['itemSNo'] . ': ' : '';
+            $errors[] = $item . ($code !== '' ? "[{$code}] " : '')
+                . ($messages[$code] ?? 'FBR rejected the supplied data. Review this error code and correct the invoice.');
+        }
+        if (!$errors && ($validation['statusCode'] ?? '') === '01') $errors[] = 'FBR rejected the supplied data. Review the invoice details.';
+        return array_values(array_unique($errors));
     }
 
     public function submitInvoice($invoice, int $retryCount = 0)
@@ -1306,7 +1282,7 @@ class FbrService
             $invoice->save();
         };
 
-        $payloadErrors = ScheduleEngine::validateFbrPayload($payload);
+        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
         if (!empty($payloadErrors)) {
             $clearHashOnFailure();
             $log = FbrLog::create([
@@ -1328,7 +1304,7 @@ class FbrService
             ];
         }
 
-        $preSubmissionErrors = $this->validatePayloadPreSubmission($payload, $company);
+        $preSubmissionErrors = array_merge($this->validatePayloadPreSubmission($payload, $company), $this->validateWithholdingAmounts($invoice));
         if (!empty($preSubmissionErrors)) {
             $clearHashOnFailure();
             $errorMessages = array_map(
@@ -1543,7 +1519,7 @@ class FbrService
                     $log->response_payload = json_encode([
                         'note' => 'FBR returned 200 OK with empty body - status unknown, needs manual verification',
                         'http_code' => $httpCode,
-                        'response_headers' => $responseHeaders ?? [],
+                        'response_header_count' => count($responseHeaders ?? []),
                         'server_ip' => $curlInfo['primary_ip'] ?? 'unknown',
                         'total_time_sec' => $curlInfo['total_time'] ?? null,
                     ]);
@@ -1586,7 +1562,7 @@ class FbrService
             // A 2xx JSON body that is neither an explicit validation rejection
             // nor an acknowledgement is not evidence of a rejection.  Treat it
             // like callback loss and preserve the submission fingerprint.
-            if (!isset($responseData['validationResponse']) && !isset($responseData['fault'])) {
+            if (!$this->isExplicitFbrRejection($responseData)) {
                 $log->status = 'pending_verification';
                 $log->failure_type = 'malformed_success_response';
                 $log->response_payload = json_encode([
@@ -1616,7 +1592,7 @@ class FbrService
                 $log->failure_type = 'ambiguous_response';
                 $log->response_payload = json_encode([
                     'note' => 'FBR returned error 500 "Something went wrong" - invoice may be accepted, needs manual verification',
-                    'original_response' => $responseData,
+                    'diagnostics' => json_decode($this->redactedResponseRecord($responseBody), true),
                 ]);
                 $log->save();
 
@@ -1672,7 +1648,7 @@ class FbrService
                 "response_time_ms" => $responseTimeMs,
             ];
         }
-        });
+        })();
     }
 
     private function parseFbrResponse(array $responseData): array
@@ -1756,6 +1732,21 @@ class FbrService
         ];
     }
 
+    /** A missing acknowledgement is not proof that the regulator rejected it. */
+    private function isExplicitFbrRejection(array $responseData): bool
+    {
+        $validation = $responseData['validationResponse'] ?? null;
+        if (!is_array($validation)) return false;
+        // Any reference can indicate partial acceptance. Reconcile, never replay.
+        if (!empty($responseData['invoiceNumber']) || !empty($responseData['InvoiceNumber'])) return false;
+        foreach (($validation['invoiceStatuses'] ?? []) as $item) {
+            if (!is_array($item) || !empty($item['invoiceNumber']) || !empty($item['invoiceNo'])) return false;
+        }
+        return ($validation['statusCode'] ?? null) === '01'
+            && strtolower((string) ($validation['status'] ?? '')) === 'invalid'
+            && (string) ($validation['errorCode'] ?? '') !== '500';
+    }
+
     private function extractErrorsFromResponse(string $body): array
     {
         $decoded = json_decode($body, true);
@@ -1782,13 +1773,26 @@ class FbrService
         return $errors ?: [$body];
     }
 
+    public function validateWithholdingAmounts($invoice): array
+    {
+        $errors = [];
+        foreach ($invoice->items as $index => $item) {
+            if ($item->st_withheld_at_source && (!is_numeric($item->st_withheld_amount) || $item->st_withheld_amount <= 0)) {
+                $errors[] = ['code' => 'WITHHOLDING_AMOUNT', 'message' => 'Item #' . ($index + 1) . ': Enter the actual sales-tax withholding amount. A checkbox is not an amount.'];
+            }
+        }
+        return $errors;
+    }
+
     public function validateOnly($invoice): array
     {
+        $withheldErrors = $this->validateWithholdingAmounts($invoice);
+        if ($withheldErrors) return ['status' => 'invalid', 'errors' => array_column($withheldErrors, 'message'), 'payload' => []];
         $payload = $this->buildPayload($invoice);
         $company = $invoice->company;
         $env = $company->fbr_environment ?? 'sandbox';
 
-        $payloadErrors = ScheduleEngine::validateFbrPayload($payload);
+        $payloadErrors = array_merge(ScheduleEngine::validateFbrPayload($payload), DiInvoiceMath::snapshotErrors($invoice, $payload));
         if (!empty($payloadErrors)) {
             return [
                 'status' => 'invalid',

@@ -176,6 +176,9 @@
                                     Fix Settings
                                 </a>
                                 @endif
+                                @if(auth('fbrpos')->user()?->role === 'company_admin' && \App\Services\FbrPosOwnerReconciliation::eligible($tx))
+                                    <a href="{{ route('fbrpos.reconcile', $tx->id) }}" class="inline-flex rounded border border-teal-400 px-2 py-1 text-teal-700" data-fbr-reconcile-link="{{ $tx->id }}">Reconcile evidence</a>
+                                @endif
                                 @if($tx->fbr_status !== 'verification_pending')
                                 <form method="POST" action="{{ route('fbrpos.failQueue.retryOne', $tx->id) }}" class="inline">
                                     @csrf

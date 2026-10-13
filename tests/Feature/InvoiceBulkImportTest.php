@@ -308,6 +308,10 @@ class InvoiceBulkImportTest extends TestCase
             'defaults' => $defaults, 'save_preset_name' => 'Approved'])->assertOk();
         $this->assertSame(2, \App\Models\InvoiceImportMappingVersion::count());
         $this->assertSame(0, Invoice::count());
+        $preset->refresh()->update(['defaults_json' => json_encode($defaults + ['buyer_ntn' => '1234567'])]);
+        $this->mappingUpload("Outlet,Qty,Item,HS,Rate,GST,New Fee\nAlpha,2,Beef,02023000,100,36,5\n")
+            ->assertOk()->assertJsonPath('recommended_preset_id', null)->assertJsonPath('presets.0.matches', false);
+        $this->assertSame(2, \App\Models\InvoiceImportMappingVersion::count(), 'Unversioned edits never inherit or rewrite an approval');
     }
 
     public function test_flag_off_preset_save_does_not_create_approval_history(): void

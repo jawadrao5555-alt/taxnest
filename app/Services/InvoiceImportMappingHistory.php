@@ -43,7 +43,20 @@ final class InvoiceImportMappingHistory
         $version = $this->current($mapping);
 
         // Preserve old presets; never invent approval metadata for them.
-        return ! $version || ! $version->approved_at ||
+        if (! $version || ! $version->approved_at) {
+            return true;
+        }
+        $approvedMapping = $version->snapshot['mapping'] ?? [];
+        $approvedDefaults = $version->snapshot['defaults'] ?? [];
+        $currentMapping = $mapping->mappingArray();
+        $currentDefaults = $mapping->defaultsArray();
+        ksort($approvedMapping);
+        ksort($approvedDefaults);
+        ksort($currentMapping);
+        ksort($currentDefaults);
+
+        // A flag-off edit must not inherit an older version's approval.
+        return $approvedMapping === $currentMapping && $approvedDefaults === $currentDefaults &&
             ($version->snapshot['header_fingerprint'] ?? null) === $this->fingerprint($headers, $extension);
     }
 

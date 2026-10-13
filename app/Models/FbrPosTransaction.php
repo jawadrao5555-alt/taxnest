@@ -55,6 +55,12 @@ class FbrPosTransaction extends Model
 
     protected static function booted()
     {
+        static::creating(function (self $t) {
+            if (\Schema::hasColumn('fbr_pos_transactions', 'fbr_receipt_profile_snapshot') && $t->company_id && $t->invoice_mode !== 'local') {
+                $company = \App\Models\Company::find($t->company_id);
+                if ($company) $t->fbr_receipt_profile_snapshot = $company->only(['name','address','ntn','fbr_sales_tax_registration_number','fbr_tax_office']);
+            }
+        });
         // Business-day stamp (Task 492 — FBR mirror of the PRA rule): set ONCE
         // at creation on EVERY create path (sale, provisional, offline sync).
         // 00:00–05:59 bills belong to the previous day's business while that
@@ -78,6 +84,7 @@ class FbrPosTransaction extends Model
     }
 
     protected $casts = [
+        'fbr_receipt_profile_snapshot' => 'array',
         'subtotal' => 'decimal:2',
         'discount_value' => 'decimal:2',
         'discount_amount' => 'decimal:2',

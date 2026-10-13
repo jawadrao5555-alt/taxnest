@@ -273,6 +273,14 @@ async function surface(page,t,path,v) {
       else pass(`${t.name}/${v.width}: inventory tabs form one reachable scrolling row`);
     }
   }
+  if(t.fiscalReceipt) {
+    for(const selector of ['[data-fbr-fiscal-receipt] img[alt="FBR digital invoicing system"]','img[alt="FBR QR Code"]']) {
+      const image=page.locator(selector);if(!await image.count() || !await image.evaluate(el=>el.complete&&el.naturalWidth>0)) fail(`${t.name}/${v.width}: fiscal image did not load: ${selector}`);
+    }
+    await page.emulateMedia({media:'print'});
+    if(!await page.locator('[data-fbr-required-profile]').isVisible()) fail(`${t.name}/${v.width}: required fiscal profile hidden on print`);
+    await page.emulateMedia({media:'screen'});
+  }
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
   if (t.denied) { if ([302,403].includes(status)||new URL(page.url()).pathname!==path) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);

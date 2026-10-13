@@ -178,6 +178,9 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.fbr_pos_registration_id') }} <span class="text-red-500">*</span></label>
+                        <label class="block mt-3">Sales Tax Registration Number (STRN)<input class="block w-full rounded text-black" name="fbr_sales_tax_registration_number" maxlength="30" value="{{ $company->fbr_sales_tax_registration_number }}"></label>
+                        <label class="block mt-3">Registered tax office / formation<input class="block w-full rounded text-black" name="fbr_tax_office" maxlength="150" value="{{ $company->fbr_tax_office }}"></label>
+                        <p class="text-xs mt-2">Use the actual STRN; NTN / CNIC / business registration are separate identifiers. Fiscal receipt details remain visible even when display preferences are off.</p>
                         <input type="text" name="fbr_pos_id" value="{{ $company->fbr_pos_id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ __('pos.ph_eg_196339') }}">
                         <p class="text-xs text-gray-400 mt-1">{{ __('pos.fbr_pos_registration_id_hint') }}</p>
                     </div>

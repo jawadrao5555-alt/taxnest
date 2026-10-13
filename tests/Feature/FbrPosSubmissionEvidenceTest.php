@@ -114,6 +114,50 @@ class FbrPosSubmissionEvidenceTest extends TestCase
         $this->assertNull($bill->fbr_invoice_number);
     }
 
+    public function test_stale_instances_cannot_dispatch_the_same_bill_twice_and_expiry_never_retries(): void
+    {
+        (require database_path('migrations/2026_10_12_100002_fbr_pos_agent_claim_timestamp.php'))->up();
+        $bill = $this->bill();
+        $otherReader = $bill->fresh();
+        $claim = \App\Services\FbrPosAgentClaim::acquire($bill);
+        $this->assertNotNull($claim);
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($otherReader));
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($otherReader));
+        $this->assertSame($claim, $bill->fresh()->fbr_submission_hash);
+        $this->travel(4)->minutes();
+        \App\Services\FbrPosAgentClaim::quarantineExpired($this->companyId);
+        $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill->fresh()));
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill->fresh()));
+    }
+
+    public function test_claim_scope_excludes_provisionals_submitted_and_other_tenant_expiry(): void
+    {
+        (require database_path('migrations/2026_10_12_100002_fbr_pos_agent_claim_timestamp.php'))->up();
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($this->bill(['invoice_mode' => 'local'])));
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($this->bill(['fbr_invoice_number' => '900000000099'])));
+        $bill = $this->bill(['company_id' => 92]);
+        \App\Services\FbrPosAgentClaim::acquire($bill);
+        $this->travel(4)->minutes();
+        \App\Services\FbrPosAgentClaim::quarantineExpired($this->companyId);
+        $this->assertSame('pending', $bill->fresh()->fbr_status);
+    }
+
+    public function test_claim_callbacks_preserve_legacy_support_and_refuse_wrong_claim(): void
+    {
+        $bill = $this->bill();
+        \App\Services\FbrPosAgentClaim::acquire($bill);
+        $wrong = $this->submit($bill, ['success' => true, 'submission_claim' => str_repeat('0', 64),
+            'pra_invoice_number' => '900000000001', 'response' => ['Code' => 100, 'InvoiceNumber' => '900000000001']]);
+        $this->assertSame('stale_submission_claim', $wrong['error']);
+        $this->assertNull($bill->fresh()->fbr_invoice_number);
+        // An older supported agent omits the additive claim token. It can
+        // still acknowledge the one bill the server exclusively dispatched.
+        $this->submit($bill, ['success' => true, 'pra_invoice_number' => '900000000001',
+            'response' => ['Code' => 100, 'InvoiceNumber' => '900000000001']]);
+        $this->assertSame('submitted', $bill->fresh()->fbr_status);
+    }
+
     public function test_safe_dispatch_telemetry_has_no_full_posid_payload_or_local_url(): void
     {
         $bill = $this->bill();

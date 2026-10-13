@@ -853,9 +853,11 @@ class AgentController extends Controller
      */
     private function fbrPendingInvoices(Company $company, Request $request)
     {
+        \App\Services\FbrPosAgentClaim::quarantineExpired((int) $company->id);
         $pending = FbrPosTransaction::where('company_id', $company->id)
             ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
             ->whereNull('fbr_invoice_number')
+            ->whereNull('fbr_submission_hash')
             ->where(function ($q) {
                 // Never hand the agent a deliberate 'local' provisional bill.
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
@@ -871,6 +873,8 @@ class AgentController extends Controller
             try {
                 $txn->loadMissing(['items', 'company']);
                 $payload = $fbrService->buildFbrPosPayload($txn);
+                $claim = \App\Services\FbrPosAgentClaim::acquire($txn);
+                if ($claim === null) continue;
                 app(FbrPosSubmissionEvidenceService::class)->recordDispatch(
                     $company,
                     $txn,
@@ -880,6 +884,7 @@ class AgentController extends Controller
                     'transaction_id' => $txn->id,
                     'invoice_number' => $txn->invoice_number,
                     'payload' => $payload,
+                    'submission_claim' => $claim,
                     'created_at' => $txn->created_at?->toIso8601String(),
                 ];
             } catch (\Throwable $e) {
@@ -925,6 +930,7 @@ class AgentController extends Controller
             // Agent >= Jul 2026: true when the failure was transport-level (IMS service
             // down / no internet / timeout) — the bill stays QUEUED, never 'failed'.
             'offline' => 'nullable|boolean',
+            'submission_claim' => 'nullable|string|size:64',
             // Additive Agent telemetry. Older agents omit it and remain valid.
             'agent_version' => 'nullable|string|max:40',
             // Additive fiscal-device evidence. These fields are diagnostic only
@@ -1197,6 +1203,14 @@ class AgentController extends Controller
                 'already_submitted' => true,
                 'pra_invoice_number' => $storedNumber,
             ]);
+        }
+
+        $reportedClaim = $request->input('submission_claim');
+        if ($reportedClaim !== null && !hash_equals((string) ($txn->fbr_submission_hash ?? ''), (string) $reportedClaim)) {
+            return response()->json(['error' => 'stale_submission_claim'], 409);
+        }
+        if ($txn->fbr_status === 'verification_pending' && !$treatAsSuccess) {
+            return response()->json(['ok' => true, 'verification_pending' => true]);
         }
 
         if ($treatAsSuccess) {

@@ -3562,6 +3562,10 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $transaction = FbrPosTransaction::where('company_id', $companyId)->findOrFail($id);
 
+        if (\App\Services\FbrPosAgentClaim::active($transaction)) {
+            return redirect()->route('fbrpos.show', $id)->with('error', __('pos.fbr_verification_pending_no_retry'));
+        }
+
         if ($transaction->fbr_status === 'submitted') {
             return redirect()->route('fbrpos.show', $id)->with('error', __('pos.already_submitted_fbr'));
         }
@@ -3578,8 +3582,9 @@ class FbrPosController extends Controller
             return redirect()->route('fbrpos.show', $id)->with('error', __('pos.local_cannot_submit_fbr'));
         }
 
-        $transaction->fbr_submission_hash = null;
-        $transaction->save();
+        if (!\App\Services\FbrPosAgentClaim::prepareRetry($transaction)) {
+            return redirect()->route('fbrpos.show', $id)->with('error', __('pos.fbr_verification_pending_no_retry'));
+        }
 
         $transaction->load(['items', 'company']);
         $fbrService = new FbrService();
@@ -3747,6 +3752,14 @@ class FbrPosController extends Controller
         $submittedById = collect($request->items)->keyBy(fn($r) => (int) $r['id']);
 
         DB::transaction(function () use ($transaction, $submittedById) {
+            $current = FbrPosTransaction::where('company_id', $transaction->company_id)
+                ->lockForUpdate()->findOrFail($transaction->id);
+            if ($current->fbr_status !== 'failed' || $current->fbr_invoice_number
+                || \App\Services\FbrPosAgentClaim::active($current)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => __('pos.edit_retry_failed_only_short'),
+                ]);
+            }
             foreach ($transaction->items as $item) {
                 $row = $submittedById[$item->id]; // guaranteed present by integrity check above
                 $price = (float) $row['unit_price'];
@@ -3931,8 +3944,7 @@ class FbrPosController extends Controller
 
         $count = 0;
         foreach ($failed as $tx) {
-            $tx->fbr_submission_hash = null;
-            $tx->save();
+            if (!\App\Services\FbrPosAgentClaim::prepareRetry($tx)) continue;
             \App\Jobs\RetryFbrPosSubmissionJob::dispatch($tx->id)->delay(now()->addSeconds(10));
             $count++;
         }
@@ -3965,9 +3977,9 @@ class FbrPosController extends Controller
         // the admin has fixed the FBR Settings (POSID / token). Reset to 'pending' so
         // the job can attempt submission; if config is still broken it will re-land as
         // 'config_error' (not 'failed') and stay out of the auto-retry pool.
-        $tx->fbr_submission_hash = null;
-        $tx->fbr_status = 'pending';
-        $tx->save();
+        if (!\App\Services\FbrPosAgentClaim::prepareRetry($tx)) {
+            return back()->with('error', __('pos.fbr_verification_pending_no_retry'));
+        }
         \App\Jobs\RetryFbrPosSubmissionJob::dispatch($tx->id)->delay(now()->addSeconds(5));
 
         return back()->with('success', __('pos.autoretry_scheduled_one', ['number' => $tx->invoice_number]));
@@ -10287,6 +10299,7 @@ class FbrPosController extends Controller
         $claimQuery = FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)
             ->whereNull('fbr_invoice_number')
+            ->whereNull('fbr_submission_hash')
             ->whereIn('fbr_status', ['failed', 'offline', 'pending', 'config_error'])
             ->where(function ($q) {
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');

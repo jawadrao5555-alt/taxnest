@@ -44,6 +44,8 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
             return;
         }
 
+        if (\App\Services\FbrPosAgentClaim::active($transaction) || $transaction->fbr_status === 'verification_pending') return;
+
         if ($transaction->fbr_status === 'submitted' || !empty($transaction->fbr_invoice_number)) {
             Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} already submitted, skip");
             return;
@@ -71,8 +73,7 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
                 ->update(['fbr_auto_retry_count' => 0]);
         }
 
-        $transaction->fbr_submission_hash = null;
-        $transaction->save();
+        if (!\App\Services\FbrPosAgentClaim::prepareRetry($transaction)) return;
 
         Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} attempt {$attempt}/{$this->tries}");
 

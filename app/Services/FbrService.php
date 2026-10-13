@@ -2318,6 +2318,9 @@ class FbrService
 
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
+        if (\App\Services\FbrPosAgentClaim::active($transaction) || $transaction->fbr_status === 'verification_pending') {
+            return ['status' => 'blocked', 'errors' => ['An FBR POS agent already owns this dispatch; reconcile before retrying.']];
+        }
         $company = $transaction->company;
         $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         // Keep code backward-compatible during rolling deploys where the new

@@ -1030,7 +1030,7 @@ async function workflow(page,t,v,diagnostics) {
       const form=page.locator('[data-fbr-owner-reconcile] form');
       await form.locator('[name=decision]').selectOption(decision);
       await form.locator('[name=evidence_source]').selectOption('ims_log');
-      await form.locator('[name=environment]').selectOption('production');
+      // Retain the requested environment shown by the actual company fixture; never guess production.
       await form.locator('[name=evidence_reference]').fill('Fictional checked IMS log '+v.width);
       const number='90000000'+v.width;
       if(decision==='accepted') await form.locator('[name=fiscal_number]').fill(number);

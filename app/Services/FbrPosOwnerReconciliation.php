@@ -44,7 +44,7 @@ final class FbrPosOwnerReconciliation
             'fiscal_number' => ['nullable', 'string', 'regex:/^(?=.*[0-9])[A-Za-z0-9\-]{6,100}$/D'],
             'confirmed' => 'accepted',
         ])->validate();
-        $requested = Company::findOrFail($companyId)->fbr_pos_environment === 'sandbox' ? 'sandbox' : 'production';
+        $requested = strtolower((string) Company::findOrFail($companyId)->fbr_pos_environment) === 'production' ? 'production' : 'sandbox';
         if ($data['environment'] !== $requested) {
             throw ValidationException::withMessages(['environment' => 'Checked IMS environment differs from the company environment. Resolve the configuration mismatch before release.']);
         }

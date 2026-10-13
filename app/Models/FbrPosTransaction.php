@@ -55,9 +55,15 @@ class FbrPosTransaction extends Model
 
     protected static function booted()
     {
-        static::created(function (self $t) {
-            if ($t->invoice_mode !== 'local' && app(\App\Services\FbrPosIdentity::class)->ready()) {
-                app(\App\Services\FbrPosIdentity::class)->capture($t);
+        static::creating(function (self $t) {
+            $service = app(\App\Services\FbrPosIdentity::class);
+            if ($t->invoice_mode !== 'local' && !$t->fbr_invoice_number && $service->ready()) {
+                $identity = $service->resolve($t);
+                if ($identity['pos_id'] !== '') {
+                    $t->fbr_pos_id_snapshot = $identity['pos_id'];
+                    $t->fbr_device_uid_snapshot = $identity['device_uid'];
+                    $t->fbr_identity_captured_at = now();
+                }
             }
         });
         // Business-day stamp (Task 492 — FBR mirror of the PRA rule): set ONCE

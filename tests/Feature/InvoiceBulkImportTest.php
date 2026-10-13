@@ -237,9 +237,12 @@ class InvoiceBulkImportTest extends TestCase
             $files = glob(database_path('migrations/*' . $name . '_table.php'));
             (require $files[0])->up();
         }
+        (require database_path('migrations/2026_10_13_000001_create_invoice_import_mapping_versions.php'))->up();
         app()->instance('currentCompanyId', $this->company->id);
         \Illuminate\Support\Facades\Route::post('/_test/import-upload', [\App\Http\Controllers\InvoiceImportController::class, 'upload']);
         \Illuminate\Support\Facades\Route::post('/_test/import-map', [\App\Http\Controllers\InvoiceImportController::class, 'applyMapping']);
+        \Illuminate\Support\Facades\Route::get('/_test/import-history/{id}', [\App\Http\Controllers\InvoiceImportController::class, 'mappingHistory']);
+        \Illuminate\Support\Facades\Route::delete('/_test/import-preset/{id}', [\App\Http\Controllers\InvoiceImportController::class, 'deleteMapping']);
     }
 
     private function mappingPreset(int $companyId, string $name, array $mapping): \App\Models\InvoiceImportMapping
@@ -256,6 +259,78 @@ class InvoiceBulkImportTest extends TestCase
         return $this->post('/_test/import-upload', [
             'import_file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('local-test.csv', $csv),
         ], ['Accept' => 'application/json']);
+    }
+
+    public function test_explicit_smart_preset_save_retains_prior_rules_and_approved_versions(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $preset = $this->mappingPreset($this->company->id, 'Daily', ['quantity' => 'Old quantity']);
+        $mapping = ['buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'GST'];
+        foreach (['Punjab', 'Sindh'] as $province) {
+            $upload = $this->mappingUpload()->assertOk();
+            $this->postJson('/_test/import-map', [
+                'mapping_token' => $upload->json('mapping_token'), 'mapping' => $mapping,
+                'defaults' => ['buyer_address' => 'Local', 'destination_province' => $province, 'document_type' => 'Sale Invoice'],
+                'save_preset_name' => 'Daily',
+            ])->assertOk()->assertJsonPath('preset_saved', 'Daily');
+        }
+        $history = $this->getJson('/_test/import-history/' . $preset->id)->assertOk()->assertJsonCount(3, 'versions');
+        $history->assertJsonPath('versions.0.version', 3)->assertJsonPath('versions.0.snapshot.defaults.destination_province', 'Sindh')
+            ->assertJsonPath('versions.1.snapshot.defaults.destination_province', 'Punjab')
+            ->assertJsonPath('versions.2.snapshot.mapping.quantity', 'Old quantity')
+            ->assertJsonPath('versions.2.approved_at', null);
+        $this->assertNotNull($history->json('versions.0.approved_at'));
+        $this->assertSame('Sindh', $preset->fresh()->defaultsArray()['destination_province']);
+        $this->assertSame(0, Invoice::count(), 'Approving a format never submits or creates invoices');
+        $this->deleteJson('/_test/import-preset/' . $preset->id)->assertOk();
+        $this->getJson('/_test/import-history/' . $preset->id)->assertOk()->assertJsonCount(3, 'versions');
+        app()->instance('currentCompanyId', $this->company->id + 1);
+        $this->getJson('/_test/import-history/' . $preset->id)->assertNotFound();
+    }
+
+    public function test_changed_approved_header_set_requires_review_and_keeps_hold_for_correction(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $mapping = ['buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item', 'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'GST'];
+        $defaults = ['buyer_address' => 'Local', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice'];
+        $upload = $this->mappingUpload()->assertOk();
+        $this->postJson('/_test/import-map', ['mapping_token' => $upload->json('mapping_token'),
+            'mapping' => $mapping, 'defaults' => $defaults, 'save_preset_name' => 'Approved'])->assertOk();
+        $preset = \App\Models\InvoiceImportMapping::firstOrFail();
+        $this->mappingUpload("GST,Rate,HS,Item,Qty,Outlet\n36,100,02023000,Beef,2,Alpha\n")->assertOk()->assertJsonPath('recommended_preset_id', $preset->id);
+        $changed = $this->mappingUpload("Outlet,Qty,Item,HS,Rate,GST,New Fee\nAlpha,2,Beef,02023000,100,36,5\n")
+            ->assertOk()->assertJsonPath('recommended_preset_id', null)->assertJsonPath('presets.0.matches', false);
+        $this->postJson('/_test/import-map', ['mapping_token' => $changed->json('mapping_token'), 'preset_id' => $preset->id])->assertStatus(422);
+        $this->postJson('/_test/import-map', ['mapping_token' => $changed->json('mapping_token'), 'mapping' => $mapping,
+            'defaults' => $defaults, 'save_preset_name' => 'Approved'])->assertOk();
+        $this->assertSame(2, \App\Models\InvoiceImportMappingVersion::count());
+        $this->assertSame(0, Invoice::count());
+    }
+
+    public function test_flag_off_preset_save_does_not_create_approval_history(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => false]);
+        $upload = $this->mappingUpload()->assertOk();
+        $this->postJson('/_test/import-map', [
+            'mapping_token' => $upload->json('mapping_token'),
+            'mapping' => ['buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item', 'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'GST'],
+            'defaults' => ['buyer_address' => 'Local', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice'],
+            'save_preset_name' => 'Legacy',
+        ])->assertOk()->assertJsonPath('preset_saved', 'Legacy');
+        $this->assertSame(0, \App\Models\InvoiceImportMappingVersion::count());
+    }
+
+    public function test_format_fingerprint_handles_reordering_but_detects_new_columns_and_file_type(): void
+    {
+        $history = new \App\Services\InvoiceImportMappingHistory();
+        $first = $history->fingerprint(['Qty', 'Outlet Name'], 'csv');
+        $this->assertSame($first, $history->fingerprint(['outlet-name', 'Qty'], 'csv'));
+        $this->assertNotSame($first, $history->fingerprint(['Qty', 'Outlet Name', 'VAT'], 'csv'));
+        $this->assertNotSame($first, $history->fingerprint(['Qty', 'Outlet Name'], 'xlsx'));
     }
 
     public function test_smart_mapping_recommends_only_current_company_and_preserves_defaults(): void

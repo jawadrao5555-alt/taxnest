@@ -7,12 +7,15 @@ use App\Jobs\ProcessInvoiceImportBatchJob;
 use App\Models\Company;
 use App\Models\InvoiceImportBatch;
 use App\Models\InvoiceImportMapping;
+use App\Models\InvoiceImportMappingVersion;
 use App\Services\AiImportAssistService;
 use App\Services\AiInvoiceReaderService;
 use App\Services\DiFeatureService;
 use App\Services\InvoiceImportService;
 use App\Services\InvoiceImportFormatMatcher;
+use App\Services\InvoiceImportMappingHistory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -142,6 +145,9 @@ class InvoiceImportController extends Controller
             if (!$preset) {
                 return response()->json(['error' => 'Preset not found.'], 404);
             }
+            if (config('features.enable_smart_di_import_mapping') && !(new InvoiceImportMappingHistory())->accepts($preset, $meta['headers'] ?? [], $extension)) {
+                return response()->json(['error' => 'This file differs from the approved format. Review the mapping and explicitly save a new format version.'], 422);
+            }
             $mapping = $preset->mappingArray();
             $defaults = $preset->defaultsArray();
             $presetName = ''; // applying an existing preset never re-saves it
@@ -162,7 +168,7 @@ class InvoiceImportController extends Controller
 
         if ($system) {
             $payload = $this->buildSmartBatch($company, $meta['original_filename'], $extension, $parsed['rows'], $system, (new \App\Services\InvoiceImportSourceIdentity())->fileFingerprint($dataPath));
-            $payload['preset_saved'] = $presetName !== '' ? $this->savePreset($company, $presetName, $mapping, $defaults) : null;
+            $payload['preset_saved'] = $presetName !== '' ? $this->savePreset($company, $presetName, $mapping, $defaults, $meta['headers'] ?? [], $extension) : null;
             @unlink($dataPath);
             @unlink($metaPath);
             return response()->json($payload);
@@ -171,7 +177,7 @@ class InvoiceImportController extends Controller
 
         $presetSaved = null;
         if ($presetName !== '') {
-            $presetSaved = $this->savePreset($company, $presetName, $mapping, $defaults);
+            $presetSaved = $this->savePreset($company, $presetName, $mapping, $defaults, $meta['headers'] ?? [], $extension);
         }
 
         $payload = $this->buildBatchPayload(
@@ -717,14 +723,14 @@ class InvoiceImportController extends Controller
         $formatMatch = $smartMapping
             ? (new InvoiceImportFormatMatcher())->match(
                 $headers,
-                $companyPresets->map(fn ($p) => [
+                $companyPresets->filter(fn ($p) => (new InvoiceImportMappingHistory())->accepts($p, $headers, $extension))->map(fn ($p) => [
                     'id' => (int) $p->id,
                     'mapping' => $p->mappingArray(),
                 ])->all()
             )
             : ['preset_id' => null, 'reason' => 'disabled'];
         $presets = $companyPresets
-            ->map(function ($p) use ($headerKeys, $headers, $smartMapping) {
+            ->map(function ($p) use ($headerKeys, $headers, $smartMapping, $extension) {
                 $mapping = $p->mappingArray();
                 $missing = [];
                 foreach ($mapping as $field => $source) {
@@ -732,7 +738,7 @@ class InvoiceImportController extends Controller
                         $missing[] = (string) $source;
                     }
                 }
-                $unambiguous = (new InvoiceImportFormatMatcher())->match($headers, [[
+                $unambiguous = (!$smartMapping || (new InvoiceImportMappingHistory())->accepts($p, $headers, $extension)) && (new InvoiceImportFormatMatcher())->match($headers, [[
                     'id' => (int) $p->id, 'mapping' => $mapping,
                 ]])['preset_id'] !== null;
                 return [
@@ -763,30 +769,45 @@ class InvoiceImportController extends Controller
     }
 
     /** Save/update a named preset. Returns the saved name, or null when the cap blocked a new one. */
-    private function savePreset(Company $company, string $name, array $mapping, array $defaults): ?string
+    private function savePreset(Company $company, string $name, array $mapping, array $defaults, array $headers, string $extension): ?string
     {
-        $mappingJson = json_encode(array_filter($mapping, fn ($v) => trim((string) $v) !== ''));
-        $defaultsJson = json_encode(array_filter($defaults, fn ($v) => trim((string) $v) !== ''));
-
-        $existing = InvoiceImportMapping::where('company_id', $company->id)->where('name', $name)->first();
-        if ($existing) {
-            $existing->update(['mapping_json' => $mappingJson, 'defaults_json' => $defaultsJson, 'user_id' => auth()->id()]);
+        return DB::transaction(function () use ($company, $name, $mapping, $defaults, $headers, $extension) {
+            Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $existing = InvoiceImportMapping::where('company_id', $company->id)->where('name', $name)->first();
+            $historyEnabled = (bool) config('features.enable_smart_di_import_mapping', false);
+            $history = new InvoiceImportMappingHistory();
+            if ($existing && $historyEnabled && !InvoiceImportMappingVersion::where('company_id', $company->id)->where('mapping_id', $existing->id)->exists()) {
+                $history->append($existing, [], '', false);
+            }
+            if (!$existing && InvoiceImportMapping::where('company_id', $company->id)->count() >= self::MAX_PRESETS) {
+                return null;
+            }
+            $values = [
+                'mapping_json' => json_encode(array_filter($mapping, fn ($v) => trim((string) $v) !== '')),
+                'defaults_json' => json_encode(array_filter($defaults, fn ($v) => trim((string) $v) !== '')),
+                'user_id' => auth()->id(),
+            ];
+            if ($existing) {
+                $existing->update($values);
+            } else {
+                $existing = InvoiceImportMapping::create($values + ['company_id' => $company->id, 'name' => $name]);
+            }
+            if ($historyEnabled) {
+                $history->append($existing, $headers, $extension, true);
+            }
             return $name;
+        });
+    }
+
+    public function mappingHistory(int $id)
+    {
+        // History remains readable after deletion, but never across tenants.
+        $versions = InvoiceImportMappingVersion::where('company_id', app('currentCompanyId'))
+            ->where('mapping_id', $id)->orderByDesc('version')->paginate(20);
+        if ($versions->isEmpty()) {
+            return response()->json(['error' => 'No format history found.'], 404);
         }
-
-        if (InvoiceImportMapping::where('company_id', $company->id)->count() >= self::MAX_PRESETS) {
-            return null; // import still proceeds; UI reports the cap
-        }
-
-        InvoiceImportMapping::create([
-            'company_id' => $company->id,
-            'user_id' => auth()->id(),
-            'name' => $name,
-            'mapping_json' => $mappingJson,
-            'defaults_json' => $defaultsJson,
-        ]);
-
-        return $name;
+        return response()->json(['versions' => $versions->items(), 'next_page_url' => $versions->nextPageUrl()]);
     }
 
     private function holdDir(int $companyId): string

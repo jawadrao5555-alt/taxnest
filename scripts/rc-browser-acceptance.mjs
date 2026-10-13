@@ -976,7 +976,9 @@ async function smartImportWorkflow(page,t,v) {
   await importer.locator('button').first().click();
   await importer.locator('input[x-model="smartSourceSystem"]').fill('rc-smart-'+v.width+'-'+Date.now());
   const values={buyer_name:'Unverified source label',buyer_ntn:'',buyer_cnic:'',buyer_address:'Source address',destination_province:'Punjab',document_type:'Sale Invoice',hs_code:'',description:'Synthetic beverage',quantity:'2',price:'',tax:'',schedule_type:'',tax_rate:'',source_invoice_number:'TEST-UI-'+v.width,invoice_date:'2026-01-01',source_sku:'TEST-SKU',source_outlet:'TEST-OUTLET',source_gross:'1300',source_discount:'100',source_vat:'216',source_net:'1416',invoice_gross:'1300',invoice_discount:'100',invoice_vat:'216',invoice_net:'1416'};
-  const csv=Object.keys(values).join(',')+'\n'+Object.values(values).join(',')+'\n';
+  const deposit={...values,source_sku:'TEST-EMPTY',description:'COKE 250 ML IMPLIED EMP 24B RGB',quantity:'2',source_gross:'100',source_discount:'0',source_vat:'0',source_net:'100'};
+  const returned={...deposit,quantity:'-2',source_gross:'-100',source_net:'-100'};
+  const csv=Object.keys(values).join(',')+'\n'+[values,deposit,returned].map(row=>Object.values(row).join(',')).join('\n')+'\n';
   await importer.locator('input[type=file]').setInputFiles({name:'synthetic-smart-'+v.width+'.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await page.waitForURL(u=>u.pathname.endsWith('/source-review'),{timeout:30000});
   const reviewPath=new URL(page.url()).pathname;
@@ -999,6 +1001,8 @@ async function smartImportWorkflow(page,t,v) {
   }
   await mapping('sku',{description:'Verified synthetic beverage',hs_code:'22021010',litres_per_case:'6',uom:'Liter',schedule_type:'standard',tax_rate:'18'});
   await mapping('buyer',{buyer_name:'Verified synthetic buyer',buyer_address:'Fictional verified address',destination_province:'Punjab',registration_type:'Unregistered'});
+  await page.locator('input[name="exclusions[3]"]').fill('Verified synthetic empty-bottle deposit charge');
+  await page.locator('input[name="exclusions[4]"]').fill('Verified synthetic empty-bottle deposit return');
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Refresh review with current mappings and exclusions'}).click()]);
   await dismiss(page);
   if((await page.locator('body').innerText()).includes('Unknown SKU'))throw new Error('Verified SKU did not resolve source review: '+(await page.locator('body').innerText()).slice(-6000));

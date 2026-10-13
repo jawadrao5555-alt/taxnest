@@ -116,6 +116,7 @@ final class McpController extends Controller
             'date_from' => ['type' => 'string', 'format' => 'date', 'description' => 'YYYY-MM-DD; defaults to today in Asia/Karachi.'],
             'date_to' => ['type' => 'string', 'format' => 'date'], 'date_basis' => ['type' => 'string', 'enum' => ['calendar', 'business']]];
 
+        $operationsPeriod = $period + ['company_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional scoped ID to disambiguate duplicate exact names.']];
         $period += ['company_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional ID from find_companies to disambiguate duplicate names; company_name must match the exact name.'], 'branch_id' => ['type' => 'integer', 'minimum' => 1], 'terminal_id' => ['type' => 'integer', 'minimum' => 1], 'payment_method' => ['type' => 'string']];
         $cursor = ['after_id' => ['type' => 'integer', 'minimum' => 0], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]];
         $defs = [
@@ -125,7 +126,7 @@ final class McpController extends Controller
             ['get_bill_details', 'One company-scoped bill and paginated items; no buyer personal data.', $period + ['bill_id' => ['type' => 'integer', 'minimum' => 1], 'after_item_id' => ['type' => 'integer', 'minimum' => 0]], ['company_name', 'bill_id']],
             ['get_company_tax_items', 'Paginated completed/locked invoice item evidence; exempt, taxable, zero-rate and unknown kept separate.', $period + $cursor + ['classification' => ['type' => 'string', 'enum' => ['exempt', 'taxable', 'zero_rate', 'unknown', 'any']]], ['company_name']],
             ['get_company_payment_summary', 'Stored payment and refund evidence. Hotel settlements are distinct from invoice values; unavailable evidence is null.', $period, ['company_name']],
-            ['get_company_operational_summary', 'Safe stock counts, print-job state counts and agent heartbeat timestamps. No print/retry/remediation actions.', $period, ['company_name']],
+            ['get_company_operational_summary', 'Company-wide safe stock counts, print-job states and agent heartbeats. No branch/counter/payment filters and no print/retry/remediation actions.', $operationsPeriod, ['company_name']],
         ];
 
         return array_map(fn ($d) => ['name' => $d[0], 'description' => $d[1], 'inputSchema' => ['type' => 'object', 'properties' => $d[2], 'required' => $d[3], 'additionalProperties' => false],

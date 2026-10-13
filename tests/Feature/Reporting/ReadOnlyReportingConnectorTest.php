@@ -354,4 +354,30 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period() + ['company_id' => 2])->assertJsonPath('result.structuredContent.company.id', 2)->assertJsonPath('result.structuredContent.totals.net_billing', 99999);
         $this->toolCall($t['access_token'], 'get_company_billing_summary', $this->period() + ['company_id' => 3])->assertJsonPath('result.isError', true);
     }
+
+    public function test_partial_payment_sources_and_operational_filters_never_claim_wrong_scope(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->unsignedBigInteger('branch_id')->nullable();
+        });
+        DB::table('pos_transactions')->where('id', 1)->update(['branch_id' => 3]);
+        Schema::create('hotel_folio_entries', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->string('entry_type');
+            $t->string('payment_method');
+            $t->decimal('amount', 14, 2);
+            $t->dateTime('created_at');
+        });
+        DB::table('hotel_folio_entries')->insert([
+            ['company_id' => 1, 'entry_type' => 'payment', 'payment_method' => 'cash', 'amount' => 80, 'created_at' => '2026-10-13 12:00:00'],
+            ['company_id' => 1, 'entry_type' => 'payment', 'payment_method' => 'card', 'amount' => 120, 'created_at' => '2026-10-13 12:00:00'],
+        ]);
+        [$p,$t] = $this->connection();
+        $r = $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period() + ['payment_method' => 'cash'])->json('result.structuredContent');
+        $this->assertCount(1, $r['hotel_folio_movements']);
+        $this->assertEquals(80, $r['hotel_folio_movements'][0]['stored_amount']);
+        $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period() + ['branch_id' => 3])->assertJsonPath('result.structuredContent.hotel_folio_movements', null);
+        $this->toolCall($t['access_token'], 'get_company_operational_summary', $this->period() + ['branch_id' => 3])->assertJsonPath('result.isError',true);
+    }
 }

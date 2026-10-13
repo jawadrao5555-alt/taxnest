@@ -209,7 +209,10 @@ final class CompanyReadReports
         if (! empty($v['status'])) {
             $q->where('b.status', $v['status']);
         }
-        if (! empty($v['fiscal_status']) && Schema::hasColumn($c['d']['table'], $c['d']['fiscal'])) {
+        if (! empty($v['fiscal_status'])) {
+            if (! Schema::hasColumn($c['d']['table'], $c['d']['fiscal'])) {
+                throw ValidationException::withMessages(['fiscal_status' => 'Stored fiscal status is unavailable for this module.']);
+            }
             $q->where('b.'.$c['d']['fiscal'], $v['fiscal_status']);
         }
         if (($v['kind'] ?? 'any') !== 'any') {
@@ -259,6 +262,12 @@ final class CompanyReadReports
 
     public function operations(array $args, ?array $allowed): array
     {
+        foreach (['branch_id', 'terminal_id', 'payment_method'] as $unsupported) {
+            if (isset($args[$unsupported])) {
+                throw ValidationException::withMessages([$unsupported => 'Operational snapshots support company-wide scope only. Billing tools support this filter.']);
+            }
+        }
+
         $c = $this->context($args, $allowed);
         $id = $c['company']->id;
         $t = $c['company']->product_type === 'pos' ? 'pos_products' : 'products';
@@ -316,8 +325,11 @@ final class CompanyReadReports
         if (Schema::hasColumn($t, 'cash_received') && Schema::hasColumn($t, 'change_due')) {
             $cash = $this->completed($c)->selectRaw("COALESCE(SUM(CASE WHEN $ret THEN 0 ELSE cash_received END),0) AS stored_sale_cash_received, COALESCE(SUM(CASE WHEN $ret THEN 0 ELSE change_due END),0) AS stored_sale_change_due, COALESCE(SUM(CASE WHEN $ret THEN cash_received ELSE 0 END),0) AS stored_return_cash_received")->first();
         }
-        if ($c['company']->product_type === 'pos' && Schema::hasTable('hotel_folio_entries')) {
+        if ($c['company']->product_type === 'pos' && ! isset($args['branch_id']) && ! isset($args['terminal_id']) && Schema::hasTable('hotel_folio_entries')) {
             $q = DB::table('hotel_folio_entries')->where('company_id', $c['company']->id)->whereIn('entry_type', ['payment', 'refund', 'deposit', 'deposit_refund']);
+            if (isset($args['payment_method'])) {
+                $q->where('payment_method', $args['payment_method']);
+            }
             if ($c['meta']['period']['basis'] === 'business') {
                 if (! Schema::hasColumn('hotel_folio_entries', 'settlement_business_date') || ! Schema::hasColumn('hotel_folio_entries', 'refund_business_date')) {
                     $q = null;
@@ -332,7 +344,7 @@ final class CompanyReadReports
             }
         }
 
-        return $c['meta'] + ['stored_pos_cash_fields' => $cash, 'hotel_folio_movements' => $ledger, 'actual_collected_total' => null,
+        return $c['meta'] + ['stored_pos_cash_fields' => $cash, 'hotel_folio_movements' => $ledger, 'hotel_folio_scope' => isset($args['branch_id']) || isset($args['terminal_id']) ? 'Unavailable for branch/counter filters: no universal folio attribution inferred' : 'Company-scoped period and optional payment method', 'actual_collected_total' => null,
             'notes' => ['These are separate stored evidence streams, never add them together: a hotel payment can accompany a POS invoice.',
                 'A credit note adjusts billing; it does not prove a refund. Refund and deposit movements are separate. Cash fields alone do not prove card, split, credit or hotel balances. No universal collected total is inferred.',
                 'Null means the source is unavailable or does not establish a reliable universal total.']];

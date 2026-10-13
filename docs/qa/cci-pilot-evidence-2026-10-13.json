@@ -1,0 +1,41 @@
+{
+    "status": "HOLD",
+    "authorization": "Evidence inventory only; verified company mappings and reviewed batch approval remain mandatory.",
+    "source_invoices": 73,
+    "source_lines": 413,
+    "source_skus": 31,
+    "source_outlets": 73,
+    "supply_dates": [
+        "2026-10-10"
+    ],
+    "staging_partition_counts": {
+        "TAXNEST SALES LINES": 311,
+        "EXCLUDED PACKAGING": 90,
+        "DAMAGE RETURNS REVIEW": 12
+    },
+    "source_negative_quantity_lines": 57,
+    "footer_totals_cents": {
+        "gross": 86159641,
+        "discount": 7572701,
+        "vat": 881909,
+        "net": 79468849
+    },
+    "footer_mismatch_count": 0,
+    "covered_source_lines": 413,
+    "uncovered_source_lines": 0,
+    "unmatched_or_duplicate_evidence_lines": 0,
+    "changed_source_values": 0,
+    "beverage_sales_lines": 311,
+    "sales_lines_missing_printed_mrp": 311,
+    "sales_lines_without_verified_hs_tax": 311,
+    "sales_lines_missing_case_conversion": 83,
+    "sales_lines_without_verified_buyer": 311,
+    "source_lines_without_item_vat_amount": 413,
+    "sku_mapping_rows": 31,
+    "sku_mappings_without_verified_hs_tax": 31,
+    "invoice_gate_rows": 73,
+    "invoice_gate_hold_count": 73,
+    "invoice_gates_without_verified_vat": 73,
+    "source_sha256": "0b6333a241798e1d0ac182390a4744aa15ce7d9affea57b93146b9f0935f0df3",
+    "evidence_sha256": "98191dfa381721aa8430bae6ed53c0c43f729bc48f3c35e99499d904bc0d0742"
+}

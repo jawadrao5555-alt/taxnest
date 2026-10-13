@@ -1029,7 +1029,11 @@ async function workflow(page,t,v,diagnostics) {
     if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');
     for(const key of keys) {
       await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
-      await Promise.all([page.waitForURL('**/admin/dashboard/details/'+key,{waitUntil:'domcontentloaded'}),page.locator(`[data-dashboard-metric="${key}"]`).click()]);
+      const link=page.locator(`[data-dashboard-metric="${key}"]`);
+      await link.click({trial:true,timeout:5000});
+      const geometry=await link.boundingBox();
+      if(!geometry || geometry.width<40 || geometry.height<40) throw new Error('Metric has no useful click area: '+key);
+      await Promise.all([page.waitForURL('**/admin/dashboard/details/'+key,{waitUntil:'domcontentloaded'}),link.click()]);
       await page.locator(`[data-dashboard-detail="${key}"]`).waitFor({state:'visible'});
       await checkUsability(page,t,key,v);
       await page.getByRole('link',{name:'Admin Dashboard',exact:false}).last().click();

@@ -197,16 +197,16 @@ body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-
 .tn-metric-ledger > div:nth-child(4n) { border-right: 0; }
 .tn-metric-ledger > div:nth-last-child(-n+4) { border-bottom: 0; }
 
-.tn-metric-ledger p:first-child,
-.tn-channel-ledger p:first-child {
+.tn-metric-ledger p:first-of-type,
+.tn-channel-ledger p:first-of-type {
     color: var(--tn-admin-muted) !important;
     font-size: .62rem !important;
     font-weight: 800;
     letter-spacing: .11em;
 }
 
-.tn-metric-ledger p:nth-child(2),
-.tn-channel-ledger p:nth-child(2) {
+.tn-metric-ledger p:nth-of-type(2),
+.tn-channel-ledger p:nth-of-type(2) {
     color: var(--tn-admin-text) !important;
     font-size: 1.55rem !important;
     font-weight: 780 !important;
@@ -237,7 +237,7 @@ body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-
 }
 
 .tn-channel-ledger > div:last-child { border-right: 0; }
-.tn-channel-ledger p:last-child { color: var(--tn-admin-muted) !important; }
+.tn-channel-ledger p:last-of-type { color: var(--tn-admin-muted) !important; }
 
 .tn-company-workspace {
     margin-bottom: 2.25rem;
@@ -394,4 +394,17 @@ html.dark body.admin-themed.tn-premium-shell,
 @keyframes tn-admin-reveal {
     from { opacity: 0; }
     to { opacity: 1; }
+}
+
+/* These links must work even when the optional CDN utility stylesheet is unavailable. */
+.tn-metric-ledger > div, .tn-channel-ledger > div { position: relative; }
+.tn-metric-ledger a[data-dashboard-metric], .tn-channel-ledger a[data-dashboard-metric] {
+    position: absolute; inset: 0; z-index: 1; display: block; cursor: pointer;
+}
+.tn-metric-ledger a[data-dashboard-metric]:hover, .tn-channel-ledger a[data-dashboard-metric]:hover,
+.tn-metric-ledger a[data-dashboard-metric]:focus-visible, .tn-channel-ledger a[data-dashboard-metric]:focus-visible {
+    outline: 2px solid var(--tn-admin-accent); outline-offset: -2px;
+}
+.tn-metric-ledger > div > a:not([data-dashboard-metric]), .tn-channel-ledger > div > a:not([data-dashboard-metric]) {
+    position: relative; z-index: 2;
 }

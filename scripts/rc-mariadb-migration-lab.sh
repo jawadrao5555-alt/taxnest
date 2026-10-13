@@ -101,9 +101,22 @@ di(){
     clean_php php artisan migrate --force --no-interaction
     clean_php php "$ROOT/scripts/tests/di-fiscal-mariadb-check.php"
 }
+fbrpos_numbering(){
+    reset "taxnest_rc_${RUN_ID}_numbering"
+    clean_php env RC_SAFE_RUN=1 php "$ROOT/scripts/tests/fbrpos-numbering-native-worker.php" seed
+    local pids=()
+    for i in {1..12}; do
+        clean_php env RC_SAFE_RUN=1 php "$ROOT/scripts/tests/fbrpos-numbering-native-worker.php" issue >"$EVIDENCE_DIR/fbrpos-number-$i.log" 2>&1 &
+        pids+=("$!")
+    done
+    local failed=0
+    for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
+    (( failed == 0 )) || fail 'FBR POS concurrent allocator failed; inspect worker logs'
+    clean_php env RC_SAFE_RUN=1 php "$ROOT/scripts/tests/fbrpos-numbering-native-worker.php" verify
+}
 checks
 case "$MODE" in
-    all) full; upgrade; concurrency; di ;;
+    all) full; upgrade; concurrency; di; fbrpos_numbering ;;
     full) full ;;
     upgrade) upgrade ;;
     concurrency) full; concurrency ;;

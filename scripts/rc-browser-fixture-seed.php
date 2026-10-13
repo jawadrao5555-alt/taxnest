@@ -454,6 +454,9 @@ $unitStocked = \App\Models\Ingredient::create([
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
+            'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
+            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],
             'customerAmountAudit' => ['customerId' => $amountCustomer->id, 'cases' => $amountCases, 'spent' => 646]],

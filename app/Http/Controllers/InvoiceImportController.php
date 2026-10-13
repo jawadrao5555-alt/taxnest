@@ -11,6 +11,7 @@ use App\Services\AiImportAssistService;
 use App\Services\AiInvoiceReaderService;
 use App\Services\DiFeatureService;
 use App\Services\InvoiceImportService;
+use App\Services\InvoiceImportFormatMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -651,10 +652,21 @@ class InvoiceImportController extends Controller
         // Saved presets, flagged by whether every mapped source column exists
         // in THIS file's headers (matching presets apply in one click).
         $headerKeys = array_map([InvoiceImportService::class, 'normalizeHeaderKey'], $headers);
-        $presets = InvoiceImportMapping::where('company_id', $company->id)
+        $companyPresets = InvoiceImportMapping::where('company_id', $company->id)
             ->orderBy('name')
-            ->get()
-            ->map(function ($p) use ($headerKeys) {
+            ->get();
+        $smartMapping = (bool) config('features.enable_smart_di_import_mapping', false);
+        $formatMatch = $smartMapping
+            ? (new InvoiceImportFormatMatcher())->match(
+                $headers,
+                $companyPresets->map(fn ($p) => [
+                    'id' => (int) $p->id,
+                    'mapping' => $p->mappingArray(),
+                ])->all()
+            )
+            : ['preset_id' => null, 'reason' => 'disabled'];
+        $presets = $companyPresets
+            ->map(function ($p) use ($headerKeys, $headers, $smartMapping) {
                 $mapping = $p->mappingArray();
                 $missing = [];
                 foreach ($mapping as $field => $source) {
@@ -662,10 +674,15 @@ class InvoiceImportController extends Controller
                         $missing[] = (string) $source;
                     }
                 }
+                $unambiguous = (new InvoiceImportFormatMatcher())->match($headers, [[
+                    'id' => (int) $p->id, 'mapping' => $mapping,
+                ]])['preset_id'] !== null;
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
-                    'matches' => !empty($mapping) && empty($missing),
+                    'matches' => $smartMapping ? $unambiguous : (!empty($mapping) && empty($missing)),
+                    'mapping' => $smartMapping ? $mapping : null,
+                    'defaults' => $smartMapping ? $p->defaultsArray() : null,
                     'missing_columns' => $missing,
                 ];
             })
@@ -678,6 +695,10 @@ class InvoiceImportController extends Controller
             'fields' => $this->service->mappingFieldMeta(),
             'suggestions' => $this->service->suggestMapping($headers),
             'presets' => $presets,
+            // Suggestion only: the mapping UI must still require user confirmation.
+            'smart_mapping_enabled' => $smartMapping,
+            'recommended_preset_id' => $formatMatch['preset_id'],
+            'format_match_reason' => $formatMatch['reason'],
             'company_province' => $this->service->normalizeProvince((string) ($company->province ?? '')) ?? '',
             'original_filename' => substr($file->getClientOriginalName(), 0, 255),
         ]);

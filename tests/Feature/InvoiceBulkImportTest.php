@@ -231,6 +231,147 @@ class InvoiceBulkImportTest extends TestCase
         return $out;
     }
 
+    private function prepareMappingWorkflow(): void
+    {
+        foreach (['create_invoice_import_mappings', 'create_invoice_import_batches'] as $name) {
+            $files = glob(database_path('migrations/*' . $name . '_table.php'));
+            (require $files[0])->up();
+        }
+        app()->instance('currentCompanyId', $this->company->id);
+        \Illuminate\Support\Facades\Route::post('/_test/import-upload', [\App\Http\Controllers\InvoiceImportController::class, 'upload']);
+        \Illuminate\Support\Facades\Route::post('/_test/import-map', [\App\Http\Controllers\InvoiceImportController::class, 'applyMapping']);
+    }
+
+    private function mappingPreset(int $companyId, string $name, array $mapping): \App\Models\InvoiceImportMapping
+    {
+        return \App\Models\InvoiceImportMapping::create([
+            'company_id' => $companyId, 'name' => $name,
+            'mapping_json' => json_encode($mapping),
+            'defaults_json' => json_encode(['buyer_address' => 'Local test address', 'destination_province' => 'Punjab']),
+        ]);
+    }
+
+    private function mappingUpload(string $csv = "Outlet,Qty,Item,HS,Rate,GST\nAlpha,2,Beef,02023000,100,36\n"): \Illuminate\Testing\TestResponse
+    {
+        return $this->post('/_test/import-upload', [
+            'import_file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('local-test.csv', $csv),
+        ], ['Accept' => 'application/json']);
+    }
+
+    public function test_smart_mapping_recommends_only_current_company_and_preserves_defaults(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $foreign = $this->mappingPreset($this->company->id + 1, 'Foreign', ['buyer_name' => 'Outlet']);
+        $own = $this->mappingPreset($this->company->id, 'Own', ['buyer_name' => 'Outlet', 'quantity' => 'Qty']);
+        $response = $this->mappingUpload()->assertOk()->assertJsonPath('recommended_preset_id', $own->id)
+            ->assertJsonPath('smart_mapping_enabled', true)->assertJsonCount(1, 'presets')
+            ->assertJsonPath('presets.0.defaults.destination_province', 'Punjab');
+        $this->assertSame($own->id, $response->json('presets.0.id'));
+        $this->assertNotSame($foreign->id, $response->json('presets.0.id'));
+        $this->assertSame(0, \App\Models\InvoiceImportBatch::count());
+        $this->assertSame(0, Invoice::count());
+        $this->postJson('/_test/import-map', ['mapping_token' => $response->json('mapping_token'), 'preset_id' => $foreign->id])
+            ->assertNotFound();
+        // A token belongs to its company even when the preset ID is omitted.
+        app()->instance('currentCompanyId', $this->company->id + 1);
+        Company::create(['id' => $this->company->id + 1, 'name' => 'Second test tenant']);
+        $this->postJson('/_test/import-map', ['mapping_token' => $response->json('mapping_token'), 'mapping' => ['buyer_name' => 'Outlet']])
+            ->assertStatus(422);
+    }
+
+    public function test_multiple_matching_presets_require_selection_and_flag_off_keeps_legacy_response(): void
+    {
+        $this->prepareMappingWorkflow();
+        $this->mappingPreset($this->company->id, 'One', ['buyer_name' => 'Outlet']);
+        $this->mappingPreset($this->company->id, 'Two', ['buyer_name' => 'Outlet']);
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $this->mappingUpload()->assertOk()->assertJsonPath('recommended_preset_id', null)
+            ->assertJsonPath('format_match_reason', 'ambiguous_presets');
+        config(['features.enable_smart_di_import_mapping' => false]);
+        $this->mappingUpload()->assertOk()->assertJsonPath('format_match_reason', 'disabled')
+            ->assertJsonPath('smart_mapping_enabled', false)->assertJsonPath('presets.0.matches', true)
+            ->assertJsonPath('presets.0.mapping', null);
+    }
+
+    public function test_reviewed_manual_correction_uses_existing_validation_and_does_not_overwrite_preset(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $saved = $this->mappingPreset($this->company->id, 'Saved', ['quantity' => 'Old quantity']);
+        $upload = $this->mappingUpload()->assertOk()->assertJsonPath('recommended_preset_id', null)
+            ->assertJsonPath('format_match_reason', 'no_exact_match');
+        $this->postJson('/_test/import-map', ['mapping_token' => $upload->json('mapping_token'), 'preset_id' => $saved->id])
+            ->assertStatus(422);
+        $mapping = ['buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'GST'];
+        $response = $this->postJson('/_test/import-map', [
+            'mapping_token' => $upload->json('mapping_token'), 'mapping' => $mapping,
+            'defaults' => ['buyer_address' => 'Local test address', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice'],
+        ]);
+        $this->assertSame(200, $response->status(), $response->getContent());
+        $response->assertJsonPath('total', 1)->assertJsonStructure(['batch_id', 'preview', 'valid_count', 'error_count']);
+        $this->assertSame(['quantity' => 'Old quantity'], $saved->fresh()->mappingArray());
+        $this->assertSame('validated', \App\Models\InvoiceImportBatch::first()->status);
+        $this->assertSame(0, Invoice::count(), 'Mapping confirmation creates a preview batch, never invoices or FBR submissions');
+    }
+
+    public function test_duplicate_mapped_headers_block_preset_apply_and_keep_upload_for_correction(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $preset = $this->mappingPreset($this->company->id, 'Duplicate', ['buyer_name' => 'Outlet']);
+        $upload = $this->mappingUpload("Outlet,out-let,Qty\nAlpha,Beta,2\n")->assertOk()
+            ->assertJsonPath('recommended_preset_id', null)->assertJsonPath('presets.0.matches', false);
+        $payload = ['mapping_token' => $upload->json('mapping_token'), 'preset_id' => $preset->id];
+        $first = $this->postJson('/_test/import-map', $payload)->assertStatus(422);
+        $this->assertStringContainsString('duplicate headers', $first->json('error'));
+        $this->postJson('/_test/import-map', $payload)->assertStatus(422)->assertJsonPath('error', $first->json('error'));
+        $this->assertSame(0, \App\Models\InvoiceImportBatch::count());
+    }
+
+    public function test_daily_exports_reuse_company_preset_after_header_reordering_and_punctuation_changes(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $preset = $this->mappingPreset($this->company->id, 'Daily export', [
+            'buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'GST',
+            'source_invoice_number' => 'Source Bill', 'invoice_date' => 'Supply Date',
+        ]);
+        $preset->update(['defaults_json' => json_encode([
+            'buyer_address' => 'Local test address', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice',
+        ])]);
+        $upload = $this->mappingUpload("Supply-Date,GST,Rate,HS,Item,Qty,Outlet,Source-Bill\n2026-10-10,36,100,02023000,Beef,2,Alpha,000123\n")
+            ->assertOk()->assertJsonPath('recommended_preset_id', $preset->id);
+        $this->postJson('/_test/import-map', [
+            'mapping_token' => $upload->json('mapping_token'), 'preset_id' => $preset->id,
+        ])->assertOk()->assertJsonPath('total', 1)
+            ->assertJsonPath('preview.0.data.source_invoice_number', '000123')
+            ->assertJsonPath('preview.0.data.invoice_date', '2026-10-10');
+        $this->assertSame(0, Invoice::count());
+        $this->assertSame('Source Bill', $preset->fresh()->mappingArray()['source_invoice_number']);
+    }
+
+    public function test_reused_source_column_blocks_manual_mapping_and_preserves_hold_for_correction(): void
+    {
+        $this->prepareMappingWorkflow();
+        config(['features.enable_smart_di_import_mapping' => true]);
+        $upload = $this->mappingUpload()->assertOk();
+        $mapping = ['buyer_name' => 'Outlet', 'quantity' => 'Qty', 'description' => 'Item',
+            'hs_code' => 'HS', 'price' => 'Rate', 'tax' => 'rate'];
+        $payload = [
+            'mapping_token' => $upload->json('mapping_token'), 'mapping' => $mapping,
+            'defaults' => ['buyer_address' => 'Local test address', 'destination_province' => 'Punjab', 'document_type' => 'Sale Invoice'],
+        ];
+        $response = $this->postJson('/_test/import-map', $payload)->assertStatus(422);
+        $this->assertStringContainsString('mapped to both price and tax', $response->json('error'));
+        $this->assertSame(0, \App\Models\InvoiceImportBatch::count());
+        $payload['mapping']['tax'] = 'GST';
+        $this->postJson('/_test/import-map', $payload)->assertOk()->assertJsonPath('total', 1);
+        $this->assertSame(0, Invoice::count());
+    }
+
     private function writeXlsx(array $header, array $rows): string
     {
         $spreadsheet = new Spreadsheet();

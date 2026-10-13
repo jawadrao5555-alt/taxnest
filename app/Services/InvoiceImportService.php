@@ -77,6 +77,7 @@ class InvoiceImportService
         'sro_schedule_no',
         'sro_serial_no',
         'reference_invoice_number',
+        'source_invoice_number',
         'invoice_date',
         'branch',
     ];
@@ -92,7 +93,7 @@ class InvoiceImportService
     ];
 
     /** Columns that must survive as literal digit/code strings. */
-    private const CODE_COLUMNS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'reference_invoice_number'];
+    private const CODE_COLUMNS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'reference_invoice_number', 'source_invoice_number'];
 
     private const NUMERIC_COLUMNS = ['quantity', 'price', 'tax', 'tax_rate', 'mrp'];
 
@@ -156,7 +157,8 @@ class InvoiceImportService
         'mrp' => ['mrp', 'retailprice', 'rrp', 'maxretailprice', 'mrpprice'],
         'sro_schedule_no' => ['sro', 'srono', 'sroscheduleno', 'sronumber', 'sroschedule'],
         'sro_serial_no' => ['sroserialno', 'sroserial', 'sroitemserial', 'sroitemserialno'],
-        'reference_invoice_number' => ['referenceinvoice', 'refinvoice', 'refinvoiceno', 'referenceinvoiceno', 'originalinvoice', 'originalinvoiceno'],
+        'reference_invoice_number' => ['referenceinvoice', 'refinvoice', 'refinvoiceno', 'referenceinvoiceno'],
+        'source_invoice_number' => ['sourceinvoicenumber', 'sourceinvoiceno', 'originalinvoice', 'originalinvoiceno', 'salesinvoiceno', 'salesinvoicenumber', 'billnumber'],
     ];
 
     /** Short per-field hints for the mapping screen (mirrors the template Help sheet). */
@@ -177,7 +179,8 @@ class InvoiceImportService
         'mrp' => 'Retail price — needed for 3rd Schedule items',
         'sro_schedule_no' => 'SRO / schedule number (auto-filled when known)',
         'sro_serial_no' => 'SRO item serial number (auto-filled when known)',
-        'reference_invoice_number' => 'Original invoice — Credit/Debit Notes only',
+        'reference_invoice_number' => 'FBR reference invoice — Credit/Debit Notes only',
+        'source_invoice_number' => 'Original DMS sales invoice identifier; prevents merging same-day bills',
         'invoice_date' => 'Actual sale date (YYYY-MM-DD or DD/MM/YYYY). Blank = today',
         'branch' => 'Which branch made the sale — its city or its name. Blank = head office',
     ];
@@ -305,10 +308,14 @@ class InvoiceImportService
 
         $allFields = array_merge(self::REQUIRED_COLUMNS, self::OPTIONAL_COLUMNS);
 
-        // Normalized header -> column index (first occurrence wins on duplicates).
+        // Reject ambiguous mapped headers instead of silently using the first column.
         $headerIndex = [];
+        $headerCounts = [];
         foreach ($grid[0] ?? [] as $idx => $h) {
             $key = self::normalizeHeaderKey((string) $h);
+            if ($key !== '') {
+                $headerCounts[$key] = ($headerCounts[$key] ?? 0) + 1;
+            }
             if ($key !== '' && !isset($headerIndex[$key])) {
                 $headerIndex[$key] = $idx;
             }
@@ -321,6 +328,7 @@ class InvoiceImportService
         // preset keeps working even when the DMS reorders columns).
         $columnIndexes = [];
         $notFound = [];
+        $mappedSources = [];
         foreach ($columnMap as $field => $source) {
             if (!in_array($field, $allFields, true)) {
                 continue;
@@ -334,6 +342,13 @@ class InvoiceImportService
                 $notFound[$field] = $source;
                 continue;
             }
+            if (($headerCounts[$key] ?? 0) > 1) {
+                return ['error' => "The mapped column '{$source}' has duplicate headers. Rename the duplicate columns and upload again."];
+            }
+            if (isset($mappedSources[$key])) {
+                return ['error' => "The source column '{$source}' is mapped to both {$mappedSources[$key]} and {$field}. Choose a separate column or a fixed value for each field."];
+            }
+            $mappedSources[$key] = $field;
             $columnIndexes[$field] = $headerIndex[$key];
         }
         if (!empty($notFound)) {
@@ -805,7 +820,8 @@ class InvoiceImportService
         return ($data['buyer_name'] ?? '') . '|' . ($data['buyer_ntn'] ?? '') . '|'
             . ($data['document_type'] ?? 'Sale Invoice') . '|' . ($data['reference_invoice_number'] ?? '')
             . '|' . ($data['invoice_date'] ?? '')
-            . '|' . ($data['_branch_id'] ?? '');
+            . '|' . ($data['_branch_id'] ?? '')
+            . '|' . ($data['source_invoice_number'] ?? '');
     }
 
     /**

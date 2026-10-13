@@ -86,7 +86,7 @@
                             @endforeach
                         </select>
                         @if(empty($eligiblePullRequests))
-                            <span class="mt-2 block text-xs text-amber-300">No eligible green cursor/* or replit/* PR is currently available.</span>
+                            <span class="mt-2 block text-xs text-amber-300">{{ ($eligibilityWarning ?? null) ? 'PR availability could not be verified. See the GitHub warning above; wait before refreshing.' : 'No eligible green cursor/* or replit/* PR is currently available.' }}</span>
                         @endif
                     </label>
                     <label class="block">

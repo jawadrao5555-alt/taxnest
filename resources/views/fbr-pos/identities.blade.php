@@ -12,6 +12,16 @@
 <label>IMS agent<select name="device_uid" required class="block w-full text-black"><option value="">Select a registered PC</option>@foreach($devices as $device)<option value="{{ $device->device_uid }}">{{ $device->label() }} — {{ $device->isOnline() ? 'online' : 'offline' }}</option>@endforeach</select></label>
 <button class="bg-blue-600 text-white rounded p-3">Save mapping</button>
 </form>
-<div class="overflow-x-auto"><table class="w-full"><thead><tr><th>Branch</th><th>Terminal</th><th>POS ID</th><th>Agent</th></tr></thead><tbody>@forelse($mappings as $map)<tr><td>{{ $branches->firstWhere('id',$map->branch_id)?->name ?? 'No branch' }}</td><td>{{ $terminals->firstWhere('id',$map->terminal_id)?->terminal_name ?? 'All' }}</td><td>{{ $map->pos_id }}</td><td>{{ $devices->firstWhere('device_uid',$map->device_uid)?->label() ?? $map->device_uid }}</td></tr>@empty<tr><td colspan="4">No mappings: company POS ID remains in use.</td></tr>@endforelse</tbody></table></div>
+<div class="overflow-x-auto"><table class="w-full"><thead><tr><th>Branch</th><th>Terminal</th><th>POS ID</th><th>Agent</th><th>Remove for new invoices</th></tr></thead><tbody>@forelse($mappings as $map)<tr><td>{{ $branches->firstWhere('id',$map->branch_id)?->name ?? 'No branch' }}</td><td>{{ $terminals->firstWhere('id',$map->terminal_id)?->terminal_name ?? 'All' }}</td><td>{{ $map->pos_id }}</td><td>{{ $devices->firstWhere('device_uid',$map->device_uid)?->label() ?? $map->device_uid }}</td><td><form method="POST">@csrf<button name="remove_mapping" value="{{ $map->id }}">Remove</button></form></td></tr>@empty<tr><td colspan="4">No mappings: company POS ID remains in use.</td></tr>@endforelse</tbody></table></div>
+@foreach($replacementBills as $bill)
+<form method="POST" class="border rounded p-4 space-y-3">@csrf
+<h2 class="font-bold">Replace IMS PC for {{ $bill->invoice_number }}</h2>
+<p>IMS rejection has been recorded. Original POS ID {{ $bill->fbr_pos_id_snapshot }} and USIN stay unchanged. Only use a replacement PC running that same registered POS identity.</p>
+<input type="hidden" name="replacement_bill" value="{{ $bill->id }}"><input type="hidden" name="pos_id" value="{{ $bill->fbr_pos_id_snapshot }}">
+<label>Replacement PC<select name="device_uid" required class="block w-full text-black">@foreach($devices as $device)<option value="{{ $device->device_uid }}">{{ $device->label() }}</option>@endforeach</select></label>
+<label>Checked replacement IMS installation reference<input name="evidence_reference" required maxlength="160" class="block w-full text-black"></label>
+<label class="block"><input type="checkbox" name="confirmed" value="1" required> I verified the replacement IMS uses the original POS ID and this invoice was not accepted.</label>
+<button class="bg-blue-600 p-3 text-white">Confirm replacement PC and allow retry</button></form>
+@endforeach
 <p>If an original PC is unavailable after submission, verify the invoice through the recovery screen before retrying. Do not submit a held invoice from another POS ID.</p>
 </div></x-fbr-pos-layout>

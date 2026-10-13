@@ -44,6 +44,22 @@ class FbrPosIdentityTest extends TestCase {
   DB::table('fbr_pos_terminals')->insert(['id'=>99,'company_id'=>2,'branch_id'=>10]);
   $this->expectException(ValidationException::class);app(FbrPosIdentity::class)->capture($this->bill(['branch_id'=>10,'terminal_id'=>99]));
  }
+ public function test_replacement_requires_rejected_ims_evidence_and_preserves_pos_and_usin(): void {
+  Schema::create('pos_agent_devices',function(Blueprint $t){$t->id();$t->integer('company_id');$t->string('device_uid');});
+  DB::table('pos_agent_devices')->insert([['company_id'=>1,'device_uid'=>'REPLACEMENT'],['company_id'=>2,'device_uid'=>'FOREIGN']]);
+  Schema::create('fbr_pos_owner_reconciliations',function(Blueprint $t){$t->id();$t->integer('company_id');$t->integer('transaction_id');$t->string('decision');$t->string('evidence_source');});
+  Schema::table('fbr_pos_transactions',function(Blueprint $t){$t->string('fbr_status')->nullable();$t->string('fbr_submission_hash')->nullable();$t->string('invoice_number')->nullable();});
+  $bill=$this->bill(['branch_id'=>10]);$bill->forceFill(['fbr_status'=>'failed','invoice_number'=>'FPOS-UNCHANGED'])->save();
+  $actor=(new \App\Models\User)->forceFill(['id'=>7,'company_id'=>1,'role'=>'company_admin']);$s=app(FbrPosIdentity::class);
+  try {$s->rebind($actor,$bill->id,'REPLACEMENT','1010','Checked IMS install');$this->fail('Missing rejection must block replacement');} catch(ValidationException $e) {$this->assertNotEmpty($e->errors());}
+  DB::table('fbr_pos_owner_reconciliations')->insert(['company_id'=>1,'transaction_id'=>$bill->id,'decision'=>'not_accepted','evidence_source'=>'ims_log']);
+  foreach([['FOREIGN','1010'],['REPLACEMENT','9999']] as [$uid,$pos]) {
+   try {$s->rebind($actor,$bill->id,$uid,$pos,'Checked IMS install');$this->fail('Foreign PC / changed POS ID must block replacement');} catch(ValidationException $e) {$this->assertNotEmpty($e->errors());}
+  }
+  $s->rebind($actor,$bill->id,'REPLACEMENT','1010','Checked IMS install');$s->rebind($actor,$bill->id,'REPLACEMENT','1010','Checked IMS install');
+  $this->assertSame('REPLACEMENT',$bill->fresh()->fbr_device_uid_snapshot);$this->assertSame('1010',$bill->fresh()->fbr_pos_id_snapshot);$this->assertSame('FPOS-UNCHANGED',$bill->fresh()->invoice_number);
+  $this->assertSame(1,DB::table('fbr_pos_identity_rebindings')->count());
+ }
  public function test_submitted_and_local_bills_are_not_rewritten(): void {
   $s=app(FbrPosIdentity::class);
   foreach([['invoice_mode'=>'local'],['fbr_invoice_number'=>'9000000000001']] as $attrs) {

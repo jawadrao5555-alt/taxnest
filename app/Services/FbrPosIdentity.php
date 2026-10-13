@@ -22,6 +22,25 @@ class FbrPosIdentity {
   $pos=(string)($mapping->pos_id ?? preg_replace('/[^0-9]/','',(string)$company->fbr_pos_id));
   return ['pos_id'=>$pos,'device_uid'=>$mapping->device_uid ?? null];
  }
+ /** Only an evidenced non-accepted invoice can move to a replacement PC with the SAME registered POSID. */
+ public function rebind(\App\Models\User $owner,int $id,string $uid,string $posId,string $reference): void {
+  abort_unless($owner->role==='company_admin',403);
+  if(!Schema::hasTable('fbr_pos_owner_reconciliations')) throw ValidationException::withMessages(['identity'=>'Complete owner reconciliation before replacing the IMS PC.']);
+  DB::transaction(function() use($owner,$id,$uid,$posId,$reference) {
+   $bill=FbrPosTransaction::withoutGlobalScopes()->where('company_id',$owner->company_id)->whereKey($id)->lockForUpdate()->firstOrFail();
+   $evidence=DB::table('fbr_pos_owner_reconciliations')->where('company_id',$owner->company_id)->where('transaction_id',$id)->orderByDesc('id')->first();
+   $valid=$bill->fbr_status==='failed' && !$bill->fbr_invoice_number && !$bill->fbr_submission_hash && $bill->fbr_identity_captured_at
+    && $evidence && $evidence->decision==='not_accepted' && $evidence->evidence_source==='ims_log'
+    && (string)$bill->fbr_pos_id_snapshot===$posId
+    && DB::table('pos_agent_devices')->where('company_id',$owner->company_id)->where('device_uid',$uid)->exists();
+   if(!$valid) throw ValidationException::withMessages(['identity'=>'Replacement requires an IMS-confirmed rejection, no active claim, and the unchanged original POS ID.']);
+   if ($bill->fbr_device_uid_snapshot === $uid) return;
+   DB::table('fbr_pos_identity_rebindings')->insert(['company_id'=>$owner->company_id,'transaction_id'=>$id,'actor_id'=>$owner->id,
+    'reconciliation_id'=>$evidence->id,'old_device_uid'=>$bill->fbr_device_uid_snapshot,'new_device_uid'=>$uid,
+    'pos_id_fingerprint'=>hash('sha256',$posId),'evidence_reference'=>$reference,'created_at'=>now()]);
+   $bill->forceFill(['fbr_device_uid_snapshot'=>$uid])->save();
+  });
+ }
  public function capture(FbrPosTransaction $bill): array {
   if (!$this->ready()) return $this->resolve($bill);
   return DB::transaction(function() use($bill) {

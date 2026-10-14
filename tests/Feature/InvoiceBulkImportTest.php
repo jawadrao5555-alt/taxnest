@@ -1252,6 +1252,35 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertSame(10000, $review['invoices'][0]['excluded_totals']['net']);
     }
 
+    public function test_smart_cci_deposit_pairs_require_explicit_review_and_preserve_draft_audit(): void
+    {
+        $this->smartTables(); $this->verifiedSmartMappings($this->company->id);
+        $good = $this->smartRow();
+        $deposit = array_merge($good, ['description' => 'COKE 250 ML IMPLIED EMP 24B RGB', 'source_sku' => 'PACK',
+            'quantity' => '2', 'source_gross' => '100', 'source_discount' => '0', 'source_vat' => '0', 'source_net' => '100']);
+        $returned = array_merge($deposit, ['quantity' => '-2', 'source_gross' => '-100', 'source_net' => '-100']);
+        $this->assertFalse($this->smartReview([$good, $deposit, $returned])['rows'][0]['valid']);
+        $one = $this->smartReview([$good, $deposit, $returned], ['3' => 'Reviewed empty bottle charge']);
+        $this->assertFalse($one['rows'][0]['valid'], 'The negative deposit still needs its own explicit reason');
+        $review = $this->smartReview([$good, $deposit, $returned], ['3' => 'Reviewed empty bottle charge', '4' => 'Reviewed empty bottle return']);
+        $this->assertTrue($review['rows'][0]['valid'], json_encode($review['invoices'][0]['errors']));
+        foreach ([1, 2] as $i) {
+            $this->assertSame('packaging_review', $review['rows'][$i]['classification']);
+            $this->assertTrue($review['rows'][$i]['excluded']);
+        }
+        $this->assertSame(0, $review['invoices'][0]['excluded_totals']['net']);
+        $this->assertSame(141600, $review['invoices'][0]['source_totals']['net']);
+        $this->assertSame(141600, $review['invoices'][0]['draft_totals']['net']);
+        $batch = $this->approvedSmartBatch($review);
+        $created = $this->service->createDraftsFromRows(array_values(array_filter($review['rows'], fn ($row) => $row['valid'])), $this->company, null, 'bulk_import', null, null, $batch->id);
+        $this->assertSame(1, $created['created_count']);
+        $this->assertSame(1, InvoiceItem::count(), 'Packaging is audited, never invoiced as a beverage');
+        $receipt = \App\Models\InvoiceImportSourceReceipt::firstOrFail();
+        $this->assertCount(3, $receipt->audit);
+        $this->assertSame('-100', $receipt->audit[2]['original_data']['source_net']);
+        $this->assertNull(Invoice::firstOrFail()->fbr_invoice_number);
+    }
+
     public function test_smart_negative_damage_missing_identity_and_invoice_mismatch_cannot_be_approved(): void
     {
         $this->smartTables(); $this->verifiedSmartMappings($this->company->id);

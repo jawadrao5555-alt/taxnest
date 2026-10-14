@@ -969,6 +969,44 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   pass(t.name+'/'+v.width+': six category-specific groups, no outlet leakage, real failed-save retry and persisted colour');
 }
 
+async function formatHistoryWorkflow(page,t,v) {
+  const name='Synthetic approved format '+v.width+' '+Date.now();
+  const csv='Outlet,Qty,Item,HS,Rate,GST\nFictional buyer,2,Beef,02023000,100,36\n';
+  async function upload() {
+    await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    const importer=page.locator('[x-data="bulkImport()"]');
+    await importer.locator('button').first().click();
+    await importer.locator('input[type=file]').setInputFiles({name:'fictional-format.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+    await importer.getByRole('button',{name:'Continue to Preview'}).waitFor();
+    return importer;
+  }
+  let importer=await upload();
+  for(const [field,column] of Object.entries({buyer_name:'Outlet',quantity:'Qty',description:'Item',hs_code:'HS',price:'Rate',tax:'GST'})) {
+    const row=importer.locator('div.grid.grid-cols-12').filter({has:page.locator('span[x-text="f.key"]').filter({hasText:new RegExp('^'+field+'$')})});
+    await row.locator('select[x-model="mappingSel[f.key]"]').selectOption(column);
+  }
+  for(const [field,value] of Object.entries({buyer_address:'Fictional address',destination_province:'Punjab',document_type:'Sale Invoice'})) {
+    const row=importer.locator('div.grid.grid-cols-12').filter({has:page.locator('span[x-text="f.key"]').filter({hasText:new RegExp('^'+field+'$')})});
+    await row.locator('select[x-model="mappingSel[f.key]"]').selectOption('');
+    const control=row.locator('[x-model="defaultsSel[f.key]"]');
+    if(await control.evaluate(el=>el.tagName==='SELECT'))await control.selectOption(value);else await control.fill(value);
+  }
+  await importer.locator('input[x-model=savePreset]').check();
+  await importer.locator('input[x-model=presetName]').fill(name);
+  const [saved]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/import-apply-mapping')),importer.getByRole('button',{name:'Continue to Preview'}).click()]);
+  const result=await saved.json();
+  if(!saved.ok()||result.preset_saved!==name)throw new Error('Explicit format approval/save failed');
+  importer=await upload();
+  const presetRow=importer.locator('div.flex.flex-wrap.items-center.justify-between').filter({has:page.locator('span[x-text="p.name"]').filter({hasText:name})});
+  const [history]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/history')),presetRow.getByRole('button',{name:'History',exact:true}).click()]);
+  const versions=(await history.json()).versions;
+  if(!history.ok()||versions.length!==1||!versions[0].approved_at||versions[0].snapshot.mapping.quantity!=='Qty')throw new Error('Saved approved history missing');
+  await importer.getByText('Format history: '+name,{exact:true}).waitFor();
+  await importer.getByText('Version 1',{exact:false}).waitFor();
+  pass(t.name+'/'+v.width+': authenticated explicit format approval and persisted history UI; no invoice creation/submission');
+}
+
 async function smartImportWorkflow(page,t,v) {
   await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
@@ -1020,6 +1058,7 @@ async function smartImportWorkflow(page,t,v) {
   await page.goto(baseUrl+reviewPath,{waitUntil:'domcontentloaded'});
   if(!(await page.locator('body').innerText()).includes('TEST-UI-'+v.width))throw new Error('Original source identity disappeared');
   pass(t.name+'/'+v.width+': authenticated upload, verified mappings, source review, explicit approval and draft receipt; no fiscal posting');
+  await formatHistoryWorkflow(page,t,v);
 }
 
 async function workflow(page,t,v,diagnostics) {

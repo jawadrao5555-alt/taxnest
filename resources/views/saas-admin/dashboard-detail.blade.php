@@ -58,6 +58,8 @@
             const response = await fetch(link.dataset.invoicePreview, {signal:request.signal,credentials:'same-origin',headers:{Accept:'application/pdf'}});
             if (!response.ok || !response.headers.get('Content-Type')?.includes('application/pdf')) throw new Error('Preview unavailable');
             const blob = await response.blob();
+            const signature = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
+            if (String.fromCharCode(...signature) !== '%PDF-') throw new Error('Invalid invoice document');
             if (!dialog.open || controller !== request) return;
             documentUrl = URL.createObjectURL(blob); frame.hidden = false;
             download.href = link.dataset.invoiceDownload; download.hidden = false;

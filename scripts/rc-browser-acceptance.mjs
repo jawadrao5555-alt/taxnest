@@ -1075,6 +1075,31 @@ async function smartImportWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.dashboardDetails) {
+    await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
+    const keys=await page.locator('[data-dashboard-metric]').evaluateAll(els=>els.map(el=>el.dataset.dashboardMetric));
+    if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');
+    for(const key of keys) {
+      await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
+      const link=page.locator(`[data-dashboard-metric="${key}"]`);
+      await link.click({trial:true,timeout:5000});
+      const geometry=await link.boundingBox();
+      if(!geometry || geometry.width<40 || geometry.height<40) throw new Error('Metric has no useful click area: '+key);
+      await Promise.all([page.waitForURL('**/admin/dashboard/details/'+key,{waitUntil:'domcontentloaded'}),link.click()]);
+      await page.locator(`[data-dashboard-detail="${key}"]`).waitFor({state:'visible'});
+      await checkUsability(page,t,key,v);
+      await page.getByRole('link',{name:'Admin Dashboard',exact:false}).last().click();
+      await page.waitForURL('**/admin/dashboard');
+    }
+    await page.goto(baseUrl+'/admin/dashboard/details/di_invoices',{waitUntil:'domcontentloaded'});
+    await page.locator('input[name="q"]').fill('RC');
+    await Promise.all([page.waitForURL(u=>u.searchParams.get('q')==='RC'),page.getByRole('button',{name:'Apply filters'}).click()]);
+    const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Export filtered CSV'}).click()]);
+    const csv=readFileSync(await download.path(),'utf8');
+    if(!csv.startsWith('id,company,company_id,product,reference,status,amount,created_at,')) throw new Error('Dashboard CSV schema missing');
+    pass(`${t.name}/${v.width}: all 13 cards opened, returned, filtered and exported`);
+    return;
+  }
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);

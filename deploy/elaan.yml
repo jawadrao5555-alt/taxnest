@@ -1,8 +1,7 @@
-title: "Hotel credit note ka reason, PRA status aur refund balance ab saaf hai"
-audience: pos
-category: hotel
+title: "Admin dashboard ki 13 summary cards par tafseeli record review"
+audience: all
 type: improvement
 points:
-  - "Pooray bill ka credit note banatay waqt asal wajah enter karein; stay aur money refund alag rehtay hain."
-  - "Credit note par PRA accepted, pending ya failed status aur available guest refund raqam saaf nazar aati hai."
-  - "58mm, 80mm aur A4 receipt credit amount aur money refunded alag dikhati hai; puranay bills aur settings preserve hain."
+  - "Platform admin ab summary cards se billing aur tax records ki tafseel dekh sakta hai."
+  - "Search, filters aur CSV export se record review asaan hai; yeh screens sirf platform admin ke liye hain."
+  - "Mobile par dashboard tables scroll hoti hain; mojooda billing aur fiscal workflows barqarar hain."

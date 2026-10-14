@@ -824,7 +824,12 @@ async function hotelCreditReview(page, t, v) {
   const issue=dialog.locator('form[data-credit-simple="1"]');
   await issue.waitFor({state:'visible'});
   if (await issue.locator('[name="mode"]').inputValue()!=='full') throw new Error('Simple flow did not use whole invoice');
-  if (await issue.locator('[name="reason"],input[type="number"],select').count()) throw new Error('Simple flow retained manual entry controls');
+  if (await issue.locator('input[type="number"],select').count()) throw new Error('Simple flow retained manual entry controls');
+  const reason=issue.locator('textarea[name="reason"]');
+  if (await reason.getAttribute('required') === null) throw new Error('Actual credit reason is not required');
+  if (await issue.evaluate(form=>form.checkValidity())) throw new Error('Empty credit reason accepted by browser');
+  await reason.fill('Synthetic unused service correction');
+  if (!await issue.evaluate(form=>form.checkValidity())) throw new Error('Valid actual reason refused');
   if (await issue.locator('button[type="submit"]').count()!==1) throw new Error('Single confirmation action missing');
   await saveEvidenceScreenshot(page,'hotel-credit-simple-full-'+v.width+'.png');
   // No fiscal POST in browser: real controller POST/idempotency is exercised with synthetic backend fixtures.
@@ -839,6 +844,8 @@ async function hotelCreditReview(page, t, v) {
   await page.locator('[data-credit-open^="credit-result-"]').first().click();
   const result=page.locator('dialog[open][id^="credit-result-"]');
   await result.waitFor({state:'visible'});
+  if (!await result.locator('[data-credit-status="accepted"]').count()) throw new Error('Accepted credit status missing');
+  if (!(await result.innerText()).includes('Credit not yet refunded')) throw new Error('Refund balance missing');
   const printLink=result.locator('a[href*="/receipt"]');
   await printLink.waitFor({state:'visible'});
   await printLink.click();
@@ -847,6 +854,8 @@ async function hotelCreditReview(page, t, v) {
   const creditReceiptFrame=page.frameLocator('[data-receipt-frame]');
   await creditReceiptFrame.locator('#receiptActions').waitFor({state:'attached'});
   if (!(await creditReceiptFrame.locator('body').innerText()).includes('SYNTHETIC-ACCEPTED-CREDIT')) throw new Error('Print opened a different or missing credit receipt');
+  const receiptText=await creditReceiptFrame.locator('body').innerText();
+  if (!receiptText.includes('Credit amount') || !receiptText.includes('Credit not yet refunded') || receiptText.includes('Thank you for your purchase')) throw new Error('Credit receipt still reads as a sale');
   await saveEvidenceScreenshot(page,'hotel-credit-print-'+v.width+'.png');
   await creditReceiptPopup.locator('[data-receipt-close]').click();
   await result.waitFor({state:'visible'});

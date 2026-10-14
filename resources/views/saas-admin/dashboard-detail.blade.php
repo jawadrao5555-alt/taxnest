@@ -53,7 +53,7 @@
         document.getElementById('tn-invoice-preview-label').textContent = link.dataset.invoiceLabel;
         status.textContent = 'Loading invoice…'; dialog.showModal();
         const request = new AbortController(); controller = request;
-        const timeout = setTimeout(() => request.abort(), 20000);
+        const timeout = setTimeout(() => request.abort(), 60000);
         try {
             const response = await fetch(link.dataset.invoicePreview, {signal:request.signal,credentials:'same-origin',headers:{Accept:'application/pdf'}});
             if (!response.ok || !response.headers.get('Content-Type')?.includes('application/pdf')) throw new Error('Preview unavailable');

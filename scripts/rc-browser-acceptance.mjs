@@ -1143,7 +1143,8 @@ async function workflow(page,t,v,diagnostics) {
       if(!await link.count())throw new Error('Typed invoice preview link missing: '+doc.product);
       const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith(`/${doc.product}/${doc.company}/${doc.record}/preview`)),link.click()]);
       if(response.status()!==200 || !response.headers()['content-type']?.includes('application/pdf')) throw new Error('Actual '+doc.product+' document did not render as PDF');
-      if(!(await response.body()).subarray(0,5).equals(Buffer.from('%PDF-')))throw new Error('Invalid actual invoice PDF');
+      const previewBytes=await response.body();
+      if(!previewBytes.subarray(0,5).equals(Buffer.from('%PDF-')))throw new Error('Invalid actual invoice PDF: '+doc.product+' bytes='+previewBytes.length+' prefix='+previewBytes.subarray(0,24).toString('hex'));
       await page.locator('#tn-invoice-preview').waitFor({state:'visible'});
       await page.locator('[data-preview-download]').waitFor({state:'visible'});
       await page.waitForFunction(()=>!document.querySelector('[data-preview-print]').disabled);

@@ -1,12 +1,8 @@
-# Elaan for THIS production deploy only. CI stores TARGET_SHA internally in
-# deployment_key; customer-visible title/points never contain provenance.
-# Do not reuse Daily L001. Do not use skip_elaan except emergencies.
-
-title: "Hotel Front Desk ab Restaurant Outlet se alag rehta hai"
+title: "Hotel credit note ka reason, PRA status aur refund balance ab saaf hai"
 audience: pos
 category: hotel
 type: improvement
 points:
-  - "Hotel / Guest House login aur Manage as Company hamesha Front Desk kholta hai — New Sale Hotel ka ghar nahi."
-  - "Agar restaurant_mode pehle se ON hai to Restaurant Outlet Hotel shell ke andar alag module hai, Back to Front Desk ke sath."
-  - "restaurant_mode OFF ho to outlet menu aur sale URL dono band — purani modules, kitchen settings, rooms aur folio history preserve."
+  - "Pooray bill ka credit note banatay waqt asal wajah enter karein; stay aur money refund alag rehtay hain."
+  - "Credit note par PRA accepted, pending ya failed status aur available guest refund raqam saaf nazar aati hai."
+  - "58mm, 80mm aur A4 receipt credit amount aur money refunded alag dikhati hai; puranay bills aur settings preserve hain."

@@ -10,7 +10,7 @@ class AdminDashboardDetail {
   $q=match($metric){
    'total_companies'=>Company::query(), 'di_companies'=>Company::where('product_type','di'), 'pos_companies'=>Company::where('product_type','pos'), 'fbrpos_companies'=>Company::where('product_type','fbrpos'),
    'pending_companies'=>Company::where('status','pending'),'suspended_companies'=>Company::where('status','suspended'),'binned_companies'=>Company::onlyTrashed(),
-   'di_invoices'=>Invoice::query(),'pos_transactions'=>PosTransaction::where('status','completed'),'fbrpos_transactions'=>FbrPosTransaction::query(),
+   'di_invoices'=>Invoice::whereHas('company',fn($q)=>$q->where('product_type','di')),'pos_transactions'=>PosTransaction::whereHas('company',fn($q)=>$q->where('product_type','pos'))->where('status','completed'),'fbrpos_transactions'=>FbrPosTransaction::whereHas('company',fn($q)=>$q->where('product_type','fbrpos')),
    'pending_payment_proofs'=>PaymentProof::where('status','pending'),'active_subscriptions'=>Subscription::where('active',true),'total_users'=>User::query()};
   $reference=$companies?'name':match($metric){'di_invoices','pos_transactions','fbrpos_transactions'=>'invoice_number','total_users'=>'name',default=>null};
   $status=match($metric){'total_users'=>'role','active_subscriptions'=>'active',default=>'status'};

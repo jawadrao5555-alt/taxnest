@@ -1083,7 +1083,7 @@ async function adminReviewContrast(page) {
         const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);return m?m[1].split(/[, ]+/).slice(0,3).map(Number):null;};
         const luminance=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:Math.pow((x+.055)/1.055,2.4);}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
         const bad=[];
-        for(const el of document.querySelectorAll('.tn-dashboard-detail-filters input,.tn-dashboard-detail-filters select,.tn-dashboard-detail-filters option,.tn-detail-primary,.tn-detail-secondary,.tn-detail-status,.tn-admin-sidebar .admin-active-link')) {
+        for(const el of document.querySelectorAll('.tn-dashboard-detail-filters input,.tn-dashboard-detail-filters select,.tn-dashboard-detail-filters option,.tn-detail-primary,.tn-detail-secondary,.tn-detail-status,.tn-admin-sidebar .admin-active-link,.tn-preview-toolbar button,.tn-preview-toolbar a')) {
           const style=getComputedStyle(el),fg=rgb(style.color),bg=rgb(style.backgroundColor);
           if(!fg||!bg) {bad.push(el.tagName+': missing native colour');continue;}
           const a=luminance(fg),b=luminance(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
@@ -1137,7 +1137,30 @@ async function workflow(page,t,v,diagnostics) {
     const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Export filtered CSV'}).click()]);
     const csv=readFileSync(await download.path(),'utf8');
     if(!csv.startsWith('id,company,company_id,product,reference,status,amount,created_at,')) throw new Error('Dashboard CSV schema missing');
-    pass(`${t.name}/${v.width}: all 13 cards opened, returned, filtered and exported`);
+    for(const doc of t.previewDocuments || []) {
+      await page.goto(baseUrl+'/admin/dashboard/details/'+doc.metric+'?company_id='+doc.company,{waitUntil:'domcontentloaded'});
+      const link=page.locator(`[data-invoice-preview$="/${doc.product}/${doc.company}/${doc.record}/preview"]`);
+      if(!await link.count())throw new Error('Typed invoice preview link missing: '+doc.product);
+      const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith(`/${doc.product}/${doc.company}/${doc.record}/preview`)),link.click()]);
+      if(response.status()!==200 || !response.headers()['content-type']?.includes('application/pdf')) throw new Error('Actual '+doc.product+' document did not render as PDF');
+      if(!(await response.body()).subarray(0,5).equals(Buffer.from('%PDF-')))throw new Error('Invalid actual invoice PDF');
+      await page.locator('#tn-invoice-preview').waitFor({state:'visible'});
+      await page.locator('[data-preview-download]').waitFor({state:'visible'});
+      await page.waitForFunction(()=>!document.querySelector('[data-preview-print]').disabled);
+      await adminReviewContrast(page);
+      const [pdf]=await Promise.all([page.waitForEvent('download'),page.locator('[data-preview-download]').click()]);
+      const bytes=readFileSync(await pdf.path());
+      if(!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))throw new Error('Downloaded invoice is not a PDF');
+      if(pdf.suggestedFilename()!==`taxnest-${doc.product}-${doc.company}-${doc.record}.pdf`)throw new Error('PDF filename loses company/product identity');
+      await page.getByRole('button',{name:'Close invoice preview'}).click();
+      if(await page.locator('#tn-invoice-preview').isVisible())throw new Error('Invoice preview did not close');
+      const other=t.previewDocuments.find(x=>x.product!==doc.product);
+      const denied=await page.request.get(baseUrl+`/admin/dashboard/invoices/${doc.product}/${other.company}/${doc.record}/download`);
+      if(denied.status()!==404)throw new Error('Cross-product/company preview was not rejected');
+    }
+    await page.goto(baseUrl+'/admin/dashboard/details/di_invoices?q=RC-CROSS-PRODUCT-SECRET',{waitUntil:'domcontentloaded'});
+    if(await page.locator('[data-invoice-preview]').count())throw new Error('Wrong-product invoice leaked into DI list');
+    pass(`${t.name}/${v.width}: all 13 cards opened, returned, filtered, exported and isolated invoice PDFs previewed/downloaded`);
     return;
   }
   if(t.smartImport)return smartImportWorkflow(page,t,v);

@@ -1,7 +1,7 @@
-title: "Admin record review mein readable filters aur wazeh selection"
+title: "Admin invoice preview, product isolation aur readable filters"
 audience: all
 type: improvement
 points:
   - "Admin dashboard ke filters aur dropdown options ab saaf contrast ke saath parhay ja sakte hain."
   - "Selected sidebar item, company tab aur status filter wazeh fill aur marker ke saath nazar aatay hain."
-  - "Mojooda admin themes, billing records aur fiscal workflows preserve hain."
+  - "Admin invoice reference se read-only PDF preview, print aur download khol sakta hai; DI, PRA POS aur FBR POS records alag rehtay hain."

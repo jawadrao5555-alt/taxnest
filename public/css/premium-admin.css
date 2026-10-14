@@ -484,3 +484,14 @@ html.dark body.admin-themed.tn-premium-shell,
 .tn-admin-sidebar nav > a:focus-visible { outline: 3px solid #e7bf3b; outline-offset: 2px; }
 
 .tn-company-panel[hidden] { display: none !important; }
+
+.tn-invoice-preview-link { background: transparent; border: 0; padding: .3rem 0; color: var(--tn-brand-deep); cursor: pointer; text-align: left; text-decoration: underline; font: inherit; }
+.tn-preview-hint { display: block; font-size: .75rem; }
+#tn-invoice-preview { width: min(1100px, 92vw); max-width: 92vw; padding: 1rem; border: 1px solid var(--tn-admin-line); border-radius: 12px; background: var(--tn-admin-surface); color: var(--tn-admin-text); }
+#tn-invoice-preview::backdrop { background: rgba(0,0,0,.65); }
+.tn-preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.tn-preview-toolbar button, .tn-preview-toolbar a { padding: .6rem .9rem; border: 1px solid var(--tn-line-strong); border-radius: 8px; background: #073943; color: white; cursor: pointer; }
+.tn-preview-toolbar button:disabled { opacity: .5; cursor: wait; }
+#tn-invoice-preview-label { overflow-wrap: anywhere; }
+#tn-invoice-preview-frame { width: 100%; height: 65vh; border: 1px solid var(--tn-admin-line); margin: 1rem 0; }
+#tn-invoice-preview [hidden] { display: none !important; }

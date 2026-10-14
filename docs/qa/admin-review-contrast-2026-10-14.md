@@ -33,3 +33,26 @@ non-loopback dependencies). The three dashboard company tabs now use native
 DOM event handling with initial aria-pressed/hidden state, removing their CDN
 dependency. Existing company lists and default DI selection are preserved.
 Browser checks also require exactly one visible panel matching each clicked tab.
+
+Owner added invoice popup/print/download and strict product isolation. Invoice
+references now open a native modal containing the PDF rendered from the existing
+DI invoice, PRA receipt or FBR POS invoice layout. Preview/download routes require
+platform admin login plus matching typed product, company and record. No tenant
+impersonation, currentCompanyId override, regulator request, browser print job or
+business-data mutation occurs. Archived PRA rows keep their existing hidden scope.
+PDF remote resources, PHP and JavaScript execution are disabled. PDF cache is
+private/no-store; inline frames are same-origin. Browser downloads retain the
+product/company/record identity in a safe server-generated filename.
+
+Product/table ownership is now enforced in dashboard counts/revenue and detail
+rows/search/filter/CSV, excluding wrong-product and orphan records. This is a
+ deliberate correction to previously unscoped aggregate semantics. Historical
+rows themselves are not changed; invalid associations require owner data review.
+
+Guarded admin/detail/FBR evidence regression: 33 tests / 292 assertions PASS.
+Coverage includes overlapping numeric IDs across all three tables, mismatched
+product/company, another same-product company, hidden archived PRA documents,
+tenant-session denial, original-record preservation, and genuine PDF response
+bytes/dispositions (layout rendering separately covered in CI). The authenticated
+browser fixture now renders/downloads real stored documents in all three products
+and rejects product/company substitutions. Fresh final-HEAD CI must pass.

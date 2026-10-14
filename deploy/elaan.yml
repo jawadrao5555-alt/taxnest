@@ -1,7 +1,7 @@
-title: "Admin dashboard ki 13 summary cards par tafseeli record review"
+title: "FBR POS fiscal response ki tasdeeq aur mazboot"
 audience: all
 type: improvement
 points:
-  - "Platform admin ab summary cards se billing aur tax records ki tafseel dekh sakta hai."
-  - "Search, filters aur CSV export se record review asaan hai; yeh screens sirf platform admin ke liye hain."
-  - "Mobile par dashboard tables scroll hoti hain; mojooda billing aur fiscal workflows barqarar hain."
+  - "FBR POS invoice number ab response ke asal fiscal evidence ke saath match hota hai."
+  - "Mukhtalif ya ghair wazeh response par bill review ke liye hold hota hai; automatic accepted nahi dikhaya jata."
+  - "Mojooda valid invoice numbers aur company settings barqarar hain."

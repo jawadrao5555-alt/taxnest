@@ -114,6 +114,32 @@ class FbrPosSubmissionEvidenceTest extends TestCase
         $this->assertNull($bill->fbr_invoice_number);
     }
 
+    public function test_message_or_mismatched_number_is_quarantined_even_with_code_100(): void
+    {
+        foreach ([
+            ['Invoice generated successfully', ['Code' => 100, 'Response' => 'Invoice generated successfully']],
+            ['900000000001', ['Code' => 100, 'InvoiceNumber' => '900000000002']],
+        ] as [$number, $response]) {
+            $bill = $this->bill();
+            $result = $this->submit($bill, ['success' => true, 'pra_invoice_number' => $number, 'response' => $response]);
+            $this->assertTrue($result['verification_pending'] ?? false);
+            $this->assertNull($bill->fresh()->fbr_invoice_number);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+        }
+    }
+
+    public function test_supported_alternate_and_legacy_number_fields_remain_accepted(): void
+    {
+        foreach (['FBRInvoiceNumber', 'invoiceNumber', 'Response'] as $field) {
+            $bill = $this->bill();
+            $number = '123456ABC20260001';
+            $this->submit($bill, ['success' => true, 'pra_invoice_number' => $number,
+                'response' => ['Code' => '100', $field => $number]]);
+            $this->assertSame($number, $bill->fresh()->fbr_invoice_number);
+            $this->assertSame('submitted', $bill->fresh()->fbr_status);
+        }
+    }
+
     public function test_safe_dispatch_telemetry_has_no_full_posid_payload_or_local_url(): void
     {
         $bill = $this->bill();

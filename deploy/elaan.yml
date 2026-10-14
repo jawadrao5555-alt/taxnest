@@ -1,12 +1,7 @@
-# Elaan for THIS production deploy only. CI stores TARGET_SHA internally in
-# deployment_key; customer-visible title/points never contain provenance.
-# Do not reuse Daily L001. Do not use skip_elaan except emergencies.
-
-title: "Hotel Front Desk ab Restaurant Outlet se alag rehta hai"
-audience: pos
-category: hotel
+title: "FBR POS fiscal response ki tasdeeq aur mazboot"
+audience: all
 type: improvement
 points:
-  - "Hotel / Guest House login aur Manage as Company hamesha Front Desk kholta hai — New Sale Hotel ka ghar nahi."
-  - "Agar restaurant_mode pehle se ON hai to Restaurant Outlet Hotel shell ke andar alag module hai, Back to Front Desk ke sath."
-  - "restaurant_mode OFF ho to outlet menu aur sale URL dono band — purani modules, kitchen settings, rooms aur folio history preserve."
+  - "FBR POS invoice number ab response ke asal fiscal evidence ke saath match hota hai."
+  - "Mukhtalif ya ghair wazeh response par bill review ke liye hold hota hai; automatic accepted nahi dikhaya jata."
+  - "Mojooda valid invoice numbers aur company settings barqarar hain."

@@ -555,7 +555,7 @@ class HotelCreditNotePolicyTest extends TestCase
             ->assertSee('name="mode" value="full"', false)
             ->assertSee(number_format($bill->total_amount, 2))
             ->assertDontSee('name="quantities[', false)
-            ->assertDontSee('name="reason"', false)
+            ->assertSee('name="reason"', false)
             ->assertDontSee('data-credit-activation="1"', false);
         $this->get($url.'?settings=1')->assertOk()->assertSee('data-credit-activation="1"', false);
         $other = $this->company('hotel');
@@ -569,14 +569,15 @@ class HotelCreditNotePolicyTest extends TestCase
         $owner->update(['pra_reporting_enabled' => true]);
         $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id);
         $data = ['simple_full' => 1, 'mode' => 'full', 'confirmed' => 1,
-            'request_key' => 'simple-full-credit-request-001', 'fingerprint' => $plan['fingerprint']];
+            'reason' => 'Guest cancelled unused room service', 'request_key' => 'simple-full-credit-request-001', 'fingerprint' => $plan['fingerprint']];
         $url = route('pos.hotel.credit-notes.issue', [$stay->id, $bill->id]);
         $this->actingAs($owner, 'pos')->post($url, $data)->assertRedirect()->assertSessionHas('success');
         $note = \App\Models\HotelCreditNote::where('stay_id', $stay->id)->sole();
         $credit = PosTransaction::findOrFail($note->credit_transaction_id);
         $this->assertEquals($bill->total_amount, $credit->total_amount);
         $this->assertEquals($bill->tax_amount, $credit->tax_amount);
-        $this->assertSame('Full invoice credit confirmed by owner.', $note->reason);
+        $this->assertSame($data['reason'], $note->reason);
+        $this->assertEquals($owner->id, $note->created_by);
         $this->post($url, $data)->assertRedirect()->assertSessionHas('success');
         $this->assertEquals(1, PosTransaction::where('parent_transaction_id', $bill->id)->count());
         $this->assertSame('checked_in', $stay->fresh()->status);
@@ -607,6 +608,78 @@ class HotelCreditNotePolicyTest extends TestCase
         $data['quantities'] = [$bill->items->first()->id => 1];
         $this->post($url, $data)->assertSessionHasErrors('quantities');
         $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
+    }
+
+    public function test_simple_full_credit_requires_the_actual_reason_without_fiscal_writes(): void
+    {
+        [$stay, $owner, $bill] = $this->fixture();
+        $this->enableFor($stay);
+        $plan = app(HotelCreditNotePolicy::class)->review($stay, $owner, (int) $bill->id);
+        $data = ['simple_full' => 1, 'mode' => 'full', 'confirmed' => 1,
+            'request_key' => 'missing-reason-credit-001', 'fingerprint' => $plan['fingerprint']];
+        $this->actingAs($owner, 'pos')->post(route('pos.hotel.credit-notes.issue', [$stay->id, $bill->id]), $data)
+            ->assertSessionHasErrors('reason');
+        $this->assertDatabaseMissing('hotel_credit_notes', ['stay_id' => $stay->id]);
+        $this->assertDatabaseMissing('pos_transactions', ['parent_transaction_id' => $bill->id]);
+    }
+
+    public function test_credit_receipt_distinguishes_document_acceptance_and_actual_refund(): void
+    {
+        [$stay, $owner, $bill, $note, $credit, $service] = $this->acceptedPartialCredit();
+        $summary = app(\App\Services\HotelCreditNoteSummary::class)->forCredit($credit);
+        $this->assertSame('accepted', $summary['status']);
+        $this->assertEquals(0, $summary['refunded']);
+        $this->assertEquals($credit->total_amount, $summary['remaining']);
+        $this->assertSame($note->reason, $summary['reason']);
+        $this->actingAs($owner, 'pos');
+        foreach (['58mm', '80mm', 'a4'] as $paper) {
+            $company = Company::findOrFail($stay->company_id);
+            $company->update(['receipt_printer_size' => $paper === '58mm' ? '58mm' : '80mm',
+                'feature_flags' => array_merge($company->feature_flags, ['hotel_receipt_a4' => $paper === 'a4'])]);
+            $this->get(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]))->assertOk()
+                ->assertSee('Credit amount')->assertSee('Accepted by PRA')->assertSee('Credit not yet refunded')
+                ->assertSee($note->reason)->assertDontSee('Thank you for your purchase');
+        }
+        $service->refund($stay, $owner, (int) $note->id, 100, 'cash', 'summary-refund-request-001');
+        $summary = app(\App\Services\HotelCreditNoteSummary::class)->forCredit($credit->fresh());
+        $this->assertEquals(100, $summary['refunded']);
+        $this->assertEquals((float) $credit->total_amount - 100, $summary['remaining']);
+        $credit->update(['pra_status' => 'submitted', 'pra_invoice_number' => null]);
+        $this->assertSame('failed', app(\App\Services\HotelCreditNoteSummary::class)->forCredit($credit)['status']);
+        $this->assertNull(app(\App\Services\HotelCreditNoteSummary::class)->forCredit($credit)['fiscal_number']);
+        foreach (['pending', 'offline', 'failed'] as $status) {
+            $credit->update(['pra_status' => $status, 'pra_invoice_number' => 'STALE-NUMBER']);
+            $summary = app(\App\Services\HotelCreditNoteSummary::class)->forCredit($credit);
+            $this->assertSame($status === 'failed' ? 'failed' : 'pending', $summary['status']);
+            $this->assertEquals(0, $summary['refundable']);
+            $this->get(route('pos.hotel.bill-receipt', [$stay->id, $credit->id]))->assertOk()
+                ->assertSee($status === 'failed' ? 'PRA submission failed' : 'Pending PRA acceptance')
+                ->assertDontSee('>SALE RECEIPT</strong>', false);
+        }
+        $foreign = $credit->replicate();
+        $foreign->company_id = $this->company('hotel')->id;
+        $foreign->invoice_number = 'FOREIGN-SYNTHETIC-CREDIT';
+        $foreign->offline_uuid = null;
+        $foreign->save();
+        $this->assertNull(app(\App\Services\HotelCreditNoteSummary::class)->forCredit($foreign));
+    }
+
+    public function test_isolated_cashier_cannot_read_other_bill_guest_funds_from_credit_receipt(): void
+    {
+        [$stay, $owner, $bill, $note, $credit] = $this->acceptedPartialCredit();
+        $cashier = $owner->replicate();
+        $cashier->email = 'credit-cashier@qa.invalid';
+        $cashier->role = 'staff';
+        $cashier->pos_role = 'pos_cashier';
+        $cashier->save();
+        $credit->update(['created_by' => $cashier->id]);
+        $this->actingAs($cashier, 'pos');
+        $summary = app(\App\Services\HotelCreditNoteSummary::class)->forCredit($credit->fresh());
+        $this->assertSame('accepted', $summary['status']);
+        $this->assertNull($summary['refundable'], 'Other cashier bill totals must not leak through guest funds');
+        $this->assertEquals(0, $summary['refunded']);
+        $this->actingAs($owner, 'pos');
+        $this->assertEquals($credit->total_amount, app(\App\Services\HotelCreditNoteSummary::class)->forCredit($credit->fresh())['refundable']);
     }
 
     private function company(string $category, array $overrides = []): Company

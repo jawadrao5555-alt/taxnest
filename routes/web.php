@@ -473,6 +473,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/invoices/import-upload', [InvoiceImportController::class, 'upload'])->name('invoices.import-upload');
         // DMS-export column mapping: apply a mapping/preset to a held upload + preset management.
         Route::post('/invoices/import-apply-mapping', [InvoiceImportController::class, 'applyMapping'])->name('invoices.import-apply-mapping');
+        Route::get('/invoices/import-mappings/{id}/history', [InvoiceImportController::class, 'mappingHistory'])->name('invoices.import-mapping-history');
         Route::post('/invoices/import-mappings/{id}/rename', [InvoiceImportController::class, 'renameMapping'])->name('invoices.import-mapping-rename');
         Route::delete('/invoices/import-mappings/{id}', [InvoiceImportController::class, 'deleteMapping'])->name('invoices.import-mapping-delete');
         Route::post('/invoices/import/{batchId}/process', [InvoiceImportController::class, 'process'])->middleware('plan.limit:invoices')->name('invoices.import-process');
@@ -1536,6 +1537,7 @@ Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admi
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
+    Route::get('/dashboard/details/{metric}', [\App\Http\Controllers\SaasAdmin\AdminDashboardDetailController::class, 'show'])->name('saas.admin.dashboard.detail');
     Route::get('/live-activity', [\App\Http\Controllers\SaasAdmin\AdminLiveActivityController::class, 'index'])->name('saas.admin.live-activity');
 
     // Live Ops console (NestPOS PRA diagnostics + owner-approved remediation)

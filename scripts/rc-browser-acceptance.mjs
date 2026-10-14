@@ -824,7 +824,12 @@ async function hotelCreditReview(page, t, v) {
   const issue=dialog.locator('form[data-credit-simple="1"]');
   await issue.waitFor({state:'visible'});
   if (await issue.locator('[name="mode"]').inputValue()!=='full') throw new Error('Simple flow did not use whole invoice');
-  if (await issue.locator('[name="reason"],input[type="number"],select').count()) throw new Error('Simple flow retained manual entry controls');
+  if (await issue.locator('input[type="number"],select').count()) throw new Error('Simple flow retained manual entry controls');
+  const reason=issue.locator('textarea[name="reason"]');
+  if (await reason.getAttribute('required') === null) throw new Error('Actual credit reason is not required');
+  if (await issue.evaluate(form=>form.checkValidity())) throw new Error('Empty credit reason accepted by browser');
+  await reason.fill('Synthetic unused service correction');
+  if (!await issue.evaluate(form=>form.checkValidity())) throw new Error('Valid actual reason refused');
   if (await issue.locator('button[type="submit"]').count()!==1) throw new Error('Single confirmation action missing');
   await saveEvidenceScreenshot(page,'hotel-credit-simple-full-'+v.width+'.png');
   // No fiscal POST in browser: real controller POST/idempotency is exercised with synthetic backend fixtures.
@@ -839,6 +844,8 @@ async function hotelCreditReview(page, t, v) {
   await page.locator('[data-credit-open^="credit-result-"]').first().click();
   const result=page.locator('dialog[open][id^="credit-result-"]');
   await result.waitFor({state:'visible'});
+  if (!await result.locator('[data-credit-status="accepted"]').count()) throw new Error('Accepted credit status missing');
+  if (!(await result.innerText()).includes('Credit not yet refunded')) throw new Error('Refund balance missing');
   const printLink=result.locator('a[href*="/receipt"]');
   await printLink.waitFor({state:'visible'});
   await printLink.click();
@@ -847,6 +854,8 @@ async function hotelCreditReview(page, t, v) {
   const creditReceiptFrame=page.frameLocator('[data-receipt-frame]');
   await creditReceiptFrame.locator('#receiptActions').waitFor({state:'attached'});
   if (!(await creditReceiptFrame.locator('body').innerText()).includes('SYNTHETIC-ACCEPTED-CREDIT')) throw new Error('Print opened a different or missing credit receipt');
+  const receiptText=await creditReceiptFrame.locator('body').innerText();
+  if (!receiptText.includes('Credit amount') || !receiptText.includes('Credit not yet refunded') || receiptText.includes('Thank you for your purchase')) throw new Error('Credit receipt still reads as a sale');
   await saveEvidenceScreenshot(page,'hotel-credit-print-'+v.width+'.png');
   await creditReceiptPopup.locator('[data-receipt-close]').click();
   await result.waitFor({state:'visible'});
@@ -969,6 +978,44 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   pass(t.name+'/'+v.width+': six category-specific groups, no outlet leakage, real failed-save retry and persisted colour');
 }
 
+async function formatHistoryWorkflow(page,t,v) {
+  const name='Synthetic approved format '+v.width+' '+Date.now();
+  const csv='Outlet,Qty,Item,HS,Rate,GST\nFictional buyer,2,Beef,02023000,100,36\n';
+  async function upload() {
+    await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    const importer=page.locator('[x-data="bulkImport()"]');
+    await importer.locator('button').first().click();
+    await importer.locator('input[type=file]').setInputFiles({name:'fictional-format.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+    await importer.getByRole('button',{name:'Continue to Preview'}).waitFor();
+    return importer;
+  }
+  let importer=await upload();
+  for(const [field,column] of Object.entries({buyer_name:'Outlet',quantity:'Qty',description:'Item',hs_code:'HS',price:'Rate',tax:'GST'})) {
+    const row=importer.locator('div.grid.grid-cols-12').filter({has:page.locator('span[x-text="f.key"]').filter({hasText:new RegExp('^'+field+'$')})});
+    await row.locator('select[x-model="mappingSel[f.key]"]').selectOption(column);
+  }
+  for(const [field,value] of Object.entries({buyer_address:'Fictional address',destination_province:'Punjab',document_type:'Sale Invoice'})) {
+    const row=importer.locator('div.grid.grid-cols-12').filter({has:page.locator('span[x-text="f.key"]').filter({hasText:new RegExp('^'+field+'$')})});
+    await row.locator('select[x-model="mappingSel[f.key]"]').selectOption('');
+    const control=row.locator('[x-model="defaultsSel[f.key]"]');
+    if(await control.evaluate(el=>el.tagName==='SELECT'))await control.selectOption(value);else await control.fill(value);
+  }
+  await importer.locator('input[x-model=savePreset]').check();
+  await importer.locator('input[x-model=presetName]').fill(name);
+  const [saved]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/import-apply-mapping')),importer.getByRole('button',{name:'Continue to Preview'}).click()]);
+  const result=await saved.json();
+  if(!saved.ok()||result.preset_saved!==name)throw new Error('Explicit format approval/save failed');
+  importer=await upload();
+  const presetRow=importer.locator('div.flex.flex-wrap.items-center.justify-between').filter({has:page.locator('span[x-text="p.name"]').filter({hasText:name})});
+  const [history]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/history')),presetRow.getByRole('button',{name:'History',exact:true}).click()]);
+  const versions=(await history.json()).versions;
+  if(!history.ok()||versions.length!==1||!versions[0].approved_at||versions[0].snapshot.mapping.quantity!=='Qty')throw new Error('Saved approved history missing');
+  await importer.getByText('Format history: '+name,{exact:true}).waitFor();
+  await importer.getByText('Version 1',{exact:false}).waitFor();
+  pass(t.name+'/'+v.width+': authenticated explicit format approval and persisted history UI; no invoice creation/submission');
+}
+
 async function smartImportWorkflow(page,t,v) {
   await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
@@ -976,7 +1023,9 @@ async function smartImportWorkflow(page,t,v) {
   await importer.locator('button').first().click();
   await importer.locator('input[x-model="smartSourceSystem"]').fill('rc-smart-'+v.width+'-'+Date.now());
   const values={buyer_name:'Unverified source label',buyer_ntn:'',buyer_cnic:'',buyer_address:'Source address',destination_province:'Punjab',document_type:'Sale Invoice',hs_code:'',description:'Synthetic beverage',quantity:'2',price:'',tax:'',schedule_type:'',tax_rate:'',source_invoice_number:'TEST-UI-'+v.width,invoice_date:'2026-01-01',source_sku:'TEST-SKU',source_outlet:'TEST-OUTLET',source_gross:'1300',source_discount:'100',source_vat:'216',source_net:'1416',invoice_gross:'1300',invoice_discount:'100',invoice_vat:'216',invoice_net:'1416'};
-  const csv=Object.keys(values).join(',')+'\n'+Object.values(values).join(',')+'\n';
+  const deposit={...values,source_sku:'TEST-EMPTY',description:'COKE 250 ML IMPLIED EMP 24B RGB',quantity:'2',source_gross:'100',source_discount:'0',source_vat:'0',source_net:'100'};
+  const returned={...deposit,quantity:'-2',source_gross:'-100',source_net:'-100'};
+  const csv=Object.keys(values).join(',')+'\n'+[values,deposit,returned].map(row=>Object.values(row).join(',')).join('\n')+'\n';
   await importer.locator('input[type=file]').setInputFiles({name:'synthetic-smart-'+v.width+'.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await page.waitForURL(u=>u.pathname.endsWith('/source-review'),{timeout:30000});
   const reviewPath=new URL(page.url()).pathname;
@@ -999,6 +1048,8 @@ async function smartImportWorkflow(page,t,v) {
   }
   await mapping('sku',{description:'Verified synthetic beverage',hs_code:'22021010',litres_per_case:'6',uom:'Liter',schedule_type:'standard',tax_rate:'18'});
   await mapping('buyer',{buyer_name:'Verified synthetic buyer',buyer_address:'Fictional verified address',destination_province:'Punjab',registration_type:'Unregistered'});
+  await page.locator('input[name="exclusions[3]"]').fill('Verified synthetic empty-bottle deposit charge');
+  await page.locator('input[name="exclusions[4]"]').fill('Verified synthetic empty-bottle deposit return');
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Refresh review with current mappings and exclusions'}).click()]);
   await dismiss(page);
   if((await page.locator('body').innerText()).includes('Unknown SKU'))throw new Error('Verified SKU did not resolve source review: '+(await page.locator('body').innerText()).slice(-6000));
@@ -1020,6 +1071,7 @@ async function smartImportWorkflow(page,t,v) {
   await page.goto(baseUrl+reviewPath,{waitUntil:'domcontentloaded'});
   if(!(await page.locator('body').innerText()).includes('TEST-UI-'+v.width))throw new Error('Original source identity disappeared');
   pass(t.name+'/'+v.width+': authenticated upload, verified mappings, source review, explicit approval and draft receipt; no fiscal posting');
+  await formatHistoryWorkflow(page,t,v);
 }
 
 async function workflow(page,t,v,diagnostics) {

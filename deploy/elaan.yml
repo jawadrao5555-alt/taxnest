@@ -1,7 +1,7 @@
-title: "Admin dashboard ki 13 summary cards par tafseeli record review"
+title: "Admin record review mein readable filters aur wazeh selection"
 audience: all
 type: improvement
 points:
-  - "Platform admin ab summary cards se billing aur tax records ki tafseel dekh sakta hai."
-  - "Search, filters aur CSV export se record review asaan hai; yeh screens sirf platform admin ke liye hain."
-  - "Mobile par dashboard tables scroll hoti hain; mojooda billing aur fiscal workflows barqarar hain."
+  - "Admin dashboard ke filters aur dropdown options ab saaf contrast ke saath parhay ja sakte hain."
+  - "Selected sidebar item, company tab aur status filter wazeh fill aur marker ke saath nazar aatay hain."
+  - "Mojooda admin themes, billing records aur fiscal workflows preserve hain."

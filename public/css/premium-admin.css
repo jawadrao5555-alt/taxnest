@@ -429,3 +429,56 @@ html.dark body.admin-themed.tn-premium-shell,
 
 /* Keep native company ledgers scrollable when external utility CSS is absent. */
 .tn-company-panel > .overflow-x-auto { max-width: 100%; overflow-x: auto; }
+
+/* Admin record review: native colours must not inherit dark utility surfaces
+   with light-canvas text. Explicit state also survives missing CDN utilities. */
+.tn-dashboard-detail { color: var(--tn-admin-text); }
+.tn-dashboard-detail a { color: var(--tn-brand-deep); }
+.tn-dashboard-detail-filters input,
+.tn-dashboard-detail-filters select,
+.tn-dashboard-detail-filters option {
+    background: var(--tn-admin-surface) !important;
+    color: var(--tn-admin-text) !important;
+    border: 1px solid var(--tn-line-strong);
+    border-radius: 8px; min-height: 42px; padding: .55rem .7rem;
+    font: inherit; color-scheme: light;
+}
+.dark .tn-dashboard-detail-filters :is(input, select, option) { color-scheme: dark; }
+.tn-dashboard-detail-filters label { color: var(--tn-admin-text); font-weight: 600; }
+.tn-dashboard-detail-filters :is(input, select):focus-visible,
+.tn-dashboard-detail :is(a, button):focus-visible,
+.tn-company-tabs button:focus-visible {
+    outline: 3px solid var(--tn-brand-deep); outline-offset: 3px;
+}
+.tn-dashboard-detail .tn-detail-primary {
+    background: #073943 !important; color: #ffffff !important;
+    border: 1px solid #073943; font-weight: 700; min-height: 42px;
+}
+.tn-dashboard-detail .tn-detail-secondary,
+.tn-dashboard-detail .tn-detail-status {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: .6rem .8rem; min-height: 42px; box-sizing: border-box;
+    background: var(--tn-admin-surface) !important; color: var(--tn-admin-text) !important;
+    border: 1px solid var(--tn-line-strong); border-radius: 8px; font-weight: 600;
+}
+.tn-detail-statuses { display: flex; flex-wrap: wrap; gap: .6rem; }
+.tn-dashboard-detail .tn-detail-status[data-selected="true"] {
+    background: #073943 !important; color: #ffffff !important;
+    border-color: #073943; box-shadow: inset 0 -3px 0 #e7bf3b;
+}
+.tn-detail-status[data-selected="true"]::before { content: "✓"; margin-right: .45rem; }
+.tn-detail-selection { padding: .8rem 1rem; background: var(--tn-brand-soft); border-left: 4px solid var(--tn-brand-deep); }
+.tn-dashboard-detail-scroll { background: var(--tn-admin-surface); border: 1px solid var(--tn-admin-line); border-radius: 10px; }
+.tn-dashboard-detail-scroll thead { background: var(--tn-brand-soft); color: var(--tn-admin-text); }
+.tn-dashboard-detail-scroll tbody tr + tr { border-top: 1px solid var(--tn-admin-line); }
+.tn-dashboard-detail-scroll tbody tr:hover { background: var(--tn-brand-soft); }
+.tn-company-tabs button { border: 0; border-bottom: 3px solid transparent; min-height: 44px; padding: .75rem 1rem; }
+.tn-company-tabs button[aria-pressed="true"] {
+    background: #073943 !important; color: #ffffff !important;
+    border-bottom-color: #e7bf3b !important; font-weight: 750;
+}
+.tn-admin-sidebar nav > a.admin-active-link {
+    background: #ffffff !important; color: #17323a !important;
+    box-shadow: inset 4px 0 0 var(--tn-admin-accent); font-weight: 750;
+}
+.tn-admin-sidebar nav > a:focus-visible { outline: 3px solid #e7bf3b; outline-offset: 2px; }

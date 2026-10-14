@@ -1074,9 +1074,38 @@ async function smartImportWorkflow(page,t,v) {
   await formatHistoryWorkflow(page,t,v);
 }
 
+async function adminReviewContrast(page) {
+  const saved=await page.evaluate(()=>({theme:getAdminTheme(),dark:document.documentElement.classList.contains('dark')}));
+  try {
+    for(const theme of ['indigo','emerald','cyan','rose','amber','purple']) for(const dark of [false,true]) {
+      await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
+      const failures=await page.evaluate(()=>{
+        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);return m?m[1].split(/[, ]+/).slice(0,3).map(Number):null;};
+        const luminance=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:Math.pow((x+.055)/1.055,2.4);}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
+        const bad=[];
+        for(const el of document.querySelectorAll('.tn-dashboard-detail-filters input,.tn-dashboard-detail-filters select,.tn-dashboard-detail-filters option,.tn-detail-primary,.tn-detail-secondary,.tn-detail-status,.tn-admin-sidebar .admin-active-link')) {
+          const style=getComputedStyle(el),fg=rgb(style.color),bg=rgb(style.backgroundColor);
+          if(!fg||!bg) {bad.push(el.tagName+': missing native colour');continue;}
+          const a=luminance(fg),b=luminance(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+          if(ratio<4.5)bad.push(el.tagName+' '+el.getAttribute('name')+': contrast '+ratio.toFixed(2));
+        }
+        return bad;
+      });
+      if(failures.length)throw new Error('Admin review contrast '+theme+'/'+(dark?'dark':'light')+': '+failures.join('; '));
+    }
+  } finally {
+    await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);
+  }
+}
+
 async function workflow(page,t,v,diagnostics) {
   if(t.dashboardDetails) {
     await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
+    for(const key of ['di','pos','fbrpos']) {
+      const tab=page.locator(`.tn-company-tabs button`).filter({hasText:key==='di'?'Digital Invoice':key==='pos'?'PRA POS':'FBR POS'});
+      await tab.click();
+      if(await tab.getAttribute('aria-pressed')!=='true' || await page.locator('.tn-company-tabs button[aria-pressed="true"]').count()!==1) throw new Error('Selected admin company tab is not explicit: '+key);
+    }
     const keys=await page.locator('[data-dashboard-metric]').evaluateAll(els=>els.map(el=>el.dataset.dashboardMetric));
     if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');
     for(const key of keys) {
@@ -1091,6 +1120,16 @@ async function workflow(page,t,v,diagnostics) {
       await page.getByRole('link',{name:'Admin Dashboard',exact:false}).last().click();
       await page.waitForURL('**/admin/dashboard');
     }
+    await page.goto(baseUrl+'/admin/dashboard/details/total_companies',{waitUntil:'domcontentloaded'});
+    if(await page.locator('.tn-admin-sidebar a[aria-current="page"]').count()!==1)throw new Error('Dashboard navigation loses selection on drilldown');
+    await adminReviewContrast(page);
+    const status=page.locator('.tn-detail-status').first();
+    if(!await status.count())throw new Error('Synthetic admin company status fixture is missing');
+    await Promise.all([page.waitForURL(u=>u.searchParams.has('status')),status.click()]);
+    await page.locator('.tn-detail-status[data-selected="true"][aria-current="true"]').waitFor({state:'visible'});
+    await adminReviewContrast(page);
+    await page.getByRole('link',{name:'Clear status',exact:true}).click();
+    await page.waitForURL(u=>!u.searchParams.has('status'));
     await page.goto(baseUrl+'/admin/dashboard/details/di_invoices',{waitUntil:'domcontentloaded'});
     await page.locator('input[name="q"]').fill('RC');
     await Promise.all([page.waitForURL(u=>u.searchParams.get('q')==='RC'),page.getByRole('button',{name:'Apply filters'}).click()]);

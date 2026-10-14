@@ -30,6 +30,15 @@ class AdminDashboardDetailTest extends TestCase {
   }
   $this->assertStringContainsString("'=Fictional Company",$this->get('/admin/dashboard/details/total_companies?export=csv')->streamedContent());
  }
+ public function test_detail_navigation_and_selected_status_are_explicit(): void {
+  $this->admin();
+  $response=$this->get('/admin/dashboard/details/total_companies?status=approved&product=di');
+  $response->assertOk()->assertSee('aria-current="page"', false)
+   ->assertSee('data-selected="true"', false)->assertSee('Currently showing', false)
+   ->assertViewHas('count',1);
+  $this->get('/admin/dashboard/details/total_companies?status=suspended')->assertOk()
+   ->assertSee('Clear status', false)->assertViewHas('count',0);
+ }
  public function test_count_and_revenue_match_existing_tile_semantics(): void {
   $this->admin();$s=app(AdminDashboardDetail::class);
   $d=$s->definition('di_invoices');$this->assertSame(3,$d['q']->count());$this->assertSame(100.0,$s->revenue($d['q'],$d));

@@ -1105,6 +1105,7 @@ async function workflow(page,t,v,diagnostics) {
       const tab=page.locator(`.tn-company-tabs button`).filter({hasText:key==='di'?'Digital Invoice':key==='pos'?'PRA POS':'FBR POS'});
       await tab.click();
       if(await tab.getAttribute('aria-pressed')!=='true' || await page.locator('.tn-company-tabs button[aria-pressed="true"]').count()!==1) throw new Error('Selected admin company tab is not explicit: '+key);
+      if(!await page.locator(`[data-company-panel="${key}"]`).isVisible() || await page.locator('[data-company-panel]:not([hidden])').count()!==1) throw new Error('Selected company tab does not show its own panel: '+key);
     }
     const keys=await page.locator('[data-dashboard-metric]').evaluateAll(els=>els.map(el=>el.dataset.dashboardMetric));
     if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');

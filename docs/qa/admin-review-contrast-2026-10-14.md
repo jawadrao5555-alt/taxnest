@@ -26,3 +26,10 @@ prior release remain; no local browser or live verification is claimed.
 
 Owner screenshots were reviewed as supplied; raw customer screenshots and
 personal data are not committed. This is a follow-up to merged PR #201.
+
+First fresh CI reproduced a further actual failure: selected company tabs did
+not update when external Alpine was unavailable (the browser fixture blocks
+non-loopback dependencies). The three dashboard company tabs now use native
+DOM event handling with initial aria-pressed/hidden state, removing their CDN
+dependency. Existing company lists and default DI selection are preserved.
+Browser checks also require exactly one visible panel matching each clicked tab.

@@ -482,3 +482,5 @@ html.dark body.admin-themed.tn-premium-shell,
     box-shadow: inset 4px 0 0 var(--tn-admin-accent); font-weight: 750;
 }
 .tn-admin-sidebar nav > a:focus-visible { outline: 3px solid #e7bf3b; outline-offset: 2px; }
+
+.tn-company-panel[hidden] { display: none !important; }

@@ -195,6 +195,23 @@ foreach (['desktop', 'mobile'] as $viewport) {
     $handoffCases[$viewport] = ['tableId' => $table->id, 'number' => $table->table_number, 'orderId' => $order->id,
         'itemName' => 'Synthetic handoff '.$viewport];
 }
+// Repeated dish rows reproduce delete -> CANCEL plus duplicate ADD, separately per viewport.
+$kotDeleteCases = [];
+foreach (['desktop', 'mobile'] as $viewport) {
+    $table = RestaurantTable::create(['company_id' => $tableShop->id, 'floor_id' => $tableFloor->id,
+        'table_number' => 'KOT-DELETE-'.$viewport, 'seats' => 4, 'status' => 'occupied', 'occupied_since' => $now, 'is_active' => true]);
+    $order = RestaurantOrder::create(['company_id' => $tableShop->id, 'table_id' => $table->id,
+        'order_number' => 'RC-KOT-DELETE-'.$viewport, 'order_type' => 'dine_in', 'source' => 'waiter',
+        'status' => 'held', 'created_by' => $tableWaiter->id, 'subtotal' => 600, 'total_amount' => 600,
+        'kot_sent_at' => $now]);
+    $lineIds = [];
+    foreach ([1, 2, 3] as $qty) {
+        $lineIds[] = RestaurantOrderItem::create(['order_id' => $order->id, 'item_type' => 'manual',
+            'item_name' => 'Synthetic repeated dish', 'quantity' => $qty, 'unit_price' => 100,
+            'subtotal' => $qty * 100, 'special_notes' => 'same notes', 'kot_printed_at' => $now])->id;
+    }
+    $kotDeleteCases[$viewport] = ['number' => $table->table_number, 'orderId' => $order->id, 'lineIds' => $lineIds];
+}
 $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
 $hotelManager->forceFill(['default_branch_id' => $hotelBranch])->save();
@@ -500,7 +517,7 @@ $fixture = [
                 'refundPath' => '/pos/hotel/stays/'.$refundStay->id.'/credit-notes']],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
-            'tableOrderWorkflow' => $tableCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
+            'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],

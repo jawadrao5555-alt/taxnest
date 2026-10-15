@@ -1281,7 +1281,53 @@ async function tableOrderWorkflow(page,t,v) {
       await page.locator('[data-video="counter-dine-in"]').waitFor({state:'visible'});
     }
   }
+  if(t.kotDeleteCases) await repeatedDishDeleteWorkflow(page,t,v);
   if(t.cashierHandoff) await cashierHandoffWorkflow(page,t,v);
+}
+async function repeatedDishDeleteWorkflow(originalPage,t,v) {
+  const expected=t.kotDeleteCases[v.width<768?'mobile':'desktop'];
+  const context=await originalPage.context().browser().newContext({viewport:v});
+  const page=await context.newPage();
+  try {
+    await login(page,t);
+    await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    await page.locator('[data-video="counter-dine-in"]').click();
+    const [claim]=await Promise.all([
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'),
+      page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click(),
+    ]);
+    if(!claim.ok())throw new Error('Repeated dish table claim failed');
+    await page.waitForFunction(id=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return Number(d.incomingOrderId)===id&&d.cart.length===3;
+    },expected.orderId);
+    await openMobileCart(page,v,['Current Order']);
+    await page.locator('[data-video="cart-remove"][data-line-id="'+expected.lineIds[2]+'"]').click();
+    const [saved]=await Promise.all([
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/restaurant/orders/'+expected.orderId+'/edit'&&r.request().method()==='POST'),
+      page.locator('[data-video="order-edit-save"]').click(),
+    ]);
+    const body=await saved.json();
+    if(!saved.ok()||!body.success)throw new Error('Delete edit failed');
+    const ids=body.order.items.map(i=>Number(i.line_id));
+    if(JSON.stringify(ids.slice().sort((a,b)=>a-b))!==JSON.stringify(expected.lineIds.slice(0,2).sort((a,b)=>a-b)))throw new Error('Deletion created duplicate lines or removed retained IDs: '+JSON.stringify(ids));
+    if(body.order.items.reduce((n,i)=>n+Number(i.quantity),0)!==3||Number(body.total)!==300)throw new Error('Deletion doubled quantities or billing total');
+    if(Object.keys(body.kot.add||{}).length)throw new Error('Pure deletion incorrectly generated an ADD kitchen action');
+    await page.waitForFunction(()=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return !d.incomingEditBusy&&d.cart.length===2&&d.cart.reduce((n,i)=>n+Number(i.quantity),0)===3;
+    });
+    // Reload and reopen through the actual table to prove persisted state, not a client-only splice.
+    await page.reload({waitUntil:'domcontentloaded'}); await waitForOperationalSurface(page); await dismiss(page);
+    await page.locator('[data-video="counter-dine-in"]').click();
+    await page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click();
+    await page.waitForFunction(id=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return Number(d.incomingOrderId)===id&&d.cart.length===2&&d.cart.reduce((n,i)=>n+Number(i.quantity),0)===3;
+    },expected.orderId);
+    pass(t.name+'/'+v.width+': repeated dish deletion retained exact line IDs, quantity 3/total 300, no ADD and persisted after reopen');
+  } finally {await context.close();}
 }
 async function cashierHandoffWorkflow(page,t,v) {
   const h=t.cashierHandoff, expected=h.cases[v.width<768?'mobile':'desktop'];

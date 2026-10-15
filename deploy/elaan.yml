@@ -1,7 +1,7 @@
-title: "Admin invoice preview, product isolation aur readable filters"
+title: "Table item delete par duplicate kitchen ADD ki correction"
 audience: all
-type: improvement
+type: fix
 points:
-  - "Admin dashboard ke filters aur dropdown options ab saaf contrast ke saath parhay ja sakte hain."
-  - "Selected sidebar item, company tab aur status filter wazeh fill aur marker ke saath nazar aatay hain."
-  - "Admin invoice reference se read-only PDF preview, print aur download khol sakta hai; DI, PRA POS aur FBR POS records alag rehtay hain."
+  - "Table order mein same dish ki multiple lines ab apne alag line ID se match hoti hain."
+  - "Item delete karne par baqi lines dobara ADD nahi hotin; cancellation sirf hatayi hui quantity ki hoti hai."
+  - "Order save aur reopen par quantity aur bill total barqarar rehtay hain."

@@ -826,20 +826,34 @@ class RestaurantWaiterController extends Controller
                 'name' => $item->item_name, 'quantity' => (float) $item->quantity,
                 'unit_price' => (float) $item->unit_price, 'notes' => $item->special_notes,
             ])->values()->all();
-            $remaining = $order->items->keyBy(fn ($item) => implode('|', [
-                $item->item_type, $item->item_id ?: '', mb_strtolower(trim($item->item_name)),
-            ]));
+            // Repeated dishes (including printed + add-on chunks) are separate
+            // order lines. Keying by dish collapsed them: retained lines were
+            // recreated while the originals survived, doubling the bill/KOT.
+            $remaining = $order->items->keyBy('id');
             $voidItems = []; $changed = []; $hasNewKitchen = false;
             foreach ($validated['items'] as $input) {
                 $key = implode('|', [
                     $input['item_type'] ?? (!empty($input['item_id']) ? 'product' : 'manual'),
                     $input['item_id'] ?? '', mb_strtolower(trim($input['name'])),
                 ]);
-                $line = !empty($input['line_id'])
-                    ? $remaining->first(fn ($candidate) => (int) $candidate->id === (int) $input['line_id'])
-                    : $remaining->get($key);
+                if (!empty($input['line_id'])) {
+                    $line = $remaining->get((int) $input['line_id']);
+                    // Unknown/reused/foreign IDs must not become ADD commands.
+                    if (!$line) {
+                        abort(response()->json(['success' => false, 'conflict' => true,
+                            'message' => 'An order line changed. Reload and review before saving.'], 409));
+                    }
+                } else {
+                    // Legacy carts omit line_id: consume one matching row at a
+                    // time, preferring its notes so repeated variants stay put.
+                    $matches = $remaining->filter(fn ($candidate) => implode('|', [
+                        $candidate->item_type, $candidate->item_id ?: '', mb_strtolower(trim($candidate->item_name)),
+                    ]) === $key);
+                    $line = $matches->first(fn ($candidate) => (string) ($candidate->special_notes ?? '')
+                        === (string) ($input['special_notes'] ?? '')) ?? $matches->first();
+                }
                 if ($line) {
-                    $remaining->forget($remaining->search(fn ($candidate) => (int) $candidate->id === (int) $line->id));
+                    $remaining->forget($line->id);
                 }
                 $qty = (float) $input['quantity'];
                 $notes = $input['special_notes'] ?? null;
@@ -855,7 +869,7 @@ class RestaurantWaiterController extends Controller
                 }
                 if (!$line) {
                     $new = RestaurantOrderItem::create([
-                        'order_id' => $order->id, 'item_type' => $input['item_type'] ?? ($input['item_id'] ? 'product' : 'manual'),
+                        'order_id' => $order->id, 'item_type' => $input['item_type'] ?? (!empty($input['item_id']) ? 'product' : 'manual'),
                         'item_id' => $input['item_id'] ?? null, 'item_name' => $input['name'],
                         'quantity' => $qty, 'unit_price' => round((float) $input['unit_price'], 2),
                         'subtotal' => round($qty * (float) $input['unit_price'], 2),

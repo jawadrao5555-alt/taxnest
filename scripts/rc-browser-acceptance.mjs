@@ -113,7 +113,13 @@ async function checkUsability(page,t,path,v) {
     const box=await el.boundingBox();
     if(!box||box.width<20||box.height<12||box.width>v.width+2)fail(`${t.name}/${v.width}: unusable control ${selector}`);
     if(t.name==='fiscal'||t.readOnly) {
-      try { await el.click({trial:true,timeout:5000}); }
+      try {
+        await el.click({trial:true,timeout:5000});
+        if(t.name==='fiscal') {
+          await el.click({timeout:5000});
+          if(!await el.evaluate(el=>document.activeElement===el))fail(`${t.name}/${v.width}: search did not receive focus after pointer click`);
+        }
+      }
       catch (error) {
         const geometry=await el.evaluate(el=>{
           const r=el.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2;

@@ -5777,44 +5777,12 @@ class FbrPosController extends Controller
 
     private function generateInvoiceNumber(int $companyId): string
     {
-        $year = now()->format('Y');
-        $prefix = "FPOS-{$year}-";
-
-        $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
-            ->where('invoice_number', 'like', "{$prefix}%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->value('invoice_number');
-
-        if ($lastInvoice) {
-            $lastNum = (int) str_replace($prefix, '', $lastInvoice);
-            $nextNum = $lastNum + 1;
-        } else {
-            $nextNum = 1;
-        }
-
-        return $prefix . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+        return \App\Services\FbrPosInvoiceSeries::issue($companyId, 'FPOS-'.now()->format('Y').'-');
     }
 
     private function generateLocalInvoiceNumber(int $companyId): string
     {
-        $year = now()->format('Y');
-        $prefix = "FLOCAL-{$year}-";
-
-        $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
-            ->where('invoice_number', 'like', "{$prefix}%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->value('invoice_number');
-
-        if ($lastInvoice) {
-            $lastNum = (int) str_replace($prefix, '', $lastInvoice);
-            $nextNum = $lastNum + 1;
-        } else {
-            $nextNum = 1;
-        }
-
-        return $prefix . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+        return \App\Services\FbrPosInvoiceSeries::issue($companyId, 'FLOCAL-'.now()->format('Y').'-');
     }
 
     public function billing()

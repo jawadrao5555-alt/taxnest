@@ -1694,7 +1694,7 @@ window.addEventListener('popstate', function() {
                                 class="p-1.5 flex-shrink-0 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             </button>
-                            <button @click.stop="removeFromCart(index)" class="p-1.5 flex-shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition active:scale-90">
+                            <button @click.stop="removeFromCart(index)" data-video="cart-remove" :data-line-id="item.line_id || ''" class="p-1.5 flex-shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </div>
@@ -1879,7 +1879,7 @@ window.addEventListener('popstate', function() {
                          The PAY (F8) button below keeps the Pay modal (method choice + note).
                          Failures surface via showToast (modal-independent). --}}
                     <div x-show="incomingOrderId" x-cloak class="grid grid-cols-2 gap-2 mb-2">
-                        <button type="button" @click="saveIncomingOrder()" :disabled="submitting || incomingEditBusy"
+                        <button type="button" @click="saveIncomingOrder()" data-video="order-edit-save" :disabled="submitting || incomingEditBusy"
                             class="py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold disabled:opacity-40">
                             <span x-show="!incomingEditBusy">{{ __('pos.waiter_edit_save_kitchen') }}</span>
                             <span x-show="incomingEditBusy">{{ __('pos.waiter_edit_saving') }}</span>

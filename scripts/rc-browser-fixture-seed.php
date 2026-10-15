@@ -451,10 +451,23 @@ $unitStocked = \App\Models\Ingredient::create([
     'current_stock' => 50, 'cost_per_unit' => 100, 'min_stock_level' => 0, 'is_active' => true,
 ]);
 
+// Actual stored document previews: disposable fixtures, never fiscal transport.
+$previewDiCompany = $company('Synthetic Admin DI Preview', 'admin-di-preview@rc-browser.invalid', 'RCBADMINPREVIEW', 'di', ['fbr_environment'=>'sandbox']);
+$previewDi = \App\Models\Invoice::forceCreate(['company_id'=>$previewDiCompany->id,'invoice_number'=>'RC-ADMIN-DI-PREVIEW','internal_invoice_number'=>'RC-ADMIN-DI-PREVIEW','buyer_name'=>'Synthetic Preview Buyer','invoice_date'=>'2026-10-01','status'=>'draft','total_amount'=>118,'total_value_excluding_st'=>100,'total_sales_tax'=>18]);
+\App\Models\InvoiceItem::forceCreate(['invoice_id'=>$previewDi->id,'hs_code'=>'0101.2100','description'=>'Synthetic admin preview line','quantity'=>1,'price'=>100,'tax'=>18,'tax_rate'=>18]);
+$previewFbr = \App\Models\FbrPosTransaction::forceCreate(['company_id'=>$fiscal->id,'invoice_number'=>'RC-ADMIN-FBR-PREVIEW','invoice_mode'=>'local','status'=>'completed','fbr_status'=>'local','created_by'=>$fiscalUser->id,'subtotal'=>100,'tax_amount'=>18,'total_amount'=>118,'payment_method'=>'cash']);
+\App\Models\FbrPosTransactionItem::forceCreate(['transaction_id'=>$previewFbr->id,'item_name'=>'Synthetic admin preview line','quantity'=>1,'unit_price'=>100,'subtotal'=>100,'tax_amount'=>18,'total'=>118,'tax_rate'=>18]);
+$wrongProductDi = \App\Models\Invoice::forceCreate(['company_id'=>$fiscal->id,'invoice_number'=>'RC-CROSS-PRODUCT-SECRET','buyer_name'=>'Synthetic Wrong Product','status'=>'draft','total_amount'=>999999]);
+$adminPreviewDocuments = [
+ ['metric'=>'di_invoices','product'=>'di','company'=>$previewDiCompany->id,'record'=>$previewDi->id,'reference'=>$previewDi->invoice_number],
+ ['metric'=>'pos_transactions','product'=>'pos','company'=>$amountCompany->id,'record'=>$amountBill->id,'reference'=>$amountBill->invoice_number],
+ ['metric'=>'fbrpos_transactions','product'=>'fbrpos','company'=>$fiscal->id,'record'=>$previewFbr->id,'reference'=>$previewFbr->invoice_number],
+];
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
-        ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true],
+        ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],
             'customerAmountAudit' => ['customerId' => $amountCustomer->id, 'cases' => $amountCases, 'spent' => 646]],

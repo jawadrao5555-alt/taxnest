@@ -1,7 +1,7 @@
-title: "FBR POS invoice serial allocation ab durable hai"
+title: "Admin invoice preview, product isolation aur readable filters"
 audience: all
 type: improvement
 points:
-  - "FBR POS company-wise invoice serial high-water record rakhta hai taa-ke puranay ya deleted bills ka number dobara allocate na ho."
-  - "Mojooda invoice references aur fiscal numbers preserve hain; har company ki series alag rehti hai."
-  - "Historical duplicate references milnay par migration review mangti hai; records khud delete ya renumber nahi hotay."
+  - "Admin dashboard ke filters aur dropdown options ab saaf contrast ke saath parhay ja sakte hain."
+  - "Selected sidebar item, company tab aur status filter wazeh fill aur marker ke saath nazar aatay hain."
+  - "Admin invoice reference se read-only PDF preview, print aur download khol sakta hai; DI, PRA POS aur FBR POS records alag rehtay hain."

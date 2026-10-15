@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="tn-admin-main" x-data="{ activeTab: 'di' }">
+<div class="tn-admin-main">
     <div class="tn-dashboard-head">
         <div>
             <p class="tn-eyebrow">Platform overview</p>
@@ -110,21 +110,21 @@
 
     <div class="tn-company-workspace">
         <div class="tn-company-tabs flex border-b border-gray-800 mb-0 overflow-x-auto">
-            <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
+            <button type="button" data-company-tab="di" aria-pressed="true" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Digital Invoice ({{ $stats['di_companies'] }})
             </button>
-            <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
+            <button type="button" data-company-tab="pos" aria-pressed="false" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 PRA POS ({{ $stats['pos_companies'] }})
             </button>
-            <button @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
+            <button type="button" data-company-tab="fbrpos" aria-pressed="false" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                 FBR POS ({{ $stats['fbrpos_companies'] }})
             </button>
         </div>
 
-        <div x-show="activeTab === 'di'" class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div data-company-panel="di" class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -172,7 +172,7 @@
             @endif
         </div>
 
-        <div x-show="activeTab === 'pos'" x-cloak class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div data-company-panel="pos" hidden class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -220,7 +220,7 @@
             @endif
         </div>
 
-        <div x-show="activeTab === 'fbrpos'" x-cloak class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div data-company-panel="fbrpos" hidden class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -307,4 +307,17 @@
         </div>
     </div>
 </div>
+<script>
+(() => {
+    const workspace = document.querySelector('.tn-company-workspace');
+    if (!workspace) return;
+    const tabs = workspace.querySelectorAll('[data-company-tab]');
+    const panels = workspace.querySelectorAll('[data-company-panel]');
+    for (const tab of tabs) tab.addEventListener('click', () => {
+        const key = tab.dataset.companyTab;
+        for (const button of tabs) button.setAttribute('aria-pressed', String(button === tab));
+        for (const panel of panels) panel.hidden = panel.dataset.companyPanel !== key;
+    });
+})();
+</script>
 </x-admin-layout>

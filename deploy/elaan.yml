@@ -1,6 +1,6 @@
 title: "Table item delete par duplicate kitchen ADD ki correction"
-audience: all
-type: fix
+audience: pos
+type: improvement
 points:
   - "Table order mein same dish ki multiple lines ab apne alag line ID se match hoti hain."
   - "Item delete karne par baqi lines dobara ADD nahi hotin; cancellation sirf hatayi hui quantity ki hoti hai."

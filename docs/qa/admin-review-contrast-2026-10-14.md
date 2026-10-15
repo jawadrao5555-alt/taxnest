@@ -56,3 +56,21 @@ tenant-session denial, original-record preservation, and genuine PDF response
 bytes/dispositions (layout rendering separately covered in CI). The authenticated
 browser fixture now renders/downloads real stored documents in all three products
 and rejects product/company substitutions. Fresh final-HEAD CI must pass.
+
+
+15 October follow-up: synced merged #196/main, retaining durable FBR serials.
+CI 38726264567 reproduced the mobile fiscal failure with exact hit geometry:
+the decorative Ctrl+S KBD badge covered the search input's clickable centre at
+390px. Both overlaid search/customer shortcut hints now use pointer-events:none;
+the browser regression keeps the real pointer trial and additionally clicks and
+requires input focus at desktop and mobile. No forced clicks or skipped checks.
+Returning from Cart alone was insufficient and is not claimed as the root cause.
+
+The same CI's Composer audit identified http-foundation and yaml advisories.
+Composer 2.10.3/PHP 8.4.26 updated only symfony/http-foundation 7.4.14 -> 7.4.21
+and symfony/yaml 8.1.1 -> 8.1.9 with --minimal-changes --no-install --no-scripts.
+Extension constraints were ignored only for local lock resolution because the
+recreated CLI lacks application extensions; required CI installs and tests with
+the real extensions. Composer validate PASS (existing unconstrained php-imap
+warning); audit reports no advisories. No constraints, audit exemptions or gates
+were weakened. Final full/native/browser CI is required before readiness.

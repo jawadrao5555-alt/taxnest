@@ -41,3 +41,14 @@ physical printer verification is claimed. CI uses only disposable fixtures.
 Saved tenant/printer/tax settings and older agents are unchanged. Raw customer
 media are not committed. Already duplicated live orders require owner review;
 this patch must not automatically delete or rewrite historical billing lines.
+
+CI 38755045551: desktop actual deletion/save/reopen passed. Mobile pointer
+click failed because .tn-cart-side discount/total controls covered the delete
+button. The premium mobile rail constrained height while the footer squeezed
+.tn-cart-main; its item content painted underneath the footer. PRA mobile now
+uses a single normal-flow cart scroller with non-shrinking item/footer wrappers
+and a non-sticky pay block. The real pointer regression is retained unchanged.
+Desktop wide-cart and FBR CSS remain scoped outside this correction.
+Additional local print permission/zero-loss regressions: 29 tests / 183
+assertions PASS. Announcement parse/title checks PASS after correcting its
+supported improvement type. Final-HEAD CI still required.

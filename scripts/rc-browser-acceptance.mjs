@@ -93,6 +93,15 @@ async function login(page,t) {
   if (page.url().endsWith(t.loginPath)) throw new Error(`${t.name}: authentication remained on login page`);
 }
 async function checkUsability(page,t,path,v) {
+  // Mobile Cart is deliberately opened for order-content checks above. Return
+  // through its real control before testing product search on the product pane.
+  if(t.name==='fiscal' && v.width<768) {
+    const back=page.locator('[data-fbr-cart-back]').first();
+    if(await back.count() && await back.isVisible()) {
+      await back.click({timeout:5000});
+      await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).mobileView==='menu');
+    }
+  }
   const width=await page.evaluate(()=>Math.max(document.documentElement.scrollWidth,document.body.scrollWidth));
   if(width>v.width+2) fail(`${t.name}/${v.width}: horizontal overflow (${width}px)`);
   for(const text of t.absenceMarkers||[])if((await page.locator('body').innerText()).includes(text))fail(`${t.name}/${v.width}: forbidden control rendered: ${text}`);

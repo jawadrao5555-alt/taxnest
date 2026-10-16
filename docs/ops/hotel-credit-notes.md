@@ -34,9 +34,7 @@ FAQ: https://e.pra.punjab.gov.pk/templates/PRA_Iris_Sales_Tax_Return_FAQs.pdf
 ## Simple full-invoice Hotel workflow (8 October 2026)
 
 Owner requested whole-invoice-only Hotel UI: Credit Note → original invoice popup → Confirm & Create.
-The popup displays original items, fiscal reference, total and rounded tax. There are no quantity inputs,
-reason textarea or second review screen. The server records the factual audit description
-"Full invoice credit confirmed by owner."; it does not invent a cancellation/error reason.
+The popup displays original items, fiscal reference, total and rounded tax. Quantity editing and a second review screen remain absent. As of the 14 October follow-up, the owner supplies an actual business reason in this same popup; the server validates and retains it with the actor audit instead of filling a generic confirmation description. Older notes retain their original recorded text. The confirmation clearly warns that this is a fiscal action, not a test.
 
 The company owner settings are on a separate screen (?settings=1), reachable from Management
 when a stay is open and from the credit-note page. Existing ON/OFF flags are unchanged.
@@ -81,3 +79,42 @@ On Hotel → Credit notes, confirm and save Create credit notes ON. Enable refun
 Missing/ambiguous historical item mapping and bill-level discounts remain review-only, even after activation. No live data is backfilled by guessing. API acceptance does not itself complete monthly-return/Annexure I adjustment; applicable legal period/procedure still needs owner verification.
 
 Automated coverage uses fictional invoices and synthetic regulator status only. No actual PRA acceptance, production fiscal writes, refund, or live-browser experiment is represented as completed by the agent.
+
+
+## Credit evidence and refund display — 14 October follow-up
+
+A read-only company/stay/note-scoped summary classifies acceptance only when the
+stored credit is submitted and has a nonblank fiscal number. Pending/offline,
+failed, and unresolved status are displayed explicitly; reporting ON is not acceptance.
+Both thermal widths and A4 Hotel receipts show Credit amount, actual reason,
+money refunded, credit not yet refunded and available guest funds. Refund eligibility
+is the minimum of unrefunded document value and remaining guest funds, and is zero
+until fiscal acceptance. Existing refund activation and locked backend caps remain.
+The receipt footer describes a credit rather than a new purchase. Printed labels
+are English even when the operator UI uses Roman Urdu/Urdu.
+
+This change does not reinterpret historical flags, fiscal numbers, payment/tax
+snapshots, guest stays or records. No document is reposted; existing positive PRA
+credit payload values remain InvoiceType=3 with original RefUSIN. Sale/tax netting
+continues through the signed return document; refund money remains a separate
+settlement event. No conclusion about monthly-return adjustment is inferred from
+API acceptance.
+
+
+Validation of this follow-up: a missing-reason HTTP regression failed before the
+fix; it now refuses without creating a return. Local PHP 8.4 under the repository
+blocked-egress runner: return/accounting suite 88 tests / 694 assertions PASS;
+final Hotel credit policy/receipt/tenant/cashier suite 31 / 254 PASS; broader receipt
+and Hotel regressions 334 / 2947 PASS (one existing skip, 28 existing deprecations).
+Asset build, PHP/JS syntax and diff checks PASS. A first unguarded test run was
+stopped by automatic review after an external PRA endpoint attempt; it is not
+passing evidence. The repository network guard was then verified to deny external
+TCP, UDP and DNS before all subsequent application tests. No live acceptance is
+claimed by these synthetic tests.
+
+Local native MariaDB and Chrome launch attempts failed at UNIX socket creation
+with Operation not permitted. Authenticated desktop/mobile credit review and
+receipt assertions were added to the existing disposable MariaDB/Chrome CI flow;
+full exact-HEAD CI is required before owner readiness. Existing monetary and
+fiscal settings remain unchanged; actual testing must use an isolated fixture,
+never a live guest bill.

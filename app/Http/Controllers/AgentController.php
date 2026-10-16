@@ -1176,9 +1176,11 @@ class AgentController extends Controller
             }
         }
         $explicitCode100 = $code === '100';
+        $returnedFiscalNumber = \App\Services\FbrPosFiscalResult::fromResponse(is_array($response) ? $response : null);
         $treatAsSuccess = $request->boolean('success')
             && $explicitCode100
-            && $fbrInvoiceNumber !== '';
+            && $returnedFiscalNumber !== null
+            && hash_equals($returnedFiscalNumber, $fbrInvoiceNumber);
         $evidence = app(FbrPosSubmissionEvidenceService::class);
 
         // Idempotent callback: once an explicit Code-100 result stamped this
@@ -1250,14 +1252,16 @@ class AgentController extends Controller
             // stamping the transaction's fiscal-number field.
             $ambiguousSuccess = $request->boolean('success')
                 && $fbrInvoiceNumber !== ''
-                && (!$explicitCode100 || !is_array($response));
+                && !$treatAsSuccess;
 
             if ($ambiguousSuccess) {
                 $reason = !is_array($response)
                     ? 'Agent success callback had a malformed response; explicit FBR IMS Code 100 was not proven.'
                     : ($code === null
                         ? 'Agent success callback omitted the FBR IMS response code; explicit Code 100 was not proven.'
-                        : 'Agent success callback carried FBR IMS code ' . mb_substr($code, 0, 40) . ', not Code 100.');
+                        : ($explicitCode100
+                            ? 'FBR IMS fiscal number was missing, invalid or did not match the callback.'
+                            : 'Agent success callback carried FBR IMS code ' . mb_substr($code, 0, 40) . ', not Code 100.'));
                 $txn->update(array_merge([
                     'fbr_status' => 'verification_pending',
                     'fbr_response_code' => $code === null ? null : mb_substr($code, 0, 250),

@@ -448,3 +448,8 @@ Agar aik workbook mein wohi Product Code/naam, Ingredient Code/naam-unit, ya woh
 - Stay folio par products **Minibar / Room Service / Stay Extra** aur services **Stay Service / Charge** ke labels se chunte hain — products rename/reset nahi hote; branch availability pehle jaisi rehti hai.
 - Housekeeping-only staff Rooms/HK board dekhte hain; folios aur Restaurant Outlet un ke liye band.
 - Saved modules, permissions, kitchen settings, rooms, stock, tax aur purane stays/folios silently change nahi hote.
+
+## Table order mein item delete aur kitchen update
+- Same dish alag lines mein ho to har line apne ID se save hoti hai. Delete ke baad sirf hatayi hui printed quantity ki CANCEL slip banti hai; baqi dishes dobara ADD nahi hotin.
+- Order save ke baad table dobara khol kar items aur total check kar sakte hain. Agar stale-order conflict aaye to pehle reload karke latest order review karein.
+- Pehle se ghalat/double ho chukay bills ko khud se automatic clear nahi kiya jata; manager se actual order aur kitchen slip mila kar review karwayein.

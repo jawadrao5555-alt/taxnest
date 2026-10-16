@@ -3876,10 +3876,12 @@ class FbrPosController extends Controller
         $fbrCompany = Company::find($companyId);
         $fbrReportingOff = $fbrCompany && !$fbrCompany->fbr_reporting_enabled;
         if ($fbrReportingOff) {
-            $transactions = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20, 1, [
-                'path' => $request->url(), 'query' => $request->query(),
-            ]);
-            $stats = (object) ['failed_count' => 0, 'pending_count' => 0, 'verification_pending_count' => 0, 'submitted_count' => 0, 'failed_amount' => 0, 'config_error_count' => 0];
+            // Reporting OFF does not prove older IMS submissions were rejected.
+            // Retain only reconciliation holds; ordinary retry queues remain hidden.
+            $recovery = \App\Services\FbrPosOwnerReconciliation::recoveryQueue((int) $companyId);
+            $transactions = (clone $recovery)->latest()->paginate(20)->withQueryString();
+            $stats = (object) ['failed_count' => 0, 'pending_count' => 0, 'verification_pending_count' => (clone $recovery)->count(),
+                'submitted_count' => 0, 'failed_amount' => 0, 'config_error_count' => 0];
             return view('fbr-pos.fail-queue', compact('transactions', 'stats', 'fbrReportingOff'));
         }
 
@@ -5789,44 +5791,12 @@ class FbrPosController extends Controller
 
     private function generateInvoiceNumber(int $companyId): string
     {
-        $year = now()->format('Y');
-        $prefix = "FPOS-{$year}-";
-
-        $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
-            ->where('invoice_number', 'like', "{$prefix}%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->value('invoice_number');
-
-        if ($lastInvoice) {
-            $lastNum = (int) str_replace($prefix, '', $lastInvoice);
-            $nextNum = $lastNum + 1;
-        } else {
-            $nextNum = 1;
-        }
-
-        return $prefix . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+        return \App\Services\FbrPosInvoiceSeries::issue($companyId, 'FPOS-'.now()->format('Y').'-');
     }
 
     private function generateLocalInvoiceNumber(int $companyId): string
     {
-        $year = now()->format('Y');
-        $prefix = "FLOCAL-{$year}-";
-
-        $lastInvoice = FbrPosTransaction::where('company_id', $companyId)
-            ->where('invoice_number', 'like', "{$prefix}%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->value('invoice_number');
-
-        if ($lastInvoice) {
-            $lastNum = (int) str_replace($prefix, '', $lastInvoice);
-            $nextNum = $lastNum + 1;
-        } else {
-            $nextNum = 1;
-        }
-
-        return $prefix . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+        return \App\Services\FbrPosInvoiceSeries::issue($companyId, 'FLOCAL-'.now()->format('Y').'-');
     }
 
     public function billing()

@@ -1,12 +1,7 @@
-# Elaan for THIS production deploy only. CI stores TARGET_SHA internally in
-# deployment_key; customer-visible title/points never contain provenance.
-# Do not reuse Daily L001. Do not use skip_elaan except emergencies.
-
-title: "Hotel Front Desk ab Restaurant Outlet se alag rehta hai"
+title: "Table item delete par duplicate kitchen ADD ki correction"
 audience: pos
-category: hotel
 type: improvement
 points:
-  - "Hotel / Guest House login aur Manage as Company hamesha Front Desk kholta hai — New Sale Hotel ka ghar nahi."
-  - "Agar restaurant_mode pehle se ON hai to Restaurant Outlet Hotel shell ke andar alag module hai, Back to Front Desk ke sath."
-  - "restaurant_mode OFF ho to outlet menu aur sale URL dono band — purani modules, kitchen settings, rooms aur folio history preserve."
+  - "Table order mein same dish ki multiple lines ab apne alag line ID se match hoti hain."
+  - "Item delete karne par baqi lines dobara ADD nahi hotin; cancellation sirf hatayi hui quantity ki hoti hai."
+  - "Order save aur reopen par quantity aur bill total barqarar rehtay hain."

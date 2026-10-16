@@ -5,6 +5,7 @@ const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 const { replayCallbacks } = require('./callback-retry-policy');
+const { parseFiscalResult } = require('./fiscal-result');
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -506,8 +507,9 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
     const diagnostics = { ...(isFiscalDevice ? callbackDiagnostics(data, praEnvironment) : {}), ...claimEvidence };
     // Tolerant comparison — the local IMS Fiscal Device service may return Code as a NUMBER (100),
     // while the cloud API returns a string ('100'). A strict === would misreport success as failure.
-    const success = data != null && String(data.Code ?? data.code ?? '') === '100';
-    const praInvoiceNumber = data?.InvoiceNumber || data?.invoiceNumber || data?.Response;
+    const fiscalResult = parseFiscalResult(data);
+    const success = fiscalResult.accepted;
+    const praInvoiceNumber = fiscalResult.number;
 
     if (success && praInvoiceNumber) {
       log(`✅ PRA accepted txn ${invoice.transaction_id}: ${praInvoiceNumber}`);

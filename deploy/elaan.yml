@@ -1,7 +1,7 @@
-title: "Agent 1.13.18 release package ki tayyari"
-audience: pos
+title: "Admin invoice popup mein blocked PDF preview ki correction"
+audience: all
 type: improvement
 points:
-  - "Updated Agent ke liye alag 1.13.18 release version tayyar kiya gaya hai."
-  - "Windows installer aur portable package ki availability successful Agent build ke baad confirm hogi."
-  - "Existing company, device aur printer settings barqarar hain."
+  - "Admin dashboard par DI, PRA POS aur FBR POS invoice preview same-origin document URL se khulta hai."
+  - "Production security policy barqarar rehti hai; PDF download aur product/company permissions preserve hain."
+  - "Blocked preview ki desktop aur mobile browser regression shamil hai."

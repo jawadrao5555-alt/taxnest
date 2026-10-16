@@ -2315,6 +2315,9 @@ class FbrService
 
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
+        if (\App\Services\FbrPosAgentClaim::active($transaction) || $transaction->fbr_status === 'verification_pending') {
+            return ['status' => 'blocked', 'errors' => ['An FBR POS agent already owns this dispatch; reconcile before retrying.']];
+        }
         $company = $transaction->company;
         $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         // Keep code backward-compatible during rolling deploys where the new
@@ -2336,7 +2339,11 @@ class FbrService
         // shop PC. This guard sits BEFORE the hash-lock so a stale hash can never strand the bill,
         // and it covers EVERY call site (store, retryFbr, editRetry, retry/sync jobs).
         if ($company && $company->agentServesFbr() && $company->agent_enabled) {
-            $transaction->update(['fbr_status' => 'pending']);
+            $queued = \App\Models\FbrPosTransaction::whereKey($transaction->id)->where('company_id', $transaction->company_id)
+                ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
+                ->whereIn('fbr_status', ['pending', 'failed', 'offline', 'config_error'])
+                ->update(['fbr_status' => 'pending']);
+            if (!$queued) return ['status' => 'blocked', 'errors' => ['Invoice acquired or changed while queuing; do not overwrite it.']];
             return [
                 'status' => 'queued_agent',
                 'message' => 'Queued for Desktop Sync Agent (Fiscal Device mode).',
@@ -2350,13 +2357,28 @@ class FbrService
             ];
         }
 
-        $submissionHash = hash('sha256', $transaction->id . '|' . $transaction->invoice_number . '|' . now()->timestamp);
+        $submissionHash = bin2hex(random_bytes(32));
+        $claimPatch = ['fbr_submission_hash' => $submissionHash, 'fbr_status' => 'pending'];
+        if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) $claimPatch['fbr_agent_claimed_at'] = now();
+        $won = \App\Models\FbrPosTransaction::whereKey($transaction->id)->where('company_id', $transaction->company_id)
+            ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
+            ->whereIn('fbr_status', ['pending', 'failed', 'offline', 'config_error'])
+            ->update($claimPatch);
+        if (!$won) return ['status' => 'blocked', 'errors' => ['Another worker owns or resolved this submission.']];
         $transaction->fbr_submission_hash = $submissionHash;
-        $transaction->save();
 
-        $clearHashOnFailure = function () use ($transaction) {
-            $transaction->fbr_submission_hash = null;
-            $transaction->save();
+        $clearHashOnFailure = function () use ($transaction, $submissionHash) {
+            // The claim was written through a query, so this model's original
+            // hash is still null. Assigning null and save() skips that column.
+            // Release only our own failed claim, never another worker's.
+            $patch = ['fbr_submission_hash' => null];
+            if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) $patch['fbr_agent_claimed_at'] = null;
+            \App\Models\FbrPosTransaction::whereKey($transaction->id)
+                ->where('company_id', $transaction->company_id)
+                ->whereNull('fbr_invoice_number')
+                ->where('fbr_submission_hash', $submissionHash)
+                ->update($patch);
+            $transaction->refresh();
         };
 
         $payload = $this->buildFbrPosPayload($transaction);

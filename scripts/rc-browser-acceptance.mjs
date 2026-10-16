@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { assertLocalOnlyBaseUrl, attachDiagnostics, launchLocalBrowser, saveEvidenceScreenshot } from './lib/local-browser.mjs';
 
@@ -1122,7 +1123,41 @@ async function adminReviewContrast(page) {
   }
 }
 
+// Full OAuth/MCP journey against the disposable native database, including actual
+// consent/revocation button clicks. The callback is loopback-only fixture config.
+async function reportingConnectorWorkflow(page,t,v) {
+  const f=t.reportingConnector, request=page.context().request;
+  const metadata=await (await request.get(baseUrl+'/.well-known/oauth-protected-resource/api/reporting/mcp')).json();
+  const callback=baseUrl+'/admin/reporting/connections';
+  const registration=await request.post(baseUrl+'/api/reporting/oauth/register',{data:{client_name:'Synthetic read-only browser '+v.width+' '+Date.now(),redirect_uris:[callback],token_endpoint_auth_method:'none'}});
+  if(registration.status()!==201)throw new Error('OAuth registration did not accept the loopback fixture callback');
+  const client=await registration.json(), verifier='a'.repeat(64);
+  const params={client_id:client.client_id,redirect_uri:callback,response_type:'code',code_challenge:createHash('sha256').update(verifier).digest('base64url'),code_challenge_method:'S256',resource:metadata.resource,scope:'taxnest.reports.read',state:'browser-'+v.width};
+  await page.goto(baseUrl+'/admin/reporting/oauth/authorize?'+new URLSearchParams(params),{waitUntil:'domcontentloaded'});
+  await checkUsability(page,{name:t.name},'/admin/reporting/oauth/authorize',v);
+  await page.locator('[name="company_ids[]"][value="'+f.companyId+'"]').check();
+  await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-consent');
+  await Promise.all([page.waitForURL(u=>u.pathname==='/admin/reporting/connections'),page.getByRole('button',{name:'Allow read-only access',exact:true}).click()]);
+  const code=new URL(page.url()).searchParams.get('code');
+  if(!code||new URL(page.url()).searchParams.get('state')!==params.state)throw new Error('Owner consent callback did not carry authorization code/state');
+  const exchanged=await request.post(baseUrl+'/api/reporting/oauth/token',{form:{grant_type:'authorization_code',client_id:client.client_id,redirect_uri:callback,resource:metadata.resource,code,code_verifier:verifier}});
+  if(exchanged.status()!==200)throw new Error('PKCE token exchange failed');
+  const tokens=await exchanged.json();
+  const report=async(companyName)=>request.post(baseUrl+'/api/reporting/mcp',{headers:{Authorization:'Bearer '+tokens.access_token},data:{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_company_billing_summary',arguments:{company_name:companyName,date_from:f.date}}}});
+  const ownResponse=await report(f.companyName), own=await ownResponse.json();
+  if(own.result?.isError||Number(own.result?.structuredContent?.totals?.net_billing)!==f.billing)throw new Error('Native billing mismatch: '+JSON.stringify({status:ownResponse.status(),rpcError:own.error,toolError:own.result?.isError,content:own.result?.isError?own.result?.content:undefined,totals:own.result?.structuredContent?.totals,period:own.result?.structuredContent?.period}));
+  const foreign=await (await report(f.foreignCompanyName)).json();
+  if(!foreign.result?.isError)throw new Error('Connection company scope leaked a foreign company report');
+  await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
+  const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
+  if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
+  if((await report(f.companyName)).status()!==401)throw new Error('Revoked token retained billing access');
+  pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
+}
+
 async function workflow(page,t,v,diagnostics) {
+  if(t.reportingConnector)return reportingConnectorWorkflow(page,t,v);
   if(t.dashboardDetails) {
     await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
     for(const key of ['di','pos','fbrpos']) {

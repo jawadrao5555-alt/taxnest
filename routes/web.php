@@ -3033,3 +3033,19 @@ Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withou
     Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
     Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
 });
+
+// Owner-authorized read-only MCP reporting, isolated from Live Ops runner credentials.
+Route::middleware('throttle:60,1')->withoutMiddleware($statelessMachine)->group(function () {
+    Route::get('/.well-known/oauth-authorization-server', [\App\Http\Controllers\Reporting\OAuthController::class, 'metadata']);
+    Route::get('/.well-known/oauth-protected-resource', [\App\Http\Controllers\Reporting\OAuthController::class, 'resource']);
+    Route::get('/.well-known/oauth-protected-resource/api/reporting/mcp', [\App\Http\Controllers\Reporting\OAuthController::class, 'resource']);
+    Route::post('/api/reporting/oauth/register', [\App\Http\Controllers\Reporting\OAuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::post('/api/reporting/oauth/token', [\App\Http\Controllers\Reporting\OAuthController::class, 'token']);
+    Route::match(['GET', 'POST', 'DELETE'], '/api/reporting/mcp', [\App\Http\Controllers\Reporting\McpController::class, 'handle']);
+});
+Route::middleware(['admin.auth', 'throttle:60,1'])->group(function () {
+    Route::get('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'consent']);
+    Route::post('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'approve']);
+    Route::get('/admin/reporting/connections', [\App\Http\Controllers\Reporting\OAuthController::class, 'connections']);
+    Route::post('/admin/reporting/connections/{id}/revoke', [\App\Http\Controllers\Reporting\OAuthController::class, 'revoke'])->whereUuid('id');
+});

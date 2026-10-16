@@ -63,3 +63,7 @@ sequenceDiagram
   SA->>Admin: Exit stopImpersonation
   Note over Panel: panel guard logged out
 ```
+
+## Read-only reporting connections
+
+`/admin/reporting/connections` manages owner-authorized company-scoped OAuth MCP reporting. Consent/revocation require SaaS `AdminUser::isSuperAdmin()`; machine report access independently rechecks that owner role and grant scope. It exposes explicit SELECT reports, not a production runner token, impersonation session, arbitrary SQL or mutation tool. Existing Live Ops approvals remain unchanged. See [connection setup and evidence semantics](../ops/readonly-reporting-connector.md).

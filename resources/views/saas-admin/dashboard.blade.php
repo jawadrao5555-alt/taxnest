@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="tn-admin-main" x-data="{ activeTab: 'di' }">
+<div class="tn-admin-main">
     <div class="tn-dashboard-head">
         <div>
             <p class="tn-eyebrow">Platform overview</p>
@@ -27,69 +27,82 @@
     @endif
 
     <div class="tn-metric-ledger">
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
+<a data-dashboard-metric="total_companies" aria-label="Open total companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'total_companies') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Companies</p>
             <p class="text-xl font-bold text-white">{{ $stats['total_companies'] }}</p>
         </div>
-        <div class="bg-gray-900 border border-emerald-900/50 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-emerald-900/50 rounded-xl p-4">
+<a data-dashboard-metric="di_companies" aria-label="Open di companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'di_companies') }}"></a>
             <p class="text-[10px] text-emerald-500 uppercase tracking-wide mb-1">DI Companies</p>
             <p class="text-xl font-bold text-emerald-400">{{ $stats['di_companies'] }}</p>
         </div>
-        <div class="bg-gray-900 border border-purple-900/50 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-purple-900/50 rounded-xl p-4">
+<a data-dashboard-metric="pos_companies" aria-label="Open pos companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'pos_companies') }}"></a>
             <p class="text-[10px] text-purple-500 uppercase tracking-wide mb-1">PRA POS</p>
             <p class="text-xl font-bold text-purple-400">{{ $stats['pos_companies'] }}</p>
         </div>
-        <div class="bg-gray-900 border border-blue-900/50 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-blue-900/50 rounded-xl p-4">
+<a data-dashboard-metric="fbrpos_companies" aria-label="Open fbrpos companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'fbrpos_companies') }}"></a>
             <p class="text-[10px] text-blue-500 uppercase tracking-wide mb-1">FBR POS</p>
             <p class="text-xl font-bold text-blue-400">{{ $stats['fbrpos_companies'] }}</p>
         </div>
-        <div class="bg-gray-900 border border-amber-900/50 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-amber-900/50 rounded-xl p-4">
+<a data-dashboard-metric="pending_companies" aria-label="Open pending companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'pending_companies') }}"></a>
             <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending</p>
             <p class="text-xl font-bold {{ $stats['pending_companies'] > 0 ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['pending_companies'] }}</p>
         </div>
-        <div class="bg-gray-900 border border-amber-900/50 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-amber-900/50 rounded-xl p-4">
+<a data-dashboard-metric="pending_payment_proofs" aria-label="Open pending payment proofs details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'pending_payment_proofs') }}"></a>
             <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending Payments</p>
             <p class="text-xl font-bold {{ ($stats['expiring_payment_proofs'] ?? 0) > 0 ? 'text-red-400' : (($stats['pending_payment_proofs'] ?? 0) > 0 ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400') }}">{{ $stats['pending_payment_proofs'] ?? 0 }}</p>
             @if(($stats['expiring_payment_proofs'] ?? 0) > 0)
-            <a href="{{ route('saas.admin.payment-proofs') }}" class="text-[10px] text-red-400 font-semibold hover:underline" title="Temporary access ending within 2 days — verify before the customer is locked out">{{ $stats['expiring_payment_proofs'] }} expiring soon!</a>
+            <a href="{{ route('saas.admin.payment-proofs') }}" class="relative z-20 text-[10px] text-red-400 font-semibold hover:underline" title="Temporary access ending within 2 days — verify before the customer is locked out">{{ $stats['expiring_payment_proofs'] }} expiring soon!</a>
             @elseif(($stats['pending_payment_proofs'] ?? 0) > 0)
-            <a href="{{ route('saas.admin.payment-proofs') }}" class="text-[10px] text-indigo-400 hover:underline">Review now</a>
+            <a href="{{ route('saas.admin.payment-proofs') }}" class="relative z-20 text-[10px] text-indigo-400 hover:underline">Review now</a>
             @endif
         </div>
-        <div class="bg-gray-900 border border-red-900/50 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-red-900/50 rounded-xl p-4">
+<a data-dashboard-metric="suspended_companies" aria-label="Open suspended companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'suspended_companies') }}"></a>
             <p class="text-[10px] text-red-500 uppercase tracking-wide mb-1">Suspended</p>
             <p class="text-xl font-bold {{ $stats['suspended_companies'] > 0 ? 'text-red-400' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['suspended_companies'] }}</p>
         </div>
-        <div class="bg-gray-900 border border-gray-700 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-gray-700 rounded-xl p-4">
+<a data-dashboard-metric="binned_companies" aria-label="Open binned companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'binned_companies') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">In Bin</p>
             <p class="text-xl font-bold {{ $stats['binned_companies'] > 0 ? 'text-gray-300' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['binned_companies'] }}</p>
             @if($stats['binned_companies'] > 0)
-            <a href="{{ route('saas.admin.companies.bin') }}" class="text-[10px] text-indigo-400 hover:underline">View Bin</a>
+            <a href="{{ route('saas.admin.companies.bin') }}" class="relative z-20 text-[10px] text-indigo-400 hover:underline">View Bin</a>
             @endif
         </div>
     </div>
 
     <div class="tn-channel-ledger">
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
+<a data-dashboard-metric="di_invoices" aria-label="Open di invoices details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'di_invoices') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">DI Invoices</p>
             <p class="text-xl font-bold text-emerald-400">{{ number_format($stats['di_invoices']) }}</p>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PKR {{ number_format($stats['di_revenue'], 0) }} revenue</p>
         </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
+<a data-dashboard-metric="pos_transactions" aria-label="Open pos transactions details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'pos_transactions') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">PRA POS Transactions</p>
             <p class="text-xl font-bold text-purple-400">{{ number_format($stats['pos_transactions']) }}</p>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PKR {{ number_format($stats['pos_revenue'], 0) }} revenue</p>
         </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
+<a data-dashboard-metric="fbrpos_transactions" aria-label="Open fbrpos transactions details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'fbrpos_transactions') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">FBR POS Transactions</p>
             <p class="text-xl font-bold text-blue-400">{{ number_format($stats['fbrpos_transactions']) }}</p>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">PKR {{ number_format($stats['fbrpos_revenue'], 0) }} revenue</p>
         </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
+<a data-dashboard-metric="active_subscriptions" aria-label="Open active subscriptions details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'active_subscriptions') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Active Subscriptions</p>
             <p class="text-xl font-bold text-indigo-400">{{ $stats['active_subscriptions'] }}</p>
         </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div class="relative group bg-gray-900 border border-gray-800 rounded-xl p-4">
+<a data-dashboard-metric="total_users" aria-label="Open total users details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'total_users') }}"></a>
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Users</p>
             <p class="text-xl font-bold text-white">{{ $stats['total_users'] }}</p>
         </div>
@@ -97,21 +110,21 @@
 
     <div class="tn-company-workspace">
         <div class="tn-company-tabs flex border-b border-gray-800 mb-0 overflow-x-auto">
-            <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
+            <button type="button" data-company-tab="di" aria-pressed="true" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Digital Invoice ({{ $stats['di_companies'] }})
             </button>
-            <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
+            <button type="button" data-company-tab="pos" aria-pressed="false" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 PRA POS ({{ $stats['pos_companies'] }})
             </button>
-            <button @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300'" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
+            <button type="button" data-company-tab="fbrpos" aria-pressed="false" class="flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition shrink-0 whitespace-nowrap">
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                 FBR POS ({{ $stats['fbrpos_companies'] }})
             </button>
         </div>
 
-        <div x-show="activeTab === 'di'" class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div data-company-panel="di" class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -159,7 +172,7 @@
             @endif
         </div>
 
-        <div x-show="activeTab === 'pos'" x-cloak class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div data-company-panel="pos" hidden class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -207,7 +220,7 @@
             @endif
         </div>
 
-        <div x-show="activeTab === 'fbrpos'" x-cloak class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
+        <div data-company-panel="fbrpos" hidden class="tn-company-panel bg-gray-900 border border-gray-800 border-t-0 rounded-b-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
@@ -294,4 +307,17 @@
         </div>
     </div>
 </div>
+<script>
+(() => {
+    const workspace = document.querySelector('.tn-company-workspace');
+    if (!workspace) return;
+    const tabs = workspace.querySelectorAll('[data-company-tab]');
+    const panels = workspace.querySelectorAll('[data-company-panel]');
+    for (const tab of tabs) tab.addEventListener('click', () => {
+        const key = tab.dataset.companyTab;
+        for (const button of tabs) button.setAttribute('aria-pressed', String(button === tab));
+        for (const panel of panels) panel.hidden = panel.dataset.companyPanel !== key;
+    });
+})();
+</script>
 </x-admin-layout>

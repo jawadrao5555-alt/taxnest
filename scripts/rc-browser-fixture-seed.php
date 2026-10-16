@@ -195,6 +195,23 @@ foreach (['desktop', 'mobile'] as $viewport) {
     $handoffCases[$viewport] = ['tableId' => $table->id, 'number' => $table->table_number, 'orderId' => $order->id,
         'itemName' => 'Synthetic handoff '.$viewport];
 }
+// Repeated dish rows reproduce delete -> CANCEL plus duplicate ADD, separately per viewport.
+$kotDeleteCases = [];
+foreach (['desktop', 'mobile'] as $viewport) {
+    $table = RestaurantTable::create(['company_id' => $tableShop->id, 'floor_id' => $tableFloor->id,
+        'table_number' => 'KOT-DELETE-'.$viewport, 'seats' => 4, 'status' => 'occupied', 'occupied_since' => $now, 'is_active' => true]);
+    $order = RestaurantOrder::create(['company_id' => $tableShop->id, 'table_id' => $table->id,
+        'order_number' => 'RC-KOT-DELETE-'.$viewport, 'order_type' => 'dine_in', 'source' => 'waiter',
+        'status' => 'held', 'created_by' => $tableWaiter->id, 'subtotal' => 600, 'total_amount' => 600,
+        'kot_sent_at' => $now]);
+    $lineIds = [];
+    foreach ([1, 2, 3] as $qty) {
+        $lineIds[] = RestaurantOrderItem::create(['order_id' => $order->id, 'item_type' => 'manual',
+            'item_name' => 'Synthetic repeated dish', 'quantity' => $qty, 'unit_price' => 100,
+            'subtotal' => $qty * 100, 'special_notes' => 'same notes', 'kot_printed_at' => $now])->id;
+    }
+    $kotDeleteCases[$viewport] = ['number' => $table->table_number, 'orderId' => $order->id, 'lineIds' => $lineIds];
+}
 $hotelOwner = $user($hotel, 'Synthetic Hotel Owner', 'hotel-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $hotelManager = $user($hotel, 'Synthetic Hotel Front Desk Manager', 'hotel-manager@rc-browser.invalid', 'staff', 'pos_manager', ['dashboard', 'hotel', 'hotel_housekeeping']);
 $hotelManager->forceFill(['default_branch_id' => $hotelBranch])->save();
@@ -463,9 +480,26 @@ $unitStocked = \App\Models\Ingredient::create([
     'current_stock' => 50, 'cost_per_unit' => 100, 'min_stock_level' => 0, 'is_active' => true,
 ]);
 
+// Actual stored document previews: disposable fixtures, never fiscal transport.
+$previewDiCompany = $company('Synthetic Admin DI Preview', 'admin-di-preview@rc-browser.invalid', 'RCBADMINPREVIEW', 'di', ['fbr_environment'=>'sandbox']);
+$previewDi = \App\Models\Invoice::forceCreate(['company_id'=>$previewDiCompany->id,'invoice_number'=>'RC-ADMIN-DI-PREVIEW','internal_invoice_number'=>'RC-ADMIN-DI-PREVIEW','buyer_name'=>'Synthetic Preview Buyer','invoice_date'=>'2026-10-01','status'=>'draft','total_amount'=>118,'total_value_excluding_st'=>100,'total_sales_tax'=>18]);
+\App\Models\InvoiceItem::forceCreate(['invoice_id'=>$previewDi->id,'hs_code'=>'0101.2100','description'=>'Synthetic admin preview line','quantity'=>1,'price'=>100,'tax'=>18,'tax_rate'=>18]);
+$previewFbr = \App\Models\FbrPosTransaction::forceCreate(['company_id'=>$fiscal->id,'invoice_number'=>'RC-ADMIN-FBR-PREVIEW','invoice_mode'=>'local','status'=>'completed','fbr_status'=>'local','created_by'=>$fiscalUser->id,'subtotal'=>100,'tax_amount'=>18,'total_amount'=>118,'payment_method'=>'cash']);
+\App\Models\FbrPosTransactionItem::forceCreate(['transaction_id'=>$previewFbr->id,'item_name'=>'Synthetic admin preview line','quantity'=>1,'unit_price'=>100,'subtotal'=>100,'tax_amount'=>18,'total'=>118,'tax_rate'=>18]);
+$wrongProductDi = \App\Models\Invoice::forceCreate(['company_id'=>$fiscal->id,'invoice_number'=>'RC-CROSS-PRODUCT-SECRET','buyer_name'=>'Synthetic Wrong Product','status'=>'draft','total_amount'=>999999]);
+$adminPreviewDocuments = [
+ ['metric'=>'di_invoices','product'=>'di','company'=>$previewDiCompany->id,'record'=>$previewDi->id,'reference'=>$previewDi->invoice_number],
+ ['metric'=>'pos_transactions','product'=>'pos','company'=>$amountCompany->id,'record'=>$amountBill->id,'reference'=>$amountBill->invoice_number],
+ ['metric'=>'fbrpos_transactions','product'=>'fbrpos','company'=>$fiscal->id,'record'=>$previewFbr->id,'reference'=>$previewFbr->invoice_number],
+];
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
+            'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
+            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
+        ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],
             'customerAmountAudit' => ['customerId' => $amountCustomer->id, 'cases' => $amountCases, 'spent' => 646]],
@@ -501,7 +535,7 @@ $fixture = [
                 'refundPath' => '/pos/hotel/stays/'.$refundStay->id.'/credit-notes']],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
-            'tableOrderWorkflow' => $tableCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
+            'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],

@@ -1225,7 +1225,7 @@ class FbrPosPhase2Controller extends Controller
             $refundTotal = round($totalSubtotal + $totalTax - $billDiscShare, 2);
 
             $shift = $this->currentShift();
-            $invNum = 'RET-' . date('ymd') . '-' . strtoupper(Str::random(5));
+            $invNum = \App\Services\FbrPosInvoiceSeries::issue($this->companyId(), 'RET-'.now()->format('ymd').'-');
 
             $return = FbrPosTransaction::create([
                 'company_id' => $this->companyId(),

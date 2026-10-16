@@ -18,12 +18,13 @@ final class InvoiceImportLineClassifier
 
         // Dedicated packaging descriptions only. A beverage in a returnable
         // bottle (e.g. Coca-Cola RB 250ml) remains a beverage sale.
-        if (preg_match('/\b(empty (bottle|crate|shell|glass)|empties|bottle deposit|crate deposit|security deposit|return of empties)\b/i', $name)) {
+        if (preg_match('/\b(empty (bottle|crate|shell|glass)|empties|bottle deposit|crate deposit|security deposit|return of empties)\b/i', $name)
+            || preg_match('/\b(?:implied|imp)\s+emp\s*\d*b?\b/i', $name)) {
             return 'packaging_review';
         }
 
         // Negative sales lines may be returns, credits or damaged stock.
-        if (preg_match('/\b(damag(ed|e)|breakage|shortage|expired stock|sales return)\b/i', $name)) {
+        if (preg_match('/\b(damag(ed|e)|breakage|shortage|expired stock|sales return|dmg|dmgd)\b/i', $name)) {
             return 'adjustment_review';
         }
 

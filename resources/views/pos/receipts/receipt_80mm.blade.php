@@ -385,6 +385,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         // Return / credit-note receipt (Task 570): explicit query, never a lazy
         // relation (live has strict lazy loading).
         $rcptIsReturn = ($transaction->transaction_type ?? 'sale') === 'return';
+        $hotelCreditSummary = $rcptIsReturn ? app(\App\Services\HotelCreditNoteSummary::class)->forCredit($transaction) : null;
         $rcptReturnParent = null;
         if ($rcptIsReturn && $transaction->parent_transaction_id) {
             try {
@@ -406,7 +407,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     @if($rcptTopBadge)
     <div class="separator"></div>
     <div class="invoice-numbers" style="text-align:center; padding:4px 5px;">
-        <strong style="font-size:12px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
+        <strong style="font-size:12px; color:#000;">{{ $hotelCreditSummary ? __('pos.receipt_credit_note') : ($rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt')) }}</strong><br>
         @if($rcptIsDailyStyle && $rcptBillToken !== null)
         <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span>
         @elseif($rcptBillToken !== null)
@@ -756,7 +757,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     <div class="double-separator"></div>
     <table class="totals-table">
         <tr class="grand-total">
-            <td class="tot-label">{{ __('pos.receipt_total_caps') }}:</td>
+            <td class="tot-label">{{ $hotelCreditSummary ? __('hotel_credit.credit_amount', [], 'en') : __('pos.receipt_total_caps') }}:</td>
             <td class="tot-value">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</td>
         </tr>
         {{-- Cash Received / Wapsi (owner request, Jul 2026): printed only when the
@@ -843,6 +844,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     <div class="edge-box" style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
 
+    @include('pos.hotel._credit-summary', ['summary' => $hotelCreditSummary, 'creditAmount' => $transaction->total_amount, 'creditReceipt' => true])
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // QR carries the RAW PRA invoice number (PRA Sahulat app format).
@@ -935,7 +937,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     @endif
 
     <div class="footer text-center">
-        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_purchase') }}</p>@endif
+        @if($rp['show_footer'])<p>{{ $hotelCreditSummary ? __('hotel_credit.receipt_footer', [], 'en') : ($rp['footer_text'] ?? __('pos.receipt_thank_purchase')) }}</p>@endif
         @if($rp['show_developed_by'] ?? true)<p>{{ __('pos.brand_developed_by') }}</p>@endif
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>

@@ -480,6 +480,32 @@ body[data-theme="midnight"] .tn-premium-sale .bg-gray-50 {
         overscroll-behavior-y: contain;
     }
 
+    /* PRA's tall table-edit footer must not squeeze the item wrapper to zero
+       and paint its discount/total controls over the delete buttons. Keep the
+       items and footer in one normal-flow mobile scroller; desktop is unchanged. */
+    .tn-premium-sale[data-tn-sale-document="pra"] .tn-cart-col:not(.hidden) {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    .tn-premium-sale[data-tn-sale-document="pra"] .tn-cart-main {
+        flex: 0 0 auto;
+        min-height: auto;
+    }
+    .tn-premium-sale[data-tn-sale-document="pra"] .tn-cart-col [x-ref="cartList"] {
+        flex: 0 0 auto !important;
+        min-height: 8rem !important;
+        overflow: visible !important;
+    }
+    .tn-premium-sale[data-tn-sale-document="pra"] .tn-cart-side {
+        display: flex;
+        flex-direction: column;
+        flex: 0 0 auto;
+        position: static;
+    }
+    .tn-premium-sale[data-tn-sale-document="pra"] .mobile-sticky-pay {
+        position: static;
+    }
+
     /*
      * Both universal cart templates use the same two-level row: the first
      * direct child is the name/details plus qty/amount/actions in one flex

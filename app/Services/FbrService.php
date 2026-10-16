@@ -1075,7 +1075,7 @@ class FbrService
         return self::SANDBOX_VALIDATE_URL;
     }
 
-    private function sendDirectToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
+    protected function sendDirectToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
     {
         $cookieFile = storage_path('app/fbr_cookies_' . md5($token) . '.txt');
 
@@ -2468,7 +2468,7 @@ class FbrService
 
             if ($curlError) {
                 $unknownOutcome = !preg_match('/could not resolve|failed to connect|connection refused/i', $curlError);
-                $clearHashOnFailure();
+                if (!$unknownOutcome) $clearHashOnFailure();
                 $log->update([
                     'status' => 'failed',
                     'response_payload' => ['curl_error' => $curlError],
@@ -2477,7 +2477,7 @@ class FbrService
                 ]);
                 $transaction->update(array_merge(
                     ['fbr_status' => $unknownOutcome ? 'verification_pending' : 'failed'],
-                    self::fbrErrorPatch(self::shortFbrTransportError($curlError))
+                    self::fbrErrorPatch($unknownOutcome ? 'FBR outcome clear nahi — IMS evidence verify karke reconciliation karein.' : self::shortFbrTransportError($curlError))
                 ));
                 return [
                     'status' => $unknownOutcome ? 'verification_pending' : 'failed',
@@ -2488,7 +2488,7 @@ class FbrService
             $responseData = json_decode($responseBody, true);
 
             if ($httpCode < 200 || $httpCode >= 300) {
-                $clearHashOnFailure();
+                if ($httpCode < 500) $clearHashOnFailure();
                 $errors = is_array($responseData) ? $this->extractErrorsFromResponse($responseBody) : [$responseBody];
                 $log->update([
                     'status' => 'failed',
@@ -2514,7 +2514,6 @@ class FbrService
                         'response_code' => '200',
                         'error_message' => 'FBR returned empty 200 response (WAF challenge). Reconcile before retry.',
                     ]);
-                    $clearHashOnFailure();
                     $transaction->update(array_merge(
                         ['fbr_status' => 'verification_pending'],
                         self::fbrErrorPatch('FBR ne khali 200 response bheja (WAF challenge) — verification zaroori hai.')
@@ -2524,7 +2523,6 @@ class FbrService
                         'errors' => ['FBR returned empty response. Reconcile before retry.'],
                     ];
                 }
-                $clearHashOnFailure();
                 $log->update([
                     'status' => 'failed',
                     'response_code' => (string) $httpCode,
@@ -2570,7 +2568,7 @@ class FbrService
 
             $responseCode = trim((string) ($responseData['Code'] ?? $responseData['code'] ?? ''));
             $failedStatus = in_array($responseCode, ['', '100'], true) ? 'verification_pending' : 'failed';
-            $clearHashOnFailure();
+            if ($failedStatus !== 'verification_pending') $clearHashOnFailure();
             $log->update([
                 'status' => 'failed',
                 'response_payload' => $responseData,
@@ -2589,14 +2587,14 @@ class FbrService
             ];
 
         } catch (\Exception $e) {
-            $clearHashOnFailure();
+            // An exception cannot prove IMS did not accept; retain our claim.
             $log->update([
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
             ]);
             $transaction->update(array_merge(
                 ['fbr_status' => 'verification_pending'],
-                self::fbrErrorPatch(self::shortFbrTransportError($e->getMessage()))
+                self::fbrErrorPatch('FBR outcome clear nahi — IMS evidence verify karke reconciliation karein.')
             ));
 
             Log::error("FBR POS submission exception for Transaction #{$transaction->id}", [

@@ -469,6 +469,54 @@ class FbrRetryCapAndConfigErrorTest extends TestCase
         $this->assertLessThanOrEqual(20, $max, 'MAX_AUTO_RETRY should not exceed 20 (runaway risk)');
     }
 
+    public function test_direct_unknown_outcomes_never_release_a_pending_bill_between_database_writes(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'fbr_pos_id' => '654321',
+            'fbr_pos_token' => \Illuminate\Support\Facades\Crypt::encryptString('fictional-local-test-token'),
+        ]);
+        foreach ([
+            ['body' => '', 'http_code' => 0, 'curl_error' => 'Operation timed out'],
+            ['body' => '{"message":"unavailable"}', 'http_code' => 503, 'curl_error' => ''],
+            ['body' => '', 'http_code' => 200, 'curl_error' => ''],
+            ['body' => '<html>upstream</html>', 'http_code' => 200, 'curl_error' => ''],
+            ['body' => '{"code":100}', 'http_code' => 200, 'curl_error' => ''],
+            ['body' => '{}', 'http_code' => 200, 'curl_error' => ''],
+        ] as $transport) {
+            $billId = $this->makeBill(['fbr_status' => 'pending']);
+            $observe = true;
+            DB::listen(function ($query) use ($billId, &$observe): void {
+                if (!$observe || !preg_match('/^update ["`]?fbr_pos_transactions["`]? /i', $query->sql)) return;
+                $row = DB::table('fbr_pos_transactions')->find($billId);
+                $this->assertFalse($row->fbr_status === 'pending' && $row->fbr_submission_hash === null,
+                    'Unknown direct outcome must never become pending/unclaimed between writes');
+            });
+            $service = new class($transport) extends FbrService {
+                public int $requests = 0;
+                public function __construct(private array $transport) {}
+                protected function sendDirectToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
+                {
+                    $this->requests++;
+                    return $this->transport;
+                }
+            };
+            try {
+                $result = $service->submitFbrPosTransaction(\App\Models\FbrPosTransaction::findOrFail($billId));
+            } finally {
+                $observe = false;
+            }
+            $this->assertSame(1, $service->requests);
+            $this->assertSame('verification_pending', $result['status']);
+            $bill = \App\Models\FbrPosTransaction::findOrFail($billId);
+            $this->assertSame('verification_pending', $bill->fbr_status);
+            $this->assertNotEmpty($bill->fbr_submission_hash);
+            $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill));
+            $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill));
+            $this->assertSame('blocked', $service->submitFbrPosTransaction($bill)['status']);
+            $this->assertSame(1, $service->requests);
+        }
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();

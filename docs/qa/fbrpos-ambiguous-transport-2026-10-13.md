@@ -55,3 +55,14 @@ callback support; new agents add product-specific ambiguity and claim evidence.
 Actual Windows packaging/publication and installed PC acceptance remain after
 owner approval. Earlier DRAFT dependency notes are superseded by this deployed
 recovery/identity/claims integration; readiness still requires fresh CI.
+
+Direct ambiguous outcomes retain their exclusive claim while changing to hold;
+there is no intermediate pending/unclaimed state for a competing worker.
+Definitive connection refusal/rejection still releases the claim for retry.
+
+Added a direct-service regression with overridden transport (no network): six
+ambiguous responses traverse the actual submission service; a database-write
+observer rejects any intermediate pending/unclaimed state, and retry/claim
+checks must remain blocked with exactly one fake transport request. The narrow
+transport method is protected to permit this isolated test. Local PHP is
+unavailable; this new application regression awaits fresh CI execution.

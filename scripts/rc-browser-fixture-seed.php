@@ -234,6 +234,15 @@ $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid
     'pos_setup_completed' => true,
 ]);
 $fiscalUser = $user($fiscal, 'Synthetic FBR Retail Owner', 'fiscal@rc-browser.invalid', 'company_admin', 'pos_admin');
+// Fictional directory rows expose every status and the unreadable offline alert.
+foreach (['approved', 'active', 'pending', 'suspended', 'rejected'] as $n => $status) {
+    $company('Synthetic Contrast '.$status, 'contrast-'.$status.'@rc-browser.invalid', '990090'.$n,
+        ['pos', 'di', 'fbrpos', 'pos', 'di'][$n], [
+            'owner_name' => 'Synthetic Contrast Owner', 'status' => $status,
+            'agent_enabled' => $status === 'approved', 'agent_last_seen' => $now->copy()->subHours(4),
+            'agent_version' => '1.0.0', 'pos_printer_settings' => ['silent_print_enabled' => true],
+        ]);
+}
 $reconcileCases = [];
 foreach ([1366, 390] as $width) {
     foreach (['accepted', 'not_accepted'] as $decision) {
@@ -499,6 +508,7 @@ $fixture = [
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
             'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
+        ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
         ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],

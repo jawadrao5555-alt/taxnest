@@ -1156,7 +1156,43 @@ async function reportingConnectorWorkflow(page,t,v) {
   pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
 }
 
+async function companyDirectoryContrast(page,t,v) {
+  await page.goto(baseUrl+'/admin/companies?search=Synthetic%20Contrast',{waitUntil:'domcontentloaded'});
+  await page.locator('.tn-directory-alert').waitFor({state:'visible'});
+  const saved=await page.evaluate(()=>({theme:getAdminTheme(),dark:document.documentElement.classList.contains('dark')}));
+  try {
+    for(const theme of ['indigo','emerald','cyan','rose','amber','purple'])for(const dark of [false,true]) {
+      await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
+      const errors=await page.evaluate(()=>{
+        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)throw new Error('Unsupported computed colour '+s);const c=m[1].split(/[, /]+/).map(Number);return [...c.slice(0,3),c[3]??1];};
+        const over=(a,b)=>a.slice(0,3).map((x,i)=>x*a[3]+b[i]*(1-a[3]));
+        const bg=el=>{const chain=[];for(let p=el;p;p=p.parentElement)chain.unshift(p);let c=[255,255,255];for(const p of chain)c=over(rgb(getComputedStyle(p).backgroundColor),c);return c;};
+        const lum=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
+        const contrast=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+        const errors=[];
+        for(const el of document.querySelectorAll('[data-company-directory] :is(h1,h2,a,p,span,th,td,input,select,option,button)')) {
+          const option=el.tagName==='OPTION';if(!option&&!el.getClientRects().length)continue;
+          if(!['INPUT','SELECT','OPTION'].includes(el.tagName)&&![...el.childNodes].some(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim()))continue;
+          const cs=getComputedStyle(el),back=bg(el),front=over(rgb(cs.color),back),ratio=contrast(front,back);
+          if(ratio<4.5)errors.push(el.tagName+' '+el.textContent.trim().slice(0,35)+' contrast '+ratio.toFixed(2));
+          if(parseFloat(cs.fontSize)<12)errors.push(el.tagName+' text below 12px');
+          if(el.tagName==='INPUT'&&el.placeholder){const ps=getComputedStyle(el,'::placeholder');if(contrast(over(rgb(ps.color),back),back)<4.5)errors.push('Faint search placeholder');}
+        }
+        return errors;
+      });
+      if(errors.length)throw new Error('Directory '+theme+'/'+dark+': '+errors.join('; '));
+    }
+    await saveEvidenceScreenshot(page,'rc-'+v.width+'-company-directory-contrast');
+    await page.locator('select[name=status]').selectOption('approved');
+    await Promise.all([page.waitForURL(u=>u.searchParams.get('status')==='approved'),page.getByRole('button',{name:'Filter',exact:true}).click()]);
+    if(await page.locator('[data-directory-status]').count()!==1||await page.locator('[data-directory-status]').first().getAttribute('data-directory-status')!=='approved')throw new Error('Directory filter changed behavior');
+    await page.locator('.tn-directory-actions a').first().click({trial:true});
+    pass(t.name+'/'+v.width+': actual alert/owner/status/actions/options >=4.5 contrast in six themes/light-dark; GET filter preserved');
+  } finally {await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);}
+}
+
 async function workflow(page,t,v,diagnostics) {
+  if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
       await page.goto(baseUrl+'/fbr-pos/fail-queue',{waitUntil:'domcontentloaded'});

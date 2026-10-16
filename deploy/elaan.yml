@@ -1,12 +1,7 @@
-# Elaan for THIS production deploy only. CI stores TARGET_SHA internally in
-# deployment_key; customer-visible title/points never contain provenance.
-# Do not reuse Daily L001. Do not use skip_elaan except emergencies.
-
-title: "Hotel Front Desk ab Restaurant Outlet se alag rehta hai"
+title: "FBR POS unknown submission outcome par safe reconciliation"
 audience: pos
-category: hotel
 type: improvement
 points:
-  - "Hotel / Guest House login aur Manage as Company hamesha Front Desk kholta hai — New Sale Hotel ka ghar nahi."
-  - "Agar restaurant_mode pehle se ON hai to Restaurant Outlet Hotel shell ke andar alag module hai, Back to Front Desk ke sath."
-  - "restaurant_mode OFF ho to outlet menu aur sale URL dono band — purani modules, kitchen settings, rooms aur folio history preserve."
+  - "Timeout ya ambiguous IMS jawab par invoice verification ke liye hold rahe gi."
+  - "Retry se pehle owner checked IMS evidence se reconciliation kar sakta hai."
+  - "Agent 1.13.19 ki publication successful Windows build ke baad confirm hogi."

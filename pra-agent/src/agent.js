@@ -5,6 +5,7 @@ const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 const { replayCallbacks } = require('./callback-retry-policy');
+const { parseFiscalResult } = require('./fiscal-result');
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -201,6 +202,7 @@ async function flushCallbackQueueInner() {
           error: item.error,
           offline: item.offline || false,
           outcome_unknown: item.outcome_unknown || false,
+          submission_claim: item.submission_claim || null,
           agent_version: item.agent_version || currentConfig.appVersion || '1.0.0',
           version: item.version || null,
           ims_version: item.ims_version || null,
@@ -490,6 +492,7 @@ function callbackDiagnostics(data, requestedEnvironment) {
 
 async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironment = null, isFbrPos = false) {
   const isFiscalDevice = praMode === 'fiscal_device';
+  const claimEvidence = invoice.submission_claim ? { submission_claim: invoice.submission_claim } : {};
   log(`Submitting txn ${invoice.transaction_id} to PRA${isFiscalDevice ? ' (Fiscal Device — localhost:8524)' : ''}`);
 
   try {
@@ -502,11 +505,12 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
     });
 
     const data = praRes.data;
-    const diagnostics = isFiscalDevice ? callbackDiagnostics(data, praEnvironment) : {};
+    const diagnostics = { ...(isFiscalDevice ? callbackDiagnostics(data, praEnvironment) : {}), ...claimEvidence };
     // Tolerant comparison — the local IMS Fiscal Device service may return Code as a NUMBER (100),
     // while the cloud API returns a string ('100'). A strict === would misreport success as failure.
-    const success = data != null && String(data.Code ?? data.code ?? '') === '100';
-    const praInvoiceNumber = data?.InvoiceNumber || data?.invoiceNumber || data?.Response;
+    const fiscalResult = parseFiscalResult(data);
+    const success = fiscalResult.accepted;
+    const praInvoiceNumber = fiscalResult.number;
 
     if (success && praInvoiceNumber) {
       log(`✅ PRA accepted txn ${invoice.transaction_id}: ${praInvoiceNumber}`);
@@ -553,7 +557,7 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
         e.response?.data,
         errMsg,
         true,
-        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}),
+        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}), ...claimEvidence,
           ...(unknownOutcome ? { outcome_unknown: true } : {}) }
       );
       // Not counted as "failed" — this is a connectivity wait, not a rejection.
@@ -570,7 +574,7 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
         e.response?.data,
         errMsg,
         false,
-        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}),
+        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}), ...claimEvidence,
           ...(isFbrPos && Number(e.response?.status) >= 500 ? { outcome_unknown: true } : {}) }
       );
       failedTxnIds.add(invoice.transaction_id);

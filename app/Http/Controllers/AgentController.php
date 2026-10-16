@@ -853,9 +853,11 @@ class AgentController extends Controller
      */
     private function fbrPendingInvoices(Company $company, Request $request)
     {
+        \App\Services\FbrPosAgentClaim::quarantineExpired((int) $company->id);
         $pending = FbrPosTransaction::where('company_id', $company->id)
             ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
             ->whereNull('fbr_invoice_number')
+            ->whereNull('fbr_submission_hash')
             ->where(function ($q) {
                 // Never hand the agent a deliberate 'local' provisional bill.
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
@@ -871,6 +873,8 @@ class AgentController extends Controller
             try {
                 $txn->loadMissing(['items', 'company']);
                 $payload = $fbrService->buildFbrPosPayload($txn);
+                $claim = \App\Services\FbrPosAgentClaim::acquire($txn, $this->requestDeviceUid($request));
+                if ($claim === null) continue;
                 app(FbrPosSubmissionEvidenceService::class)->recordDispatch(
                     $company,
                     $txn,
@@ -880,6 +884,7 @@ class AgentController extends Controller
                     'transaction_id' => $txn->id,
                     'invoice_number' => $txn->invoice_number,
                     'payload' => $payload,
+                    'submission_claim' => $claim,
                     'created_at' => $txn->created_at?->toIso8601String(),
                 ];
             } catch (\Throwable $e) {
@@ -927,6 +932,7 @@ class AgentController extends Controller
             // down / no internet / timeout) — the bill stays QUEUED, never 'failed'.
             'offline' => 'nullable|boolean',
             'outcome_unknown' => 'nullable|boolean',
+            'submission_claim' => 'nullable|string|size:64',
             // Additive Agent telemetry. Older agents omit it and remain valid.
             'agent_version' => 'nullable|string|max:40',
             // Additive fiscal-device evidence. These fields are diagnostic only
@@ -1172,9 +1178,11 @@ class AgentController extends Controller
             }
         }
         $explicitCode100 = $code === '100';
+        $returnedFiscalNumber = \App\Services\FbrPosFiscalResult::fromResponse(is_array($response) ? $response : null);
         $treatAsSuccess = $request->boolean('success')
             && $explicitCode100
-            && $fbrInvoiceNumber !== '';
+            && $returnedFiscalNumber !== null
+            && hash_equals($returnedFiscalNumber, $fbrInvoiceNumber);
         $evidence = app(FbrPosSubmissionEvidenceService::class);
 
         // Idempotent callback: once an explicit Code-100 result stamped this
@@ -1199,6 +1207,14 @@ class AgentController extends Controller
                 'already_submitted' => true,
                 'pra_invoice_number' => $storedNumber,
             ]);
+        }
+
+        $reportedClaim = $request->input('submission_claim');
+        if ($reportedClaim !== null && !hash_equals((string) ($txn->fbr_submission_hash ?? ''), (string) $reportedClaim)) {
+            return response()->json(['error' => 'stale_submission_claim'], 409);
+        }
+        if ($txn->fbr_status === 'verification_pending' && !$treatAsSuccess) {
+            return response()->json(['ok' => true, 'verification_pending' => true]);
         }
 
         if ($treatAsSuccess) {
@@ -1238,10 +1254,11 @@ class AgentController extends Controller
             // stamping the transaction's fiscal-number field.
             $ambiguousSuccess = $request->boolean('success')
                 && $fbrInvoiceNumber !== ''
-                && (!$explicitCode100 || !is_array($response));
+                && !$treatAsSuccess;
 
             $unknownOutcome = $request->boolean('outcome_unknown')
-                || ($explicitCode100 && $fbrInvoiceNumber === '')
+                || ($explicitCode100 && !$treatAsSuccess)
+                || ($code === null && $response !== null)
                 || preg_match('/timed?\s*out|timeout|ECONNABORTED|ECONNRESET|socket hang up/i', $errMsg);
 
             if ($ambiguousSuccess || $unknownOutcome) {
@@ -1249,7 +1266,9 @@ class AgentController extends Controller
                     ? 'Agent success callback had a malformed response; explicit FBR IMS Code 100 was not proven.'
                     : ($code === null
                         ? 'Agent success callback omitted the FBR IMS response code; explicit Code 100 was not proven.'
-                        : 'Agent success callback carried FBR IMS code ' . mb_substr($code, 0, 40) . ', not Code 100.');
+                        : ($explicitCode100
+                            ? 'FBR IMS fiscal number was missing, invalid or did not match the callback.'
+                            : 'Agent success callback carried FBR IMS code ' . mb_substr($code, 0, 40) . ', not Code 100.'));
                 if ($unknownOutcome) $reason = 'FBR IMS may have accepted this invoice; reconcile its existing USIN before any retry.';
                 $txn->update(array_merge([
                     'fbr_status' => 'verification_pending',

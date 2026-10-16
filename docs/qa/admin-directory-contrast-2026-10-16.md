@@ -29,3 +29,9 @@ html.dark + main + gray-text selector with higher specificity than the initial
 scoped alert text rule. Bind that rule to the admin body so it wins in both
 modes. Keep the contrast assertion unchanged; add the same safe read-only
 directory journey to required early preflight for desktop/mobile feedback.
+
+Run 38866621145: actual contrast/size/options/filter/pointer assertions PASS
+on desktop and mobile across every theme/mode. The generic surface check
+then compared pathname to a query-bearing path. Declare expectedPaths as
+/admin/companies while retaining the search URL and actual filter assertions;
+no contrast assertion or native UI interaction is weakened.

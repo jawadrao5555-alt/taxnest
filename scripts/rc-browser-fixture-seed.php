@@ -508,7 +508,7 @@ $fixture = [
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
             'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
-        ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
+        ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
         ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],

@@ -234,6 +234,18 @@ $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid
     'pos_setup_completed' => true,
 ]);
 $fiscalUser = $user($fiscal, 'Synthetic FBR Retail Owner', 'fiscal@rc-browser.invalid', 'company_admin', 'pos_admin');
+$reconcileCases = [];
+foreach ([1366, 390] as $width) {
+    foreach (['accepted', 'not_accepted'] as $decision) {
+        $bill = \App\Models\FbrPosTransaction::withoutGlobalScopes()->create([
+            'company_id' => $fiscal->id, 'invoice_number' => 'RC-RECONCILE-'.$width.'-'.$decision,
+            'invoice_mode' => 'fbr', 'fbr_status' => 'verification_pending', 'status' => 'completed',
+            'subtotal' => 1000, 'tax_amount' => 180, 'total_amount' => 1180,
+            'payment_method' => 'cash', 'created_by' => $fiscalUser->id,
+        ]);
+        $reconcileCases[$width][$decision] = $bill->id;
+    }
+}
 
 foreach (['pos', 'fbr_pos'] as $audience) {
     AppUpdate::create([
@@ -511,6 +523,9 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys),
     'transactionalJourneys' => [
+        ['name' => 'fbr-owner-reconciliation', 'login' => $fiscalUser->email, 'password' => $password,
+            'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/fail-queue'],
+            'markers' => ['FBR Fail Queue'], 'fbrReconciliation' => $reconcileCases],
         ['name' => 'ingredient-unit-audit', 'login' => $unitOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/restaurant/ingredients'], 'markers' => ['Synthetic Stocked Chicken'],
             'ingredientUnitAudit' => ['unused' => $unitCases, 'stocked' => ['id' => $unitStocked->id, 'name' => $unitStocked->name]]],

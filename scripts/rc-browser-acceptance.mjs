@@ -1157,6 +1157,31 @@ async function reportingConnectorWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.fbrReconciliation) {
+    for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
+      await page.goto(baseUrl+'/fbr-pos/fail-queue',{waitUntil:'domcontentloaded'});
+      await dismiss(page);
+      await Promise.all([page.waitForURL(`**/fbr-pos/fail-queue/${id}/reconcile`,{waitUntil:'domcontentloaded'}),
+        page.locator(`a[href$="/fbr-pos/fail-queue/${id}/reconcile"]`).click()]);
+      await dismiss(page);
+      const form=page.locator('[data-fbr-owner-reconcile] form');
+      await form.locator('[name=decision]').selectOption(decision);
+      await form.locator('[name=evidence_source]').selectOption('ims_log');
+      // Retain the requested environment shown by the actual company fixture; never guess production.
+      await form.locator('[name=evidence_reference]').fill('Fictional checked IMS log '+v.width);
+      const number='90000000'+v.width;
+      if(decision==='accepted') await form.locator('[name=fiscal_number]').fill(number);
+      await form.locator('[name=confirmed]').check();
+      await Promise.all([page.waitForURL(/\/fbr-pos\/fail-queue$/,{waitUntil:'domcontentloaded'}),form.locator('button').click()]);
+      const result=await page.request.get(baseUrl+`/fbr-pos/transaction/${id}/fbr-status`);
+      if(!result.ok())throw new Error('Reconciled invoice status unavailable');
+      const state=await result.json();
+      if(state.fbr_status!==(decision==='accepted'?'submitted':'failed'))throw new Error('Owner reconciliation did not persist the checked result');
+      if(decision==='accepted'&&state.fbr_invoice_number!==number)throw new Error('Owner fiscal identity changed');
+    }
+    pass(t.name+'/'+v.width+': owner acceptance/rejection reconciliation, no fiscal submission');
+    return;
+  }
   if(t.reportingConnector)return reportingConnectorWorkflow(page,t,v);
   if(t.dashboardDetails) {
     await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});

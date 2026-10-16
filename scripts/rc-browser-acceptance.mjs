@@ -1226,7 +1226,7 @@ async function workflow(page,t,v,diagnostics) {
       window.invoicePreviewPolicyViolations=[];
       document.addEventListener('securitypolicyviolation',event=>window.invoicePreviewPolicyViolations.push({directive:event.effectiveDirective,uri:event.blockedURI}));
     });
-    await page.route('**/admin/dashboard/details/**',async route=>{
+    await page.route('**/admin/dashboard/**',async route=>{
       const response=await route.fetch();
       await route.fulfill({response,headers:{...response.headers(),'content-security-policy':t.invoicePreviewCsp}});
     });
@@ -1248,6 +1248,7 @@ async function workflow(page,t,v,diagnostics) {
       await page.waitForTimeout(350);
       const violations=await page.evaluate(()=>window.invoicePreviewPolicyViolations || []);
       if(violations.some(x=>/frame|child|default/.test(x.directive)))throw new Error('Production CSP blocked invoice preview: '+JSON.stringify(violations));
+      await saveEvidenceScreenshot(page,`rc-admin-invoice-preview-${doc.product}-${v.width}`);
       await adminReviewContrast(page);
       const [pdf]=await Promise.all([page.waitForEvent('download'),page.locator('[data-preview-download]').click()]);
       const bytes=readFileSync(await pdf.path());

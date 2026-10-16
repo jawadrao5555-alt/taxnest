@@ -505,7 +505,7 @@ html.dark body.admin-themed.tn-premium-shell,
     border-color: #be123c !important;
     color: #881337;
 }
-.tn-company-directory .tn-directory-alert :is(h2, a, span, svg) { color: #881337 !important; }
+body.admin-themed .tn-company-directory .tn-directory-alert :is(h2, a, span, svg) { color: #881337 !important; }
 .tn-company-directory .tn-directory-alert a { text-decoration: underline; text-underline-offset: .2em; }
 .tn-company-directory .tn-directory-alert span[class*="bg-gray"] { background: #ffe4e6 !important; }
 .tn-company-directory .tn-directory-alert :is(h2, a, span) { font-size: .8125rem; line-height: 1.55; }

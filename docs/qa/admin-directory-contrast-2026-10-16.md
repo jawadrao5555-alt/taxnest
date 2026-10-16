@@ -22,3 +22,10 @@ pass is claimed. Node syntax and whitespace pass.
 This is a separate screen-only PR from #197. More owner screenshots are expected
 and will extend this same scope after inspection. Draft pending fresh browser
 results and any additional supplied screens. No merge or deployment.
+
+Fresh browser run 38865058060 reproduced dark-mode failures on the alert's POS
+badge (1.63:1) and Silent print metadata (1.97:1). taxnest-ui.css uses an
+html.dark + main + gray-text selector with higher specificity than the initial
+scoped alert text rule. Bind that rule to the admin body so it wins in both
+modes. Keep the contrast assertion unchanged; add the same safe read-only
+directory journey to required early preflight for desktop/mobile feedback.

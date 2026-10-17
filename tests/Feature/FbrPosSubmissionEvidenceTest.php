@@ -110,8 +110,56 @@ class FbrPosSubmissionEvidenceTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $bill->refresh();
-        $this->assertSame('failed', $bill->fbr_status);
+        $this->assertSame('verification_pending', $bill->fbr_status);
         $this->assertNull($bill->fbr_invoice_number);
+    }
+
+    public function test_unknown_transport_outcome_is_held_while_connection_refusal_remains_retryable(): void
+    {
+        foreach (['timeout of 30000ms exceeded', 'ECONNRESET socket hang up'] as $error) {
+            $bill = $this->bill();
+            $result = $this->submit($bill, ['success' => false, 'offline' => true, 'error' => $error]);
+            $this->assertTrue($result['verification_pending'] ?? false);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+            $this->assertNull($bill->fresh()->fbr_invoice_number);
+            $result = (new \App\Services\FbrService)->submitFbrPosTransaction($bill->fresh());
+            $this->assertSame('blocked', $result['status']);
+        }
+        $bill = $this->bill();
+        $this->submit($bill, ['success' => false, 'offline' => true, 'error' => 'ECONNREFUSED']);
+        $this->assertSame('offline', $bill->fresh()->fbr_status);
+    }
+
+    public function test_unknown_acknowledgements_and_claimed_callbacks_remain_held_on_replay(): void
+    {
+        foreach ([['Code' => 100], ['Code' => 100, 'InvoiceNumber' => 'invalid prose'], ['message' => 'upstream unavailable']] as $response) {
+            $bill = $this->bill();
+            $claim = \App\Services\FbrPosAgentClaim::acquire($bill);
+            $wrong = $this->submit($bill, ['success' => false, 'outcome_unknown' => true,
+                'submission_claim' => str_repeat('0', 64), 'response' => $response]);
+            $this->assertSame('stale_submission_claim', $wrong['error']);
+            $this->assertSame('pending', $bill->fresh()->fbr_status);
+            $result = $this->submit($bill, ['success' => false, 'submission_claim' => $claim,
+                'pra_invoice_number' => 'invalid prose', 'response' => $response]);
+            $this->assertTrue($result['verification_pending'] ?? false);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+            $this->assertNull($bill->fresh()->fbr_invoice_number);
+            $this->submit($bill, ['success' => false, 'offline' => true, 'error' => 'ECONNREFUSED']);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+            $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill->fresh()));
+            $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill->fresh()));
+            $this->assertSame('blocked', (new \App\Services\FbrService)->submitFbrPosTransaction($bill->fresh())['status']);
+        }
+        Http::assertNothingSent();
+    }
+
+    public function test_new_agent_can_report_an_unknown_outcome_without_error_text(): void
+    {
+        $bill = $this->bill();
+        $result = $this->submit($bill, ['success' => false, 'outcome_unknown' => true]);
+        $this->assertTrue($result['verification_pending'] ?? false);
+        $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+        $this->assertNull($bill->fresh()->fbr_invoice_number);
     }
 
     public function test_stale_instances_cannot_dispatch_the_same_bill_twice_and_expiry_never_retries(): void

@@ -201,6 +201,7 @@ async function flushCallbackQueueInner() {
           response: item.response,
           error: item.error,
           offline: item.offline || false,
+          outcome_unknown: item.outcome_unknown || false,
           submission_claim: item.submission_claim || null,
           agent_version: item.agent_version || currentConfig.appVersion || '1.0.0',
           version: item.version || null,
@@ -424,7 +425,7 @@ async function syncOnceInner() {
       timeout: 15000,
     });
 
-    const { invoices, pra_endpoint, pra_token, pra_mode, pra_environment, count } = res.data;
+    const { invoices, pra_endpoint, pra_token, pra_mode, pra_environment, count, fiscal_product } = res.data;
     status.fiscalConnectivity = 'reachable';
     status.lastFiscalCheck = new Date().toISOString();
     status.pendingCount = count;
@@ -441,7 +442,7 @@ async function syncOnceInner() {
     log(`Found ${count} pending invoices`);
 
     for (const inv of invoices) {
-      await submitToPra(inv, pra_endpoint, pra_token, pra_mode, pra_environment);
+      await submitToPra(inv, pra_endpoint, pra_token, pra_mode, pra_environment, fiscal_product === 'fbrpos');
     }
 
     status.lastSync = new Date().toISOString();
@@ -489,7 +490,7 @@ function callbackDiagnostics(data, requestedEnvironment) {
   };
 }
 
-async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironment = null) {
+async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironment = null, isFbrPos = false) {
   const isFiscalDevice = praMode === 'fiscal_device';
   const claimEvidence = invoice.submission_claim ? { submission_claim: invoice.submission_claim } : {};
   log(`Submitting txn ${invoice.transaction_id} to PRA${isFiscalDevice ? ' (Fiscal Device — localhost:8524)' : ''}`);
@@ -528,7 +529,9 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
       // Pass any invoice number we DID receive — the server has a regex rescue
       // (fiscal-number pattern) that flips the row to 'submitted' if PRA actually issued one,
       // preventing a duplicate re-submission of an already-fiscalized bill.
-      await reportResult(invoice.transaction_id, false, praInvoiceNumber || null, data, err, false, diagnostics);
+      await reportResult(invoice.transaction_id, false, praInvoiceNumber || null,
+        data && typeof data === 'object' ? data : null, err, false,
+        { ...diagnostics, ...(isFbrPos && (success || !data || typeof data !== 'object' || !String(data.Code ?? data.code ?? '')) ? { outcome_unknown: true } : {}) });
       failedTxnIds.add(invoice.transaction_id);
       status.failedCount = failedTxnIds.size;
     }
@@ -543,7 +546,10 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
       errMsg = `IMS Fiscal Device service is NOT running on this PC (localhost:8524 unreachable). Install/start PRAL's IMS Fiscal Device software, then bills will sync automatically. (${e.message})`;
     }
     if (transportError) {
-      log(`📡 Offline/unreachable for txn ${invoice.transaction_id} — queued, will retry automatically: ${errMsg}`);
+      const definitelyNotConnected = /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH/.test(String(e.code || ''));
+      const unknownOutcome = isFbrPos && !definitelyNotConnected;
+      log(unknownOutcome ? `Verification required for txn ${invoice.transaction_id}: ${errMsg}`
+        : `Offline for txn ${invoice.transaction_id}, queued for retry: ${errMsg}`);
       await reportResult(
         invoice.transaction_id,
         false,
@@ -551,7 +557,8 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
         e.response?.data,
         errMsg,
         true,
-        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}), ...claimEvidence }
+        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}), ...claimEvidence,
+          ...(unknownOutcome ? { outcome_unknown: true } : {}) }
       );
       // Not counted as "failed" — this is a connectivity wait, not a rejection.
       if (failedTxnIds.has(invoice.transaction_id)) {
@@ -567,7 +574,8 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
         e.response?.data,
         errMsg,
         false,
-        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}), ...claimEvidence }
+        { ...(isFiscalDevice ? callbackDiagnostics(e.response?.data, praEnvironment) : {}), ...claimEvidence,
+          ...(isFbrPos && Number(e.response?.status) >= 500 ? { outcome_unknown: true } : {}) }
       );
       failedTxnIds.add(invoice.transaction_id);
       status.failedCount = failedTxnIds.size;

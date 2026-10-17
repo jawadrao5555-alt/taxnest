@@ -1,7 +1,7 @@
-title: "CCI import ke liye evidence audit aur missing-data report"
+title: "Desktop Agent par actual version aur build date"
 audience: all
 type: improvement
 points:
-  - "Offline audit source coverage aur invoice totals ki reconciliation report banata hai."
-  - "Missing MRP, verified mapping, buyer aur VAT evidence wazeh dikhai jati hai."
-  - "Yeh audit invoice create ya submit nahi karta; real pilot ki approval alag zaroori hai."
+  - "Agent ki settings screen par version aur actual build date wazeh dikhengi."
+  - "Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga."
+  - "Saved company, device aur printer settings barqarar rahengi."

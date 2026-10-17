@@ -243,6 +243,11 @@ foreach (['approved', 'active', 'pending', 'suspended', 'rejected'] as $n => $st
             'agent_version' => '1.0.0', 'pos_printer_settings' => ['silent_print_enabled' => true],
         ]);
 }
+$fiscal->forceFill(['fbr_sales_tax_registration_number'=>'1234567890123','fbr_tax_office'=>'Fictional tax office','fbr_pos_id'=>'1010',
+ 'address'=>'Fictional fiscal outlet','invoice_display_prefs'=>['fbrpos'=>['show_tax'=>false,'show_verify_line'=>false,'show_address'=>false,'show_ntn'=>false]]])->save();
+$fiscalReceipt = \App\Models\FbrPosTransaction::create(['company_id'=>$fiscal->id,'invoice_number'=>'RC-FISCAL-RECEIPT','invoice_mode'=>'fbr',
+ 'fbr_status'=>'submitted','fbr_invoice_number'=>'9000000000001','status'=>'completed','subtotal'=>1000,'total_amount'=>1180,'tax_rate'=>18,'tax_amount'=>180,'payment_method'=>'card','created_by'=>$fiscalUser->id]);
+$fiscalReceipt->items()->create(['item_name'=>'Synthetic fiscal goods','quantity'=>1,'unit_price'=>1000,'subtotal'=>1000,'total'=>1180,'tax_rate'=>18,'tax_amount'=>180]);
 $reconcileCases = [];
 foreach ([1366, 390] as $width) {
     foreach (['accepted', 'not_accepted'] as $decision) {
@@ -502,14 +507,31 @@ $adminPreviewDocuments = [
  ['metric'=>'fbrpos_transactions','product'=>'fbrpos','company'=>$fiscal->id,'record'=>$previewFbr->id,'reference'=>$previewFbr->invoice_number],
 ];
 
+// Enforce the actual production policy in the disposable invoice-preview browser
+// journey; application/runtime/database remain isolated and synthetic.
+$fixtureEnvironment = app()->environment();
+try {
+    app()->instance('env', 'production');
+    $policyResponse = (new \App\Http\Middleware\SecurityHeaders)->handle(
+        \Illuminate\Http\Request::create('http://127.0.0.1/admin/dashboard/details/pos_transactions'),
+        fn () => response('<html></html>')
+    );
+    $adminPreviewCsp = $policyResponse->headers->get('Content-Security-Policy');
+} finally {
+    app()->instance('env', $fixtureEnvironment);
+}
+if (!$adminPreviewCsp) throw new RuntimeException('Production CSP missing from preview fixture');
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name'=>'fbr-fiscal-receipt','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/transaction/'.$fiscalReceipt->id.'/receipt'],'markers'=>['FBR: 9000000000001','STRN: 1234567890123','Tax Asaan / SMS 9966'],'fiscalReceipt'=>true],
+        ['name'=>'fbr-identity-settings','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/settings/identities'],'markers'=>['Branch / terminal FBR identity']],
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
             'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
         ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
-        ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments],
+        ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments,'invoicePreviewCsp'=>$adminPreviewCsp],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],
             'customerAmountAudit' => ['customerId' => $amountCustomer->id, 'cases' => $amountCases, 'spent' => 646]],

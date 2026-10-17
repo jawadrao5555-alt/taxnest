@@ -1075,7 +1075,7 @@ class FbrService
         return self::SANDBOX_VALIDATE_URL;
     }
 
-    private function sendDirectToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
+    protected function sendDirectToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
     {
         $cookieFile = storage_path('app/fbr_cookies_' . md5($token) . '.txt');
 
@@ -1915,6 +1915,7 @@ class FbrService
     public function buildFbrPosPayload(\App\Models\FbrPosTransaction $transaction): array
     {
         $company = $transaction->company;
+        $identity = app(\App\Services\FbrPosIdentity::class)->capture($transaction);
 
         // ── RETURN / CREDIT NOTE (Aug 2026 — Retail Core) ────────────────────────
         // FBR IMS spec (SRO 1279/2021): a refund invoice carries InvoiceType=3 and
@@ -2012,7 +2013,7 @@ class FbrService
 
         return [
             'InvoiceNumber'    => '',
-            'POSID'            => (int) preg_replace('/[^0-9]/', '', (string) ($company->fbr_pos_id ?? '')),
+            'POSID'            => (int) $identity['pos_id'],
             'USIN'             => (string) $transaction->invoice_number,
             'DateTime'         => $transaction->created_at->format('Y-m-d H:i:s'),
             'BuyerNTN'         => $buyerNtn,
@@ -2315,6 +2316,9 @@ class FbrService
 
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
+        if (\App\Services\FbrPosAgentClaim::active($transaction) || $transaction->fbr_status === 'verification_pending') {
+            return ['status' => 'blocked', 'errors' => ['An FBR POS agent already owns this dispatch; reconcile before retrying.']];
+        }
         $company = $transaction->company;
         $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         // Keep code backward-compatible during rolling deploys where the new
@@ -2336,7 +2340,11 @@ class FbrService
         // shop PC. This guard sits BEFORE the hash-lock so a stale hash can never strand the bill,
         // and it covers EVERY call site (store, retryFbr, editRetry, retry/sync jobs).
         if ($company && $company->agentServesFbr() && $company->agent_enabled) {
-            $transaction->update(['fbr_status' => 'pending']);
+            $queued = \App\Models\FbrPosTransaction::whereKey($transaction->id)->where('company_id', $transaction->company_id)
+                ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
+                ->whereIn('fbr_status', ['pending', 'failed', 'offline', 'config_error'])
+                ->update(['fbr_status' => 'pending']);
+            if (!$queued) return ['status' => 'blocked', 'errors' => ['Invoice acquired or changed while queuing; do not overwrite it.']];
             return [
                 'status' => 'queued_agent',
                 'message' => 'Queued for Desktop Sync Agent (Fiscal Device mode).',
@@ -2350,13 +2358,28 @@ class FbrService
             ];
         }
 
-        $submissionHash = hash('sha256', $transaction->id . '|' . $transaction->invoice_number . '|' . now()->timestamp);
+        $submissionHash = bin2hex(random_bytes(32));
+        $claimPatch = ['fbr_submission_hash' => $submissionHash, 'fbr_status' => 'pending'];
+        if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) $claimPatch['fbr_agent_claimed_at'] = now();
+        $won = \App\Models\FbrPosTransaction::whereKey($transaction->id)->where('company_id', $transaction->company_id)
+            ->whereNull('fbr_invoice_number')->whereNull('fbr_submission_hash')
+            ->whereIn('fbr_status', ['pending', 'failed', 'offline', 'config_error'])
+            ->update($claimPatch);
+        if (!$won) return ['status' => 'blocked', 'errors' => ['Another worker owns or resolved this submission.']];
         $transaction->fbr_submission_hash = $submissionHash;
-        $transaction->save();
 
-        $clearHashOnFailure = function () use ($transaction) {
-            $transaction->fbr_submission_hash = null;
-            $transaction->save();
+        $clearHashOnFailure = function () use ($transaction, $submissionHash) {
+            // The claim was written through a query, so this model's original
+            // hash is still null. Assigning null and save() skips that column.
+            // Release only our own failed claim, never another worker's.
+            $patch = ['fbr_submission_hash' => null];
+            if (Schema::hasColumn('fbr_pos_transactions', 'fbr_agent_claimed_at')) $patch['fbr_agent_claimed_at'] = null;
+            \App\Models\FbrPosTransaction::whereKey($transaction->id)
+                ->where('company_id', $transaction->company_id)
+                ->whereNull('fbr_invoice_number')
+                ->where('fbr_submission_hash', $submissionHash)
+                ->update($patch);
+            $transaction->refresh();
         };
 
         $payload = $this->buildFbrPosPayload($transaction);
@@ -2445,7 +2468,8 @@ class FbrService
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
 
             if ($curlError) {
-                $clearHashOnFailure();
+                $unknownOutcome = !preg_match('/could not resolve|failed to connect|connection refused/i', $curlError);
+                if (!$unknownOutcome) $clearHashOnFailure();
                 $log->update([
                     'status' => 'failed',
                     'response_payload' => ['curl_error' => $curlError],
@@ -2453,11 +2477,11 @@ class FbrService
                     'response_code' => '0',
                 ]);
                 $transaction->update(array_merge(
-                    ['fbr_status' => 'failed'],
-                    self::fbrErrorPatch(self::shortFbrTransportError($curlError))
+                    ['fbr_status' => $unknownOutcome ? 'verification_pending' : 'failed'],
+                    self::fbrErrorPatch($unknownOutcome ? 'FBR outcome clear nahi — IMS evidence verify karke reconciliation karein.' : self::shortFbrTransportError($curlError))
                 ));
                 return [
-                    'status' => 'failed',
+                    'status' => $unknownOutcome ? 'verification_pending' : 'failed',
                     'errors' => ['FBR connection failed: ' . $curlError],
                 ];
             }
@@ -2465,7 +2489,7 @@ class FbrService
             $responseData = json_decode($responseBody, true);
 
             if ($httpCode < 200 || $httpCode >= 300) {
-                $clearHashOnFailure();
+                if ($httpCode < 500) $clearHashOnFailure();
                 $errors = is_array($responseData) ? $this->extractErrorsFromResponse($responseBody) : [$responseBody];
                 $log->update([
                     'status' => 'failed',
@@ -2474,11 +2498,11 @@ class FbrService
                     'error_message' => implode('; ', $errors),
                 ]);
                 $transaction->update(array_merge(
-                    ['fbr_status' => 'failed'],
+                    ['fbr_status' => $httpCode >= 500 ? 'verification_pending' : 'failed'],
                     self::fbrErrorPatch('FBR HTTP ' . $httpCode . ' — ' . implode('; ', $errors))
                 ));
                 return [
-                    'status' => 'failed',
+                    'status' => $httpCode >= 500 ? 'verification_pending' : 'failed',
                     'errors' => $errors,
                     'http_status' => $httpCode,
                 ];
@@ -2489,30 +2513,28 @@ class FbrService
                     $log->update([
                         'status' => 'failed',
                         'response_code' => '200',
-                        'error_message' => 'FBR returned empty 200 response (WAF challenge). Retry later.',
+                        'error_message' => 'FBR returned empty 200 response (WAF challenge). Reconcile before retry.',
                     ]);
-                    $clearHashOnFailure();
                     $transaction->update(array_merge(
-                        ['fbr_status' => 'pending'],
-                        self::fbrErrorPatch('FBR ne khali 200 response bheja (WAF challenge) — auto-retry hoga.')
+                        ['fbr_status' => 'verification_pending'],
+                        self::fbrErrorPatch('FBR ne khali 200 response bheja (WAF challenge) — verification zaroori hai.')
                     ));
                     return [
-                        'status' => 'retry',
-                        'errors' => ['FBR returned empty response. May need retry.'],
+                        'status' => 'verification_pending',
+                        'errors' => ['FBR returned empty response. Reconcile before retry.'],
                     ];
                 }
-                $clearHashOnFailure();
                 $log->update([
                     'status' => 'failed',
                     'response_code' => (string) $httpCode,
                     'error_message' => 'FBR returned non-JSON: ' . substr($responseBody, 0, 500),
                 ]);
                 $transaction->update(array_merge(
-                    ['fbr_status' => 'failed'],
+                    ['fbr_status' => 'verification_pending'],
                     self::fbrErrorPatch('FBR ne ghair-mutawaqqa (non-JSON) jawab bheja: ' . substr($responseBody, 0, 200))
                 ));
                 return [
-                    'status' => 'failed',
+                    'status' => 'verification_pending',
                     'errors' => ['FBR returned unexpected response format.'],
                 ];
             }
@@ -2545,7 +2567,9 @@ class FbrService
                 ];
             }
 
-            $clearHashOnFailure();
+            $responseCode = trim((string) ($responseData['Code'] ?? $responseData['code'] ?? ''));
+            $failedStatus = in_array($responseCode, ['', '100'], true) ? 'verification_pending' : 'failed';
+            if ($failedStatus !== 'verification_pending') $clearHashOnFailure();
             $log->update([
                 'status' => 'failed',
                 'response_payload' => $responseData,
@@ -2553,25 +2577,25 @@ class FbrService
                 'error_message' => implode('; ', $fbrResult['errors']),
             ]);
             $transaction->update(array_merge([
-                'fbr_status' => 'failed',
+                'fbr_status' => $failedStatus,
                 'fbr_response' => $responseData,
             ], self::fbrErrorPatch('FBR rejection: ' . implode('; ', $fbrResult['errors']))));
 
             return [
-                'status' => 'failed',
+                'status' => $failedStatus,
                 'errors' => $fbrResult['errors'],
                 'fbr_response' => $responseData,
             ];
 
         } catch (\Exception $e) {
-            $clearHashOnFailure();
+            // An exception cannot prove IMS did not accept; retain our claim.
             $log->update([
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
             ]);
             $transaction->update(array_merge(
-                ['fbr_status' => 'failed'],
-                self::fbrErrorPatch(self::shortFbrTransportError($e->getMessage()))
+                ['fbr_status' => 'verification_pending'],
+                self::fbrErrorPatch('FBR outcome clear nahi — IMS evidence verify karke reconciliation karein.')
             ));
 
             Log::error("FBR POS submission exception for Transaction #{$transaction->id}", [
@@ -2579,7 +2603,7 @@ class FbrService
             ]);
 
             return [
-                'status' => 'failed',
+                'status' => 'verification_pending',
                 'errors' => [$e->getMessage()],
             ];
         }

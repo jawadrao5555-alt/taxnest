@@ -298,6 +298,14 @@ async function surface(page,t,path,v) {
       else pass(`${t.name}/${v.width}: inventory tabs form one reachable scrolling row`);
     }
   }
+  if(t.fiscalReceipt) {
+    for(const selector of ['[data-fbr-fiscal-receipt] img[alt="FBR digital invoicing system"]','img[alt="FBR QR Code"]']) {
+      const image=page.locator(selector);if(!await image.count() || !await image.evaluate(el=>el.complete&&el.naturalWidth>0)) fail(`${t.name}/${v.width}: fiscal image did not load: ${selector}`);
+    }
+    await page.emulateMedia({media:'print'});
+    if(!await page.locator('[data-fbr-required-profile]').isVisible()) fail(`${t.name}/${v.width}: required fiscal profile hidden on print`);
+    await page.emulateMedia({media:'screen'});
+  }
   const status=response?.status()||0, body=await page.locator('body').innerText().catch(()=> '');
   if (t.denied) { if ([302,403].includes(status)||new URL(page.url()).pathname!==path) pass(`AUTHZ DENIAL PASS: ${t.name}/${v.width}: denied surface stayed denied`); else fail(`${t.name}/${v.width}: denied surface rendered (${status})`); return; }
   if (status>=400||page.url().includes('/login')) return fail(`${t.name}/${v.width}: ${path} unauthorized or errored (${status})`);
@@ -1257,6 +1265,15 @@ async function workflow(page,t,v,diagnostics) {
     const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Export filtered CSV'}).click()]);
     const csv=readFileSync(await download.path(),'utf8');
     if(!csv.startsWith('id,company,company_id,product,reference,status,amount,created_at,')) throw new Error('Dashboard CSV schema missing');
+    if(!t.invoicePreviewCsp)throw new Error('Invoice preview must enforce the actual production CSP');
+    await page.addInitScript(() => {
+      window.invoicePreviewPolicyViolations=[];
+      document.addEventListener('securitypolicyviolation',event=>window.invoicePreviewPolicyViolations.push({directive:event.effectiveDirective,uri:event.blockedURI}));
+    });
+    await page.route('**/admin/dashboard/**',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,headers:{...response.headers(),'content-security-policy':t.invoicePreviewCsp}});
+    });
     for(const doc of t.previewDocuments || []) {
       await page.goto(baseUrl+'/admin/dashboard/details/'+doc.metric+'?company_id='+doc.company,{waitUntil:'domcontentloaded'});
       const link=page.locator(`[data-invoice-preview$="/${doc.product}/${doc.company}/${doc.record}/preview"]`);
@@ -1272,6 +1289,10 @@ async function workflow(page,t,v,diagnostics) {
       await page.locator('#tn-invoice-preview').waitFor({state:'visible'});
       await page.locator('[data-preview-download]').waitFor({state:'visible'});
       await page.waitForFunction(()=>!document.querySelector('[data-preview-print]').disabled);
+      await page.waitForTimeout(350);
+      const violations=await page.evaluate(()=>window.invoicePreviewPolicyViolations || []);
+      if(violations.some(x=>/frame|child|default/.test(x.directive)))throw new Error('Production CSP blocked invoice preview: '+JSON.stringify(violations));
+      await saveEvidenceScreenshot(page,`rc-admin-invoice-preview-${doc.product}-${v.width}`);
       await adminReviewContrast(page);
       const [pdf]=await Promise.all([page.waitForEvent('download'),page.locator('[data-preview-download]').click()]);
       const bytes=readFileSync(await pdf.path());

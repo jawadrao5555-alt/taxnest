@@ -115,8 +115,21 @@ fbrpos_numbering(){
     clean_php env RC_SAFE_RUN=1 php "$ROOT/scripts/tests/fbrpos-numbering-native-worker.php" verify
 }
 checks
+fbrpos_claims(){
+    reset "taxnest_rc_${RUN_ID}_claims"
+    clean_php env RC_SAFE_RUN=1 php "$ROOT/scripts/tests/fbrpos-agent-claim-native-worker.php" seed
+    local pids=() failed=0
+    for i in {1..12}; do
+        clean_php env RC_SAFE_RUN=1 php "$ROOT/scripts/tests/fbrpos-agent-claim-native-worker.php" claim >"$EVIDENCE_DIR/fbrpos-claim-$i.log" 2>&1 &
+        pids+=("$!")
+    done
+    for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
+    (( failed == 0 )) || fail 'FBR POS claim worker failed'
+    [[ "$(grep -h '^won$' "$EVIDENCE_DIR"/fbrpos-claim-*.log | wc -l)" == 1 ]] || fail 'Multiple workers dispatched one FBR POS invoice'
+    clean_php env RC_SAFE_RUN=1 php "$ROOT/scripts/tests/fbrpos-agent-claim-native-worker.php" verify
+}
 case "$MODE" in
-    all) full; upgrade; concurrency; di; fbrpos_numbering ;;
+    all) full; upgrade; concurrency; di; fbrpos_numbering; fbrpos_claims ;;
     full) full ;;
     upgrade) upgrade ;;
     concurrency) full; concurrency ;;

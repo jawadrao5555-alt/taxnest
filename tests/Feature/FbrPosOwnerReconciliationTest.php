@@ -58,6 +58,48 @@ class FbrPosOwnerReconciliationTest extends TestCase
         $this->assertSame('failed',$this->bill->fresh()->fbr_status);
     }
 
+    public function test_expired_exclusive_claim_requires_audited_rejection_before_same_usin_can_be_claimed_again(): void
+    {
+        $this->bill->update(['fbr_status' => 'pending']);
+        $claim = \App\Services\FbrPosAgentClaim::acquire($this->bill);
+        $this->assertNotNull($claim);
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($this->bill->fresh()));
+        $this->travel(4)->minutes();
+        \App\Services\FbrPosAgentClaim::quarantineExpired(91);
+        $this->bill->refresh();
+        $this->assertSame('verification_pending', $this->bill->fbr_status);
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($this->bill));
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($this->bill));
+
+        app(FbrPosOwnerReconciliation::class)->resolve($this->owner, 91, $this->bill->id,
+            $this->data(['decision' => 'not_accepted', 'fiscal_number' => null]));
+        $this->bill->refresh();
+        $this->assertSame('FPOS-2026-00001', $this->bill->invoice_number);
+        $this->assertNull($this->bill->fbr_submission_hash);
+        $this->assertTrue(\App\Services\FbrPosAgentClaim::prepareRetry($this->bill));
+        $nextClaim = \App\Services\FbrPosAgentClaim::acquire($this->bill);
+        $this->assertNotNull($nextClaim);
+        $this->assertNotSame($claim, $nextClaim);
+        $this->assertSame(1, DB::table('fbr_pos_owner_reconciliations')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_owner_accepted_expired_claim_cannot_be_retried_or_dispatched_again(): void
+    {
+        $this->bill->update(['fbr_status' => 'pending']);
+        $this->assertNotNull(\App\Services\FbrPosAgentClaim::acquire($this->bill));
+        $this->travel(4)->minutes();
+        \App\Services\FbrPosAgentClaim::quarantineExpired(91);
+        $this->bill->refresh();
+        app(FbrPosOwnerReconciliation::class)->resolve($this->owner, 91, $this->bill->id, $this->data());
+        $this->bill->refresh();
+        $this->assertSame('submitted', $this->bill->fbr_status);
+        $this->assertSame('900000000001', $this->bill->fbr_invoice_number);
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($this->bill));
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($this->bill));
+        Http::assertNothingSent();
+    }
+
     public function test_reporting_off_recovery_list_preserves_holds_and_isolates_company_and_provisionals(): void
     {
         $foreign = FbrPosTransaction::create(['company_id'=>92,'invoice_number'=>'FOREIGN','invoice_mode'=>'fbr','fbr_status'=>'verification_pending','total_amount'=>1180]);

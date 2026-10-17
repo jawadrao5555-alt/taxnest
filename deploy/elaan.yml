@@ -1,7 +1,7 @@
-title: "Table item delete par duplicate kitchen ADD ki correction"
-audience: pos
+title: "Admin company directory mein wazeh text aur readable controls"
+audience: all
 type: improvement
 points:
-  - "Table order mein same dish ki multiple lines ab apne alag line ID se match hoti hain."
-  - "Item delete karne par baqi lines dobara ADD nahi hotin; cancellation sirf hatayi hui quantity ki hoti hai."
-  - "Order save aur reopen par quantity aur bill total barqarar rehtay hain."
+  - "Agent Health alert aur company details par text zyada wazeh nazar aye ga."
+  - "Status badges, filters aur action labels readable size aur contrast mein honge."
+  - "Existing saved themes aur company settings barqarar rahengi."

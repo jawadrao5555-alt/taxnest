@@ -38,12 +38,11 @@
     const status = document.getElementById('tn-invoice-preview-status');
     const download = dialog.querySelector('[data-preview-download]');
     const print = dialog.querySelector('[data-preview-print]');
-    let controller, documentUrl, opener;
+    let controller, opener;
     const clear = () => {
         controller?.abort(); controller = null;
-        frame.hidden = true; frame.removeAttribute('src'); print.disabled = true;
+        frame.onload = null; frame.hidden = true; frame.removeAttribute('src'); print.disabled = true;
         download.hidden = true; download.removeAttribute('href');
-        if (documentUrl) URL.revokeObjectURL(documentUrl); documentUrl = null;
     };
     dialog.addEventListener('close', () => { clear(); opener?.focus(); });
     dialog.querySelector('[data-preview-close]').addEventListener('click', () => dialog.close());
@@ -55,16 +54,20 @@
         const request = new AbortController(); controller = request;
         const timeout = setTimeout(() => request.abort(), 60000);
         try {
-            const response = await fetch(link.dataset.invoicePreview, {signal:request.signal,credentials:'same-origin',headers:{Accept:'application/pdf'}});
+            const previewUrl = new URL(link.dataset.invoicePreview, window.location.href);
+            if (previewUrl.origin !== window.location.origin) throw new Error('Invalid invoice preview origin');
+            const response = await fetch(previewUrl.href, {signal:request.signal,credentials:'same-origin',headers:{Accept:'application/pdf'}});
             if (!response.ok || !response.headers.get('Content-Type')?.includes('application/pdf')) throw new Error('Preview unavailable');
             const blob = await response.blob();
             const signature = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
             if (String.fromCharCode(...signature) !== '%PDF-') throw new Error('Invalid invoice document');
             if (!dialog.open || controller !== request) return;
-            documentUrl = URL.createObjectURL(blob); frame.hidden = false;
+            // Keep the validated document on its authenticated same-origin URL.
+            // A blob iframe is blocked by the production default-src policy.
+            frame.hidden = false;
             download.href = link.dataset.invoiceDownload; download.hidden = false;
             frame.onload = () => { if(dialog.open && controller === request) print.disabled = false; };
-            frame.src = documentUrl;
+            frame.src = previewUrl.href;
             status.textContent = 'Read-only invoice preview. Download PDF or print using the preview controls.';
         } catch (error) {
             if (dialog.open && controller === request) status.textContent = 'Invoice preview could not load. Close and try again.';

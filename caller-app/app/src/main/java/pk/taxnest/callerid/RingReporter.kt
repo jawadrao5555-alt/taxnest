@@ -20,8 +20,11 @@ object RingReporter {
         val name = rawName?.trim()?.take(120) ?: ""
         if (phone.isEmpty() && name.isEmpty()) return
         try {
-            synchronized(deliveryLock) {
+            synchronized(Prefs.accountLock) {
                 if (Prefs.token(ctx) != token) return
+                // Adopt an existing working pairing once; credential changes thereafter require re-pairing.
+                if (LanClient.isPaired(ctx) && Prefs.lanAccountScope(ctx) == null)
+                    Prefs.setLanAccountScope(ctx, RingOutbox.scope(token))
                 outbox(ctx).enqueue(RingOutbox.scope(token), lanScope(ctx), phone, name,
                     if (source == "whatsapp") "whatsapp" else "sim", System.currentTimeMillis())
                 // Schedule BEFORE trying a lane: process death must not strand the snapshot.
@@ -35,13 +38,16 @@ object RingReporter {
     }
 
     /** Bounded drain; retries retain original identity/time. true means more work remains. */
-    fun drain(context: Context, stopped: () -> Boolean = { false }): Boolean = synchronized(deliveryLock) {
+    fun drain(context: Context, stopped: () -> Boolean = { false }): Boolean = synchronized(deliveryLock) drainLock@ {
         val ctx = context.applicationContext
-        val token = Prefs.token(ctx) ?: return@synchronized false
+        val token = Prefs.token(ctx) ?: return@drainLock false
         val scope = RingOutbox.scope(token)
         val box = outbox(ctx)
         try {
-            val pending = box.pending(scope, System.currentTimeMillis())
+            val pending = synchronized(Prefs.accountLock) {
+                if (Prefs.token(ctx) != token) return@drainLock false
+                box.pending(scope, System.currentTimeMillis())
+            }
             for (event in pending.take(5)) {
                 if (stopped() || Prefs.token(ctx) != token) break
                 val now = System.currentTimeMillis()
@@ -55,7 +61,8 @@ object RingReporter {
                     if (cloud == RingDeliveryPolicy.Result.RETRY && cloudFirst && lanReady &&
                         Prefs.token(ctx) == token && postLan(ctx, event)) RingDeliveryPolicy.Result.DELIVERED else cloud
                 }
-                if (Prefs.token(ctx) != token) return@synchronized false
+                synchronized(Prefs.accountLock) {
+                if (Prefs.token(ctx) != token) return@drainLock false
                 when (result) {
                     RingDeliveryPolicy.Result.DELIVERED -> {
                         box.acknowledge(scope, event.uuid, now)
@@ -66,18 +73,22 @@ object RingReporter {
                         // Feature/package is authoritative. Do not backlog calls made while disabled.
                         box.clear(scope, now)
                         Prefs.setFeatureEnabled(ctx, false)
-                        return@synchronized false
+                        return@drainLock false
                     }
                     RingDeliveryPolicy.Result.UNAUTHORIZED -> {
                         box.clear(scope, now)
                         Prefs.setToken(ctx, null)
-                        return@synchronized false
+                        return@drainLock false
                     }
                     RingDeliveryPolicy.Result.DROP -> box.acknowledge(scope, event.uuid, now)
-                    RingDeliveryPolicy.Result.RETRY -> return@synchronized true
+                    RingDeliveryPolicy.Result.RETRY -> return@drainLock true
+                }
                 }
             }
-            box.pending(scope, System.currentTimeMillis()).isNotEmpty()
+            synchronized(Prefs.accountLock) {
+                if (Prefs.token(ctx) != token) return@drainLock false
+                box.pending(scope, System.currentTimeMillis()).isNotEmpty()
+            }
         } catch (e: Exception) {
             Log.w("CallerOutbox", "Saved queue recovery needs attention", e)
             true

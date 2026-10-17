@@ -11,7 +11,18 @@ object Prefs {
         c.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     fun token(c: Context): String? = sp(c).getString("token", null)
-    fun setToken(c: Context, v: String?) = sp(c).edit().putString("token", v).apply()
+    internal val accountLock = Any()
+    fun setToken(c: Context, v: String?) = synchronized(accountLock) {
+        val previous = token(c)
+        if (previous != v) {
+            // Preserve pairing settings, but never adopt the old shop's PC under new credentials.
+            if (previous != null && lanAccountScope(c) == null && lanToken(c) != null)
+                setLanAccountScope(c, RingOutbox.scope(previous))
+            try { RingOutbox(c.noBackupFilesDir).clear(RingOutbox.scope(v ?: ""), System.currentTimeMillis()) }
+            catch (e: Exception) { android.util.Log.w("CallerOutbox", "Account queue cleanup needs attention", e) }
+        }
+        sp(c).edit().putString("token", v).commit()
+    }
 
     /**
      * UI ki zubaan (Task 1382): "en" | "rur" | "ur" — matlab `Lang` mein.
@@ -91,6 +102,9 @@ object Prefs {
 
     fun lanToken(c: Context): String? = sp(c).getString("lan_token", null)
     fun setLanToken(c: Context, v: String?) { sp(c).edit().putString("lan_token", v).commit() }
+
+    fun lanAccountScope(c: Context): String? = sp(c).getString("lan_account_scope", null)
+    fun setLanAccountScope(c: Context, v: String?) { sp(c).edit().putString("lan_account_scope", v).commit() }
 
     /** Aakhri kamyab LAN ring — settings screen sach bol sake. */
     fun lanLastOkAt(c: Context): Long = sp(c).getLong("lan_last_ok_at", 0L)

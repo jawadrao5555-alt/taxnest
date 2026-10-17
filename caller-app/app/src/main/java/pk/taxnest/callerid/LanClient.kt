@@ -185,6 +185,7 @@ object LanClient {
      * unpairs it there (or the shop clears every device).
      */
     fun pair(ctx: Context, host: String, code: String, deviceLabel: String?): PairResult {
+        val cloudAccount = Prefs.token(ctx)
         val cleanHost = host.trim()
         if (!isPrivateIpv4(cleanHost)) return PairResult(false, error = "not_private")
 
@@ -199,9 +200,13 @@ object LanClient {
         if (status == 200 && json?.optBoolean("ok") == true) {
             val token = json.optString("token").takeIf { it.isNotBlank() }
                 ?: return PairResult(false, port, "no_token")
-            Prefs.setLanHost(ctx, cleanHost)
-            Prefs.setLanPort(ctx, port)
-            Prefs.setLanToken(ctx, token)
+            synchronized(Prefs.accountLock) {
+                if (Prefs.token(ctx) != cloudAccount) return PairResult(false, port, "no_token")
+                Prefs.setLanHost(ctx, cleanHost)
+                Prefs.setLanPort(ctx, port)
+                Prefs.setLanToken(ctx, token)
+                Prefs.setLanAccountScope(ctx, cloudAccount?.let { RingOutbox.scope(it) })
+            }
             return PairResult(true, port)
         }
         return PairResult(
@@ -217,7 +222,8 @@ object LanClient {
     }
 
     fun isPaired(ctx: Context): Boolean =
-        Prefs.lanToken(ctx) != null && Prefs.lanHost(ctx)?.isNotBlank() == true
+        Prefs.lanToken(ctx) != null && Prefs.lanHost(ctx)?.isNotBlank() == true &&
+            (Prefs.lanAccountScope(ctx) == null || Prefs.token(ctx)?.let { RingOutbox.scope(it) } == Prefs.lanAccountScope(ctx))
 
     fun forget(ctx: Context) {
         Prefs.setLanToken(ctx, null)
@@ -242,6 +248,7 @@ object LanClient {
         deadlineAt: Long = System.currentTimeMillis() + RING_BUDGET_MS,
         expectedPairing: String? = null,
     ): Boolean {
+        if (!isPaired(ctx)) return false
         if (phone.isNullOrBlank()) {
             // The agent stores rings by number; a name-only ring has nothing to
             // match a customer on. The cloud lane still carries it.

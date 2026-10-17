@@ -57,3 +57,6 @@ backup.sql
 /database/deploy/*-production-sync/
 /caller-app/TaxNest-PRA-Agent-Windows.zip
 /public/downloads/TaxNest-PRA-Agent-Windows.zip
+
+# Agent packaging date is generated for each actual build.
+/pra-agent/build-info.json

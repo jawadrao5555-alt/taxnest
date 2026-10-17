@@ -1915,6 +1915,7 @@ class FbrService
     public function buildFbrPosPayload(\App\Models\FbrPosTransaction $transaction): array
     {
         $company = $transaction->company;
+        $identity = app(\App\Services\FbrPosIdentity::class)->capture($transaction);
 
         // ── RETURN / CREDIT NOTE (Aug 2026 — Retail Core) ────────────────────────
         // FBR IMS spec (SRO 1279/2021): a refund invoice carries InvoiceType=3 and
@@ -2012,7 +2013,7 @@ class FbrService
 
         return [
             'InvoiceNumber'    => '',
-            'POSID'            => (int) preg_replace('/[^0-9]/', '', (string) ($company->fbr_pos_id ?? '')),
+            'POSID'            => (int) $identity['pos_id'],
             'USIN'             => (string) $transaction->invoice_number,
             'DateTime'         => $transaction->created_at->format('Y-m-d H:i:s'),
             'BuyerNTN'         => $buyerNtn,

@@ -1,7 +1,7 @@
-title: "FBR POS unknown submission outcome par safe reconciliation"
+title: "FBR POS branch aur counter ki apni fiscal identity"
 audience: pos
 type: improvement
 points:
-  - "Timeout ya ambiguous IMS jawab par invoice verification ke liye hold rahe gi."
-  - "Retry se pehle owner checked IMS evidence se reconciliation kar sakta hai."
-  - "Agent 1.13.19 ki publication successful Windows build ke baad confirm hogi."
+  - "Owner branch aur terminal ko us ke registered POS ID aur Agent PC se map kar sakta hai."
+  - "Final invoice apni original POS identity rakhe gi; baad ki mapping purane bill ko nahi badle gi."
+  - "Uncertain submission hold rahe gi; replacement PC ke liye checked IMS rejection zaroori hai."

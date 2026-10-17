@@ -109,6 +109,8 @@ jobs:
           php-version: '8.4'
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Check combined FBR identity, exclusive claim and owner recovery
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FbrPosIdentityTest.php tests/Feature/FbrPosSubmissionEvidenceTest.php tests/Feature/FbrPosOwnerReconciliationTest.php
       - name: Check Smart DI import safeguards and legacy import regression
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/CciVoyageInvoiceParserTest.php tests/Unit/InvoiceImportLineClassifierTest.php tests/Feature/InvoiceBulkImportTest.php
       - name: Check Guest House settings regressions before the full suite

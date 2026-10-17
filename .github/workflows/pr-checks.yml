@@ -247,7 +247,7 @@ jobs:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
-          node scripts/agent-build-display-smoke.mjs
+          RC_BROWSER_ONLY=agent-build-identity bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=readonly-reporting-connection bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run

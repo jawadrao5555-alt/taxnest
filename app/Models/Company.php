@@ -264,7 +264,7 @@ class Company extends Model
         // Peti (Wholesale) Rate (Task 1414) — single source of truth switch + margin.
         'fbr_peti_rate_enabled',
         'fbr_peti_margin_pct',
-        'fbr_pos_id',
+        'fbr_pos_id', 'fbr_sales_tax_registration_number', 'fbr_tax_office',
         'fbr_access_code',
         'fbr_pos_token',
         'fbr_pos_environment',

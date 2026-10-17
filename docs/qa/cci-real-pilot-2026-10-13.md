@@ -42,3 +42,11 @@ Local command: `bash scripts/rc-safe-run -- php scripts/cci-pilot-evidence-audit
 Validation: 8 tests / 450 assertions including existing parser coverage, changed/duplicate/missing evidence, conflicting footer rejection, identifier omission and no automatic release after filled cells. Real source/evidence audit ran successfully with full line coverage. Full CI remains pending at PR creation. This backend-only audit has no UI flow.
 
 After evidence arrives: verify company-specific mappings → reconcile source item VAT against the DI payload → owner-reviewed draft-only pilot → inspect original dates, units, MRP, buyer identity and totals → explicitly approved sandbox/live submission through the normal owner release path. Code changes cannot replace missing supplier or registration evidence.
+
+## 17 October deployed-main refresh
+
+Merged original audit HEAD 41f525c327b20a405d679bc7c58837b8ec3b1875 onto successfully deployed and Actions-live-verified main 5436f1c7ef07040c4cd5208488396e7b588b80c7 (#202), preserving both histories. Clean merge, no audit implementation/test/source-evidence changes. The current fiscal receipt, branch identity, claim/recovery, read-only reporting and preview protections remain present. Audit/parser regressions are included in the early Smart DI preflight.
+
+The real-source figures and observed HOLD above are historical 13 October evidence, not a new audit of a potentially changed workbook. This refresh does not re-read, expose or modify customer workbooks. Fresh CI validates code/regressions only. No new verified supplier, MRP, conversion, buyer-registration or item-VAT evidence was supplied in this task, so real fiscal pilot signoff remains pending. Audit PR readiness is not permission to create or submit fiscal invoices.
+
+Local PHP/MariaDB/Chrome executables unavailable. Run fresh exact-HEAD targeted audit/parser tests, native migration/concurrency, browser acceptance and full PHPUnit before approval readiness. Agent inputs/version stay 1.13.19. No production/customer/regulator access or agent merge/deploy.

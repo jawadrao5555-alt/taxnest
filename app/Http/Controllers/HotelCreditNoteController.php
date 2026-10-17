@@ -111,11 +111,10 @@ class HotelCreditNoteController extends Controller
     public function issue(Request $request, int $id, int $bill)
     {
         $stay = $this->stay($id);
-        // The simple Hotel form confirms a complete invoice, without editable quantities or an invented correction reason.
+        // Whole-invoice UI still requires the actual business reason; never invent one.
         $simple = $request->boolean('simple_full');
         if ($simple) {
             $request->validate(['mode' => 'required|in:full', 'quantities' => 'prohibited']);
-            $request->merge(['reason' => 'Full invoice credit confirmed by owner.']);
         }
         $data = $request->validate(['reason' => 'required|string|min:5|max:255', 'request_key' => 'required|string|min:16|max:64',
             'fingerprint' => 'required|string|size:64', 'confirmed' => 'accepted']);

@@ -42,7 +42,7 @@ class FbrPosSubmissionEvidenceService
                     ->where('transaction_id', $transaction->id)
                     ->lockForUpdate()
                     ->first();
-                $posId = $this->normaliseIdentity($company->fbr_pos_id);
+                $posId = $this->normaliseIdentity($transaction->fbr_pos_id_snapshot ?? $company->fbr_pos_id);
                 $attrs = [
                     'company_id' => (int) $company->id,
                     'channel' => 'local_fiscal_device',
@@ -94,7 +94,7 @@ class FbrPosSubmissionEvidenceService
 
         try {
             $now = now();
-            $posId = $this->normaliseIdentity($company->fbr_pos_id);
+            $posId = $this->normaliseIdentity($transaction->fbr_pos_id_snapshot ?? $company->fbr_pos_id);
             $fiscal = $this->normaliseIdentity($fiscalNumber);
             $encoded = is_array($response)
                 ? json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
@@ -161,7 +161,8 @@ class FbrPosSubmissionEvidenceService
                 return $unknown;
             }
 
-            $current = $this->fingerprint($this->normaliseIdentity($company->fbr_pos_id));
+            $bill = FbrPosTransaction::withoutGlobalScopes()->where('company_id', $company->id)->find($row->transaction_id);
+            $current = $this->fingerprint($this->normaliseIdentity($bill?->fbr_pos_id_snapshot ?? $company->fbr_pos_id));
             $stored = $row->pos_id_fingerprint ?: null;
             $posState = (! $current || ! $stored)
                 ? 'unknown'

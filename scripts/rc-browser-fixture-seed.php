@@ -234,6 +234,11 @@ $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid
     'pos_setup_completed' => true,
 ]);
 $fiscalUser = $user($fiscal, 'Synthetic FBR Retail Owner', 'fiscal@rc-browser.invalid', 'company_admin', 'pos_admin');
+$fiscal->forceFill(['fbr_sales_tax_registration_number'=>'1234567890123','fbr_tax_office'=>'Fictional tax office','fbr_pos_id'=>'1010',
+ 'address'=>'Fictional fiscal outlet','invoice_display_prefs'=>['fbrpos'=>['show_tax'=>false,'show_verify_line'=>false,'show_address'=>false,'show_ntn'=>false]]])->save();
+$fiscalReceipt = \App\Models\FbrPosTransaction::create(['company_id'=>$fiscal->id,'invoice_number'=>'RC-FISCAL-RECEIPT','invoice_mode'=>'fbr',
+ 'fbr_status'=>'submitted','fbr_invoice_number'=>'9000000000001','status'=>'completed','subtotal'=>1000,'total_amount'=>1180,'tax_rate'=>18,'tax_amount'=>180,'payment_method'=>'card','created_by'=>$fiscalUser->id]);
+$fiscalReceipt->items()->create(['item_name'=>'Synthetic fiscal goods','quantity'=>1,'unit_price'=>1000,'subtotal'=>1000,'total'=>1180,'tax_rate'=>18,'tax_amount'=>180]);
 $reconcileCases = [];
 foreach ([1366, 390] as $width) {
     foreach (['accepted', 'not_accepted'] as $decision) {
@@ -511,6 +516,7 @@ if (!$adminPreviewCsp) throw new RuntimeException('Production CSP missing from p
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name'=>'fbr-fiscal-receipt','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/transaction/'.$fiscalReceipt->id.'/receipt'],'markers'=>['FBR: 9000000000001','STRN: 1234567890123','Tax Asaan / SMS 9966'],'fiscalReceipt'=>true],
         ['name'=>'fbr-identity-settings','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/settings/identities'],'markers'=>['Branch / terminal FBR identity']],
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],

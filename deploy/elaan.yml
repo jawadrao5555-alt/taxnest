@@ -1,7 +1,7 @@
-title: "FBR POS branch aur counter ki apni fiscal identity"
+title: "FBR fiscal receipt par original seller aur POS details"
 audience: pos
 type: improvement
 points:
-  - "Owner branch aur terminal ko us ke registered POS ID aur Agent PC se map kar sakta hai."
-  - "Final invoice apni original POS identity rakhe gi; baad ki mapping purane bill ko nahi badle gi."
-  - "Uncertain submission hold rahe gi; replacement PC ke liye checked IMS rejection zaroori hai."
+  - "Submitted FBR bill par tax, fiscal number, POS ID aur verification details nazar ayengi."
+  - "New invoices seller ka original profile save karengi; baad ki profile changes se purani identity nahi badle gi."
+  - "Missing STRN ya tax-office data wazeh dikhaya jaye ga; held aur local bills fiscal acceptance nahi dikhayenge."

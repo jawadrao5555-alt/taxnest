@@ -10,6 +10,15 @@
         $is58 = $paperSize === 'thermal58';
         // Receipt Display toggles (owner, 22 Jul 2026) — business-profile Print Settings.
         $rd = $company->displayPrefs('fbrpos');
+        $fiscalReceipt = $transaction->fbr_status === 'submitted' && !empty($transaction->fbr_invoice_number) && $transaction->invoice_mode !== 'local';
+        $seller = $transaction->fbr_receipt_profile_snapshot ?? $company->only(['name','address','ntn','fbr_sales_tax_registration_number','fbr_tax_office']);
+        if ($fiscalReceipt) {
+            foreach (['show_business_name','show_address','show_ntn','show_tax','show_verify_line'] as $field) $rd[$field] = true;
+        }
+        $receiptSellerName = $fiscalReceipt ? ($seller['name'] ?? '') : $company->name;
+        $receiptPosId = $transaction->fbr_pos_id_snapshot ?? $company->fbr_pos_id;
+        $fbrLogoPath = public_path('images/fbr-digital-invoice-logo-print.png');
+        $fbrLogo = is_file($fbrLogoPath) ? 'data:image/png;base64,'.base64_encode(file_get_contents($fbrLogoPath)) : null;
         // Print style (bold + logo position) — shared with PRA receipts.
         // posReceiptStyle() defaults: bold=true, logo='center'.
         // logo_finals_only is ignored on FBR (no local/provisional bills flow here).
@@ -229,7 +238,7 @@
         });
     </script>
 
-    <div class="receipt-wrap">
+    <div class="receipt-wrap" role="main">
     <div class="header text-center">
         {{-- Logo placement (Task #286, ported from PRA receipt_80mm):
              'center' = large centered logo above business name (default).
@@ -242,29 +251,40 @@
         @if($printStyle['logo'] === 'center')
         {{-- line-height:0 wrapper + block img: no inline-descender gap under logo --}}
         <div style="text-align:center; margin:0; padding:2mm 0 0; line-height:0;">
-            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
+            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $receiptSellerName }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
         </div>
-        @if($rd['show_business_name'])<h1>{{ $company->name }}</h1>@endif
+        @if($rd['show_business_name'])<h1>{{ $receiptSellerName }}</h1>@endif
         @else
         {{-- Side logo: business name left, logo right — compact header --}}
         <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
             <tr>
                 <td style="text-align:left; vertical-align:middle; width:64%; padding:0;">
-                    @if($rd['show_business_name'])<h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>@endif
+                    @if($rd['show_business_name'])<h1 style="text-align:left; margin:0;">{{ $receiptSellerName }}</h1>@endif
                 </td>
                 <td style="text-align:right; vertical-align:middle; width:36%; padding:0;">
-                    <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width:80px; max-height:42px; object-fit:contain;">
+                    <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $receiptSellerName }}" style="max-width:80px; max-height:42px; object-fit:contain;">
                 </td>
             </tr>
         </table>
         @endif
         @else
-        @if($rd['show_business_name'])<h1>{{ $company->name }}</h1>@endif
+        @if($rd['show_business_name'])<h1>{{ $receiptSellerName }}</h1>@endif
         @endif
-        @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
+        @if($rd['show_address'] && ($seller['address'] ?? $company->address))<p>{{ $fiscalReceipt ? ($seller['address'] ?? '') : $company->address }}</p>@endif
         @if($rd['show_mobile'] && $company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
         @if($rd['show_email'] && $company->email)<p>{{ $company->email }}</p>@endif
-        @if($rd['show_ntn'] && $company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
+        @if($rd['show_ntn'] && ($seller['ntn'] ?? $company->ntn))<p>NTN: {{ $fiscalReceipt ? ($seller['ntn'] ?? '') : $company->ntn }}</p>@endif
+        @if($fiscalReceipt)
+        <div data-fbr-required-profile="1">
+            <p>Seller: {{ $seller['name'] ?? '' }}</p>
+            <p>STRN: {{ $seller['fbr_sales_tax_registration_number'] ?? 'Not configured' }}</p>
+            <p>Tax office: {{ $seller['fbr_tax_office'] ?? 'Not configured' }}</p>
+            <p>FBR POS ID: {{ $receiptPosId ?: 'Not configured' }}</p>
+            @if(empty($seller['address']) || empty($seller['ntn']) || empty($seller['fbr_sales_tax_registration_number']) || empty($seller['fbr_tax_office']) || empty($receiptPosId))
+            <p style="font-weight:bold;">Seller fiscal profile incomplete — complete FBR settings.</p>
+            @endif
+        </div>
+        @endif
     </div>
 
     <div class="separator"></div>
@@ -433,6 +453,13 @@
         </tbody>
     </table>
 
+    @if($fiscalReceipt)
+    <div data-fbr-item-tax="1" style="font-size:9px; margin-top:4px;">
+      @foreach($transaction->items as $taxItem)
+      <div>{{ $taxItem->item_name }} — Tax {{ number_format((float)$taxItem->tax_rate,2) }}%: PKR {{ number_format((float)$taxItem->tax_amount,2) }}</div>
+      @endforeach
+    </div>
+    @endif
     <div class="separator"></div>
 
     <table class="totals-table">
@@ -536,9 +563,10 @@
            'failed'                          → FBR rejected: dashed retry badge
            'pending' / (other non-null)      → awaiting submission: dashed retry badge
            null / 'local' ($fbrRcptTopBadge) → handled in top section; QR-only here --}}
-    @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
+    @if($fiscalReceipt)
     {{-- SUBMITTED: FBR accepted the bill and returned a fiscal invoice number. --}}
-    <div class="fbr-badge">
+    <div class="fbr-badge" data-fbr-fiscal-receipt="1">
+        @if($fbrLogo)<img src="{{ $fbrLogo }}" alt="FBR digital invoicing system" style="width:90px;max-width:100%;height:auto;margin:3px auto;display:block;">@endif
         <div style="margin: 3px 0;">
             @if($qrUrl)
             <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
@@ -547,7 +575,7 @@
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
         {{-- Task 769: verify-line toggle (Receipt Settings) — default ON when absent. --}}
         @if($rd['show_verify_line'] ?? true)
-        <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
+        <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }} — Tax Asaan / SMS 9966</div>
         @endif
     </div>
     @elseif($transaction->fbr_status === 'offline')
@@ -640,7 +668,7 @@
         <p style="font-style: italic; margin-top:2px;">{{ $company->receipt_footer_note }}</p>
         @endif
         @endif
-        @if($company->fbr_pos_id && !$transaction->isNonIntegratedBill())
+        @if($fiscalReceipt)
         <p style="font-weight:bold;">{{ __('pos.rcpt_fbr_integrated') }}</p>
         @endif
         @if($rd['show_developed_by'])

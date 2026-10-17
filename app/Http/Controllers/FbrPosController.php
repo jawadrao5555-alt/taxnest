@@ -4107,6 +4107,8 @@ class FbrPosController extends Controller
                 'fbr_pos_environment' => 'required|in:sandbox,production',
                 'fbr_connection_mode' => 'nullable|in:cloud,fiscal_device',
                 'fbr_pos_id' => 'nullable|string|max:100',
+                'fbr_sales_tax_registration_number' => 'nullable|string|max:30',
+                'fbr_tax_office' => 'nullable|string|max:150',
                 'fbr_pos_token' => 'nullable|string|max:2000',
                 'fbr_access_code' => 'nullable|string|max:500',
             ]);
@@ -4128,6 +4130,9 @@ class FbrPosController extends Controller
                 }
             }
 
+            foreach (['fbr_sales_tax_registration_number', 'fbr_tax_office'] as $field) {
+                if ($request->has($field)) $updateData[$field] = trim((string) $request->input($field)) ?: null;
+            }
             if ($request->filled('fbr_pos_id')) {
                 $updateData['fbr_pos_id'] = $request->fbr_pos_id;
             }

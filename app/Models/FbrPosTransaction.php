@@ -56,6 +56,10 @@ class FbrPosTransaction extends Model
     protected static function booted()
     {
         static::creating(function (self $t) {
+            if (\Schema::hasColumn('fbr_pos_transactions', 'fbr_receipt_profile_snapshot') && $t->company_id && $t->invoice_mode !== 'local') {
+                $company = \App\Models\Company::find($t->company_id);
+                if ($company) $t->fbr_receipt_profile_snapshot = $company->only(['name','address','ntn','fbr_sales_tax_registration_number','fbr_tax_office']);
+            }
             $service = app(\App\Services\FbrPosIdentity::class);
             if ($t->invoice_mode !== 'local' && !$t->fbr_invoice_number && $service->ready()) {
                 $identity = $service->resolve($t);
@@ -89,6 +93,7 @@ class FbrPosTransaction extends Model
     }
 
     protected $casts = [
+        'fbr_receipt_profile_snapshot' => 'array',
         'subtotal' => 'decimal:2',
         'discount_value' => 'decimal:2',
         'discount_amount' => 'decimal:2',

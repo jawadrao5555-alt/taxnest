@@ -1,7 +1,7 @@
-title: "CCI import ke liye evidence audit aur missing-data report"
+title: "Admin company directory mein wazeh text aur readable controls"
 audience: all
 type: improvement
 points:
-  - "Offline audit source coverage aur invoice totals ki reconciliation report banata hai."
-  - "Missing MRP, verified mapping, buyer aur VAT evidence wazeh dikhai jati hai."
-  - "Yeh audit invoice create ya submit nahi karta; real pilot ki approval alag zaroori hai."
+  - "Agent Health alert aur company details par text zyada wazeh nazar aye ga."
+  - "Status badges, filters aur action labels readable size aur contrast mein honge."
+  - "Existing saved themes aur company settings barqarar rahengi."

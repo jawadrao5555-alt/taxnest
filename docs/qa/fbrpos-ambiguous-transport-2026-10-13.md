@@ -66,3 +66,18 @@ observer rejects any intermediate pending/unclaimed state, and retry/claim
 checks must remain blocked with exactly one fake transport request. The narrow
 transport method is protected to permit this isolated test. Local PHP is
 unavailable; this new application regression awaits fresh CI execution.
+
+## 17 October refresh after owner-approved preview release
+
+Merged main 8ecfb8667dc9b2560d84525a45093319a08f4d86 (#212) into
+this PR history. Production run 39007005447 passed deployment, live SHA/markers
+verification and relay callback. The only merge conflict was deploy/elaan.yml;
+retain this upcoming FBR protection release's unique announcement. All #212
+same-origin PDF fixes, production-CSP browser fixture/preflight and evidence
+capture remain. No FBR/application/Agent/test implementation changed relative
+to previously passing cff5dd8c; compare verifies those paths are identical.
+Fresh local Agent suite 79/79 PASS, lock portability/release-chain/Node syntax
+and whitespace checks PASS. Local PHP/MariaDB/Chrome execution unavailable;
+combined fresh exact-HEAD CI is required before owner approval. Do not reuse
+previous HEAD's green checks. No production access, merge/deploy/build dispatch
+by this refresh; Windows 1.13.19 publication remains after owner approval.

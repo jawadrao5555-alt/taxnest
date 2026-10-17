@@ -35,7 +35,9 @@ final class SmartInvoiceImportReview
             if (count($amounts) === 4 && $amounts['gross'] - $amounts['discount'] + $amounts['vat'] !== $amounts['net']) {
                 $errors[] = 'Source gross - discount + VAT does not equal net.';
             }
-            if ((InvoiceImportService::cleanNumber($raw['quantity'] ?? '') ?? 0) < 0 || (count($amounts) === 4 && min($amounts) < 0)) {
+            // Explicit empty/deposit descriptions remain in packaging review even for returns.
+            // Every such row still requires its own exclusion reason and exact reconciliation.
+            if ($class !== 'packaging_review' && ((InvoiceImportService::cleanNumber($raw['quantity'] ?? '') ?? 0) < 0 || (count($amounts) === 4 && min($amounts) < 0))) {
                 $class = 'adjustment_review';
             }
             $excluded = false;

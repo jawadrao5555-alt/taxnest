@@ -473,6 +473,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/invoices/import-upload', [InvoiceImportController::class, 'upload'])->name('invoices.import-upload');
         // DMS-export column mapping: apply a mapping/preset to a held upload + preset management.
         Route::post('/invoices/import-apply-mapping', [InvoiceImportController::class, 'applyMapping'])->name('invoices.import-apply-mapping');
+        Route::get('/invoices/import-mappings/{id}/history', [InvoiceImportController::class, 'mappingHistory'])->name('invoices.import-mapping-history');
         Route::post('/invoices/import-mappings/{id}/rename', [InvoiceImportController::class, 'renameMapping'])->name('invoices.import-mapping-rename');
         Route::delete('/invoices/import-mappings/{id}', [InvoiceImportController::class, 'deleteMapping'])->name('invoices.import-mapping-delete');
         Route::post('/invoices/import/{batchId}/process', [InvoiceImportController::class, 'process'])->middleware('plan.limit:invoices')->name('invoices.import-process');
@@ -1536,6 +1537,8 @@ Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admi
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
+    Route::get('/dashboard/invoices/{product}/{company}/{record}/{action}', [\App\Http\Controllers\SaasAdmin\AdminInvoicePreviewController::class, 'show'])->whereIn('product', ['di', 'pos', 'fbrpos'])->whereNumber(['company', 'record'])->whereIn('action', ['preview', 'download'])->name('saas.admin.invoice.document');
+    Route::get('/dashboard/details/{metric}', [\App\Http\Controllers\SaasAdmin\AdminDashboardDetailController::class, 'show'])->name('saas.admin.dashboard.detail');
     Route::get('/live-activity', [\App\Http\Controllers\SaasAdmin\AdminLiveActivityController::class, 'index'])->name('saas.admin.live-activity');
 
     // Live Ops console (NestPOS PRA diagnostics + owner-approved remediation)
@@ -2500,6 +2503,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/transactions/{id}/edit-failed', [FbrPosController::class, 'editFailed'])->name('fbrpos.editFailed');
     Route::post('/transactions/{id}/update-and-retry', [FbrPosController::class, 'updateAndRetry'])->name('fbrpos.updateAndRetry');
     Route::get('/fail-queue', [FbrPosController::class, 'failQueue'])->name('fbrpos.failQueue');
+    Route::get('/fail-queue/{id}/reconcile', [\App\Http\Controllers\FbrPosReconciliationController::class, 'show'])->name('fbrpos.reconcile');
+    Route::post('/fail-queue/{id}/reconcile', [\App\Http\Controllers\FbrPosReconciliationController::class, 'store'])->name('fbrpos.reconcile.store');
     Route::post('/fail-queue/retry-all', [FbrPosController::class, 'failQueueRetryAll'])->name('fbrpos.failQueue.retryAll');
     Route::post('/fail-queue/{id}/retry', [FbrPosController::class, 'failQueueRetryOne'])->name('fbrpos.failQueue.retryOne');
     Route::match(['get', 'post'], '/settings/identities', [\App\Http\Controllers\FbrPosIdentityController::class, 'index'])->name('fbrpos.identities');
@@ -3030,4 +3035,20 @@ Route::prefix('api/deployment-approval/v1')->middleware('throttle:30,1')->withou
     Route::post('/deploy-run', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'deployRun']);
     Route::post('/provenance/verify', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'provenance']);
     Route::post('/status', [\App\Http\Controllers\SaasAdmin\OwnerDeploymentApprovalController::class, 'status']);
+});
+
+// Owner-authorized read-only MCP reporting, isolated from Live Ops runner credentials.
+Route::middleware('throttle:60,1')->withoutMiddleware($statelessMachine)->group(function () {
+    Route::get('/.well-known/oauth-authorization-server', [\App\Http\Controllers\Reporting\OAuthController::class, 'metadata']);
+    Route::get('/.well-known/oauth-protected-resource', [\App\Http\Controllers\Reporting\OAuthController::class, 'resource']);
+    Route::get('/.well-known/oauth-protected-resource/api/reporting/mcp', [\App\Http\Controllers\Reporting\OAuthController::class, 'resource']);
+    Route::post('/api/reporting/oauth/register', [\App\Http\Controllers\Reporting\OAuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::post('/api/reporting/oauth/token', [\App\Http\Controllers\Reporting\OAuthController::class, 'token']);
+    Route::match(['GET', 'POST', 'DELETE'], '/api/reporting/mcp', [\App\Http\Controllers\Reporting\McpController::class, 'handle']);
+});
+Route::middleware(['admin.auth', 'throttle:60,1'])->group(function () {
+    Route::get('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'consent']);
+    Route::post('/admin/reporting/oauth/authorize', [\App\Http\Controllers\Reporting\OAuthController::class, 'approve']);
+    Route::get('/admin/reporting/connections', [\App\Http\Controllers\Reporting\OAuthController::class, 'connections']);
+    Route::post('/admin/reporting/connections/{id}/revoke', [\App\Http\Controllers\Reporting\OAuthController::class, 'revoke'])->whereUuid('id');
 });

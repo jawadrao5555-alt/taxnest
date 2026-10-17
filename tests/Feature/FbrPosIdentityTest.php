@@ -40,6 +40,24 @@ class FbrPosIdentityTest extends TestCase {
   $this->assertSame([$default->id],$s->route(FbrPosTransaction::where('company_id',1),1,null)->pluck('id')->all());
   $s->capture($b);$this->assertFalse($s->route(FbrPosTransaction::whereKey($b->id),1,'PC-A')->exists());
  }
+ public function test_mapped_identity_keeps_exclusive_claim_and_quarantines_unknown_outcome(): void {
+  Schema::table('fbr_pos_transactions',function(Blueprint $t){$t->string('fbr_status')->nullable();$t->string('fbr_submission_hash')->nullable();$t->timestamp('fbr_agent_claimed_at')->nullable();});
+  $bill=$this->bill(['branch_id'=>10,'terminal_id'=>20,'fbr_status'=>'pending']);
+  $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill,'PC-A'));
+  $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill));
+  $claim=\App\Services\FbrPosAgentClaim::acquire($bill,'PC-B');
+  $this->assertNotNull($claim);
+  $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill->fresh(),'PC-B'));
+  $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill->fresh()));
+  $this->travel(4)->minutes();
+  \App\Services\FbrPosAgentClaim::quarantineExpired(1);
+  $bill->refresh();
+  $this->assertSame('verification_pending',$bill->fbr_status);
+  $this->assertSame($claim,$bill->fbr_submission_hash);
+  $this->assertSame('1020',$bill->fbr_pos_id_snapshot);
+  $this->assertSame('PC-B',$bill->fbr_device_uid_snapshot);
+  $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill,'PC-B'));
+ }
  public function test_foreign_terminal_is_rejected(): void {
   DB::table('fbr_pos_terminals')->insert(['id'=>99,'company_id'=>2,'branch_id'=>10]);
   $this->expectException(ValidationException::class);app(FbrPosIdentity::class)->capture($this->bill(['branch_id'=>10,'terminal_id'=>99]));

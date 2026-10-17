@@ -81,6 +81,7 @@ class SyncFbrPosOfflineInvoicesJob implements ShouldQueue
             // job/manual-retry doesn't double-submit. Only proceed if we won.
             $claimed = FbrPosTransaction::where('id', $transaction->id)
                 ->whereNull('fbr_invoice_number')
+                ->whereNull('fbr_submission_hash')
                 ->whereIn('fbr_status', ['offline', 'pending', 'failed'])
                 ->where('fbr_auto_retry_count', '<', self::MAX_AUTO_RETRY)
                 ->update(['fbr_status' => 'pending', 'fbr_submission_hash' => null]);

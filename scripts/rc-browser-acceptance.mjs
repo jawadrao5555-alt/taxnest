@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { assertLocalOnlyBaseUrl, attachDiagnostics, launchLocalBrowser, saveEvidenceScreenshot } from './lib/local-browser.mjs';
 
@@ -93,6 +94,15 @@ async function login(page,t) {
   if (page.url().endsWith(t.loginPath)) throw new Error(`${t.name}: authentication remained on login page`);
 }
 async function checkUsability(page,t,path,v) {
+  // Mobile Cart is deliberately opened for order-content checks above. Return
+  // through its real control before testing product search on the product pane.
+  if(t.name==='fiscal' && v.width<768) {
+    const back=page.locator('[data-fbr-cart-back]').first();
+    if(await back.count() && await back.isVisible()) {
+      await back.click({timeout:5000});
+      await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).mobileView==='menu');
+    }
+  }
   const width=await page.evaluate(()=>Math.max(document.documentElement.scrollWidth,document.body.scrollWidth));
   if(width>v.width+2) fail(`${t.name}/${v.width}: horizontal overflow (${width}px)`);
   for(const text of t.absenceMarkers||[])if((await page.locator('body').innerText()).includes(text))fail(`${t.name}/${v.width}: forbidden control rendered: ${text}`);
@@ -104,8 +114,23 @@ async function checkUsability(page,t,path,v) {
     const box=await el.boundingBox();
     if(!box||box.width<20||box.height<12||box.width>v.width+2)fail(`${t.name}/${v.width}: unusable control ${selector}`);
     if(t.name==='fiscal'||t.readOnly) {
-      try { await el.click({trial:true,timeout:5000}); }
-      catch { fail(`${t.name}/${v.width}: sale control is not pointer-actionable: ${selector}`); }
+      try {
+        await el.click({trial:true,timeout:5000});
+        if(t.name==='fiscal') {
+          await el.click({timeout:5000});
+          if(!await el.evaluate(el=>document.activeElement===el))fail(`${t.name}/${v.width}: search did not receive focus after pointer click`);
+        }
+      }
+      catch (error) {
+        const geometry=await el.evaluate(el=>{
+          const r=el.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2;
+          const hit=document.elementFromPoint(x,y);
+          return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},viewport:{width:innerWidth,height:innerHeight,scrollY},
+            targetStyle:{display:getComputedStyle(el).display,visibility:getComputedStyle(el).visibility},
+            hit:hit?{tag:hit.tagName,id:hit.id,classes:hit.className}:null};
+        });
+        fail(`${t.name}/${v.width}: sale control is not pointer-actionable: ${selector}; ${JSON.stringify(geometry)}; ${error.message.slice(0,1600)}`);
+      }
     }
   }
   if(t.readOnly) {
@@ -824,7 +849,12 @@ async function hotelCreditReview(page, t, v) {
   const issue=dialog.locator('form[data-credit-simple="1"]');
   await issue.waitFor({state:'visible'});
   if (await issue.locator('[name="mode"]').inputValue()!=='full') throw new Error('Simple flow did not use whole invoice');
-  if (await issue.locator('[name="reason"],input[type="number"],select').count()) throw new Error('Simple flow retained manual entry controls');
+  if (await issue.locator('input[type="number"],select').count()) throw new Error('Simple flow retained manual entry controls');
+  const reason=issue.locator('textarea[name="reason"]');
+  if (await reason.getAttribute('required') === null) throw new Error('Actual credit reason is not required');
+  if (await issue.evaluate(form=>form.checkValidity())) throw new Error('Empty credit reason accepted by browser');
+  await reason.fill('Synthetic unused service correction');
+  if (!await issue.evaluate(form=>form.checkValidity())) throw new Error('Valid actual reason refused');
   if (await issue.locator('button[type="submit"]').count()!==1) throw new Error('Single confirmation action missing');
   await saveEvidenceScreenshot(page,'hotel-credit-simple-full-'+v.width+'.png');
   // No fiscal POST in browser: real controller POST/idempotency is exercised with synthetic backend fixtures.
@@ -839,6 +869,8 @@ async function hotelCreditReview(page, t, v) {
   await page.locator('[data-credit-open^="credit-result-"]').first().click();
   const result=page.locator('dialog[open][id^="credit-result-"]');
   await result.waitFor({state:'visible'});
+  if (!await result.locator('[data-credit-status="accepted"]').count()) throw new Error('Accepted credit status missing');
+  if (!(await result.innerText()).includes('Credit not yet refunded')) throw new Error('Refund balance missing');
   const printLink=result.locator('a[href*="/receipt"]');
   await printLink.waitFor({state:'visible'});
   await printLink.click();
@@ -847,6 +879,8 @@ async function hotelCreditReview(page, t, v) {
   const creditReceiptFrame=page.frameLocator('[data-receipt-frame]');
   await creditReceiptFrame.locator('#receiptActions').waitFor({state:'attached'});
   if (!(await creditReceiptFrame.locator('body').innerText()).includes('SYNTHETIC-ACCEPTED-CREDIT')) throw new Error('Print opened a different or missing credit receipt');
+  const receiptText=await creditReceiptFrame.locator('body').innerText();
+  if (!receiptText.includes('Credit amount') || !receiptText.includes('Credit not yet refunded') || receiptText.includes('Thank you for your purchase')) throw new Error('Credit receipt still reads as a sale');
   await saveEvidenceScreenshot(page,'hotel-credit-print-'+v.width+'.png');
   await creditReceiptPopup.locator('[data-receipt-close]').click();
   await result.waitFor({state:'visible'});
@@ -969,6 +1003,44 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   pass(t.name+'/'+v.width+': six category-specific groups, no outlet leakage, real failed-save retry and persisted colour');
 }
 
+async function formatHistoryWorkflow(page,t,v) {
+  const name='Synthetic approved format '+v.width+' '+Date.now();
+  const csv='Outlet,Qty,Item,HS,Rate,GST\nFictional buyer,2,Beef,02023000,100,36\n';
+  async function upload() {
+    await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    const importer=page.locator('[x-data="bulkImport()"]');
+    await importer.locator('button').first().click();
+    await importer.locator('input[type=file]').setInputFiles({name:'fictional-format.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+    await importer.getByRole('button',{name:'Continue to Preview'}).waitFor();
+    return importer;
+  }
+  let importer=await upload();
+  for(const [field,column] of Object.entries({buyer_name:'Outlet',quantity:'Qty',description:'Item',hs_code:'HS',price:'Rate',tax:'GST'})) {
+    const row=importer.locator('div.grid.grid-cols-12').filter({has:page.locator('span[x-text="f.key"]').filter({hasText:new RegExp('^'+field+'$')})});
+    await row.locator('select[x-model="mappingSel[f.key]"]').selectOption(column);
+  }
+  for(const [field,value] of Object.entries({buyer_address:'Fictional address',destination_province:'Punjab',document_type:'Sale Invoice'})) {
+    const row=importer.locator('div.grid.grid-cols-12').filter({has:page.locator('span[x-text="f.key"]').filter({hasText:new RegExp('^'+field+'$')})});
+    await row.locator('select[x-model="mappingSel[f.key]"]').selectOption('');
+    const control=row.locator('[x-model="defaultsSel[f.key]"]');
+    if(await control.evaluate(el=>el.tagName==='SELECT'))await control.selectOption(value);else await control.fill(value);
+  }
+  await importer.locator('input[x-model=savePreset]').check();
+  await importer.locator('input[x-model=presetName]').fill(name);
+  const [saved]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/import-apply-mapping')),importer.getByRole('button',{name:'Continue to Preview'}).click()]);
+  const result=await saved.json();
+  if(!saved.ok()||result.preset_saved!==name)throw new Error('Explicit format approval/save failed');
+  importer=await upload();
+  const presetRow=importer.locator('div.flex.flex-wrap.items-center.justify-between').filter({has:page.locator('span[x-text="p.name"]').filter({hasText:name})});
+  const [history]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/history')),presetRow.getByRole('button',{name:'History',exact:true}).click()]);
+  const versions=(await history.json()).versions;
+  if(!history.ok()||versions.length!==1||!versions[0].approved_at||versions[0].snapshot.mapping.quantity!=='Qty')throw new Error('Saved approved history missing');
+  await importer.getByText('Format history: '+name,{exact:true}).waitFor();
+  await importer.getByText('Version 1',{exact:false}).waitFor();
+  pass(t.name+'/'+v.width+': authenticated explicit format approval and persisted history UI; no invoice creation/submission');
+}
+
 async function smartImportWorkflow(page,t,v) {
   await page.goto(baseUrl+'/invoices?tab=completed',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
@@ -976,7 +1048,9 @@ async function smartImportWorkflow(page,t,v) {
   await importer.locator('button').first().click();
   await importer.locator('input[x-model="smartSourceSystem"]').fill('rc-smart-'+v.width+'-'+Date.now());
   const values={buyer_name:'Unverified source label',buyer_ntn:'',buyer_cnic:'',buyer_address:'Source address',destination_province:'Punjab',document_type:'Sale Invoice',hs_code:'',description:'Synthetic beverage',quantity:'2',price:'',tax:'',schedule_type:'',tax_rate:'',source_invoice_number:'TEST-UI-'+v.width,invoice_date:'2026-01-01',source_sku:'TEST-SKU',source_outlet:'TEST-OUTLET',source_gross:'1300',source_discount:'100',source_vat:'216',source_net:'1416',invoice_gross:'1300',invoice_discount:'100',invoice_vat:'216',invoice_net:'1416'};
-  const csv=Object.keys(values).join(',')+'\n'+Object.values(values).join(',')+'\n';
+  const deposit={...values,source_sku:'TEST-EMPTY',description:'COKE 250 ML IMPLIED EMP 24B RGB',quantity:'2',source_gross:'100',source_discount:'0',source_vat:'0',source_net:'100'};
+  const returned={...deposit,quantity:'-2',source_gross:'-100',source_net:'-100'};
+  const csv=Object.keys(values).join(',')+'\n'+[values,deposit,returned].map(row=>Object.values(row).join(',')).join('\n')+'\n';
   await importer.locator('input[type=file]').setInputFiles({name:'synthetic-smart-'+v.width+'.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await page.waitForURL(u=>u.pathname.endsWith('/source-review'),{timeout:30000});
   const reviewPath=new URL(page.url()).pathname;
@@ -999,6 +1073,8 @@ async function smartImportWorkflow(page,t,v) {
   }
   await mapping('sku',{description:'Verified synthetic beverage',hs_code:'22021010',litres_per_case:'6',uom:'Liter',schedule_type:'standard',tax_rate:'18'});
   await mapping('buyer',{buyer_name:'Verified synthetic buyer',buyer_address:'Fictional verified address',destination_province:'Punjab',registration_type:'Unregistered'});
+  await page.locator('input[name="exclusions[3]"]').fill('Verified synthetic empty-bottle deposit charge');
+  await page.locator('input[name="exclusions[4]"]').fill('Verified synthetic empty-bottle deposit return');
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Refresh review with current mappings and exclusions'}).click()]);
   await dismiss(page);
   if((await page.locator('body').innerText()).includes('Unknown SKU'))throw new Error('Verified SKU did not resolve source review: '+(await page.locator('body').innerText()).slice(-6000));
@@ -1020,9 +1096,175 @@ async function smartImportWorkflow(page,t,v) {
   await page.goto(baseUrl+reviewPath,{waitUntil:'domcontentloaded'});
   if(!(await page.locator('body').innerText()).includes('TEST-UI-'+v.width))throw new Error('Original source identity disappeared');
   pass(t.name+'/'+v.width+': authenticated upload, verified mappings, source review, explicit approval and draft receipt; no fiscal posting');
+  await formatHistoryWorkflow(page,t,v);
+}
+
+async function adminReviewContrast(page) {
+  const saved=await page.evaluate(()=>({theme:getAdminTheme(),dark:document.documentElement.classList.contains('dark')}));
+  try {
+    for(const theme of ['indigo','emerald','cyan','rose','amber','purple']) for(const dark of [false,true]) {
+      await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
+      const failures=await page.evaluate(()=>{
+        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);return m?m[1].split(/[, ]+/).slice(0,3).map(Number):null;};
+        const luminance=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:Math.pow((x+.055)/1.055,2.4);}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
+        const bad=[];
+        for(const el of document.querySelectorAll('.tn-dashboard-detail-filters input,.tn-dashboard-detail-filters select,.tn-dashboard-detail-filters option,.tn-detail-primary,.tn-detail-secondary,.tn-detail-status,.tn-admin-sidebar .admin-active-link,.tn-preview-toolbar button,.tn-preview-toolbar a')) {
+          const style=getComputedStyle(el),fg=rgb(style.color),bg=rgb(style.backgroundColor);
+          if(!fg||!bg) {bad.push(el.tagName+': missing native colour');continue;}
+          const a=luminance(fg),b=luminance(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+          if(ratio<4.5)bad.push(el.tagName+' '+el.getAttribute('name')+': contrast '+ratio.toFixed(2));
+        }
+        return bad;
+      });
+      if(failures.length)throw new Error('Admin review contrast '+theme+'/'+(dark?'dark':'light')+': '+failures.join('; '));
+    }
+  } finally {
+    await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);
+  }
+}
+
+// Full OAuth/MCP journey against the disposable native database, including actual
+// consent/revocation button clicks. The callback is loopback-only fixture config.
+async function reportingConnectorWorkflow(page,t,v) {
+  const f=t.reportingConnector, request=page.context().request;
+  const metadata=await (await request.get(baseUrl+'/.well-known/oauth-protected-resource/api/reporting/mcp')).json();
+  const callback=baseUrl+'/admin/reporting/connections';
+  const registration=await request.post(baseUrl+'/api/reporting/oauth/register',{data:{client_name:'Synthetic read-only browser '+v.width+' '+Date.now(),redirect_uris:[callback],token_endpoint_auth_method:'none'}});
+  if(registration.status()!==201)throw new Error('OAuth registration did not accept the loopback fixture callback');
+  const client=await registration.json(), verifier='a'.repeat(64);
+  const params={client_id:client.client_id,redirect_uri:callback,response_type:'code',code_challenge:createHash('sha256').update(verifier).digest('base64url'),code_challenge_method:'S256',resource:metadata.resource,scope:'taxnest.reports.read',state:'browser-'+v.width};
+  await page.goto(baseUrl+'/admin/reporting/oauth/authorize?'+new URLSearchParams(params),{waitUntil:'domcontentloaded'});
+  await checkUsability(page,{name:t.name},'/admin/reporting/oauth/authorize',v);
+  await page.locator('[name="company_ids[]"][value="'+f.companyId+'"]').check();
+  await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-consent');
+  await Promise.all([page.waitForURL(u=>u.pathname==='/admin/reporting/connections'),page.getByRole('button',{name:'Allow read-only access',exact:true}).click()]);
+  const code=new URL(page.url()).searchParams.get('code');
+  if(!code||new URL(page.url()).searchParams.get('state')!==params.state)throw new Error('Owner consent callback did not carry authorization code/state');
+  const exchanged=await request.post(baseUrl+'/api/reporting/oauth/token',{form:{grant_type:'authorization_code',client_id:client.client_id,redirect_uri:callback,resource:metadata.resource,code,code_verifier:verifier}});
+  if(exchanged.status()!==200)throw new Error('PKCE token exchange failed');
+  const tokens=await exchanged.json();
+  const report=async(companyName)=>request.post(baseUrl+'/api/reporting/mcp',{headers:{Authorization:'Bearer '+tokens.access_token},data:{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'get_company_billing_summary',arguments:{company_name:companyName,date_from:f.date}}}});
+  const ownResponse=await report(f.companyName), own=await ownResponse.json();
+  if(own.result?.isError||Number(own.result?.structuredContent?.totals?.net_billing)!==f.billing)throw new Error('Native billing mismatch: '+JSON.stringify({status:ownResponse.status(),rpcError:own.error,toolError:own.result?.isError,content:own.result?.isError?own.result?.content:undefined,totals:own.result?.structuredContent?.totals,period:own.result?.structuredContent?.period}));
+  const foreign=await (await report(f.foreignCompanyName)).json();
+  if(!foreign.result?.isError)throw new Error('Connection company scope leaked a foreign company report');
+  await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
+  const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
+  if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
+  if((await report(f.companyName)).status()!==401)throw new Error('Revoked token retained billing access');
+  pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.fbrReconciliation) {
+    for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
+      await page.goto(baseUrl+'/fbr-pos/fail-queue',{waitUntil:'domcontentloaded'});
+      await dismiss(page);
+      await Promise.all([page.waitForURL(`**/fbr-pos/fail-queue/${id}/reconcile`,{waitUntil:'domcontentloaded'}),
+        page.locator(`a[href$="/fbr-pos/fail-queue/${id}/reconcile"]`).click()]);
+      await dismiss(page);
+      const form=page.locator('[data-fbr-owner-reconcile] form');
+      await form.locator('[name=decision]').selectOption(decision);
+      await form.locator('[name=evidence_source]').selectOption('ims_log');
+      // Retain the requested environment shown by the actual company fixture; never guess production.
+      await form.locator('[name=evidence_reference]').fill('Fictional checked IMS log '+v.width);
+      const number='90000000'+v.width;
+      if(decision==='accepted') await form.locator('[name=fiscal_number]').fill(number);
+      await form.locator('[name=confirmed]').check();
+      await Promise.all([page.waitForURL(/\/fbr-pos\/fail-queue$/,{waitUntil:'domcontentloaded'}),form.locator('button').click()]);
+      const result=await page.request.get(baseUrl+`/fbr-pos/transaction/${id}/fbr-status`);
+      if(!result.ok())throw new Error('Reconciled invoice status unavailable');
+      const state=await result.json();
+      if(state.fbr_status!==(decision==='accepted'?'submitted':'failed'))throw new Error('Owner reconciliation did not persist the checked result');
+      if(decision==='accepted'&&state.fbr_invoice_number!==number)throw new Error('Owner fiscal identity changed');
+    }
+    pass(t.name+'/'+v.width+': owner acceptance/rejection reconciliation, no fiscal submission');
+    return;
+  }
+  if(t.reportingConnector)return reportingConnectorWorkflow(page,t,v);
+  if(t.dashboardDetails) {
+    await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
+    for(const key of ['di','pos','fbrpos']) {
+      const tab=page.locator(`.tn-company-tabs button`).filter({hasText:key==='di'?'Digital Invoice':key==='pos'?'PRA POS':'FBR POS'});
+      await tab.click();
+      if(await tab.getAttribute('aria-pressed')!=='true' || await page.locator('.tn-company-tabs button[aria-pressed="true"]').count()!==1) throw new Error('Selected admin company tab is not explicit: '+key);
+      if(!await page.locator(`[data-company-panel="${key}"]`).isVisible() || await page.locator('[data-company-panel]:not([hidden])').count()!==1) throw new Error('Selected company tab does not show its own panel: '+key);
+    }
+    const keys=await page.locator('[data-dashboard-metric]').evaluateAll(els=>els.map(el=>el.dataset.dashboardMetric));
+    if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');
+    for(const key of keys) {
+      await page.goto(baseUrl+'/admin/dashboard',{waitUntil:'domcontentloaded'});
+      const link=page.locator(`[data-dashboard-metric="${key}"]`);
+      await link.click({trial:true,timeout:5000});
+      const geometry=await link.boundingBox();
+      if(!geometry || geometry.width<40 || geometry.height<40) throw new Error('Metric has no useful click area: '+key);
+      await Promise.all([page.waitForURL('**/admin/dashboard/details/'+key,{waitUntil:'domcontentloaded'}),link.click()]);
+      await page.locator(`[data-dashboard-detail="${key}"]`).waitFor({state:'visible'});
+      await checkUsability(page,t,key,v);
+      await page.getByRole('link',{name:'Admin Dashboard',exact:false}).last().click();
+      await page.waitForURL('**/admin/dashboard');
+    }
+    await page.goto(baseUrl+'/admin/dashboard/details/total_companies',{waitUntil:'domcontentloaded'});
+    if(await page.locator('.tn-admin-sidebar a[aria-current="page"]').count()!==1)throw new Error('Dashboard navigation loses selection on drilldown');
+    await adminReviewContrast(page);
+    const status=page.locator('.tn-detail-status').first();
+    if(!await status.count())throw new Error('Synthetic admin company status fixture is missing');
+    await Promise.all([page.waitForURL(u=>u.searchParams.has('status')),status.click()]);
+    await page.locator('.tn-detail-status[data-selected="true"][aria-current="true"]').waitFor({state:'visible'});
+    await adminReviewContrast(page);
+    await page.getByRole('link',{name:'Clear status',exact:true}).click();
+    await page.waitForURL(u=>!u.searchParams.has('status'));
+    await page.goto(baseUrl+'/admin/dashboard/details/di_invoices',{waitUntil:'domcontentloaded'});
+    await page.locator('input[name="q"]').fill('RC');
+    await Promise.all([page.waitForURL(u=>u.searchParams.get('q')==='RC'),page.getByRole('button',{name:'Apply filters'}).click()]);
+    const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Export filtered CSV'}).click()]);
+    const csv=readFileSync(await download.path(),'utf8');
+    if(!csv.startsWith('id,company,company_id,product,reference,status,amount,created_at,')) throw new Error('Dashboard CSV schema missing');
+    if(!t.invoicePreviewCsp)throw new Error('Invoice preview must enforce the actual production CSP');
+    await page.addInitScript(() => {
+      window.invoicePreviewPolicyViolations=[];
+      document.addEventListener('securitypolicyviolation',event=>window.invoicePreviewPolicyViolations.push({directive:event.effectiveDirective,uri:event.blockedURI}));
+    });
+    await page.route('**/admin/dashboard/**',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,headers:{...response.headers(),'content-security-policy':t.invoicePreviewCsp}});
+    });
+    for(const doc of t.previewDocuments || []) {
+      await page.goto(baseUrl+'/admin/dashboard/details/'+doc.metric+'?company_id='+doc.company,{waitUntil:'domcontentloaded'});
+      const link=page.locator(`[data-invoice-preview$="/${doc.product}/${doc.company}/${doc.record}/preview"]`);
+      if(!await link.count())throw new Error('Typed invoice preview link missing: '+doc.product);
+      const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith(`/${doc.product}/${doc.company}/${doc.record}/preview`)),link.click()]);
+      if(response.status()!==200 || !response.headers()['content-type']?.includes('application/pdf')) throw new Error('Actual '+doc.product+' document did not render as PDF');
+      // Chrome's PDF response capture can expose an empty CDP body. Verify
+      // binary bytes via the authenticated HTTP client; the UI separately
+      // validates its fetched blob before showing any preview/download controls.
+      const documentResponse=await page.request.get(response.url());
+      const previewBytes=await documentResponse.body();
+      if(documentResponse.status()!==200 || !documentResponse.headers()['content-type']?.includes('application/pdf') || !previewBytes.subarray(0,5).equals(Buffer.from('%PDF-')))throw new Error('Invalid actual invoice PDF: '+doc.product+' bytes='+previewBytes.length+' prefix='+previewBytes.subarray(0,24).toString('hex'));
+      await page.locator('#tn-invoice-preview').waitFor({state:'visible'});
+      await page.locator('[data-preview-download]').waitFor({state:'visible'});
+      await page.waitForFunction(()=>!document.querySelector('[data-preview-print]').disabled);
+      await page.waitForTimeout(350);
+      const violations=await page.evaluate(()=>window.invoicePreviewPolicyViolations || []);
+      if(violations.some(x=>/frame|child|default/.test(x.directive)))throw new Error('Production CSP blocked invoice preview: '+JSON.stringify(violations));
+      await saveEvidenceScreenshot(page,`rc-admin-invoice-preview-${doc.product}-${v.width}`);
+      await adminReviewContrast(page);
+      const [pdf]=await Promise.all([page.waitForEvent('download'),page.locator('[data-preview-download]').click()]);
+      const bytes=readFileSync(await pdf.path());
+      if(!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))throw new Error('Downloaded invoice is not a PDF');
+      if(pdf.suggestedFilename()!==`taxnest-${doc.product}-${doc.company}-${doc.record}.pdf`)throw new Error('PDF filename loses company/product identity');
+      await page.getByRole('button',{name:'Close invoice preview'}).click();
+      if(await page.locator('#tn-invoice-preview').isVisible())throw new Error('Invoice preview did not close');
+      const other=t.previewDocuments.find(x=>x.product!==doc.product);
+      const denied=await page.request.get(baseUrl+`/admin/dashboard/invoices/${doc.product}/${other.company}/${doc.record}/download`);
+      if(denied.status()!==404)throw new Error('Cross-product/company preview was not rejected');
+    }
+    await page.goto(baseUrl+'/admin/dashboard/details/di_invoices?q=RC-CROSS-PRODUCT-SECRET',{waitUntil:'domcontentloaded'});
+    if(await page.locator('[data-invoice-preview]').count())throw new Error('Wrong-product invoice leaked into DI list');
+    pass(`${t.name}/${v.width}: all 13 cards opened, returned, filtered, exported and isolated invoice PDFs previewed/downloaded`);
+    return;
+  }
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
@@ -1112,7 +1354,53 @@ async function tableOrderWorkflow(page,t,v) {
       await page.locator('[data-video="counter-dine-in"]').waitFor({state:'visible'});
     }
   }
+  if(t.kotDeleteCases) await repeatedDishDeleteWorkflow(page,t,v);
   if(t.cashierHandoff) await cashierHandoffWorkflow(page,t,v);
+}
+async function repeatedDishDeleteWorkflow(originalPage,t,v) {
+  const expected=t.kotDeleteCases[v.width<768?'mobile':'desktop'];
+  const context=await originalPage.context().browser().newContext({viewport:v});
+  const page=await context.newPage();
+  try {
+    await login(page,t);
+    await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+    await waitForOperationalSurface(page); await dismiss(page);
+    await page.locator('[data-video="counter-dine-in"]').click();
+    const [claim]=await Promise.all([
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/api/incoming-orders/'+expected.orderId+'/claim'&&r.request().method()==='POST'),
+      page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click(),
+    ]);
+    if(!claim.ok())throw new Error('Repeated dish table claim failed');
+    await page.waitForFunction(id=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return Number(d.incomingOrderId)===id&&d.cart.length===3;
+    },expected.orderId);
+    await openMobileCart(page,v,['Current Order']);
+    await page.locator('[data-video="cart-remove"][data-line-id="'+expected.lineIds[2]+'"]').click();
+    const [saved]=await Promise.all([
+      page.waitForResponse(r=>r.url()===baseUrl+'/pos/restaurant/orders/'+expected.orderId+'/edit'&&r.request().method()==='POST'),
+      page.locator('[data-video="order-edit-save"]').click(),
+    ]);
+    const body=await saved.json();
+    if(!saved.ok()||!body.success)throw new Error('Delete edit failed');
+    const ids=body.order.items.map(i=>Number(i.line_id));
+    if(JSON.stringify(ids.slice().sort((a,b)=>a-b))!==JSON.stringify(expected.lineIds.slice(0,2).sort((a,b)=>a-b)))throw new Error('Deletion created duplicate lines or removed retained IDs: '+JSON.stringify(ids));
+    if(body.order.items.reduce((n,i)=>n+Number(i.quantity),0)!==3||Number(body.total)!==300)throw new Error('Deletion doubled quantities or billing total');
+    if(Object.keys(body.kot.add||{}).length)throw new Error('Pure deletion incorrectly generated an ADD kitchen action');
+    await page.waitForFunction(()=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return !d.incomingEditBusy&&d.cart.length===2&&d.cart.reduce((n,i)=>n+Number(i.quantity),0)===3;
+    });
+    // Reload and reopen through the actual table to prove persisted state, not a client-only splice.
+    await page.reload({waitUntil:'domcontentloaded'}); await waitForOperationalSurface(page); await dismiss(page);
+    await page.locator('[data-video="counter-dine-in"]').click();
+    await page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number}).click();
+    await page.waitForFunction(id=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return Number(d.incomingOrderId)===id&&d.cart.length===2&&d.cart.reduce((n,i)=>n+Number(i.quantity),0)===3;
+    },expected.orderId);
+    pass(t.name+'/'+v.width+': repeated dish deletion retained exact line IDs, quantity 3/total 300, no ADD and persisted after reopen');
+  } finally {await context.close();}
 }
 async function cashierHandoffWorkflow(page,t,v) {
   const h=t.cashierHandoff, expected=h.cases[v.width<768?'mobile':'desktop'];
@@ -1295,6 +1583,6 @@ async function one(browser,label,v,t) {
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();
-try { for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
 

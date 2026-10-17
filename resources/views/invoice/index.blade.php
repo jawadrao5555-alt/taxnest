@@ -108,12 +108,24 @@
                                                         </div>
                                                         <div class="flex items-center gap-1.5">
                                                             <button x-show="p.matches || smartMappingEnabled" @click="smartMappingEnabled ? selectMappingPreset(p.id) : applyMapping(p.id)" :disabled="applyingMapping" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50" x-text="smartMappingEnabled ? 'Review mapping' : 'Apply'">Apply</button>
+                                                            <button x-show="smartMappingEnabled" @click="loadMappingHistory(p)" class="px-2 py-1 text-xs text-gray-500 underline">History</button>
                                                             <button @click="renamePreset(p)" class="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline">Rename</button>
                                                             <button @click="deletePreset(p)" class="px-2 py-1 text-xs text-red-500 hover:text-red-700 underline">Delete</button>
                                                         </div>
                                                     </div>
                                                 </template>
                                             </div>
+                                        </div>
+
+                                        <div x-show="mappingHistoryTitle" class="border rounded-lg p-3 space-y-2 text-xs">
+                                            <p class="font-semibold" x-text="mappingHistoryTitle"></p>
+                                            <button x-show="mappingHistoryNext" @click="loadMappingHistory(null, true)" class="underline">Load older versions</button>
+                                            <template x-for="v in mappingHistoryVersions" :key="v.id">
+                                                <div class="border-t pt-2">
+                                                    <p x-text="'Version ' + v.version + (v.approved_at ? ' — approved ' + v.approved_at : ' — historical, approval not recorded')"></p>
+                                                    <pre class="whitespace-pre-wrap break-all" x-text="JSON.stringify(v.snapshot, null, 2)"></pre>
+                                                </div>
+                                            </template>
                                         </div>
 
                                         @if(!empty($aiReaderAllowed))
@@ -176,7 +188,7 @@
                                         <div class="flex flex-wrap items-center gap-3">
                                             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                                 <input type="checkbox" x-model="savePreset" class="rounded border-gray-300 text-emerald-600">
-                                                <span>Save this mapping as a preset</span>
+                                                <span x-text="smartMappingEnabled ? 'Approve and save this format as a preset (keeps version history)' : 'Save this mapping as a preset'"></span>
                                             </label>
                                             <input x-show="savePreset" type="text" x-model="presetName" maxlength="100" placeholder="Preset name, e.g. Coca-Cola Voyage export" class="flex-1 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5" style="min-width: 220px;">
                                         </div>
@@ -1383,6 +1395,9 @@ function bulkImport() {
         savePreset: false,
         presetName: '',
         mappingError: '',
+        mappingHistoryTitle: '',
+        mappingHistoryVersions: [],
+        mappingHistoryNext: null,
         applyingMapping: false,
         presetSavedName: '',
         presetCapWarning: false,
@@ -1534,6 +1549,9 @@ function bulkImport() {
         },
 
         setupMapping(data) {
+            this.mappingHistoryTitle = '';
+            this.mappingHistoryVersions = [];
+            this.mappingHistoryNext = null;
             this.mappingToken = data.mapping_token;
             this.mappingFilename = data.original_filename || '';
             this.fileHeaders = data.headers || [];
@@ -1586,6 +1604,24 @@ function bulkImport() {
             this.presetName = '';
             this.mappingError = '';
             this.formatMatchNotice = 'Loaded "' + preset.name + '". Review every column and fixed value; correct anything needed, then continue to validation. No invoices have been created or submitted.';
+        },
+
+        async loadMappingHistory(p, older = false) {
+            if (!older) {
+                this.mappingHistoryTitle = '';
+                this.mappingHistoryVersions = [];
+                this.mappingHistoryNext = null;
+            }
+            try {
+                const response = await fetch(older ? this.mappingHistoryNext : '/invoices/import-mappings/' + p.id + '/history', {headers: {'Accept': 'application/json'}});
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Could not load history.');
+                if (!older) this.mappingHistoryTitle = 'Format history: ' + p.name;
+                this.mappingHistoryVersions = this.mappingHistoryVersions.concat(data.versions || []);
+                this.mappingHistoryNext = data.next_page_url || null;
+            } catch (error) {
+                this.mappingError = error.message || 'Could not load history.';
+            }
         },
 
         async applyMapping(presetId = null) {

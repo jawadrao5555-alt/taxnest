@@ -240,6 +240,7 @@ object LanClient {
         name: String?,
         source: String,
         deadlineAt: Long = System.currentTimeMillis() + RING_BUDGET_MS,
+        expectedPairing: String? = null,
     ): Boolean {
         if (phone.isNullOrBlank()) {
             // The agent stores rings by number; a name-only ring has nothing to
@@ -248,6 +249,7 @@ object LanClient {
         }
         val host = Prefs.lanHost(ctx)?.trim().orEmpty()
         val token = Prefs.lanToken(ctx) ?: return false
+        if (expectedPairing != null && RingOutbox.scope(host + "|" + token) != expectedPairing) return false
         if (!isPrivateIpv4(host)) return false
 
         val body = JSONObject()
@@ -265,7 +267,7 @@ object LanClient {
             val found = findPort(host, port, deadlineAt)
             if (found != null && found != port) {
                 port = found
-                Prefs.setLanPort(ctx, port)
+                if (Prefs.lanToken(ctx) == token && Prefs.lanHost(ctx)?.trim() == host) Prefs.setLanPort(ctx, port)
                 val retry = call(host, port, "POST", "/lan/caller/ring", body, token)
                 status = retry.first
                 json = retry.second
@@ -275,7 +277,7 @@ object LanClient {
         if (status == 401) {
             // The owner unplugged this phone in the agent window. Drop the dead
             // token so the app can say "pair again" instead of failing forever.
-            Prefs.setLanToken(ctx, null)
+            if (Prefs.lanToken(ctx) == token && Prefs.lanHost(ctx)?.trim() == host) Prefs.setLanToken(ctx, null)
             return false
         }
         return status == 200 && json?.optBoolean("ok") == true

@@ -119,6 +119,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosCounterOrderOpenStatusesTest.php tests/Feature/PosWaiterOrderSettleAuthTest.php tests/Feature/WaiterCashierEditBehaviorTest.php
       - name: Check Hotel bill dialog and fiscal cancellation regressions before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelGuestHouseV1Test.php tests/Feature/HotelCategoryNativeUiTest.php tests/Feature/HotelSimpleDeskPricingTest.php tests/Feature/HotelCreditNotePolicyTest.php tests/Feature/HotelGuestHouseFinalDeliveryTest.php
+      - name: Check Caller ID recovery, timestamp, package and legacy regressions
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosCallerRingUuidTest.php tests/Feature/PosCallerRingCollapseTest.php tests/Feature/PosCallerEventsEtagTest.php tests/Feature/PosCallerIdPlanGateTest.php tests/Feature/PosCallerIdToggleAndEventsTest.php tests/Feature/AgentCallerReplayTest.php
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence
@@ -307,6 +309,20 @@ jobs:
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
       - name: Run realtime gateway tests with egress blocked
         run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Check durable Caller ID recovery without external services
+        run: bash scripts/rc-safe-run -- java scripts/tests/CallerOutboxCheck.java .
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile all Caller ID flavors and run Android unit tests
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;34.0.0"
+          gradle -p caller-app --no-daemon --console=plain :app:testSimDebugUnitTest :app:testPlusDebugUnitTest :app:testPlayDebugUnitTest :app:assembleSimDebug :app:assemblePlusDebug :app:assemblePlayDebug
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()

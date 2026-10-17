@@ -190,4 +190,17 @@ class PosCallerEventsEtagTest extends TestCase
         $this->assertCount(0, $data->events);
         $this->assertEquals($after, $data->last_id, 'Nothing new → cursor stays put');
     }
+    public function test_recovered_history_does_not_trigger_a_fresh_popup(): void
+    {
+        $this->actAsAdmin();
+        $oldId = $this->insertEvent(expired: true);
+        DB::table('pos_caller_events')->where('id', $oldId)->update(['created_at' => now(), 'ring_at' => now()->subHours(2)]);
+        $data = $this->eventsResponse(0)->getData();
+        $this->assertCount(0, $data->events);
+        $this->assertEquals($oldId, $data->last_id);
+        $recent = (new PosCallerIdController())->recentCalls(Request::create('/pos/api/caller-recent', 'GET'))->getData();
+        $this->assertCount(1, $recent->calls);
+        $this->assertEquals($oldId, $recent->calls[0]->id);
+    }
+
 }

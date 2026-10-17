@@ -1,142 +1,114 @@
 package pk.taxnest.callerid
 
 import android.content.Context
+import android.util.Log
 import org.json.JSONObject
-import java.util.UUID
 import kotlin.concurrent.thread
 
-/**
- * Ring → server. SHARED by BOTH builds (Task 1345) so the POS sale-screen popup
- * behaves exactly the same no matter which APK the shop installed:
- *   - same /ring payload  {phone, name, source, at}
- *   - same 60-second per-caller dedupe
- *   - same token/401 handling (token cleared → login screen on next app open)
- *
- * Builds:
- *   sim  ("clean")  → PhoneStateReceiver, Android telephony, SIM calls only.
- *   plus            → CallListenerService, dialer + WhatsApp notifications.
- *
- * Dedupe lives in SharedPreferences, NOT a static map: the sim build's detector
- * is a manifest BroadcastReceiver and Android may run each ring in a FRESH
- * process — an in-memory map would forget the previous ring and double-post.
- */
+/** Shared SIM/plus/Play durable transport; detection rules remain in RingCoordinator. */
 object RingReporter {
+    private val deliveryLock = Any()
+    private fun outbox(ctx: Context) = RingOutbox(ctx.noBackupFilesDir)
+    private fun lanScope(ctx: Context): String = if (LanClient.isPaired(ctx))
+        RingOutbox.scope((Prefs.lanHost(ctx)?.trim() ?: "") + "|" + (Prefs.lanToken(ctx) ?: "")) else ""
 
-    /** Same caller inside this window = one ring only. */
-    private const val WINDOW_MS = 60_000L
-
-    /** Dedupe entries older than this are dropped so the pref never grows. */
-    private const val PRUNE_MS = 300_000L
-
-    /** Blocking — call from a background thread (or inside goAsync()). */
+    /** Persist before network/dedupe acknowledgement, even in a short-lived receiver. */
     fun report(context: Context, rawPhone: String?, rawName: String?, source: String) {
         val ctx = context.applicationContext
         val token = Prefs.token(ctx) ?: return
-
-        val phone = rawPhone?.replace(Regex("[^+0-9]"), "")?.takeIf { it.length >= 9 }
-        val name = rawName?.trim()?.takeIf { it.isNotEmpty() }
-        if (phone == null && name == null) return
-
-        val now = System.currentTimeMillis()
-        if (!claim(ctx, (phone ?: "") + "|" + (name ?: ""), now)) return
-
-        // The ring's identity, minted ONCE and sent down whichever lane (or
-        // lanes) this call takes. Both the cloud and the shop PC dedupe on it,
-        // so a cloud POST whose reply was lost — followed by the LAN fallback —
-        // still shows the cashier exactly one popup. Without it the counter
-        // pops twice for one call the moment the line comes back.
-        val uuid = UUID.randomUUID().toString()
-
-        val lanReady = LanClient.isPaired(ctx)
-
-        // Lane order. During an outage the WiFi is still connected, so asking
-        // Android whether this network is validated is what stops every ring
-        // from burning the cloud's full timeout before trying a PC one metre
-        // away — the detector does not live that long. It is only a hint: if
-        // the lane we picked fails, the other one is still tried.
-        val cloudFirst = !lanReady || LanClient.looksOnline(ctx)
-
-        val delivered = if (cloudFirst) {
-            postCloud(ctx, token, uuid, phone, name, source, now) ||
-                (lanReady && postLan(ctx, uuid, phone, name, source, now))
-        } else {
-            postLan(ctx, uuid, phone, name, source, now) ||
-                postCloud(ctx, token, uuid, phone, name, source, now)
+        val phone = rawPhone?.replace(Regex("[^+0-9]"), "")?.takeIf { it.length >= 9 }?.take(40) ?: ""
+        val name = rawName?.trim()?.take(120) ?: ""
+        if (phone.isEmpty() && name.isEmpty()) return
+        try {
+            synchronized(deliveryLock) {
+                if (Prefs.token(ctx) != token) return
+                outbox(ctx).enqueue(RingOutbox.scope(token), lanScope(ctx), phone, name,
+                    if (source == "whatsapp") "whatsapp" else "sim", System.currentTimeMillis())
+                // Schedule BEFORE trying a lane: process death must not strand the snapshot.
+                RingRetryJob.schedule(ctx)
+            }
+            drain(ctx)
+        } catch (e: Exception) {
+            // No phone/name/token in diagnostics. Never silently overwrite a corrupt/full queue.
+            Log.w("CallerOutbox", "Ring persistence/delivery needs attention", e)
         }
-
-        if (delivered) Prefs.setLastSentAt(ctx, now)
     }
 
-    /** Cloud lane. true = the server took it. */
-    private fun postCloud(
-        ctx: Context,
-        token: String,
-        uuid: String,
-        phone: String?,
-        name: String?,
-        source: String,
-        now: Long,
-    ): Boolean {
-        val payload = JSONObject()
-            .put("phone", phone ?: JSONObject.NULL)
-            .put("name", name ?: JSONObject.NULL)
-            .put("source", source)
-            .put("at", now)
-            .put("uuid", uuid)
-
-        val (code, _) = ApiClient.post("/ring", payload, token)
-        if (code == 401) {
-            // Token rotate ho gaya (device revoke / dusre phone se login) —
-            // yahan clear, agli app-open par login screen.
-            Prefs.setToken(ctx, null)
-            return false
+    /** Bounded drain; retries retain original identity/time. true means more work remains. */
+    fun drain(context: Context, stopped: () -> Boolean = { false }): Boolean = synchronized(deliveryLock) {
+        val ctx = context.applicationContext
+        val token = Prefs.token(ctx) ?: return@synchronized false
+        val scope = RingOutbox.scope(token)
+        val box = outbox(ctx)
+        try {
+            val pending = box.pending(scope, System.currentTimeMillis())
+            for (event in pending.take(5)) {
+                if (stopped() || Prefs.token(ctx) != token) break
+                val now = System.currentTimeMillis()
+                val lanReady = event.mayUseLan(lanScope(ctx), now) && Prefs.featureEnabled(ctx)
+                val cloudFirst = !lanReady || LanClient.looksOnline(ctx)
+                val result = if (!cloudFirst && postLan(ctx, event)) {
+                    RingDeliveryPolicy.Result.DELIVERED
+                } else {
+                    val cloud = postCloud(token, event)
+                    // Explicit disabled/plan/revocation responses never fall through to LAN.
+                    if (cloud == RingDeliveryPolicy.Result.RETRY && cloudFirst && lanReady &&
+                        Prefs.token(ctx) == token && postLan(ctx, event)) RingDeliveryPolicy.Result.DELIVERED else cloud
+                }
+                if (Prefs.token(ctx) != token) return@synchronized false
+                when (result) {
+                    RingDeliveryPolicy.Result.DELIVERED -> {
+                        box.acknowledge(scope, event.uuid, now)
+                        Prefs.setLastSentAt(ctx, now)
+                        Prefs.setFeatureEnabled(ctx, true)
+                    }
+                    RingDeliveryPolicy.Result.DENIED -> {
+                        // Feature/package is authoritative. Do not backlog calls made while disabled.
+                        box.clear(scope, now)
+                        Prefs.setFeatureEnabled(ctx, false)
+                        return@synchronized false
+                    }
+                    RingDeliveryPolicy.Result.UNAUTHORIZED -> {
+                        box.clear(scope, now)
+                        Prefs.setToken(ctx, null)
+                        return@synchronized false
+                    }
+                    RingDeliveryPolicy.Result.DROP -> box.acknowledge(scope, event.uuid, now)
+                    RingDeliveryPolicy.Result.RETRY -> return@synchronized true
+                }
+            }
+            box.pending(scope, System.currentTimeMillis()).isNotEmpty()
+        } catch (e: Exception) {
+            Log.w("CallerOutbox", "Saved queue recovery needs attention", e)
+            true
         }
-        return code in 200..299
     }
 
-    /** LAN lane — the shop's own PC. true = the PC took it. */
-    private fun postLan(
-        ctx: Context,
-        uuid: String,
-        phone: String?,
-        name: String?,
-        source: String,
-        now: Long,
-    ): Boolean {
-        val ok = try {
-            LanClient.ring(ctx, uuid, phone, name, source)
-        } catch (_: Exception) {
-            false // the fallback lane must never be the thing that crashes a detector
-        }
-        if (ok) Prefs.setLanLastOkAt(ctx, now)
+    private fun postCloud(token: String, event: RingOutbox.Event): RingDeliveryPolicy.Result {
+        val payload = JSONObject().put("phone", event.phone.ifEmpty { null } ?: JSONObject.NULL)
+            .put("name", event.name.ifEmpty { null } ?: JSONObject.NULL).put("source", event.source)
+            .put("at", event.at).put("uuid", event.uuid)
+        val (code, body) = ApiClient.post("/ring", payload, token)
+        val accepted = if (body != null && body.has("accepted") && !body.isNull("accepted")) body.optBoolean("accepted") else null
+        return RingDeliveryPolicy.cloud(code, body?.optBoolean("ok") == true, accepted, body?.optString("reason") ?: "")
+    }
+
+    private fun postLan(ctx: Context, event: RingOutbox.Event): Boolean {
+        val ok = try { LanClient.ring(ctx, event.uuid, event.phone.ifEmpty { null }, event.name.ifEmpty { null }, event.source, expectedPairing = event.lanScope) }
+            catch (_: Exception) { false }
+        if (ok) Prefs.setLanLastOkAt(ctx, System.currentTimeMillis())
         return ok
     }
 
-    /** Fire-and-forget wrapper for callers that are already alive (the listener service). */
     fun reportAsync(context: Context, rawPhone: String?, rawName: String?, source: String) {
-        thread(name = "caller-ring-post") {
-            try {
-                report(context, rawPhone, rawName, source)
-            } catch (_: Exception) {
-                // Detector kabhi crash na kare.
-            }
-        }
+        thread(name = "caller-ring-post") { report(context, rawPhone, rawName, source) }
     }
 
-    /** true = this caller may be sent now (and the window is claimed). */
-    private fun claim(ctx: Context, key: String, now: Long): Boolean = synchronized(this) {
-        val stored = try { JSONObject(Prefs.ringDedupe(ctx)) } catch (_: Exception) { JSONObject() }
-        if (now - stored.optLong(key, 0L) < WINDOW_MS) return false
-
-        val fresh = JSONObject()
-        val keys = stored.keys()
-        while (keys.hasNext()) {
-            val k = keys.next()
-            val t = stored.optLong(k, 0L)
-            if (now - t < PRUNE_MS) fresh.put(k, t)
+    fun resume(context: Context) {
+        val ctx = context.applicationContext
+        if (Prefs.token(ctx) == null) return
+        thread(name = "caller-ring-recover") {
+            if (drain(ctx)) RingRetryJob.schedule(ctx)
         }
-        fresh.put(key, now)
-        Prefs.setRingDedupe(ctx, fresh.toString())
-        return true
     }
 }

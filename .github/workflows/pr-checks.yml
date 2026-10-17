@@ -112,7 +112,7 @@ jobs:
       - name: Check combined FBR identity, exclusive claim and owner recovery
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FbrPosIdentityTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php tests/Feature/FbrPosReceiptSerialWithFiscalTest.php tests/Feature/FbrPosReceiptOrderMatchLayoutTest.php tests/Feature/FbrPosSubmissionEvidenceTest.php tests/Feature/FbrPosOwnerReconciliationTest.php
       - name: Check Smart DI import safeguards and legacy import regression
-        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/CciVoyageInvoiceParserTest.php tests/Unit/InvoiceImportLineClassifierTest.php tests/Feature/InvoiceBulkImportTest.php
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/CciPilotEvidenceAuditTest.php tests/Unit/CciVoyageInvoiceParserTest.php tests/Unit/InvoiceImportLineClassifierTest.php tests/Feature/InvoiceBulkImportTest.php
       - name: Check Guest House settings regressions before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelSettingsCategoryTest.php
       - name: Check occupied waiter table regressions before the full suite

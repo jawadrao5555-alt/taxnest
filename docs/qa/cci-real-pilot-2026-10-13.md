@@ -50,3 +50,5 @@ Merged original audit HEAD 41f525c327b20a405d679bc7c58837b8ec3b1875 onto success
 The real-source figures and observed HOLD above are historical 13 October evidence, not a new audit of a potentially changed workbook. This refresh does not re-read, expose or modify customer workbooks. Fresh CI validates code/regressions only. No new verified supplier, MRP, conversion, buyer-registration or item-VAT evidence was supplied in this task, so real fiscal pilot signoff remains pending. Audit PR readiness is not permission to create or submit fiscal invoices.
 
 Local PHP/MariaDB/Chrome executables unavailable. Run fresh exact-HEAD targeted audit/parser tests, native migration/concurrency, browser acceptance and full PHPUnit before approval readiness. Agent inputs/version stay 1.13.19. No production/customer/regulator access or agent merge/deploy.
+
+Initial refresh CI correctly rejected unsupported announcement audience `di`. Changed metadata to supported `all`; local announcement parser/freshness/SHA-title checks PASS. No audit implementation or customer evidence changed. Fresh exact-HEAD CI required after this correction.

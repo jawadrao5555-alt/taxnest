@@ -136,6 +136,67 @@ class WaiterCashierEditBehaviorTest extends TestCase
         $this->assertSame(3.0, (float) json_decode($payload, true)[0]['qty']);
     }
 
+    public function test_deleting_one_of_repeated_dishes_does_not_readd_the_retained_lines(): void
+    {
+        $company = Company::create(['name' => 'A']); $cashier = $this->cashier($company->id);
+        $order = $this->order($company, $cashier);
+        $first = $this->line($order, 1); $second = $this->line($order, 2); $removed = $this->line($order, 3);
+        $product = DB::table('pos_products')->insertGetId(['company_id' => $company->id, 'name' => 'Burger', 'price' => 100, 'is_active' => true]);
+        $order->items()->update(['item_type' => 'product', 'item_id' => $product]);
+        $response = $this->edit($order, [
+            ['item_type' => 'product', 'item_id' => $product, 'line_id' => $first, 'name' => 'Burger', 'quantity' => 1, 'unit_price' => 100, 'special_notes' => 'old'],
+            ['item_type' => 'product', 'item_id' => $product, 'line_id' => $second, 'name' => 'Burger', 'quantity' => 2, 'unit_price' => 100, 'special_notes' => 'old'],
+        ], 'delete-repeated');
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame([$first, $second], $order->items()->orderBy('id')->pluck('id')->all());
+        $this->assertSame(3.0, (float) $order->items()->sum('quantity'));
+        $this->assertSame(300.0, (float) $order->fresh()->total_amount);
+        $attempt = DB::table('restaurant_order_edit_attempts')->where('edit_uuid', 'delete-repeated')->first();
+        $this->assertNull($attempt->add_payload);
+        $void = json_decode($attempt->void_payload, true);
+        $this->assertCount(1, $void);
+        $this->assertSame(3.0, (float) $void[0]['qty']);
+        $this->assertFalse($order->items()->whereKey($removed)->exists());
+    }
+
+    public function test_legacy_repeated_dishes_are_each_consumed_once_without_line_ids(): void
+    {
+        $company = Company::create(['name' => 'A']); $cashier = $this->cashier($company->id);
+        $order = $this->order($company, $cashier);
+        $first = $this->line($order); $second = $this->line($order);
+        $response = $this->edit($order, [
+            ['item_type' => 'manual', 'item_id' => null, 'name' => 'Burger', 'quantity' => 1, 'unit_price' => 100, 'special_notes' => 'old'],
+            ['item_type' => 'manual', 'item_id' => null, 'name' => 'Burger', 'quantity' => 1, 'unit_price' => 100, 'special_notes' => 'old'],
+        ], 'legacy-repeated');
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame([$first, $second], $order->items()->orderBy('id')->pluck('id')->all());
+        $attempt = DB::table('restaurant_order_edit_attempts')->where('edit_uuid', 'legacy-repeated')->first();
+        $this->assertNull($attempt->add_payload); $this->assertNull($attempt->void_payload);
+    }
+
+    public function test_foreign_line_id_rolls_back_the_whole_edit_without_an_add(): void
+    {
+        $company = Company::create(['name' => 'A']); $cashier = $this->cashier($company->id);
+        $order = $this->order($company, $cashier); $first = $this->line($order);
+        $foreignCompany = Company::create(['name' => 'B']);
+        $foreign = $this->order($foreignCompany, $cashier, ['order_number' => 'W-FOREIGN']);
+        $foreignLine = $this->line($foreign);
+        try {
+            $this->edit($order, [
+                ['line_id' => $first, 'name' => 'Burger', 'quantity' => 2, 'unit_price' => 100, 'special_notes' => 'old'],
+                ['line_id' => $foreignLine, 'name' => 'Burger', 'quantity' => 1, 'unit_price' => 100],
+            ], 'foreign-line');
+            $this->fail('Foreign line ID must conflict, not become a new ADD.');
+        } catch (\Illuminate\Http\Exceptions\HttpResponseException $e) {
+            $this->assertSame(409, $e->getResponse()->getStatusCode());
+        }
+        $this->assertSame([$first], $order->items()->pluck('id')->all());
+        $this->assertSame(1.0, (float) $order->items()->sum('quantity'));
+        $this->assertSame(0, (int) $order->fresh()->edit_revision);
+        $this->assertSame(1.0, (float) $foreign->items()->sum('quantity'));
+        $this->assertSame(0, DB::table('restaurant_order_edit_attempts')->count());
+    }
+
     public function test_unchanged_snapshot_creates_no_add_or_void_payload(): void
     {
         $company = Company::create(['name' => 'A']); $cashier = $this->cashier($company->id);

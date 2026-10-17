@@ -60,6 +60,15 @@ class FbrPosTransaction extends Model
                 $company = \App\Models\Company::find($t->company_id);
                 if ($company) $t->fbr_receipt_profile_snapshot = $company->only(['name','address','ntn','fbr_sales_tax_registration_number','fbr_tax_office']);
             }
+            $service = app(\App\Services\FbrPosIdentity::class);
+            if ($t->invoice_mode !== 'local' && !$t->fbr_invoice_number && $service->ready()) {
+                $identity = $service->resolve($t);
+                if ($identity['pos_id'] !== '') {
+                    $t->fbr_pos_id_snapshot = $identity['pos_id'];
+                    $t->fbr_device_uid_snapshot = $identity['device_uid'];
+                    $t->fbr_identity_captured_at = now();
+                }
+            }
         });
         // Business-day stamp (Task 492 — FBR mirror of the PRA rule): set ONCE
         // at creation on EVERY create path (sale, provisional, offline sync).

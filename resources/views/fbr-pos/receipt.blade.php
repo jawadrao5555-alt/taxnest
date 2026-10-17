@@ -15,6 +15,7 @@
         if ($fiscalReceipt) {
             foreach (['show_business_name','show_address','show_ntn','show_tax','show_verify_line'] as $field) $rd[$field] = true;
         }
+        $receiptSellerName = $fiscalReceipt ? ($seller['name'] ?? '') : $company->name;
         $receiptPosId = $transaction->fbr_pos_id_snapshot ?? $company->fbr_pos_id;
         $fbrLogoPath = public_path('images/fbr-digital-invoice-logo-print.png');
         $fbrLogo = is_file($fbrLogoPath) ? 'data:image/png;base64,'.base64_encode(file_get_contents($fbrLogoPath)) : null;
@@ -250,24 +251,24 @@
         @if($printStyle['logo'] === 'center')
         {{-- line-height:0 wrapper + block img: no inline-descender gap under logo --}}
         <div style="text-align:center; margin:0; padding:2mm 0 0; line-height:0;">
-            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
+            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $receiptSellerName }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
         </div>
-        @if($rd['show_business_name'])<h1>{{ $company->name }}</h1>@endif
+        @if($rd['show_business_name'])<h1>{{ $receiptSellerName }}</h1>@endif
         @else
         {{-- Side logo: business name left, logo right — compact header --}}
         <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
             <tr>
                 <td style="text-align:left; vertical-align:middle; width:64%; padding:0;">
-                    @if($rd['show_business_name'])<h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>@endif
+                    @if($rd['show_business_name'])<h1 style="text-align:left; margin:0;">{{ $receiptSellerName }}</h1>@endif
                 </td>
                 <td style="text-align:right; vertical-align:middle; width:36%; padding:0;">
-                    <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width:80px; max-height:42px; object-fit:contain;">
+                    <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $receiptSellerName }}" style="max-width:80px; max-height:42px; object-fit:contain;">
                 </td>
             </tr>
         </table>
         @endif
         @else
-        @if($rd['show_business_name'])<h1>{{ $company->name }}</h1>@endif
+        @if($rd['show_business_name'])<h1>{{ $receiptSellerName }}</h1>@endif
         @endif
         @if($rd['show_address'] && ($seller['address'] ?? $company->address))<p>{{ $fiscalReceipt ? ($seller['address'] ?? '') : $company->address }}</p>@endif
         @if($rd['show_mobile'] && $company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif

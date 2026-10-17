@@ -110,8 +110,148 @@ class FbrPosSubmissionEvidenceTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $bill->refresh();
-        $this->assertSame('failed', $bill->fbr_status);
+        $this->assertSame('verification_pending', $bill->fbr_status);
         $this->assertNull($bill->fbr_invoice_number);
+    }
+
+    public function test_unknown_transport_outcome_is_held_while_connection_refusal_remains_retryable(): void
+    {
+        foreach (['timeout of 30000ms exceeded', 'ECONNRESET socket hang up'] as $error) {
+            $bill = $this->bill();
+            $result = $this->submit($bill, ['success' => false, 'offline' => true, 'error' => $error]);
+            $this->assertTrue($result['verification_pending'] ?? false);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+            $this->assertNull($bill->fresh()->fbr_invoice_number);
+            $result = (new \App\Services\FbrService)->submitFbrPosTransaction($bill->fresh());
+            $this->assertSame('blocked', $result['status']);
+        }
+        $bill = $this->bill();
+        $this->submit($bill, ['success' => false, 'offline' => true, 'error' => 'ECONNREFUSED']);
+        $this->assertSame('offline', $bill->fresh()->fbr_status);
+    }
+
+    public function test_unknown_acknowledgements_and_claimed_callbacks_remain_held_on_replay(): void
+    {
+        foreach ([['Code' => 100], ['Code' => 100, 'InvoiceNumber' => 'invalid prose'], ['message' => 'upstream unavailable']] as $response) {
+            $bill = $this->bill();
+            $claim = \App\Services\FbrPosAgentClaim::acquire($bill);
+            $wrong = $this->submit($bill, ['success' => false, 'outcome_unknown' => true,
+                'submission_claim' => str_repeat('0', 64), 'response' => $response]);
+            $this->assertSame('stale_submission_claim', $wrong['error']);
+            $this->assertSame('pending', $bill->fresh()->fbr_status);
+            $result = $this->submit($bill, ['success' => false, 'submission_claim' => $claim,
+                'pra_invoice_number' => 'invalid prose', 'response' => $response]);
+            $this->assertTrue($result['verification_pending'] ?? false);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+            $this->assertNull($bill->fresh()->fbr_invoice_number);
+            $this->submit($bill, ['success' => false, 'offline' => true, 'error' => 'ECONNREFUSED']);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+            $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill->fresh()));
+            $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill->fresh()));
+            $this->assertSame('blocked', (new \App\Services\FbrService)->submitFbrPosTransaction($bill->fresh())['status']);
+        }
+        Http::assertNothingSent();
+    }
+
+    public function test_new_agent_can_report_an_unknown_outcome_without_error_text(): void
+    {
+        $bill = $this->bill();
+        $result = $this->submit($bill, ['success' => false, 'outcome_unknown' => true]);
+        $this->assertTrue($result['verification_pending'] ?? false);
+        $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+        $this->assertNull($bill->fresh()->fbr_invoice_number);
+    }
+
+    public function test_stale_instances_cannot_dispatch_the_same_bill_twice_and_expiry_never_retries(): void
+    {
+        (require database_path('migrations/2026_10_12_100002_fbr_pos_agent_claim_timestamp.php'))->up();
+        $bill = $this->bill();
+        $otherReader = $bill->fresh();
+        $claim = \App\Services\FbrPosAgentClaim::acquire($bill);
+        $this->assertNotNull($claim);
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($otherReader));
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($otherReader));
+        $this->assertSame($claim, $bill->fresh()->fbr_submission_hash);
+        $this->travel(4)->minutes();
+        \App\Services\FbrPosAgentClaim::quarantineExpired($this->companyId);
+        $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($bill->fresh()));
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill->fresh()));
+    }
+
+    public function test_legacy_claim_without_timestamp_cannot_be_cleared_for_blind_retry(): void
+    {
+        (require database_path('migrations/2026_10_12_100002_fbr_pos_agent_claim_timestamp.php'))->up();
+        $bill=$this->bill();$bill->forceFill(['fbr_submission_hash'=>'legacy-dispatch'])->save();
+        $this->assertTrue(\App\Services\FbrPosAgentClaim::active($bill));
+        $this->assertFalse(\App\Services\FbrPosAgentClaim::prepareRetry($bill));
+        $this->travel(4)->minutes();\App\Services\FbrPosAgentClaim::quarantineExpired($this->companyId);
+        $this->assertSame('verification_pending',$bill->fresh()->fbr_status);
+    }
+
+    public function test_atomic_claim_rechecks_current_assigned_device_after_rebinding(): void
+    {
+        Schema::table('fbr_pos_transactions', function (Blueprint $t) { $t->string('fbr_device_uid_snapshot')->nullable(); });
+        $bill = $this->bill();
+        $bill->forceFill(['fbr_device_uid_snapshot' => 'OLD-PC'])->save();
+        $stale = $bill->fresh();
+        $bill->forceFill(['fbr_device_uid_snapshot' => 'REPLACEMENT'])->save();
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($stale, 'OLD-PC'));
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($stale));
+        $this->assertNotNull(\App\Services\FbrPosAgentClaim::acquire($stale, 'REPLACEMENT'));
+    }
+
+    public function test_claim_scope_excludes_provisionals_submitted_and_other_tenant_expiry(): void
+    {
+        (require database_path('migrations/2026_10_12_100002_fbr_pos_agent_claim_timestamp.php'))->up();
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($this->bill(['invoice_mode' => 'local'])));
+        $this->assertNull(\App\Services\FbrPosAgentClaim::acquire($this->bill(['fbr_invoice_number' => '900000000099'])));
+        $bill = $this->bill(['company_id' => 92]);
+        \App\Services\FbrPosAgentClaim::acquire($bill);
+        $this->travel(4)->minutes();
+        \App\Services\FbrPosAgentClaim::quarantineExpired($this->companyId);
+        $this->assertSame('pending', $bill->fresh()->fbr_status);
+    }
+
+    public function test_claim_callbacks_preserve_legacy_support_and_refuse_wrong_claim(): void
+    {
+        $bill = $this->bill();
+        \App\Services\FbrPosAgentClaim::acquire($bill);
+        $wrong = $this->submit($bill, ['success' => true, 'submission_claim' => str_repeat('0', 64),
+            'pra_invoice_number' => '900000000001', 'response' => ['Code' => 100, 'InvoiceNumber' => '900000000001']]);
+        $this->assertSame('stale_submission_claim', $wrong['error']);
+        $this->assertNull($bill->fresh()->fbr_invoice_number);
+        // An older supported agent omits the additive claim token. It can
+        // still acknowledge the one bill the server exclusively dispatched.
+        $this->submit($bill, ['success' => true, 'pra_invoice_number' => '900000000001',
+            'response' => ['Code' => 100, 'InvoiceNumber' => '900000000001']]);
+        $this->assertSame('submitted', $bill->fresh()->fbr_status);
+    }
+
+    public function test_message_or_mismatched_number_is_quarantined_even_with_code_100(): void
+    {
+        foreach ([
+            ['Invoice generated successfully', ['Code' => 100, 'Response' => 'Invoice generated successfully']],
+            ['900000000001', ['Code' => 100, 'InvoiceNumber' => '900000000002']],
+        ] as [$number, $response]) {
+            $bill = $this->bill();
+            $result = $this->submit($bill, ['success' => true, 'pra_invoice_number' => $number, 'response' => $response]);
+            $this->assertTrue($result['verification_pending'] ?? false);
+            $this->assertNull($bill->fresh()->fbr_invoice_number);
+            $this->assertSame('verification_pending', $bill->fresh()->fbr_status);
+        }
+    }
+
+    public function test_supported_alternate_and_legacy_number_fields_remain_accepted(): void
+    {
+        foreach (['FBRInvoiceNumber', 'invoiceNumber', 'Response'] as $field) {
+            $bill = $this->bill();
+            $number = '123456ABC20260001';
+            $this->submit($bill, ['success' => true, 'pra_invoice_number' => $number,
+                'response' => ['Code' => '100', $field => $number]]);
+            $this->assertSame($number, $bill->fresh()->fbr_invoice_number);
+            $this->assertSame('submitted', $bill->fresh()->fbr_status);
+        }
     }
 
     public function test_safe_dispatch_telemetry_has_no_full_posid_payload_or_local_url(): void

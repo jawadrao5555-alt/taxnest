@@ -46,17 +46,17 @@ class AdminDashboardController extends Controller
             'total_users' => User::count(),
             'total_franchises' => Schema::hasTable('franchises') ? Franchise::count() : 0,
 
-            'di_invoices' => Invoice::count(),
-            'di_revenue' => Invoice::where('status', 'locked')->sum('total_amount'),
+            'di_invoices' => Invoice::whereHas('company', fn($q) => $q->where('product_type', 'di'))->count(),
+            'di_revenue' => Invoice::whereHas('company', fn($q) => $q->where('product_type', 'di'))->where('status', 'locked')->sum('total_amount'),
 
-            'pos_transactions' => PosTransaction::where('status', 'completed')->count(),
-            'pos_revenue' => PosTransaction::where('status', 'completed')->sum('total_amount'),
-            'today_pos_transactions' => PosTransaction::where('status', 'completed')
+            'pos_transactions' => PosTransaction::whereHas('company', fn($q) => $q->where('product_type', 'pos'))->where('status', 'completed')->count(),
+            'pos_revenue' => PosTransaction::whereHas('company', fn($q) => $q->where('product_type', 'pos'))->where('status', 'completed')->sum('total_amount'),
+            'today_pos_transactions' => PosTransaction::whereHas('company', fn($q) => $q->where('product_type', 'pos'))->where('status', 'completed')
                 ->whereDate('created_at', today())->count(),
 
-            'fbrpos_transactions' => FbrPosTransaction::count(),
-            'fbrpos_revenue' => FbrPosTransaction::sum('total_amount'),
-            'today_fbrpos_transactions' => FbrPosTransaction::whereDate('created_at', today())->count(),
+            'fbrpos_transactions' => FbrPosTransaction::whereHas('company', fn($q) => $q->where('product_type', 'fbrpos'))->count(),
+            'fbrpos_revenue' => FbrPosTransaction::whereHas('company', fn($q) => $q->where('product_type', 'fbrpos'))->sum('total_amount'),
+            'today_fbrpos_transactions' => FbrPosTransaction::whereHas('company', fn($q) => $q->where('product_type', 'fbrpos'))->whereDate('created_at', today())->count(),
         ];
 
         // Dashboard shows the latest N per tab; the full paginated list lives at

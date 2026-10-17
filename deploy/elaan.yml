@@ -1,7 +1,8 @@
-title: "CCI import ke liye evidence audit aur missing-data report"
-audience: all
+title: "Caller ID ki missed-ring recovery ki tayyari"
+audience: pos
 type: improvement
 points:
-  - "Offline audit source coverage aur invoice totals ki reconciliation report banata hai."
-  - "Missing MRP, verified mapping, buyer aur VAT evidence wazeh dikhai jati hai."
-  - "Yeh audit invoice create ya submit nahi karta; real pilot ki approval alag zaroori hai."
+  - "Caller app ki nayi 1.8.0 build ke liye saved queue aur reconnect retry shamil ki gayi hai."
+  - "Purani rings asal waqt ke saath history mein aayengi; nayi incoming call ka popup nahi banengi."
+  - "Package lock aur feature OFF ka jawab delivery ki kamyabi nahi samjha jayega."
+  - "Signed Android update ki availability successful build aur phone verification ke baad confirm hogi."

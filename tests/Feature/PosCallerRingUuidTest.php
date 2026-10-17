@@ -223,4 +223,50 @@ class PosCallerRingUuidTest extends TestCase
         $this->assertTrue($res['accepted']);
         $this->assertCount(1, $this->rows());
     }
+    public function test_durable_replay_keeps_old_time_and_does_not_collapse_a_new_call(): void
+    {
+        Carbon::setTestNow('2026-10-17 18:00:00');
+        $old = now()->subHours(2);
+        $this->assertTrue($this->ring(['phone' => '03000000001', 'uuid' => 'new-live'])['accepted']);
+        $replay = $this->ring(['phone' => '03000000001', 'uuid' => 'old-queued', 'at' => $old->getTimestampMs()]);
+        $this->assertTrue($replay['accepted']);
+        $this->assertCount(2, $this->rows());
+        $this->assertTrue(Carbon::parse($this->rows()->last()->ring_at)->equalTo($old));
+        $this->assertSame('duplicate', $this->ring(['phone' => '03000000001', 'uuid' => 'old-queued', 'at' => $old->getTimestampMs()])['reason']);
+    }
+
+    public function test_a_disabled_company_does_not_accept_queued_history(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update(['caller_id_enabled' => false]);
+        $data = $this->ring(['phone' => '03000000001', 'uuid' => 'disabled-ring', 'at' => now()->subHour()->getTimestampMs()]);
+        $this->assertFalse($data['accepted']);
+        $this->assertSame('disabled', $data['reason']);
+        $this->assertCount(0, $this->rows());
+    }
+
+    public function test_timestamp_outside_retention_is_refused_instead_of_restamped(): void
+    {
+        $request = Request::create('/api/caller-app/v1/ring', 'POST', [
+            'phone' => '03000000001', 'uuid' => 'expired-ring', 'at' => now()->subHours(49)->getTimestampMs(),
+        ]);
+        $request->headers->set('Authorization', 'Bearer ' . $this->token);
+        app()->instance('request', $request);
+        $this->assertSame(422, app(PosCallerIdController::class)->appRing($request)->getStatusCode());
+        $this->assertCount(0, $this->rows());
+    }
+
+    public function test_the_same_uuid_is_isolated_between_companies(): void
+    {
+        $this->assertTrue($this->ring(['phone' => '03000000001', 'uuid' => 'shared-id'])['accepted']);
+        $other = Company::create(['name' => 'Second fictional shop', 'product_type' => 'pos']);
+        $plain = $other->id . '|other-fictional-token';
+        DB::table('companies')->where('id', $other->id)->update([
+            'is_internal_account' => true, 'caller_id_enabled' => true,
+            'caller_app_token' => hash('sha256', $plain),
+        ]);
+        $this->token = $plain;
+        $this->assertTrue($this->ring(['phone' => '03000000001', 'uuid' => 'shared-id'])['accepted']);
+        $this->assertSame(2, DB::table('pos_caller_events')->where('offline_uuid', 'shared-id')->count());
+    }
+
 }

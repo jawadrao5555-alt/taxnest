@@ -164,6 +164,7 @@ class MainActivity : BaseActivity() {
         super.onResume()
         ui.post(stateLoop)
         refreshMe()
+        RingReporter.resume(this)
     }
 
     override fun onPause() {

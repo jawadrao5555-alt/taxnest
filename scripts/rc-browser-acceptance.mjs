@@ -1221,6 +1221,15 @@ async function workflow(page,t,v,diagnostics) {
     const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Export filtered CSV'}).click()]);
     const csv=readFileSync(await download.path(),'utf8');
     if(!csv.startsWith('id,company,company_id,product,reference,status,amount,created_at,')) throw new Error('Dashboard CSV schema missing');
+    if(!t.invoicePreviewCsp)throw new Error('Invoice preview must enforce the actual production CSP');
+    await page.addInitScript(() => {
+      window.invoicePreviewPolicyViolations=[];
+      document.addEventListener('securitypolicyviolation',event=>window.invoicePreviewPolicyViolations.push({directive:event.effectiveDirective,uri:event.blockedURI}));
+    });
+    await page.route('**/admin/dashboard/**',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,headers:{...response.headers(),'content-security-policy':t.invoicePreviewCsp}});
+    });
     for(const doc of t.previewDocuments || []) {
       await page.goto(baseUrl+'/admin/dashboard/details/'+doc.metric+'?company_id='+doc.company,{waitUntil:'domcontentloaded'});
       const link=page.locator(`[data-invoice-preview$="/${doc.product}/${doc.company}/${doc.record}/preview"]`);
@@ -1236,6 +1245,10 @@ async function workflow(page,t,v,diagnostics) {
       await page.locator('#tn-invoice-preview').waitFor({state:'visible'});
       await page.locator('[data-preview-download]').waitFor({state:'visible'});
       await page.waitForFunction(()=>!document.querySelector('[data-preview-print]').disabled);
+      await page.waitForTimeout(350);
+      const violations=await page.evaluate(()=>window.invoicePreviewPolicyViolations || []);
+      if(violations.some(x=>/frame|child|default/.test(x.directive)))throw new Error('Production CSP blocked invoice preview: '+JSON.stringify(violations));
+      await saveEvidenceScreenshot(page,`rc-admin-invoice-preview-${doc.product}-${v.width}`);
       await adminReviewContrast(page);
       const [pdf]=await Promise.all([page.waitForEvent('download'),page.locator('[data-preview-download]').click()]);
       const bytes=readFileSync(await pdf.path());

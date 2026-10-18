@@ -1,7 +1,7 @@
-title: "CCI import ke liye evidence audit aur missing-data report"
-audience: all
-type: improvement
+title: "Product search mein tamam matching deals"
+audience: pos
+type: fix
 points:
-  - "Offline audit source coverage aur invoice totals ki reconciliation report banata hai."
-  - "Missing MRP, verified mapping, buyer aur VAT evidence wazeh dikhai jati hai."
-  - "Yeh audit invoice create ya submit nahi karta; real pilot ki approval alag zaroori hai."
+  - "Search mein matching deals aur products sirf pehle 12 tak mehdood nahi rahenge."
+  - "Bari list mein mazeed results load ho sakte hain aur keyboard se bhi select honge."
+  - "Exact barcode aur SKU ko search mein pehli tarjeeh barqarar hai."

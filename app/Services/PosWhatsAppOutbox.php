@@ -51,6 +51,8 @@ class PosWhatsAppOutbox
 
     public function process(int $id): void
     {
+        // Never send from an uncommitted payment/test transaction.
+        if (DB::transactionLevel() > 0) return;
         // Atomic claim; duplicate callbacks/workers cannot send the same row.
         $claimed = DB::table('pos_whatsapp_outbox')->where('id', $id)->where('status', 'pending')
             ->where('next_attempt_at', '<=', now())->update([

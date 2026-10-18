@@ -838,6 +838,7 @@ class PosWhatsappBillShareTest extends TestCase
             'wa_template_name' => 'invoice_notification', 'wa_attach_pdf' => true, 'wa_app_secret' => 'synthetic-app-secret'])->save();
         PosFeatureService::flushGateCaches();
         \Illuminate\Support\Facades\Http::preventStrayRequests();
+        \Illuminate\Support\Facades\Http::fake();
         return [$company, app(\App\Services\PosWhatsAppOutbox::class)];
     }
 
@@ -961,10 +962,38 @@ class PosWhatsappBillShareTest extends TestCase
     {
         [$company, $outbox] = $this->autoSendFixture();$user = $this->makeUser($company->id);
         \Illuminate\Support\Facades\Http::fake(['graph.facebook.com/*' => \Illuminate\Support\Facades\Http::response(['messages' => [['id' => 'wamid.SALE']]], 200)]);
-        $response = $this->actingAs($user, 'pos')->postJson('/pos/invoice', $this->storePayload());
+        $response = $this->actingAs($user, 'pos')->postJson('/pos/invoice/store', $this->storePayload());
         $response->assertOk()->assertJsonPath('success', true);
         $this->assertSame(1, DB::table('pos_whatsapp_outbox')->count());
         $outbox->drain();\Illuminate\Support\Facades\Http::assertSentCount(1);
+    }
+
+    public function test_pos_status_webhook_requires_signature_and_matching_meta_number(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture();
+        Schema::create('invoice_deliveries', function (Blueprint $t) {
+            $t->id();$t->unsignedBigInteger('company_id');$t->string('provider_message_id')->nullable();
+            $t->string('status');$t->text('error')->nullable();$t->timestamps();
+        });
+        \Illuminate\Support\Facades\Http::fake(['graph.facebook.com/*' => \Illuminate\Support\Facades\Http::response(['messages' => [['id' => 'wamid.SIGNED']]], 200)]);
+        $id = $outbox->enqueue($this->autoBill($company->id));$outbox->process($id);
+        $payload = ['entry' => [['changes' => [['value' => [
+            'metadata' => ['phone_number_id' => '123456789'],
+            'statuses' => [['id' => 'wamid.SIGNED', 'status' => 'read']],
+        ]]]]]];
+        $url = '/webhooks/whatsapp/' . $company->id;
+        $this->postJson($url, $payload)->assertUnauthorized();
+        $this->assertSame('sent', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        $send = function (array $data) use ($url) {
+            $raw = json_encode($data);
+            return $this->call('POST', $url, [], [], [], [
+                'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json',
+                'HTTP_X_HUB_SIGNATURE_256' => 'sha256=' . hash_hmac('sha256', $raw, 'synthetic-app-secret'),
+            ], $raw);
+        };
+        $wrong = $payload;$wrong['entry'][0]['changes'][0]['value']['metadata']['phone_number_id'] = '999';
+        $send($wrong)->assertOk();$this->assertSame('sent', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        $send($payload)->assertOk();$this->assertSame('read', DB::table('pos_whatsapp_outbox')->find($id)->status);
     }
 
 }

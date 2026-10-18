@@ -838,7 +838,7 @@ class PosWhatsappBillShareTest extends TestCase
             'wa_template_name' => 'invoice_notification', 'wa_attach_pdf' => true, 'wa_app_secret' => 'synthetic-app-secret'])->save();
         PosFeatureService::flushGateCaches();
         \Illuminate\Support\Facades\Http::preventStrayRequests();
-        \Illuminate\Support\Facades\Http::fake();
+        \Illuminate\Support\Facades\Http::fake([]);
         return [$company, app(\App\Services\PosWhatsAppOutbox::class)];
     }
 
@@ -891,7 +891,10 @@ class PosWhatsappBillShareTest extends TestCase
         $bill = $this->autoBill($company->id, ['pra_status' => 'local']);
         $bill->update(['pra_status' => 'pending']);$bill->update(['notes' => 'unchanged delivery']);
         $this->assertSame(1, DB::table('pos_whatsapp_outbox')->count());
-        DB::beginTransaction();$this->autoBill($company->id);$this->assertSame(2, DB::table('pos_whatsapp_outbox')->count());DB::rollBack();
+        DB::beginTransaction();$uncommitted = $this->autoBill($company->id);
+        $uncommittedId = $outbox->enqueue($uncommitted);$outbox->process($uncommittedId);
+        $this->assertSame('pending', DB::table('pos_whatsapp_outbox')->find($uncommittedId)->status);
+        $this->assertSame(2, DB::table('pos_whatsapp_outbox')->count());DB::rollBack();
         $this->assertSame(1, DB::table('pos_whatsapp_outbox')->count());
         \Illuminate\Support\Facades\Http::assertNothingSent();
     }

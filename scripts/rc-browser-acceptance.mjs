@@ -1614,6 +1614,18 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
   }
   await page.evaluate(()=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.highlightIndex=11;d.moveHighlight(1);});
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).highlightIndex===12);
+
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:85},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.onSearchInput();
+  });
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===85);
+  const more=dropdown.locator('button[x-show="searchSuggestions.length > searchDisplayCount"]');
+  await more.scrollIntoViewIfNeeded();await more.click();
+  if(!await dropdown.isVisible())throw new Error('Load more closed the search dropdown');
+  const last=dropdown.locator('button').filter({hasText:'QA Deal No 85'});
+  await last.scrollIntoViewIfNeeded();if(!await last.isVisible())throw new Error('Load more did not reveal matching deal 85');
   await saveEvidenceScreenshot(page,'catalog-search-complete-'+v.width);
   pass(t.name+'/'+v.width+': all sixteen deals searchable across category filters; 13-16 visible and keyboard reachable');
 }

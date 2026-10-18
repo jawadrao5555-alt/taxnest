@@ -1185,7 +1185,7 @@ window.addEventListener('popstate', function() {
                         <span class="text-sm font-extrabold flex-shrink-0 text-purple-600 dark:text-purple-300" :style="i === highlightIndex ? 'color:white;' : ''" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
-                <button type="button" x-show="searchSuggestions.length > searchDisplayCount" @click="searchDisplayCount += 60" class="w-full px-4 py-3 text-sm font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-700">
+                <button type="button" x-show="searchSuggestions.length > searchDisplayCount" @click.stop="searchDisplayCount += 60; $refs.searchInput?.focus()" class="w-full px-4 py-3 text-sm font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-700">
                     {{ __('pos.load_more_prefix') }}<span x-text="searchSuggestions.length - searchDisplayCount"></span>)
                 </button>
             </div>

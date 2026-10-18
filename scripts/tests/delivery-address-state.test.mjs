@@ -59,3 +59,13 @@ test('explicitly clearing the picker remains empty after a delayed response',asy
  const f=fixture();f.ui.selectedCustomer={id:5,name:'E'};const pending=f.ui.loadCustomerAddresses();
  f.ui._deliveryAddressChoiceVersion=1;f.reply(0,[{id:0,address:'E default'}]);await pending;assert.equal(f.ui.selectedDeliveryAddress,'');
 });
+
+test('failed lookup without a known address blocks saving rather than silently omitting it',async()=>{
+ const f=fixture();f.ui.selectedCustomer={id:4,name:'D'};f.ui.loadCustomerAddresses();
+ const result=f.ui.waitForDeliveryAddress();f.requests[0].reject(Error('offline'));
+ assert.equal(await result,false);assert.equal(f.ui.selectedDeliveryAddress,'');
+});
+test('a confirmed empty address book keeps delivery-without-address optional',async()=>{
+ const f=fixture();f.ui.selectedCustomer={id:4,name:'D'};f.ui.loadCustomerAddresses();
+ const result=f.ui.waitForDeliveryAddress();f.reply(0,[]);assert.equal(await result,true);
+});

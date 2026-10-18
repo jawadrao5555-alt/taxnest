@@ -8615,11 +8615,12 @@ function restaurantPos() {
             this.selectedDeliveryAddress = seed;
             this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
             const choiceVersion = this._deliveryAddressChoiceVersion || 0;
+            const load = { customer: c, generation, choiceVersion, pending: null, failed: false };
             const pending = (async () => {
                 if (!c || !c.id) return;
                 try {
                     const res = await this._fetchWithTimeout('/pos/api/customer-addresses?customer_id=' + c.id, { headers: { 'Accept': 'application/json' } });
-                    if (!res.ok) return;
+                    if (!res.ok) { load.failed = true; return; }
                     const data = await res.json();
                     if (this.selectedCustomer !== c || this._deliveryAddressGeneration !== generation || this.orderType !== 'delivery') return;
                     const addresses = Array.isArray(data.addresses) ? data.addresses.filter(a => a && String(a.address || '').trim()) : [];
@@ -8630,19 +8631,26 @@ function restaurantPos() {
                     if (!selected && !seed && choiceVersion === (this._deliveryAddressChoiceVersion || 0) && addresses.length) {
                         this.selectedDeliveryAddress = addresses[0].address;
                     }
-                } catch (e) { console.error('[addresses] load failed', e); }
+                } catch (e) { load.failed = true; console.error('[addresses] load failed', e); }
             })();
-            this._deliveryAddressLoad = { customer: c, generation, choiceVersion, pending };
+            load.pending = pending;
+            this._deliveryAddressLoad = load;
             return pending;
         },
         async waitForDeliveryAddress() {
-            if (this.selectedDeliveryAddress) return;
+            if (this.selectedDeliveryAddress) return true;
             // If a new current lookup replaced the one we awaited, wait for that one too.
             for (;;) {
                 const load = this._deliveryAddressLoad;
-                if (!load || load.customer !== this.selectedCustomer || this.orderType !== 'delivery') return;
+                if (!load || load.customer !== this.selectedCustomer || this.orderType !== 'delivery') return true;
                 await load.pending;
-                if (this._deliveryAddressLoad === load) return;
+                if (this._deliveryAddressLoad === load) {
+                    if (load.failed && !this.selectedDeliveryAddress) {
+                        this.showToast(window.TXT.network_error, 'error');
+                        return false;
+                    }
+                    return true;
+                }
             }
         },
         async saveNewAddress() {
@@ -8679,7 +8687,6 @@ function restaurantPos() {
         // id=0 = customer's default address (cleared, not row-deleted); walk-in
         // one-off entries (id=null) are local-only, just dropped from the list.
         async deleteSelectedAddress() {
-            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
             const sel = this.selectedDeliveryAddress;
             // Duplicate texts (review catch): if the same address text exists as
             // both the Default and an extra row, delete the EXTRA row first —
@@ -8688,6 +8695,7 @@ function restaurantPos() {
             const a = matches.find(x => x.id !== 0 && x.id !== null) || matches.find(x => x.id !== 0) || matches[0];
             if (!a) return;
             if (!confirm(window.TXT.confirm_delete_address + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;
+            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
             const drop = () => {
                 this.customerAddresses = this.customerAddresses.filter(x => x !== a);
                 this.selectedDeliveryAddress = '';
@@ -10706,7 +10714,7 @@ function restaurantPos() {
         },
 
         async holdOrder(opts) {
-            if (this.orderType === 'delivery') await this.waitForDeliveryAddress();
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             // EDIT MODE: a provisional bill can't be turned into a held order —
             // F9 Update Bill is the only save path while editing.
             if (this.editingBillId) {
@@ -10935,7 +10943,7 @@ function restaurantPos() {
             window.location.href = '{{ route('pos.invoice.create') }}';
         },
         async updateProvisionalBill() {
-            if (this.orderType === 'delivery') await this.waitForDeliveryAddress();
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             if (this.submitting || !this.editingBillId) return;
             if (this.cart.length === 0) { this.showToast(window.TXT.cart_empty_add_or_delete, 'error'); return; }
             if (!navigator.onLine) { this.showToast(window.TXT.offline_update_online_only, 'error'); return; }
@@ -11058,7 +11066,7 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
-            if (this.orderType === 'delivery') await this.waitForDeliveryAddress();
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             if (this.submitting) return;
             if (this.incomingOrderId && this.recalledCartDirty() && !await this.saveIncomingOrder()) return;
             // A recalled/held online-marked order has already chosen its payment
@@ -11238,7 +11246,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
-            if (this.orderType === 'delivery') await this.waitForDeliveryAddress();
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).
             if (this.submitting) return;
             const now = Date.now();

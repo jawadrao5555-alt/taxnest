@@ -1,6 +1,6 @@
 title: "Delivery bill par address ki hifazat"
 audience: pos
-type: fix
+type: improvement
 points:
   - "Customer select karte hi known delivery address foran bill ke liye tayyar rahega."
   - "Slow address lookup aur customer badalne par purana response naya address replace nahi karega."

@@ -1,7 +1,7 @@
-title: "Admin company directory mein wazeh text aur readable controls"
-audience: all
+title: "Rider ki location zyada jaldi aur durust sync hogi"
+audience: pos
 type: improvement
 points:
-  - "Agent Health alert aur company details par text zyada wazeh nazar aye ga."
-  - "Status badges, filters aur action labels readable size aur contrast mein honge."
-  - "Existing saved themes aur company settings barqarar rahengi."
+  - "On-duty GPS aur map ki refresh tez hogi; offline trail apna asal waqt rakhega."
+  - "Nayi location purane buffer se pehle sync hogi aur purani request live pin ko peeche nahi karegi."
+  - "Package permission aur existing company settings barqarar rahengi."

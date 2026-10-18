@@ -1200,6 +1200,7 @@ async function companyDirectoryContrast(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
   if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
@@ -1630,3 +1631,26 @@ const {browser}=await launchLocalBrowser();
 try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
 
+
+async function riderRealtimeWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/riders/tracking',{waitUntil:'domcontentloaded'});
+  const read=()=>page.evaluate(id=>{
+    const root=document.querySelector('[x-data^="riderTracking("]');
+    const d=root&&window.Alpine?.$data(root),marker=d?.markers?.[id];
+    return marker?{lat:marker.getLatLng().lat,lng:marker.getLatLng().lng}:null;
+  },t.riderRealtime.id);
+  await page.waitForFunction(id=>{
+    const root=document.querySelector('[x-data^="riderTracking("]');
+    return root&&window.Alpine?.$data(root)?.markers?.[id];
+  },t.riderRealtime.id);
+  const at=Date.now(),lat=v.width===390?31.522:31.521,lng=74.322;
+  const response=await page.request.post(baseUrl+'/api/rider-app/v1/locations',{
+    headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{points:[{lat,lng,acc:8,at}]}});
+  if(!response.ok()||!(await response.json()).acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged');
+  await page.waitForFunction(({id,lat,lng})=>{
+    const d=window.Alpine.$data(document.querySelector('[x-data^="riderTracking("]'));
+    const m=d.markers[id]?.getLatLng();return m&&Math.abs(m.lat-lat)<.000001&&Math.abs(m.lng-lng)<.000001;
+  },{id:t.riderRealtime.id,lat,lng},{timeout:10000});
+  const pin=await read();if(!pin)throw new Error('Actual Leaflet rider marker missing');
+  pass(t.name+'/'+v.width+': real authenticated API upload reaches Leaflet pin through automatic five-second poll');
+}

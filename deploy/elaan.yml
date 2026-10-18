@@ -1,6 +1,6 @@
 title: "Product search mein tamam matching deals"
 audience: pos
-type: fix
+type: improvement
 points:
   - "Search mein matching deals aur products sirf pehle 12 tak mehdood nahi rahenge."
   - "Bari list mein mazeed results load ho sakte hain aur keyboard se bhi select honge."

@@ -87,13 +87,19 @@ object Prefs {
      * the rider can re-login on this device and the buffered offline points will
      * drain automatically once duty resumes.
      */
-    fun clearToken(c: Context) =
-        sp(c).edit()
-            .remove("token").remove("rider_name").remove("company_name")
-            .remove("seen_deliveries") // fresh login must re-alert still-open bills
-            .remove("seen_arrivals")   // fresh login clears arrival notification dedupe
-            .putBoolean("duty", false)
-            .apply()
+    fun clearToken(c: Context) {
+        synchronized(sessionLock) {
+            val editor = sp(c).edit()
+            // Adopt an upgraded logged-in session BEFORE evicting its token;
+            // otherwise a same-rider re-login cannot prove ownership of its trail.
+            if (sp(c).getString("queue_owner", null) == null) {
+                editor.putString("queue_owner", token(c)?.substringBefore('|'))
+            }
+            editor.remove("token").remove("rider_name").remove("company_name")
+                .remove("seen_deliveries").remove("seen_arrivals")
+                .putBoolean("duty", false).commit()
+        }
+    }
 
     /**
      * Full session wipe — used only on VOLUNTARY logout.  Clears the queue

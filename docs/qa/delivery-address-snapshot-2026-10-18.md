@@ -21,3 +21,5 @@ Post-change local validation: 14 real-method behavioral Node tests PASS (default
 If the current lookup fails and there is no known/selected address, saving stops with the existing translated network-error feedback instead of silently serializing an unknown empty address. A successful empty address book remains optional, as do walk-in/takeaway flows. Known snapshots do not wait on a slow book. Cancelled deletions do not change selection state.
 
 Offline recovery: a cashier-entered new address becomes a visible one-off bill snapshot immediately. Failure to save the reusable customer address book still gives the existing failure feedback, but does not discard the typed address or block that bill. Confirmed saves replace the temporary option with the server row. Extra behavioral tests cover failed/offline and confirmed saves.
+
+First browser attempt reached the real invoice POST and failed at the existing subscription gate because the table-order fixture had no subscription. Seed that fictional shop a normal active package with a bounded 100-invoice quota. No application gate is changed or bypassed; rerun the actual bill/receipt proof on the replacement HEAD.

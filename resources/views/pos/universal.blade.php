@@ -8665,6 +8665,12 @@ function restaurantPos() {
                 this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                 return;
             }
+            // The cashier's typed address is valid for this bill even when saving
+            // the reusable address book fails/offline. Keep it visibly as a one-off.
+            const temporary = { id: null, label: label || null, address: text };
+            this.customerAddresses.push(temporary);
+            this.selectedDeliveryAddress = text;
+            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
             try {
                 const res = await fetch('/pos/api/customer-addresses', {
                     method: 'POST',
@@ -8674,6 +8680,7 @@ function restaurantPos() {
                 const data = await res.json().catch(() => null);
                 if (this.selectedCustomer !== c) return;
                 if (data && data.success && data.address) {
+                    this.customerAddresses = this.customerAddresses.filter(a => !(a.id === null && a.address === text));
                     this.customerAddresses.push(data.address);
                     this.selectedDeliveryAddress = data.address.address;
                     this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';

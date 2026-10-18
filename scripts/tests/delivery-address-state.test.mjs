@@ -7,7 +7,7 @@ function method(name){const start=source.search(new RegExp('^        (?:async )?
 function fixture(){
  const requests=[];const fetch=(url)=>new Promise((resolve,reject)=>requests.push({url,resolve,reject}));
  const context=vm.createContext({fetch,console:{error(){}},window:{TXT:{}},setTimeout,clearTimeout});
- const names=['loadCustomerAddresses','selectLookedUpCustomer','selectCustomerWithStats','selectCustomerFromPhone','_selectQuickCustomer'];
+ const names=['loadCustomerAddresses','saveNewAddress','selectLookedUpCustomer','selectCustomerWithStats','selectCustomerFromPhone','_selectQuickCustomer'];
  for(const name of ['waitForDeliveryAddress'])if(source.includes('        async '+name+'('))names.push(name);
  const ui=vm.runInContext('({'+names.map(method).join('\n')+'})',context);
  Object.assign(ui,{selectedCustomer:{id:1,name:'A',address:'A default'},orderType:'delivery',customerAddresses:[],selectedDeliveryAddress:'',showToast(){},$nextTick(){},_fetchWithTimeout:fetch});
@@ -68,4 +68,18 @@ test('failed lookup without a known address blocks saving rather than silently o
 test('a confirmed empty address book keeps delivery-without-address optional',async()=>{
  const f=fixture();f.ui.selectedCustomer={id:4,name:'D'};f.ui.loadCustomerAddresses();
  const result=f.ui.waitForDeliveryAddress();f.reply(0,[]);assert.equal(await result,true);
+});
+
+test('typed one-off address remains billable if saving the address book fails offline',async()=>{
+ const f=fixture();f.ui.newAddrText='Cashier entered offline address';f.ui.newAddrLabel='Office';
+ const pending=f.ui.saveNewAddress();assert.equal(f.ui.selectedDeliveryAddress,'Cashier entered offline address');
+ f.requests[0].reject(Error('offline'));await pending;
+ assert.equal(f.ui.selectedDeliveryAddress,'Cashier entered offline address');
+ assert.equal(await f.ui.waitForDeliveryAddress(),true);
+});
+test('confirmed address-book save replaces its temporary one-off without duplicate options',async()=>{
+ const f=fixture();f.ui.newAddrText='Saved office';f.ui.newAddrLabel='Office';
+ const pending=f.ui.saveNewAddress();f.requests[0].resolve({json:async()=>({success:true,address:{id:7,address:'Saved office'}})});await pending;
+ assert.equal(f.ui.customerAddresses.filter(a=>a.address==='Saved office').length,1);
+ assert.equal(f.ui.customerAddresses.find(a=>a.address==='Saved office').id,7);
 });

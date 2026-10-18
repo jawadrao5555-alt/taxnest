@@ -49,6 +49,17 @@ class PosTransaction extends Model
      */
     protected static function booted(): void
     {
+        $enqueueWhatsApp = function (self $bill) {
+            try { app(\App\Services\PosWhatsAppOutbox::class)->enqueue($bill); }
+            catch (\Throwable $e) { report($e); } // Delivery must not roll back payment.
+        };
+        static::created($enqueueWhatsApp);
+        static::updated(function (self $bill) use ($enqueueWhatsApp) {
+            if (($bill->wasChanged('status') && $bill->status === 'completed')
+                || ($bill->wasChanged('pra_status') && $bill->getRawOriginal('pra_status') === 'local'
+                    && !$bill->isDeliberateProvisional())) $enqueueWhatsApp($bill);
+        });
+
         static::addGlobalScope('hide_archived', function (Builder $q) {
             // Only filter when the column exists (post-migration).
             if (\Schema::hasColumn('pos_transactions', 'is_archived')) {

@@ -824,4 +824,147 @@ class PosWhatsappBillShareTest extends TestCase
             'setWaBill must coerce share_url to null (not empty string) on null/missing'
         );
     }
+    private function autoSendFixture(bool $enabled = true, bool $package = true): array
+    {
+        (require database_path('migrations/2026_08_03_030000_whatsapp_business_api_phase2.php'))->up();
+        Schema::table('companies', fn (Blueprint $t) => $t->text('wa_app_secret')->nullable());
+        Schema::table('pricing_plans', fn (Blueprint $t) => $t->boolean('whatsapp_enabled')->default(false));
+        (require database_path('migrations/2026_12_03_010000_create_pos_whatsapp_outbox.php'))->up();
+        $id = $this->makeCompany();
+        $this->subscribe($id, ['whatsapp_enabled' => $package]);
+        $company = \App\Models\Company::find($id);
+        $company->forceFill(['pos_whatsapp_auto_send' => $enabled, 'wa_api_enabled' => true,
+            'wa_phone_number_id' => '123456789', 'wa_api_token' => \Illuminate\Support\Facades\Crypt::encryptString('synthetic-token'),
+            'wa_template_name' => 'invoice_notification', 'wa_attach_pdf' => true, 'wa_app_secret' => 'synthetic-app-secret'])->save();
+        PosFeatureService::flushGateCaches();
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+        return [$company, app(\App\Services\PosWhatsAppOutbox::class)];
+    }
+
+    private function autoBill(int $company, array $overrides = []): \App\Models\PosTransaction
+    {
+        return \App\Models\PosTransaction::create(array_merge([
+            'company_id' => $company, 'invoice_number' => 'AUTO-' . uniqid(), 'status' => 'completed',
+            'customer_phone' => '03001234567', 'total_amount' => 116, 'pra_status' => null,
+        ], $overrides));
+    }
+
+    public function test_auto_send_defaults_off_and_preserves_manual_bill_payload(): void
+    {
+        [$company] = $this->autoSendFixture(false);
+        $bill = $this->autoBill($company->id);
+        $this->assertSame(0, DB::table('pos_whatsapp_outbox')->count());
+        $this->assertSame('923001234567', $bill->waBillPayload($company)['wa_phone']);
+        $this->assertFalse((bool) \App\Models\Company::find($this->makeCompany())->pos_whatsapp_auto_send);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_auto_bill_claim_is_idempotent_and_uses_the_actual_pos_pdf_route(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture();
+        \Illuminate\Support\Facades\Http::fake(['graph.facebook.com/*' => \Illuminate\Support\Facades\Http::response(['messages' => [['id' => 'wamid.POS1']]], 200)]);
+        $bill = $this->autoBill($company->id);$id = $outbox->enqueue($bill);
+        $outbox->process($id);$outbox->process($id);$outbox->enqueue($bill);$outbox->drain();
+        $this->assertSame(1, DB::table('pos_whatsapp_outbox')->count());
+        $this->assertSame('sent', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        \Illuminate\Support\Facades\Http::assertSentCount(1);
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) use ($bill) {
+            $data = $request->data();
+            $pdf = $data['template']['components'][0]['parameters'][0]['document']['link'];
+            return $data['to'] === '923001234567' && str_ends_with($pdf, '/pos/invoice/share/' . $bill->fresh()->share_token)
+                && $data['template']['components'][1]['parameters'][0]['text'] === $bill->invoice_number;
+        });
+    }
+
+    public function test_provisional_draft_cancelled_and_invalid_number_never_enqueue(): void
+    {
+        [$company] = $this->autoSendFixture();
+        foreach ([['pra_status' => 'local'], ['status' => 'draft'], ['status' => 'cancelled'], ['customer_phone' => 'bad']] as $attrs) $this->autoBill($company->id, $attrs);
+        $this->assertSame(0, DB::table('pos_whatsapp_outbox')->count());
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_promoting_provisional_enqueues_once_and_bill_rollback_rolls_back_outbox(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture();
+        $bill = $this->autoBill($company->id, ['pra_status' => 'local']);
+        $bill->update(['pra_status' => 'pending']);$bill->update(['notes' => 'unchanged delivery']);
+        $this->assertSame(1, DB::table('pos_whatsapp_outbox')->count());
+        DB::beginTransaction();$this->autoBill($company->id);$this->assertSame(2, DB::table('pos_whatsapp_outbox')->count());DB::rollBack();
+        $this->assertSame(1, DB::table('pos_whatsapp_outbox')->count());
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_package_denial_and_opt_out_before_send_prevent_provider_calls(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture(true, false);
+        $this->autoBill($company->id);$this->assertSame(0, DB::table('pos_whatsapp_outbox')->count());
+        DB::table('pricing_plans')->update(['whatsapp_enabled' => true]);PosFeatureService::flushGateCaches();
+        $bill = $this->autoBill($company->id);$id = $outbox->enqueue($bill);
+        $company->update(['pos_whatsapp_auto_send' => false]);$outbox->process($id);
+        $this->assertSame('cancelled', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_rate_limit_retries_but_ambiguous_response_is_not_automatically_resent(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture();
+        \Illuminate\Support\Facades\Http::fake(['graph.facebook.com/*' => \Illuminate\Support\Facades\Http::sequence()->push([], 429)->push([], 503)]);
+        $id = $outbox->enqueue($this->autoBill($company->id));$outbox->process($id);
+        $this->assertSame('pending', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        $outbox->drain();\Illuminate\Support\Facades\Http::assertSentCount(1);
+        DB::table('pos_whatsapp_outbox')->where('id', $id)->update(['next_attempt_at' => now()->subSecond()]);
+        $outbox->drain();$this->assertSame('unknown', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        $outbox->drain();\Illuminate\Support\Facades\Http::assertSentCount(2);
+    }
+
+    public function test_early_webhook_is_replayed_and_foreign_company_cannot_advance_status(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture();
+        \Illuminate\Support\Facades\Http::fake(function () use ($outbox, $company) {
+            $outbox->applyStatus($company->id, ['id' => 'wamid.EARLY', 'status' => 'delivered']);
+            return \Illuminate\Support\Facades\Http::response(['messages' => [['id' => 'wamid.EARLY']]], 200);
+        });
+        $id = $outbox->enqueue($this->autoBill($company->id));$outbox->process($id);
+        $this->assertSame('delivered', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        $outbox->applyStatus($company->id + 10, ['id' => 'wamid.EARLY', 'status' => 'read']);
+        $outbox->applyStatus($company->id, ['id' => 'wamid.EARLY', 'status' => 'sent']);
+        $this->assertSame('delivered', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        $outbox->applyStatus($company->id, ['id' => 'wamid.EARLY', 'status' => 'read']);
+        $outbox->applyStatus($company->id, ['id' => 'wamid.EARLY', 'status' => 'failed']);
+        $this->assertSame('read', DB::table('pos_whatsapp_outbox')->find($id)->status);
+    }
+
+    public function test_interrupted_send_becomes_unknown_instead_of_duplicate_retry(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture();
+        $id = $outbox->enqueue($this->autoBill($company->id));
+        DB::table('pos_whatsapp_outbox')->where('id', $id)->update(['status' => 'sending', 'claimed_at' => now()->subMinutes(6)]);
+        $outbox->drain();$this->assertSame('unknown', DB::table('pos_whatsapp_outbox')->find($id)->status);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_pos_owner_settings_keep_blank_secrets_and_cashier_cannot_change_them(): void
+    {
+        [$company] = $this->autoSendFixture();$user = $this->makeUser($company->id);
+        $this->actingAs($user, 'pos')->post('/pos/settings/whatsapp-delivery', [
+            'auto_send' => 0, 'wa_api_token' => '', 'wa_app_secret' => '',
+        ])->assertRedirect('/pos/settings/whatsapp-delivery');
+        $company->refresh();$this->assertFalse($company->pos_whatsapp_auto_send);
+        $this->assertSame('synthetic-token', \Illuminate\Support\Facades\Crypt::decryptString($company->wa_api_token));
+        $this->assertSame('synthetic-app-secret', $company->wa_app_secret);
+        $user->forceFill(['role' => 'user', 'pos_role' => 'pos_cashier'])->save();
+        $this->actingAs($user, 'pos')->post('/pos/settings/whatsapp-delivery', ['auto_send' => 1])->assertForbidden();
+    }
+
+    public function test_real_sale_route_creates_durable_auto_send_without_changing_payment_result(): void
+    {
+        [$company, $outbox] = $this->autoSendFixture();$user = $this->makeUser($company->id);
+        \Illuminate\Support\Facades\Http::fake(['graph.facebook.com/*' => \Illuminate\Support\Facades\Http::response(['messages' => [['id' => 'wamid.SALE']]], 200)]);
+        $response = $this->actingAs($user, 'pos')->postJson('/pos/invoice', $this->storePayload());
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertSame(1, DB::table('pos_whatsapp_outbox')->count());
+        $outbox->drain();\Illuminate\Support\Facades\Http::assertSentCount(1);
+    }
+
 }

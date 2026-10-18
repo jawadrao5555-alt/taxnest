@@ -113,6 +113,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FbrPosIdentityTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php tests/Feature/FbrPosReceiptSerialWithFiscalTest.php tests/Feature/FbrPosReceiptOrderMatchLayoutTest.php tests/Feature/FbrPosSubmissionEvidenceTest.php tests/Feature/FbrPosOwnerReconciliationTest.php
       - name: Check Smart DI import safeguards and legacy import regression
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Unit/CciPilotEvidenceAuditTest.php tests/Unit/CciVoyageInvoiceParserTest.php tests/Unit/InvoiceImportLineClassifierTest.php tests/Feature/InvoiceBulkImportTest.php
+      - name: Check optional POS WhatsApp delivery, gates and DI compatibility
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosWhatsappBillShareTest.php tests/Feature/WhatsAppBusinessApiSendTest.php tests/Feature/WhatsAppWebhookSignatureTest.php
       - name: Check Guest House settings regressions before the full suite
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelSettingsCategoryTest.php
       - name: Check occupied waiter table regressions before the full suite
@@ -250,6 +252,7 @@ jobs:
           RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=readonly-reporting-connection bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-company-directory-contrast bash scripts/rc-browser-fixture.sh run
+          RC_BROWSER_ONLY=whatsapp-optional-autosend bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run
       - name: Exercise general isolated browser acceptance
         env:

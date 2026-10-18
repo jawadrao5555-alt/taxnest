@@ -1,7 +1,7 @@
-title: "Admin company directory mein wazeh text aur readable controls"
-audience: all
-type: improvement
+title: "WhatsApp bill ka optional auto-send aur delivery status"
+audience: pos
+type: feature
 points:
-  - "Agent Health alert aur company details par text zyada wazeh nazar aye ga."
-  - "Status badges, filters aur action labels readable size aur contrast mein honge."
-  - "Existing saved themes aur company settings barqarar rahengi."
+  - "Auto-send default OFF hai; owner package permission ke saath ON/OFF kar sakta hai."
+  - "Final bill durable queue se bheja jata hai; manual WhatsApp aur auto-open settings barqarar hain."
+  - "Sent, delivered, read aur failure ki halat settings mein nazar aati hai."

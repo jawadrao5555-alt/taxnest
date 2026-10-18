@@ -930,6 +930,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/caller-devices/revoke', [\App\Http\Controllers\PosCallerIdController::class, 'revokeDevice'])->name('pos.settings.caller-devices.revoke');
     Route::post('/settings/receipt-autoclose', [PosController::class, 'updateReceiptAutoclose'])->name('pos.settings.receipt-autoclose');
     Route::post('/settings/cash-received-toggle', [PosController::class, 'toggleCashReceived'])->name('pos.settings.cash-received-toggle');
+    Route::get('/settings/whatsapp-delivery', [\App\Http\Controllers\PosWhatsAppSettingsController::class, 'show'])->name('pos.whatsapp-delivery');
+    Route::post('/settings/whatsapp-delivery', [\App\Http\Controllers\PosWhatsAppSettingsController::class, 'save'])->name('pos.whatsapp-delivery.save');
     Route::post('/settings/whatsapp-bill-toggle', [PosController::class, 'toggleWhatsappBill'])->name('pos.settings.whatsapp-bill-toggle');
     Route::post('/settings/tax-pricing-mode', [PosController::class, 'updateTaxPricingMode'])->name('pos.settings.tax-pricing-mode');
     Route::post('/settings/inventory-toggle', [PosController::class, 'updateInventoryToggle'])->name('pos.settings.inventory-toggle');

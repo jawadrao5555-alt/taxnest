@@ -553,6 +553,13 @@
                 </div>
                 @endif
 
+                @if($whatsappRelevant && auth('pos')->user()?->isPosAdmin())
+                <a href="{{ route('pos.whatsapp-delivery') }}" class="block rounded-xl border p-4 font-bold bg-white dark:bg-gray-900">
+                    WhatsApp optional auto-send — {{ ($company->pos_whatsapp_auto_send ?? false) ? 'ON' : 'OFF' }}
+                    <span class="block text-sm font-normal">API setup, ON/OFF aur delivery status</span>
+                </a>
+                @endif
+
                 {{-- Inventory tracking (moved here from Business Profile) --}}
                 @if($inventoryRelevant)
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">

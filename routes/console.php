@@ -9,6 +9,8 @@ use App\Jobs\SyncPosOfflineInvoicesJob;
 use App\Jobs\SyncFbrPosOfflineInvoicesJob;
 use App\Jobs\CheckTrialExpiryJob;
 
+Schedule::command('pos:whatsapp-drain --limit=5')->everyMinute()->withoutOverlapping(5);
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

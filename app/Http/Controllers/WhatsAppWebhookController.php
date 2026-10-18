@@ -58,6 +58,12 @@ class WhatsAppWebhookController extends Controller
             foreach ((array) $request->input('entry', []) as $entry) {
                 foreach ((array) ($entry['changes'] ?? []) as $change) {
                     foreach ((array) ($change['value']['statuses'] ?? []) as $status) {
+                        $c = Company::find($company);
+                        // POS automation requires signed callbacks for this exact Meta number.
+                        if ($c && !empty($c->getRawOriginal('wa_app_secret'))
+                            && (string) ($change['value']['metadata']['phone_number_id'] ?? '') === (string) $c->wa_phone_number_id) {
+                            app(\App\Services\PosWhatsAppOutbox::class)->applyStatus($company, $status);
+                        }
                         $this->applyStatus($company, $status);
                     }
                 }

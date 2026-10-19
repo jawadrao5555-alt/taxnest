@@ -488,4 +488,15 @@ class FeaturedWhatsNewTest extends TestCase
         $this->assertSame(0, AppUpdateSeen::count());
     }
 
+    public function test_complete_history_does_not_start_old_featured_popup_queue(): void
+    {
+        $old = $this->makeUpdate('Older featured notice in history', 'pos', true);
+        $old->forceFill(['created_at' => now()->subHour()])->save();
+        for ($i = 1; $i <= 13; $i++) $this->makeUpdate('Recent routine '.$i, 'pos', false);
+        $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile')
+            ->assertOk()->assertSee('Older featured notice in history')
+            ->assertDontSee(self::WN_POPUP_MARKER, false);
+        $this->assertSame(0, AppUpdateSeen::count());
+    }
+
 }

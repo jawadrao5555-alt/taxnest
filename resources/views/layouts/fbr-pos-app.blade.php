@@ -36,7 +36,8 @@
             $whatsNewUnseenIds = $bellState['unseenIds'];
             $whatsNewUnseenCount = count($whatsNewUnseenIds);
             if ($whatsNewList->isNotEmpty()) {
-                $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
+                // Preserve the existing latest-ten automatic-popup horizon; full history is manual.
+                $whatsNewUnseen = $whatsNewList->take(10)->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null
                     : $whatsNewUnseen->first(fn ($u) => (bool) ($u->is_featured ?? false));
                 $whatsNewPopupList = $whatsNewPopup ? collect([$whatsNewPopup]) : collect();

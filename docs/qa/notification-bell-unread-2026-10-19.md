@@ -13,6 +13,8 @@ Unread totals and scrollable history cover all eligible seven-day notices
 instead of only ten rows. Read entries remain re-openable and older unread
 entries do not require a refresh to become reachable.
 Repeated acknowledgements remove an ID once, not an arbitrary count decrement.
+Automatic featured popups retain the existing latest-ten horizon: expanding
+manual history must not start an older featured popup queue.
 
 ## Compatibility matrix
 

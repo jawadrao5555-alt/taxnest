@@ -1,5 +1,13 @@
 <!DOCTYPE html>
 @php
+    $diUpdateUser = auth('web')->user();
+    $diUpdateCompany = $diUpdateUser?->company_id ? \App\Models\Company::find($diUpdateUser->company_id) : null;
+    $diUpdateState = null;
+    if ($diUpdateCompany?->product_type === 'di' && $diUpdateCompany->status === 'approved'
+        && $diUpdateUser->isPosAdmin()
+        && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
+        $diUpdateState = \App\Models\AppUpdate::bellForCompany($diUpdateCompany, 'di', (int) $diUpdateUser->id);
+    }
     $isDarkMode = auth()->check() && auth()->user()->dark_mode;
     $isInternal = auth()->check() && auth()->user()->company_id && optional(\App\Models\Company::find(auth()->user()->company_id))->is_internal_account;
     if ($isInternal && is_null(auth()->user()->dark_mode)) {
@@ -243,6 +251,12 @@
                                 @endif">
                                 {{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}
                             </span>
+                            @if($diUpdateState)
+                                @include('partials.di-update-bell', [
+                                    'whatsNewList' => $diUpdateState['updates'], 'whatsNewSeenIds' => $diUpdateState['seenIds'],
+                                    'whatsNewUnseenIds' => $diUpdateState['unseenIds'], 'whatsNewUnseenCount' => count($diUpdateState['unseenIds']),
+                                ])
+                            @endif
                             {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
                             <x-pwa-install-menu-item color="emerald" app-name="Tax DI" label="Download App" item-class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition" />
                             {{-- App update / refresh control — always visible, badges when update available --}}
@@ -539,5 +553,12 @@
         <x-subscription-expiry-popup />
         <x-whatsapp-support />
         <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
+        @if($diUpdateState)
+            @include('partials.whats-new-detail-modals', [
+                'updates' => $diUpdateState['updates'], 'seenIds' => $diUpdateState['seenIds'],
+                'seenEndpoint' => session('impersonation.readonly') ? null : route('di.whats-new.seen'),
+            ])
+        @endif
+        @include('partials.modal-a11y-support')
     </body>
 </html>

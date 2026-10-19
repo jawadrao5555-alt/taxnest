@@ -16,8 +16,10 @@
         $elaanGroups = [
             'pra' => \App\Services\PosFeatureService::categoryGroups('pra'),
             'fbr' => \App\Services\PosFeatureService::categoryGroups('fbr'),
+            'di' => ['DI sectors' => array_keys(\App\Models\AppUpdate::DI_SECTORS)],
         ];
         $elaanCatLabel = function ($key) {
+            if (isset(\App\Models\AppUpdate::DI_SECTORS[$key])) return \App\Models\AppUpdate::DI_SECTORS[$key];
             $label = __('pos.auth_bt_' . $key);
             return $label === 'pos.auth_bt_' . $key ? ucwords(str_replace('_', ' ', $key)) : $label;
         };
@@ -115,7 +117,7 @@
                                             {{ $upd->is_published ? 'Published' : 'Hidden' }}
                                         </span>
                                         <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center {{ $upd->audience === 'fbr_pos' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : ($upd->audience === 'all' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300') }}">
-                                            {{ $upd->audience === 'fbr_pos' ? 'FBR POS' : ($upd->audience === 'all' ? 'PRA + FBR' : 'PRA POS') }}
+                                            {{ ['pos' => 'PRA POS', 'fbr_pos' => 'FBR POS', 'di' => 'Digital Invoicing', 'all' => 'PRA + FBR'][$upd->audience] ?? 'Unknown audience' }}
                                         </span>
                                         <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
                                             {{ \App\Support\PosVocabulary::audienceOptions()[$upd->audience_family] ?? \App\Support\PosVocabulary::audienceOptions()['all'] }}
@@ -225,9 +227,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience</label>
-                    <select name="audience" id="addAudience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    <select name="audience" id="addAudience" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        <option value="" disabled selected>Select the receiving system</option>
                         <option value="pos">PRA POS users only</option>
                         <option value="fbr_pos">FBR POS users only</option>
+                        <option value="di">Digital Invoicing users only</option>
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
@@ -290,6 +294,7 @@
                     <select name="audience" id="editAudience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         <option value="pos">PRA POS users only</option>
                         <option value="fbr_pos">FBR POS users only</option>
+                        <option value="di">Digital Invoicing users only</option>
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
@@ -380,9 +385,11 @@
         function elaanSyncPanels(prefix, audience) {
             var box = elaanCatBox(prefix);
             if (!box) return;
+            if (audience === 'di') document.getElementById(prefix + 'AudienceFamily').value = 'all';
+            document.getElementById(prefix + 'AudienceFamily').closest('div').classList.toggle('hidden', audience === 'di');
             box.querySelectorAll('[data-elaan-panel]').forEach(function (sec) {
                 var panel = sec.getAttribute('data-elaan-panel');
-                var show = audience === 'all' || (audience === 'fbr_pos' ? panel === 'fbr' : panel === 'pra');
+                var show = audience === 'all' ? panel !== 'di' : panel === ({pos:'pra',fbr_pos:'fbr',di:'di'}[audience]);
                 sec.classList.toggle('hidden', !show);
                 if (!show) sec.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
             });
@@ -394,7 +401,7 @@
             var family = document.getElementById(prefix + 'AudienceFamily').value;
             var all = box.querySelector('[data-elaan-scope=all]').checked;
             var chosen = Array.from(box.querySelectorAll('input[data-elaan-cat]:checked')).map(function (c) { return c.closest('label').textContent.trim(); });
-            box.querySelector('[data-elaan-preview]').textContent = 'Audience preview: ' + (audience === 'all' ? 'PRA + FBR' : audience === 'pos' ? 'PRA' : 'FBR') + ' · ' + (family === 'all' ? 'all families' : family.replace('_', ' ')) + ' · ' + (all ? 'all categories (explicit)' : chosen.length ? chosen.join(', ') : 'select a category before publishing');
+            box.querySelector('[data-elaan-preview]').textContent = 'Audience preview: ' + (audience === 'all' ? 'PRA + FBR' : audience === 'pos' ? 'PRA' : audience === 'di' ? 'Digital Invoicing' : 'FBR') + ' · ' + (family === 'all' ? 'all families' : family.replace('_', ' ')) + ' · ' + (all ? 'all categories (explicit)' : chosen.length ? chosen.join(', ') : 'select a category before publishing');
         }
 
         function elaanSyncScope(prefix) {
@@ -451,7 +458,7 @@
             document.getElementById('editUpdateForm').action = '/admin/app-updates/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
-            document.getElementById('editAudience').value = ['pos','fbr_pos','all'].includes(audience) ? audience : 'pos';
+            document.getElementById('editAudience').value = ['pos','fbr_pos','di','all'].includes(audience) ? audience : 'pos';
             document.getElementById('editAudienceFamily').value = ['all','food_service','goods_retail','pharmacy','services','accommodation'].includes(audienceFamily) ? audienceFamily : 'all';
             document.getElementById('editType').value = type === 'feature' ? 'feature' : 'improvement';
             elaanSyncPanels('edit', document.getElementById('editAudience').value);

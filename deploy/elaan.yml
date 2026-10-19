@@ -1,7 +1,7 @@
-title: "Desktop Agent par actual version aur build date"
+title: "Notifications ka read status aur sahi system ki updates"
 audience: all
 type: improvement
 points:
-  - "Agent ki settings screen par version aur actual build date wazeh dikhengi."
-  - "Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga."
-  - "Saved company, device aur printer settings barqarar rahengi."
+  - "Kisi update ki detail kholne par uska NEW label aur unread count read status save hone ke baad badlenge."
+  - "Read status save na ho to dobara koshish ka option milega."
+  - "Update release karte waqt receiving system aur business category select ki ja sakegi."

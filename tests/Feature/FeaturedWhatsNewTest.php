@@ -440,4 +440,52 @@ class FeaturedWhatsNewTest extends TestCase
             'app_update_id' => $update->id, 'user_id' => $this->posAdminId,
         ]);
     }
+    public function test_unread_count_is_not_capped_and_reading_one_notice_is_idempotent_and_isolated(): void
+    {
+        $updates = [];
+        for ($i = 1; $i <= 13; $i++) {
+            $updates[] = $this->makeUpdate('Unread notice '.$i, 'pos', false);
+        }
+        $this->makeUpdate('Other panel notice', 'fbr_pos', false);
+        $company = \App\Models\Company::find($this->posCompanyId);
+        $state = AppUpdate::bellForCompany($company, 'pra', $this->posAdminId);
+        $this->assertCount(13, $state['unseenIds']);
+        $this->assertCount(10, $state['updates']);
+        $read = $state['updates']->first();
+        for ($repeat = 0; $repeat < 2; $repeat++) {
+            $this->actingAs(User::find($this->posAdminId), 'pos')
+                ->postJson('/pos/whats-new/seen', ['update_id' => $read->id])
+                ->assertOk()->assertJson(['ok' => true]);
+        }
+        $state = AppUpdate::bellForCompany($company, 'pra', $this->posAdminId);
+        $this->assertCount(12, $state['unseenIds']);
+        $this->assertCount(10, $state['updates']);
+        $this->assertFalse($state['updates']->contains('id', $read->id), 'Unread notices must remain reachable ahead of already read history.');
+        $this->assertSame(1, AppUpdateSeen::count());
+        $this->assertCount(13, AppUpdate::bellForCompany($company, 'pra', $this->cashierId)['unseenIds']);
+        $this->assertCount(1, AppUpdate::bellForCompany(\App\Models\Company::find($this->fbrCompanyId), 'fbr', $this->fbrAdminId)['unseenIds']);
+    }
+
+    public function test_di_sector_targeting_is_separate_from_both_pos_panels_and_other_sectors(): void
+    {
+        Schema::table('companies', function (Blueprint $table) { $table->string('sector_type')->nullable(); });
+        Schema::table('app_updates', function (Blueprint $table) { $table->text('target_categories')->nullable(); });
+        $diId = DB::table('companies')->insertGetId(['name' => 'Synthetic DI retail', 'product_type' => 'di', 'sector_type' => 'Retail']);
+        $otherId = DB::table('companies')->insertGetId(['name' => 'Synthetic DI services', 'product_type' => 'di', 'sector_type' => 'Services']);
+        $di = \App\Models\Company::find($diId);
+        $other = \App\Models\Company::find($otherId);
+        $target = $this->makeUpdate('DI retail notice', 'di', false);
+        $target->update(['target_categories' => ['di_retail']]);
+        $legacyBoth = $this->makeUpdate('Both POS panels notice', 'all', false);
+        $this->assertSame([$target->id], AppUpdate::forCompany($di, 'di')->pluck('id')->all());
+        $this->assertSame([], AppUpdate::forCompany($other, 'di')->pluck('id')->all());
+        foreach (['pra' => $this->posCompanyId, 'fbr' => $this->fbrCompanyId] as $panel => $companyId) {
+            $company = \App\Models\Company::find($companyId);
+            $this->assertSame([$legacyBoth->id], AppUpdate::forCompany($company, $panel)->pluck('id')->all());
+            $this->assertSame([], AppUpdate::forCompany($company, 'di')->pluck('id')->all());
+        }
+        $this->assertSame([], AppUpdate::forCompany($di, 'pra')->pluck('id')->all());
+        $this->assertSame(0, AppUpdateSeen::count());
+    }
+
 }

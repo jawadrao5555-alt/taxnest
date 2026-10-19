@@ -4,6 +4,8 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'notification_read_failed' => 'پڑھے جانے کی حالت محفوظ نہیں ہوئی۔ یہ اطلاع ابھی غیر پڑھی ہے۔',
+    'notification_read_retry' => 'دوبارہ کوشش',
     'a4_printer_desc' => 'رسید 80mm تھرمل لے آؤٹ پر پرنٹ ہوگی، جو پورے A4 صفحے کے بیچ میں ہوگی۔',
     'a4_printer_thermal_style' => 'A4 پرنٹر (A4 پر تھرمل اسٹائل)',
     'aaj_ka_din_close' => 'آج کا دن پہلے ہی کلوز ہو چکا ہے۔',

@@ -912,16 +912,17 @@ async function hotelCreditReview(page, t, v) {
 }
 
 async function notificationWorkflow(page, t, v, diagnostics) {
-  const panel=t.notificationWorkflow, prefix=panel==='fbr'?'/fbr-pos':'/pos';
-  await page.goto(baseUrl+prefix+'/my-profile',{waitUntil:'domcontentloaded'});
+  const panel=t.notificationWorkflow, prefix=panel==='di'?'':panel==='fbr'?'/fbr-pos':'/pos';
+  await page.goto(baseUrl+(panel==='di'?'/profile':prefix+'/my-profile'),{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
+  const expectedFailureUrl=baseUrl+prefix+'/whats-new/seen';
+  if(panel!=='di'){
   const modal=page.locator('[data-wn-featured="1"]:visible');
   await modal.waitFor({state:'visible',timeout:15000});
   if(await modal.count()!==1)throw new Error('duplicate featured receipts rendered multiple popups');
   const dismissButton=modal.locator('button').last();
   const endpoint='**'+prefix+'/whats-new/seen';
   let injectedFailures=0;
-  const expectedFailureUrl=baseUrl+prefix+'/whats-new/seen';
   await page.route(endpoint, route=>{
     if(route.request().method()!=='POST')return route.continue();
     injectedFailures++;
@@ -947,6 +948,7 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   ]);
   if(!ack.ok()||!(await ack.json()).ok)throw new Error('notification retry was not acknowledged by the real server');
   await modal.waitFor({state:'hidden',timeout:5000});
+  }
   for(let refresh=0;refresh<2;refresh++){
     await page.reload({waitUntil:'domcontentloaded'});
     await waitForOperationalSurface(page);
@@ -956,10 +958,31 @@ async function notificationWorkflow(page, t, v, diagnostics) {
     await bell.waitFor({state:'visible',timeout:5000});
     const text=await bell.innerText();
     for(let i=1;i<=7;i++)if(!text.includes('Synthetic routine '+panel+' '+i))throw new Error('routine bell history disappeared after refresh');
-    if((text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
+    if(panel!=='di'&&(text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
+    if(/Synthetic routine (pra|fbr|di) /.test(text.replaceAll('Synthetic routine '+panel+' ', 'Own notice ')))throw new Error('another product notification leaked into the bell');
     await page.locator('[data-tn-topnav-control="notification"]').first().click();
   }
-  pass(t.name+'/'+v.width+': real failed-save retry, duplicate consolidation and seven routine notices across refresh');
+  const notificationButton=page.locator('[data-tn-topnav-control="notification"]').first();
+  const count=notificationButton.locator('[x-text="unseen"]');
+  if((await count.innerText()).trim()!=='7')throw new Error('routine unread count must start at seven');
+  await notificationButton.click();
+  const row=page.locator('[x-show="bellOpen"]:visible button').filter({hasText:'Synthetic routine '+panel+' 1'}).first();
+  const [detailAck]=await Promise.all([
+    page.waitForResponse(r=>r.url()===expectedFailureUrl&&r.request().method()==='POST'), row.click(),
+  ]);
+  if(!detailAck.ok()||!(await detailAck.json()).ok)throw new Error('opening detail did not persist read status');
+  const detail=page.locator('[data-whats-new-detail-id]:visible');
+  await detail.waitFor({state:'visible'});
+  await page.waitForFunction(()=>[...document.querySelectorAll('[data-tn-topnav-control="notification"] [x-text="unseen"]')].some(x=>x.textContent.trim()==='6'));
+  await detail.getByRole('button',{name:'Close',exact:true}).click();
+  await notificationButton.click();
+  if(await row.locator('[x-show="rowUnseen"]').isVisible())throw new Error('opened notification still displays NEW');
+  await row.click();
+  await page.locator('[data-whats-new-detail-id]:visible').getByRole('button',{name:'Close',exact:true}).click();
+  if((await count.innerText()).trim()!=='6')throw new Error('reopening read notice decremented count again');
+  await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
+  if((await count.innerText()).trim()!=='6')throw new Error('read acknowledgement did not survive reload');
+  pass(t.name+'/'+v.width+': read on open clears NEW, persists count, repeat is idempotent; failed-save retry and seven routine notices');
 }
 
 async function hotelSettingsWorkflow(page,t,v,diagnostics) {

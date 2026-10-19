@@ -283,8 +283,9 @@ foreach (['pos', 'fbr_pos'] as $audience) {
     ]);
 }
 
+$notificationDi = $company('Synthetic Notification DI', 'notification-di@rc-browser.invalid', 'RCNOTICEDI', 'di', ['sector_type' => 'Retail']);
 $notificationUsers = [];
-foreach (['pra' => $hotel, 'fbr' => $fiscal] as $panel => $noticeCompany) {
+foreach (['pra' => $hotel, 'fbr' => $fiscal, 'di' => $notificationDi] as $panel => $noticeCompany) {
     foreach (['desktop', 'mobile'] as $viewport) {
         $account = $user($noticeCompany, 'Synthetic Notification '.$panel.' '.$viewport,
             'notice-'.$panel.'-'.$viewport.'@rc-browser.invalid', 'company_admin', 'pos_admin');
@@ -294,16 +295,17 @@ foreach (['pra' => $hotel, 'fbr' => $fiscal] as $panel => $noticeCompany) {
     for ($i = 1; $i <= 7; $i++) {
         AppUpdate::create([
             'title' => 'Synthetic routine '.$panel.' '.$i, 'points' => ['Reception notice'],
-            'audience' => $panel === 'fbr' ? 'fbr_pos' : 'pos',
-            'target_categories' => [$panel === 'fbr' ? 'retail' : 'hotel'],
+            'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
+            'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => false,
         ]);
     }
+    if ($panel === 'di') continue;
     foreach (['a', 'b'] as $receipt) {
         AppUpdate::create([
             'title' => 'Synthetic featured '.$panel, 'points' => ['Important reception notice'],
-            'audience' => $panel === 'fbr' ? 'fbr_pos' : 'pos',
-            'target_categories' => [$panel === 'fbr' ? 'retail' : 'hotel'],
+            'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
+            'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => true,
             'deployment_key' => sha1('synthetic-notification-'.$panel.'-'.$receipt),
         ]);
@@ -581,6 +583,7 @@ $fixture = [
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
+        ['name' => 'notification-di', 'login' => $notificationUsers['di']['desktop'], 'mobileLogin' => $notificationUsers['di']['mobile'], 'password' => $password, 'loginPath' => '/login', 'paths' => ['/profile'], 'notificationWorkflow' => 'di'],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
         ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],
         ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk']],

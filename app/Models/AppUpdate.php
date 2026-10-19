@@ -33,6 +33,15 @@ class AppUpdate extends Model
         'is_featured' => 'boolean',
     ];
 
+    /** DI sectors use the company profile value; POS category settings stay unchanged. */
+    public const DI_SECTORS = [
+        'di_manufacturing' => 'Manufacturing', 'di_services' => 'Services',
+        'di_trading' => 'Trading', 'di_it_software' => 'IT/Software',
+        'di_textiles' => 'Textiles', 'di_pharmaceuticals' => 'Pharmaceuticals',
+        'di_agriculture' => 'Agriculture', 'di_construction' => 'Construction',
+        'di_retail' => 'Retail', 'di_export' => 'Export', 'di_unspecified' => 'Unspecified / other sector',
+    ];
+
     public function isCustomerDuplicate(): bool
     {
         return $this->is_published
@@ -51,6 +60,21 @@ class AppUpdate extends Model
         $keys = self::whereIn('id', $seen)->whereNotNull('notification_key')->pluck('notification_key');
         return array_values(array_unique(array_merge($seen,
             self::whereIn('notification_key', $keys)->pluck('id')->all())));
+    }
+
+    public static function bellForCompany(?Company $company, string $panel, int $userId): array
+    {
+        $seenIds = self::seenIdsForUser($userId);
+        $query = self::forCompany($company, $panel)->forCompanyFamily($company)->published()->liveWindow();
+        $unseenIds = (clone $query)->whereNotIn('app_updates.id', $seenIds)->pluck('app_updates.id')
+            ->map(fn ($id) => (int) $id)->all();
+        $list = clone $query;
+        if ($unseenIds) {
+            // Integers only; unread entries must not be hidden behind ten read rows.
+            $list->orderByRaw('CASE WHEN app_updates.id IN (' . implode(',', $unseenIds) . ') THEN 0 ELSE 1 END');
+        }
+        return ['updates' => $list->orderByDesc('created_at')->orderByDesc('id')->limit(10)->get(),
+            'seenIds' => $seenIds, 'unseenIds' => $unseenIds];
     }
 
     protected static function booted(): void
@@ -197,6 +221,10 @@ class AppUpdate extends Model
 
     public static function recipientCategories(?Company $company): array
     {
+        if ($company?->product_type === 'di') {
+            $key = array_search(trim((string) $company->sector_type), self::DI_SECTORS, true);
+            return [$key === false ? 'di_unspecified' : $key];
+        }
         $categories = [\App\Services\PosFeatureService::resolveCategory($company)];
         if (self::hotelHasFoodOutlet($company)) {
             $categories[] = 'restaurant';
@@ -206,6 +234,7 @@ class AppUpdate extends Model
 
     public static function recipientFamilies(?Company $company): array
     {
+        if ($company?->product_type === 'di') return ['all'];
         $families = \App\Services\PosFeatureService::audiencesFor($company);
         if (\App\Services\PosFeatureService::resolveCategory($company) === 'hotel'
             && !self::hotelHasFoodOutlet($company)) {
@@ -242,7 +271,7 @@ class AppUpdate extends Model
         }
         $clean = array_values(array_unique(array_filter(
             array_map(fn ($c) => is_string($c) ? trim($c) : null, $list),
-            fn ($c) => $c !== null && $c !== '' && \App\Services\PosFeatureService::isKnownCategory($c)
+            fn ($c) => $c !== null && $c !== '' && (\App\Services\PosFeatureService::isKnownCategory($c) || array_key_exists($c, self::DI_SECTORS))
         )));
 
         return $clean ?: null;
@@ -264,8 +293,13 @@ class AppUpdate extends Model
      */
     public function scopeForCompany($query, ?Company $company, ?string $panel = null)
     {
-        $panel = $panel ?: \App\Services\PosFeatureService::panelFor($company);
-        $audiences = $panel === 'fbr' ? ['fbr_pos', 'all'] : ['pos', 'all'];
+        $panel = $panel ?: ($company?->product_type === 'di' ? 'di' : \App\Services\PosFeatureService::panelFor($company));
+        $expectedProduct = ['pra' => 'pos', 'fbr' => 'fbrpos', 'di' => 'di'][$panel] ?? null;
+        if (!$expectedProduct || !$company || $company->product_type !== $expectedProduct) {
+            return $query->whereRaw('1 = 0');
+        }
+        // Legacy 'all' means both POS panels only, never DI.
+        $audiences = $panel === 'di' ? ['di'] : ($panel === 'fbr' ? ['fbr_pos', 'all'] : ['pos', 'all']);
         $query->whereIn('audience', $audiences)->customerCanonical();
 
         if (!\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')) {

@@ -1,5 +1,5 @@
 {{-- Re-openable large detail views for every update in the bell history.
-     Opening the bell does not mark anything read; dismissing this modal marks
+     Opening the bell does not mark anything read; opening this detail marks
      only this update. Seen updates remain re-openable for the full live window. --}}
 <div data-tn-whats-new-history="1" data-tn-seen-endpoint="{{ $seenEndpoint ?? '' }}">
 @foreach($updates as $detailUpdate)
@@ -7,15 +7,22 @@
         x-data="{
             open: false,
             wasSeen: {{ in_array($detailUpdate->id, $seenIds) ? 'true' : 'false' }},
-            openDetail() {
+            savingSeen: false,
+            seenError: false,
+            async openDetail() {
                 this.open = true;
                 this.$nextTick(() => window.TnModalA11y.open(this.$refs.detailDialog));
+                await this.markDetailSeen();
             },
-            async dismissDetail() {
+            dismissDetail() {
                 const dialog = this.$refs.detailDialog;
                 this.open = false;
                 this.$nextTick(() => window.TnModalA11y.close(dialog));
-                if (this.wasSeen || @json(empty($seenEndpoint))) return;
+            },
+            async markDetailSeen() {
+                if (this.wasSeen || this.savingSeen || @json(empty($seenEndpoint))) return;
+                this.savingSeen = true;
+                this.seenError = false;
                 try {
                     const response = await fetch(this.$el.closest('[data-tn-whats-new-history]').dataset.seenEndpoint, {
                         method: 'POST',
@@ -27,14 +34,16 @@
                         body: JSON.stringify({ update_id: {{ (int) $detailUpdate->id }} })
                     });
                     const result = response.ok ? await response.json() : null;
-                    if (!result || result.ok !== true) return;
+                    if (!result || result.ok !== true) throw new Error('Read acknowledgement failed');
                     this.wasSeen = true;
                     window.dispatchEvent(new CustomEvent('whats-new-seen', {
                         detail: { id: {{ (int) $detailUpdate->id }}, wasSeen: false }
                     }));
-                } catch (_) {}
+                } catch (_) { this.seenError = true; }
+                finally { this.savingSeen = false; }
             }
         }"
+        @whats-new-seen.window="if (Number($event.detail.id) === {{ (int) $detailUpdate->id }}) wasSeen = true"
         @open-whats-new-detail.window="if (Number($event.detail.id) === {{ (int) $detailUpdate->id }}) openDetail()"
         @keydown.escape.window="if (open) dismissDetail()"
         @keydown.tab="window.TnModalA11y.trap($event, $refs.detailDialog)"
@@ -86,6 +95,10 @@
             </div>
 
             <div class="px-6 sm:px-8 pb-6">
+                <div x-show="seenError" x-cloak role="alert" class="mb-3 rounded-lg p-3 bg-red-50 text-red-800 text-sm">
+                    {{ __('pos.notification_read_failed') }}
+                    <button type="button" @click="markDetailSeen()" :disabled="savingSeen" class="underline font-bold">{{ __('pos.notification_read_retry') }}</button>
+                </div>
                 <button type="button" @click="dismissDetail()"
                         class="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-sm transition cursor-pointer">
                     {{ __('pos.whats_new_got_it') }}

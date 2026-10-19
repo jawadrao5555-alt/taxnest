@@ -4,6 +4,8 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Arabic-script characters here.
 
 return [
+    'notification_read_failed' => 'Read status save nahi hua. Yeh notification abhi unread hai.',
+    'notification_read_retry' => 'Dobara koshish',
     'a4_printer_desc' => 'Receipt 80mm thermal layout mein print hogi, full A4 page par center hogi.',
     'a4_printer_thermal_style' => 'A4 Printer (Thermal-style A4 par)',
     'aaj_ka_din_close' => 'Aaj ka din close ho chuka hai',

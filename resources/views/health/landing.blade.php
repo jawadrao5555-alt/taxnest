@@ -178,6 +178,7 @@
 
 {{-- The footer login link is panel-aware: a visitor on this page belongs to the
      Nest ERPS panel, never the Digital Invoice one. --}}
-<x-site-footer :loginUrl="NestErps::loginPath(NestErps::HEALTH)" :loginLabel="NestErps::LABEL . ' Log In'" />
+@include('partials.product-guide-link', ['productGuideKey' => 'erps'])
+    <x-site-footer :loginUrl="NestErps::loginPath(NestErps::HEALTH)" :loginLabel="NestErps::LABEL . ' Log In'" />
 </body>
 </html>

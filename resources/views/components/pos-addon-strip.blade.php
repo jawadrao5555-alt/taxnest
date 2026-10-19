@@ -17,13 +17,27 @@
         }
         $adsLabels[$adsCode] = __('pos.addon_label_' . $adsCode);
     }
-    $adsPlans = ($plans ?? \App\Services\PosPlanComparisonService::plans())
+    $adsAllPlans = $plans ?? \App\Services\PosPlanComparisonService::plans();
+    $adsPlans = $adsAllPlans
         ->filter(fn ($plan) => \App\Services\PosAddonService::purchasableCodesForPlan($plan) !== [])
         ->values();
     $adsAvailable = $adsPlans->mapWithKeys(fn ($plan) => [
         (string) $plan->id => \App\Services\PosAddonService::purchasableCodesForPlan($plan),
     ])->all();
     $adsNames = $adsPlans->mapWithKeys(fn ($plan) => [(string) $plan->id => $plan->name])->all();
+    $adsBasePrices = $adsPlans->mapWithKeys(fn ($plan) => [(string) $plan->id =>
+        (float) \App\Services\SubscriptionAssignmentService::computePrice($plan, 'annual')['final_price'],
+    ])->all();
+    $adsAlternatives = $adsPlans->mapWithKeys(fn ($plan) => [(string) $plan->id =>
+        $adsAllPlans->filter(fn ($candidate) => $candidate->id !== $plan->id
+            && \App\Services\PosPublicQuoteService::preservesPackage($plan, $candidate))
+            ->map(fn ($candidate) => [
+                'name' => $candidate->name,
+                'price' => (float) \App\Services\SubscriptionAssignmentService::computePrice($candidate, 'annual')['final_price'],
+                'included' => array_keys(array_filter(\App\Services\PosAddonPricingService::ADDONS,
+                    fn ($spec) => (bool) $candidate->{$spec['gate']})),
+            ])->values()->all(),
+    ])->all();
 @endphp
 
 @once
@@ -73,12 +87,14 @@
 </style>
 @endonce
 
-<div class="tn-addons"
+<div class="tn-addons" data-public-addon-quote
      x-data="{
         cycle: 'annual',
         picked: [],
         planId: {{ \Illuminate\Support\Js::from((string) ($adsPlans->first()?->id ?? '')) }},
         available: {{ \Illuminate\Support\Js::from($adsAvailable) }},
+        basePrices: {{ \Illuminate\Support\Js::from($adsBasePrices) }},
+        alternatives: {{ \Illuminate\Support\Js::from($adsAlternatives) }},
         planNames: {{ \Illuminate\Support\Js::from($adsNames) }},
         prices: {{ \Illuminate\Support\Js::from($adsPrices) }},
         labels: {{ \Illuminate\Support\Js::from($adsLabels) }},
@@ -89,6 +105,18 @@
         },
         total() {
             return this.picked.reduce((sum, code) => sum + this.priceOf(code), 0);
+        },
+        packagePrice() { return Number(this.basePrices[this.planId] || 0); },
+        grandTotal() { return this.packagePrice() + this.total(); },
+        betterPlan() {
+            if (!this.picked.length) return null;
+            return (this.alternatives[this.planId] || [])
+                .filter(plan => plan.price < this.grandTotal() && this.picked.every(code => plan.included.includes(code)))
+                .sort((a,b) => a.price - b.price)[0] || null;
+        },
+        betterUrl() {
+            const plan=this.betterPlan();
+            return plan ? '/pos/register?' + new URLSearchParams({plan:plan.name,addon_cycle:'annual'}) : '#';
         },
         canBuy(code) {
             return (this.available[this.planId] || []).includes(code);
@@ -156,9 +184,11 @@
 
     <div class="tn-addons__bill" aria-live="polite">
         <div>
+            <p class="tn-addons__bill-count">{{ __('pos.addons_package_price') }}: PKR <span data-quote-package x-text="fmt(packagePrice())"></span></p>
             <p class="tn-addons__bill-title">{{ __('pos.addons_bill_title') }}</p>
             <p class="tn-addons__bill-count" x-text="picked.length + ' ' + selectedSuffix">0 {{ __('pos.addons_selected_suffix') }}</p>
-            <p class="tn-addons__bill-total">PKR <span x-text="fmt(total())">0</span></p>
+            <p class="tn-addons__bill-count">{{ __('pos.addons_subtotal') }}: PKR <span data-quote-addons x-text="fmt(total())">0</span></p>
+            <p class="tn-addons__bill-total">{{ __('pos.addons_grand_total') }}: PKR <span data-quote-total x-text="fmt(grandTotal())"></span> / {{ __('pos.addons_per_year') }}</p>
         </div>
         <a class="tn-addons__continue"
            :class="{ 'is-disabled': picked.length === 0 }"
@@ -168,5 +198,13 @@
         </a>
     </div>
 
+    <div class="tn-addons__note" x-show="betterPlan()" x-cloak data-quote-better>
+        <p>{{ __('pos.addons_better_plan') }} <strong x-text="betterPlan()?.name"></strong>:
+            PKR <span x-text="fmt(betterPlan()?.price)"></span> / {{ __('pos.addons_per_year') }}.
+            {{ __('pos.addons_saving') }} PKR <strong x-text="fmt(grandTotal() - (betterPlan()?.price || 0))"></strong>.
+        </p>
+        <a :href="betterUrl()" style="color:#0A4D5C;text-decoration:underline">{{ __('pos.addons_compare_alternative') }}</a>
+    </div>
+    <p class="tn-addons__note">{{ __('pos.addons_whatsapp_scope') }}</p>
     <p class="tn-addons__note">{{ __('pos.addons_public_note') }}</p>
 </div>

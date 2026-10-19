@@ -160,6 +160,12 @@
                         </div>
                         @endif
 
+                        <p data-signup-quote-total x-show="planId" class="text-sm font-semibold text-white" aria-live="polite">
+                            {{ __('pos.addons_grand_total') }}: PKR
+                            <span x-text="(Number((prices[planId] || {})[cycle] || 0) + addonTotal()).toLocaleString('en-US')"></span>
+                            <span x-text="perLabel"></span>
+                        </p>
+
                         <div class="pt-1 pb-2" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 12px;">
                             <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">{{ __('pos.auth_select_business_type') }}</p>
                         </div>

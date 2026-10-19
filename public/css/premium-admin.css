@@ -495,3 +495,38 @@ html.dark body.admin-themed.tn-premium-shell,
 #tn-invoice-preview-label { overflow-wrap: anywhere; }
 #tn-invoice-preview-frame { width: 100%; height: 65vh; border: 1px solid var(--tn-admin-line); margin: 1rem 0; }
 #tn-invoice-preview [hidden] { display: none !important; }
+
+
+/* Company directory keeps its dark table, with explicit readable foregrounds.
+   The health notice has its own opaque surface instead of dark-theme utility
+   colours alpha-blending into the light workspace. Scope avoids changing POS. */
+.tn-company-directory .tn-directory-alert {
+    background: #fff1f2 !important;
+    border-color: #be123c !important;
+    color: #881337;
+}
+body.admin-themed .tn-company-directory .tn-directory-alert :is(h2, a, span, svg) { color: #881337 !important; }
+.tn-company-directory .tn-directory-alert a { text-decoration: underline; text-underline-offset: .2em; }
+.tn-company-directory .tn-directory-alert span[class*="bg-gray"] { background: #ffe4e6 !important; }
+.tn-company-directory .tn-directory-alert :is(h2, a, span) { font-size: .8125rem; line-height: 1.55; }
+.tn-company-directory :is(.tn-directory-table, .tn-directory-filters) { background: #111827 !important; color: #f1f5f9; }
+.tn-company-directory .tn-directory-table :is(th, td, p, a, span) { font-size: .8125rem; line-height: 1.55; }
+.tn-company-directory .tn-directory-table :is(.text-gray-400, .text-gray-500, .text-gray-600, .tn-directory-owner) { color: #cbd5e1 !important; }
+.tn-company-directory .tn-directory-table a.text-white { color: #f8fafc !important; }
+.tn-company-directory .tn-directory-filters :is(input, select, option) { background: #1f2937 !important; color: #f8fafc !important; }
+.tn-company-directory .tn-directory-filters input::placeholder { color: #cbd5e1 !important; opacity: 1; }
+.tn-company-directory .tn-directory-filters button { background: #3730a3 !important; color: #fff !important; }
+.tn-company-directory .tn-directory-table span[class*="bg-"] { background: #e0e7ff !important; color: #312e81 !important; }
+.tn-company-directory .tn-directory-table span[class*="bg-red"],
+.tn-company-directory .tn-directory-table [data-directory-status="suspended"] { background: #fee2e2 !important; color: #991b1b !important; }
+.tn-company-directory .tn-directory-table span[class*="bg-amber"],
+.tn-company-directory .tn-directory-table [data-directory-status="pending"] { background: #fef3c7 !important; color: #78350f !important; }
+.tn-company-directory .tn-directory-table :is([data-directory-status="approved"], [data-directory-status="active"]) { background: #dcfce7 !important; color: #14532d !important; }
+.tn-company-directory .tn-directory-table [data-directory-status="rejected"] { background: #e2e8f0 !important; color: #334155 !important; }
+.tn-company-directory .tn-directory-actions :is(a, button) { display: inline-flex; align-items: center; min-height: 2rem; padding: .35rem .65rem; background: #e0e7ff !important; color: #312e81 !important; font-size: .8125rem; font-weight: 650; }
+.tn-company-directory :is(a, button, input, select):focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+.tn-company-directory > div:first-child a { background: #3730a3 !important; color: #fff !important; }
+.tn-company-directory > div:first-child a:last-child { background: #1f2937 !important; color: #f1f5f9 !important; }
+body.admin-themed .tn-company-directory h1.text-white { color: var(--tn-admin-text) !important; }
+.tn-company-directory .tn-directory-table tbody tr { background: #111827 !important; }
+.tn-company-directory .tn-directory-table td::before { color: #cbd5e1 !important; }

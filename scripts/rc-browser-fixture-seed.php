@@ -145,6 +145,17 @@ $tableShop = $company('Synthetic Table Order Recovery', 'table-orders-company@rc
     'table_click_direct_open' => true, 'pos_guided_flow_enabled' => false,
     'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
 ]);
+// The real invoice-store route enforces subscription quota even for internal fixtures.
+// Give only this synthetic shop a normal, active, bounded package; do not bypass the gate.
+$addressProofPlan = \App\Models\PricingPlan::create([
+    'name' => 'Synthetic delivery address proof', 'product_type' => 'pos',
+    'invoice_limit' => 100, 'price' => 100, 'is_trial' => false,
+]);
+\App\Models\Subscription::create([
+    'company_id' => $tableShop->id, 'pricing_plan_id' => $addressProofPlan->id,
+    'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(),
+    'active' => true,
+]);
 $tableCashier = $user($tableShop, 'Synthetic Table Cashier', 'table-orders@rc-browser.invalid', 'user', 'pos_cashier');
 $tableWaiter = $user($tableShop, 'Synthetic Table Waiter', 'table-waiter@rc-browser.invalid', 'user', 'pos_waiter');
 $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);
@@ -234,6 +245,15 @@ $fiscal = $company('Synthetic RC FBR Retail', 'fiscal-company@rc-browser.invalid
     'pos_setup_completed' => true,
 ]);
 $fiscalUser = $user($fiscal, 'Synthetic FBR Retail Owner', 'fiscal@rc-browser.invalid', 'company_admin', 'pos_admin');
+// Fictional directory rows expose every status and the unreadable offline alert.
+foreach (['approved', 'active', 'pending', 'suspended', 'rejected'] as $n => $status) {
+    $company('Synthetic Contrast '.$status, 'contrast-'.$status.'@rc-browser.invalid', '990090'.$n,
+        ['pos', 'di', 'fbrpos', 'pos', 'di'][$n], [
+            'owner_name' => 'Synthetic Contrast Owner', 'status' => $status,
+            'agent_enabled' => $status === 'approved', 'agent_last_seen' => $now->copy()->subHours(4),
+            'agent_version' => '1.0.0', 'pos_printer_settings' => ['silent_print_enabled' => true],
+        ]);
+}
 $fiscal->forceFill(['fbr_sales_tax_registration_number'=>'1234567890123','fbr_tax_office'=>'Fictional tax office','fbr_pos_id'=>'1010',
  'address'=>'Fictional fiscal outlet','invoice_display_prefs'=>['fbrpos'=>['show_tax'=>false,'show_verify_line'=>false,'show_address'=>false,'show_ntn'=>false]]])->save();
 $fiscalReceipt = \App\Models\FbrPosTransaction::create(['company_id'=>$fiscal->id,'invoice_number'=>'RC-FISCAL-RECEIPT','invoice_mode'=>'fbr',
@@ -521,6 +541,7 @@ $fixture = [
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
             'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
+        ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
         ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments,'invoicePreviewCsp'=>$adminPreviewCsp],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/customers/'.$amountCustomer->id.'/history'], 'markers' => ['Synthetic Amount Customer'],

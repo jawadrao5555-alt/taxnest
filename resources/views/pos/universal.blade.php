@@ -1541,7 +1541,7 @@ window.addEventListener('popstate', function() {
                         <template x-if="orderType === 'delivery'">
                             <div class="mt-1 space-y-1">
                                 <div class="flex items-center gap-1">
-                                    <select x-model="selectedDeliveryAddress" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <select x-model="selectedDeliveryAddress" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                                         <option value="">{{ __('pos.delivery_address_divider') }}</option>
                                         <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
                                             <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
@@ -5050,6 +5050,9 @@ function restaurantPos() {
         deliveryChargeInput: '',
         customerAddresses: [],
         selectedDeliveryAddress: '',
+        _deliveryAddressChoiceVersion: 0,
+        _deliveryAddressGeneration: 0,
+        _deliveryAddressLoad: null,
         showAddrNew: false,
         newAddrText: '',
         newAddrLabel: '',
@@ -8612,16 +8615,51 @@ function restaurantPos() {
         // The chosen text is a SNAPSHOT on the bill (pos_transactions.delivery_address)
         // so later address edits never rewrite old receipts. Walk-in customers (no id)
         // can still type a one-off address — it snapshots without being saved.
-        async loadCustomerAddresses() {
-            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
+        loadCustomerAddresses(snapshot = null) {
             const c = this.selectedCustomer;
-            if (!c || !c.id) return;
-            try {
-                const res = await fetch('/pos/api/customer-addresses?customer_id=' + c.id, { headers: { 'Accept': 'application/json' } });
-                const data = await res.json();
-                this.customerAddresses = Array.isArray(data.addresses) ? data.addresses : [];
-                if (this.customerAddresses.length) this.selectedDeliveryAddress = this.customerAddresses[0].address;
-            } catch (e) { console.error('[addresses] load failed', e); }
+            const generation = this._deliveryAddressGeneration = (this._deliveryAddressGeneration || 0) + 1;
+            const seed = String(snapshot === null ? (c?.address || '') : snapshot).trim();
+            this.customerAddresses = seed ? [{ id: snapshot === null ? 0 : null, label: null, address: seed }] : [];
+            this.selectedDeliveryAddress = seed;
+            this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
+            const choiceVersion = this._deliveryAddressChoiceVersion || 0;
+            const load = { customer: c, generation, choiceVersion, pending: null, failed: false };
+            const pending = (async () => {
+                if (!c || !c.id) return;
+                try {
+                    const res = await this._fetchWithTimeout('/pos/api/customer-addresses?customer_id=' + c.id, { headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) { load.failed = true; return; }
+                    const data = await res.json();
+                    if (this.selectedCustomer !== c || this._deliveryAddressGeneration !== generation || this.orderType !== 'delivery') return;
+                    const addresses = Array.isArray(data.addresses) ? data.addresses.filter(a => a && String(a.address || '').trim()) : [];
+                    const selected = this.selectedDeliveryAddress;
+                    if (selected && !addresses.some(a => a.address === selected)) addresses.unshift({ id: null, label: null, address: selected });
+                    this.customerAddresses = addresses;
+                    // Never overwrite a deliberate selection (including clearing the picker).
+                    if (!selected && !seed && choiceVersion === (this._deliveryAddressChoiceVersion || 0) && addresses.length) {
+                        this.selectedDeliveryAddress = addresses[0].address;
+                    }
+                } catch (e) { load.failed = true; console.error('[addresses] load failed', e); }
+            })();
+            load.pending = pending;
+            this._deliveryAddressLoad = load;
+            return pending;
+        },
+        async waitForDeliveryAddress() {
+            if (this.selectedDeliveryAddress) return true;
+            // If a new current lookup replaced the one we awaited, wait for that one too.
+            for (;;) {
+                const load = this._deliveryAddressLoad;
+                if (!load || load.customer !== this.selectedCustomer || this.orderType !== 'delivery') return true;
+                await load.pending;
+                if (this._deliveryAddressLoad === load) {
+                    if (load.failed && !this.selectedDeliveryAddress) {
+                        this.showToast(window.TXT.network_error, 'error');
+                        return false;
+                    }
+                    return true;
+                }
+            }
         },
         async saveNewAddress() {
             const text = (this.newAddrText || '').trim();
@@ -8635,6 +8673,12 @@ function restaurantPos() {
                 this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                 return;
             }
+            // The cashier's typed address is valid for this bill even when saving
+            // the reusable address book fails/offline. Keep it visibly as a one-off.
+            const temporary = { id: null, label: label || null, address: text };
+            this.customerAddresses.push(temporary);
+            this.selectedDeliveryAddress = text;
+            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
             try {
                 const res = await fetch('/pos/api/customer-addresses', {
                     method: 'POST',
@@ -8642,7 +8686,9 @@ function restaurantPos() {
                     body: JSON.stringify({ customer_id: c.id, address: text, label: label || null }),
                 });
                 const data = await res.json().catch(() => null);
+                if (this.selectedCustomer !== c) return;
                 if (data && data.success && data.address) {
+                    this.customerAddresses = this.customerAddresses.filter(a => !(a.id === null && a.address === text));
                     this.customerAddresses.push(data.address);
                     this.selectedDeliveryAddress = data.address.address;
                     this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
@@ -8664,6 +8710,7 @@ function restaurantPos() {
             const a = matches.find(x => x.id !== 0 && x.id !== null) || matches.find(x => x.id !== 0) || matches[0];
             if (!a) return;
             if (!confirm(window.TXT.confirm_delete_address + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;
+            this._deliveryAddressChoiceVersion = (this._deliveryAddressChoiceVersion || 0) + 1;
             const drop = () => {
                 this.customerAddresses = this.customerAddresses.filter(x => x !== a);
                 this.selectedDeliveryAddress = '';
@@ -8678,6 +8725,7 @@ function restaurantPos() {
                 });
                 const data = await res.json().catch(() => null);
                 if (data && data.success) {
+                    if (this.selectedCustomer !== c) return;
                     drop();
                     if (a.id === 0 && this.selectedCustomer) this.selectedCustomer.address = '';
                     this.showToast(window.TXT.address_deleted, 'success');
@@ -10013,6 +10061,7 @@ function restaurantPos() {
             if (!this.customerLookupResult || !this.customerLookupResult.found) return;
             const c = this.customerLookupResult.customer;
             this.selectedCustomer = c;
+            if (this.orderType === 'delivery') this.loadCustomerAddresses();
             this.customerStats = this.customerLookupResult.stats;
             this.customerPhoneQuery = c.name + (c.phone ? " · " + c.phone : "");
             this.showCustomerPicker = false;
@@ -10022,6 +10071,7 @@ function restaurantPos() {
 
         async selectCustomerWithStats(c) {
             this.selectedCustomer = c;
+            if (this.orderType === 'delivery') this.loadCustomerAddresses();
             this.customerStats = null;
             this.customerPhoneQuery = c.name + (c.phone ? " · " + c.phone : "");
             this.showCustomerPicker = false;
@@ -10266,6 +10316,7 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data.success) {
                     this.selectedCustomer = { id: data.customer.id, name: data.customer.name, phone: data.customer.phone, address: data.customer.address };
+                    if (this.orderType === 'delivery') this.loadCustomerAddresses();
                     this.customerStats = { total_orders: 0, total_spent: 0, is_frequent: false, last_order_date: null };
                     this.customerPhoneQuery = data.customer.name + (data.customer.phone ? ' · ' + data.customer.phone : '');
                     if (this.guidedFlow) this.flowStep = 'items';
@@ -10678,6 +10729,7 @@ function restaurantPos() {
         },
 
         async holdOrder(opts) {
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             // EDIT MODE: a provisional bill can't be turned into a held order —
             // F9 Update Bill is the only save path while editing.
             if (this.editingBillId) {
@@ -10900,30 +10952,13 @@ function restaurantPos() {
             if (this.discountValue > 0) this.showDiscount = true;
             this.kitchenNotes = eb.notes || '';
             this.recalcDiscount();
-            if (this.orderType === 'delivery') {
-                // Bill's snapshot address shows instantly; saved address book merges in
-                // behind it (loadCustomerAddresses resets the list, so re-pin after).
-                const snap = eb.delivery_address || '';
-                if (snap) {
-                    this.customerAddresses = [{ id: null, label: null, address: snap }];
-                    this.selectedDeliveryAddress = snap;
-                }
-                if (eb.customer_id) {
-                    this.loadCustomerAddresses().then(() => {
-                        if (snap) {
-                            if (!this.customerAddresses.some(a => (a.address || '') === snap)) {
-                                this.customerAddresses.unshift({ id: null, label: null, address: snap });
-                            }
-                            this.selectedDeliveryAddress = snap;
-                        }
-                    });
-                }
-            }
+            if (this.orderType === 'delivery') this.loadCustomerAddresses(eb.delivery_address || '');
         },
         cancelEditMode() {
             window.location.href = '{{ route('pos.invoice.create') }}';
         },
         async updateProvisionalBill() {
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             if (this.submitting || !this.editingBillId) return;
             if (this.cart.length === 0) { this.showToast(window.TXT.cart_empty_add_or_delete, 'error'); return; }
             if (!navigator.onLine) { this.showToast(window.TXT.offline_update_online_only, 'error'); return; }
@@ -11046,6 +11081,7 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             if (this.submitting) return;
             if (this.incomingOrderId && this.recalledCartDirty() && !await this.saveIncomingOrder()) return;
             // A recalled/held online-marked order has already chosen its payment
@@ -11225,6 +11261,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).
             if (this.submitting) return;
             const now = Date.now();
@@ -13612,23 +13649,7 @@ function restaurantPos() {
             // pattern as enterEditMode: the snapshot shows instantly; the saved
             // address book merges in behind it (loadCustomerAddresses resets the
             // list + auto-selects the default, so re-pin after it finishes).
-            if (this.orderType === 'delivery') {
-                const snap = (order.delivery_address || '').trim();
-                if (snap) {
-                    this.customerAddresses = [{ id: null, label: null, address: snap }];
-                    this.selectedDeliveryAddress = snap;
-                }
-                if (order.customer_id) {
-                    this.loadCustomerAddresses().then(() => {
-                        if (snap) {
-                            if (!this.customerAddresses.some(a => (a.address || '') === snap)) {
-                                this.customerAddresses.unshift({ id: null, label: null, address: snap });
-                            }
-                            this.selectedDeliveryAddress = snap;
-                        }
-                    });
-                }
-            }
+            if (this.orderType === 'delivery') this.loadCustomerAddresses(order.delivery_address || '');
             // Task 781: meta snapshot for the in-panel table actions — the order
             // leaves heldOrders on the next line, so KOT gating + the cancel
             // modal would otherwise lose kot_sent_at / order_number.
@@ -13669,6 +13690,7 @@ function restaurantPos() {
         },
         _selectQuickCustomer(cust, msg, tone) {
             this.selectedCustomer = cust; this.showQuickAdd = false;
+            if (this.orderType === 'delivery') this.loadCustomerAddresses();
             this.customerPhoneQuery = cust.phone || cust.name;
             this.quickCustomerName = ''; this.quickCustomerPhone = ''; this.quickCustomerAddress = ''; this.showCustomerPicker = false;
             this.showToast(msg, tone);

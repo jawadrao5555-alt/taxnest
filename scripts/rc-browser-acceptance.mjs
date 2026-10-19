@@ -1634,15 +1634,16 @@ if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s)
 
 async function whatsappAutoSendWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/settings/whatsapp-delivery',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
   const toggle=page.locator('input[type=checkbox][name=auto_send]');
   if(await toggle.isChecked())throw new Error('New company auto-send must default OFF');
   for(const key of ['wa_api_token','wa_app_secret'])if(await page.locator('input[name='+key+']').inputValue())throw new Error('Saved secret leaked into form');
   const html=await page.content();if(html.includes('synthetic-api-token')||html.includes('synthetic-app-secret'))throw new Error('Saved secret leaked into HTML');
   await toggle.check();await Promise.all([page.waitForURL('**/pos/settings/whatsapp-delivery'),page.getByRole('button',{name:'Save settings',exact:true}).click()]);
-  await page.getByRole('status').waitFor();
+  await page.getByRole('status').waitFor(); await dismiss(page);
   if(!await toggle.isChecked())throw new Error('ON did not persist');
   await toggle.uncheck();await Promise.all([page.waitForURL('**/pos/settings/whatsapp-delivery'),page.getByRole('button',{name:'Save settings',exact:true}).click()]);
-  await page.getByRole('status').waitFor();await page.reload({waitUntil:'domcontentloaded'});
+  await page.getByRole('status').waitFor(); await dismiss(page);await page.reload({waitUntil:'domcontentloaded'});
   if(await toggle.isChecked())throw new Error('OFF did not persist');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-whatsapp-optional-autosend');
   pass(t.name+'/'+v.width+': actual owner form defaults OFF, persists ON/OFF, keeps blank encrypted secrets private');

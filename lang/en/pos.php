@@ -4,6 +4,8 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'restaurant_top_selling_scope' => 'Completed restaurant orders for the selected business dates, ranked by quantity. Amounts are item subtotals before bill-level discounts and tax. Select an item to see its orders.',
+    'orders_count_label' => 'Orders',
     'a4_printer_desc' => 'Receipt prints in 80mm thermal layout, centered on full A4 page.',
     'a4_printer_thermal_style' => 'A4 Printer (Thermal-style on A4)',
     'aaj_ka_din_close' => 'Today has already been closed',

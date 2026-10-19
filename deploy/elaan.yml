@@ -1,7 +1,9 @@
-title: "Desktop Agent par actual version aur build date"
-audience: all
+title: "Top Selling ki mukammal list aur item details"
+audience: pos
 type: improvement
 points:
-  - "Agent ki settings screen par version aur actual build date wazeh dikhengi."
-  - "Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga."
-  - "Saved company, device aur printer settings barqarar rahengi."
+  - "Restaurant Top Selling ke View All par tamam bikne wale items ki list khulegi."
+  - "Har item ki quantity, subtotal aur orders ki tadaad ke saath order details bhi dekhi ja sakengi."
+  - "Business dates badal kar usi period ki mukammal list dekhein."
+categories:
+  - restaurant

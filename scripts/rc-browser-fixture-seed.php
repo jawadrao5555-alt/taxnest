@@ -283,6 +283,15 @@ foreach (['pos', 'fbr_pos'] as $audience) {
     ]);
 }
 
+$topSellingCompany = $company('Synthetic Top Selling', 'top-selling-company@rc-browser.invalid', 'RCTOPSELL001', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_setup_completed' => true,
+]);
+$topSellingOwner = $user($topSellingCompany, 'Synthetic Top Selling Owner', 'top-selling-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$topSellingOrder = RestaurantOrder::create(['company_id' => $topSellingCompany->id, 'order_number' => 'RC-TOP-ORDER', 'order_type' => 'takeaway', 'status' => 'completed', 'created_by' => $topSellingOwner->id, 'subtotal' => 13600, 'total_amount' => 13600]);
+for ($i = 1; $i <= 16; $i++) {
+    RestaurantOrderItem::create(['order_id' => $topSellingOrder->id, 'item_type' => 'manual', 'item_name' => 'Synthetic complete item '.$i, 'quantity' => $i, 'unit_price' => 100, 'subtotal' => $i * 100]);
+}
 $notificationUsers = [];
 foreach (['pra' => $hotel, 'fbr' => $fiscal] as $panel => $noticeCompany) {
     foreach (['desktop', 'mobile'] as $viewport) {
@@ -581,6 +590,7 @@ $fixture = [
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
+        ['name' => 'restaurant-top-selling', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/restaurant/top-selling'], 'restaurantTopSelling' => true, 'markers' => ['Synthetic complete item 16']],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
         ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],
         ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk']],

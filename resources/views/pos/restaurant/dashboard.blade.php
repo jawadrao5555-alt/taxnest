@@ -20,7 +20,7 @@
 @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 </style>
 
-<div class="tn-restaurant-dashboard w-full overflow-x-hidden" x-data="rDash()" x-init="init()">
+<div class="tn-restaurant-dashboard w-full overflow-x-hidden" x-data="rDash()">
     <div class="tn-page px-4 sm:px-6 py-5 max-w-7xl mx-auto">
         @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')

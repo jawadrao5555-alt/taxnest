@@ -578,6 +578,7 @@ class PosRestaurantDashboardCountsTest extends TestCase
 
     public function test_restaurant_top_selling_details_reject_cashiers(): void
     {
+        $this->assertSame('reports', \App\Services\PosAccessService::featureForPath('pos/restaurant/top-selling'));
         $this->actAs('cashier');
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         (new RestaurantPosController())->topSelling(\Illuminate\Http\Request::create('/pos/restaurant/top-selling'));

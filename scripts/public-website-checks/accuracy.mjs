@@ -7,7 +7,7 @@ export default async function check(page, baseUrl) {
     assert(!body.includes('14,999 / year'), 'obsolete PRA headline');
     assert(!body.includes('600 KB') && !body.includes('600\u00a0KB'), 'obsolete APK size');
     assert(!body.includes('from Pro upward') && !body.includes('Premium plan'), 'retired package name');
-    if (path === '/pos') { assert(body.includes('Bismillah Restaurant')); assert(!body.includes('Sugar Premium')); }
+    if (path === '/pos') { assert(/Bismillah Restaurant/i.test(body)); assert(!/Sugar Premium/i.test(body)); }
     if (path === '/privacy') assert(body.includes('does not upload your address book'));
     if (path === '/digital-invoice') assert(!body.includes('watched continuously'));
   }

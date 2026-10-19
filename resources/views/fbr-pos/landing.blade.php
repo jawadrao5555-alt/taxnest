@@ -350,8 +350,8 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left divide-y md:divide-y-0 md:divide-x divide-gray-200">
                 <div class="fade-in-up py-4 md:py-0 md:pr-12">
-                    <div class="text-5xl font-serif font-bold text-[#052730] mb-2"><span class="text-[#E7BF3B] text-2xl align-top">PKR</span> 0.00</div>
-                    <div class="text-gray-600 font-medium">Fine exposure for missing FBR deadlines. Auto-sync handles submission securely in the background.</div>
+                    <div class="text-5xl font-serif font-bold text-[#052730] mb-2">Submission status</div>
+                    <div class="text-gray-600 font-medium">Track queued, accepted and failed submissions. Review errors and authority responses; software cannot guarantee exemption from fines.</div>
                 </div>
                 <div class="fade-in-up py-4 md:py-0 md:px-12" style="transition-delay: 100ms;">
                     <div class="text-5xl font-serif font-bold text-[#052730] mb-2">100%</div>
@@ -536,7 +536,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18v4H3V3zm2 8h14m-9 4h4m-7 4h10a2 2 0 002-2v-6H5v6a2 2 0 002 2z"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Restaurant Orders &amp; Kitchen</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">Run dine-in tables, print kitchen order tickets by station, and put a kitchen display screen in front of the chef — plus a scan-to-order public QR menu for your customers. Kitchen printing is on the Business plan.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Print kitchen order tickets for held orders on eligible packages. Need table service, a kitchen display or a public QR ordering menu? Compare the PRA product and confirm your required workflow with support before purchase.</p>
                 </div>
 
                 <!-- Inventory -->

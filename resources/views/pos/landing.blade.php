@@ -7,10 +7,10 @@
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>NestPOS — Keyboard-Fast POS with PRA Compliance</title>
-    <meta name="description" content="NestPOS is a keyboard-fast PRA-compliant POS system for Pakistani retail and restaurants — offline billing, automatic fiscal sync, and real-time sales reporting.">
+    <meta name="description" content="NestPOS is a keyboard-fast PRA-compliant POS system for Pakistani restaurants and service businesses — offline billing, automatic fiscal sync, and real-time sales reporting.">
     @include('partials.meta-og', [
         'ogTitle'       => 'NestPOS — Keyboard-Fast POS with PRA Compliance',
-        'ogDescription' => 'A lightning-fast point-of-sale system built for Pakistani retailers. PRA-integrated billing, inventory, and daily reports — all in one keyboard-driven screen.',
+        'ogDescription' => 'A lightning-fast point-of-sale system built for Pakistani restaurants and service businesses. PRA-integrated billing, inventory, and daily reports — all in one keyboard-driven screen.',
         'ogUrl'         => 'https://taxnest.pk/pos',
     ])
     <link rel="canonical" href="https://taxnest.pk/pos">
@@ -147,7 +147,7 @@
                 "name": "What do the NestPOS plans include?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Starter has 2 team accounts and 1 included branch. Business has 7 team accounts, 1 included branch, the restaurant and kitchen module, Staff Attendance, Delivery Riders, QR Menu and WhatsApp Bill. Unlimited has 12 team accounts, 2 included branches, Rider Live Tracking and Caller ID. Offline billing is available on all three packages. Business can buy Rider Live Tracking and Caller ID as optional paid add-ons; WhatsApp Bill is included, not an add-on. Extra branches can be purchased for Rs 10,000 per branch per year."
+                    "text": "The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Business can purchase eligible Rider Live Tracking and Caller ID add-ons; Unlimited includes them. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear."
                 }
             },
             {
@@ -155,7 +155,7 @@
                 "name": "Is there a mobile app? Does it work in Urdu?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Yes to both. A lightweight Android app (~600 KB) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language."
+                    "text": "Yes to both. An Android app (see Downloads for current size) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language."
                 }
             }
         ]
@@ -236,7 +236,7 @@
                     <!-- HTML Receipt Artifact -->
                     <div class="thermal-receipt text-gray-800 font-mono text-sm p-8 max-w-sm mx-auto transform rotate-2">
                         <div class="text-center mb-6 border-b-2 border-dashed border-gray-300 pb-6">
-                            <h3 class="font-bold text-xl uppercase mb-1">Bismillah Kiryana</h3>
+                            <h3 class="font-bold text-xl uppercase mb-1">Bismillah Restaurant</h3>
                             <p class="text-xs">Main Bazar, Model Town, Lahore</p>
                             <p class="text-xs">NTN: 4123456-7</p>
                             <p class="text-xs">PNTN: P4123456-7</p>
@@ -251,19 +251,19 @@
                         </div>
                         <div class="space-y-2 text-xs mb-4">
                             <div class="flex justify-between">
-                                <span>Sugar Premium 1kg</span>
+                                <span>Chicken Soup</span>
                                 <span>165</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Dal Chana 1kg</span>
+                                <span>Chicken Biryani</span>
                                 <span>320</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Surf Excel 1kg</span>
+                                <span>Chicken Karahi</span>
                                 <span>550</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Lipton Yellow 500g</span>
+                                <span>Family Rice Platter</span>
                                 <span>480</span>
                             </div>
                         </div>
@@ -346,7 +346,7 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mb-20">
                 <h2 class="text-4xl sm:text-5xl font-serif text-[#052730] mb-6">Built for speed and compliance.</h2>
-                <p class="text-xl text-gray-600 font-light">Every feature serves one purpose: getting the customer checked out quickly while keeping your business completely compliant with government regulations.</p>
+                <p class="text-xl text-gray-600 font-light">Every feature serves one purpose: getting the customer checked out quickly while supporting your billing and regulatory reporting workflow.</p>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-20">
@@ -375,7 +375,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">4</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Restaurant ready</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Kitchen order tickets (KOT), dine-in table board, kitchen display screen, waiter tablets and a scan-to-order QR menu (included from Business upward) — with cancel protection that records exactly which items were already made, so kitchen waste never hides.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Kitchen order tickets (KOT), dine-in table board, kitchen display screen and waiter tablets where enabled by your package and business settings, plus a scan-to-order QR menu on eligible packages — with cancel protection that records exactly which items were already made, so kitchen waste never hides.</p>
                 </div>
 
                 <!-- Feature 5 -->
@@ -389,7 +389,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">6</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">The manager's cockpit</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (included from Pro upward), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Business plan and above), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (included from Business upward), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Business plan and above), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
                 </div>
 
                 <!-- Feature 7 -->
@@ -417,7 +417,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">10</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Mobile apps</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">A lightweight Android app (~600&nbsp;KB) puts the full POS in every team member's pocket — owner, manager, waiter or cashier. Riders get their own app, and with the Rider Live Tracking add-on you watch them move on a live map.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">An Android app (see Downloads for current size) puts the full POS in every team member's pocket — owner, manager, waiter or cashier. Riders get their own app, and with the Rider Live Tracking add-on you watch them move on a live map.</p>
                 </div>
 
                 <!-- Feature 11 -->
@@ -480,14 +480,14 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter has 2 team accounts and 1 included branch. Business has 7 team accounts, 1 included branch, the restaurant and kitchen module, Staff Attendance, Delivery Riders, QR Menu and WhatsApp Bill. Unlimited has 12 team accounts, 2 included branches, Rider Live Tracking and Caller ID. Offline billing is available on all three packages. Business can buy Rider Live Tracking and Caller ID as optional paid add-ons; WhatsApp Bill is included, not an add-on. Extra branches can be purchased for Rs 10,000 per branch per year.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Business can purchase eligible Rider Live Tracking and Caller ID add-ons; Unlimited includes them. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear.</div>
                 </div>
                 <div class="border-b border-gray-200">
                     <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left">
                         <span class="font-serif text-lg text-gray-900">Is there a mobile app? Does it work in Urdu?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 5 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 5" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes to both. A lightweight Android app (~600&nbsp;KB) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language.</div>
+                    <div x-show="open === 5" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes to both. An Android app (see Downloads for current size) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language.</div>
                 </div>
             </div>
         </div>

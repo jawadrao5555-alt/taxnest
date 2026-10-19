@@ -216,7 +216,7 @@
                 "name": "I don't know my HS codes. Does the system help?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — so the right rate is applied before the invoice ever leaves your screen."
+                    "text": "Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — for your review before submission. Your company remains responsible for the selected classification and rate."
                 }
             },
             {
@@ -484,9 +484,9 @@
                     <p class="text-sm text-gray-500">Draft, verify, locked — a simple flow your staff learns in one afternoon.</p>
                 </div>
                 <div class="reveal-on-scroll md:pl-12" style="transition-delay: 200ms;">
-                    <p class="text-[3.5rem] font-serif font-bold text-[#0A4D5C] leading-none mb-2">24/7</p>
+                    <p class="text-[3.5rem] font-serif font-bold text-[#0A4D5C] leading-none mb-2">Daily</p>
                     <p class="text-sm font-semibold text-gray-900 uppercase tracking-widest mb-1">Token Monitoring</p>
-                    <p class="text-sm text-gray-500">Your FBR token's health is watched continuously, so submissions never fail silently.</p>
+                    <p class="text-sm text-gray-500">Scheduled expiry checks help you spot an expiring FBR token. Review submission responses in your panel.</p>
                 </div>
             </div>
         </div>
@@ -560,7 +560,7 @@
                     </div>
                     <div>
                         <h4 class="text-2xl font-serif text-[#052730] mb-3">HS Code Intelligence</h4>
-                        <p class="text-gray-600 leading-relaxed mb-4">Stop guessing tariff classifications. Enter your item, and the system queries a comprehensive HS database to suggest the correct code and its corresponding GST rate. Your rate lists stay clean and compliant automatically.</p>
+                        <p class="text-gray-600 leading-relaxed mb-4">Stop guessing tariff classifications. Enter your item, and the system queries a comprehensive HS database to suggest matching codes and rates for your review. Confirm the classification and applicable tax treatment before submission.</p>
                     </div>
                 </div>
 
@@ -586,7 +586,7 @@
                     </div>
                     <div>
                         <h4 class="text-2xl font-serif text-[#052730] mb-3">Bulk Excel Import</h4>
-                        <p class="text-gray-600 leading-relaxed mb-4">Already keeping your sales in spreadsheets? Upload an Excel file and TaxNest turns entire batches of rows into draft invoices in one go — each row mapped, validated against FBR rules, and queued for review. Rows that fail get AI-suggested fixes you can apply in one click (Premium). No more retyping hundreds of invoices by hand at month end.</p>
+                        <p class="text-gray-600 leading-relaxed mb-4">Already keeping your sales in spreadsheets? Upload an Excel file and TaxNest turns entire batches of rows into draft invoices in one go — each row mapped, validated against FBR rules, and queued for review. Rows that fail get AI-suggested fixes you can apply in one click, subject to your plan's AI allowance. No more retyping hundreds of invoices by hand at month end.</p>
                     </div>
                 </div>
 
@@ -612,7 +612,7 @@
                     </div>
                     <div>
                         <h4 class="text-2xl font-serif text-[#052730] mb-3">Deliver &amp; Brand Your Invoices</h4>
-                        <p class="text-gray-600 leading-relaxed mb-4">Send any invoice straight to the buyer over WhatsApp or email, or hand them a secure share link they can open on any phone. Need a month's worth of PDFs for the accountant? Download them all as a ZIP in one click. On the Premium plan, white-label the PDFs with your own logo and colors so every invoice carries your brand, not ours.</p>
+                        <p class="text-gray-600 leading-relaxed mb-4">Send any invoice straight to the buyer over WhatsApp or email, or hand them a secure share link they can open on any phone. Need a month's worth of PDFs for the accountant? Download them all as a ZIP in one click. On Kaarobar and Unlimited, white-label the PDFs with your own logo and colors so every invoice carries your brand, not ours.</p>
                     </div>
                 </div>
 
@@ -638,7 +638,7 @@
                     </div>
                     <div>
                         <h4 class="text-2xl font-serif text-[#052730] mb-3">Consultant Console &amp; API</h4>
-                        <p class="text-gray-600 leading-relaxed mb-4">Tax consultants get a dedicated console: link client companies, watch each one's filing health from a single dashboard, and earn referral commissions on clients you bring in. Building your own software? The Premium plan includes a REST API to push invoices into TaxNest programmatically with a secure API key.</p>
+                        <p class="text-gray-600 leading-relaxed mb-4">Tax consultants get a dedicated console: link client companies, watch each one's filing health from a single dashboard, and earn referral commissions on clients you bring in. Building your own software? Kaarobar and Unlimited include a REST API to push invoices into TaxNest programmatically with a secure API key.</p>
                     </div>
                 </div>
             </div>
@@ -686,7 +686,7 @@
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">I don't know my HS codes. Does the system help?</span>
                         <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 3" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — so the right rate is applied before the invoice ever leaves your screen.</div>
+                    <div x-show="open === 3" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — for your review before submission. Your company remains responsible for the selected classification and rate.</div>
                 </div>
                 <div class="bg-white">
                     <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">

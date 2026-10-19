@@ -1,8 +1,7 @@
-title: "Caller ID ki missed-ring recovery ki tayyari"
-audience: pos
+title: "Website ki package aur product maloomat ki durusti"
+audience: all
 type: improvement
 points:
-  - "Caller app ki nayi 1.8.0 build ke liye saved queue aur reconnect retry shamil ki gayi hai."
-  - "Purani rings asal waqt ke saath history mein aayengi; nayi incoming call ka popup nahi banengi."
-  - "Package lock aur feature OFF ka jawab delivery ki kamyabi nahi samjha jayega."
-  - "Signed Android update ki availability successful build aur phone verification ke baad confirm hogi."
+  - "Public PRA starting price ab current package price se li jati hai."
+  - "Purane package names, Android size aur unsupported compliance claims durust kiye gaye hain."
+  - "Caller local contact lookup, rider location aur Healthcare records ki privacy wazeh ki gayi hai."

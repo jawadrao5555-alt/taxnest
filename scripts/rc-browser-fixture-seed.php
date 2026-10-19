@@ -145,6 +145,17 @@ $tableShop = $company('Synthetic Table Order Recovery', 'table-orders-company@rc
     'table_click_direct_open' => true, 'pos_guided_flow_enabled' => false,
     'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
 ]);
+// The real invoice-store route enforces subscription quota even for internal fixtures.
+// Give only this synthetic shop a normal, active, bounded package; do not bypass the gate.
+$addressProofPlan = \App\Models\PricingPlan::create([
+    'name' => 'Synthetic delivery address proof', 'product_type' => 'pos',
+    'invoice_limit' => 100, 'price' => 100, 'is_trial' => false,
+]);
+\App\Models\Subscription::create([
+    'company_id' => $tableShop->id, 'pricing_plan_id' => $addressProofPlan->id,
+    'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(),
+    'active' => true,
+]);
 $tableCashier = $user($tableShop, 'Synthetic Table Cashier', 'table-orders@rc-browser.invalid', 'user', 'pos_cashier');
 $tableWaiter = $user($tableShop, 'Synthetic Table Waiter', 'table-waiter@rc-browser.invalid', 'user', 'pos_waiter');
 $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);

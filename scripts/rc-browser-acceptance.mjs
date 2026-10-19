@@ -1365,6 +1365,7 @@ async function ingredientUnitAudit(page,t,v) {
 }
 
 async function tableOrderWorkflow(page,t,v) {
+  await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
@@ -1630,3 +1631,50 @@ const {browser}=await launchLocalBrowser();
 try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
 
+
+async function deliveryAddressSnapshotWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
+  const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
+  const address='Synthetic delivery lane '+v.width;
+  const response=await page.request.post(baseUrl+'/pos/restaurant/api/customer-store',{
+    headers,data:{name:'Synthetic address customer '+v.width,phone:'0300'+String(1000000+v.width),address},
+  });
+  const data=await response.json();
+  if(!response.ok()||!data.success||!data.customer?.id)throw new Error('Synthetic delivery customer setup failed');
+  let release;const gate=new Promise(resolve=>release=resolve);
+  const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
+  await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});
+  let moneyPosts=0;
+  page.on('request',request=>{if(request.method()==='POST'&&request.url()===baseUrl+'/pos/invoice/store')moneyPosts++;});
+  // Actual UI DTO without address, as happens in the customer picker. Server book is delayed.
+  await page.evaluate(customer=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.orderType='delivery';d.selectCustomerFromPhone({id:customer.id,name:customer.name,phone:customer.phone});
+    d.cart=[{cart_uid:'qa-address',item_id:null,item_type:'manual',item_name:'Synthetic address proof',quantity:1,unit_price:100,is_tax_exempt:true,special_notes:''}];
+    d.lastPayTime=0;
+  },data.customer);
+  const posted=page.waitForResponse(r=>r.url()===baseUrl+'/pos/invoice/store'&&r.request().method()==='POST');
+  const payment=page.evaluate(async()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    await d.processPaymentManual('cash',true,true);
+  });
+  await page.waitForTimeout(150);
+  if(moneyPosts!==0)throw new Error('Delivery payment serialized before its current address lookup completed');
+  release();
+  const savedResponse=await posted;const saved=await savedResponse.json();await payment;
+  if(!savedResponse.ok()||!saved.success||!saved.transaction_id)throw new Error('Synthetic provisional delivery save failed: '+JSON.stringify(saved));
+  const payload=savedResponse.request().postDataJSON();
+  if(payload.delivery_address!==address)throw new Error('Selected delivery address missing from real bill payload');
+  await page.unroute(bookUrl);
+  await page.goto(baseUrl+'/pos/transaction/'+saved.transaction_id+'/receipt',{waitUntil:'domcontentloaded'});
+  const receipt=page.locator('body');
+  if(!(await receipt.innerText()).includes(address))throw new Error('Persisted address absent from receipt preview');
+  await page.emulateMedia({media:'print'});
+  const line=page.getByText(address,{exact:true});
+  if(!await line.isVisible())throw new Error('Persisted address hidden in print layout');
+  await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
+  await page.emulateMedia({media:'screen'});
+  pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
+}

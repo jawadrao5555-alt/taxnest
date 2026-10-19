@@ -42,3 +42,8 @@ backend and disposable MariaDB/Chrome desktop/mobile tests before owner approval
 New browser coverage opens real notification details, checks NEW removal and
 count persistence; DI fixture verifies product isolation. No production/ZFC
 account data or customer messaging was accessed. Not live verified.
+
+Follow-up: refreshed on merged Caller PR #214 (d93596d). Browser rapid bell
+close/open exposed an outside-click race: the toggle sat outside the dropdown
+dismissal boundary. The boundary now wraps the toggle and menu together on
+PRA/FBR/DI; pointer acceptance remains mandatory with no forced clicks.

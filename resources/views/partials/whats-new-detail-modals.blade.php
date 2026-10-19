@@ -20,7 +20,8 @@
                 this.$nextTick(() => window.TnModalA11y.close(dialog));
             },
             async markDetailSeen() {
-                if (this.wasSeen || this.savingSeen || @json(empty($seenEndpoint))) return;
+                if (this.wasSeen || @json(empty($seenEndpoint))) return;
+                if (this.savingSeen) return;
                 this.savingSeen = true;
                 this.seenError = false;
                 try {

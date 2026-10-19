@@ -702,6 +702,7 @@
     </section>
 
     <!-- Footer -->
+    @include('partials.product-guide-link', ['productGuideKey' => 'fbr'])
     <x-site-footer login-url="/fbr-pos/login" login-label="FBR POS Log In" />
 
     <x-whatsapp-support />

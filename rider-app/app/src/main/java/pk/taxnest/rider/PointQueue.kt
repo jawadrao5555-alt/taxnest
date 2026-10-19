@@ -11,15 +11,15 @@ import org.json.JSONObject
  */
 object PointQueue {
     private const val CAP = 5000
-    private val lock = Any()
+    private val lock = Prefs.sessionLock
 
-    fun add(c: Context, lat: Double, lng: Double, accuracyM: Int?, batteryPct: Int? = null) {
+    fun add(c: Context, lat: Double, lng: Double, accuracyM: Int?, batteryPct: Int? = null, capturedAtMs: Long = System.currentTimeMillis()) {
         synchronized(lock) {
             val arr = load(c)
             val p = JSONObject()
                 .put("lat", lat)
                 .put("lng", lng)
-                .put("at", System.currentTimeMillis())
+                .put("at", capturedAtMs)
             if (accuracyM != null) p.put("acc", accuracyM)
             // v1.5.0 (Task #1106): battery % rides on each point; the server
             // denormalizes the newest live reading for the admin map. Optional
@@ -41,9 +41,7 @@ object PointQueue {
     /** Take up to [max] oldest points (they stay queued until [removeFirst]). */
     fun peekBatch(c: Context, max: Int = 100): JSONArray = synchronized(lock) {
         val arr = load(c)
-        JSONArray().also { out ->
-            for (i in 0 until minOf(max, arr.length())) out.put(arr.get(i))
-        }
+        LocationBatchPolicy.select(arr, max)
     }
 
     fun removeFirst(c: Context, n: Int) {
@@ -69,6 +67,19 @@ object PointQueue {
         if (n <= 0 || batch.length() == 0) return
         val anchor = batch.optJSONObject(minOf(n, batch.length()) - 1)?.optLong("at", 0L) ?: 0L
         if (anchor > 0L) removeUpTo(c, anchor) else removeFirst(c, n)
+    }
+
+    /** Only remove identities explicitly acknowledged from THIS request. */
+    fun acknowledge(c: Context, batch: JSONArray, response: JSONObject): Boolean = synchronized(lock) {
+        val acknowledged = LocationBatchPolicy.acknowledged(batch, response) ?: return@synchronized false
+        val arr = load(c)
+        val out = JSONArray()
+        for (i in 0 until arr.length()) {
+            val point = arr.optJSONObject(i) ?: continue
+            if (point.optLong("at", 0L) !in acknowledged) out.put(point)
+        }
+        Prefs.setQueueJson(c, out.toString())
+        true
     }
 
     /**

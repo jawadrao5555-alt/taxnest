@@ -19,10 +19,8 @@ import kotlin.concurrent.thread
  * the server.  Fresh points (no `at` or lag < 5 min) are silently skipped by
  * the server unless duty is ON.
  *
- * Response `stored` field: the app removes exactly that many points from the
- * front of the queue so partial-accept (dedupe, 7-day rejects) is handled
- * precisely.  If stored==0 the entire batch is removed to avoid an infinite
- * retry loop for points that will never be accepted (too old, bad coords).
+ * New servers return explicit capture-time acknowledgements. A partial legacy
+ * count cannot identify accepted rows in a latest-first batch: keep and retry.
  */
 object QueueDrain {
 
@@ -58,10 +56,10 @@ object QueueDrain {
      */
     fun drainBlocking(context: Context) {
         val c = context.applicationContext
-        val token = Prefs.token(c) ?: return
         if (PointQueue.size(c) == 0) return
 
         synchronized(uploadLock) {
+            val token = Prefs.token(c) ?: return
             // Drain in batches until queue is empty or a hard error occurs.
             repeat(50) { // safety cap: max 50 × 100 = 5000 points per drain cycle
                 val batch = PointQueue.peekBatch(c, 100)
@@ -72,20 +70,17 @@ object QueueDrain {
                     JSONObject().put("points", batch),
                     token
                 )
+                synchronized(Prefs.sessionLock) {
+                    if (Prefs.token(c) != token) return
                 when {
                     code in 200..299 -> {
-                        val stored = body?.optInt("stored", 0) ?: 0
-                        // Remove exactly `stored` validated points.  If stored==0
-                        // (all rejected as too-old or bad coords), remove the full
-                        // batch to prevent an infinite retry of permanently-invalid pts.
-                        val toRemove = if (stored > 0) stored else batch.length()
-                        PointQueue.ackBatch(c, batch, toRemove)
+                        if (body == null || !PointQueue.acknowledge(c, batch, body)) return
                         Prefs.setLastSync(c, System.currentTimeMillis())
                         Prefs.setLastSyncError(c, SyncStatus.ERR_NONE)
                         // If we received fewer than a full batch the server accepted
                         // all it could — stop looping (remaining might be fresh pts
                         // that need duty=ON, or queue is now empty).
-                        if (stored < batch.length()) return
+                        if (body.optInt("stored", 0) < batch.length()) return
                     }
                     code == 401 -> {
                         // Token rotated by another device login.  Evict token but
@@ -110,6 +105,7 @@ object QueueDrain {
                         Prefs.setLastSyncError(c, SyncStatus.ERR_NET)
                         return
                     }
+                }
                 }
             }
         }

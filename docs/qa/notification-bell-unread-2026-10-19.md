@@ -47,3 +47,13 @@ Follow-up: refreshed on merged Caller PR #214 (d93596d). Browser rapid bell
 close/open exposed an outside-click race: the toggle sat outside the dropdown
 dismissal boundary. The boundary now wraps the toggle and menu together on
 PRA/FBR/DI; pointer acceptance remains mandatory with no forced clicks.
+
+## Refresh after #217 — 19 October
+
+Merged main 6dd506910cd1d8da87f59d69a10a03cda077e1b1, preserving Rider sync, Caller recovery, public guide/pricing, catalog/address fixes and their checks. Only the current release announcement conflicted.
+
+The last failed full-suite assertion expected the old inline audience query in each layout; the shared bell service now owns that exact audience/published/window predicate. Updated the existing DomainMoveNotice guard to assert the new shared call and predicate while preserving every overlay-suppression assertion. No eligibility/suppression behavior is removed to satisfy the guard.
+
+Browser failure root cause: the targeted notification preflight and the later full acceptance reused the same users. The first run correctly saved featured/routine reads; the second then incorrectly required a fresh featured popup and seven unread routines. Give preflight desktop/mobile their own synthetic users, separate from full-suite desktop/mobile users. Keep all real read-on-open, failed-save retry, NEW removal, count decrement, idempotence, reload, history and cross-product assertions unchanged. No production read state is reset and no browser assertion is weakened.
+
+Local refresh result: 17/17 Node notification acknowledgement/read-count and Rider map tests pass under rc-safe-run; browser script syntax and git whitespace checks pass. PHP/Chrome unavailable locally; exact-HEAD isolated CI results remain required.

@@ -279,4 +279,51 @@ class RiderOfflineLocationSyncTest extends TestCase
         $this->assertNotNull($rider->last_located_at,
             'last_located_at must be set when previously NULL (first fix)');
     }
+    public function test_overlapping_upload_cannot_regress_a_live_position_from_stale_auth_model(): void
+    {
+        [$snapshot, $token] = $this->makeRiderAndToken();
+        PosRider::whereKey($snapshot->id)->update([
+            'last_lat' => 31.6, 'last_lng' => 74.4, 'last_located_at' => now()->subSeconds(5),
+        ]);
+        $controller = new class($snapshot) extends PosRiderTrackingController {
+            public function __construct(private PosRider $snapshot) {}
+            public function riderFromToken(Request $request): PosRider { return $this->snapshot; }
+        };
+        $controller->appLocations(Request::create('/locations', 'POST', ['points' => [
+            ['lat' => 31.5, 'lng' => 74.3, 'at' => (int) now()->subSeconds(20)->getPreciseTimestamp(3)],
+        ]]));
+        $this->assertEquals(31.6, (float) $snapshot->fresh()->last_lat);
+        $this->assertEquals(1, DB::table('pos_rider_locations')->count());
+    }
+
+    public function test_acknowledgements_identify_non_prefix_accepted_and_terminal_points(): void
+    {
+        [$rider, $token] = $this->makeRiderAndToken();
+        $rider->update(['on_duty' => false]);
+        $fresh = (int) now()->subSeconds(5)->getPreciseTimestamp(3);
+        $old = (int) now()->subMinutes(10)->getPreciseTimestamp(3);
+        $invalid = $old - 1000;
+        $data = $this->callLocations($token, [
+            ['lat' => 31.5, 'lng' => 74.3, 'at' => $fresh],
+            ['lat' => 500, 'lng' => 74.3, 'at' => $invalid],
+            ['lat' => 31.4, 'lng' => 74.2, 'at' => $old],
+        ])->getData(true);
+        $this->assertSame(1, $data['stored']);
+        $this->assertEqualsCanonicalizing([$old, $invalid], $data['acknowledged_at']);
+        $this->assertNull($rider->fresh()->last_located_at);
+    }
+
+    public function test_suspended_company_cannot_upload_even_with_valid_token(): void
+    {
+        [$rider, $token] = $this->makeRiderAndToken();
+        DB::table('companies')->where('id', $rider->company_id)->update(['status' => 'suspended']);
+        try {
+            $this->callLocations($token, [['lat' => 31.5, 'lng' => 74.3]]);
+            $this->fail('Suspended tenant must be denied');
+        } catch (\Illuminate\Http\Exceptions\HttpResponseException $e) {
+            $this->assertSame(403, $e->getResponse()->status());
+        }
+        $this->assertSame(0, DB::table('pos_rider_locations')->count());
+    }
+
 }

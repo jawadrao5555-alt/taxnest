@@ -10,11 +10,11 @@ function fixture(fetch,readonly=false){
  const events=[];const ui=vm.runInNewContext('('+expression+')',{fetch,
   window:{TnModalA11y:{open(){},close(){}},dispatchEvent:e=>events.push(e)},
   document:{querySelector:()=>({content:'synthetic-csrf'})},CustomEvent:class{constructor(type,args){this.type=type;this.detail=args.detail;}}});
- ui.$refs={detailDialog:{}};ui.$nextTick=fn=>fn();ui.$el={closest:()=>({dataset:{seenEndpoint:'/pos/whats-new/seen'}})};
+ ui.$refs={detailDialog:{}};ui.$nextTick=fn=>fn();ui.$el={closest:()=>({dataset:{tnSeenEndpoint:'/pos/whats-new/seen'}})};
  return {ui,events};
 }
 test('opening a particular notification acknowledges it and decrements only after success',async()=>{
- let calls=0;const f=fixture(async(url,options)=>{calls++;assert.equal(JSON.parse(options.body).update_id,123);return {ok:true,json:async()=>({ok:true})};});
+ let calls=0;const f=fixture(async(url,options)=>{calls++;assert.equal(url,'/pos/whats-new/seen');assert.equal(JSON.parse(options.body).update_id,123);return {ok:true,json:async()=>({ok:true})};});
  await f.ui.openDetail();assert.equal(calls,1);assert.equal(f.ui.wasSeen,true);assert.equal(f.events.length,1);
 });
 test('read is confirmed once despite concurrent open, close and reopen',async()=>{

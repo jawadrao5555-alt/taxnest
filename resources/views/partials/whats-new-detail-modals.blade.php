@@ -24,7 +24,7 @@
                 this.savingSeen = true;
                 this.seenError = false;
                 try {
-                    const response = await fetch(this.$el.closest('[data-tn-whats-new-history]').dataset.seenEndpoint, {
+                    const response = await fetch(this.$el.closest('[data-tn-whats-new-history]').dataset.tnSeenEndpoint, {
                         method: 'POST',
                         headers: {
                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,

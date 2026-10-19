@@ -6,7 +6,8 @@ and the real Alpine component, not claimed screenshot inspection.
 
 Before change, opening detail issued zero acknowledgement requests; the new
 component regression failed 0 !== 1. Acknowledgement previously happened only
-on closing detail and swallowed errors. It now saves the selected notice on
+on closing detail and swallowed errors. The detail component also read the wrong
+dataset property: data-tn-seen-endpoint maps to tnSeenEndpoint, not seenEndpoint. It now saves the selected notice on
 opening, changes state after server success, and offers retry on failure.
 Unread totals cover all eligible notices instead of only ten displayed rows.
 Unread notices sort first so older unread entries remain reachable on refresh.

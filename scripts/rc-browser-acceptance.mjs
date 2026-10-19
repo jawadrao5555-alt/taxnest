@@ -1164,7 +1164,43 @@ async function reportingConnectorWorkflow(page,t,v) {
   pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
 }
 
+async function companyDirectoryContrast(page,t,v) {
+  await page.goto(baseUrl+'/admin/companies?search=Synthetic%20Contrast',{waitUntil:'domcontentloaded'});
+  await page.locator('.tn-directory-alert').waitFor({state:'visible'});
+  const saved=await page.evaluate(()=>({theme:getAdminTheme(),dark:document.documentElement.classList.contains('dark')}));
+  try {
+    for(const theme of ['indigo','emerald','cyan','rose','amber','purple'])for(const dark of [false,true]) {
+      await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
+      const errors=await page.evaluate(()=>{
+        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)throw new Error('Unsupported computed colour '+s);const c=m[1].split(/[, /]+/).map(Number);return [...c.slice(0,3),c[3]??1];};
+        const over=(a,b)=>a.slice(0,3).map((x,i)=>x*a[3]+b[i]*(1-a[3]));
+        const bg=el=>{const chain=[];for(let p=el;p;p=p.parentElement)chain.unshift(p);let c=[255,255,255];for(const p of chain)c=over(rgb(getComputedStyle(p).backgroundColor),c);return c;};
+        const lum=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
+        const contrast=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+        const errors=[];
+        for(const el of document.querySelectorAll('[data-company-directory] :is(h1,h2,a,p,span,th,td,input,select,option,button)')) {
+          const option=el.tagName==='OPTION';if(!option&&!el.getClientRects().length)continue;
+          if(!['INPUT','SELECT','OPTION'].includes(el.tagName)&&![...el.childNodes].some(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim()))continue;
+          const cs=getComputedStyle(el),back=bg(el),front=over(rgb(cs.color),back),ratio=contrast(front,back);
+          if(ratio<4.5)errors.push(el.tagName+' '+el.textContent.trim().slice(0,35)+' contrast '+ratio.toFixed(2));
+          if(parseFloat(cs.fontSize)<12)errors.push(el.tagName+' text below 12px');
+          if(el.tagName==='INPUT'&&el.placeholder){const ps=getComputedStyle(el,'::placeholder');if(contrast(over(rgb(ps.color),back),back)<4.5)errors.push('Faint search placeholder');}
+        }
+        return errors;
+      });
+      if(errors.length)throw new Error('Directory '+theme+'/'+dark+': '+errors.join('; '));
+    }
+    await saveEvidenceScreenshot(page,'rc-'+v.width+'-company-directory-contrast');
+    await page.locator('select[name=status]').selectOption('approved');
+    await Promise.all([page.waitForURL(u=>u.searchParams.get('status')==='approved'),page.getByRole('button',{name:'Filter',exact:true}).click()]);
+    if(await page.locator('[data-directory-status]').count()!==1||await page.locator('[data-directory-status]').first().getAttribute('data-directory-status')!=='approved')throw new Error('Directory filter changed behavior');
+    await page.locator('.tn-directory-actions a').first().click({trial:true});
+    pass(t.name+'/'+v.width+': actual alert/owner/status/actions/options >=4.5 contrast in six themes/light-dark; GET filter preserved');
+  } finally {await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);}
+}
+
 async function workflow(page,t,v,diagnostics) {
+  if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
       await page.goto(baseUrl+'/fbr-pos/fail-queue',{waitUntil:'domcontentloaded'});
@@ -1329,6 +1365,8 @@ async function ingredientUnitAudit(page,t,v) {
 }
 
 async function tableOrderWorkflow(page,t,v) {
+  await catalogSearchCompleteWorkflow(page,t,v);
+  await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
@@ -1594,3 +1632,84 @@ const {browser}=await launchLocalBrowser();
 try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
 
+
+async function catalogSearchCompleteWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  // Synthetic in-memory catalog: actual sale UI/methods, no company/product writes.
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:16},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.allProducts=[];d.allServices=[];d.searchQuery='';d.selectedCategory=777;d.searchAnyWord=false;
+  });
+  const input=page.locator('[x-ref="searchInput"]');await input.fill('QA Deal');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
+  const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
+  for(const n of [13,14,15,16]) {
+    const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});
+    await item.scrollIntoViewIfNeeded();if(!await item.isVisible())throw new Error('matching deal '+n+' is hidden from search');
+  }
+  await page.evaluate(()=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.highlightIndex=11;d.moveHighlight(1);});
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).highlightIndex===12);
+
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:85},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.onSearchInput();
+  });
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===85);
+  const more=dropdown.locator('button[x-show="searchSuggestions.length > searchDisplayCount"]');
+  await more.scrollIntoViewIfNeeded();await more.click();
+  if(!await dropdown.isVisible())throw new Error('Load more closed the search dropdown');
+  const last=dropdown.locator('button').filter({hasText:'QA Deal No 85'});
+  await last.scrollIntoViewIfNeeded();if(!await last.isVisible())throw new Error('Load more did not reveal matching deal 85');
+  await saveEvidenceScreenshot(page,'catalog-search-complete-'+v.width);
+  pass(t.name+'/'+v.width+': all sixteen deals searchable across category filters; 13-16 visible and keyboard reachable');
+}
+
+async function deliveryAddressSnapshotWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
+  const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
+  const address='Synthetic delivery lane '+v.width;
+  const response=await page.request.post(baseUrl+'/pos/restaurant/api/customer-store',{
+    headers,data:{name:'Synthetic address customer '+v.width,phone:'0300'+String(1000000+v.width),address},
+  });
+  const data=await response.json();
+  if(!response.ok()||!data.success||!data.customer?.id)throw new Error('Synthetic delivery customer setup failed');
+  let release;const gate=new Promise(resolve=>release=resolve);
+  const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
+  await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});
+  let moneyPosts=0;
+  page.on('request',request=>{if(request.method()==='POST'&&request.url()===baseUrl+'/pos/invoice/store')moneyPosts++;});
+  // Actual UI DTO without address, as happens in the customer picker. Server book is delayed.
+  await page.evaluate(customer=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.orderType='delivery';d.selectCustomerFromPhone({id:customer.id,name:customer.name,phone:customer.phone});
+    d.cart=[{cart_uid:'qa-address',item_id:null,item_type:'manual',item_name:'Synthetic address proof',quantity:1,unit_price:100,is_tax_exempt:true,special_notes:''}];
+    d.lastPayTime=0;
+  },data.customer);
+  const posted=page.waitForResponse(r=>r.url()===baseUrl+'/pos/invoice/store'&&r.request().method()==='POST');
+  const payment=page.evaluate(async()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    await d.processPaymentManual('cash',true,true);
+  });
+  await page.waitForTimeout(150);
+  if(moneyPosts!==0)throw new Error('Delivery payment serialized before its current address lookup completed');
+  release();
+  const savedResponse=await posted;const saved=await savedResponse.json();await payment;
+  if(!savedResponse.ok()||!saved.success||!saved.transaction_id)throw new Error('Synthetic provisional delivery save failed: '+JSON.stringify(saved));
+  const payload=savedResponse.request().postDataJSON();
+  if(payload.delivery_address!==address)throw new Error('Selected delivery address missing from real bill payload');
+  await page.unroute(bookUrl);
+  await page.goto(baseUrl+'/pos/transaction/'+saved.transaction_id+'/receipt',{waitUntil:'domcontentloaded'});
+  const receipt=page.locator('body');
+  if(!(await receipt.innerText()).includes(address))throw new Error('Persisted address absent from receipt preview');
+  await page.emulateMedia({media:'print'});
+  const line=page.getByText(address,{exact:true});
+  if(!await line.isVisible())throw new Error('Persisted address hidden in print layout');
+  await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
+  await page.emulateMedia({media:'screen'});
+  pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
+}

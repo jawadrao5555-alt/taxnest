@@ -13,3 +13,9 @@ Local 83/83 platform-independent Agent tests PASS, including actual filesystem p
 Draft while #210 is first in the owner queue. Refresh against its deployed main and require all exact-HEAD checks before approval. Actual Windows build/publication and installed-PC verification happen after owner approval/relay. No production/customer credentials, regulator requests, merge or deploy by agent.
 
 First CI browser attempt stopped before rendering: standalone Node invocation did not inherit the disposable Playwright cache selected inside rc-browser-fixture.sh. Run the identity smoke through the existing fixture safe_browser lane (including socket/cache validation and egress isolation), rather than exposing a system browser or bypassing the sandbox. Replacement exact-HEAD CI must prove the rendering assertions.
+
+## 19 October refresh after PR216
+
+Integrate current main26f63f49835032fe06b3a3ff9a81e29115d3e13e after the owner-approved search release. Preserve PR210 contrast plus PR215 address and PR216 complete-search code and required regression/browser journeys. Only release announcement conflicts; retain this PR's version/build-date announcement. No changes to the identity implementation, device/printer settings, updater or regulator paths during refresh.
+
+Eight focused actual build-info/display/release-manifest tests PASS again both plain and under egress blocking. Browser harness syntax and whitespace pass locally. Full platform-independent Agent, native/PHP and real settings-HTML browser proof must pass on the NEW exact HEAD before owner approval; previous greens are historical only. Source remains1.13.20 with no source commit in the UI. Windows package/publication and installed-PC confirmation remain after owner approval/relay.

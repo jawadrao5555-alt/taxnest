@@ -15,10 +15,12 @@ class PosPublicQuoteService
                 return false;
             }
         }
-        foreach (['invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_products', 'max_users'] as $column) {
-            $before = (int) ($current->{$column} ?? 0);
-            $after = (int) ($candidate->{$column} ?? 0);
-            if ($after !== -1 && ($before === -1 || $after < $before)) {
+        foreach (['invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_products'] as $column) {
+            $before = $current->{$column};
+            $after = $candidate->{$column};
+            $beforeUnlimited = PosPlanComparisonService::isUnlimited($before);
+            $afterUnlimited = PosPlanComparisonService::isUnlimited($after);
+            if (! $afterUnlimited && ($beforeUnlimited || (int) $after < (int) $before)) {
                 return false;
             }
         }

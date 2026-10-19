@@ -11,7 +11,7 @@ export default async function check(page, baseUrl) {
   await boxes.nth(0).check();await boxes.nth(1).check();
   quote=await read();assert.equal(quote.picked.length,2);assert.equal(quote.total,quote.package+quote.addons);assert(quote.addons>0);
   const text=await picker.locator('[data-quote-total]').innerText();assert.equal(text,quote.total.toLocaleString('en-US'));
-  assert(quote.better && quote.better.price<quote.total,'lower-cost included package should be offered');
+  assert(quote.better && quote.better.price<quote.total,'lower-cost included package should be offered: '+JSON.stringify(quote));
   assert.equal(quote.better.name,'Unlimited');
   const upgrade=picker.locator('[data-quote-better] a');
   const cheaper=new URL(await upgrade.getAttribute('href'),baseUrl);assert.equal(cheaper.searchParams.get('plan'),'Unlimited');assert.equal(cheaper.searchParams.getAll('addons[]').length,0);

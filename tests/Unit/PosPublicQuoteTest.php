@@ -23,5 +23,11 @@ class PosPublicQuoteTest extends TestCase
         $this->assertFalse(PosPublicQuoteService::preservesPackage($business, $unlimited));
         $unlimited->invoice_limit = -1;
         $this->assertTrue(PosPublicQuoteService::preservesPackage($business, $unlimited));
+        $business->max_users = 500; // DI-only column: not a PRA package limit.
+        $unlimited->max_users = 1;
+        $this->assertTrue(PosPublicQuoteService::preservesPackage($business, $unlimited));
+        $business->max_terminals = null;
+        $unlimited->max_terminals = -1;
+        $this->assertTrue(PosPublicQuoteService::preservesPackage($business, $unlimited));
     }
 }

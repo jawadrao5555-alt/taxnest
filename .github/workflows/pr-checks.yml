@@ -306,6 +306,8 @@ jobs:
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
+      - name: Check complete catalog search and exact scanner priority
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/catalog-search-results.test.mjs
       - name: Check delivery address race and snapshot preservation
         run: bash scripts/rc-safe-run -- node --test scripts/tests/delivery-address-state.test.mjs
       - name: Run realtime gateway tests with egress blocked

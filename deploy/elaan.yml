@@ -1,7 +1,7 @@
-title: "Delivery bill par address ki hifazat"
+title: "Product search mein tamam matching deals"
 audience: pos
 type: improvement
 points:
-  - "Customer select karte hi known delivery address foran bill ke liye tayyar rahega."
-  - "Slow address lookup aur customer badalne par purana response naya address replace nahi karega."
-  - "Held aur editable bill ka chuna hua address lookup ke dauran bhi barqarar rahega."
+  - "Search mein matching deals aur products sirf pehle 12 tak mehdood nahi rahenge."
+  - "Bari list mein mazeed results load ho sakte hain aur keyboard se bhi select honge."
+  - "Exact barcode aur SKU ko search mein pehli tarjeeh barqarar hai."

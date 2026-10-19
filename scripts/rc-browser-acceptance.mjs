@@ -1365,6 +1365,7 @@ async function ingredientUnitAudit(page,t,v) {
 }
 
 async function tableOrderWorkflow(page,t,v) {
+  await catalogSearchCompleteWorkflow(page,t,v);
   await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
@@ -1631,6 +1632,40 @@ const {browser}=await launchLocalBrowser();
 try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
 
+
+async function catalogSearchCompleteWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  // Synthetic in-memory catalog: actual sale UI/methods, no company/product writes.
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:16},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.allProducts=[];d.allServices=[];d.searchQuery='';d.selectedCategory=777;d.searchAnyWord=false;
+  });
+  const input=page.locator('[x-ref="searchInput"]');await input.fill('QA Deal');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
+  const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
+  for(const n of [13,14,15,16]) {
+    const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});
+    await item.scrollIntoViewIfNeeded();if(!await item.isVisible())throw new Error('matching deal '+n+' is hidden from search');
+  }
+  await page.evaluate(()=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.highlightIndex=11;d.moveHighlight(1);});
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).highlightIndex===12);
+
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:85},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.onSearchInput();
+  });
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===85);
+  const more=dropdown.locator('button[x-show="searchSuggestions.length > searchDisplayCount"]');
+  await more.scrollIntoViewIfNeeded();await more.click();
+  if(!await dropdown.isVisible())throw new Error('Load more closed the search dropdown');
+  const last=dropdown.locator('button').filter({hasText:'QA Deal No 85'});
+  await last.scrollIntoViewIfNeeded();if(!await last.isVisible())throw new Error('Load more did not reveal matching deal 85');
+  await saveEvidenceScreenshot(page,'catalog-search-complete-'+v.width);
+  pass(t.name+'/'+v.width+': all sixteen deals searchable across category filters; 13-16 visible and keyboard reachable');
+}
 
 async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});

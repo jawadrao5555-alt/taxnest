@@ -1162,7 +1162,7 @@ window.addEventListener('popstate', function() {
                  one line per product (no category sub-label), tighter rows, taller list so more
                  results fit without scrolling. Stock dots stay (inline after the name). --}}
             <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-y-auto" style="max-height:min(60vh,480px);" x-ref="searchDropdown">
-                <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
+                <template x-for="(s, i) in searchSuggestions.slice(0, searchDisplayCount)" :key="s.id + s.type">
                     <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
                         :data-hl="i === highlightIndex ? 'true' : 'false'"
                         class="w-full flex items-center gap-3 px-3 py-1.5 text-left"
@@ -1170,6 +1170,7 @@ window.addEventListener('popstate', function() {
                         <template x-if="s.image">
                             <img :src="s.image" class="w-7 h-7 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
                         </template>
+
                         <template x-if="!s.image">
                             <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300" :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : ''">
                                 <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
@@ -1184,6 +1185,9 @@ window.addEventListener('popstate', function() {
                         <span class="text-sm font-extrabold flex-shrink-0 text-purple-600 dark:text-purple-300" :style="i === highlightIndex ? 'color:white;' : ''" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
+                <button type="button" x-show="searchSuggestions.length > searchDisplayCount" @click.stop="searchDisplayCount += 60; $refs.searchInput?.focus()" class="w-full px-4 py-3 text-sm font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-700">
+                    {{ __('pos.load_more_prefix') }}<span x-text="searchSuggestions.length - searchDisplayCount"></span>)
+                </button>
             </div>
         </div>
 
@@ -4920,6 +4924,7 @@ function restaurantPos() {
         activeCategory: 'all',
         searchQuery: '',
         searchSuggestions: [],
+        searchDisplayCount: 60,
         showSearchDropdown: false,
         showCustomerPicker: false,
         customerSearch: '',
@@ -6882,7 +6887,7 @@ function restaurantPos() {
                         const r = this.nameMatchRank(it.name, q, this.searchAnyWord);
                         if (r > 0) {
                             pref.push({ it, r, i });
-                        } else if (codeSearch && other.length < 12
+                        } else if (codeSearch
                             && ((it.barcode && String(it.barcode).toLowerCase().includes(q))
                             || (it.sku && String(it.sku).toLowerCase().includes(q)))) {
                             other.push(it);
@@ -6902,13 +6907,15 @@ function restaurantPos() {
                     }
                     // Higher rank first; catalog order within a rank (stable tiebreak).
                     pref.sort((a, b) => (b.r - a.r) || (a.i - b.i));
-                    const out = [...pref.slice(0, 12).map(p => p.it), ...other].slice(0, 12);
+                    const named = new Set(pref.map(p => p.it));
+                    const out = [...pref.map(p => p.it), ...other.filter(it => !named.has(it))];
                     // (Scanner safety: pool is global now, so an exact barcode/SKU match is
                     // always already in scope — the old category-filter rescue is unnecessary.)
                     // Exact barcode/SKU match jumps to the top so the scanner's trailing
                     // Enter always adds the right product (not an accidental name match).
                     out.sort((a, b) => (this.isExactCodeMatch(b, q) ? 1 : 0) - (this.isExactCodeMatch(a, q) ? 1 : 0));
                     this.searchSuggestions = out;
+                    this.searchDisplayCount = 60;
                     this.highlightIndex = 0;
                     this.showSearchDropdown = true;
                 }
@@ -6917,6 +6924,7 @@ function restaurantPos() {
         moveHighlight(dir) {
             if (!this.showSearchDropdown || this.searchSuggestions.length === 0) return;
             this.highlightIndex = Math.max(0, Math.min(this.searchSuggestions.length - 1, this.highlightIndex + dir));
+            this.searchDisplayCount = Math.max(this.searchDisplayCount, this.highlightIndex + 1);
             this.$nextTick(() => {
                 const dd = this.$refs.searchDropdown;
                 if (dd) {

@@ -1,3 +1,11 @@
+## v1.13.20 (2026-10-17)
+**Actual Agent version and packaging date on the settings screen**
+
+- Show the running application version and actual packaging date/time in readable header rows. Source commit is not displayed.
+- Generate build metadata during packaging; startup never substitutes the PC startup date. Missing/invalid metadata displays an explicit unavailable date.
+- Keep the metadata display independent of the rest of settings initialization; preserve configuration, printer assignments, fiscal sync and update behavior.
+- Verify build metadata inside the produced Windows app.asar. Installed-PC acceptance requires the owner-approved Windows release and a test PC.
+
 # TaxNest PRA Sync Agent — Changelog
 
 ## v1.13.16 (2026-10-03)

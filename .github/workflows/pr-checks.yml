@@ -249,8 +249,10 @@ jobs:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=agent-build-identity bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=readonly-reporting-connection bash scripts/rc-browser-fixture.sh run
+          RC_BROWSER_ONLY=admin-company-directory-contrast bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run
       - name: Exercise general isolated browser acceptance
         env:
@@ -307,6 +309,10 @@ jobs:
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
+      - name: Check complete catalog search and exact scanner priority
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/catalog-search-results.test.mjs
+      - name: Check delivery address race and snapshot preservation
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/delivery-address-state.test.mjs
       - name: Run realtime gateway tests with egress blocked
         run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4

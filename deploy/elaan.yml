@@ -1,8 +1,7 @@
-title: "Caller ID ki missed-ring recovery ki tayyari"
-audience: pos
+title: "Har product ki website guide aur demo tayyari"
+audience: all
 type: improvement
 points:
-  - "Caller app ki nayi 1.8.0 build ke liye saved queue aur reconnect retry shamil ki gayi hai."
-  - "Purani rings asal waqt ke saath history mein aayengi; nayi incoming call ka popup nahi banengi."
-  - "Package lock aur feature OFF ka jawab delivery ki kamyabi nahi samjha jayega."
-  - "Signed Android update ki availability successful build aur phone verification ke baad confirm hogi."
+  - "Digital Invoice, PRA POS, FBR POS aur Healthcare ke written workflows aik public guide mein hain."
+  - "Example screens aur package scope se product ka intikhab asaan hota hai."
+  - "Migration, training, devices aur human support ke liye demo se pehle ki maloomat wazeh hai."

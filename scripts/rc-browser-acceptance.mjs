@@ -964,24 +964,29 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   }
   const notificationButton=page.locator('[data-tn-topnav-control="notification"]').first();
   const count=notificationButton.locator('[x-text="unseen"]');
-  if((await count.innerText()).trim()!=='7')throw new Error('routine unread count must start at seven');
+  const before=Number((await count.innerText()).trim());
+  if(!Number.isInteger(before)||before<7)throw new Error('routine notices missing from unread count');
   await notificationButton.click();
   const row=page.locator('[x-show="bellOpen"]:visible button').filter({hasText:'Synthetic routine '+panel+' 1'}).first();
+  await page.waitForFunction(()=>[...document.querySelectorAll('[data-whats-new-detail-id]')].every(el=>el._x_dataStack?.length));
   const [detailAck]=await Promise.all([
     page.waitForResponse(r=>r.url()===expectedFailureUrl&&r.request().method()==='POST'), row.click(),
-  ]);
+  ]).catch(async error=>{
+    const states=await page.locator('[data-whats-new-detail-id]').evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.whatsNewDetailId,open:window.Alpine.$data(n).open,seen:window.Alpine.$data(n).wasSeen,error:window.Alpine.$data(n).seenError})));
+    throw new Error(error.message+' detail state '+JSON.stringify(states));
+  });
   if(!detailAck.ok()||!(await detailAck.json()).ok)throw new Error('opening detail did not persist read status');
   const detail=page.locator('[data-whats-new-detail-id]:visible');
   await detail.waitFor({state:'visible'});
-  await page.waitForFunction(()=>[...document.querySelectorAll('[data-tn-topnav-control="notification"] [x-text="unseen"]')].some(x=>x.textContent.trim()==='6'));
+  await page.waitForFunction(expected=>[...document.querySelectorAll('[data-tn-topnav-control="notification"] [x-text="unseen"]')].some(x=>Number(x.textContent.trim())===expected),before-1);
   await detail.getByRole('button',{name:'Close',exact:true}).click();
   await notificationButton.click();
   if(await row.locator('[x-show="rowUnseen"]').isVisible())throw new Error('opened notification still displays NEW');
   await row.click();
   await page.locator('[data-whats-new-detail-id]:visible').getByRole('button',{name:'Close',exact:true}).click();
-  if((await count.innerText()).trim()!=='6')throw new Error('reopening read notice decremented count again');
+  if(Number((await count.innerText()).trim())!==before-1)throw new Error('reopening read notice decremented count again');
   await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
-  if((await count.innerText()).trim()!=='6')throw new Error('read acknowledgement did not survive reload');
+  if(Number((await count.innerText()).trim())!==before-1)throw new Error('read acknowledgement did not survive reload');
   pass(t.name+'/'+v.width+': read on open clears NEW, persists count, repeat is idempotent; failed-save retry and seven routine notices');
 }
 

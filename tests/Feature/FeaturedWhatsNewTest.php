@@ -450,7 +450,7 @@ class FeaturedWhatsNewTest extends TestCase
         $company = \App\Models\Company::find($this->posCompanyId);
         $state = AppUpdate::bellForCompany($company, 'pra', $this->posAdminId);
         $this->assertCount(13, $state['unseenIds']);
-        $this->assertCount(10, $state['updates']);
+        $this->assertCount(13, $state['updates']);
         $read = $state['updates']->first();
         for ($repeat = 0; $repeat < 2; $repeat++) {
             $this->actingAs(User::find($this->posAdminId), 'pos')
@@ -459,8 +459,8 @@ class FeaturedWhatsNewTest extends TestCase
         }
         $state = AppUpdate::bellForCompany($company, 'pra', $this->posAdminId);
         $this->assertCount(12, $state['unseenIds']);
-        $this->assertCount(10, $state['updates']);
-        $this->assertFalse($state['updates']->contains('id', $read->id), 'Unread notices must remain reachable ahead of already read history.');
+        $this->assertCount(13, $state['updates']);
+        $this->assertTrue($state['updates']->contains('id', $read->id), 'Read history stays re-openable while every unread notice remains reachable.');
         $this->assertSame(1, AppUpdateSeen::count());
         $this->assertCount(13, AppUpdate::bellForCompany($company, 'pra', $this->cashierId)['unseenIds']);
         $this->assertCount(1, AppUpdate::bellForCompany(\App\Models\Company::find($this->fbrCompanyId), 'fbr', $this->fbrAdminId)['unseenIds']);

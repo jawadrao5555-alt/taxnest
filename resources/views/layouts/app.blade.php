@@ -5,6 +5,8 @@
     $diUpdateState = null;
     if ($diUpdateCompany?->product_type === 'di' && $diUpdateCompany->status === 'approved'
         && $diUpdateUser->isPosAdmin()
+        && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
+        && \Illuminate\Support\Facades\Schema::hasTable('app_update_seens')
         && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
         $diUpdateState = \App\Models\AppUpdate::bellForCompany($diUpdateCompany, 'di', (int) $diUpdateUser->id);
     }

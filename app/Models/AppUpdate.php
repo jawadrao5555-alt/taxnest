@@ -65,16 +65,11 @@ class AppUpdate extends Model
     public static function bellForCompany(?Company $company, string $panel, int $userId): array
     {
         $seenIds = self::seenIdsForUser($userId);
-        $query = self::forCompany($company, $panel)->forCompanyFamily($company)->published()->liveWindow();
-        $unseenIds = (clone $query)->whereNotIn('app_updates.id', $seenIds)->pluck('app_updates.id')
-            ->map(fn ($id) => (int) $id)->all();
-        $list = clone $query;
-        if ($unseenIds) {
-            // Integers only; unread entries must not be hidden behind ten read rows.
-            $list->orderByRaw('CASE WHEN app_updates.id IN (' . implode(',', $unseenIds) . ') THEN 0 ELSE 1 END');
-        }
-        return ['updates' => $list->orderByDesc('created_at')->orderByDesc('id')->limit(10)->get(),
-            'seenIds' => $seenIds, 'unseenIds' => $unseenIds];
+        $updates = self::forCompany($company, $panel)->forCompanyFamily($company)->published()->liveWindow()
+            ->orderByDesc('created_at')->orderByDesc('id')->get();
+        $unseenIds = $updates->reject(fn ($update) => in_array($update->id, $seenIds))
+            ->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        return ['updates' => $updates, 'seenIds' => $seenIds, 'unseenIds' => $unseenIds];
     }
 
     protected static function booted(): void

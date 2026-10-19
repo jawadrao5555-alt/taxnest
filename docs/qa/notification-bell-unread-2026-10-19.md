@@ -9,8 +9,9 @@ component regression failed 0 !== 1. Acknowledgement previously happened only
 on closing detail and swallowed errors. The detail component also read the wrong
 dataset property: data-tn-seen-endpoint maps to tnSeenEndpoint, not seenEndpoint. It now saves the selected notice on
 opening, changes state after server success, and offers retry on failure.
-Unread totals cover all eligible notices instead of only ten displayed rows.
-Unread notices sort first so older unread entries remain reachable on refresh.
+Unread totals and scrollable history cover all eligible seven-day notices
+instead of only ten rows. Read entries remain re-openable and older unread
+entries do not require a refresh to become reachable.
 Repeated acknowledgements remove an ID once, not an arbitrary count decrement.
 
 ## Compatibility matrix

@@ -1366,6 +1366,8 @@ async function ingredientUnitAudit(page,t,v) {
 }
 
 async function tableOrderWorkflow(page,t,v) {
+  await catalogSearchCompleteWorkflow(page,t,v);
+  await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
@@ -1653,4 +1655,85 @@ async function riderRealtimeWorkflow(page,t,v) {
   },{id:t.riderRealtime.id,lat,lng},{timeout:10000});
   const pin=await read();if(!pin)throw new Error('Actual Leaflet rider marker missing');
   pass(t.name+'/'+v.width+': real authenticated API upload reaches Leaflet pin through automatic five-second poll');
+}
+
+async function catalogSearchCompleteWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  // Synthetic in-memory catalog: actual sale UI/methods, no company/product writes.
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:16},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.allProducts=[];d.allServices=[];d.searchQuery='';d.selectedCategory=777;d.searchAnyWord=false;
+  });
+  const input=page.locator('[x-ref="searchInput"]');await input.fill('QA Deal');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
+  const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
+  for(const n of [13,14,15,16]) {
+    const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});
+    await item.scrollIntoViewIfNeeded();if(!await item.isVisible())throw new Error('matching deal '+n+' is hidden from search');
+  }
+  await page.evaluate(()=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.highlightIndex=11;d.moveHighlight(1);});
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).highlightIndex===12);
+
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:85},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.onSearchInput();
+  });
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===85);
+  const more=dropdown.locator('button[x-show="searchSuggestions.length > searchDisplayCount"]');
+  await more.scrollIntoViewIfNeeded();await more.click();
+  if(!await dropdown.isVisible())throw new Error('Load more closed the search dropdown');
+  const last=dropdown.locator('button').filter({hasText:'QA Deal No 85'});
+  await last.scrollIntoViewIfNeeded();if(!await last.isVisible())throw new Error('Load more did not reveal matching deal 85');
+  await saveEvidenceScreenshot(page,'catalog-search-complete-'+v.width);
+  pass(t.name+'/'+v.width+': all sixteen deals searchable across category filters; 13-16 visible and keyboard reachable');
+}
+
+async function deliveryAddressSnapshotWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
+  const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
+  const address='Synthetic delivery lane '+v.width;
+  const response=await page.request.post(baseUrl+'/pos/restaurant/api/customer-store',{
+    headers,data:{name:'Synthetic address customer '+v.width,phone:'0300'+String(1000000+v.width),address},
+  });
+  const data=await response.json();
+  if(!response.ok()||!data.success||!data.customer?.id)throw new Error('Synthetic delivery customer setup failed');
+  let release;const gate=new Promise(resolve=>release=resolve);
+  const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
+  await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});
+  let moneyPosts=0;
+  page.on('request',request=>{if(request.method()==='POST'&&request.url()===baseUrl+'/pos/invoice/store')moneyPosts++;});
+  // Actual UI DTO without address, as happens in the customer picker. Server book is delayed.
+  await page.evaluate(customer=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.orderType='delivery';d.selectCustomerFromPhone({id:customer.id,name:customer.name,phone:customer.phone});
+    d.cart=[{cart_uid:'qa-address',item_id:null,item_type:'manual',item_name:'Synthetic address proof',quantity:1,unit_price:100,is_tax_exempt:true,special_notes:''}];
+    d.lastPayTime=0;
+  },data.customer);
+  const posted=page.waitForResponse(r=>r.url()===baseUrl+'/pos/invoice/store'&&r.request().method()==='POST');
+  const payment=page.evaluate(async()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    await d.processPaymentManual('cash',true,true);
+  });
+  await page.waitForTimeout(150);
+  if(moneyPosts!==0)throw new Error('Delivery payment serialized before its current address lookup completed');
+  release();
+  const savedResponse=await posted;const saved=await savedResponse.json();await payment;
+  if(!savedResponse.ok()||!saved.success||!saved.transaction_id)throw new Error('Synthetic provisional delivery save failed: '+JSON.stringify(saved));
+  const payload=savedResponse.request().postDataJSON();
+  if(payload.delivery_address!==address)throw new Error('Selected delivery address missing from real bill payload');
+  await page.unroute(bookUrl);
+  await page.goto(baseUrl+'/pos/transaction/'+saved.transaction_id+'/receipt',{waitUntil:'domcontentloaded'});
+  const receipt=page.locator('body');
+  if(!(await receipt.innerText()).includes(address))throw new Error('Persisted address absent from receipt preview');
+  await page.emulateMedia({media:'print'});
+  const line=page.getByText(address,{exact:true});
+  if(!await line.isVisible())throw new Error('Persisted address hidden in print layout');
+  await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
+  await page.emulateMedia({media:'screen'});
+  pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
 }

@@ -43,3 +43,18 @@ if (![...lines].some((l) => l.replace(/\\/g, '/') === '/main.js')) {
   process.exit(1);
 }
 console.log('[verify-asar] OK: app.asar contains main.js + node_modules for: ' + deps.join(', '));
+
+// Verify the actual packed date/version, not a date fabricated when the app starts.
+const { parseBuildInfo } = require('../src/build-info');
+const version = require('../package.json').version;
+const expected = parseBuildInfo(fs.readFileSync(path.join(root, 'build-info.json'), 'utf8'), version);
+const temporary = fs.mkdtempSync(path.join(require('os').tmpdir(), 'taxnest-build-info-'));
+try {
+  if (!norm.has('/build-info.json') || !expected.builtAt) throw new Error('Valid build-info.json missing');
+  execSync('npx --yes @electron/asar@3 extract-file "' + asar + '" build-info.json', {
+    cwd: temporary, encoding: 'utf8', maxBuffer: 1024 * 1024,
+  });
+  const packed = parseBuildInfo(fs.readFileSync(path.join(temporary, 'build-info.json'), 'utf8'), version);
+  if (!packed.builtAt || packed.builtAt !== expected.builtAt) throw new Error('Packed build identity does not match this build');
+  console.log('[verify-asar] OK: packed Agent version and build date match this build');
+} finally { fs.rmSync(temporary, { recursive: true, force: true }); }

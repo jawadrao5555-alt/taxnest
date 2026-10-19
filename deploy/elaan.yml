@@ -5,3 +5,4 @@ points:
   - "On-duty GPS aur map ki refresh tez hogi; offline trail apna asal waqt rakhega."
   - "Nayi location purane buffer se pehle sync hogi aur purani request live pin ko peeche nahi karegi."
   - "Package permission aur existing company settings barqarar rahengi."
+  - "Rider Android 1.8.0 ki signed update phone verification aur publication ke baad available hogi."

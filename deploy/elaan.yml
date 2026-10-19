@@ -1,7 +1,7 @@
-title: "Product search mein tamam matching deals"
-audience: pos
+title: "Desktop Agent par actual version aur build date"
+audience: all
 type: improvement
 points:
-  - "Search mein matching deals aur products sirf pehle 12 tak mehdood nahi rahenge."
-  - "Bari list mein mazeed results load ho sakte hain aur keyboard se bhi select honge."
-  - "Exact barcode aur SKU ko search mein pehli tarjeeh barqarar hai."
+  - "Agent ki settings screen par version aur actual build date wazeh dikhengi."
+  - "Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga."
+  - "Saved company, device aur printer settings barqarar rahengi."

@@ -135,8 +135,8 @@
   <div class="header">
     <h1>🛡️ TaxNest PRA Sync Agent</h1>
     <p>Auto-syncs your POS invoices to PRA via your local Pakistani IP</p>
-    <p style="font-size:11px; color:#a78bfa; margin-top:4px;">
-      Agent version: <strong id="agentVersion">—</strong> · Build: <span id="buildVer">—</span>
+    <p style="font-size:13px; color:#e9d5ff; margin-top:6px; line-height:1.6;">
+      Agent version: <strong id="agentVersion">Loading…</strong><br>Build date: <time id="buildVer">Loading…</time>
       <button id="checkUpdateBtn" title="Check for updates" style="background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.3); color:#c4b5fd; cursor:pointer; padding:3px 10px; border-radius:6px; margin-left:8px; font-size:11px; vertical-align:middle;">↻ Check Updates</button>
     </p>
   </div>
@@ -311,6 +311,7 @@
   </div>
 </div>
 
+<script src="src/build-info-view.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
 
@@ -579,9 +580,6 @@
   });
 
   (async () => {
-    const v = await window.agentAPI.getVersion();
-    $('agentVersion').textContent = v.version ? `v${v.version}` : '—';
-    $('buildVer').textContent = v.build;
     const u = await window.agentAPI.checkUpdate();
     showUpdateBanner(u);
   })();

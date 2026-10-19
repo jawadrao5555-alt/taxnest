@@ -200,7 +200,7 @@ foreach (['held', 'preparing', 'ready'] as $index => $status) {
     $tableCases[] = ['tableId' => $table->id, 'number' => $table->table_number,
         'orderId' => $order->id, 'itemName' => 'Synthetic '.$status.' dish', 'status' => $status];
 }
-foreach (['desktop', 'mobile', 'preflight-desktop', 'preflight-mobile'] as $viewport) {
+foreach (['desktop', 'mobile'] as $viewport) {
     $table = RestaurantTable::create(['company_id' => $tableShop->id, 'floor_id' => $tableFloor->id,
         'table_number' => 'HANDOFF-'.$viewport, 'seats' => 4, 'status' => 'occupied', 'occupied_since' => $now, 'is_active' => true]);
     $order = RestaurantOrder::create(['company_id' => $tableShop->id, 'table_id' => $table->id,
@@ -292,7 +292,7 @@ foreach (['pos', 'fbr_pos'] as $audience) {
 $notificationDi = $company('Synthetic Notification DI', 'notification-di@rc-browser.invalid', 'RCNOTICEDI', 'di', ['sector_type' => 'Retail']);
 $notificationUsers = [];
 foreach (['pra' => $hotel, 'fbr' => $fiscal, 'di' => $notificationDi] as $panel => $noticeCompany) {
-    foreach (['desktop', 'mobile'] as $viewport) {
+    foreach (['desktop', 'mobile', 'preflight-desktop', 'preflight-mobile'] as $viewport) {
         $account = $user($noticeCompany, 'Synthetic Notification '.$panel.' '.$viewport,
             'notice-'.$panel.'-'.$viewport.'@rc-browser.invalid', 'company_admin', 'pos_admin');
         $account->forceFill(['pra_elaan_seen_at' => now()])->save();

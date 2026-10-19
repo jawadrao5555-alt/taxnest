@@ -1,8 +1,7 @@
-title: "Caller ID ki missed-ring recovery ki tayyari"
+title: "Website par package aur add-ons ka wazeh total"
 audience: pos
 type: improvement
 points:
-  - "Caller app ki nayi 1.8.0 build ke liye saved queue aur reconnect retry shamil ki gayi hai."
-  - "Purani rings asal waqt ke saath history mein aayengi; nayi incoming call ka popup nahi banengi."
-  - "Package lock aur feature OFF ka jawab delivery ki kamyabi nahi samjha jayega."
-  - "Signed Android update ki availability successful build aur phone verification ke baad confirm hogi."
+  - "Public picker aur registration mein package aur add-ons ka combined annual total dikhaya jata hai."
+  - "Agar wohi selected features shamil wala package sasta ho to uska option aur bachat dikhayi jati hai."
+  - "Package ki existing features aur limits kam hon to alternative recommend nahi hota."

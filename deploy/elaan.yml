@@ -1,7 +1,8 @@
-title: "Desktop Agent par actual version aur build date"
-audience: all
+title: "Caller ID ki missed-ring recovery ki tayyari"
+audience: pos
 type: improvement
 points:
-  - "Agent ki settings screen par version aur actual build date wazeh dikhengi."
-  - "Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga."
-  - "Saved company, device aur printer settings barqarar rahengi."
+  - "Caller app ki nayi 1.8.0 build ke liye saved queue aur reconnect retry shamil ki gayi hai."
+  - "Purani rings asal waqt ke saath history mein aayengi; nayi incoming call ka popup nahi banengi."
+  - "Package lock aur feature OFF ka jawab delivery ki kamyabi nahi samjha jayega."
+  - "Signed Android update ki availability successful build aur phone verification ke baad confirm hogi."

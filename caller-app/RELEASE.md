@@ -1,3 +1,13 @@
+## 1.8.0 — durable ring recovery (pending owner release)
+
+Version code 10. Shared by sim/plus/play; preserve the same application ID and signing lineage.
+
+Calls are committed to a bounded private `noBackupFilesDir` outbox before transport. Retry uses the original UUID/time across process death, connectivity recovery and reboot (Android JobScheduler). Cached account tokens are hashed for queue ownership; login/logout/token rotation drops old-scope history rather than replaying it under another credential. Queue retention is 24 hours / 500 entries. Existing working pairings are adopted once; after a cloud credential/account change the saved LAN host/port/token stay intact but the new session must re-pair before LAN delivery. This prevents a new shop using the previous shop's PC. Full/corrupt storage is logged without phone/name/token and is never silently overwritten. Android battery/force-stop policies may defer jobs; opening the app also resumes recovery.
+
+Cloud `accepted:false` is delivery only for `duplicate`; feature/package rejection stops fallback and clears pending history without updating last-success. Invalid individual payloads are discarded separately; network/429/5xx stays queued. Supported old Agents lack original LAN timestamps: only fresh events (<120s) with the unchanged pairing may take that route. Old events use the cloud history path only. Existing pairing ports, config, detection and languages remain.
+
+Required before release: exact-HEAD mandatory CI (JVM behavior, all three Android debug builds/unit tasks, backend targeted/full regressions), then real-phone SIM/WhatsApp incoming vs outgoing, airplane/WiFi-off/on, process death/reboot, reply-loss duplicate, feature OFF/package lock and account switch. Debug compilation is not signed release evidence. Build signed sim/plus APKs with the existing trusted keystore, verify signature/version/checksums, then owner publishes both download files and updates `caller_app_latest_version` / `caller_app_plus_latest_version` together. Play follows its own signing/distribution route. No metadata/public APK is changed by this PR; do not advertise 1.8.0 before that succeeds.
+
 # TaxNest Caller ID APK — Build & Release Runbook
 
 Last updated: 29 Aug 2026 (v1.7.0 — LAN Mode: the ring reaches the counter over

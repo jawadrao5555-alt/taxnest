@@ -162,6 +162,12 @@ $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' =>
 $tableCases = [];
 $handoffCases = [];
 $tableOwner = $user($tableShop, 'Synthetic Table Owner', 'table-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$riderLiveToken = 'rider-realtime-fixture-' . \Illuminate\Support\Str::random(32);
+$riderLive = \App\Models\PosRider::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Live Rider',
+    'is_active' => true, 'on_duty' => true, 'duty_started_at' => $now, 'app_token' => hash('sha256', $riderLiveToken),
+    'last_lat' => 31.51, 'last_lng' => 74.31, 'last_located_at' => $now->copy()->subSeconds(30)]);
+$riderLiveToken = $riderLive->id . '|' . $riderLiveToken;
+$riderLive->update(['app_token' => hash('sha256', $riderLiveToken)]);
 $tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
 $printEvidenceShop = $company('Synthetic Print Evidence', 'print-evidence@rc-browser.invalid', 'RCBROWSERPRINT', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
@@ -541,6 +547,9 @@ $fixture = [
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
             'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
+        ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
+            'paths'=>['/pos/riders/tracking'],'markers'=>['Synthetic Live Rider'],
+            'riderRealtime'=>['id'=>$riderLive->id,'token'=>$riderLiveToken]],
         ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
         ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments,'invoicePreviewCsp'=>$adminPreviewCsp],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',

@@ -1,7 +1,8 @@
-title: "Har product ki website guide aur demo tayyari"
-audience: all
+title: "Rider ki location zyada jaldi aur durust sync hogi"
+audience: pos
 type: improvement
 points:
-  - "Digital Invoice, PRA POS, FBR POS aur Healthcare ke written workflows aik public guide mein hain."
-  - "Example screens aur package scope se product ka intikhab asaan hota hai."
-  - "Migration, training, devices aur human support ke liye demo se pehle ki maloomat wazeh hai."
+  - "On-duty GPS aur map ki refresh tez hogi; offline trail apna asal waqt rakhega."
+  - "Nayi location purane buffer se pehle sync hogi aur purani request live pin ko peeche nahi karegi."
+  - "Package permission aur existing company settings barqarar rahengi."
+  - "Rider Android 1.8.0 ki signed update phone verification aur publication ke baad available hogi."

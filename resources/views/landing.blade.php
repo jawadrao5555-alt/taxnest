@@ -661,7 +661,7 @@
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 17,990 / year</td>
-                            <td class="p-5 font-bold text-[#052730]">@php($publicPraStart = \App\Services\PosPlanComparisonService::plans()->sortBy(fn ($plan) => (float) $plan->sale_price)->first())
+                            <td class="p-5 font-bold text-[#052730]">@php($publicPraStart = \Illuminate\Support\Facades\Schema::hasTable('pricing_plans') ? \App\Services\PosPlanComparisonService::plans()->sortBy(fn ($plan) => (float) $plan->sale_price)->first() : null)
                             @if($publicPraStart) PKR {{ number_format((float) $publicPraStart->sale_price) }} / year @else See PRA pricing @endif</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 17,999 / year</td>
                         </tr>

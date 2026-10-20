@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="p-4 sm:p-6 max-w-7xl mx-auto">
+<div class="tn-live-ops p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-white">Live Ops</h1>
         <p class="text-sm text-gray-400 mt-1">NestPOS PRA diagnostics and owner-approved remediation. Diagnosis never auto-fixes.</p>
@@ -119,7 +119,7 @@
                 @forelse($recentReports as $r)
                     <li>#{{ $r->id }} {{ $r->operation }} company={{ $r->company_id ?? '-' }} <span class="text-gray-500">{{ $r->created_at }}</span></li>
                 @empty
-                    <li class="text-gray-500">None yet</li>
+                    <li class="text-gray-500">No diagnostic reports yet. Run a diagnostic to see its result here.</li>
                 @endforelse
             </ul>
         </div>
@@ -132,7 +132,7 @@
                         {{ $r->action }} {{ $r->status }} company={{ $r->company_id }}
                     </li>
                 @empty
-                    <li class="text-gray-500">None yet</li>
+                    <li class="text-gray-500">No remediation requests yet. Proposed actions will appear here before approval.</li>
                 @endforelse
             </ul>
         </div>
@@ -142,7 +142,7 @@
                 @forelse($recentCommands as $c)
                     <li>{{ $c->command_type }} {{ $c->status }} company={{ $c->company_id }}</li>
                 @empty
-                    <li class="text-gray-500">None yet</li>
+                    <li class="text-gray-500">No agent commands yet. Commands will appear here when requested.</li>
                 @endforelse
             </ul>
         </div>
@@ -152,7 +152,7 @@
                 @forelse($recentAudit as $a)
                     <li>{{ $a->event_type }} {{ $a->operation }} <span class="text-gray-500">{{ $a->created_at }}</span></li>
                 @empty
-                    <li class="text-gray-500">None yet</li>
+                    <li class="text-gray-500">No audit events yet. Live Ops activity will appear here.</li>
                 @endforelse
             </ul>
         </div>

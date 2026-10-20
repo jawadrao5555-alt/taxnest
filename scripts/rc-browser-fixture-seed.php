@@ -571,6 +571,7 @@ $fixture = [
         ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/riders/tracking'],'markers'=>['Synthetic Live Rider'],
             'riderRealtime'=>['id'=>$riderLive->id,'token'=>$riderLiveToken]],
+        ['name'=>'admin-live-ops-readability','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/live-ops'],'markers'=>['Live Ops'],'liveOpsReadability'=>true],
         ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
         ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments,'invoicePreviewCsp'=>$adminPreviewCsp],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',

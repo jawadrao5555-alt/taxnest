@@ -1,7 +1,6 @@
-title: "Website ki package aur product maloomat ki durusti"
-audience: all
+title: "Mobile apps ki signed beta verification ki tyari"
+audience: pos
 type: improvement
 points:
-  - "Public PRA starting price ab current package price se li jati hai."
-  - "Purane package names, Android size aur unsupported compliance claims durust kiye gaye hain."
-  - "Caller local contact lookup, rider location aur Healthcare records ki privacy wazeh ki gayi hai."
+  - "Rider aur Caller builds ke liye owner-controlled signing aur verification process shamil hai."
+  - "Naye public APK aur version update phone testing ke baad owner release karega."

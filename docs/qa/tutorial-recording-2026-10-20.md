@@ -13,3 +13,9 @@ entire unchanged acceptance matrix. Local opt-in/path/symlink tests pass;
 JS/shell/YAML and whitespace checks pass. Real Chrome/SDK/PHP unavailable in
 this workspace; exact-HEAD CI recording remains required. No production or
 customer video, narrated final tutorial or public release is claimed.
+
+CI correctly rejected an extra upload preceding sanitized evidence. Keep the
+sanitized evidence artifact first and preserve its existing success gate. The
+DAG guard now explicitly restricts the additional browser-only synthetic
+preview upload to success(), two exact staged patterns, required manifest and
+Top Selling recording preflight; arbitrary extra uploads remain rejected.

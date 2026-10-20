@@ -35,7 +35,19 @@ function contract(doc,label){
     const steps=jobs[name].steps||[];
     const text=steps.map(s=>s.run||'').join('\n');
     for(const needle of needles)if(!text.includes(needle))throw Error(`${label}: ${name} lacks mandatory command: ${needle}`);
-    const artifact=steps.find(s=>s.uses==='actions/upload-artifact@v4');
+    const artifacts=steps.filter(s=>s.uses==='actions/upload-artifact@v4');
+    const artifact=artifacts[0];
+    for(const extra of artifacts.slice(1)) {
+      const paths=String(extra.with?.path||'').trim().split('\n');
+      const allowed=['${{ runner.temp }}/tutorial-preview/*.webm','${{ runner.temp }}/tutorial-preview/recording-manifest.json'];
+      if(name!=='browserdesktopmobile'||extra.name!=='Upload synthetic Top Selling recording preview'
+        ||extra.if!=='success()'||extra.with?.name!=='tutorial-preview-${{ github.run_id }}'
+        ||JSON.stringify(paths)!==JSON.stringify(allowed)||extra.with?.['if-no-files-found']!=='error'
+        ||!text.includes('RC_TUTORIAL_RECORDING=1 RC_BROWSER_ONLY=restaurant-top-selling')
+        ||!text.includes('test -s "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json"')) {
+        throw Error(`${label}: ${name} has an unapproved extra artifact upload`);
+      }
+    }
     if(!artifact||artifact.if!=="always() && steps.sanitize_evidence.outcome == 'success'")throw Error(`${label}: ${name} must upload only after sanitizer success`);
     const sanitize=steps.find(s=>String(s.name||'').toLowerCase().includes('sanitize ci evidence'));
     if(!sanitize||sanitize.if!=='always()'||!String(sanitize.run||'').includes('ci-sanitize-evidence.sh'))throw Error(`${label}: ${name} lacks the sanitizer collector`);

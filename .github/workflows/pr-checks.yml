@@ -283,16 +283,6 @@ jobs:
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: bash scripts/rc-browser-fixture.sh stop
-      - name: Upload synthetic Top Selling recording preview
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tutorial-preview-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/tutorial-preview/*.webm
-            ${{ runner.temp }}/tutorial-preview/recording-manifest.json
-          if-no-files-found: error
-          retention-days: 14
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()
@@ -307,6 +297,16 @@ jobs:
           name: rc-evidence-${{ github.job }}-${{ github.run_id }}
           path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
           if-no-files-found: warn
+          retention-days: 14
+      - name: Upload synthetic Top Selling recording preview
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tutorial-preview-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/tutorial-preview/*.webm
+            ${{ runner.temp }}/tutorial-preview/recording-manifest.json
+          if-no-files-found: error
           retention-days: 14
 
   jsagentrealtime:

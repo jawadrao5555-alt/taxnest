@@ -81,6 +81,7 @@ class PosAccessService
         '#^pos/riders/\d+/settle$#' => 'deliveries',
         '#^pos/dashboard#' => 'dashboard',
         '#^pos/restaurant/dashboard#' => 'dashboard',
+        '#^pos/restaurant/top-selling#' => 'reports',
         '#^pos/transactions#' => 'orders',
         // Return / credit-note flow (Task 678): its own per-staff grant —
         // MUST precede the generic transaction/ prefix or it falls into

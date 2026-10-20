@@ -1215,6 +1215,7 @@ class AdminCompanyController extends Controller
         // that blocks re-registration), hs_* logs (global HS intelligence).
         // Schema guards keep this safe during the deploy-before-migrate window.
         $orphanTables = [
+            'pos_whatsapp_status_events', 'pos_whatsapp_outbox',
             'pos_riders', 'pos_rider_settlements', 'pos_day_close_reports',
             'pos_deals', 'pos_deal_usages', 'pos_stations', 'pos_menu_items', 'pos_print_jobs',
             'pos_customer_addresses', 'pos_customer_spend_snapshots', 'pos_local_series_resets',

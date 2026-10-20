@@ -25,7 +25,7 @@ import org.json.JSONObject
  *
  * - LocationManager (GPS + network) — zero Play-Services dependency, works on
  *   every Android phone in the market.
- * - Points buffer in PointQueue (offline-safe), flushed every 45s / 20 points.
+ * - Points buffer in PointQueue (offline-safe), flushed every 5s while on duty.
  * - Server is the boss: 401/403 → end session/duty; 409 → duty already off.
  *
  * 401 handling — token-only eviction:
@@ -48,10 +48,9 @@ class TrackingService : Service(), LocationListener {
         @Volatile var running = false
         private const val NOTIF_ID = 1
         private const val CHANNEL = "duty_tracking"
-        private const val FLUSH_MS = 45_000L
-        private const val MIN_TIME_MS = 20_000L
-        private const val MIN_DIST_M = 15f
-        private const val FLUSH_AT_POINTS = 20
+        private const val FLUSH_MS = 5_000L
+        private const val MIN_TIME_MS = 5_000L
+        private const val MIN_DIST_M = 5f
 
         /**
          * Stationary heartbeat interval. Kept well under the server's smallest
@@ -228,11 +227,8 @@ class TrackingService : Service(), LocationListener {
             location.time.takeIf { it > 0L } ?: lastPointAt
         )
         PointQueue.add(
-            this, location.latitude, location.longitude, lastAcc, batteryPct()
+            this, location.latitude, location.longitude, lastAcc, batteryPct(), latestFix!!.capturedAtMs
         )
-        if (PointQueue.size(this) >= FLUSH_AT_POINTS) {
-            netHandler.post { flush() }
-        }
         // Task #1508: check proximity to each delivery destination and fire
         // arrival notification (deduped) when the rider is near.  Runs on the
         // GPS callback thread — ArrivalNotifier is thread-safe.
@@ -267,8 +263,8 @@ class TrackingService : Service(), LocationListener {
 
     /**
      * Stationary heartbeat (v1.7.0): no new fix for HEARTBEAT_MS → re-queue the
-     * last known position with a CURRENT timestamp. Server-side this keeps
-     * last_located_at fresh, so the live map's red "khamosh" badge means what
+     * last known position with its ORIGINAL capture timestamp. Server-side this keeps
+     * last_located_at honest, so the live map's red "khamosh" badge means what
      * it says. Identical coordinates ⇒ no effect on distance or idle stats.
      */
     private fun maybeHeartbeat() {
@@ -278,7 +274,10 @@ class TrackingService : Service(), LocationListener {
         val now = System.currentTimeMillis()
         if (lastPointAt != 0L && now - lastPointAt < HEARTBEAT_MS) return
         lastPointAt = now
-        PointQueue.add(this, lat, lng, lastAcc, batteryPct())
+        val fix = latestFix ?: return
+        // A heartbeat must never re-date an obsolete GPS fix as "live".
+        if (now - fix.capturedAtMs !in 0..HEARTBEAT_MS) return
+        PointQueue.add(this, lat, lng, lastAcc, batteryPct(), fix.capturedAtMs)
     }
 
     /**
@@ -301,25 +300,19 @@ class TrackingService : Service(), LocationListener {
 
     /** Upload one batch; server responses steer local state. */
     private fun flush() {
-        val token = Prefs.token(this) ?: run { stopSelf(); return }
         // Shared with QueueDrain: the background worker may drain the same
         // queue while we are running (v1.7.0) — never trim it twice.
         synchronized(QueueDrain.uploadLock) {
+            val token = Prefs.token(this) ?: run { stopSelf(); return }
             val batch = PointQueue.peekBatch(this, 100)
             if (batch.length() == 0) return
 
             val (code, body) = ApiClient.post("/locations", JSONObject().put("points", batch), token)
+            synchronized(Prefs.sessionLock) {
+                if (Prefs.token(this) != token) return
             when {
                 code in 200..299 -> {
-                    // Use the server's `stored` count to trim the queue precisely.
-                    // If stored==0 (all points rejected as too-old or bad coords),
-                    // remove the full batch to avoid an infinite retry of permanently-
-                    // invalid points.
-                    val stored = body?.optInt("stored", 0) ?: 0
-                    val toRemove = if (stored > 0) stored else batch.length()
-                    // ackBatch (not removeFirst): live fixes keep arriving during
-                    // the upload and a full buffer trims its own front.
-                    PointQueue.ackBatch(this, batch, toRemove)
+                    if (body == null || !PointQueue.acknowledge(this, batch, body)) return
                     Prefs.setLastSync(this, System.currentTimeMillis())
                     Prefs.setLastSyncError(this, SyncStatus.ERR_NONE)
                 }
@@ -344,6 +337,7 @@ class TrackingService : Service(), LocationListener {
                 }
                 // network failure / other transient error → keep buffer, try next loop
                 else -> Prefs.setLastSyncError(this, SyncStatus.ERR_NET)
+            }
             }
         }
     }

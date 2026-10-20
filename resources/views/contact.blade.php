@@ -115,7 +115,7 @@
                 <div class="flex items-start gap-3">
                     <svg class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div>
-                        <h4 class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Support Hours</h4>
+                        <h4 class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Human Support Hours</h4>
                         <p class="text-sm text-gray-700">{{ $hours }}</p>
                     </div>
                 </div>
@@ -128,6 +128,12 @@
                 <p class="text-gray-500 text-sm">Contact details will appear here once the administrator adds them in the admin settings.</p>
             </div>
             @endif
+        </section>
+
+        <section style="max-width:1100px;margin:0 auto;padding:24px;color:#374151">
+            <h2 style="font-size:1.25rem;font-weight:700">Before your product demo</h2>
+            <p style="margin-top:10px">Tell us which product you need, your business type, branches, counters and printer models. Share anonymised sample data only. We will need to agree migration, training and any after-hours support as part of your setup scope; an in-panel AI assistant is separate from human support hours.</p>
+            <a href="/product-guide" style="display:inline-block;margin-top:12px;color:#0A4D5C;text-decoration:underline">Read the product and onboarding guide</a>
         </section>
 
         <!-- Legal sections -->
@@ -150,7 +156,7 @@
                             <li class="flex gap-2"><span class="text-emerald-500">✓</span> Providing the platform and keeping it reasonably available and secure.</li>
                             <li class="flex gap-2"><span class="text-emerald-500">✓</span> Transmitting your invoices and POS data to FBR / PRA through their official APIs (PRAL IMS, FBR Digital Invoicing) as you configure.</li>
                             <li class="flex gap-2"><span class="text-emerald-500">✓</span> Applying tax rates and calculation logic per the current published FBR / PRA rules implemented in the system.</li>
-                            <li class="flex gap-2"><span class="text-emerald-500">✓</span> Protecting your account with access controls and immutable audit logs.</li>
+                            <li class="flex gap-2"><span class="text-emerald-500">✓</span> Protecting your account with access controls and audit logs for supported billing and account events.</li>
                             <li class="flex gap-2"><span class="text-emerald-500">✓</span> Relaying the authority's response to you transparently, including any rejection reasons.</li>
                             <li class="flex gap-2"><span class="text-emerald-500">✓</span> Providing support for platform issues through the channels listed above.</li>
                         </ul>

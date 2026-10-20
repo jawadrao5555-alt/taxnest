@@ -5,13 +5,25 @@ import android.content.SharedPreferences
 
 /** Tiny SharedPreferences wrapper — single source of app state. */
 object Prefs {
+    val sessionLock = Any()
     private const val FILE = "rider_prefs"
 
     private fun sp(c: Context): SharedPreferences =
         c.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     fun token(c: Context): String? = sp(c).getString("token", null)
-    fun setToken(c: Context, v: String?) = sp(c).edit().putString("token", v).apply()
+    fun setToken(c: Context, v: String?) {
+        synchronized(sessionLock) {
+            val owner = v?.substringBefore('|')
+            val previous = sp(c).getString("queue_owner", null)
+                ?: token(c)?.substringBefore('|')
+            val editor = sp(c).edit().putString("token", v).putString("queue_owner", owner)
+            // A token rotation for the SAME rider retains its offline trail.
+            // Never attribute another/unknown rider's buffered GPS to a login.
+            if (owner != previous) editor.putString("queue", "[]")
+            editor.commit()
+        }
+    }
 
     fun riderName(c: Context): String = sp(c).getString("rider_name", "") ?: ""
     fun setRiderName(c: Context, v: String) = sp(c).edit().putString("rider_name", v).apply()
@@ -28,7 +40,7 @@ object Prefs {
     }
 
     fun queueJson(c: Context): String = sp(c).getString("queue", "[]") ?: "[]"
-    fun setQueueJson(c: Context, v: String) = sp(c).edit().putString("queue", v).apply()
+    fun setQueueJson(c: Context, v: String) = sp(c).edit().putString("queue", v).commit()
 
     fun lastSync(c: Context): Long = sp(c).getLong("last_sync", 0L)
     fun setLastSync(c: Context, v: Long) = sp(c).edit().putLong("last_sync", v).apply()
@@ -75,13 +87,19 @@ object Prefs {
      * the rider can re-login on this device and the buffered offline points will
      * drain automatically once duty resumes.
      */
-    fun clearToken(c: Context) =
-        sp(c).edit()
-            .remove("token").remove("rider_name").remove("company_name")
-            .remove("seen_deliveries") // fresh login must re-alert still-open bills
-            .remove("seen_arrivals")   // fresh login clears arrival notification dedupe
-            .putBoolean("duty", false)
-            .apply()
+    fun clearToken(c: Context) {
+        synchronized(sessionLock) {
+            val editor = sp(c).edit()
+            // Adopt an upgraded logged-in session BEFORE evicting its token;
+            // otherwise a same-rider re-login cannot prove ownership of its trail.
+            if (sp(c).getString("queue_owner", null) == null) {
+                editor.putString("queue_owner", token(c)?.substringBefore('|'))
+            }
+            editor.remove("token").remove("rider_name").remove("company_name")
+                .remove("seen_deliveries").remove("seen_arrivals")
+                .putBoolean("duty", false).commit()
+        }
+    }
 
     /**
      * Full session wipe — used only on VOLUNTARY logout.  Clears the queue

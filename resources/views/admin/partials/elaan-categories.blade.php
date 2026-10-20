@@ -21,7 +21,7 @@
     <div data-elaan-catbox class="space-y-3 max-h-64 overflow-y-auto pr-1">
         @foreach($elaanGroups as $panel => $groups)
             <div data-elaan-panel="{{ $panel }}">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">{{ $panel === 'fbr' ? 'FBR POS categories' : 'PRA POS categories' }}</p>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">{{ $panel === 'di' ? 'Digital Invoicing sectors' : ($panel === 'fbr' ? 'FBR POS categories' : 'PRA POS categories') }}</p>
                 @foreach($groups as $heading => $members)
                     <div class="mb-2">
                         <div class="flex items-center gap-2 mb-1">

@@ -216,6 +216,7 @@ Route::get('/', function () {
 });
 
 Route::get('/contact', fn () => view('contact'))->name('contact');
+Route::view('/product-guide', 'product-guide')->name('product-guide');
 
 // Public legal pages. Google Play in dono URLs ko listing mein maangta hai aur
 // yeh check karta hai ke woh bina login khulen (Task 1346) — is liye yeh guest
@@ -391,6 +392,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('di.whats-new.seen');
 
     // ── Tax Consultant Console (any DI web user can become a consultant) ──
     // Linking is consent-based ONLY: redeem a client-generated invite code, or
@@ -930,6 +932,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/caller-devices/revoke', [\App\Http\Controllers\PosCallerIdController::class, 'revokeDevice'])->name('pos.settings.caller-devices.revoke');
     Route::post('/settings/receipt-autoclose', [PosController::class, 'updateReceiptAutoclose'])->name('pos.settings.receipt-autoclose');
     Route::post('/settings/cash-received-toggle', [PosController::class, 'toggleCashReceived'])->name('pos.settings.cash-received-toggle');
+    Route::get('/settings/whatsapp-delivery', [\App\Http\Controllers\PosWhatsAppSettingsController::class, 'show'])->name('pos.whatsapp-delivery');
+    Route::post('/settings/whatsapp-delivery', [\App\Http\Controllers\PosWhatsAppSettingsController::class, 'save'])->name('pos.whatsapp-delivery.save');
     Route::post('/settings/whatsapp-bill-toggle', [PosController::class, 'toggleWhatsappBill'])->name('pos.settings.whatsapp-bill-toggle');
     Route::post('/settings/tax-pricing-mode', [PosController::class, 'updateTaxPricingMode'])->name('pos.settings.tax-pricing-mode');
     Route::post('/settings/inventory-toggle', [PosController::class, 'updateInventoryToggle'])->name('pos.settings.inventory-toggle');
@@ -1454,6 +1458,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/orders/{id}/resend-kitchen', [RestaurantPosController::class, 'resendKitchen'])->name('pos.restaurant.orders.resend-kitchen');
     Route::post('/api/toggle-auto-kot', [PosController::class, 'toggleAutoKot'])->name('pos.api.toggle-auto-kot');
     Route::get('/restaurant/dashboard', [RestaurantPosController::class, 'dashboard'])->name('pos.restaurant.dashboard');
+    Route::get('/restaurant/top-selling', [RestaurantPosController::class, 'topSelling'])->name('pos.restaurant.top-selling');
     Route::get('/restaurant/receipt/{id}', [RestaurantPosController::class, 'receipt'])->name('pos.restaurant.receipt');
     Route::get('/restaurant/api/check-stock', [RestaurantPosController::class, 'checkStock'])->name('pos.restaurant.check-stock');
     Route::post('/restaurant/api/refresh-product-image/{id}', [RestaurantPosController::class, 'refreshProductImage'])->name('pos.restaurant.refresh-image');

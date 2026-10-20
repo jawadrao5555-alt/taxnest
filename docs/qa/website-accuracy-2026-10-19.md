@@ -11,3 +11,7 @@ Local reproduction: repository templates reproduce the audited mismatches. PHP a
 Remaining: real signed Caller/Rider phone releases, WhatsApp delivery, provider acceptance and production accounts are outside this content PR. FBR copy is limited to the confirmed held-order KOT flow; no new feature is promised. Contact address and human support hours remain existing admin settings, rather than invented details.
 
 CI found the existing minimal homepage smoke has no pricing_plans table. Guard the optional starting-price lookup with Schema::hasTable; that environment shows the existing 'See PRA pricing' fallback rather than a 500. Existing ExampleTest remains unchanged and is the missing-schema regression. Public rendered pages already passed in isolated Chrome on the prior HEAD; full exact-HEAD checks must rerun after this fix.
+
+## Refresh after Top Selling — 2026-10-20
+
+Merged latest main `1e7fc9621b8dd57edf7d7ae5fbf743fd13bbe3df` after PR #220. Preserved public pricing/guide browser checks, notifications, optional WhatsApp and complete Top Selling behavior. Local JavaScript syntax and staged whitespace checks passed. PHP and Chrome remain unavailable locally; fresh exact-head isolated CI is required, including the existing missing-schema homepage regression and all three public website modules at desktop/mobile.

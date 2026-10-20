@@ -1212,6 +1212,45 @@ async function reportingConnectorWorkflow(page,t,v) {
   pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
 }
 
+async function liveOpsReadability(page,t,v) {
+  await page.goto(baseUrl+'/admin/live-ops',{waitUntil:'domcontentloaded'});
+  const root=page.locator('.tn-live-ops');
+  await root.waitFor({state:'visible'});
+  const saved=await page.evaluate(()=>({theme:getAdminTheme(),dark:document.documentElement.classList.contains('dark')}));
+  try {
+    for(const theme of ['indigo','emerald','cyan','rose','amber','purple'])for(const dark of [false,true]) {
+      await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
+      const errors=await root.evaluate(root=>{
+        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)throw new Error('Unsupported computed colour '+s);const c=m[1].split(/[, /]+/).map(Number);return [...c.slice(0,3),c[3]??1];};
+        const over=(a,b)=>a.slice(0,3).map((x,i)=>x*a[3]+b[i]*(1-a[3]));
+        const bg=el=>{const chain=[];for(let p=el;p;p=p.parentElement)chain.unshift(p);let c=[255,255,255];for(const p of chain)c=over(rgb(getComputedStyle(p).backgroundColor),c);return c;};
+        const lum=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
+        const contrast=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+        const errors=[];
+        const controls=root.querySelectorAll('.bg-gray-900 :is(label,p,li,input,select,option,textarea,button)');
+        if(!controls.length)throw new Error('Live Ops readability sample is empty');
+        for(const el of controls) {
+          if(el.tagName!=='OPTION'&&!el.getClientRects().length)continue;
+          const cs=getComputedStyle(el),back=bg(el),ratio=contrast(over(rgb(cs.color),back),back);
+          if(ratio<4.5)errors.push(el.tagName+' contrast '+ratio.toFixed(2));
+          if(el.placeholder) {
+            const ps=getComputedStyle(el,'::placeholder');
+            if(contrast(over(rgb(ps.color),back),back)<4.5)errors.push('Faint placeholder');
+          }
+        }
+        return errors;
+      });
+      if(errors.length)throw new Error('Live Ops '+theme+'/'+dark+': '+errors.join('; '));
+      await checkUsability(page,t,'/admin/live-ops',v);
+    }
+    for(const label of ['No remediation requests yet.','No agent commands yet.']) {
+      if(!(await root.innerText()).includes(label))throw new Error('Missing descriptive empty state: '+label);
+    }
+    await saveEvidenceScreenshot(page,'rc-'+v.width+'-live-ops-readability');
+    pass(t.name+'/'+v.width+': actual read-only Live Ops cards, controls, options and placeholders >=4.5 across six themes/two modes; descriptive empty states');
+  } finally {await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);}
+}
+
 async function companyDirectoryContrast(page,t,v) {
   await page.goto(baseUrl+'/admin/companies?search=Synthetic%20Contrast',{waitUntil:'domcontentloaded'});
   await page.locator('.tn-directory-alert').waitFor({state:'visible'});
@@ -1250,6 +1289,7 @@ async function companyDirectoryContrast(page,t,v) {
 async function workflow(page,t,v,diagnostics) {
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
   if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
+  if(t.liveOpsReadability)return liveOpsReadability(page,t,v);
   if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {

@@ -530,3 +530,24 @@ body.admin-themed .tn-company-directory .tn-directory-alert :is(h2, a, span, svg
 body.admin-themed .tn-company-directory h1.text-white { color: var(--tn-admin-text) !important; }
 .tn-company-directory .tn-directory-table tbody tr { background: #111827 !important; }
 .tn-company-directory .tn-directory-table td::before { color: #cbd5e1 !important; }
+
+
+/* Live Ops retains its existing dark cards in every saved theme/mode. Keep
+   secondary labels readable on those cards without recolouring light canvas
+   text or changing any tenant/POS surface. */
+.tn-live-ops :is(.bg-gray-900, .bg-gray-950) :is(.text-gray-500, .text-gray-600) {
+    color: #cbd5e1 !important;
+}
+.tn-live-ops :is(input, select, textarea, option) {
+    min-width: 0;
+    background-color: #030712 !important;
+    color: #f8fafc !important;
+    color-scheme: dark;
+}
+.tn-live-ops :is(input, textarea)::placeholder { color: #cbd5e1 !important; opacity: 1; }
+.tn-live-ops button.bg-amber-600 { background-color: #92400e !important; color: #fff !important; }
+.tn-live-ops :is(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid #60a5fa; outline-offset: 3px;
+}
+.tn-live-ops .grid > div { min-width: 0; }
+.tn-live-ops :is(li, code) { overflow-wrap: anywhere; }

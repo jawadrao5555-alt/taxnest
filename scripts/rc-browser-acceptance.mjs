@@ -1237,13 +1237,33 @@ async function companyDirectoryContrast(page,t,v) {
         return errors;
       });
       if(errors.length)throw new Error('Directory '+theme+'/'+dark+': '+errors.join('; '));
+      await checkUsability(page,t,'/admin/companies',v);
+      const search=page.getByRole('textbox',{name:'Search companies',exact:true});
+      await search.focus();
+      for(const name of ['Company product type','Company status','Filter']) {
+        await page.keyboard.press('Tab');
+        const focused=page.getByRole(name==='Filter'?'button':'combobox',{name,exact:true});
+        if(!await focused.evaluate(el=>document.activeElement===el))throw new Error('Directory keyboard order lost '+name);
+        const ring=await focused.evaluate(el=>{const s=getComputedStyle(el);return {width:parseFloat(s.outlineWidth),style:s.outlineStyle};});
+        if(ring.width<2||ring.style==='none')throw new Error('Directory keyboard focus is not visible on '+name);
+      }
+      const actions=page.locator('.tn-directory-actions :is(a,button)');
+      if(!await actions.count())throw new Error('Directory action sample is empty');
+      for(let i=0;i<await actions.count();i++) {
+        const action=actions.nth(i);
+        await action.scrollIntoViewIfNeeded();
+        await action.click({trial:true}); // never submit company status actions
+        const box=await action.boundingBox();
+        if(!box||box.width<20||box.height<28)throw new Error('Directory action is clipped or too small');
+      }
+
     }
     await saveEvidenceScreenshot(page,'rc-'+v.width+'-company-directory-contrast');
     await page.locator('select[name=status]').selectOption('approved');
     await Promise.all([page.waitForURL(u=>u.searchParams.get('status')==='approved'),page.getByRole('button',{name:'Filter',exact:true}).click()]);
     if(await page.locator('[data-directory-status]').count()!==1||await page.locator('[data-directory-status]').first().getAttribute('data-directory-status')!=='approved')throw new Error('Directory filter changed behavior');
     await page.locator('.tn-directory-actions a').first().click({trial:true});
-    pass(t.name+'/'+v.width+': actual alert/owner/status/actions/options >=4.5 contrast in six themes/light-dark; GET filter preserved');
+    pass(t.name+'/'+v.width+': actual alert/owner/status/actions/options >=4.5 contrast in six themes/light-dark; keyboard labels/focus/order and all status action hit targets; GET filter preserved');
   } finally {await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);}
 }
 

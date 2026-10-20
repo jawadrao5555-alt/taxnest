@@ -34,4 +34,18 @@ class CciPilotEvidenceAuditTest extends TestCase {
   [$rows,$grids]=$this->fixture();$grids['TAXNEST SALES LINES'][1][7]=125;$grids['TAXNEST SALES LINES'][1][8]='VERIFIED';$grids['TAXNEST SALES LINES'][1][9]=6;$grids['TAXNEST SALES LINES'][1][10]='REGISTERED VERIFIED';
   $a=(new CciPilotEvidenceAudit)->auditRows($rows,$grids);$this->assertSame(0,$a['sales_lines_missing_printed_mrp']);$this->assertSame('HOLD',$a['status']);
  }
+ public function test_request_list_points_to_missing_cells_without_copying_buyer_or_invoice_identifiers(): void {
+  [$rows,$grids]=$this->fixture();$audit=(new CciPilotEvidenceAudit)->auditRows($rows,$grids);
+  $request=$audit['evidence_requests'][0];
+  $this->assertSame('TAXNEST SALES LINES',$request['sheet']);$this->assertSame(2,$request['evidence_row']);$this->assertSame(16,$request['source_row']);
+  $this->assertSame(['Printed Retail Price','HS and Tax Verified','Litres per Case (if known)','Buyer Status'],$request['required_fields']);
+  $this->assertCount(3,$audit['evidence_requests']);
+  $this->assertStringNotContainsString('PRIVATE',json_encode($audit['evidence_requests']));
+  $this->assertStringNotContainsString('CCI Invoice No',json_encode($audit['evidence_requests']));
+  $grids['TAXNEST SALES LINES'][1][7]=125;$grids['TAXNEST SALES LINES'][1][8]='VERIFIED';
+  $grids['TAXNEST SALES LINES'][1][9]=6;$grids['TAXNEST SALES LINES'][1][10]='REGISTERED VERIFIED';
+  $updated=(new CciPilotEvidenceAudit)->auditRows($rows,$grids);
+  $this->assertCount(2,$updated['evidence_requests']);$this->assertSame('HOLD',$updated['status']);
+  $this->assertSame($audit['footer_totals_cents'],$updated['footer_totals_cents']);
+ }
 }

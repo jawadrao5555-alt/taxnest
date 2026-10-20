@@ -1,7 +1,6 @@
-title: "Website ki package aur product maloomat ki durusti"
-audience: all
+title: "CCI pilot ke missing evidence ki work list"
+audience: di
 type: improvement
 points:
-  - "Public PRA starting price ab current package price se li jati hai."
-  - "Purane package names, Android size aur unsupported compliance claims durust kiye gaye hain."
-  - "Caller local contact lookup, rider location aur Healthcare records ki privacy wazeh ki gayi hai."
+  - "Offline audit missing evidence ke sheet aur row references deta hai."
+  - "MRP, HS/tax aur buyer evidence owner confirmation se hi verified hogi; import HOLD barqarar hai."

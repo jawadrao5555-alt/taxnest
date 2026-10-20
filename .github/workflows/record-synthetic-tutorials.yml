@@ -12,6 +12,9 @@ jobs:
   record:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
     container:
       image: mariadb:10.6.23-jammy@sha256:93435df079cf42c7590ad12f7481d88d297d0228c723c152eb0600caa25a157f
       options: --user root

@@ -114,6 +114,7 @@
         </div>
     </main>
 
+    @include('partials.product-guide-link', ['productGuideKey' => ''])
     <x-site-footer />
 <script>
 (function () {

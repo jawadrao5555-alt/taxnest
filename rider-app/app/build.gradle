@@ -17,8 +17,8 @@ android {
         applicationId "pk.taxnest.rider"
         minSdk 24
         targetSdk 34
-        versionCode 13
-        versionName "1.7.3"
+        versionCode 14
+        versionName "1.8.0"
     }
 
     signingConfigs {
@@ -68,6 +68,7 @@ dependencies {
     // QR is encoded entirely on-device from the server allowlisted bare payload.
     implementation 'com.google.zxing:core:3.5.3'
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 }
 
 // Task #1106: Google Services plugin can only run with a real

@@ -153,12 +153,29 @@ $tableShop = $company('Synthetic Table Order Recovery', 'table-orders-company@rc
     'table_click_direct_open' => true, 'pos_guided_flow_enabled' => false,
     'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
 ]);
+// The real invoice-store route enforces subscription quota even for internal fixtures.
+// Give only this synthetic shop a normal, active, bounded package; do not bypass the gate.
+$addressProofPlan = \App\Models\PricingPlan::create([
+    'name' => 'Synthetic delivery address proof', 'product_type' => 'pos',
+    'invoice_limit' => 100, 'price' => 100, 'is_trial' => false,
+]);
+\App\Models\Subscription::create([
+    'company_id' => $tableShop->id, 'pricing_plan_id' => $addressProofPlan->id,
+    'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(),
+    'active' => true,
+]);
 $tableCashier = $user($tableShop, 'Synthetic Table Cashier', 'table-orders@rc-browser.invalid', 'user', 'pos_cashier');
 $tableWaiter = $user($tableShop, 'Synthetic Table Waiter', 'table-waiter@rc-browser.invalid', 'user', 'pos_waiter');
 $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);
 $tableCases = [];
 $handoffCases = [];
 $tableOwner = $user($tableShop, 'Synthetic Table Owner', 'table-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$riderLiveToken = 'rider-realtime-fixture-' . \Illuminate\Support\Str::random(32);
+$riderLive = \App\Models\PosRider::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Live Rider',
+    'is_active' => true, 'on_duty' => true, 'duty_started_at' => $now, 'app_token' => hash('sha256', $riderLiveToken),
+    'last_lat' => 31.51, 'last_lng' => 74.31, 'last_located_at' => $now->copy()->subSeconds(30)]);
+$riderLiveToken = $riderLive->id . '|' . $riderLiveToken;
+$riderLive->update(['app_token' => hash('sha256', $riderLiveToken)]);
 $tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
 $printEvidenceShop = $company('Synthetic Print Evidence', 'print-evidence@rc-browser.invalid', 'RCBROWSERPRINT', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
@@ -280,9 +297,10 @@ foreach (['pos', 'fbr_pos'] as $audience) {
     ]);
 }
 
+$notificationDi = $company('Synthetic Notification DI', 'notification-di@rc-browser.invalid', 'RCNOTICEDI', 'di', ['sector_type' => 'Retail']);
 $notificationUsers = [];
-foreach (['pra' => $hotel, 'fbr' => $fiscal] as $panel => $noticeCompany) {
-    foreach (['desktop', 'mobile'] as $viewport) {
+foreach (['pra' => $hotel, 'fbr' => $fiscal, 'di' => $notificationDi] as $panel => $noticeCompany) {
+    foreach (['desktop', 'mobile', 'preflight-desktop', 'preflight-mobile'] as $viewport) {
         $account = $user($noticeCompany, 'Synthetic Notification '.$panel.' '.$viewport,
             'notice-'.$panel.'-'.$viewport.'@rc-browser.invalid', 'company_admin', 'pos_admin');
         $account->forceFill(['pra_elaan_seen_at' => now()])->save();
@@ -291,16 +309,17 @@ foreach (['pra' => $hotel, 'fbr' => $fiscal] as $panel => $noticeCompany) {
     for ($i = 1; $i <= 7; $i++) {
         AppUpdate::create([
             'title' => 'Synthetic routine '.$panel.' '.$i, 'points' => ['Reception notice'],
-            'audience' => $panel === 'fbr' ? 'fbr_pos' : 'pos',
-            'target_categories' => [$panel === 'fbr' ? 'retail' : 'hotel'],
+            'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
+            'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => false,
         ]);
     }
+    if ($panel === 'di') continue;
     foreach (['a', 'b'] as $receipt) {
         AppUpdate::create([
             'title' => 'Synthetic featured '.$panel, 'points' => ['Important reception notice'],
-            'audience' => $panel === 'fbr' ? 'fbr_pos' : 'pos',
-            'target_categories' => [$panel === 'fbr' ? 'retail' : 'hotel'],
+            'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
+            'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => true,
             'deployment_key' => sha1('synthetic-notification-'.$panel.'-'.$receipt),
         ]);
@@ -540,6 +559,9 @@ $fixture = [
             'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
         ['name'=>'whatsapp-optional-autosend','login'=>$waOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/settings/whatsapp-delivery'],'markers'=>['WhatsApp auto-send'], 'whatsappAutoSend'=>true],
+        ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
+            'paths'=>['/pos/riders/tracking'],'markers'=>['Synthetic Live Rider'],
+            'riderRealtime'=>['id'=>$riderLive->id,'token'=>$riderLiveToken]],
         ['name'=>'admin-company-directory-contrast','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/companies?search=Synthetic%20Contrast'],'expectedPaths'=>['/admin/companies'],'markers'=>['Synthetic Contrast Owner'],'companyDirectoryContrast'=>true],
         ['name'=>'admin-dashboard-details','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login','paths'=>['/admin/dashboard'],'markers'=>['Admin Dashboard'],'dashboardDetails'=>true,'previewDocuments'=>$adminPreviewDocuments,'invoicePreviewCsp'=>$adminPreviewCsp],
         ['name' => 'customer-amount-audit', 'login' => $amountOwner->email, 'password' => $password, 'loginPath' => '/pos/login',
@@ -580,8 +602,9 @@ $fixture = [
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
-        ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
-        ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],
+        ['name' => 'notification-di', 'login' => $notificationUsers['di']['desktop'], 'mobileLogin' => $notificationUsers['di']['mobile'], 'preflightLogin' => $notificationUsers['di']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['di']['preflight-mobile'], 'password' => $password, 'loginPath' => '/login', 'paths' => ['/profile'], 'notificationWorkflow' => 'di'],
+        ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'preflightLogin' => $notificationUsers['pra']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['pra']['preflight-mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],
+        ['name' => 'notification-fbr', 'login' => $notificationUsers['fbr']['desktop'], 'mobileLogin' => $notificationUsers['fbr']['mobile'], 'preflightLogin' => $notificationUsers['fbr']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['fbr']['preflight-mobile'], 'password' => $password, 'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/my-profile'], 'notificationWorkflow' => 'fbr'],
         ['name' => 'hotel-simple-desk', 'login' => $hotelOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'hotelWorkflow' => true, 'paths' => ['/pos/hotel'], 'markers' => ['Hotel front desk']],
         [
         'name' => 'service-work-orders', 'login' => $serviceWorker->email, 'password' => $password,

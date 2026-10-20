@@ -912,16 +912,17 @@ async function hotelCreditReview(page, t, v) {
 }
 
 async function notificationWorkflow(page, t, v, diagnostics) {
-  const panel=t.notificationWorkflow, prefix=panel==='fbr'?'/fbr-pos':'/pos';
-  await page.goto(baseUrl+prefix+'/my-profile',{waitUntil:'domcontentloaded'});
+  const panel=t.notificationWorkflow, prefix=panel==='di'?'':panel==='fbr'?'/fbr-pos':'/pos';
+  await page.goto(baseUrl+(panel==='di'?'/profile':prefix+'/my-profile'),{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
+  const expectedFailureUrl=baseUrl+prefix+'/whats-new/seen';
+  if(panel!=='di'){
   const modal=page.locator('[data-wn-featured="1"]:visible');
   await modal.waitFor({state:'visible',timeout:15000});
   if(await modal.count()!==1)throw new Error('duplicate featured receipts rendered multiple popups');
   const dismissButton=modal.locator('button').last();
   const endpoint='**'+prefix+'/whats-new/seen';
   let injectedFailures=0;
-  const expectedFailureUrl=baseUrl+prefix+'/whats-new/seen';
   await page.route(endpoint, route=>{
     if(route.request().method()!=='POST')return route.continue();
     injectedFailures++;
@@ -947,6 +948,7 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   ]);
   if(!ack.ok()||!(await ack.json()).ok)throw new Error('notification retry was not acknowledged by the real server');
   await modal.waitFor({state:'hidden',timeout:5000});
+  }
   for(let refresh=0;refresh<2;refresh++){
     await page.reload({waitUntil:'domcontentloaded'});
     await waitForOperationalSurface(page);
@@ -956,10 +958,36 @@ async function notificationWorkflow(page, t, v, diagnostics) {
     await bell.waitFor({state:'visible',timeout:5000});
     const text=await bell.innerText();
     for(let i=1;i<=7;i++)if(!text.includes('Synthetic routine '+panel+' '+i))throw new Error('routine bell history disappeared after refresh');
-    if((text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
+    if(panel!=='di'&&(text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
+    if(/Synthetic routine (pra|fbr|di) /.test(text.replaceAll('Synthetic routine '+panel+' ', 'Own notice ')))throw new Error('another product notification leaked into the bell');
     await page.locator('[data-tn-topnav-control="notification"]').first().click();
   }
-  pass(t.name+'/'+v.width+': real failed-save retry, duplicate consolidation and seven routine notices across refresh');
+  const notificationButton=page.locator('[data-tn-topnav-control="notification"]').first();
+  const count=notificationButton.locator('[x-text="unseen"]');
+  const before=Number((await count.innerText()).trim());
+  if(!Number.isInteger(before)||before<7)throw new Error('routine notices missing from unread count');
+  await notificationButton.click();
+  const row=page.locator('[x-show="bellOpen"]:visible button').filter({hasText:'Synthetic routine '+panel+' 1'}).first();
+  await page.waitForFunction(()=>[...document.querySelectorAll('[data-whats-new-detail-id]')].every(el=>el._x_dataStack?.length));
+  const [detailAck]=await Promise.all([
+    page.waitForResponse(r=>r.url()===expectedFailureUrl&&r.request().method()==='POST'), row.click(),
+  ]).catch(async error=>{
+    const states=await page.locator('[data-whats-new-detail-id]').evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.whatsNewDetailId,open:window.Alpine.$data(n).open,seen:window.Alpine.$data(n).wasSeen,error:window.Alpine.$data(n).seenError})));
+    throw new Error(error.message+' detail state '+JSON.stringify(states));
+  });
+  if(!detailAck.ok()||!(await detailAck.json()).ok)throw new Error('opening detail did not persist read status');
+  const detail=page.locator('[data-whats-new-detail-id]:visible');
+  await detail.waitFor({state:'visible'});
+  await page.waitForFunction(expected=>[...document.querySelectorAll('[data-tn-topnav-control="notification"] [x-text="unseen"]')].some(x=>Number(x.textContent.trim())===expected),before-1);
+  await detail.getByRole('button',{name:'Close',exact:true}).click();
+  await notificationButton.click();
+  if(await row.locator('[x-show="rowUnseen"]').isVisible())throw new Error('opened notification still displays NEW');
+  await row.click();
+  await page.locator('[data-whats-new-detail-id]:visible').getByRole('button',{name:'Close',exact:true}).click();
+  if(Number((await count.innerText()).trim())!==before-1)throw new Error('reopening read notice decremented count again');
+  await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
+  if(Number((await count.innerText()).trim())!==before-1)throw new Error('read acknowledgement did not survive reload');
+  pass(t.name+'/'+v.width+': read on open clears NEW, persists count, repeat is idempotent; failed-save retry and seven routine notices');
 }
 
 async function hotelSettingsWorkflow(page,t,v,diagnostics) {
@@ -1201,6 +1229,7 @@ async function companyDirectoryContrast(page,t,v) {
 
 async function workflow(page,t,v,diagnostics) {
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
+  if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
   if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
@@ -1366,6 +1395,8 @@ async function ingredientUnitAudit(page,t,v) {
 }
 
 async function tableOrderWorkflow(page,t,v) {
+  await catalogSearchCompleteWorkflow(page,t,v);
+  await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
@@ -1624,7 +1655,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v,serviceWorkers:'allow'}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t.notificationWorkflow?{...t,login:requested.length?(v.width<768?t.preflightMobileLogin:t.preflightLogin):(v.width<768?t.mobileLogin:t.login)}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();
@@ -1647,4 +1678,108 @@ async function whatsappAutoSendWorkflow(page,t,v) {
   if(await toggle.isChecked())throw new Error('OFF did not persist');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-whatsapp-optional-autosend');
   pass(t.name+'/'+v.width+': actual owner form defaults OFF, persists ON/OFF, keeps blank encrypted secrets private');
+}
+
+async function riderRealtimeWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/riders/tracking',{waitUntil:'domcontentloaded'});
+  const read=()=>page.evaluate(id=>{
+    const root=document.querySelector('[x-data^="riderTracking("]');
+    const d=root&&window.Alpine?.$data(root),marker=d?.markers?.[id];
+    return marker?{lat:marker.getLatLng().lat,lng:marker.getLatLng().lng}:null;
+  },t.riderRealtime.id);
+  await page.waitForFunction(id=>{
+    const root=document.querySelector('[x-data^="riderTracking("]');
+    return root&&window.Alpine?.$data(root)?.markers?.[id];
+  },t.riderRealtime.id);
+  const at=Date.now(),lat=v.width===390?31.522:31.521,lng=74.322;
+  const response=await page.request.post(baseUrl+'/api/rider-app/v1/locations',{
+    headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{points:[{lat,lng,acc:8,at}]}});
+  if(!response.ok()||!(await response.json()).acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged');
+  await page.waitForFunction(({id,lat,lng})=>{
+    const d=window.Alpine.$data(document.querySelector('[x-data^="riderTracking("]'));
+    const m=d.markers[id]?.getLatLng();return m&&Math.abs(m.lat-lat)<.000001&&Math.abs(m.lng-lng)<.000001;
+  },{id:t.riderRealtime.id,lat,lng},{timeout:10000});
+  const pin=await read();if(!pin)throw new Error('Actual Leaflet rider marker missing');
+  pass(t.name+'/'+v.width+': real authenticated API upload reaches Leaflet pin through automatic five-second poll');
+}
+
+async function catalogSearchCompleteWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  // Synthetic in-memory catalog: actual sale UI/methods, no company/product writes.
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:16},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.allProducts=[];d.allServices=[];d.searchQuery='';d.selectedCategory=777;d.searchAnyWord=false;
+  });
+  const input=page.locator('[x-ref="searchInput"]');await input.fill('QA Deal');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
+  const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
+  for(const n of [13,14,15,16]) {
+    const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});
+    await item.scrollIntoViewIfNeeded();if(!await item.isVisible())throw new Error('matching deal '+n+' is hidden from search');
+  }
+  await page.evaluate(()=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.highlightIndex=11;d.moveHighlight(1);});
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).highlightIndex===12);
+
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.allDeals=Array.from({length:85},(_,i)=>({id:900000+i,type:'deal',name:'QA Deal No '+(i+1),price:100,category_id:991}));
+    d.onSearchInput();
+  });
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===85);
+  const more=dropdown.locator('button[x-show="searchSuggestions.length > searchDisplayCount"]');
+  await more.scrollIntoViewIfNeeded();await more.click();
+  if(!await dropdown.isVisible())throw new Error('Load more closed the search dropdown');
+  const last=dropdown.locator('button').filter({hasText:'QA Deal No 85'});
+  await last.scrollIntoViewIfNeeded();if(!await last.isVisible())throw new Error('Load more did not reveal matching deal 85');
+  await saveEvidenceScreenshot(page,'catalog-search-complete-'+v.width);
+  pass(t.name+'/'+v.width+': all sixteen deals searchable across category filters; 13-16 visible and keyboard reachable');
+}
+
+async function deliveryAddressSnapshotWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
+  const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
+  const address='Synthetic delivery lane '+v.width;
+  const response=await page.request.post(baseUrl+'/pos/restaurant/api/customer-store',{
+    headers,data:{name:'Synthetic address customer '+v.width,phone:'0300'+String(1000000+v.width),address},
+  });
+  const data=await response.json();
+  if(!response.ok()||!data.success||!data.customer?.id)throw new Error('Synthetic delivery customer setup failed');
+  let release;const gate=new Promise(resolve=>release=resolve);
+  const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
+  await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});
+  let moneyPosts=0;
+  page.on('request',request=>{if(request.method()==='POST'&&request.url()===baseUrl+'/pos/invoice/store')moneyPosts++;});
+  // Actual UI DTO without address, as happens in the customer picker. Server book is delayed.
+  await page.evaluate(customer=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.orderType='delivery';d.selectCustomerFromPhone({id:customer.id,name:customer.name,phone:customer.phone});
+    d.cart=[{cart_uid:'qa-address',item_id:null,item_type:'manual',item_name:'Synthetic address proof',quantity:1,unit_price:100,is_tax_exempt:true,special_notes:''}];
+    d.lastPayTime=0;
+  },data.customer);
+  const posted=page.waitForResponse(r=>r.url()===baseUrl+'/pos/invoice/store'&&r.request().method()==='POST');
+  const payment=page.evaluate(async()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    await d.processPaymentManual('cash',true,true);
+  });
+  await page.waitForTimeout(150);
+  if(moneyPosts!==0)throw new Error('Delivery payment serialized before its current address lookup completed');
+  release();
+  const savedResponse=await posted;const saved=await savedResponse.json();await payment;
+  if(!savedResponse.ok()||!saved.success||!saved.transaction_id)throw new Error('Synthetic provisional delivery save failed: '+JSON.stringify(saved));
+  const payload=savedResponse.request().postDataJSON();
+  if(payload.delivery_address!==address)throw new Error('Selected delivery address missing from real bill payload');
+  await page.unroute(bookUrl);
+  await page.goto(baseUrl+'/pos/transaction/'+saved.transaction_id+'/receipt',{waitUntil:'domcontentloaded'});
+  const receipt=page.locator('body');
+  if(!(await receipt.innerText()).includes(address))throw new Error('Persisted address absent from receipt preview');
+  await page.emulateMedia({media:'print'});
+  const line=page.getByText(address,{exact:true});
+  if(!await line.isVisible())throw new Error('Persisted address hidden in print layout');
+  await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
+  await page.emulateMedia({media:'screen'});
+  pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
 }

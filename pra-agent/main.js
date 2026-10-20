@@ -45,7 +45,8 @@ const {
 } = require('./src/server-url');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260906-1';
+const BUILD_INFO = require('./src/build-info').loadBuildInfo(app.getVersion(), path.join(__dirname, 'build-info.json'));
+const BUILD_TIMESTAMP = BUILD_INFO.build;
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -1455,7 +1456,7 @@ ipcMain.handle('install-update-now', async () => {
   return { ok: false, error: 'Updates now install automatically — nothing to do.' };
 });
 
-ipcMain.handle('get-version', () => ({ build: BUILD_TIMESTAMP, version: app.getVersion() }));
+ipcMain.handle('get-version', () => ({ ...BUILD_INFO, version: app.getVersion() }));
 
 // ─── NestPOS Desktop (POS screen shell) IPC ─────────────────────────────────
 ipcMain.handle('get-pos-settings', () => getPosSettings());

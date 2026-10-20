@@ -4,6 +4,8 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'notification_read_failed' => 'پڑھے جانے کی حالت محفوظ نہیں ہوئی۔ یہ اطلاع ابھی غیر پڑھی ہے۔',
+    'notification_read_retry' => 'دوبارہ کوشش',
     'a4_printer_desc' => 'رسید 80mm تھرمل لے آؤٹ پر پرنٹ ہوگی، جو پورے A4 صفحے کے بیچ میں ہوگی۔',
     'a4_printer_thermal_style' => 'A4 پرنٹر (A4 پر تھرمل اسٹائل)',
     'aaj_ka_din_close' => 'آج کا دن پہلے ہی کلوز ہو چکا ہے۔',
@@ -6080,6 +6082,13 @@ return [
     'addons_choose_cycle' => 'سہولت کی ادائیگی کی مدت چنیں',
     'addons_public_subtitle' => 'اپنی دکان کے لیے مطلوبہ ادائیگی والی سہولتوں پر نشان لگائیں۔ چنی ہوئی رقم نیچے بل میں شامل ہو جائے گی۔',
     'addons_public_hint' => 'Business میں ایڈ آن؛ Unlimited میں دونوں شامل ہیں۔',
+    'addons_package_price' => 'پیکیج کی قیمت',
+    'addons_subtotal' => 'اضافی سہولتوں کی قیمت',
+    'addons_grand_total' => 'پیکیج اور اضافی سہولتوں کا کل',
+    'addons_better_plan' => 'یہ سہولتیں شامل رکھنے والا پیکیج سستا ہے:',
+    'addons_saving' => 'بچت',
+    'addons_compare_alternative' => 'یہ پیکیج دیکھیں',
+    'addons_whatsapp_scope' => 'واٹس ایپ بل اہل پیکیجز میں دستی شیئرنگ ہے۔ خودکار ارسال الگ اختیاری سہولت ہے؛ خریدنے سے پہلے سپورٹ سے دستیابی کی تصدیق کریں۔ رائیڈر اور کالر کے لیے موزوں ایپس، اجازتیں اور انٹرنیٹ درکار ہیں۔',
     'addons_bill_title' => 'چنی ہوئی سہولتوں کا بل',
     'addons_selected_suffix' => 'منتخب',
     'addons_continue_cta' => 'انتخاب کے ساتھ آگے بڑھیں',

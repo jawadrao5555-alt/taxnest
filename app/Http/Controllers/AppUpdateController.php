@@ -58,7 +58,7 @@ class AppUpdateController extends Controller
     public function audiencePreview(Request $request)
     {
         $request->validate([
-            'audience' => 'required|in:pos,fbr_pos,all',
+            'audience' => 'required|in:pos,fbr_pos,di,all',
             'audience_family' => 'required|in:all,food_service,goods_retail,pharmacy,services,accommodation',
             'audience_scope' => 'required|in:all,cats',
             'target_categories' => 'nullable|array',
@@ -67,11 +67,13 @@ class AppUpdateController extends Controller
         $categories = $this->validatedCategories($request);
         $count = 0;
         $examples = [];
-        foreach (Company::whereIn('product_type', ['pos', 'fbrpos'])
+        foreach (Company::whereIn('product_type', ['pos', 'fbrpos', 'di'])
             ->cursor() as $company) {
-            $panel = PosFeatureService::panelFor($company);
+            $panel = $company->product_type === 'di' ? 'di' : PosFeatureService::panelFor($company);
             if ($request->input('audience') === 'pos' && $panel !== 'pra'
                 || $request->input('audience') === 'fbr_pos' && $panel !== 'fbr'
+                || $request->input('audience') === 'di' && $panel !== 'di'
+                || $request->input('audience') === 'all' && $panel === 'di'
                 || ($request->input('audience_family') !== 'all'
                     && !in_array($request->input('audience_family'), AppUpdate::recipientFamilies($company), true))
                 || ($categories && !array_intersect(AppUpdate::recipientCategories($company), $categories))) {
@@ -93,7 +95,7 @@ class AppUpdateController extends Controller
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             // Audience (Aug 2026): 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
-            'audience' => 'nullable|in:pos,fbr_pos,all',
+            'audience' => 'nullable|in:pos,fbr_pos,di,all',
             'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services,accommodation',
             'audience_scope' => 'required|in:all,cats',
             // Type (Task 1286): 'feature' = Naya Feature, 'improvement' = Behtari / Masla Hal.
@@ -162,7 +164,7 @@ class AppUpdateController extends Controller
             'title' => 'required|string|max:150',
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
-            'audience' => 'nullable|in:pos,fbr_pos,all',
+            'audience' => 'nullable|in:pos,fbr_pos,di,all',
             'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services,accommodation',
             'audience_scope' => 'required|in:all,cats',
             'type' => 'nullable|in:feature,improvement',
@@ -239,6 +241,9 @@ class AppUpdateController extends Controller
     /** An empty or off-panel selection must never become a universal announcement. */
     private function validatedCategories(Request $request): ?array
     {
+        if ($request->input('audience') === 'di' && $request->input('audience_family', 'all') !== 'all') {
+            throw ValidationException::withMessages(['audience_family' => 'Digital Invoicing uses sector categories; choose all families.']);
+        }
         if ($request->input('audience_scope') === 'all') {
             return null;
         }
@@ -247,7 +252,8 @@ class AppUpdateController extends Controller
         $categories = AppUpdate::normalizeCategories($selected);
         $panels = $request->input('audience') === 'all' ? ['pra', 'fbr']
             : [$request->input('audience') === 'fbr_pos' ? 'fbr' : 'pra'];
-        $allowed = [];
+        $allowed = $request->input('audience') === 'di' ? array_keys(AppUpdate::DI_SECTORS) : [];
+        if ($request->input('audience') === 'di') $panels = [];
         foreach ($panels as $panel) {
             $allowed = array_merge($allowed, \App\Services\PosFeatureService::categories($panel));
         }
@@ -367,7 +373,7 @@ class AppUpdateController extends Controller
 
     /**
      * Mark published POS updates as seen for the logged-in POS user.
-     * Called by the one-time popup ("Samajh Gaya") and by opening the bell dropdown.
+     * Called when opening one notification detail or acknowledging the featured popup.
      */
     public function markSeen(Request $request)
     {
@@ -375,9 +381,9 @@ class AppUpdateController extends Controller
         // for either guard. Audience 'all' targets both panels.
         // The endpoint determines the panel; a simultaneous login must never
         // consume another account's notifications.
-        $panel = $request->is('fbr-pos/*') ? 'fbr' : 'pra';
-        $user = auth($panel === 'fbr' ? 'fbrpos' : 'pos')->user();
-        if (!$user) {
+        $panel = $request->is('fbr-pos/*') ? 'fbr' : ($request->is('pos/*') ? 'pra' : 'di');
+        $user = auth(['fbr' => 'fbrpos', 'pra' => 'pos', 'di' => 'web'][$panel])->user();
+        if (!$user || !$user->isPosAdmin()) {
             return response()->json(['ok' => false], 401);
         }
 

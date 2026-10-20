@@ -4,6 +4,8 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'notification_read_failed' => 'Could not save read status. This notification remains unread.',
+    'notification_read_retry' => 'Retry',
     'a4_printer_desc' => 'Receipt prints in 80mm thermal layout, centered on full A4 page.',
     'a4_printer_thermal_style' => 'A4 Printer (Thermal-style on A4)',
     'aaj_ka_din_close' => 'Today has already been closed',
@@ -6095,6 +6097,13 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'addons_choose_cycle' => 'Choose add-on billing period',
     'addons_public_subtitle' => 'Tick the paid features your shop needs. Your selected amount is added to the quote below.',
     'addons_public_hint' => 'Available with Business; Unlimited includes both.',
+    'addons_package_price' => 'Package price',
+    'addons_subtotal' => 'Add-ons subtotal',
+    'addons_grand_total' => 'Package + add-ons total',
+    'addons_better_plan' => 'A package with these features included costs less:',
+    'addons_saving' => 'Save',
+    'addons_compare_alternative' => 'Review this package',
+    'addons_whatsapp_scope' => 'WhatsApp Bill means manual sharing on eligible packages. Automatic sending is a separate optional capability; confirm availability with support before buying. Rider and Caller features require compatible apps, permissions and connectivity.',
     'addons_bill_title' => 'Selected features bill',
     'addons_selected_suffix' => 'selected',
     'addons_continue_cta' => 'Continue with selection',

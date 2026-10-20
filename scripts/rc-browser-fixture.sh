@@ -267,7 +267,14 @@ run() {
   kill -0 "$server_pid" 2>/dev/null || fail 'loopback PHP server is not running'
   cd "$ROOT"
   safe_browser node scripts/tests/rc-browser-chromium-socket-check.mjs
+  if [[ "${RC_BROWSER_ONLY:-}" == agent-build-identity ]]; then
+    safe_browser node scripts/agent-build-display-smoke.mjs
+  else
+  if [[ -f "$ROOT/scripts/public-website-checks.mjs" ]]; then
+    safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" node scripts/public-website-checks.mjs
+  fi
   safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" RC_BROWSER_FIXTURE="$FIXTURE" node scripts/rc-browser-acceptance.mjs
+  fi
 }
 serve() { resume; wait "$(cat "$SERVER_PID")"; }
 stop() {

@@ -20,8 +20,8 @@ class DomainMoveNoticeTest extends TestCase
     public function test_pos_layouts_do_not_stack_whats_new_over_the_shared_notice_window(): void
     {
         foreach ([
-            resource_path('views/layouts/pos-app.blade.php') => "::forCompany(\$companyLayout ?? null, 'pra')",
-            resource_path('views/layouts/fbr-pos-app.blade.php') => "::forCompany(\$fbrCompany ?? null, 'fbr')",
+            resource_path('views/layouts/pos-app.blade.php') => "::bellForCompany(\$companyLayout ?? null, 'pra',",
+            resource_path('views/layouts/fbr-pos-app.blade.php') => "::bellForCompany(\$fbrCompany ?? null, 'fbr',",
         ] as $layout => $targetedHistoryQuery) {
             $markup = file_get_contents($layout);
 
@@ -35,9 +35,13 @@ class DomainMoveNoticeTest extends TestCase
                 $markup
             );
             $this->assertStringContainsString($targetedHistoryQuery, $markup);
-            $this->assertStringContainsString("->where('is_published', true)", $markup);
+            $this->assertStringContainsString("\$whatsNewList = \$bellState['updates'];", $markup);
             $this->assertStringContainsString("'updates' => \$whatsNewList", $markup);
         }
+
+        // Eligibility moved to the shared bell query; both layouts must keep using it.
+        $bellQuery = file_get_contents(app_path('Models/AppUpdate.php'));
+        $this->assertStringContainsString('self::forCompany($company, $panel)->forCompanyFamily($company)->published()->liveWindow()', $bellQuery);
 
         $posLayout = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
         $this->assertStringContainsString('if ($sharedDomainAgentNoticeLive)', $posLayout);

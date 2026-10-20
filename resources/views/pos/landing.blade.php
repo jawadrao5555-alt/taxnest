@@ -494,6 +494,7 @@
     </section>
 
     <!-- Footer -->
+    @include('partials.product-guide-link', ['productGuideKey' => 'pra'])
     <x-site-footer login-url="/pos/login" login-label="POS Log In" />
 
     <x-whatsapp-support />

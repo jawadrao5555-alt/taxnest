@@ -216,6 +216,7 @@ Route::get('/', function () {
 });
 
 Route::get('/contact', fn () => view('contact'))->name('contact');
+Route::view('/product-guide', 'product-guide')->name('product-guide');
 
 // Public legal pages. Google Play in dono URLs ko listing mein maangta hai aur
 // yeh check karta hai ke woh bina login khulen (Task 1346) — is liye yeh guest
@@ -391,6 +392,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('di.whats-new.seen');
 
     // ── Tax Consultant Console (any DI web user can become a consultant) ──
     // Linking is consent-based ONLY: redeem a client-generated invite code, or

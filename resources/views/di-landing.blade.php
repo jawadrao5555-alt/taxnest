@@ -717,6 +717,7 @@
         </div>
     </section>
 
+    @include('partials.product-guide-link', ['productGuideKey' => 'di'])
     <x-site-footer />
 
     <script>

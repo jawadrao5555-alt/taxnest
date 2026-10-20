@@ -347,6 +347,48 @@ class AdminActionPostsSmokeTest extends TestCase
         $this->assertSame(4, DB::table('subscriptions')->count(), 'Historical records must remain untouched');
     }
 
+    public function test_subscription_empty_list_has_no_phantom_results_or_pages(): void
+    {
+        $this->actingAsAdmin()->get('/admin/subscriptions')->assertOk()
+            ->assertViewIs('saas-admin.subscriptions')
+            ->assertViewHas('companiesPage', fn ($page) => $page->total() === 0
+                && $page->isEmpty() && !$page->hasPages())
+            ->assertSee('No subscriptions found.')
+            ->assertDontSee('Showing 1 to');
+    }
+
+    public function test_subscription_pages_and_filtered_empty_state_match_the_same_company_query(): void
+    {
+        $planId = $this->makePlan(['name' => 'Business', 'product_type' => 'pos']);
+        $firstCompany = null;
+        for ($i = 1; $i <= 21; $i++) {
+            $companyId = $this->makeCompany(['name' => 'Subscription fixture '.$i, 'product_type' => 'pos']);
+            $firstCompany ??= $companyId;
+            DB::table('subscriptions')->insert([
+                'company_id' => $companyId, 'pricing_plan_id' => $planId,
+                'billing_cycle' => 'annual', 'active' => true,
+                'start_date' => now()->toDateString(), 'end_date' => now()->addYear()->toDateString(),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $this->actingAsAdmin()->get('/admin/subscriptions?page=1')->assertOk()
+            ->assertViewHas('companiesPage', fn ($page) => $page->total() === 21
+                && $page->count() === 20 && $page->hasMorePages())
+            ->assertDontSee('No subscriptions found.');
+        $this->actingAsAdmin()->get('/admin/subscriptions?page=2')->assertOk()
+            ->assertViewHas('companiesPage', fn ($page) => $page->total() === 21
+                && $page->count() === 1 && $page->first()->id === $firstCompany
+                && !$page->hasMorePages())
+            ->assertDontSee('No subscriptions found.');
+        $this->actingAsAdmin()->get('/admin/subscriptions?status=inactive')->assertOk()
+            ->assertViewHas('companiesPage', fn ($page) => $page->total() === 0
+                && $page->isEmpty() && !$page->hasPages())
+            ->assertSee('No subscriptions found.');
+        $this->assertSame(21, DB::table('subscriptions')->count());
+        $this->assertSame(21, DB::table('subscriptions')->where('active', true)->count());
+    }
+
     public function test_repeated_admin_assign_is_idempotent_but_paid_renewal_still_creates_history(): void
     {
         $planId = $this->makePlan(['name' => 'Business', 'product_type' => 'pos', 'price' => 29999]);

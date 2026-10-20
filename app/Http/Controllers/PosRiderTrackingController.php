@@ -458,6 +458,7 @@ class PosRiderTrackingController extends Controller
         }
         $points = array_slice($points, 0, 240);
 
+        $acknowledged = [];
         $rows      = [];
         $rejectReason = null; // Task #1357: why we refused points, for the live card
         $newestLive = null; // newest fresh (non-offline) point — drives regression guard
@@ -465,6 +466,10 @@ class PosRiderTrackingController extends Controller
         $oldestAccepted = now()->subDays(self::POINT_MAX_AGE_DAYS);
 
         foreach ($points as $p) {
+            if (!is_array($p)) continue;
+            $identity = isset($p['at']) && is_numeric($p['at']) ? (int) $p['at'] : null;
+            // Invalid/expired rows are terminal. Exclude duty-off rows below.
+            if ($identity !== null) $acknowledged[] = $identity;
             $lat = isset($p['lat']) ? (float) $p['lat'] : null;
             $lng = isset($p['lng']) ? (float) $p['lng'] : null;
             if ($lat === null || $lng === null || abs($lat) > 90 || abs($lng) > 180
@@ -511,7 +516,8 @@ class PosRiderTrackingController extends Controller
             // Per-point duty gate: fresh points require duty=ON; buffered past
             // points (is_offline) are accepted regardless of duty status.
             if (!$isOffline && !$dutyOn) {
-                $rejectReason = 'duty_off'; // Task #1357: surfaced on the live card
+                if ($identity !== null) array_pop($acknowledged);
+                $rejectReason = 'duty_off'; // fresh point may become buffered later
                 continue; // fresh GPS fix while rider is off-duty — skip
             }
 
@@ -557,25 +563,22 @@ class PosRiderTrackingController extends Controller
             // but do not touch the denormalized position fields — a drain of
             // yesterday's route must not overwrite today's live rider position.
             if ($newestLive !== null) {
-                $currentLocatedAt = $rider->last_located_at
-                    ? $rider->last_located_at->format('Y-m-d H:i:s')
-                    : null;
-                if ($currentLocatedAt === null || $newestLive['recorded_at'] > $currentLocatedAt) {
-                    $denorm = [
-                        'last_lat'        => $newestLive['lat'],
-                        'last_lng'        => $newestLive['lng'],
-                        'last_located_at' => $newestLive['recorded_at'],
-                    ];
-                    // Task #1106: denormalize battery alongside the position —
-                    // same regression guard, so a stale drain batch can never
-                    // overwrite a fresher battery reading. NULL from a v1.5.0
-                    // point is NOT written (a transient read failure on the
-                    // phone must not blank a known level). hasColumn: drift.
-                    if ($newestLiveBat !== null && Schema::hasColumn('pos_riders', 'last_battery_pct')) {
-                        $denorm['last_battery_pct'] = $newestLiveBat;
-                    }
-                    $rider->update($denorm);
+                $denorm = [
+                    'last_lat' => $newestLive['lat'],
+                    'last_lng' => $newestLive['lng'],
+                    'last_located_at' => $newestLive['recorded_at'],
+                ];
+                if ($newestLiveBat !== null && Schema::hasColumn('pos_riders', 'last_battery_pct')) {
+                    $denorm['last_battery_pct'] = $newestLiveBat;
                 }
+                // Compare in the UPDATE, not on the token-auth model snapshot:
+                // overlapping requests must never move the live pin backwards.
+                PosRider::where('id', $rider->id)->where('company_id', $rider->company_id)
+                    ->where('on_duty', true)->where('is_active', true)
+                    ->where(function ($q) use ($newestLive) {
+                        $q->whereNull('last_located_at')
+                            ->orWhere('last_located_at', '<', $newestLive['recorded_at']);
+                    })->update($denorm);
             }
         }
 
@@ -611,7 +614,8 @@ class PosRiderTrackingController extends Controller
         // count($rows) = points that passed all validation (lat/lng/age/duty
         // gate); insertOrIgnore may write fewer on duplicate replay, but the
         // client should remove all validated rows — duplicates are safe to drop.
-        return response()->json(['ok' => true, 'stored' => count($rows)]);
+        return response()->json(['ok' => true, 'stored' => count($rows),
+            'acknowledged_at' => array_values(array_unique($acknowledged))]);
     }
 
     /** GET /api/rider-app/v1/me — app home screen summary. */

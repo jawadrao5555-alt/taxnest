@@ -148,6 +148,7 @@ class Company extends Model
         'pos_cash_received_enabled',
         'pos_whatsapp_bill_enabled',
         'pos_whatsapp_bill_auto_open',
+        'pos_whatsapp_auto_send',
         'pra_reporting_enabled',
         'pos_integration_mode',
         'kds_enabled',
@@ -290,6 +291,7 @@ class Company extends Model
     ];
 
     protected $casts = [
+        'pos_whatsapp_auto_send' => 'boolean',
         'wa_app_secret' => 'encrypted',
         'extra_branch_slots' => 'integer',
         'token_expires_at' => 'datetime',

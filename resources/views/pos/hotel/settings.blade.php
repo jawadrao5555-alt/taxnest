@@ -77,6 +77,7 @@
                     <a href="{{ route('pos.receipt-settings') }}" class="block underline">{{ __('pos.card_receipt_display') }}</a>
                     <p class="text-xs text-gray-500">{{ __('pos.hotel_settings_printer_scope') }}</p>
                     @if($hotelSettings['whatsapp'])
+                        <a class="block underline" href="{{ route('pos.whatsapp-delivery') }}">WhatsApp optional auto-send — ON/OFF aur delivery status</a>
                         @foreach([['whatsapp', 'enabled', 'wa_bill_toggle'], ['whatsappAuto', 'auto_open', 'wa_bill_auto_open']] as [$key, $payloadKey, $label])
                             <div class="flex items-center justify-between gap-3">
                                 <span>{{ __('pos.'.$label) }}</span>

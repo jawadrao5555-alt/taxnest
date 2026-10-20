@@ -1,7 +1,7 @@
 <x-pos-layout>
 {{-- Rider LIVE Tracking (Aug 2026) — Unlimited exclusive.
      Live map (Leaflet + OSM, self-hosted vendor per site-perf convention),
-     20s poll off pos_riders denormalized last-known columns, per-rider
+     5s visible-tab poll off pos_riders denormalized last-known columns, per-rider
      day trail polyline. Locked plans see the upgrade card (admin upsell). --}}
 
 @if($locked)
@@ -330,6 +330,13 @@
             playMarker: null,
             playReadout: '',
             timer: null,
+            loadAbort: null,
+            loadGeneration: 0,
+            loadFailures: 0,
+            visibilityListener: null,
+            onlineListener: null,
+            destroyed: false,
+            accessLost: false,
             didFit: false,
             searchQ: '',
             searchResults: [],
@@ -420,22 +427,68 @@
                     this.cityCenter();
                     this.ipCenter();
                 }
-                this.timer = setInterval(() => this.load(), 20000);
-                document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden) this.load();
-                });
+                this.visibilityListener = () => {
+                    clearTimeout(this.timer);
+                    if (document.hidden) { this.loadGeneration++; this.loadAbort?.abort(); }
+                    else this.load();
+                };
+                this.onlineListener = () => { if (!document.hidden) this.load(); };
+                document.addEventListener('visibilitychange', this.visibilityListener);
+                window.addEventListener('online', this.onlineListener);
             },
-            load() {
-                fetch(this.dataUrl, { headers: { 'Accept': 'application/json' } })
-                    .then(r => r.ok ? r.json() : null)
-                    .then(j => {
-                        if (!j || !j.ok) return;
-                        this.riders = j.riders || [];
+            destroy() {
+                this.destroyed = true;
+                clearTimeout(this.timer);
+                this.loadGeneration++;
+                this.loadAbort?.abort();
+                document.removeEventListener('visibilitychange', this.visibilityListener);
+                window.removeEventListener('online', this.onlineListener);
+                if (this.playTimer) clearInterval(this.playTimer);
+                this.map?.remove();
+            },
+            async load() {
+                clearTimeout(this.timer);
+                if (this.destroyed || this.accessLost || document.hidden) return;
+                const generation = ++this.loadGeneration;
+                this.loadAbort?.abort();
+                const controller = new AbortController();
+                this.loadAbort = controller;
+                const timeout = setTimeout(() => controller.abort(), 12000);
+                try {
+                    const response = await fetch(this.dataUrl, {cache: 'no-store', signal: controller.signal,
+                        headers: {'Accept': 'application/json'}});
+                    if (generation !== this.loadGeneration) return;
+                    if ([401, 403, 419].includes(response.status)) {
+                        this.accessLost = true;
+                        this.clearTrail();
+                        this.placeLayer?.clearLayers();
+                        this.arrivalLayer?.clearLayers();
+                        this.riders = [];
                         this.renderMarkers();
-                        const onDuty = this.riders.filter(r => r.on_duty).length;
-                        this.statusLine = onDuty + ' / ' + this.riders.length + ' ' + this.i18n.on_duty.toLowerCase();
-                    })
-                    .catch(() => {});
+                        this.statusLine = this.i18n.locked || 'Tracking access unavailable';
+                        // Stop automatic retries after authorization/package loss.
+                        return;
+                    }
+                    if (!response.ok) throw new Error('Tracking unavailable');
+                    const j = await response.json();
+                    if (generation !== this.loadGeneration || !j?.ok) return;
+                    this.riders = j.riders || [];
+                    this.renderMarkers();
+                    const onDuty = this.riders.filter(r => r.on_duty).length;
+                    this.statusLine = onDuty + ' / ' + this.riders.length + ' ' + this.i18n.on_duty.toLowerCase();
+                    this.loadFailures = 0;
+                } catch (error) {
+                    if (generation !== this.loadGeneration) return;
+                    this.loadFailures++;
+                    this.statusLine = this.i18n.sync_delayed || 'Connection delayed — retrying';
+                } finally {
+                    clearTimeout(timeout);
+                    if (generation === this.loadGeneration && !this.destroyed && !this.accessLost && !document.hidden) {
+                        this.loadAbort = null;
+                        // Completion-based schedule: no overlapping slow polls.
+                        this.timer = setTimeout(() => this.load(), Math.min(30000, 5000 * 2 ** Math.min(this.loadFailures, 3)));
+                    }
+                }
             },
             loadPlaces() {
                 if (!this.placesDataUrl || !this.placeLayer || !this.arrivalLayer) return;
@@ -500,6 +553,13 @@
                 return this.i18n.last_seen + ': ' + Math.floor(s / 60) + ' ' + this.i18n.min_ago;
             },
             renderMarkers() {
+                const visible = new Set(this.riders.filter(r => r.lat !== null && r.lng !== null).map(r => String(r.id)));
+                for (const id of Object.keys(this.markers)) if (!visible.has(id)) {
+                    this.markers[id].remove(); delete this.markers[id];
+                }
+                for (const id of Object.keys(this.warnBadges)) if (!visible.has(id)) {
+                    this.warnBadges[id].remove(); delete this.warnBadges[id];
+                }
                 const bounds = [];
                 this.riders.forEach(r => {
                     if (r.lat === null || r.lng === null) return;

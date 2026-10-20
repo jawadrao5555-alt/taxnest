@@ -26,3 +26,7 @@ Added real backend query/controller regression and isolated MariaDB/Chrome View
 All -> sixteen items -> selected-order details -> date filter flow, desktop and
 390px mobile. Local PHP/Chrome unavailable, so these tests require fresh CI;
 JavaScript syntax and whitespace checks pass locally. Not production verified.
+
+## Refresh after WhatsApp deployment — 2026-10-20
+
+Merged main `725070a55b55419c237e4956f5d063abd150b617` into this change. Kept notification product targeting, independent preflight users, WhatsApp checks and public website checks. Local Node regression checks: 36 passed; browser runner syntax and staged whitespace checks passed. PHP and real Chrome are unavailable locally; exact-head CI must pass before owner approval.

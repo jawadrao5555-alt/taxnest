@@ -430,17 +430,19 @@ class PosCallerIdController extends Controller
             return response()->json(['ok' => false, 'error' => 'empty'], 422);
         }
 
-        // Ring time: client epoch ms → app TZ (rider trap). Reject stale (>10 min).
+        // Preserve the occurrence time on durable retries; old calls are history,
+        // never "now". Older apps without at retain immediate ring behavior.
         $ringAt = now();
         if ($request->filled('at')) {
             try {
-                $candidate = Carbon::createFromTimestampMs((float) $request->input('at'))
+                $ringAt = Carbon::createFromTimestampMs((float) $request->input('at'))
                     ->setTimezone(config('app.timezone'));
-                if ($candidate->gt(now()->subMinutes(10)) && $candidate->lt(now()->addMinutes(5))) {
-                    $ringAt = $candidate;
-                }
             } catch (\Throwable $e) {
-                // keep now()
+                return response()->json(['ok' => false, 'error' => 'invalid_time'], 422);
+            }
+            if ($ringAt->lt(now()->subHours(self::EVENT_RETENTION_HOURS))
+                || $ringAt->gt(now()->addMinutes(5))) {
+                return response()->json(['ok' => false, 'error' => 'invalid_time'], 422);
             }
         }
 
@@ -484,6 +486,7 @@ class PosCallerIdController extends Controller
         $recent = DB::table('pos_caller_events')
             ->where('company_id', $company->id)
             ->where('created_at', '>=', now()->subSeconds(self::DEDUPE_SECONDS))
+            ->whereBetween('ring_at', [$ringAt->copy()->subSeconds(self::DEDUPE_SECONDS), $ringAt->copy()->addSeconds(self::DEDUPE_SECONDS)])
             ->when($phone, fn ($q) => $q->where('phone', $phone))
             ->when(!$phone, fn ($q) => $q->whereNull('phone')->where('caller_name', $name))
             ->orderByDesc('id')
@@ -519,7 +522,8 @@ class PosCallerIdController extends Controller
             // Losing that race means the ring IS recorded — so answer like any
             // other duplicate instead of handing the phone a 500 it will
             // dutifully retry.
-            if ($uuid !== '' && $uuidColumn) {
+            if ($uuid !== '' && $uuidColumn && DB::table('pos_caller_events')
+                ->where('company_id', $company->id)->where('offline_uuid', $uuid)->exists()) {
                 return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'duplicate']);
             }
             throw $e;
@@ -850,6 +854,10 @@ class PosCallerIdController extends Controller
             ->where('company_id', $companyId)
             ->where('id', '>', $after)
             ->where('created_at', '>=', now()->subSeconds(self::EVENT_FRESH_SECONDS))
+            ->where(function ($q) {
+                $q->where('ring_at', '>=', now()->subSeconds(self::EVENT_FRESH_SECONDS))
+                    ->orWhereNull('ring_at'); // legacy rows without an occurrence time
+            })
             // Task 1380: a ring cleared on one counter must not pop on another.
             ->when($this->clearSupported(), fn ($q) => $q->whereNull('cleared_at'))
             ->orderBy('id')

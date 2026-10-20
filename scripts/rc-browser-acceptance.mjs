@@ -912,16 +912,17 @@ async function hotelCreditReview(page, t, v) {
 }
 
 async function notificationWorkflow(page, t, v, diagnostics) {
-  const panel=t.notificationWorkflow, prefix=panel==='fbr'?'/fbr-pos':'/pos';
-  await page.goto(baseUrl+prefix+'/my-profile',{waitUntil:'domcontentloaded'});
+  const panel=t.notificationWorkflow, prefix=panel==='di'?'':panel==='fbr'?'/fbr-pos':'/pos';
+  await page.goto(baseUrl+(panel==='di'?'/profile':prefix+'/my-profile'),{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
+  const expectedFailureUrl=baseUrl+prefix+'/whats-new/seen';
+  if(panel!=='di'){
   const modal=page.locator('[data-wn-featured="1"]:visible');
   await modal.waitFor({state:'visible',timeout:15000});
   if(await modal.count()!==1)throw new Error('duplicate featured receipts rendered multiple popups');
   const dismissButton=modal.locator('button').last();
   const endpoint='**'+prefix+'/whats-new/seen';
   let injectedFailures=0;
-  const expectedFailureUrl=baseUrl+prefix+'/whats-new/seen';
   await page.route(endpoint, route=>{
     if(route.request().method()!=='POST')return route.continue();
     injectedFailures++;
@@ -947,6 +948,7 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   ]);
   if(!ack.ok()||!(await ack.json()).ok)throw new Error('notification retry was not acknowledged by the real server');
   await modal.waitFor({state:'hidden',timeout:5000});
+  }
   for(let refresh=0;refresh<2;refresh++){
     await page.reload({waitUntil:'domcontentloaded'});
     await waitForOperationalSurface(page);
@@ -956,10 +958,36 @@ async function notificationWorkflow(page, t, v, diagnostics) {
     await bell.waitFor({state:'visible',timeout:5000});
     const text=await bell.innerText();
     for(let i=1;i<=7;i++)if(!text.includes('Synthetic routine '+panel+' '+i))throw new Error('routine bell history disappeared after refresh');
-    if((text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
+    if(panel!=='di'&&(text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
+    if(/Synthetic routine (pra|fbr|di) /.test(text.replaceAll('Synthetic routine '+panel+' ', 'Own notice ')))throw new Error('another product notification leaked into the bell');
     await page.locator('[data-tn-topnav-control="notification"]').first().click();
   }
-  pass(t.name+'/'+v.width+': real failed-save retry, duplicate consolidation and seven routine notices across refresh');
+  const notificationButton=page.locator('[data-tn-topnav-control="notification"]').first();
+  const count=notificationButton.locator('[x-text="unseen"]');
+  const before=Number((await count.innerText()).trim());
+  if(!Number.isInteger(before)||before<7)throw new Error('routine notices missing from unread count');
+  await notificationButton.click();
+  const row=page.locator('[x-show="bellOpen"]:visible button').filter({hasText:'Synthetic routine '+panel+' 1'}).first();
+  await page.waitForFunction(()=>[...document.querySelectorAll('[data-whats-new-detail-id]')].every(el=>el._x_dataStack?.length));
+  const [detailAck]=await Promise.all([
+    page.waitForResponse(r=>r.url()===expectedFailureUrl&&r.request().method()==='POST'), row.click(),
+  ]).catch(async error=>{
+    const states=await page.locator('[data-whats-new-detail-id]').evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.whatsNewDetailId,open:window.Alpine.$data(n).open,seen:window.Alpine.$data(n).wasSeen,error:window.Alpine.$data(n).seenError})));
+    throw new Error(error.message+' detail state '+JSON.stringify(states));
+  });
+  if(!detailAck.ok()||!(await detailAck.json()).ok)throw new Error('opening detail did not persist read status');
+  const detail=page.locator('[data-whats-new-detail-id]:visible');
+  await detail.waitFor({state:'visible'});
+  await page.waitForFunction(expected=>[...document.querySelectorAll('[data-tn-topnav-control="notification"] [x-text="unseen"]')].some(x=>Number(x.textContent.trim())===expected),before-1);
+  await detail.getByRole('button',{name:'Close',exact:true}).click();
+  await notificationButton.click();
+  if(await row.locator('[x-show="rowUnseen"]').isVisible())throw new Error('opened notification still displays NEW');
+  await row.click();
+  await page.locator('[data-whats-new-detail-id]:visible').getByRole('button',{name:'Close',exact:true}).click();
+  if(Number((await count.innerText()).trim())!==before-1)throw new Error('reopening read notice decremented count again');
+  await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
+  if(Number((await count.innerText()).trim())!==before-1)throw new Error('read acknowledgement did not survive reload');
+  pass(t.name+'/'+v.width+': read on open clears NEW, persists count, repeat is idempotent; failed-save retry and seven routine notices');
 }
 
 async function hotelSettingsWorkflow(page,t,v,diagnostics) {
@@ -1626,7 +1654,7 @@ async function healthIsolation(browser,label,v,iso) {
 }
 async function one(browser,label,v,t) {
   valid(t); const c=await browser.newContext({viewport:v,serviceWorkers:'allow'}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t.notificationWorkflow&&v.width<768?{...t,login:t.mobileLogin}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  try { await login(p,t.notificationWorkflow?{...t,login:requested.length?(v.width<768?t.preflightMobileLogin:t.preflightLogin):(v.width<768?t.mobileLogin:t.login)}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
 }
 const {browser}=await launchLocalBrowser();

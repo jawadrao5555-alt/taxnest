@@ -109,6 +109,8 @@ jobs:
           php-version: '8.4'
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Check notification read state and product targeting
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FeaturedWhatsNewTest.php tests/Feature/WhatsNewAudienceTargetingTest.php
       - name: Check combined FBR identity, exclusive claim and owner recovery
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FbrPosIdentityTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php tests/Feature/FbrPosReceiptSerialWithFiscalTest.php tests/Feature/FbrPosReceiptOrderMatchLayoutTest.php tests/Feature/FbrPosSubmissionEvidenceTest.php tests/Feature/FbrPosOwnerReconciliationTest.php
       - name: Check Smart DI import safeguards and legacy import regression
@@ -249,6 +251,7 @@ jobs:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=notification-pra,notification-fbr,notification-di bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=agent-build-identity bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=readonly-reporting-connection bash scripts/rc-browser-fixture.sh run
@@ -308,7 +311,7 @@ jobs:
         run: |
           mapfile -t tests < <(find pra-agent/test -maxdepth 1 -type f -name '*.test.js' ! -name 'local-core-internet-cut.test.js' -printf '%p\n' | sort)
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
-          bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs
+          bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
       - name: Check realtime rider map request ordering and recovery
         run: bash scripts/rc-safe-run -- node --test scripts/tests/rider-realtime-map.test.mjs

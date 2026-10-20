@@ -1,8 +1,7 @@
-title: "Rider ki location zyada jaldi aur durust sync hogi"
-audience: pos
+title: "Notifications ka read status aur sahi system ki updates"
+audience: all
 type: improvement
 points:
-  - "On-duty GPS aur map ki refresh tez hogi; offline trail apna asal waqt rakhega."
-  - "Nayi location purane buffer se pehle sync hogi aur purani request live pin ko peeche nahi karegi."
-  - "Package permission aur existing company settings barqarar rahengi."
-  - "Rider Android 1.8.0 ki signed update phone verification aur publication ke baad available hogi."
+  - "Kisi update ki detail kholne par uska NEW label aur unread count read status save hone ke baad badlenge."
+  - "Read status save na ho to dobara koshish ka option milega."
+  - "Update release karte waqt receiving system aur business category select ki ja sakegi."

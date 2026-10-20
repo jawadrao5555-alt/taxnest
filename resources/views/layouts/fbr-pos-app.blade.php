@@ -16,7 +16,7 @@
     // its fixed service window; unread updates remain available from the bell.
     // Same single owner as the PRA layout — see App\Support\SharedServiceNotice.
     $sharedDomainAgentNoticeLive = \App\Support\SharedServiceNotice::isLive();
-    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null; $whatsNewReadOnly = false;
+    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewUnseenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null; $whatsNewReadOnly = false;
     try {
         $wnAllowed = $fbrUser && $fbrUser->isPosAdmin();
         $wnPending = ($fbrCompany->status ?? null) === 'pending';
@@ -30,13 +30,14 @@
             // bell + popup 7 days after publish (read-time filter, no cron).
             // Task 1585: forCompany() adds the business-category targeting on
             // top of the panel audience (one shared predicate).
-            $whatsNewList = \App\Models\AppUpdate::forCompany($fbrCompany ?? null, 'fbr')->forCompanyFamily($fbrCompany ?? null)->where('is_published', true)
-                ->where('created_at', '>=', now()->subDays(\App\Models\AppUpdate::LIVE_DAYS))
-                ->orderByDesc('created_at')->limit(10)->get();
+            $bellState = \App\Models\AppUpdate::bellForCompany($fbrCompany ?? null, 'fbr', (int) $fbrUser->id);
+            $whatsNewList = $bellState['updates'];
+            $whatsNewSeenIds = $bellState['seenIds'];
+            $whatsNewUnseenIds = $bellState['unseenIds'];
+            $whatsNewUnseenCount = count($whatsNewUnseenIds);
             if ($whatsNewList->isNotEmpty()) {
-                $whatsNewSeenIds = \App\Models\AppUpdate::seenIdsForUser((int) $fbrUser->id);
-                $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
-                $whatsNewUnseenCount = $whatsNewUnseen->count();
+                // Preserve the existing latest-ten automatic-popup horizon; full history is manual.
+                $whatsNewUnseen = $whatsNewList->take(10)->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewPopup = ($sharedDomainAgentNoticeLive || $wnReadonlyImp) ? null
                     : $whatsNewUnseen->first(fn ($u) => (bool) ($u->is_featured ?? false));
                 $whatsNewPopupList = $whatsNewPopup ? collect([$whatsNewPopup]) : collect();
@@ -536,8 +537,8 @@
                         <div data-tn-topnav-menu-cluster class="tn-topnav-menu-cluster flex items-center gap-2">
                         @if($whatsNewList->isNotEmpty())
                         {{-- What's New bell — opening history does NOT mark anything seen. --}}
-                        <div class="relative" x-data="{ bellOpen: false, unseen: {{ (int) $whatsNewUnseenCount }},
-                                }" @whats-new-seen.window="if (!$event.detail.wasSeen) unseen = Math.max(0, unseen - 1)">
+                        <div class="relative" x-data="{ bellOpen: false, unseen: {{ (int) $whatsNewUnseenCount }}, unreadIds: {{ Js::from($whatsNewUnseenIds) }},
+                                }" @click.outside="bellOpen = false" @whats-new-seen.window="unreadIds = unreadIds.filter(id => Number(id) !== Number($event.detail.id)); unseen = unreadIds.length">
                             <button data-tn-topnav-control="notification" @click="bellOpen = !bellOpen" title="{{ __('pos.ti_app_updates') }}" class="relative p-2 rounded-lg text-white hover:bg-white/15 transition cursor-pointer">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                 <span x-show="unseen > 0" x-cloak x-text="unseen"
@@ -545,7 +546,7 @@
                                       style="top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 9px;"></span>
                             </button>
 
-                            <div x-show="bellOpen" x-cloak @click.outside="bellOpen = false"
+                            <div x-show="bellOpen" x-cloak
                                  x-transition:enter="transition ease-out duration-150"
                                  x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
                                  x-transition:enter-end="opacity-100 translate-y-0 scale-100"

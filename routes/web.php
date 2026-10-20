@@ -392,6 +392,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('di.whats-new.seen');
 
     // ── Tax Consultant Console (any DI web user can become a consultant) ──
     // Linking is consent-based ONLY: redeem a client-generated invite code, or

@@ -536,23 +536,52 @@ class PosRestaurantDashboardCountsTest extends TestCase
         }
     }
 
-    public function test_restaurant_top_sellers_and_view_all_default_to_the_current_business_day(): void
+    public function test_restaurant_view_all_shows_all_order_items_and_per_item_details_for_the_same_business_day(): void
     {
-        $controller = file_get_contents(app_path('Http/Controllers/RestaurantPosController.php'));
-        $start = strpos($controller, '$topProducts = RestaurantOrderItem::select');
-        $end = strpos($controller, '// Inventory master switch', $start);
-        $topSellerBlock = substr($controller, $start, $end - $start);
+        $this->actAs('pos_admin');
+        $order = $this->order(['status' => 'completed', 'created_at' => now()]);
+        for ($i = 1; $i <= 16; $i++) {
+            DB::table('restaurant_order_items')->insert(['order_id' => $order,
+                'item_name' => 'Synthetic sold item '.$i, 'quantity' => $i, 'subtotal' => $i * 100]);
+        }
+        $foreign = $this->order(['company_id' => $this->companyId + 1, 'status' => 'completed']);
+        $cancelled = $this->order(['status' => 'cancelled']);
+        $old = $this->order(['status' => 'completed', 'created_at' => now()->subDays(3)]);
+        foreach ([$foreign, $cancelled, $old] as $id) {
+            DB::table('restaurant_order_items')->insert(['order_id' => $id, 'item_name' => 'Excluded item', 'quantity' => 999, 'subtotal' => 99999]);
+        }
+        $dashboard = $this->dashboardData();
+        $this->assertCount(8, $dashboard['topProducts']);
+        $this->assertSame(route('pos.restaurant.top-selling'), $dashboard['topItemsReportUrl']);
+        $data = (new RestaurantPosController())->topSelling(\Illuminate\Http\Request::create('/pos/restaurant/top-selling'))->getData();
+        $this->assertSame(16, $data['items']->total());
+        $this->assertSame('Synthetic sold item 16', $data['items']->first()->item_name);
+        $this->assertSame(16.0, (float) $data['items']->first()->total_qty);
+        $this->assertSame(1600.0, (float) $data['items']->first()->total_revenue);
+        $detail = (new RestaurantPosController())->topSelling(\Illuminate\Http\Request::create('/pos/restaurant/top-selling', 'GET', ['item' => 'Synthetic sold item 16']))->getData();
+        $this->assertSame(1, $detail['lines']->total());
+        $this->assertSame($order, $detail['lines']->first()->order_id);
+    }
 
-        $this->assertStringContainsString("->where('created_at', '>=', \$cxFrom)", $topSellerBlock);
-        $this->assertStringContainsString("->where('created_at', '<', \$cxTo)", $topSellerBlock);
-        $this->assertStringNotContainsString('subDays(7)', $topSellerBlock);
+    public function test_restaurant_top_selling_uses_half_open_business_cutoff_and_combines_repeat_orders(): void
+    {
+        [$start, $until] = \App\Services\PosBusinessDay::windowFor($this->companyId, '2026-10-18', '2026-10-18');
+        foreach ([$start->copy()->subSecond(), $start, $until->copy()->subSecond(), $until] as $time) {
+            $id = $this->order(['status' => 'completed', 'created_at' => $time]);
+            DB::table('restaurant_order_items')->insert(['order_id' => $id, 'item_name' => 'Boundary item', 'quantity' => 1.5, 'subtotal' => 150]);
+        }
+        $item = \App\Services\RestaurantTopSelling::summary($this->companyId, $start, $until)->sole();
+        $this->assertSame(3.0, (float) $item->total_qty);
+        $this->assertSame(300.0, (float) $item->total_revenue);
+        $this->assertSame(2, (int) $item->total_orders);
+    }
 
-        $urlStart = strpos($topSellerBlock, '$topItemsReportUrl = route');
-        $urlBlock = substr($topSellerBlock, $urlStart);
-        $this->assertStringContainsString("'top_items' => 1", $urlBlock);
-        $this->assertStringContainsString("'cashier' => 'all'", $urlBlock);
-        $this->assertStringNotContainsString("'from' =>", $urlBlock);
-        $this->assertStringNotContainsString("'to' =>", $urlBlock);
+    public function test_restaurant_top_selling_details_reject_cashiers(): void
+    {
+        $this->assertSame('reports', \App\Services\PosAccessService::featureForPath('pos/restaurant/top-selling'));
+        $this->actAs('cashier');
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        (new RestaurantPosController())->topSelling(\Illuminate\Http\Request::create('/pos/restaurant/top-selling'));
     }
 
     public function test_detailed_top_seller_report_uses_report_filters_and_business_dates_without_a_limit(): void

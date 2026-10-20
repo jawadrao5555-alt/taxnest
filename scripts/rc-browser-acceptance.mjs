@@ -911,6 +911,26 @@ async function hotelCreditReview(page, t, v) {
 
 }
 
+async function restaurantTopSellingWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const viewAll=page.locator('a[href$="/pos/restaurant/top-selling"]').first();
+  await Promise.all([page.waitForURL(u=>u.pathname==='/pos/restaurant/top-selling'),viewAll.click()]);
+  const summary=page.locator('[data-top-selling-summary]');
+  await summary.waitFor({state:'visible'});
+  if(await summary.locator('tbody tr').count()!==16)throw new Error('View All did not show all sixteen sold items');
+  await summary.getByRole('link',{name:'Synthetic complete item 16',exact:true}).click();
+  const details=page.locator('[data-top-selling-details]');
+  await details.waitFor({state:'visible'});
+  const text=await details.innerText();
+  if(!text.includes('RC-TOP-ORDER')||!text.includes('1,600.00'))throw new Error('selected item order/amount details missing');
+  const from=page.locator('input[name="from"]');const to=page.locator('input[name="to"]');
+  const current=await from.inputValue();await from.fill(current);await to.fill(current);
+  await Promise.all([page.waitForURL(u=>u.searchParams.get('from')===current&&!u.searchParams.has('item')),page.locator('form button').filter({hasText:'Apply'}).click()]);
+  if(await summary.locator('tbody tr').count()!==16)throw new Error('filter change lost full item list');
+  pass(t.name+'/'+v.width+': real View All opens sixteen items and selected-order detail, filters retain complete view');
+}
+
 async function notificationWorkflow(page, t, v, diagnostics) {
   const panel=t.notificationWorkflow, prefix=panel==='di'?'':panel==='fbr'?'/fbr-pos':'/pos';
   await page.goto(baseUrl+(panel==='di'?'/profile':prefix+'/my-profile'),{waitUntil:'domcontentloaded'});
@@ -1343,6 +1363,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
+  if (t.restaurantTopSelling) return restaurantTopSellingWorkflow(page,t,v);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v,diagnostics);
   if (t.hotelCreditReview) return hotelCreditReview(page,t,v);

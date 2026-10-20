@@ -4,6 +4,8 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'restaurant_top_selling_scope' => 'منتخب کاروباری تاریخوں کے مکمل ریسٹورنٹ آرڈر، مقدار کے لحاظ سے۔ رقم بل کی رعایت اور ٹیکس سے پہلے آئٹم کا سب ٹوٹل ہے۔ تفصیل کے لیے آئٹم کھولیں۔',
+    'orders_count_label' => 'آرڈرز',
     'notification_read_failed' => 'پڑھے جانے کی حالت محفوظ نہیں ہوئی۔ یہ اطلاع ابھی غیر پڑھی ہے۔',
     'notification_read_retry' => 'دوبارہ کوشش',
     'a4_printer_desc' => 'رسید 80mm تھرمل لے آؤٹ پر پرنٹ ہوگی، جو پورے A4 صفحے کے بیچ میں ہوگی۔',

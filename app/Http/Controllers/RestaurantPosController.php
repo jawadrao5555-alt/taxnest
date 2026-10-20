@@ -3001,6 +3001,30 @@ class RestaurantPosController extends Controller
         return response()->json(['success' => false, 'message' => 'Could not fetch image']);
     }
 
+    public function topSelling(Request $request)
+    {
+        $user = auth('pos')->user();
+        abort_unless($user && $user->isPosAdmin(), 403);
+        $companyId = (int) app('currentCompanyId');
+        $today = \App\Services\PosBusinessDay::current($companyId);
+        $request->validate([
+            'from' => 'nullable|date_format:Y-m-d',
+            'to' => 'nullable|date_format:Y-m-d|after_or_equal:from',
+            'item' => 'nullable|string|max:255',
+        ]);
+        $from = $request->input('from') ?: $today;
+        $to = $request->input('to') ?: $from;
+        abort_if(\Carbon\Carbon::parse($from)->gt(\Carbon\Carbon::parse($to))
+            || \Carbon\Carbon::parse($from)->diffInDays(\Carbon\Carbon::parse($to)) > 366, 422);
+        [$start, $until] = \App\Services\PosBusinessDay::windowFor($companyId, $from, $to);
+        $items = \App\Services\RestaurantTopSelling::summary($companyId, $start, $until)->paginate(50)->withQueryString();
+        $selectedItem = $request->input('item');
+        $lines = $selectedItem === null ? null : \App\Services\RestaurantTopSelling::query($companyId, $start, $until)
+            ->where('item_name', $selectedItem)->with('order.posTransaction')
+            ->orderByDesc('id')->paginate(50, ['*'], 'details_page')->withQueryString();
+        return view('pos.restaurant.top-selling', compact('items', 'lines', 'selectedItem', 'from', 'to'));
+    }
+
     public function dashboard()
     {
         $companyId = app('currentCompanyId');
@@ -3136,29 +3160,9 @@ class RestaurantPosController extends Controller
         $totalTables = RestaurantTable::where('company_id', $companyId)->count();
         $occupiedTables = RestaurantTable::where('company_id', $companyId)->where('status', 'occupied')->count();
 
-        $topProducts = RestaurantOrderItem::select('item_name',
-            DB::raw('SUM(quantity) as total_qty'),
-            DB::raw('SUM(subtotal) as total_revenue'))
-            ->whereHas('order', function ($q) use ($companyId, $cxFrom, $cxTo) {
-                $q->where('company_id', $companyId)
-                    ->where('status', 'completed')
-                    ->where('created_at', '>=', $cxFrom)
-                    ->where('created_at', '<', $cxTo);
-            })
-            ->groupBy('item_name')
-            ->orderByDesc('total_qty')
-            ->limit(8)
-            ->get();
-
-        // Top Selling is a current-business-day view. Do not force a historical
-        // range into "View all": the canonical Reports resolver defaults a
-        // date-less visit to Today while preserving any dates the user later
-        // selects explicitly.
-        $topItemsReportUrl = route('pos.reports', [
-            'top_items' => 1,
-            'tab' => ($user?->posBillingScope() ?? 'both') === 'local' ? 'local' : 'pra',
-            'cashier' => 'all',
-        ]);
+        $topProducts = \App\Services\RestaurantTopSelling::summary($companyId, $cxFrom, $cxTo)->limit(8)->get();
+        // Full list must use these same order items and the business-day window.
+        $topItemsReportUrl = route('pos.restaurant.top-selling');
 
         // Inventory master switch — when company has inventory_enabled = false,
         // the dashboard low-stock badge/section must stay empty.

@@ -4,6 +4,8 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Arabic-script characters here.
 
 return [
+    'restaurant_top_selling_scope' => 'Selected business dates ke tamam completed restaurant orders, quantity ke hisab se. Amount item subtotal hai; bill discount aur tax se pehle. Order details ke liye item kholain.',
+    'orders_count_label' => 'Orders',
     'notification_read_failed' => 'Read status save nahi hua. Yeh notification abhi unread hai.',
     'notification_read_retry' => 'Dobara koshish',
     'a4_printer_desc' => 'Receipt 80mm thermal layout mein print hogi, full A4 page par center hogi.',

@@ -139,6 +139,26 @@ class ReadOnlyReportingConnectorTest extends TestCase
         return $this->withToken($token)->postJson('/api/reporting/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => $tool, 'arguments' => $args]]);
     }
 
+    public function test_connection_page_separates_authorisation_from_scoped_read_evidence_without_business_writes(): void
+    {
+        [$params, $tokens] = $this->connection();
+        $before = DB::table('pos_transactions')->orderBy('id')->get()->toJson();
+        $this->actingAs($this->owner, 'admin')->get('/admin/reporting/connections')->assertOk()
+            ->assertSee('Connect and verify a known bill')->assertSee('No successful report read recorded');
+        $this->toolCall($tokens['access_token'], 'get_company_billing_summary', ['company_id' => 1, 'company_name' => 'Pizza Master Test', 'date_from' => '2026-10-13'])->assertOk();
+        $grant = DB::table('reporting_oauth_grants')->first();
+        // An inconsistent audit actor must not inflate this owner's evidence.
+        DB::table('reporting_read_audits')->insert(['grant_id' => $grant->id, 'actor_id' => $this->owner->id + 999,
+            'tool' => 'foreign-owner-marker', 'created_at' => '2099-01-01 00:00:00']);
+        $this->get('/admin/reporting/connections')->assertOk()->assertViewHas('grants', function ($grants) {
+            return $grants->count() === 1 && (int) $grants->first()->successful_reads === 1
+                && $grants->first()->last_read_at !== '2099-01-01 00:00:00';
+        })->assertDontSee($tokens['access_token'])->assertDontSee($tokens['refresh_token'])->assertDontSee('foreign-owner-marker');
+        $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
+        $this->owner->update(['role' => 'support']);
+        $this->get('/admin/reporting/connections')->assertForbidden();
+    }
+
     public function test_billing_splits_return_reporting_tax_and_excludes_other_tenant_dates_and_cancelled(): void
     {
         [$p,$tokens] = $this->connection();

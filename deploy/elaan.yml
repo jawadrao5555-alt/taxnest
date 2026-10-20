@@ -1,7 +1,7 @@
-title: "Website ki package aur product maloomat ki durusti"
+title: "Read-only reporting connection ki verification rehnumai"
 audience: all
 type: improvement
 points:
-  - "Public PRA starting price ab current package price se li jati hai."
-  - "Purane package names, Android size aur unsupported compliance claims durust kiye gaye hain."
-  - "Caller local contact lookup, rider location aur Healthcare records ki privacy wazeh ki gayi hai."
+  - "Owner reporting connections par successful report-read evidence dekh sakta hai."
+  - "Known billing, tax, credit notes aur payments match karne ke steps shamil hain."
+  - "Active access ko ChatGPT connection ya billing verification complete nahi kaha jata."

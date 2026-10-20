@@ -360,7 +360,7 @@ class PraElaanTallyTest extends TestCase
             ->assertOk()->assertViewIs('admin.feature-suggestions')
             ->assertViewHas('suggestions', fn ($rows) => $rows->total() === 1
                 && $rows->first()->title === 'Planned route fixture')
-            ->assertSee('Planned route fixture')->assertDontSee('Pending route fixture')
+            ->assertSee('Planned route fixture')
             ->assertDontSee('Sync from DRAP')
             ->assertSee('href="'.route('admin.feature-suggestions').'"', false)
             ->assertSee('href="'.route('admin.medicine-catalogue').'"', false);

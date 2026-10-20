@@ -138,6 +138,14 @@ $settingsHotel = $company('Synthetic Rooms Only Settings', 'settings-hotel@rc-br
     'pos_theme' => 'blue', 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
 ]);
 $settingsOwner = $user($settingsHotel, 'Synthetic Hotel Settings Owner', 'hotel-settings@rc-browser.invalid', 'company_admin', 'pos_admin');
+$waShop = $company('Synthetic WhatsApp Auto Send', 'wa-auto-company@rc-browser.invalid', 'RCBROWSERWA', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'pos_setup_completed' => true,
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_whatsapp_bill_enabled' => true,
+]);
+$waShop->forceFill(['wa_api_enabled' => true, 'wa_phone_number_id' => '123456789',
+    'wa_api_token' => \Illuminate\Support\Facades\Crypt::encryptString('synthetic-api-token'),
+    'wa_template_name' => 'invoice_notification', 'wa_app_secret' => 'synthetic-app-secret', 'wa_attach_pdf' => true])->save();
+$waOwner = $user($waShop, 'Synthetic WhatsApp Owner', 'wa-auto-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
 $tableShop = $company('Synthetic Table Order Recovery', 'table-orders-company@rc-browser.invalid', 'RCBROWSERTABLES', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant',
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
@@ -549,6 +557,8 @@ $fixture = [
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
             'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
+        ['name'=>'whatsapp-optional-autosend','login'=>$waOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
+            'paths'=>['/pos/settings/whatsapp-delivery'],'markers'=>['WhatsApp auto-send'], 'whatsappAutoSend'=>true],
         ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/riders/tracking'],'markers'=>['Synthetic Live Rider'],
             'riderRealtime'=>['id'=>$riderLive->id,'token'=>$riderLiveToken]],

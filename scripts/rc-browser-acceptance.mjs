@@ -1228,6 +1228,7 @@ async function companyDirectoryContrast(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
   if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
   if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
   if(t.fbrReconciliation) {
@@ -1661,6 +1662,23 @@ const {browser}=await launchLocalBrowser();
 try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
 
+
+async function whatsappAutoSendWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/settings/whatsapp-delivery',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  const toggle=page.locator('input[type=checkbox][name=auto_send]');
+  if(await toggle.isChecked())throw new Error('New company auto-send must default OFF');
+  for(const key of ['wa_api_token','wa_app_secret'])if(await page.locator('input[name='+key+']').inputValue())throw new Error('Saved secret leaked into form');
+  const html=await page.content();if(html.includes('synthetic-api-token')||html.includes('synthetic-app-secret'))throw new Error('Saved secret leaked into HTML');
+  await toggle.check();await Promise.all([page.waitForURL('**/pos/settings/whatsapp-delivery'),page.getByRole('button',{name:'Save settings',exact:true}).click()]);
+  await page.getByRole('status').waitFor(); await dismiss(page);
+  if(!await toggle.isChecked())throw new Error('ON did not persist');
+  await toggle.uncheck();await Promise.all([page.waitForURL('**/pos/settings/whatsapp-delivery'),page.getByRole('button',{name:'Save settings',exact:true}).click()]);
+  await page.getByRole('status').waitFor(); await dismiss(page);await page.reload({waitUntil:'domcontentloaded'});
+  if(await toggle.isChecked())throw new Error('OFF did not persist');
+  await saveEvidenceScreenshot(page,'rc-'+v.width+'-whatsapp-optional-autosend');
+  pass(t.name+'/'+v.width+': actual owner form defaults OFF, persists ON/OFF, keeps blank encrypted secrets private');
+}
 
 async function riderRealtimeWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/riders/tracking',{waitUntil:'domcontentloaded'});

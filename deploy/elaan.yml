@@ -1,7 +1,8 @@
-title: "Notifications ka read status aur sahi system ki updates"
-audience: all
-type: improvement
+title: "WhatsApp bill ka optional auto-send aur delivery status"
+audience: pos
+type: feature
 points:
-  - "Kisi update ki detail kholne par uska NEW label aur unread count read status save hone ke baad badlenge."
-  - "Read status save na ho to dobara koshish ka option milega."
-  - "Update release karte waqt receiving system aur business category select ki ja sakegi."
+  - "Auto-send default OFF hai; owner package permission ke saath ON/OFF kar sakta hai."
+  - "Final bill durable queue se bheja jata hai; manual WhatsApp aur auto-open settings barqarar hain."
+  - "Sent, delivered, read aur failure ki halat settings mein nazar aati hai."
+  - "Automatic delivery ke liye owner ki Meta configuration aur approved template darkar hain; SENT ka matlab customer delivery nahi."

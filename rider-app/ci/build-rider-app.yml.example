@@ -1,3 +1,6 @@
+# HISTORICAL EXAMPLE ONLY: generates a throwaway signing key. Do not activate.
+# Stable-key owner beta path: .github/workflows/build-android-beta.yml
+# See docs/ops/android-beta-release.md.
 name: Build Rider App (Android)
 # IMPORTANT: this workflow uploads the APK as a workflow ARTIFACT only.
 # NEVER publish it as a GitHub release — desktop agents self-update from this

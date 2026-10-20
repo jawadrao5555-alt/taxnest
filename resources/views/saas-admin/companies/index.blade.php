@@ -43,15 +43,15 @@
 
     <div class="tn-directory-filters bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
         <form method="GET" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, NTN, owner..." class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
-            <select name="product_type" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
+            <input type="text" name="search" aria-label="Search companies" value="{{ request('search') }}" placeholder="Search name, NTN, owner..." class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
+            <select name="product_type" aria-label="Company product type" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Types</option>
                 <option value="di" {{ request('product_type') === 'di' ? 'selected' : '' }}>Digital Invoice</option>
                 <option value="pos" {{ request('product_type') === 'pos' ? 'selected' : '' }}>PRA POS</option>
                 <option value="fbrpos" {{ request('product_type') === 'fbrpos' ? 'selected' : '' }}>FBR POS</option>
                 <option value="{{ \App\Support\NestErps::PRODUCT_TYPE }}" {{ \App\Support\NestErps::isProductType(request('product_type')) ? 'selected' : '' }}>{{ \App\Support\NestErps::LABEL }}</option>
             </select>
-            <select name="status" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
+            <select name="status" aria-label="Company status" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Statuses</option>
                 <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
                 <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>

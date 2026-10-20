@@ -90,7 +90,7 @@
 
             <div id="who" class="scroll-mt-24 legal-prose">
                 <h3 class="text-2xl font-serif text-[#052730] mb-4">1. Who we are</h3>
-                <p>This policy is issued by {{ $legalName }} ("TaxNest", "we", "us"), Pakistan. It covers the TaxNest web platform at taxnest.pk (FBR Digital Invoicing, NestPOS for PRA, and FBR POS) and the TaxNest Android applications, including <strong>TaxNest Caller ID</strong> (package <code>pk.taxnest.callerid</code>).</p>
+                <p>This policy is issued by {{ $legalName }} ("TaxNest", "we", "us"), Pakistan. It covers the TaxNest web platform at taxnest.pk (FBR Digital Invoicing, NestPOS for PRA, FBR POS, and Nest ERPS Healthcare) and the TaxNest Android applications, including <strong>TaxNest Caller ID</strong> (package <code>pk.taxnest.callerid</code>).</p>
                 <p>TaxNest is business software sold to registered businesses. In almost every case the person using our apps is a shop owner or their staff member, using the software for their own shop.</p>
             </div>
 
@@ -102,6 +102,10 @@
                     <li><strong>Transaction data you create</strong> — invoices, POS bills, products, customers, ledgers and payments.</li>
                     <li><strong>Technical and usage data</strong> — log records, device / browser information, IP address, and audit trails of actions taken in your account.</li>
                 </ul>
+                <h4>Rider location</h4>
+                <p>When a business enables Rider Live Tracking on an eligible package and the rider grants location permission, the rider app sends location coordinates and their recorded time to that business account for delivery tracking. Phone location permissions can be withdrawn in Android settings. Location updates depend on device permissions, connectivity and background restrictions; a map pin is not a guarantee of the rider's current position.</p>
+                <h4>Healthcare records</h4>
+                <p>Healthcare customers may enter patient identity and contact details, appointments, clinical notes, laboratory results, prescriptions, admissions and billing records for the modules they use. These records are held for the healthcare company; access is restricted by user role and configured branch or department scope. The healthcare company is responsible for authorising staff access and obtaining the permissions needed to enter patient records. Contact us to request access, correction or deletion, subject to applicable record-retention requirements.</p>
                 <h4>Why</h4>
                 <ul>
                     <li>To run the service and produce your invoices and receipts.</li>
@@ -138,7 +142,7 @@
                 <h4>What the app never does</h4>
                 <ul>
                     <li>It does not read, store or transmit any notification other than an incoming-call notification from the phone's own calling app or from WhatsApp — no messages, chats, emails, or other apps' notifications.</li>
-                    <li>It does not read your call history, contacts, SMS, photos or files.</li>
+                    <li>It does not read your call history, SMS, photos or files. The WhatsApp Plus build can request Contacts permission to resolve a displayed caller name against contacts locally on the phone. It does not upload your address book; only the matched incoming caller number and call details are sent to your shop account.</li>
                     <li>It does not record calls or audio.</li>
                     <li>It does not track location.</li>
                     <li>It does not show ads, and it contains no advertising or analytics SDKs.</li>
@@ -162,7 +166,7 @@
 
             <div id="security" class="scroll-mt-24 legal-prose">
                 <h3 class="text-2xl font-serif text-[#052730] mb-4">5. Security &amp; retention</h3>
-                <p>All traffic between our apps and our servers is encrypted in transit using HTTPS (TLS). Access is controlled per account and per user role, sensitive credentials are stored encrypted, and account actions are written to immutable audit logs.</p>
+                <p>All traffic between our apps and our servers is encrypted in transit using HTTPS (TLS). Access is controlled per account and per user role, sensitive credentials are stored encrypted, and supported billing and account events are recorded in audit logs with application controls against editing recorded entries.</p>
                 <p>Business records (invoices, bills, customers, ledgers) are retained while your account is active and for the period required by Pakistani tax law. Caller ID ring records are deleted automatically after about 48 hours. Device tokens are deleted when the device is revoked or the user signs out.</p>
             </div>
 

@@ -207,7 +207,7 @@
                 "name": "Can I run branches and multiple staff accounts?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and every action lands in an immutable audit log."
+                    "text": "Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and supported billing and account events are recorded in audit logs."
                 }
             }
         ]
@@ -363,7 +363,7 @@
                 <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">The Suite</h2>
                 <h3 class="text-3xl sm:text-4xl font-serif text-[#052730] mb-6">Three distinct systems. <br>One standard of engineering.</h3>
                 <p class="text-gray-600 leading-relaxed text-lg">
-                    TaxNest isn't a generic SaaS tool. It's a suite of compliance products designed specifically for Pakistan's regulatory requirements. Every module operates with complete isolation—ensuring role-based access, multi-branch integrity, and immutable audit logs.
+                    TaxNest isn't a generic SaaS tool. It's a suite of compliance products designed specifically for Pakistan's regulatory requirements. Every module operates with complete isolation—ensuring role-based access, multi-branch integrity, and audit logs for supported events.
                 </p>
             </div>
 
@@ -578,7 +578,7 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16 fade-in-up">
                 <h2 class="text-sm font-bold tracking-widest uppercase text-gray-500 mb-4">Foundation</h2>
-                <h3 class="text-3xl font-serif text-[#052730]">Built on immutable standards.</h3>
+                <h3 class="text-3xl font-serif text-[#052730]">Built for accountable billing.</h3>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -661,7 +661,8 @@
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 17,990 / year</td>
-                            <td class="p-5 font-bold text-[#052730]">PKR 14,999 / year</td>
+                            <td class="p-5 font-bold text-[#052730]">@php($publicPraStart = \Illuminate\Support\Facades\Schema::hasTable('pricing_plans') ? \App\Services\PosPlanComparisonService::plans()->sortBy(fn ($plan) => (float) $plan->sale_price)->first() : null)
+                            @if($publicPraStart) PKR {{ number_format((float) $publicPraStart->sale_price) }} / year @else See PRA pricing @endif</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 17,999 / year</td>
                         </tr>
                         <tr class="border-b border-gray-100">
@@ -724,7 +725,7 @@
                         <span class="font-semibold text-[#052730]">Can I run branches and multiple staff accounts?</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and every action lands in an immutable audit log.</div>
+                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and supported billing and account events are recorded in audit logs.</div>
                 </div>
             </div>
         </div>

@@ -1,9 +1,7 @@
-title: "Top Selling ki mukammal list aur item details"
-audience: pos
+title: "Website ki package aur product maloomat ki durusti"
+audience: all
 type: improvement
 points:
-  - "Restaurant Top Selling ke View All par tamam bikne wale items ki list khulegi."
-  - "Har item ki quantity, subtotal aur orders ki tadaad ke saath order details bhi dekhi ja sakengi."
-  - "Business dates badal kar usi period ki mukammal list dekhein."
-categories:
-  - restaurant
+  - "Public PRA starting price ab current package price se li jati hai."
+  - "Purane package names, Android size aur unsupported compliance claims durust kiye gaye hain."
+  - "Caller local contact lookup, rider location aur Healthcare records ki privacy wazeh ki gayi hai."

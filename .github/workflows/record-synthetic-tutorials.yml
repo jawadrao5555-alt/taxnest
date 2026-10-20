@@ -1,0 +1,84 @@
+name: Record synthetic POS tutorials
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Full main SHA to record locally; no public publishing
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  record:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    container:
+      image: mariadb:10.6.23-jammy@sha256:93435df079cf42c7590ad12f7481d88d297d0228c723c152eb0600caa25a157f
+      options: --user root
+    env:
+      RC_MARIADB_VERSION: '10.6.23'
+      RC_MARIADB_PORT: '33117'
+      RC_BROWSER_PORT: '5911'
+      RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-tutorials
+    steps:
+      - name: Bootstrap disposable container
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE"
+          apt-get update
+          apt-get install -y --no-install-recommends bash ca-certificates git sudo
+          chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          set-safe-directory: false
+          persist-credentials: false
+      - name: Check exact source on main
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          [[ "$TARGET_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git merge-base --is-ancestor "$TARGET_SHA" origin/main
+          git checkout --detach "$TARGET_SHA"
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+      - name: Install disposable database prerequisites
+        run: bash scripts/ci-mariadb-provision.sh install
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql
+          tools: composer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - name: Install locked app and browser dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+          bash scripts/npm-bootstrap-pinned.sh ci --ignore-scripts --no-audit --no-fund
+          bash scripts/rc-playwright-install.sh
+      - name: Record validated desktop and mobile journeys
+        env:
+          RC_TUTORIAL_RECORDING: '1'
+          RC_BROWSER_ONLY: restaurant-top-selling,whatsapp-optional-autosend,rider-realtime-map,notification-pra
+        run: |
+          set -euo pipefail
+          trap 'bash scripts/rc-browser-fixture.sh stop' EXIT
+          bash scripts/rc-browser-fixture.sh setup
+          bash scripts/rc-browser-fixture.sh run
+          test -s "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json"
+          mkdir -p "$RUNNER_TEMP/tutorial-review"
+          cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/"*.webm "$RUNNER_TEMP/tutorial-review/"
+          cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json" "$RUNNER_TEMP/tutorial-review/"
+      - name: Stop disposable fixture
+        if: always()
+        run: bash scripts/rc-browser-fixture.sh stop
+      - name: Upload successful synthetic recordings for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-tutorials-${{ inputs.target_sha }}
+          path: ${{ runner.temp }}/tutorial-review/
+          if-no-files-found: error
+          retention-days: 14

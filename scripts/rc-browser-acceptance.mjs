@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { recordingDirectory } from './lib/tutorial-recording.mjs';
 import { assertLocalOnlyBaseUrl, attachDiagnostics, launchLocalBrowser, saveEvidenceScreenshot } from './lib/local-browser.mjs';
 
 const baseUrl = assertLocalOnlyBaseUrl(process.env.BASE_URL);
@@ -10,6 +13,8 @@ if (!fixtureStat.isFile() || realpathSync(fixturePath) !== fixturePath) throw ne
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
 if (!fixture.synthetic || !Array.isArray(fixture.readOnlyJourneys) || !Array.isArray(fixture.transactionalJourneys)) throw new Error('synthetic separated fixture required');
 const requested = String(process.env.RC_BROWSER_ONLY || '').split(',').map(x => x.trim()).filter(Boolean);
+const videoDirectory = recordingDirectory(process.env.RC_TUTORIAL_RECORDING, fixturePath, requested);
+const recorded = [];
 const regular = [...fixture.readOnlyJourneys, ...fixture.transactionalJourneys];
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
 // Exercise transactional table, settings and Hotel desk regressions first; retain every journey.
@@ -1675,13 +1680,32 @@ async function healthIsolation(browser,label,v,iso) {
   } finally {await saveEvidenceScreenshot(p,`rc-${label}-health-isolation`).catch(()=>{});await c.close();}
 }
 async function one(browser,label,v,t) {
-  valid(t); const c=await browser.newContext({viewport:v,serviceWorkers:'allow'}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
+  valid(t); const failuresBefore = failures;
+  const c=await browser.newContext({viewport:v,serviceWorkers:'allow',...(videoDirectory?{recordVideo:{dir:join(videoDirectory,'raw'),size:v}}:{})}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
   try { await login(p,t.notificationWorkflow?{...t,login:requested.length?(v.width<768?t.preflightMobileLogin:t.preflightLogin):(v.width<768?t.mobileLogin:t.login)}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
-  catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});await c.close();}
+  catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {
+    await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});
+    const video=p.video(); await c.close();
+    if(videoDirectory && video) {
+      if(failures === failuresBefore) {
+        const name=`${t.name}-${label}.webm`, target=join(videoDirectory,name);
+        await video.saveAs(target);
+        const bytes=readFileSync(target);
+        if(!bytes.length)throw new Error('Empty tutorial recording');
+        recorded.push({name,sha256:createHash('sha256').update(bytes).digest('hex'),size:bytes.length,journey:t.name,viewport:v});
+      }
+      await video.delete();
+    }
+  }
 }
 const {browser}=await launchLocalBrowser();
 try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
-if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);} console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
+if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);}
+if(videoDirectory) {
+  if(recorded.length !== cases.length * views.length)throw new Error('Incomplete tutorial recordings');
+  writeFileSync(join(videoDirectory,'recording-manifest.json'),JSON.stringify({schema_version:1,source_sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),synthetic:true,review_status:'OWNER_REVIEW_REQUIRED',recorded_at:new Date().toISOString(),artifacts:recorded},null,2)+'\n');
+}
+console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic journeys passed.');
 
 
 async function whatsappAutoSendWorkflow(page,t,v) {

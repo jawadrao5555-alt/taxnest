@@ -1,7 +1,7 @@
-title: "Website ki package aur product maloomat ki durusti"
-audience: all
+title: "WhatsApp setup aur delivery ki wazeh tasdeeq"
+audience: pos
 type: improvement
 points:
-  - "Public PRA starting price ab current package price se li jati hai."
-  - "Purane package names, Android size aur unsupported compliance claims durust kiye gaye hain."
-  - "Caller local contact lookup, rider location aur Healthcare records ki privacy wazeh ki gayi hai."
+  - "Auto-send settings mein saved setup checklist aur company ki delivered/read evidence nazar aati hai."
+  - "Unreadable saved token par auto-send ON nahi hota; OFF karna mumkin rehta hai."
+  - "Sent provider acceptance hai; customer delivery ki tasdeeq alag dikhai jati hai."

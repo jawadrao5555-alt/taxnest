@@ -961,6 +961,41 @@ class PosWhatsappBillShareTest extends TestCase
         $this->actingAs($user, 'pos')->post('/pos/settings/whatsapp-delivery', ['auto_send' => 1])->assertForbidden();
     }
 
+    public function test_readiness_does_not_treat_corrupt_saved_credentials_as_usable_and_off_still_works(): void
+    {
+        [$company] = $this->autoSendFixture();
+        $user = $this->makeUser($company->id);
+        $this->assertTrue(\App\Services\PosWhatsAppReadiness::inspect($company)['setup_ready']);
+        DB::table('companies')->where('id', $company->id)->update(['wa_api_token' => 'broken-secret-ciphertext']);
+        $company->refresh();
+        $this->assertFalse(\App\Services\PosWhatsAppReadiness::inspect($company)['setup_ready']);
+        $this->actingAs($user, 'pos')->post('/pos/settings/whatsapp-delivery', ['auto_send' => 1])
+            ->assertSessionHasErrors('auto_send')->assertSessionMissing('_old_input.wa_api_token');
+        $this->actingAs($user, 'pos')->post('/pos/settings/whatsapp-delivery', ['auto_send' => 0])
+            ->assertRedirect('/pos/settings/whatsapp-delivery');
+        $this->assertFalse($company->fresh()->pos_whatsapp_auto_send);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_readiness_delivery_evidence_is_company_scoped_and_sent_is_not_delivery(): void
+    {
+        [$company] = $this->autoSendFixture();
+        $user = $this->makeUser($company->id);
+        foreach ([[$company->id, 1, 'sent'], [$company->id + 999, 888, 'delivered']] as [$tenant, $bill, $status]) {
+            DB::table('pos_whatsapp_outbox')->insert(['company_id' => $tenant, 'transaction_id' => $bill,
+                'recipient' => '923001234567', 'status' => $status, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $this->actingAs($user, 'pos')->get('/pos/settings/whatsapp-delivery')->assertOk()
+            ->assertViewHas('confirmedDelivery', null)->assertSee('Saved setup checklist')
+            ->assertDontSee('synthetic-token')->assertDontSee('synthetic-app-secret');
+        DB::table('pos_whatsapp_outbox')->where('company_id', $company->id)->update(['status' => 'delivered']);
+        $this->get('/pos/settings/whatsapp-delivery')->assertOk()
+            ->assertViewHas('confirmedDelivery', fn ($row) => $row->transaction_id === 1 && $row->status === 'delivered');
+        $user->forceFill(['role' => 'user', 'pos_role' => 'pos_cashier'])->save();
+        $this->actingAs($user, 'pos')->get('/pos/settings/whatsapp-delivery')->assertForbidden();
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
     public function test_real_sale_route_creates_durable_auto_send_without_changing_payment_result(): void
     {
         [$company, $outbox] = $this->autoSendFixture();$user = $this->makeUser($company->id);

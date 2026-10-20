@@ -8,7 +8,7 @@
 #     --title "Naya update — August 2026" \
 #     --point "Pehla kaam theek hua" \
 #     --point "Doosra feature add kiya" \
-#     [--audience pos|fbr_pos|all]   (default: pos) \
+#     [--audience pos|fbr_pos|di|all]   (default: pos) \
 #     [--category restaurant] [--category pharmacy] ...   (repeatable; none = all shops)
 #
 # Usage (dev local DB):
@@ -34,7 +34,7 @@
 # Rules (from .agents/memory/pos-whats-new-updates.md):
 #   - points MUST be a PHP array on the way in (never a pre-encoded JSON string).
 #   - AppUpdate model's setPointsAttribute handles encoding — just pass the array.
-#   - audience 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
+#   - audience 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'di' = Digital Invoicing, 'all' = POS panels.
 #   - --category narrows the elaan to shops on those business categories
 #     (Task 1585). No --category = every shop of that audience. Unknown keys
 #     are rejected by the model normalizer, so the row would silently widen —
@@ -100,7 +100,7 @@ if [ -n "$DEPLOY_SHA" ] && ! printf '%s' "$DEPLOY_SHA" | grep -qE '^[0-9a-fA-F]{
   fail "--deploy-sha must be exactly 40 hexadecimal characters"
 fi
 [ ${#POINTS[@]} -gt 0 ] || fail "at least one --point is required"
-case "$AUDIENCE" in pos|fbr_pos|all) ;; *) fail "--audience must be pos, fbr_pos, or all" ;; esac
+case "$AUDIENCE" in pos|fbr_pos|di|all) ;; *) fail "--audience must be pos, fbr_pos, di, or all" ;; esac
 case "$ELAAN_TYPE" in feature|improvement|"") ;; *) fail "type must be feature or improvement" ;; esac
 [ -n "$ELAAN_TYPE" ] || ELAAN_TYPE="improvement"
 

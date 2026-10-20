@@ -94,10 +94,10 @@ KNOWN_LIVE_OR_RETIRED_TITLES = {
     "Production update — NestPOS Live Ops diagnose aur owner-approved fix ab ready hai",
 }
 assert title not in KNOWN_LIVE_OR_RETIRED_TITLES, title
-assert d["audience"] in ("pos", "all")
+assert d["audience"] in ("pos", "fbr_pos", "di", "all")
 PY
   then
-    ok "committed spec is a new unique pos/all title (not L001, not a known live title)"
+    ok "committed spec is a new unique audience-targeted title (not L001, not a known live title)"
   else
     bad "committed spec must use a new unique title that can pass the freshness gate"
   fi
@@ -135,6 +135,17 @@ else
 fi
 
 echo ""
+
+# Digital Invoicing must remain distinct from both POS products.
+cat > "$TMP/di.yml" <<'YAML'
+title: "Synthetic DI evidence update"
+audience: di
+points:
+  - "Offline evidence checklist only."
+YAML
+DI_OUT=$(python3 "$PARSE" "$TMP/di.yml") || bad "DI spec rejected"
+printf '%s' "$DI_OUT" | python3 -c 'import json,sys; assert json.load(sys.stdin)["audience"] == "di"' && ok "DI targeting preserved" || bad "DI audience widened"
+bash "$INSERT" --dry-run --from-file "$TMP/di.yml" | grep -q 'audience=di' && ok "DI insert dry-run accepted" || bad "DI insert dry-run rejected"
 if [ "$FAILS" -eq 0 ]; then
   echo "ALL CHECKS PASSED"
   exit 0

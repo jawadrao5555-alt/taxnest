@@ -12,3 +12,8 @@ filled sales evidence removing only its request, stable totals and unchanged
 HOLD. Existing duplicate/changed/missing-row tests remain. PHP unavailable
 locally; targeted/full isolated CI required. Real owner source/evidence files
 were not accessed, and current pilot readiness is not claimed.
+
+CI exposed a release-path gap: admin/bell support DI targeting, but the Elaan
+CLI/parser still rejected audience di. Extend the same strict allowlist with
+di (unknown audiences still fail); test exact DI parsing and dry-run without
+widening to POS. The CCI release announcement remains DI-only.

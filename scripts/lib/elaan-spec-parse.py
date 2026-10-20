@@ -7,7 +7,7 @@ on the runner (stdlib only).
 
 Schema:
   title: string (required)
-  audience: pos | fbr_pos | all  (default pos)
+  audience: pos | fbr_pos | di | all  (default pos)
   body: string (optional; used as a point if points is empty)
   points: list of strings (required unless body is set)
   category: string (optional singular)
@@ -27,7 +27,7 @@ RESERVED_TITLES = frozenset(
         "Daily L001 ke liye roz Reset dabana zaroori nahi",
     }
 )
-AUDIENCES = frozenset({"pos", "fbr_pos", "all"})
+AUDIENCES = frozenset({"pos", "fbr_pos", "di", "all"})
 KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*?)\s*$")
 
 
@@ -89,7 +89,7 @@ def parse_restricted_yaml(text: str) -> dict:
 
     audience = str(data.get("audience") or "pos").strip()
     if audience not in AUDIENCES:
-        raise ValueError("audience must be pos, fbr_pos, or all")
+        raise ValueError("audience must be pos, fbr_pos, di, or all")
 
     points: list[str] = []
     if isinstance(data.get("points"), list):

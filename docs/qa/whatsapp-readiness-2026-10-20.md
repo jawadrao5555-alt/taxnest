@@ -24,3 +24,13 @@ desktop/390px optional-auto-send journey checks the readiness/evidence region.
 Local JS syntax and whitespace checks passed. PHP/Chrome unavailable locally;
 fresh isolated CI required for targeted/full PHP and real browser re-test.
 No real delivery verification is claimed by this change.
+
+## Refresh after Android preparation deployment — 2026-10-20
+
+Merged main `740bbdd94bdf31a0f3876d4b1a6548a78ab6bc54` after PR #224.
+Preserved the protected Android beta workflow, stable signing lineage checks,
+artifact inventory tests and all existing POS/reporting behavior. Only the
+release announcement conflicted; this PR retains its WhatsApp announcement.
+Local JavaScript syntax, artifact inventory regression and whitespace checks
+passed. PHP/Chrome unavailable locally; fresh exact-HEAD CI is required.
+Actual Meta delivery and owner acceptance remain unverified.

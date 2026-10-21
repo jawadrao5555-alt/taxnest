@@ -992,6 +992,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('pos.api.customer-addresses.store');
     Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('pos.api.customer-addresses.delete');
     Route::patch('/api/customers/{id}/name', [PosController::class, 'apiUpdateCustomerName'])->name('pos.api.customers.name');
+    Route::patch('/api/customers/{id}/contact', [PosController::class, 'apiUpdateCustomerContact'])->name('pos.api.customers.contact');
     Route::get('/api/failed-bills', [PosController::class, 'apiFailedBills'])->name('pos.api.failed-bills');
     Route::post('/api/failed-bills/{id}/retry', [PosController::class, 'apiRetryFailed'])->name('pos.api.failed.retry');
     // Offline queue telemetry — the sale screen reports bills still held on the

@@ -7178,5 +7178,9 @@ return [
     'print_no_document_reason_store_slip_disabled' => 'اسٹور سلپ بند ہے',
     'print_no_document_reason_held_sale_missing' => 'ہولڈ سیل اب دستیاب نہیں',
     'return_not_allowed_hotel_credit_required' => 'اس بل کے لیے ہوٹل واپسی / کریڈٹ نوٹ استعمال کریں۔ رقم کی واپسی الگ ہے۔',
+    'edit_customer_phone' => 'کسٹمر کا درست فون نمبر درج کریں',
+    'customer_contact_invalid' => 'کسٹمر کا نام اور درست فون نمبر درج کریں۔',
+    'customer_contact_changed' => 'کسٹمر کی تفصیل بدل گئی ہے۔ دوبارہ تلاش کر کے کوشش کریں۔',
+    'customer_contact_duplicate' => 'یہ نمبر دوسرے محفوظ کسٹمر کا ہے۔ اسی کسٹمر کو منتخب کریں۔',
 ];
 

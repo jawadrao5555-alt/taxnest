@@ -7181,5 +7181,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_no_document_reason_store_slip_disabled' => 'Store slip band hai',
     'print_no_document_reason_held_sale_missing' => 'Held sale ab dastiyab nahi',
     'return_not_allowed_hotel_credit_required' => 'Is bill ke liye Hotel Return / Credit Note screen use karein. Payment refund alag hai.',
+    'edit_customer_phone' => 'Customer ka durust phone number likhein',
+    'customer_contact_invalid' => 'Customer ka naam aur durust phone number likhein.',
+    'customer_contact_changed' => 'Customer ki tafseel badal gayi hai. Dobara talash karke koshish karein.',
+    'customer_contact_duplicate' => 'Yeh number doosre saved customer ka hai. Usi customer ko chunein.',
 ];
 

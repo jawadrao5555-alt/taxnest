@@ -1574,6 +1574,9 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                     </div>
+                    <button type="button" data-edit-customer-contact x-show="selectedCustomer && selectedCustomer.id" x-cloak
+                            @click="editCustomerContact(selectedCustomer)" :disabled="editingCustomerId !== null"
+                            class="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-bold text-purple-800 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/40 disabled:opacity-50">{{ __('pos.edit') }}</button>
                     {{-- Task 1380 (owner video, Aug 2026): attached customer ko YAHIN se
                          hatane ka rasta. Pehle clear ka ✕ sirf products column ke customer
                          search box par tha, is liye call se bana customer is card par
@@ -10268,6 +10271,35 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
 
+        async editCustomerContact(customer) {
+            if (!customer || !customer.id || this.editingCustomerId) return;
+            const entered = window.prompt(window.TXT.edit_customer_name, customer.name || '');
+            if (entered === null) return;
+            const phone = window.prompt(window.TXT.edit_customer_phone, customer.phone || '');
+            if (phone === null) return;
+            const name = entered.trim();
+            if (!name) { this.showToast(window.TXT.customer_name_required, 'error'); return; }
+            this.editingCustomerId = customer.id;
+            try {
+                const response = await fetch('/pos/api/customers/' + encodeURIComponent(customer.id) + '/contact', {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ name, phone: phone.trim(), expected_phone: customer.phone || null }),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) { this.showToast(data.message || window.TXT.failed_update_customer_name, 'error'); return; }
+                const saved = data.customer;
+                for (const rows of [this.allCustomers, this.customerPhoneResults]) {
+                    if (Array.isArray(rows)) rows.filter(row => Number(row.id) === Number(saved.id)).forEach(row => Object.assign(row, saved));
+                }
+                Object.assign(customer, saved);
+                if (this.selectedCustomer && Number(this.selectedCustomer.id) === Number(saved.id)) {
+                    Object.assign(this.selectedCustomer, saved);
+                    this.customerPhoneQuery = saved.name + (saved.phone ? ' · ' + saved.phone : '');
+                }
+                this.showToast(window.TXT.customer_name_updated, 'success');
+            } catch (_) { this.showToast(window.TXT.network_error, 'error'); }
+            finally { this.editingCustomerId = null; }
+        },
         async editCustomerName(cr) {
             if (!cr || this.editingCustomerId) return;
             const entered = window.prompt(window.TXT.edit_customer_name, cr.name || '');

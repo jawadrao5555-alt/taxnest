@@ -1451,6 +1451,25 @@ async function tableOrderWorkflow(page,t,v) {
     await openMobileCart(page,v,['Current Order']);
     await root.getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
     if(!await page.locator('[data-video="open-payment"]').isEnabled())throw new Error(expected.status+' table lost its payment action');
+    if(expected===t.tableOrderWorkflow[0]){
+      const originalViewport=page.viewportSize();
+      if(v.width>=768)await page.setViewportSize({width:v.width,height:620});
+      await root.evaluate(el=>{
+        const d=window.Alpine.$data(el);window.__cartScrollOriginal=[...d.cart];
+        d.cart.push(...Array.from({length:24},(_,i)=>({cart_uid:'qa-scroll-'+i,item_id:null,item_type:'manual',item_name:'QA scroll item '+i,quantity:1,unit_price:100,is_tax_exempt:true,special_notes:''})));
+      });
+      const list=page.locator('[x-ref="cartList"]');await list.waitFor({state:'visible'});
+      const before=await page.evaluate(()=>({doc:document.scrollingElement.scrollTop,main:document.querySelector('main')?.scrollTop||0,grid:document.querySelector('[x-ref="gridContainer"]')?.scrollTop||0}));
+      await list.hover();await page.mouse.wheel(0,800);
+      await page.waitForFunction(()=>document.querySelector('[x-ref="cartList"]').scrollTop>0);
+      const after=await page.evaluate(()=>({doc:document.scrollingElement.scrollTop,main:document.querySelector('main')?.scrollTop||0,grid:document.querySelector('[x-ref="gridContainer"]')?.scrollTop||0}));
+      if(JSON.stringify(before)!==JSON.stringify(after))throw new Error('Cart wheel scrolled the page/product grid instead of its items');
+      const last=list.getByText('QA scroll item 23',{exact:true});await last.scrollIntoViewIfNeeded();
+      if(!await last.isVisible())throw new Error('Last newly-added recalled-cart item is unreachable');
+      await saveEvidenceScreenshot(page,'recalled-cart-scroll-'+v.width+'.png');
+      await root.evaluate(el=>{const d=window.Alpine.$data(el);d.cart=window.__cartScrollOriginal;delete window.__cartScrollOriginal;});
+      await page.setViewportSize(originalViewport);
+    }
     pass(t.name+'/'+v.width+': '+expected.status+' exact occupied table opened with items and enabled payment');
     if(v.width<768) {
       // Return through the real mobile cart back button before opening another table.

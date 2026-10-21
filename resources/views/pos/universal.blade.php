@@ -3786,7 +3786,7 @@ window.addEventListener('popstate', function() {
                                 <kbd style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F1</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.order_type_cycle') }}</span>
+                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.product_search') }}</span>
                                 <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F2</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">

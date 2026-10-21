@@ -5,6 +5,27 @@
     @if(session('success'))<p role="status" class="p-3 rounded bg-emerald-100 text-emerald-900">{{ session('success') }}</p>@endif
     @if($errors->any())<div role="alert" class="p-3 rounded bg-red-100 text-red-900">{{ $errors->first() }}</div>@endif
     @unless($allowed)<p class="p-3 rounded bg-amber-100 text-amber-900">{{ __('pos.wa_bill_plan_locked_api') }} Auto-send OFF karna hamesha mumkin hai.</p>@endunless
+    <section class="border rounded-xl p-4 space-y-3" data-whatsapp-readiness>
+        <h2 class="font-bold">Saved setup checklist</h2>
+        <ul class="space-y-1">@foreach($readiness['checks'] as $label => $passed)
+            <li>{{ $passed ? '✓' : '✗' }} {{ $label }} — {{ $passed ? 'Ready' : 'Action needed' }}</li>
+        @endforeach</ul>
+        <p class="text-sm">Yeh sirf saved configuration ka check hai. Meta number/token ki validity, approved template aur webhook delivery abhi is se verify nahi hoti.</p>
+        @unless($readiness['webhook_verify_token_saved'])<p class="text-sm">Webhook Verify Token save karein aur Meta mein callback verification complete karein.</p>@endunless
+        @if($confirmedDelivery)
+            <p class="text-sm" data-confirmed-delivery>Is company ki latest confirmed callback: Bill #{{ $confirmedDelivery->transaction_id }}, {{ $confirmedDelivery->status }}, {{ $confirmedDelivery->updated_at }} ({{ config('app.timezone') }}). Yeh us bill ki evidence hai, har naye bill ki delivery guarantee nahi.</p>
+        @else
+            <p class="text-sm" data-confirmed-delivery>Abhi is company ke kisi auto-send bill ka delivered/read callback record nahi mila.</p>
+        @endif
+        <details><summary class="cursor-pointer font-semibold">Real bill verification ke steps</summary>
+            <ol class="list-decimal pl-5 text-sm space-y-2 mt-2">
+                <li>Meta mein isi number ka English four-parameter template approve karein; PDF ON ho to DOCUMENT header bhi chahiye.</li>
+                <li>Apne authorised test customer number ke saath ek naya final bill banayein. Auto-send ON aur package eligibility confirm karein.</li>
+                <li>Recent status mein sent sirf provider acceptance hai. Customer phone aur signed delivered/read callback se delivery confirm karein.</li>
+                <li>Auto-send OFF karke agla bill verify karein. Manual WhatsApp sharing alag rehti hai. Unknown status ko bina provider history dekhe dobara send na karein.</li>
+            </ol>
+        </details>
+    </section>
     <form method="POST" action="{{ route('pos.whatsapp-delivery.save') }}" class="space-y-4 p-4 border rounded-xl bg-white dark:bg-gray-900">
         @csrf
         <input type="hidden" name="auto_send" value="0">

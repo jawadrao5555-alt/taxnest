@@ -1210,7 +1210,10 @@ async function reportingConnectorWorkflow(page,t,v) {
   const foreign=await (await report(f.foreignCompanyName)).json();
   if(!foreign.result?.isError)throw new Error('Connection company scope leaked a foreign company report');
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
+  await page.locator('[data-reporting-onboarding]').waitFor();
   const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
+  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 1.'))throw new Error('Successful read evidence missing or failed foreign read counted');
+  await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-read-evidence');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
   if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
   if((await report(f.companyName)).status()!==401)throw new Error('Revoked token retained billing access');
@@ -1710,6 +1713,8 @@ console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic j
 
 async function whatsappAutoSendWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/settings/whatsapp-delivery',{waitUntil:'domcontentloaded'});
+  await page.locator('[data-whatsapp-readiness]').waitFor();
+  if(!await page.locator('[data-confirmed-delivery]').innerText())throw new Error('Missing company delivery evidence state');
   await waitForOperationalSurface(page); await dismiss(page);
   const toggle=page.locator('input[type=checkbox][name=auto_send]');
   if(await toggle.isChecked())throw new Error('New company auto-send must default OFF');

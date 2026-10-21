@@ -1790,6 +1790,15 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
 async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    if(!d.guidedOrderTypes().includes('delivery'))throw new Error('Delivery fixture is missing its supported feature');
+    d.orderType='takeaway';
+    const originalCart=d.cart;
+    d.callerBillFrom({phone:'03000000000'});
+    if(d.orderType!=='delivery'||d.selectedCustomer?.phone!=='03000000000'||d.cart!==originalCart)throw new Error('Unsaved caller Bill did not select Delivery without replacing cart');
+  });
+  await saveEvidenceScreenshot(page,'unsaved-caller-delivery-'+v.width+'.png');
   const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
   const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
   const address='Synthetic delivery lane '+v.width;

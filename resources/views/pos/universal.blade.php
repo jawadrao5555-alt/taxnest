@@ -14094,18 +14094,18 @@ function restaurantPos() {
             const phone = (m && m.phone) || ev.phone || '';
             if (m && m.customer_id) {
                 this.selectCustomerWithStats({ id: m.customer_id, name: name, phone: phone, address: m.address || '' });
-                // v2: delivery jump — caller = delivery order 9 times out of 10.
-                // Only when this shop actually HAS the Delivery type; setOrderType
-                // itself pulls the customer's saved addresses for the prefill.
-                if (this.guidedOrderTypes().includes('delivery') && this.orderType !== 'delivery') {
-                    this.setOrderType('delivery');
-                }
             } else {
                 // No saved customer — attach name/phone to the bill as-is (walk-in
                 // with phone); cashier can save the customer from the picker later.
                 this.selectedCustomer = { id: null, name: name || phone, phone: phone };
                 this.customerPhoneQuery = (name ? name : '') + (name && phone ? ' · ' : '') + (phone || '');
                 this.showToast(window.TXT.customer_prefix + (name || phone), 'success');
+            }
+            // Explicit Bill/attach action follows the same policy for saved and
+            // unsaved callers. A passive incoming ring never changes the cart.
+            // Keep feature gating and the existing setOrderType transition.
+            if (this.guidedOrderTypes().includes('delivery') && this.orderType !== 'delivery') {
+                this.setOrderType('delivery');
             }
         },
         // ── Task 1381: POS se hi call back ──────────────────────────────────

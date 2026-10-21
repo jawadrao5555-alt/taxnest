@@ -1,6 +1,7 @@
-title: "Mobile apps ki signed beta verification ki tyari"
-audience: pos
+title: "Desktop Agent Health report ki wazeh tafseel"
+audience: all
 type: improvement
 points:
-  - "Rider aur Caller builds ke liye owner-controlled signing aur verification process shamil hai."
-  - "Naye public APK aur version update phone testing ke baad owner release karega."
+  - "Agent Health report mein last heartbeat, version aur counters ki observations wazeh ki gayi hain."
+  - "Fleet totals aur limited detail rows ko alag dikhaya jata hai."
+  - "PC ya internet ki wajah saboot ke baghair confirmed nahi batayi jati."

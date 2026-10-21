@@ -919,6 +919,23 @@ async function hotelCreditReview(page, t, v) {
 async function restaurantTopSellingWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  const dashboard=page.locator('[x-data="rDash()"]');
+  const bell=page.locator('[data-tn-topnav-control="notification"]').first();
+  await bell.click();
+  const history=page.locator('[x-show="bellOpen"]:visible');
+  await history.waitFor({state:'visible'});
+  await page.evaluate(async()=>{
+    window.__readingNoticeMarker='still-reading';
+    await window.Alpine.$data(document.querySelector('[x-data="rDash()"]')).refreshDashboard();
+  });
+  if(await page.evaluate(()=>window.__readingNoticeMarker)!=='still-reading')throw new Error('dashboard reloaded while notification history was open');
+  await history.locator('button').first().click();
+  const detail=page.locator('[data-whats-new-detail-id]:visible');
+  await detail.waitFor({state:'visible'});
+  await dashboard.evaluate(async el=>window.Alpine.$data(el).refreshDashboard());
+  if(!await detail.isVisible()||await page.evaluate(()=>window.__readingNoticeMarker)!=='still-reading')throw new Error('dashboard closed a notification being read');
+  await saveEvidenceScreenshot(page,'dashboard-reading-notice-'+v.width+'.png');
+  await detail.getByRole('button',{name:'Close',exact:true}).click();
   const viewAll=page.locator('a[href$="/pos/restaurant/top-selling"]').first();
   await Promise.all([page.waitForURL(u=>u.pathname==='/pos/restaurant/top-selling'),viewAll.click()]);
   const summary=page.locator('[data-top-selling-summary]');

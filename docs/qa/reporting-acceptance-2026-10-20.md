@@ -29,3 +29,9 @@ by its deployment. Android beta release checks and the WhatsApp readiness
 browser journey remain present. Fresh full CI on the refreshed PR HEAD is
 required; refer to the PR for the latest run and results. This refresh does not
 claim a live ChatGPT OAuth handshake or known-customer billing reconciliation.
+
+The refreshed run exposed newly published upstream npm advisories. The root
+and mockup locks now use Vite 7.3.7; root and Agent locks use follow-redirects
+1.16.1. These are compatible patch updates with no package-range changes or
+audit exceptions. All three affected lockfile audits report zero vulnerabilities
+locally. Full exact-HEAD CI remains required after this dependency refresh.

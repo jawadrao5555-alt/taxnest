@@ -12,6 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 22 Oct 2026: pin Electron/package/build runtime 42.11.3 for
+// GHSA-fw47-9c62-h3vw. Only the root Electron spec and Electron package entry
+// change; all other locked entries, counts and local-fork hashes stay pinned.
 // Reviewed 21 Oct 2026: Agent package identity advances to 1.13.21 to release
 // the already-reviewed redirect patch without overwriting immutable v1.13.20.
 // Dependency versions, edges, integrity values and source checks are unchanged.
@@ -46,7 +49,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: 'b00a6afe0716e9b66815d401a38c270e9b3235738ac61de35a38c28b5d4ee730',
+    graph: '7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

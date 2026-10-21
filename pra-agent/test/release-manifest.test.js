@@ -25,6 +25,13 @@ test('package and lock release identity stay aligned beyond immutable v1.13.6', 
   assert.notEqual(packageJson.version, '1.13.6');
 });
 
+test('reviewed Electron runtime is identical in package, lock and Windows build configuration', () => {
+  assert.equal(packageJson.devDependencies.electron, '42.11.3');
+  assert.equal(packageJson.build.electronVersion, '42.11.3');
+  assert.equal(packageLock.packages[''].devDependencies.electron, '42.11.3');
+  assert.equal(packageLock.packages['node_modules/electron'].version, '42.11.3');
+});
+
 test('accepts a complete compatible canonical release manifest', () => {
   assert.deepEqual(validateUpdateInfo(good, '1.13.5'), { ok: true });
 });

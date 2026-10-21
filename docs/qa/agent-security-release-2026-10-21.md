@@ -34,3 +34,26 @@ keep this Agent release note because the tutorial announcement is already live.
 Tutorial recording, actual container upload outputs and fail-closed CI contracts
 are retained byte-for-byte from main. Fresh all-eight exact-HEAD PR checks are
 required; prior checks on the older base are not this refreshed acceptance.
+# Patched runtime follow-up — 22 October 2026
+
+Fresh refreshed-head CI exposed GHSA-fw47-9c62-h3vw. The previous manifest
+requested Electron ^41.7.1, its lock selected 41.10.7, while Windows build config
+pinned 41.7.1. Both old versions are within the affected <42.11.3 range. Pin all
+three runtime identities to 42.11.3. Package release identity remains 1.13.21.
+Only the root Electron specification and Electron package entry change in the
+lock; every other entry, dependency edge, count and local-fork hash is unchanged.
+Reviewed graph fingerprint: 7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25.
+
+Electron 42 installs its binary lazily. The PR Node CI lane now explicitly
+downloads the checksum-verified runtime and runs the existing real BrowserWindow
+offline/reconnect/encrypted-persistence acceptance with fictional loopback data
+under the existing egress blocker. No real printer is configured. Existing
+tutorial recording/output gates remain intact. Runtime failure is fatal; no
+skip, weaker audit, platform downgrade or gate bypass is added.
+
+Local release identity/build display tests (9/9), release-chain safety matrix,
+lock portability and negative source-integrity probes, active/proposed CI DAG
+contract and whitespace checks pass. Local real display startup remains blocked
+by this host's socket restrictions; authentic runtime CI acceptance is mandatory.
+Windows packaging/assets/update discovery/fleet rollout and Offline Agent
+root-cause diagnosis remain separate, unverified acceptance.

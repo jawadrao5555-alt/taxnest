@@ -3324,7 +3324,7 @@ window.addEventListener('popstate', function() {
                     <div>
                         <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <svg class="w-5 h-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                            {{ __('pos.reprint_todays_bills') }} <span class="text-xs font-medium text-teal-600 ml-1" x-text="'(' + filteredReprintBills().length + ')'"></span>
+                            {{ __('pos.reprint') }} <span class="text-xs font-medium text-teal-600 ml-1" x-text="'(' + filteredReprintBills().length + ')'"></span>
                         </h3>
                         <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.reprint_click_hint') }}</p>
                     </div>
@@ -3335,6 +3335,12 @@ window.addEventListener('popstate', function() {
                         <button @click="showReprint = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                 </div>
+                <label class="mt-3 flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
+                    {{ __('pos.date_label') }}
+                    <input type="date" x-model="reprintDate" @change="activeReprintIndex = 0; reprintPreviewBill = null; loadReprintBills()"
+                           :disabled="reprintBusyId !== null" class="rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm">
+                </label>
+                <p x-show="reprintLoadError" x-cloak role="alert" class="mt-2 text-sm font-semibold text-red-700 dark:text-red-300" x-text="window.TXT.network_error"></p>
                 <div class="mt-3 relative">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     {{-- Element-level keydown handlers REQUIRED: handleKey's global input-field
@@ -3360,8 +3366,8 @@ window.addEventListener('popstate', function() {
                 <template x-if="!reprintLoading && filteredReprintBills().length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <p class="text-sm font-medium" x-text="reprintSearch ? window.TXT.no_bill_found : window.TXT.no_bills_today"></p>
-                        <p class="text-[11px] text-gray-400 mt-1" x-text="reprintSearch ? window.TXT.change_search_try_again : window.TXT.todays_bills_appear_here"></p>
+                        <p class="text-sm font-medium" x-text="window.TXT.no_bill_found"></p>
+                        <p class="text-[11px] text-gray-400 mt-1" x-text="window.TXT.change_search_try_again"></p>
                     </div>
                 </template>
                 <template x-for="(bill, bi) in filteredReprintBills()" :key="bill.id">
@@ -5269,6 +5275,9 @@ function restaurantPos() {
         activeReprintIndex: 0,
         reprintLoading: false,
         reprintSearch: '',
+        reprintDate: '',
+        reprintLoadError: false,
+        _reprintLoadVersion: 0,
         reprintBusyId: null,
         reprintPreviewBill: null,   // Preview modal (ZFC 30 Jul 2026): bill being previewed
         // ── QUICK RETURN (Task 681) — bill number → return form ──────────
@@ -12796,20 +12805,26 @@ function restaurantPos() {
             this.$nextTick(() => { const el = this.$refs.reprintSearchInput; if (el) el.focus(); });
         },
         async loadReprintBills() {
+            const version = ++this._reprintLoadVersion;
             this.reprintLoading = true;
+            this.reprintLoadError = false;
+            this.reprintBills = [];
+            this.reprintPreviewBill = null;
             try {
-                const res = await fetch('{{ url('/pos/api/todays-bills') }}', { headers: { 'Accept': 'application/json' } });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.success) {
-                        this.reprintBills = data.bills || [];
-                        if (this.activeReprintIndex >= this.reprintBills.length) {
-                            this.activeReprintIndex = Math.max(0, this.reprintBills.length - 1);
-                        }
-                    }
-                }
-            } catch (e) { console.warn('loadReprintBills error', e); }
-            this.reprintLoading = false;
+                const query = this.reprintDate ? '?date=' + encodeURIComponent(this.reprintDate) : '';
+                const res = await fetch('{{ url('/pos/api/todays-bills') }}' + query, { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('Bill list unavailable');
+                const data = await res.json();
+                if (!data || !data.success) throw new Error('Bill list unavailable');
+                if (version !== this._reprintLoadVersion) return;
+                this.reprintBills = data.bills || [];
+                this.reprintDate = data.business_date || this.reprintDate;
+                this.activeReprintIndex = 0;
+            } catch (e) {
+                if (version === this._reprintLoadVersion) this.reprintLoadError = true;
+            } finally {
+                if (version === this._reprintLoadVersion) this.reprintLoading = false;
+            }
         },
         filteredReprintBills() {
             const q = (this.reprintSearch || '').toLowerCase().trim();

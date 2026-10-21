@@ -57,3 +57,9 @@ contract and whitespace checks pass. Local real display startup remains blocked
 by this host's socket restrictions; authentic runtime CI acceptance is mandatory.
 Windows packaging/assets/update discovery/fleet rollout and Offline Agent
 root-cause diagnosis remain separate, unverified acceptance.
+
+## Real Electron acceptance cleanup
+
+Fresh CI run 39669294621 installed Electron 42.11.3 and the shipped-main/BrowserWindow release-gate assertions passed, including offline persistence, lost-response retry and single cloud hold/settlement. The job then timed out: xvfb-run's wrapper exited while descendant Electron pipes remained open. This was a harness cleanup failure, so the PR remains draft.
+
+The isolated POSIX launch now owns a dedicated process group and waits for `close` (including inherited pipes), terminating only that fixture tree. Windows direct-child handling remains direct. New actual subprocess regressions cover direct child, wrapper/grandchild pipe closure, repeated cleanup and an unrelated process surviving. Both pass locally; the entire real BrowserWindow harness must pass fresh exact-HEAD CI before readiness. No runtime assertion, timeout or required gate was removed.

@@ -7,3 +7,9 @@ Fresh PRA analytics (no from/to) now resolves both defaults through that existin
 Added supported application regressions for midnight before/after custom cutoff, a second tenant with a different cutoff, already-closed previous day, unchanged saved cutoff and explicit/partial/reversed/capped ranges. Existing legacy no-company reflection and FBR defaults remain valid. Real Chrome reports journey checks actual rendered default dates against server-resolved company day, captures desktop/390px screenshots and submits explicit dates that must remain selected.
 
 PHP 8.3 syntax-only, JS syntax, whitespace pass locally. Required PHP 8.4/application/database/browser CI pending: local supported PHP/app/browser sockets unavailable. No independent live acceptance claimed.
+
+## Overnight CI follow-up
+
+Latest full PHPUnit found existing return-netting fixtures deliberately dated to the calendar day but queried through the newly changed default. Make that test explicitly request its fixture date, retaining every netting assertion. Additionally move the same fictional rows to the active business day and check a fresh no-query report retains two sales/gross1655/tax255. New default/cutoff/tenant/explicit-range tests remain required.
+
+Local environment recheck: loopback binding is available in this run, but supported PHP 8.4 is absent and Chrome installation failed (truncated/non-zip download). Local pure JS/syntax checks are limited evidence; supported real browser/database/full PHP acceptance remains GitHub CI, not customer production acceptance.

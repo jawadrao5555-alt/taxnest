@@ -312,6 +312,10 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
             'tax_inclusive' => true, 'tax_menu_rate' => 16, 'tax_rate' => 8,
             'subtotal' => 467.97, 'tax_amount' => 31.03, 'total_amount' => 499,
             'payment_method' => 'card', 'discount_amount' => 0,
+            // The receipt legitimately mints a public QR token for old bills.
+            // Start with an existing token so the entire saved row can still
+            // be compared without excluding any fiscal/snapshot attributes.
+            'share_token' => str_repeat('a', 64), 'share_token_created_at' => now(),
         ])->save();
         $before = $bill->fresh()->getAttributes();
         foreach (['80mm', '58mm'] as $paper) {

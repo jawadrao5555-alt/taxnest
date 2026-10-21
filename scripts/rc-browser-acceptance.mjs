@@ -1801,6 +1801,7 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await page.evaluate(customer=>{
     const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.selectedCustomer=customer;
   },data.customer);
+  await openMobileCart(page,v,['Current Order']);
   let contactPrompts=0;
   const correctedPhone='0300'+String(3000000+v.width);
   const acceptContact=dialog=>dialog.accept(contactPrompts++===0?'Synthetic corrected contact':correctedPhone);

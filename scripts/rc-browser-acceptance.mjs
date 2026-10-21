@@ -289,6 +289,17 @@ async function surface(page,t,path,v) {
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
   await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigationWithReloadRetry(page,t,path,v); await openMobileCart(page,v,t.markers||[]);
+  if(t.riderRealtime && path==='/pos/riders/tracking') {
+    // This navigation mounts a fresh Alpine screen whose rider cards arrive
+    // from its real asynchronous data request. The earlier map journey was a
+    // different document; a fixed 300ms loading-shell pause is not readiness.
+    await page.waitForFunction(({id,markers})=>{
+      const root=document.querySelector('[x-data^="riderTracking("]');
+      const data=root&&window.Alpine?.$data(root);
+      return data?.riders?.some(r=>Number(r.id)===Number(id))
+        &&markers.every(marker=>root.innerText.includes(marker));
+    },{id:t.riderRealtime.id,markers:t.markers||[]},{timeout:15000});
+  }
   if(path==='/pos/inventory'){
     const tabs=page.locator('.tn-inventory-nav').first();
     if(!await tabs.count())fail(`${t.name}/${v.width}: inventory navigation missing`);

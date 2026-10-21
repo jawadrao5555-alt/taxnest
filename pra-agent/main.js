@@ -1471,6 +1471,16 @@ ipcMain.handle('save-pos-settings', (event, s) => {
 
 ipcMain.handle('open-pos-window', () => ({ ok: openPos() }));
 
+// Explicit owner/cashier click only; no renderer-supplied destination.
+ipcMain.handle('open-pos-browser', async () => {
+  try {
+    const { posBrowserUrl } = require('./src/pos-browser-url');
+    const config = getMigratedAgentConfig();
+    await shell.openExternal(posBrowserUrl(config && config.serverUrl ? config.serverUrl : DEFAULT_SERVER_URL));
+    return { ok: true };
+  } catch (_) { return { ok: false }; }
+});
+
 // Sensitive Core ingress is Electron IPC only. The exact POS webContents is
 // the authentication boundary; no HTTP/LAN route exists for these records.
 const appendCoreEventFromPos = createEventIngress({

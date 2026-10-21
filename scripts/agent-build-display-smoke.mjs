@@ -10,20 +10,26 @@ const version = require('../pra-agent/package.json').version;
 const identity = parseBuildInfo(createBuildInfo(version, new Date('2026-10-17T14:05:06.000Z')), version);
 const html = readFileSync(new URL('../pra-agent/index.html', import.meta.url), 'utf8');
 const displayScript = readFileSync(new URL('../pra-agent/src/build-info-view.js', import.meta.url), 'utf8');
+const launchScript = readFileSync(new URL('../pra-agent/src/pos-launch-ui.js', import.meta.url), 'utf8');
 const server = createServer((request, response) => {
   const mode = new URL(request.url, 'http://127.0.0.1').searchParams.get('mode') || 'valid';
   if (request.url.split('?')[0] === '/src/build-info-view.js') {
     response.writeHead(200, { 'Content-Type': 'text/javascript' }); response.end(displayScript); return;
   }
+  if (request.url.split('?')[0] === '/src/pos-launch-ui.js') {
+    response.writeHead(200, { 'Content-Type': 'text/javascript' }); response.end(launchScript); return;
+  }
   if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
   const info = mode === 'missing' ? { version, builtAt: null } : identity;
   const bridge = `<script>
-    window.__unexpectedAgentCalls=[];
+    window.__unexpectedAgentCalls=[];window.__fixturePosLaunches=0;window.__fixtureBrowserLaunches=0;
     window.agentAPI=new Proxy({
       getVersion:async()=>{if(${JSON.stringify(mode)}==='ipc-error')throw new Error('Synthetic identity IPC unavailable');return ${JSON.stringify(info)};},
       getConfig:async()=>({serverUrl:location.origin+'/api/agent',companyId:'Fictional company',apiKey:''}),
       getPrinters:async()=>({printers:[]}),getStatus:async()=>({running:false,connected:false}),
       imsMode:()=>null,checkUpdate:async()=>({available:false}),
+      openPosWindow:async()=>{window.__fixturePosLaunches++;return {ok:false};},
+      openPosInBrowser:async()=>{window.__fixtureBrowserLaunches++;return {ok:true};},
       getPosSettings:async()=>({}),getLanSettings:async()=>({enabled:false}),getLanStatus:async()=>({enabled:false}),
     },{get:(target,key)=>key in target?target[key]:String(key).startsWith('on')?()=>{}:async()=>{window.__unexpectedAgentCalls.push(String(key));return {};}});
   </script>`;
@@ -58,6 +64,14 @@ try {
       assert.equal(await date.getAttribute('datetime'), null);
     }
     assert.equal(await page.locator('#serverUrl').inputValue(), origin + '/api/agent');
+    await page.locator('#openPosBtn').click();
+    await page.waitForFunction(()=>document.getElementById('posLaunchStatus').textContent.includes('POS nahi khul saki'));
+    assert.equal(await page.evaluate(()=>window.__fixturePosLaunches),1);
+    assert.equal(await page.evaluate(()=>window.__fixtureBrowserLaunches),0,'failure must not automatically launch a browser');
+    await page.locator('#openPosBrowserBtn').click();
+    await page.waitForFunction(()=>document.getElementById('posLaunchStatus').textContent.includes('Browser mein POS kholne ki darkhwast'));
+    assert.equal(await page.evaluate(()=>window.__fixtureBrowserLaunches),1);
+    await saveEvidenceScreenshot(page,'agent-pos-launch-recovery-'+mode);
     assert.deepEqual(await page.evaluate(() => window.__unexpectedAgentCalls), []);
     assert.deepEqual(errors, []);
   }

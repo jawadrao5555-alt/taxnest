@@ -296,6 +296,43 @@ class LiveOpsDiagnosticsTest extends LiveOpsTestCase
         ]);
     }
 
+    public function test_agent_fleet_counts_include_offline_companies_outside_detail_limit(): void
+    {
+        config(['live_ops.limits.max_companies_in_report' => 1]);
+        $recent = $this->makeCompany('Synthetic Recent Shop');
+        $old = $this->makeCompany('Synthetic Old Shop', ['agent_last_seen' => now()->subHours(6)]);
+        $this->makeCompany('Disabled Shop', ['agent_enabled' => false]);
+        $this->makeCompany('Other Product', ['product_type' => 'fbrpos']);
+        $before = DB::table('companies')->orderBy('id')->get()->toJson();
+
+        $report = app(LiveOpsDiagnosticsService::class)->run('AGENT_HEALTH', []);
+        $this->assertSame(['enabled' => 2, 'online' => 1, 'long_offline' => 1], $report['data']['counts']);
+        $this->assertStringContainsString('2 enabled; 1 online; 1 long offline', $report['summary_text']);
+        $this->assertCount(1, $report['data']['agents']);
+        $this->assertSame($recent, $report['data']['agents'][0]['company_id']);
+        $this->assertSame(['total' => 2, 'returned' => 1, 'truncated' => true], $report['data']['coverage']);
+        $this->assertSame($before, DB::table('companies')->orderBy('id')->get()->toJson());
+        $this->assertSame(0, DB::table('live_ops_agent_commands')->count());
+
+        $scoped = app(LiveOpsDiagnosticsService::class)->run('AGENT_HEALTH', ['company_id' => $old]);
+        $this->assertSame($old, $scoped['data']['company']['id']);
+        $this->assertFalse($scoped['data']['company']['agent_online']);
+        $this->assertStringNotContainsString('Synthetic Recent Shop', json_encode($scoped['data']));
+    }
+
+    public function test_agent_fleet_empty_and_unlimited_detail_cases_have_explicit_coverage(): void
+    {
+        $empty = app(LiveOpsDiagnosticsService::class)->run('AGENT_HEALTH', []);
+        $this->assertSame(['enabled' => 0, 'online' => 0, 'long_offline' => 0], $empty['data']['counts']);
+        $this->assertSame(['total' => 0, 'returned' => 0, 'truncated' => false], $empty['data']['coverage']);
+        $this->makeCompany('Legacy Fresh Shop');
+        $this->makeCompany('Never Connected Shop', ['agent_last_seen' => null]);
+        $this->makeCompany('Popup-only Shop', ['agent_last_seen' => now()->subHours(6), 'pos_printer_settings' => json_encode(['silent_print_enabled' => false])]);
+        $report = app(LiveOpsDiagnosticsService::class)->run('AGENT_HEALTH', []);
+        $this->assertSame(['enabled' => 3, 'online' => 1, 'long_offline' => 1], $report['data']['counts']);
+        $this->assertSame(['total' => 3, 'returned' => 3, 'truncated' => false], $report['data']['coverage']);
+    }
+
     public function test_agent_health_fleet_still_works_without_company(): void
     {
         $this->makeCompany('Agent Fleet');

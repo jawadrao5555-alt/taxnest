@@ -340,7 +340,7 @@ jobs:
       - name: Check Android beta artifact inventory
         run: bash scripts/rc-safe-run -- node --test scripts/tests/android-beta-manifest.test.mjs
       - name: Check realtime rider map request ordering and recovery
-        run: bash scripts/rc-safe-run -- node --test scripts/tests/rider-realtime-map.test.mjs
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/rider-realtime-map.test.mjs scripts/tests/rider-settlement-selection.test.mjs
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin

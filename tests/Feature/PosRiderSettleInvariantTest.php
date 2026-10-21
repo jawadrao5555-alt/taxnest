@@ -144,6 +144,28 @@ class PosRiderSettleInvariantTest extends TestCase
 
     // ── 1. settle_all never touches fiscal identity ─────────────────────────
 
+    public function test_selected_cash_bills_settle_and_advance_while_omitted_bills_and_retry_stay_unchanged(): void
+    {
+        $rider = $this->makeRider();
+        $first = $this->makeBill($rider);
+        $second = $this->makeBill($rider);
+        $omitted = $this->makeBill($rider);
+        $before = $this->tx($omitted);
+        $response = $this->settle($rider, ['bill_ids' => [$first, $second], 'received_amount' => 1000]);
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertSame(2, $response->getData(true)['bill_count']);
+        foreach ([$first, $second] as $id) {
+            $this->assertSame('delivered', $this->tx($id)->delivery_status);
+            $this->assertNotNull($this->tx($id)->rider_settlement_id);
+            $this->assertSame('submitted', $this->tx($id)->pra_status);
+        }
+        $this->assertEquals($before, $this->tx($omitted));
+        $again = $this->settle($rider, ['bill_ids' => [$first, $second], 'received_amount' => 1000]);
+        $this->assertSame(422, $again->getStatusCode());
+        $this->assertSame(1, DB::table('pos_rider_settlements')->count());
+        $this->assertSame(1000.0, (float) DB::table('pos_rider_settlements')->sum('total_amount'));
+    }
+
     public function test_settle_all_never_mutates_invoice_mode_status_or_number(): void
     {
         $riderId = $this->makeRider();

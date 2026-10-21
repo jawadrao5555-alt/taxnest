@@ -297,6 +297,28 @@ foreach (['pos', 'fbr_pos'] as $audience) {
     ]);
 }
 
+$bulkRiderCompany = $company('Synthetic Bulk Rider Cash', 'bulk-rider@rc-browser.invalid', 'RCBULKRIDER', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'pos_setup_completed' => true,
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
+]);
+$bulkRiderOwner = $user($bulkRiderCompany, 'Synthetic Bulk Rider Owner', 'bulk-rider-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$bulkRiderCases = [];
+foreach ([1366, 390] as $width) {
+    $riderId = DB::table('pos_riders')->insertGetId(['company_id' => $bulkRiderCompany->id, 'name' => 'Synthetic Rider '.$width, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
+    $ids = [];
+    for ($i = 1; $i <= 3; $i++) {
+        $ids[] = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $bulkRiderCompany->id, 'created_by' => $bulkRiderOwner->id,
+            'invoice_number' => 'RC-RIDER-'.$width.'-'.$i, 'business_date' => \App\Services\PosBusinessDay::current($bulkRiderCompany->id),
+            'status' => 'completed', 'invoice_mode' => 'local', 'pra_status' => 'local',
+            'customer_name' => 'Synthetic rider customer '.$i, 'payment_method' => 'cash', 'order_type' => 'delivery',
+            'subtotal' => 100, 'tax_rate' => 0, 'tax_amount' => 0, 'total_amount' => 100,
+            'rider_id' => $riderId, 'delivery_status' => 'dispatched', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+    }
+    $bulkRiderCases[$width] = ['riderId' => $riderId, 'ids' => $ids];
+}
+
 $topSellingCompany = $company('Synthetic Top Selling', 'top-selling-company@rc-browser.invalid', 'RCTOPSELL001', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_setup_completed' => true,
@@ -611,6 +633,7 @@ $fixture = [
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
+        ['name' => 'rider-selected-settlement', 'login' => $bulkRiderOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/deliveries'], 'riderBulkSelection' => $bulkRiderCases],
         ['name' => 'restaurant-top-selling', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/restaurant/top-selling'], 'restaurantTopSelling' => true, 'markers' => ['Synthetic complete item 16']],
         ['name' => 'notification-di', 'login' => $notificationUsers['di']['desktop'], 'mobileLogin' => $notificationUsers['di']['mobile'], 'preflightLogin' => $notificationUsers['di']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['di']['preflight-mobile'], 'password' => $password, 'loginPath' => '/login', 'paths' => ['/profile'], 'notificationWorkflow' => 'di'],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'preflightLogin' => $notificationUsers['pra']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['pra']['preflight-mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],

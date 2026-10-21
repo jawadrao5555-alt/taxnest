@@ -1,0 +1,5 @@
+# Reprint order/payment filters
+
+Source: owner video 1d70b9d3-3441-4b88-81f6-b4cdfe0b2730.mp4 requests Dine In / Takeaway / Delivery and Cash / Card filters. Add two labelled selectors that combine with the existing text search. Card includes stored card/debit_card/credit_card; QR remains distinct, and All preserves online/other/legacy rows. Reset keyboard selection/preview on filter changes. No server query, access widening, saved amount, payment method or print command changes.
+
+Before patch actual production method ignored filters (3 failing cases). After patch 3/3 production-method regressions pass, including composed filters/search, aliases, empty results, reset and immutable source rows. Real Chrome sale/Reprint journey changes the actual controls, asserts rendered rows, resets All, captures desktop/390px screenshots and continues existing order tests. JS syntax/whitespace/workflow contract pass locally. Supported local PHP/app/browser unavailable; full CI/browser acceptance pending, no independent production acceptance. Historical date selection is separate PR #244; current-day default is preserved here.

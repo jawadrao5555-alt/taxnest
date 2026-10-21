@@ -1429,6 +1429,30 @@ async function tableOrderWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  await root.evaluate(el=>window.Alpine.$data(el).openReprint());
+  const reprint=page.locator('[x-show="showReprint"]');await reprint.waitFor({state:'visible'});
+  await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintLoading);
+  await root.evaluate(el=>{
+    const d=window.Alpine.$data(el);
+    d.reprintBills=[
+      {id:990001,display_number:'QA-FILTER-CASH',customer_name:'QA cash delivery',order_type:'delivery',payment_method:'cash',total_amount:100,badge:'local'},
+      {id:990002,display_number:'QA-FILTER-CARD',customer_name:'QA card delivery',order_type:'delivery',payment_method:'debit_card',total_amount:100,badge:'local'},
+      {id:990003,display_number:'QA-FILTER-TAKE',customer_name:'QA card takeaway',order_type:'takeaway',payment_method:'card',total_amount:100,badge:'local'},
+    ];
+  });
+  await reprint.locator('[x-model="reprintOrderType"]').selectOption('delivery');
+  await reprint.locator('[x-model="reprintPayment"]').selectOption('card');
+  await page.waitForFunction(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return d.filteredReprintBills().length===1&&d.filteredReprintBills()[0].id===990002;
+  });
+  const text=await reprint.innerText();
+  if(!text.includes('QA card delivery')||text.includes('QA cash delivery')||text.includes('QA card takeaway'))throw new Error('Reprint filter controls rendered incorrect rows');
+  await saveEvidenceScreenshot(page,'reprint-type-payment-filters-'+v.width+'.png');
+  await reprint.locator('[x-model="reprintOrderType"]').selectOption('');
+  await reprint.locator('[x-model="reprintPayment"]').selectOption('');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).filteredReprintBills().length===3);
+  await root.evaluate(el=>{window.Alpine.$data(el).showReprint=false;});
+
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});

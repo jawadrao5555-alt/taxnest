@@ -1,0 +1,9 @@
+# Choose a report download folder (optional Agent setting)
+
+Owner audio AUDIO-2026-10-21-02-00-51.m4a requests a folder choice instead of forced Downloads. Code-confirmed Agent behavior: wireSilentDownloads always calls setSavePath, deliberately suppressing Electron's native Save As dialog. Add a default-OFF `askDownloadLocation` preference for PRA Desktop. OFF/missing = existing collision-safe silent Downloads; ON = leave native Save As enabled with a suggested filename. Read preference per download so the existing window honors changes. A cancelled dialog neither silently saves nor announces failure. Completion notification/reveal uses the actual chosen filename/path.
+
+Preserve startup, kiosk, offline, unknown saved preference keys and old renderer payloads (omitting the new preference cannot reset it). No company/printer/fiscal/tenant data or release tags change. FBR behavior remains unchanged. Customer copy is plain Roman Urdu.
+
+Actual production download handler/settings regressions: 4/4 pass locally (default/collision/listener, opt-in/chosen filename, cancel, dynamic ON/OFF, legacy/unknown saved settings). Syntax/whitespace pass. Existing Node CI discovery includes the tests. Native Windows Save As interaction, packaging/update and owner's installation remain unverified; local Electron display sockets unavailable. This is Agent-specific: a normal Chrome browser separately controls its own Downloads setting; the website cannot force a folder choice there.
+
+Primary API reference checked 2026-10-21: https://www.electronjs.org/docs/latest/api/download-item (`setSavePath`, `setSaveDialogOptions`, `getSavePath`). Chrome instructions: Settings → Downloads → Ask where to save each file before downloading: https://support.google.com/chrome/answer/95759?hl=en . No browser preference was changed on the owner's PC.

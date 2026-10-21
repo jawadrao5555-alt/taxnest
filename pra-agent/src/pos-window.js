@@ -71,11 +71,12 @@ function deriveOrigin(config) {
 // popped Chromium's default Save dialog in front of the cashier. Instead:
 // auto-save into the PC's Downloads folder (collision-safe name), then a
 // Roman Urdu notification confirms it — clicking the notification opens the
-// file. Registered ONCE per session; child popup windows share the same
+// file. An opt-in PRA setting retains the native Save As dialog instead.
+// Registered ONCE per session; child popup windows share the same
 // partition, so this single handler covers them too.
 const downloadWiredSessions = new WeakSet();
 
-function wireSilentDownloads(ses) {
+function wireSilentDownloads(ses, shouldAsk = () => false) {
   try {
     if (!ses || downloadWiredSessions.has(ses)) return;
     downloadWiredSessions.add(ses);
@@ -89,15 +90,25 @@ function wireSilentDownloads(ses) {
         for (let i = 1; i < 200 && fs.existsSync(target); i++) {
           target = path.join(downloadsDir, `${base} (${i})${ext}`);
         }
-        // setSavePath BEFORE any await/return = no Save dialog, ever.
-        item.setSavePath(target);
+        const ask = shouldAsk() === true;
+        if (ask) {
+          // Do not call setSavePath: Electron retains its native Save As dialog.
+          item.setSaveDialogOptions({ title: 'File save karne ka folder chunein', defaultPath: target });
+        } else {
+          item.setSavePath(target);
+        }
         item.once('done', (_e, state) => {
           try {
+            if (state === 'cancelled') return;
             if (!Notification.isSupported()) return;
             if (state === 'completed') {
+              if (ask) {
+                target = item.getSavePath();
+                if (!target) return;
+              }
               const n = new Notification({
                 title: 'File download ho gayi',
-                body: path.basename(target) + ' — Downloads folder mein save ho gayi. Kholne ke liye yahan click karein.',
+                body: path.basename(target) + (ask ? ' — aapke chune hue folder mein save ho gayi. Kholne ke liye yahan click karein.' : ' — Downloads folder mein save ho gayi. Kholne ke liye yahan click karein.'),
               });
               n.on('click', () => {
                 // Open the file itself; if Windows has no app for it, at least
@@ -227,9 +238,9 @@ function openPosWindow(config, opts = {}) {
     }
   } catch (e) {}
 
-  // Exports/PDFs save silently to Downloads (covers child popups too — same
-  // session partition).
-  wireSilentDownloads(posWindow.webContents.session);
+  // Preserve silent Downloads by default; optional native Save As is read
+  // per download, including child popups sharing this session partition).
+  wireSilentDownloads(posWindow.webContents.session, typeof opts.shouldAskDownloadLocation === 'function' ? opts.shouldAskDownloadLocation : () => false);
 
   // Agent AUTO-CONFIG (v1.5.0): once the cashier is logged in (any authed
   // /pos/ page loaded), let main.js pull the company's agent credentials

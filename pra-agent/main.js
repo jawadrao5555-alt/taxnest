@@ -361,14 +361,17 @@ function getMigratedAgentConfig() {
 // ─── NestPOS Desktop (POS screen shell) settings ────────────────────────────
 function getPosSettings() {
   const s = store.get('posSettings') || {};
-  return { openOnStartup: !!s.openOnStartup, kiosk: !!s.kiosk, offlineMode: !!s.offlineMode };
+  return { openOnStartup: !!s.openOnStartup, kiosk: !!s.kiosk, offlineMode: !!s.offlineMode, askDownloadLocation: !!s.askDownloadLocation };
 }
 
 function setPosSettings(next) {
+  const current = store.get('posSettings') || {};
   store.set('posSettings', {
+    ...current,
     openOnStartup: !!next.openOnStartup,
     kiosk: !!next.kiosk,
     offlineMode: !!next.offlineMode,
+    askDownloadLocation: typeof next.askDownloadLocation === 'boolean' ? next.askDownloadLocation : !!current.askDownloadLocation,
   });
 }
 
@@ -853,6 +856,7 @@ function openPos() {
     openPosWindow(posConfig, {
       kiosk: s.kiosk,
       isOfflineEnabled: () => getPosSettings().offlineMode,
+      shouldAskDownloadLocation: () => getPosSettings().askDownloadLocation,
       onKioskToggle: (kioskNow) => {
         setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
         buildTrayMenu();

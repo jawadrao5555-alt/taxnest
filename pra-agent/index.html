@@ -244,6 +244,11 @@
     <p style="font-size:11px; color:#c4b5fd; margin:6px 0 0 24px; line-height:1.5;">
       Changing this takes effect the next time the POS screen is opened. First login always needs internet.
     </p>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px;font-size:13px;color:#fff;">
+      <input type="checkbox" id="posAskDownload" style="width:auto;margin:0;">
+      Har report download par file save karne ka folder chunein
+    </label>
+    <p style="font-size:12px;color:#ddd6fe;margin:6px 0 0 24px;">OFF: pehle ki tarah Downloads mein save hogi. ON: aap folder aur file ka naam chun sakte hain.</p>
     <div id="posSaved" style="display:none; margin-top:8px; font-size:12px; color:#10b981;">✓ Saved</div>
   </div>
 
@@ -645,12 +650,14 @@
     $('posStartup').checked = !!s.openOnStartup;
     $('posKiosk').checked = !!s.kiosk;
     $('posOffline').checked = !!s.offlineMode;
+    $('posAskDownload').checked = !!s.askDownloadLocation;
   }
   async function savePosSettings() {
     await window.agentAPI.savePosSettings({
       openOnStartup: $('posStartup').checked,
       kiosk: $('posKiosk').checked,
       offlineMode: $('posOffline').checked,
+      askDownloadLocation: $('posAskDownload').checked,
     });
     $('posSaved').style.display = 'block';
     setTimeout(() => { $('posSaved').style.display = 'none'; }, 2000);
@@ -658,6 +665,7 @@
   $('posStartup').addEventListener('change', savePosSettings);
   $('posKiosk').addEventListener('change', savePosSettings);
   $('posOffline').addEventListener('change', savePosSettings);
+  $('posAskDownload').addEventListener('change', savePosSettings);
   $('openPosBtn').addEventListener('click', () => window.agentAPI.openPosWindow());
   loadPosSettings();
 

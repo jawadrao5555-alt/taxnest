@@ -1371,6 +1371,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
+  if (t.menuExemptFilter) return menuExemptFilterWorkflow(page,t,v);
   if (t.restaurantTopSelling) return restaurantTopSellingWorkflow(page,t,v);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v,diagnostics);
@@ -1832,4 +1833,26 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
   await page.emulateMedia({media:'screen'});
   pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
+}
+
+async function menuExemptFilterWorkflow(page,t,v){
+  await page.goto(baseUrl+'/pos/products',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const root=page.locator('[x-data="productCatalog()"]');
+  await root.evaluate(el=>{
+    const d=window.Alpine.$data(el);
+    d.products=[
+      {id:990001,name:'QA ordinary exempt',is_tax_exempt:true,is_third_schedule:false,is_active:true,category:'Drink',price:100,cost_price:0,stock_quantity:null},
+      {id:990002,name:'QA taxable',is_tax_exempt:false,is_third_schedule:false,is_active:true,category:'Meal',price:100,cost_price:0,stock_quantity:null},
+      {id:990003,name:'QA third exempt',is_tax_exempt:true,is_third_schedule:true,is_active:true,category:'Drink',price:100,cost_price:0,stock_quantity:null},
+    ];d.search='';d.catFilter='';d.statusFilter='';
+  });
+  await root.locator('select[x-model="statusFilter"]').selectOption('exempt');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[x-data="productCatalog()"]')).filtered.length===2);
+  const table=root.locator('[x-show="view === \'table\'"]');
+  const text=await table.innerText();
+  if(!text.includes('QA ordinary exempt')||!text.includes('QA third exempt')||text.includes('QA taxable'))throw new Error('Exempt filter did not render only exempt products');
+  await saveEvidenceScreenshot(page,'menu-exempt-filter-'+v.width+'.png');
+  await root.locator('select[x-model="statusFilter"]').selectOption('');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[x-data="productCatalog()"]')).filtered.length===3);
 }

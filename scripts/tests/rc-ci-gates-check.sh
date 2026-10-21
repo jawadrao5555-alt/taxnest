@@ -39,10 +39,12 @@ function contract(doc,label){
     const artifact=artifacts[0];
     for(const extra of artifacts.slice(1)) {
       const paths=String(extra.with?.path||'').trim().split('\n');
-      const allowed=['${{ runner.temp }}/tutorial-preview/*.webm','${{ runner.temp }}/tutorial-preview/recording-manifest.json'];
+      const allowed=['${{ steps.browser-preflight.outputs.preview_dir }}/*.webm','${{ steps.browser-preflight.outputs.preview_dir }}/recording-manifest.json'];
+      const preflight=steps.find(s=>s.id==='browser-preflight');
       if(name!=='browserdesktopmobile'||extra.name!=='Upload synthetic Top Selling recording preview'
         ||extra.if!=='success()'||extra.with?.name!=='tutorial-preview-${{ github.run_id }}'
         ||JSON.stringify(paths)!==JSON.stringify(allowed)||extra.with?.['if-no-files-found']!=='error'
+        ||!String(preflight?.run||'').includes('echo "preview_dir=$(realpath "$RUNNER_TEMP/tutorial-preview")" >> "$GITHUB_OUTPUT"')
         ||!text.includes('RC_TUTORIAL_RECORDING=1 RC_BROWSER_ONLY=restaurant-top-selling')
         ||!text.includes('test -s "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json"')) {
         throw Error(`${label}: ${name} has an unapproved extra artifact upload`);

@@ -249,6 +249,7 @@ jobs:
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs
       - name: Seed and verify authenticated Smart DI source import
+        id: browser-preflight
         env:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
@@ -268,6 +269,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/tutorial-preview"
           cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/"*.webm "$RUNNER_TEMP/tutorial-preview/"
           cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json" "$RUNNER_TEMP/tutorial-preview/"
+          echo "preview_dir=$(realpath "$RUNNER_TEMP/tutorial-preview")" >> "$GITHUB_OUTPUT"
       - name: Exercise general isolated browser acceptance
         env:
           RC_MARIADB_PORT: '33117'
@@ -304,8 +306,8 @@ jobs:
         with:
           name: tutorial-preview-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/tutorial-preview/*.webm
-            ${{ runner.temp }}/tutorial-preview/recording-manifest.json
+            ${{ steps.browser-preflight.outputs.preview_dir }}/*.webm
+            ${{ steps.browser-preflight.outputs.preview_dir }}/recording-manifest.json
           if-no-files-found: error
           retention-days: 14
 

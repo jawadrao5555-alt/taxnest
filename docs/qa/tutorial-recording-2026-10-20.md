@@ -28,3 +28,12 @@ announcement; #226's reporting announcement has already been deployed.
 Reporting read-evidence and WhatsApp readiness browser assertions, and the
 reviewed dependency security patches, remain present. Fresh eight-check CI and
 synthetic recording artifacts on the refreshed exact HEAD are required.
+
+Artifact inspection on refreshed HEAD c8e5e102 found a real upload-path defect:
+the preview ZIP contained the two WebMs but omitted recording-manifest.json.
+The container generated files under its runtime temporary directory, while the
+upload action received host runner.temp paths; its log chose `/` as archive
+root. Both recording workflows now export the real staged runtime directory
+as a step output and use that output for upload. The CI contract rejects the
+old host-path inputs. Re-test must inspect the resulting ZIP for both videos,
+the manifest, and matching source/hash/size metadata before approval readiness.

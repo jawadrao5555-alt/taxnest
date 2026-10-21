@@ -319,6 +319,8 @@ jobs:
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
+      - name: Check Android beta artifact inventory
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/android-beta-manifest.test.mjs
       - name: Check realtime rider map request ordering and recovery
         run: bash scripts/rc-safe-run -- node --test scripts/tests/rider-realtime-map.test.mjs
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Services\PosFeatureService;
+use App\Services\PosWhatsAppReadiness;
 use App\Services\WhatsAppBusinessApi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -29,6 +30,11 @@ class PosWhatsAppSettingsController extends Controller
         return view('pos.whatsapp-delivery', [
             'company' => $company, 'allowed' => PosFeatureService::planAllows($company, 'whatsapp_enabled'),
             'configured' => WhatsAppBusinessApi::configuredFor($company), 'deliveries' => $deliveries,
+            'readiness' => PosWhatsAppReadiness::inspect($company),
+            'confirmedDelivery' => Schema::hasTable('pos_whatsapp_outbox')
+                ? DB::table('pos_whatsapp_outbox')->where('company_id', $company->id)
+                    ->whereIn('status', ['delivered', 'read'])->latest('updated_at')->first(['transaction_id', 'status', 'updated_at'])
+                : null,
         ]);
     }
 
@@ -58,9 +64,9 @@ class PosWhatsAppSettingsController extends Controller
             if (!PosFeatureService::planAllows($company, 'whatsapp_enabled')) {
                 return back()->withErrors(['auto_send' => __('pos.wa_bill_plan_locked_api')]);
             }
-            if (!$company->pos_whatsapp_bill_enabled || !WhatsAppBusinessApi::configuredFor($company) || empty($company->wa_app_secret)) {
+            if (!PosWhatsAppReadiness::inspect($company)['setup_ready']) {
                 // Never flash secrets back through validation old-input/session.
-                return back()->withErrors(['auto_send' => 'WhatsApp Bill, API credentials aur App Secret configure karna zaroori hai.']);
+                return back()->withErrors(['auto_send' => 'WhatsApp Bill aur readable API credentials/App Secret configure karein. Neeche setup checklist dekhein.']);
             }
         }
         $company->save();

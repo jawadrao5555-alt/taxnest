@@ -1,0 +1,101 @@
+name: Prepare signed Rider and Caller beta
+run-name: Android beta — ${{ inputs.target_sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Full approved main SHA to build (no hosting or rollout)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: android-beta-${{ inputs.target_sha }}
+  cancel-in-progress: false
+jobs:
+  source:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require an exact commit on main
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git cat-file -e "$TARGET_SHA^{commit}"
+          git merge-base --is-ancestor "$TARGET_SHA" origin/main
+  signed-beta:
+    needs: source
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    environment: android-signing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.target_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          gradle-version: '8.11.1'
+          cache-disabled: true
+      - name: Materialize owner signing and Rider Firebase inputs
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          FIREBASE_BASE64: ${{ secrets.RIDER_FIREBASE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$KEYSTORE_BASE64" && test -n "$FIREBASE_BASE64" && test -n "$KEYSTORE_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/taxnest-rider.p12"
+          printf '%s' "$FIREBASE_BASE64" | base64 --decode > rider-app/app/google-services.json
+      - name: Build and validate exact signed beta artifacts
+        env:
+          RIDER_KS: ${{ runner.temp }}/taxnest-rider.p12
+          RIDER_KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          sdkmanager "platforms;android-34" "platforms;android-36" "build-tools;34.0.0"
+          gradle -p rider-app --no-daemon --console=plain :app:testReleaseUnitTest :app:assembleRelease
+          gradle -p caller-app --no-daemon --console=plain :app:testSimReleaseUnitTest :app:testPlusReleaseUnitTest :app:assembleSimRelease :app:assemblePlusRelease
+          mkdir -p "$RUNNER_TEMP/android-beta"
+          cp rider-app/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/android-beta/taxnest-rider.apk"
+          cp caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk "$RUNNER_TEMP/android-beta/taxnest-caller.apk"
+          cp caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk "$RUNNER_TEMP/android-beta/taxnest-caller-plus.apk"
+          bash scripts/apk-release-check.sh "$RUNNER_TEMP/android-beta/"*.apk
+          bash scripts/verify-apk-firebase.sh "$RUNNER_TEMP/android-beta/taxnest-rider.apk" rider-app/app/google-services.json
+          # Cryptographic signature verification is mandatory, not optional SDK discovery.
+          for apk in "$RUNNER_TEMP/android-beta/"*.apk; do
+            "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify "$apk"
+          done
+          node scripts/android-beta-manifest.mjs "$TARGET_SHA" "$RUNNER_TEMP/android-beta"
+          INPUTS_SHA=$(node -p 'require(process.env.RUNNER_TEMP+"/android-beta/beta-manifest.json").build_inputs_sha256')
+          bash scripts/android-release-provenance-check.sh --manifest "$RUNNER_TEMP/android-beta/beta-manifest.json" --source-sha "$TARGET_SHA" --build-inputs-sha "$INPUTS_SHA" "$RUNNER_TEMP/android-beta/"*.apk
+      - name: Upload beta for owner phone testing only
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-beta-${{ inputs.target_sha }}
+          path: ${{ runner.temp }}/android-beta/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove signing inputs
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/taxnest-rider.p12" rider-app/app/google-services.json

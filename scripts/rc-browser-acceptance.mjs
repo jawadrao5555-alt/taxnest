@@ -1689,6 +1689,8 @@ if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s)
 
 async function whatsappAutoSendWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/settings/whatsapp-delivery',{waitUntil:'domcontentloaded'});
+  await page.locator('[data-whatsapp-readiness]').waitFor();
+  if(!await page.locator('[data-confirmed-delivery]').innerText())throw new Error('Missing company delivery evidence state');
   await waitForOperationalSurface(page); await dismiss(page);
   const toggle=page.locator('input[type=checkbox][name=auto_send]');
   if(await toggle.isChecked())throw new Error('New company auto-send must default OFF');

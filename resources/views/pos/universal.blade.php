@@ -1002,7 +1002,7 @@ window.addEventListener('popstate', function() {
              the whole widget is hidden unless a restaurant feature (tables/KOT/kitchen)
              or Delivery is enabled. orderType silently stays 'takeaway' underneath. --}}
         @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
-        <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="{{ __('pos.ti_press_f2_cycle') }}">
+        <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="{{ __('pos.ti_choose_order_type') }}">
             @if($features->tables)
             {{-- Dine In pill (owner, 26 Jul 2026): selected table isi pill mein
                  dikhta hai ("Dine In · T-3"); dobara click = picker (table change).
@@ -1018,7 +1018,6 @@ window.addEventListener('popstate', function() {
             @if($features->delivery)
             <button @click="setOrderType('delivery')" class="px-3.5 py-2 text-xs font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.delivery') }}</button>
             @endif
-            <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>
 
         {{-- Item #3 (owner, Jul 2026): delivery charges input MOVED to the cart panel's

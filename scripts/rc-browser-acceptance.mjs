@@ -289,6 +289,17 @@ async function surface(page,t,path,v) {
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
   await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigationWithReloadRetry(page,t,path,v); await openMobileCart(page,v,t.markers||[]);
+  if(t.riderRealtime && path==='/pos/riders/tracking') {
+    // This navigation mounts a fresh Alpine screen whose rider cards arrive
+    // from its real asynchronous data request. The earlier map journey was a
+    // different document; a fixed 300ms loading-shell pause is not readiness.
+    await page.waitForFunction(({id,markers})=>{
+      const root=document.querySelector('[x-data^="riderTracking("]');
+      const data=root&&window.Alpine?.$data(root);
+      return data?.riders?.some(r=>Number(r.id)===Number(id))
+        &&markers.every(marker=>root.innerText.includes(marker));
+    },{id:t.riderRealtime.id,markers:t.markers||[]},{timeout:15000});
+  }
   if(path==='/pos/inventory'){
     const tabs=page.locator('.tn-inventory-nav').first();
     if(!await tabs.count())fail(`${t.name}/${v.width}: inventory navigation missing`);
@@ -1790,6 +1801,24 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
 async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  const callerPhone='0300'+String(2000000+v.width);
+  await page.evaluate(phone=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.callerBillFrom({phone});
+  },callerPhone);
+  await openMobileCart(page,v,['Current Order']);
+  await page.locator('[data-save-attached-caller]:visible').click();
+  const name=page.locator('[x-ref="newCustomerNameInput"]');await name.waitFor({state:'visible'});
+  if(await name.inputValue()!=='')throw new Error('Caller phone was incorrectly prefilled as the customer name');
+  await name.fill('Synthetic caller name '+v.width);
+  const [callerSaved]=await Promise.all([
+    page.waitForResponse(r=>r.url()===baseUrl+'/pos/restaurant/api/customer-store'&&r.request().method()==='POST'),
+    page.locator('[x-show="showNewCustomerInline"] button').last().click(),
+  ]);
+  const callerData=await callerSaved.json();
+  if(!callerSaved.ok()||!callerData.success||!callerData.customer?.id)throw new Error('Actual caller customer save failed');
+  await page.waitForFunction(name=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.name===name,'Synthetic caller name '+v.width);
+  await saveEvidenceScreenshot(page,'attached-caller-saved-name-'+v.width+'.png');
   const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
   const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
   const address='Synthetic delivery lane '+v.width;

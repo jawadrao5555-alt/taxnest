@@ -5,3 +5,9 @@ Owner source a0fc2d7b-2d8d-43e8-b23a-650f29532ce3.mp4: after attaching an unknow
 Expose the same save flow on the attached unsaved customer card. Prefill the phone, leave a phone-as-name fallback blank, preserve a real caller name, focus the existing name field. Saved customers cannot enter this create path. The existing company-scoped phone-deduplicating customerStore endpoint remains unchanged; no new create endpoint or historical invoice rewrite. Product-grid ON/OFF retains the existing top customer form/toolbar.
 
 Local actual-method regressions: 3/3 pass (blank/real name, formatted phone, focus/cart, saved/missing identity). Syntax/whitespace/workflow contract pass. Real Chrome delivery journey now clicks the actual attached-card action, fills the existing name field, saves through the actual local API, checks attached saved identity and captures desktop/390px evidence. Supported local PHP/app/browser unavailable; full CI/browser pending, not independently live verified. Order-type consistency is separate #240; existing-customer name/phone editing is separate work.
+
+## Overnight CI follow-up
+
+Latest CI exposed the real 390px cart flow: the test now enters the cart through its actual button; Save returns to the menu pane where the existing name form lives, before its next-tick focus. Actual-method regression checks pane transition, cart preservation and invalid/saved-customer no-op. Browser/full exact-HEAD CI must be repeated.
+
+Local environment recheck: loopback binding is available in this run, but supported PHP 8.4 is absent and Chrome installation failed (truncated/non-zip download). Local pure JS/syntax checks are limited evidence; supported real browser/database/full PHP acceptance remains GitHub CI, not customer production acceptance.

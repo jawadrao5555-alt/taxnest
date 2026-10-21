@@ -14212,6 +14212,8 @@ function restaurantPos() {
         saveAttachedCallerCustomer() {
             const customer = this.selectedCustomer;
             if (!customer || customer.id || !customer.phone) return;
+            // The existing inline name form lives in the menu pane on phones.
+            this.mobileView = 'menu';
             this.callerSaveCustomer({
                 phone: customer.phone,
                 name: customer.name === customer.phone ? '' : (customer.name || ''),

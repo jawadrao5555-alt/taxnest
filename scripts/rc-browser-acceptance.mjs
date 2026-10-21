@@ -1795,6 +1795,7 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
     const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
     d.callerBillFrom({phone});
   },callerPhone);
+  await openMobileCart(page,v,['Current Order']);
   await page.locator('[data-save-attached-caller]:visible').click();
   const name=page.locator('[x-ref="newCustomerNameInput"]');await name.waitFor({state:'visible'});
   if(await name.inputValue()!=='')throw new Error('Caller phone was incorrectly prefilled as the customer name');

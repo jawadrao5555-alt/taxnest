@@ -10197,6 +10197,56 @@ class PosController extends Controller
         return response()->json(['addresses' => $addresses]);
     }
 
+    /** Explicit contact correction; the legacy name-only API stays unchanged. */
+    public function apiUpdateCustomerContact(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $input = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['required', 'string', 'max:30', 'regex:/^[0-9+() \-]+$/'],
+            'expected_phone' => ['present', 'nullable', 'string', 'max:30'],
+        ]);
+        $name = trim($input['name']);
+        $phone = trim($input['phone']);
+        $digits = preg_replace('/\D+/', '', $phone);
+        if ($name === '' || strlen($digits) < 4 || strlen($digits) > 15) {
+            return response()->json(['success' => false, 'message' => __('pos.customer_contact_invalid')], 422);
+        }
+        // Fail closed if identity locking is unavailable. Share the existing
+        // create endpoint's mutex for equivalent local/international spellings.
+        $locks = [];
+        try {
+            foreach (\App\Services\PosCustomerPhoneIdentity::creationLockKeys($companyId, $phone) as $key) {
+                $lock = \Illuminate\Support\Facades\Cache::lock($key, 60);
+                $lock->block(3);
+                $locks[] = $lock;
+            }
+            return DB::transaction(function () use ($companyId, $id, $name, $phone, $input) {
+                // Serialize corrections and inspect only this company's identities.
+                Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+                $customers = PosCustomer::where('company_id', $companyId)->lockForUpdate()->get(['id', 'phone']);
+                $current = $customers->first(fn ($row) => (int) $row->id === (int) $id);
+                if (!$current) return response()->json(['success' => false, 'message' => __('pos.customer_not_found')], 404);
+                if (trim((string) $current->phone) !== trim((string) $input['expected_phone'])) {
+                    return response()->json(['success' => false, 'message' => __('pos.customer_contact_changed')], 409);
+                }
+                $canonical = \App\Services\PosCustomerPhoneIdentity::canonical($phone);
+                if ($customers->contains(fn ($row) => (int) $row->id !== (int) $id
+                    && \App\Services\PosCustomerPhoneIdentity::canonical($row->phone) === $canonical)) {
+                    return response()->json(['success' => false, 'message' => __('pos.customer_contact_duplicate')], 422);
+                }
+                $customer = PosCustomer::where('company_id', $companyId)->findOrFail((int) $id);
+                $customer->update(['name' => $name, 'phone' => $phone]);
+                return response()->json(['success' => true, 'customer' => $customer->only(['id', 'name', 'phone', 'address'])])
+                    ->header('Cache-Control', 'no-store, private');
+            }, 3);
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
+            return response()->json(['success' => false, 'message' => __('pos.customer_contact_changed')], 409);
+        } finally {
+            foreach (array_reverse($locks) as $lock) $lock->release();
+        }
+    }
+
     /**
      * Correct a customer's display name from the sale screen.
      *

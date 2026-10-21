@@ -105,6 +105,59 @@ class PosSaleCustomerNameEditTest extends TestCase
         $this->assertSame('Ali Raza', $customer->fresh()->name);
     }
 
+    public function test_explicit_contact_correction_preserves_identity_and_old_bill_snapshot(): void
+    {
+        $company = $this->company('Contact correction');
+        $customer = $this->customer($company, 'Original name', '03000000000');
+        $bill = \App\Models\PosTransaction::create([
+            'company_id' => $company->id, 'customer_id' => $customer->id,
+            'invoice_number' => 'FIXTURE-CONTACT-1', 'invoice_mode' => 'local', 'pra_status' => 'local',
+            'customer_name' => $customer->name, 'customer_phone' => $customer->phone,
+            'subtotal' => 100, 'tax_amount' => 0, 'total_amount' => 100,
+            'payment_method' => 'cash', 'status' => 'completed',
+        ]);
+        $before = $bill->fresh()->getAttributes();
+        $this->actingAs($this->user($company), 'pos')->patchJson(route('pos.api.customers.contact', $customer->id), [
+            'name' => 'Corrected name', 'phone' => '03000000001', 'expected_phone' => '03000000000',
+        ])->assertOk()->assertJsonPath('customer.id', $customer->id)->assertJsonPath('customer.phone', '03000000001')
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $this->assertSame(1, PosCustomer::where('company_id', $company->id)->count());
+        $this->assertSame('Corrected name', $customer->fresh()->name);
+        $this->assertSame($before, $bill->fresh()->getAttributes());
+    }
+
+    public function test_contact_correction_rejects_normalized_duplicate_and_stale_identity_without_partial_write(): void
+    {
+        $company = $this->company('Contact collisions');
+        $customer = $this->customer($company, 'Original', '03000000000');
+        $this->customer($company, 'Other', '+92 300 0000001');
+        $this->actingAs($this->user($company), 'pos')->patchJson(route('pos.api.customers.contact', $customer->id), [
+            'name' => 'Do not save', 'phone' => '0300-0000001', 'expected_phone' => '03000000000',
+        ])->assertUnprocessable();
+        $this->assertSame('Original', $customer->fresh()->name);
+        $this->patchJson(route('pos.api.customers.contact', $customer->id), [
+            'name' => 'Do not save', 'phone' => '03000000002', 'expected_phone' => 'stale',
+        ])->assertStatus(409);
+        $this->assertSame('03000000000', $customer->fresh()->phone);
+    }
+
+    public function test_contact_correction_is_company_scoped_and_allows_another_tenant_to_use_same_phone(): void
+    {
+        $own = $this->company('Own contact shop'); $foreign = $this->company('Other contact shop');
+        $customer = $this->customer($own, 'Own', '03000000000');
+        $other = $this->customer($foreign, 'Other', '03000000001');
+        $this->actingAs($this->user($own), 'pos')->patchJson(route('pos.api.customers.contact', $other->id), [
+            'name' => 'Wrong tenant', 'phone' => '03000000003', 'expected_phone' => $other->phone,
+        ])->assertNotFound();
+        $this->patchJson(route('pos.api.customers.contact', $customer->id), [
+            'name' => 'Own corrected', 'phone' => $other->phone, 'expected_phone' => $customer->phone,
+        ])->assertOk();
+        $this->assertSame('Other', $other->fresh()->name);
+        $this->patchJson(route('pos.api.customers.contact', $customer->id), [
+            'name' => 'Do not save', 'phone' => 'invalid', 'expected_phone' => $other->phone,
+        ])->assertUnprocessable();
+    }
+
     public function test_every_sale_screen_exposes_a_discoverable_name_edit_action(): void
     {
         $pra = file_get_contents(resource_path('views/pos/partials/sale-customer-box.blade.php'));

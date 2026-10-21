@@ -1798,6 +1798,23 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   });
   const data=await response.json();
   if(!response.ok()||!data.success||!data.customer?.id)throw new Error('Synthetic delivery customer setup failed');
+  await page.evaluate(customer=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.selectedCustomer=customer;
+  },data.customer);
+  let contactPrompts=0;
+  const correctedPhone='0300'+String(3000000+v.width);
+  const acceptContact=dialog=>dialog.accept(contactPrompts++===0?'Synthetic corrected contact':correctedPhone);
+  page.on('dialog',acceptContact);
+  const [contactResponse]=await Promise.all([
+    page.waitForResponse(r=>r.url().endsWith('/pos/api/customers/'+data.customer.id+'/contact')&&r.request().method()==='PATCH'),
+    page.locator('[data-edit-customer-contact]:visible').click(),
+  ]);
+  page.off('dialog',acceptContact);
+  const corrected=await contactResponse.json();
+  if(!contactResponse.ok()||!corrected.success||corrected.customer.id!==data.customer.id||corrected.customer.phone!==correctedPhone)throw new Error('Actual customer contact correction failed');
+  data.customer=corrected.customer;
+  await page.waitForFunction(phone=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.phone===phone,correctedPhone);
+  await saveEvidenceScreenshot(page,'customer-contact-corrected-'+v.width+'.png');
   let release;const gate=new Promise(resolve=>release=resolve);
   const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
   await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});

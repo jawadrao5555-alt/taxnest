@@ -249,13 +249,14 @@ jobs:
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs
       - name: Seed and verify authenticated Smart DI source import
+        id: browser-preflight
         env:
           RC_MARIADB_PORT: '33117'
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
-          RC_BROWSER_ONLY=restaurant-top-selling bash scripts/rc-browser-fixture.sh run
+          RC_TUTORIAL_RECORDING=1 RC_BROWSER_ONLY=restaurant-top-selling bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=notification-pra,notification-fbr,notification-di bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=agent-build-identity bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
@@ -264,6 +265,11 @@ jobs:
           RC_BROWSER_ONLY=whatsapp-optional-autosend bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=rider-realtime-map bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run
+          test -s "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json"
+          mkdir -p "$RUNNER_TEMP/tutorial-preview"
+          cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/"*.webm "$RUNNER_TEMP/tutorial-preview/"
+          cp "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json" "$RUNNER_TEMP/tutorial-preview/"
+          echo "preview_dir=$(realpath "$RUNNER_TEMP/tutorial-preview")" >> "$GITHUB_OUTPUT"
       - name: Exercise general isolated browser acceptance
         env:
           RC_MARIADB_PORT: '33117'
@@ -294,6 +300,16 @@ jobs:
           path: ${{ runner.temp }}/taxnest-rc-evidence/${{ github.job }}
           if-no-files-found: warn
           retention-days: 14
+      - name: Upload synthetic Top Selling recording preview
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tutorial-preview-${{ github.run_id }}
+          path: |
+            ${{ steps.browser-preflight.outputs.preview_dir }}/*.webm
+            ${{ steps.browser-preflight.outputs.preview_dir }}/recording-manifest.json
+          if-no-files-found: error
+          retention-days: 14
 
   jsagentrealtime:
     name: Node 22 PRA Agent and realtime gateway
@@ -319,6 +335,8 @@ jobs:
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
+      - name: Check isolated tutorial recording paths
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/tutorial-recording.test.mjs
       - name: Check Android beta artifact inventory
         run: bash scripts/rc-safe-run -- node --test scripts/tests/android-beta-manifest.test.mjs
       - name: Check realtime rider map request ordering and recovery

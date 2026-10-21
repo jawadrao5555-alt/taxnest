@@ -273,7 +273,7 @@ run() {
   if [[ -f "$ROOT/scripts/public-website-checks.mjs" ]]; then
     safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" node scripts/public-website-checks.mjs
   fi
-  safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" RC_BROWSER_FIXTURE="$FIXTURE" node scripts/rc-browser-acceptance.mjs
+  safe_browser env BASE_URL="http://127.0.0.1:$BROWSER_PORT" RC_BROWSER_FIXTURE="$FIXTURE" RC_TUTORIAL_RECORDING="${RC_TUTORIAL_RECORDING:-0}" node scripts/rc-browser-acceptance.mjs
   fi
 }
 serve() { resume; wait "$(cat "$SERVER_PID")"; }

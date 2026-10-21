@@ -4383,12 +4383,16 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- Viewport overlays must escape the sale root's zoom/overflow and clear
+         the actual header height, including compact/expanded toolbars. --}}
+    <template x-teleport="body">
+    <div data-tn-caller-overlays x-show="!callerBlocked()" @resize.window="callerOverlayEpoch++" style="position:relative;z-index:150;">
     {{-- ── Caller ID popup (Task 1039) — non-blocking incoming-call card.
-         Sits below the toast slot; z-[60] like the toast (payment/receipt
-         modals never coexist — callerBlocked() defers rings while they're up).
+         Viewport layer clears the measured header. Payment/receipt/PIN
+         blocks hide this layer and callerBlocked() still defers new rings.
          No NEW arbitrary Tailwind classes (vite-arbitrary-classes.md):
          width via inline style, z-[60]/text-[10px]/text-[11px] already built. --}}
-    <div x-show="callerPopup" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:330px; max-width:92vw;">
+    <div x-show="callerPopup" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 text-white" :class="callerPopup && callerPopup.source === 'whatsapp' ? 'bg-green-600' : 'bg-sky-600'">
                 <svg class="w-4 h-4 animate-pulse flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -4443,7 +4447,7 @@ window.addEventListener('popstate', function() {
          Small fixed pill under the popup slot; only rendered when the feature
          is baked ON. Unseen count = client-side localStorage cursor. --}}
     <template x-if="callerIdOn">
-        <div class="fixed top-20 right-4 z-50 flex flex-col items-end gap-1.5" x-show="!callerPopup" x-cloak>
+        <div class="fixed right-4 z-50 flex flex-col items-end gap-1.5" :style="callerOverlayStyle(0)" x-show="!callerPopup" x-cloak>
             {{-- Task 1397: hover par poora jumla BUTTON se milta hai — badge
                  khud 16px ka hai, us par theek se hover nahi hota. Alpine se
                  pehle static title chalta rehta hai. --}}
@@ -4466,7 +4470,7 @@ window.addEventListener('popstate', function() {
     </template>
 
     {{-- ── Caller ID v2: recent-calls panel (last 24h) --}}
-    <div x-show="showCallerLog" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:340px; max-width:92vw;">
+    <div x-show="showCallerLog" x-cloak x-transition.opacity data-tn-caller-history class="fixed right-4 z-[60]" :style="callerOverlayStyle(340)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-sky-600 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_log_title') }}</span>
@@ -4522,7 +4526,7 @@ window.addEventListener('popstate', function() {
          Wajah ka text server ke `reason` se banta hai, is liye teenon keys
          zabardasti bake karwani hain: --}}
     {{-- @posI18nExtra: caller_dial_no_device caller_dial_old_app caller_dial_notif_off --}}
-    <div x-show="callerDialFallback" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:330px; max-width:92vw;">
+    <div x-show="callerDialFallback" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_dial_title') }}</span>
@@ -4541,6 +4545,9 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
     </div>
+
+    </div>
+    </template>
 
     <div x-show="toast.show" class="fixed top-4 right-4 z-[60] max-w-sm" :class="toast.show ? 'toast-enter' : 'toast-exit'">
         {{-- ZFC issue #12 (28 Jul 2026): NEW 'info' toast type — blue, i-icon.
@@ -13786,6 +13793,17 @@ function restaurantPos() {
         // ─── Caller ID popup (Task 1039) ───────────────────────────────────
         // Non-blocking: silent while payment / receipt / manager-PIN / table-
         // switch prompts are up — deferred rings surface right after (queue).
+        callerOverlayEpoch: 0,
+        callerOverlayStyle(width) {
+            // Epoch makes window resize/fullscreen changes reactive.
+            this.callerOverlayEpoch;
+            const header = document.querySelector('[data-tn-topnav="pra"]');
+            const height = window.innerHeight;
+            const bottom = header ? header.getBoundingClientRect().bottom : 64;
+            const top = Math.min(Math.max(8, bottom + 8), Math.max(8, height - 120));
+            return 'top:' + top + 'px;max-height:' + Math.max(100, height - top - 8)
+                + 'px;max-width:calc(100vw - 32px);overflow-y:auto;width:' + (width ? width + 'px' : 'auto') + ';';
+        },
         callerBlocked() {
             return this.showPayModal || this.showReceipt || this.showManagerPinModal
                 || !!this.tableSwitchPrompt || this.submitting;

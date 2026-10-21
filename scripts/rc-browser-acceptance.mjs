@@ -1429,6 +1429,23 @@ async function tableOrderWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  const savedStyle=await root.getAttribute('style');
+  await root.evaluate(el=>{
+    el.style.zoom='0.8';
+    const d=window.Alpine.$data(el);d.callerIdOn=true;d.showCallerLog=true;
+    d.callerLog=[{id:990001,phone:'03000000000',name:'Synthetic previous call',at:'12:00',source:'sim'}];
+  });
+  const callerPanel=page.locator('[data-tn-caller-history]:visible');await callerPanel.waitFor({state:'visible'});
+  const placement=await callerPanel.evaluate(el=>{
+    const r=el.getBoundingClientRect(),h=document.querySelector('[data-tn-topnav="pra"]').getBoundingClientRect();
+    return {top:r.top,headerBottom:h.bottom,bottom:r.bottom,height:innerHeight,escaped:!document.querySelector('[data-tn-sale-root]').contains(el)};
+  });
+  if(!placement.escaped||placement.top<placement.headerBottom+4||placement.bottom>placement.height)throw new Error('Caller history is clipped by header/viewport: '+JSON.stringify(placement));
+  await saveEvidenceScreenshot(page,'caller-history-header-clearance-'+v.width+'.png');
+  await callerPanel.locator('button').filter({hasText:'Bill'}).first().click();
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.phone==='03000000000');
+  await root.evaluate((el,style)=>{el.setAttribute('style',style||'');const d=window.Alpine.$data(el);d.clearAttachedCustomer();d.callerIdOn=false;},savedStyle);
+
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});

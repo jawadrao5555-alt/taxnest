@@ -7181,5 +7181,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_no_document_reason_store_slip_disabled' => 'Store slip band hai',
     'print_no_document_reason_held_sale_missing' => 'Held sale ab dastiyab nahi',
     'return_not_allowed_hotel_credit_required' => 'Is bill ke liye Hotel Return / Credit Note screen use karein. Payment refund alag hai.',
+    'settle_select_all_cash' => 'Tamam cash bills chunein',
+    'settle_selected_delivery_hint' => 'Jo bills abhi baqi rakhne hain unka nishan hata dein. Poori raqam wale selected bills Delivered ho jayenge. Baqi bills nahi badlenge.',
+    'settle_selection_confirm' => ':count selected cash bills ke liye Rs. :amount wasool karein? Poori raqam wale bills Delivered ho jayenge. Unselected bills nahi badlenge.',
 ];
 

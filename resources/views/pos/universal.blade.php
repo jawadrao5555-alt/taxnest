@@ -3349,6 +3349,25 @@ window.addEventListener('popstate', function() {
                            placeholder="{{ __('pos.ph_reprint_search') }}"
                            class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400">
                 </div>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <label class="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        {{ __('pos.order_type') }}
+                        <select x-model="reprintOrderType" @change="activeReprintIndex = 0; reprintPreviewBill = null" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <option value="">{{ __('pos.all_types') }}</option>
+                            <option value="dine_in">{{ __('pos.dine_in') }}</option>
+                            <option value="takeaway">{{ __('pos.takeaway') }}</option>
+                            <option value="delivery">{{ __('pos.delivery') }}</option>
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        {{ __('pos.payment_method') }}
+                        <select x-model="reprintPayment" @change="activeReprintIndex = 0; reprintPreviewBill = null" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <option value="">{{ __('pos.all_types') }}</option>
+                            <option value="cash">{{ __('pos.pm_cash') }}</option>
+                            <option value="card">{{ __('pos.pm_card') }}</option>
+                        </select>
+                    </label>
+                </div>
             </div>
             <div class="flex-1 overflow-y-auto">
                 <template x-if="reprintLoading && reprintBills.length === 0">
@@ -3360,8 +3379,8 @@ window.addEventListener('popstate', function() {
                 <template x-if="!reprintLoading && filteredReprintBills().length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <p class="text-sm font-medium" x-text="reprintSearch ? window.TXT.no_bill_found : window.TXT.no_bills_today"></p>
-                        <p class="text-[11px] text-gray-400 mt-1" x-text="reprintSearch ? window.TXT.change_search_try_again : window.TXT.todays_bills_appear_here"></p>
+                        <p class="text-sm font-medium" x-text="(reprintSearch || reprintOrderType || reprintPayment) ? window.TXT.no_bill_found : window.TXT.no_bills_today"></p>
+                        <p class="text-[11px] text-gray-400 mt-1" x-text="(reprintSearch || reprintOrderType || reprintPayment) ? window.TXT.change_search_try_again : window.TXT.todays_bills_appear_here"></p>
                     </div>
                 </template>
                 <template x-for="(bill, bi) in filteredReprintBills()" :key="bill.id">
@@ -5269,6 +5288,8 @@ function restaurantPos() {
         activeReprintIndex: 0,
         reprintLoading: false,
         reprintSearch: '',
+        reprintOrderType: '',
+        reprintPayment: '',
         reprintBusyId: null,
         reprintPreviewBill: null,   // Preview modal (ZFC 30 Jul 2026): bill being previewed
         // ── QUICK RETURN (Task 681) — bill number → return form ──────────
@@ -12787,6 +12808,8 @@ function restaurantPos() {
         openReprint() {
             this.activeReprintIndex = 0;
             this.reprintSearch = '';
+            this.reprintOrderType = '';
+            this.reprintPayment = '';
             // Self-heal: _printViaIframe's onAfterPrint is skipped when the print
             // session goes stale (cancelPendingPrints) — never let a stuck busy
             // id dead-lock the whole reprint feature for the session.
@@ -12813,15 +12836,18 @@ function restaurantPos() {
         },
         filteredReprintBills() {
             const q = (this.reprintSearch || '').toLowerCase().trim();
-            if (!q) return this.reprintBills;
-            return this.reprintBills.filter(b =>
-                (b.display_number || '').toLowerCase().includes(q)
-                || (b.bill_token || '').toString().toLowerCase().includes(q)
-                || (b.invoice_number || '').toLowerCase().includes(q)
-                || (b.pra_invoice_number || '').toLowerCase().includes(q)
-                || (b.customer_name || '').toLowerCase().includes(q)
-                || String(b.total_amount || '').includes(q)
-            );
+            return this.reprintBills.filter(b => {
+                if (this.reprintOrderType && b.order_type !== this.reprintOrderType) return false;
+                const payment = String(b.payment_method || '').trim().toLowerCase();
+                if (this.reprintPayment === 'cash' && payment !== 'cash') return false;
+                if (this.reprintPayment === 'card' && !['card', 'debit_card', 'credit_card'].includes(payment)) return false;
+                return !q || (b.display_number || '').toLowerCase().includes(q)
+                    || (b.bill_token || '').toString().toLowerCase().includes(q)
+                    || (b.invoice_number || '').toLowerCase().includes(q)
+                    || (b.pra_invoice_number || '').toLowerCase().includes(q)
+                    || (b.customer_name || '').toLowerCase().includes(q)
+                    || String(b.total_amount || '').includes(q);
+            });
         },
         // Print the ORIGINAL receipt of any of today's bills — no COPY label
         // (owner rule 23 Jul 2026). Mirrors printReceipt() for an arbitrary

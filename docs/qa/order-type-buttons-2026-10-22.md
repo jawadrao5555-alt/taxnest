@@ -1,0 +1,5 @@
+# Readable order-type controls
+
+Owner source: 4ba007ac-34ea-4d27-8e20-6058ba6dcacc.mov. The restaurant order-type buttons use 12px labels and faint inactive gray text. Increase labels to 14px, minimum control height to 44px, and inactive text to gray-800 / dark gray-200. Add a visible keyboard focus outline and aria-pressed selection state. Preserve all handlers, feature gates, table picker, selected table/waiter badges and saved appearance settings.
+
+Compatibility: selected/unselected, light/dark, desktop/390px, Dine In picker and existing Takeaway/Delivery transitions. The existing real Chrome table-order acceptance now checks computed font/minimum height and actual text/background contrast >=4.5:1 in both modes, captures screenshots, then continues its real table-order workflow. JS syntax/whitespace pass locally. Supported PHP 8.4/local application/browser sockets unavailable; visual/full acceptance remains pending CI, not independently live verified. No arbitrary Tailwind dimensions introduced; no functional keyboard changes. The misleading F2 hint is a separate issue.

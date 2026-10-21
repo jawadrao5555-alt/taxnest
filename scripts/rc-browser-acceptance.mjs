@@ -1429,6 +1429,21 @@ async function tableOrderWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  const switcher=page.locator('[data-tn-order-type-switcher]');
+  const wasDark=await page.evaluate(()=>document.documentElement.classList.contains('dark'));
+  for(const dark of [false,true]){
+    await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
+    const metrics=await switcher.locator('button').evaluateAll(nodes=>nodes.map(el=>{
+      const s=getComputedStyle(el);
+      const lum=rgb=>{const c=rgb.match(/[\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;});return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2];};
+      const fg=lum(s.color),bg=lum(s.backgroundColor);
+      return {font:parseFloat(s.fontSize),minHeight:parseFloat(s.minHeight),contrast:(Math.max(fg,bg)+0.05)/(Math.min(fg,bg)+0.05)};
+    }));
+    if(metrics.length!==3||metrics.some(m=>m.font<14||m.minHeight<44||m.contrast<4.5))throw new Error('Order-type button readability failed: '+JSON.stringify(metrics));
+    await saveEvidenceScreenshot(page,'order-type-buttons-'+(dark?'dark':'light')+'-'+v.width+'.png');
+  }
+  await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),wasDark);
+
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});

@@ -299,6 +299,33 @@ class PosCustomerLiveSearchAndBillViewTest extends TestCase
         }
     }
 
+    public function test_card_receipts_hide_only_card_discount_and_preserve_tax_payable_and_saved_snapshot(): void
+    {
+        $company = $this->company();
+        $owner = $this->owner($company);
+        $customer = $this->customer($company, 'Synthetic receipt customer', '03000000000');
+        $bill = $this->bill($company, $customer, [
+            ['name' => 'Synthetic taxable item', 'qty' => 1, 'price' => 450],
+            ['name' => 'Synthetic exempt drink', 'qty' => 1, 'price' => 80],
+        ]);
+        $bill->forceFill([
+            'tax_inclusive' => true, 'tax_menu_rate' => 16, 'tax_rate' => 8,
+            'subtotal' => 467.97, 'tax_amount' => 31.03, 'total_amount' => 499,
+            'payment_method' => 'card', 'discount_amount' => 0,
+        ])->save();
+        $before = $bill->fresh()->getAttributes();
+        foreach (['80mm', '58mm'] as $paper) {
+            $company->update(['receipt_printer_size' => $paper]);
+            $response = $this->actingAs($owner, 'pos')->get('/pos/transaction/'.$bill->id.'/receipt')
+                ->assertOk()->assertDontSee('Card Discount')->assertSee('8% incl.')
+                ->assertSee('530.00')->assertSee('31.03')->assertSee('499.00');
+            $this->assertSame($before, $bill->fresh()->getAttributes(), 'receipt reads must not rewrite any saved snapshot');
+        }
+        // An ordinary cashier-entered discount must still print independently.
+        $bill->forceFill(['discount_amount' => 10, 'discount_type' => 'amount'])->save();
+        $this->get('/pos/transaction/'.$bill->id.'/receipt')->assertOk()->assertSee('Discount:')->assertDontSee('Card Discount');
+    }
+
     public function test_the_history_page_makes_real_bills_clickable(): void
     {
         $company = $this->company();

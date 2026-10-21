@@ -1641,6 +1641,8 @@ async function customerAmountAudit(page,t,v) {
     await modal.locator('button').first().click();
     await page.goto(baseUrl+'/pos/transaction/'+bill.id+'/receipt',{waitUntil:'domcontentloaded'});
     if(!(await page.locator('body').innerText()).includes('PKR '+bill.payable+'.00'))throw new Error('actual receipt payable differs from history');
+    if((await page.locator('body').innerText()).includes('Card Discount'))throw new Error('Receipt still shows the removed Card Discount line');
+    await saveEvidenceScreenshot(page,'receipt-no-card-discount-'+bill.id+'-'+v.width+'.png');
     await page.goto(baseUrl+'/pos/transactions?tab=local',{waitUntil:'domcontentloaded'});
     await waitForOperationalSurface(page); await dismiss(page);
     const transactionRow=page.locator('tr').filter({has:page.locator('a[href$="/pos/transaction/'+bill.id+'"]')});

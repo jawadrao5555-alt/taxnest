@@ -1,6 +1,7 @@
-title: "Mobile apps ki signed beta verification ki tyari"
+title: "WhatsApp setup aur delivery ki wazeh tasdeeq"
 audience: pos
 type: improvement
 points:
-  - "Rider aur Caller builds ke liye owner-controlled signing aur verification process shamil hai."
-  - "Naye public APK aur version update phone testing ke baad owner release karega."
+  - "Auto-send settings mein saved setup checklist aur company ki delivered/read evidence nazar aati hai."
+  - "Unreadable saved token par auto-send ON nahi hota; OFF karna mumkin rehta hai."
+  - "Sent provider acceptance hai; customer delivery ki tasdeeq alag dikhai jati hai."

@@ -166,6 +166,14 @@ $addressProofPlan = \App\Models\PricingPlan::create([
 ]);
 $tableCashier = $user($tableShop, 'Synthetic Table Cashier', 'table-orders@rc-browser.invalid', 'user', 'pos_cashier');
 $tableWaiter = $user($tableShop, 'Synthetic Table Waiter', 'table-waiter@rc-browser.invalid', 'user', 'pos_waiter');
+DB::table('pos_transactions')->insert([
+    'company_id' => $tableShop->id, 'created_by' => $tableCashier->id,
+    'invoice_number' => 'RC-HISTORICAL-REPRINT', 'business_date' => '2024-01-02',
+    'status' => 'completed', 'invoice_mode' => 'local', 'pra_status' => 'local',
+    'customer_name' => 'Synthetic historical date proof', 'payment_method' => 'cash',
+    'subtotal' => 100, 'tax_rate' => 0, 'tax_amount' => 0, 'total_amount' => 100,
+    'created_at' => '2024-01-02 12:00:00', 'updated_at' => '2024-01-02 12:00:00',
+]);
 $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);
 $tableCases = [];
 $handoffCases = [];

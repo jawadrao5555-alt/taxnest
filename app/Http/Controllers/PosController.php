@@ -5654,6 +5654,8 @@ class PosController extends Controller
     public function apiTodaysBills(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $validated = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']]);
+        $businessDate = $validated['date'] ?? \App\Services\PosBusinessDay::current($companyId);
 
         // Visibility MUST mirror receipt(): archived bills are listed ONLY when
         // invoice_mode='local' (post-finalize archive) — archived PRA bills stay
@@ -5668,7 +5670,7 @@ class PosController extends Controller
                       ->orWhere('invoice_mode', 'local');
                 }
             })
-            ->where('business_date', \App\Services\PosBusinessDay::current($companyId))
+            ->where('business_date', $businessDate)
             // Billing Scope (07 Aug 2026): stream-locked staff get ONLY their own
             // stream in the Reprint list — mirrors applyReportFilters' split.
             ->where(function ($q) {
@@ -5761,6 +5763,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'count'   => $data->count(),
+            'business_date' => $businessDate,
             'bills'   => $data,
         ]);
     }

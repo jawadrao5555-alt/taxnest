@@ -1,0 +1,7 @@
+# Reprint a selected business date
+
+Owner source 8ce746ea-8945-4e18-b1c8-17e94d386f52.mp4. Reprint has no date selector and its read-only endpoint always restricts to current business date. Add an optional validated YYYY-MM-DD date query and a date selector; no date retains the server's company-specific active business day. Keep the existing newest-300 cap and all company, billing-stream, cashier-own-sales and receipt/archive visibility predicates. Selecting an older date does not grant access to an otherwise hidden bill.
+
+UI clears stale rows/preview immediately and rejects late older-date responses; a failed request shows an error with no wrong-date bills available to print. Existing print mechanism and saved/fiscal data are untouched.
+
+Local actual-method load/date/race/failure tests: 3/3 pass. PHP 8.3 syntax-only checks, JS syntax, whitespace and CI contract pass; PHP 8.3 is not substituted for required PHP 8.4 tests. Added actual endpoint regressions for historical date, foreign company, billing scope, archive rules, cashier isolation and invalid input. Added a fictional historical receipt fixture and real Chrome date-select/list-render flow/screenshots at desktop/390px. These supported PHP/full browser checks are pending CI because local application/browser sockets and supported PHP are unavailable. No print is invoked in date acceptance, no independent live verification claimed.

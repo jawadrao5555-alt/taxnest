@@ -1429,6 +1429,21 @@ async function tableOrderWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  await root.evaluate(el=>window.Alpine.$data(el).openReprint());
+  const reprint=page.locator('[x-show="showReprint"]');
+  await reprint.waitFor({state:'visible'});
+  const date=reprint.locator('input[type="date"]');
+  await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintLoading);
+  await date.fill('2024-01-02');
+  await date.press('Tab');
+  await page.waitForFunction(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    return !d.reprintLoading&&d.reprintDate==='2024-01-02'&&d.reprintBills.some(b=>b.customer_name==='Synthetic historical date proof');
+  });
+  if(!(await reprint.innerText()).includes('Synthetic historical date proof'))throw new Error('Selected historical business date was not rendered in Reprint');
+  await saveEvidenceScreenshot(page,'historical-reprint-date-'+v.width+'.png');
+  await root.evaluate(el=>{window.Alpine.$data(el).showReprint=false;});
+
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});

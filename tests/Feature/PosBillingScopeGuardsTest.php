@@ -682,6 +682,35 @@ class PosBillingScopeGuardsTest extends TestCase
         return [$localId, $praId];
     }
 
+    public function test_reprint_selected_historical_date_preserves_tenant_scope_and_archive_visibility(): void
+    {
+        $cid = $this->makeCompany();
+        $other = $this->makeCompany();
+        $user = $this->makeUser($cid, ['pos_billing_scope' => 'local']);
+        $date = '2024-01-02';
+        $visible = $this->makeTxn($cid, ['business_date' => $date, 'is_archived' => true]);
+        $this->makeTxn($other, ['business_date' => $date]);
+        $this->makePraTxn($cid, ['business_date' => $date]);
+        $this->makePraTxn($cid, ['business_date' => $date, 'is_archived' => true]);
+        $this->makeTxn($cid, ['business_date' => '2024-01-03']);
+        $response = $this->actingAs($user, 'pos')->getJson('/pos/api/todays-bills?date='.$date)
+            ->assertOk()->assertJsonPath('business_date', $date);
+        $this->assertSame([$visible], collect($response->json('bills'))->pluck('id')->all());
+    }
+
+    public function test_reprint_historical_date_keeps_cashier_own_sales_isolation_and_rejects_invalid_date(): void
+    {
+        $cid = $this->makeCompany(['pos_cashier_own_sales_only' => true]);
+        $user = $this->makeUser($cid, ['pos_billing_scope' => 'both']);
+        $other = $this->makeUser($cid, ['pos_billing_scope' => 'both']);
+        $date = '2024-01-02';
+        $own = $this->makeTxn($cid, ['business_date' => $date, 'created_by' => $user->id]);
+        $this->makeTxn($cid, ['business_date' => $date, 'created_by' => $other->id]);
+        $response = $this->actingAs($user, 'pos')->getJson('/pos/api/todays-bills?date='.$date)->assertOk();
+        $this->assertSame([$own], collect($response->json('bills'))->pluck('id')->all());
+        $this->getJson('/pos/api/todays-bills?date=2024-99-99')->assertUnprocessable()->assertJsonValidationErrors('date');
+    }
+
     public function test_api_todays_bills_local_scope_excludes_pra_bills(): void
     {
         $cid  = $this->makeCompany();

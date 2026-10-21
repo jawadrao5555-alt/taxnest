@@ -1371,6 +1371,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
+  if (t.reportsBusinessDay) return reportsBusinessDayWorkflow(page,t,v);
   if (t.restaurantTopSelling) return restaurantTopSellingWorkflow(page,t,v);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v,diagnostics);
@@ -1832,4 +1833,16 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
   await page.emulateMedia({media:'screen'});
   pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
+}
+
+async function reportsBusinessDayWorkflow(page,t,v){
+  await page.goto(baseUrl+'/pos/reports',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const from=page.locator('input[type="date"][name="from"]');
+  const to=page.locator('input[type="date"][name="to"]');
+  if(await from.inputValue()!==t.reportsBusinessDay||await to.inputValue()!==t.reportsBusinessDay)throw new Error('Fresh reports did not use the active company business day');
+  await saveEvidenceScreenshot(page,'reports-active-business-day-'+v.width+'.png');
+  await from.fill('2024-01-02');await to.fill('2024-01-03');
+  await Promise.all([page.waitForURL(u=>u.searchParams.get('from')==='2024-01-02'&&u.searchParams.get('to')==='2024-01-03'),from.locator('xpath=ancestor::form').locator('button[type="submit"]').click()]);
+  if(await from.inputValue()!=='2024-01-02'||await to.inputValue()!=='2024-01-03')throw new Error('Explicit report dates were reset to the active day');
 }

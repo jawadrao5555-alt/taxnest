@@ -25,3 +25,12 @@ Actual Windows packaging, signed/released artifact availability and installed
 fleet updates remain unverified until the owner-approved release build and
 independent rollout acceptance. Do not describe this version bump as a shipped
 Windows release or as a diagnosis of offline fleet warnings.
+
+Refresh after PR #227: base is deployed main
+`7de0ae0e897786881a25105f7e639ec173050b87`. Deploy run 39654969409
+passed exact live SHA/marker verification at 18:45:02 UTC on 21 October 2026,
+and its relay callback succeeded. The only merge conflict was the announcement:
+keep this Agent release note because the tutorial announcement is already live.
+Tutorial recording, actual container upload outputs and fail-closed CI contracts
+are retained byte-for-byte from main. Fresh all-eight exact-HEAD PR checks are
+required; prior checks on the older base are not this refreshed acceptance.

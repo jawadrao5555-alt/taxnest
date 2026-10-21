@@ -358,7 +358,7 @@ jobs:
       - name: Check complete catalog search and exact scanner priority
         run: bash scripts/rc-safe-run -- node --test scripts/tests/catalog-search-results.test.mjs
       - name: Check delivery address race and snapshot preservation
-        run: bash scripts/rc-safe-run -- node --test scripts/tests/delivery-address-state.test.mjs
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/delivery-address-state.test.mjs scripts/tests/cart-wheel-routing.test.mjs
       - name: Run realtime gateway tests with egress blocked
         run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4

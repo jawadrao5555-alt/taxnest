@@ -322,7 +322,7 @@
     /* Browser zoom reduces the CSS viewport height. Keep the complete cart,
        totals and final actions reachable instead of clipping them at the root. */
     .tn-cart-col { min-height: 0; overflow-y: auto; }
-    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .tn-cart-col [x-ref="cartList"] { flex: 1 1 auto; min-height: 8rem; max-height: 55vh; max-height: 55dvh; overflow-y: auto; }
     .mobile-sticky-pay {
         position: sticky;
         bottom: 0;
@@ -335,7 +335,7 @@
 }
 @media (min-width: 768px) and (max-width: 1023px) {
     .tn-cart-col { min-height: 0; overflow-y: auto; }
-    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .tn-cart-col [x-ref="cartList"] { flex: 1 1 auto; min-height: 8rem; max-height: 55vh; max-height: 55dvh; overflow-y: auto; }
     .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
     .dark .mobile-sticky-pay { background: #111827; }
 }
@@ -349,6 +349,8 @@
    kabhi widecart nahi hota. Custom classes — no Tailwind rebuild dependency. */
 .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
 .tn-cart-side { display: contents; }
+/* Wheel/touch may chain from the list into its own footer rail, not the page. */
+.tn-cart-col { overscroll-behavior-y: contain; }
 /* Legacy fallback (no display:contents): wrappers become plain flex columns that
    reproduce the original stacking — cart list pane flexes, footer pane sizes to
    content — so old WebViews keep a working (normal) cart layout. */
@@ -408,7 +410,7 @@
        whole cart column scroll on mobile and dock the pay block with a SOLID
        background + top hairline so content scrolls cleanly underneath it. */
     .tn-cart-col { overflow-y: auto; }
-    .tn-cart-col [x-ref="cartList"] { flex: none; overflow: visible; }
+    .tn-cart-col [x-ref="cartList"] { flex: 1 1 auto; min-height: 8rem; max-height: 55vh; max-height: 55dvh; overflow-y: auto; }
     .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); box-shadow: 0 -10px 24px rgba(0,0,0,.10); padding-bottom: env(safe-area-inset-bottom, 0); }
     .dark .mobile-sticky-pay { background: #111827; }
     .mobile-collapse-header { cursor: pointer; user-select: none; }
@@ -10005,7 +10007,7 @@ function restaurantPos() {
         handleGlobalWheel(e) {
             if (!e.deltaY) return;
             // Never hijack the wheel inside fixed overlays (modals, drawers).
-            if (e.target && e.target.closest && e.target.closest('.fixed')) return;
+            if (e.target && e.target.closest && (e.target.closest('.fixed') || e.target.closest('.tn-cart-col'))) return;
             let el = e.target;
             while (el && el !== document.body) {
                 if (el.scrollHeight > el.clientHeight + 1) {

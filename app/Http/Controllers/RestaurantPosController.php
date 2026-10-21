@@ -1252,6 +1252,9 @@ class RestaurantPosController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'cash');
+        if ($request->boolean('online_payment_confirmed') || in_array($paymentMethod, ['qr_payment', 'online'], true)) {
+            \App\Services\PosOnlinePaymentVerification::requireAuthorized(auth('pos')->user(), (int) $companyId);
+        }
         // A confirmed online transfer is money already received, not a request
         // to collect Cash/Card again.  Older tabs still submit whichever payment
         // button opened the confirmation dialog, so make the server authoritative

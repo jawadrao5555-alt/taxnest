@@ -221,7 +221,7 @@
         {{-- Settle modal (one per rider with open bills) --}}
         @if($owed > 0)
         <template x-teleport="body">
-            <div data-rider-settlement-dialog="{{ $rider->id }}" x-show="settleRider === {{ $rider->id }}" x-cloak @keydown.escape.window="if (settleRider === {{ $rider->id }}) settleRider = null" @keydown.escape.prevent.stop="settleRider = null" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div data-rider-settlement-dialog="{{ $rider->id }}" style="z-index:80;" x-show="settleRider === {{ $rider->id }}" x-cloak @keydown.escape.window="if (settleRider === {{ $rider->id }}) settleRider = null" @keydown.escape.prevent.stop="settleRider = null" class="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <div class="absolute inset-0 bg-black/50" @click="settleRider = null"></div>
                 <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-lg p-5 max-h-[85vh] overflow-y-auto">
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — {{ $rider->name }}</h3>

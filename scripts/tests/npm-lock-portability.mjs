@@ -12,6 +12,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 21 Oct 2026: Vite 7.3.7 (root/mockup) and follow-redirects
+// 1.16.1 (root/Agent) address GHSA-587h-7wmj-h5pm and GHSA-q3jh-wrc6-jgq8
+// plus related advisories. Only those version, resolved and integrity fields
+// changed; package counts, dependency edges and all source checks stay pinned.
 // Reviewed 7 Oct 2026: root shell-quote 1.11.0 addresses GHSA-pqg4-j6r4-53mv.
 // Reviewed 6 Oct 2026: source-map-js 1.2.2 and root selector-parser 7.1.6
 // address GHSA-68fv-2mgg-jv7q / GHSA-rj75-hqrm-r3gf. All other
@@ -21,7 +25,7 @@ const LOCKS = [
     lock: 'package-lock.json',
     packages: 249,
     resolved: 242,
-    graph: '3fa4dad8472f652b66bdfde685d509bd0facde0ae06521559748ece7b09b35c8',
+    graph: 'dc2565379f0b5a493bf0148ad8b04edb8d1cfb39faedefa4bd0f0af1e7891e96',
   },
   {
     lock: 'agent-realtime-gateway/package-lock.json',
@@ -33,13 +37,13 @@ const LOCKS = [
     lock: 'artifacts/mockup-sandbox/package-lock.json',
     packages: 318,
     resolved: 311,
-    graph: '59d62e514361d57322d1c6a6462886b584933ce55728755ccfeb6ffb0e72e56f',
+    graph: '6ffd45847b225822d72d5c7b76e2c756007957ffe215e7ec99f9262a16283ac3',
   },
   {
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: 'dd4d1905abf744ae75a772b08aecd822e0e3a1cbabd38ddc58fae7614e62df69',
+    graph: '5f39a9574100cf433971fdc38ebe74f5376d0cac1c0495b4012e7269b9fe55c3',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

@@ -123,10 +123,14 @@ final class OAuthController extends Controller
     public function connections()
     {
         $owner = $this->owner();
+        $reads = DB::table('reporting_read_audits')->where('actor_id', $owner->id)
+            ->selectRaw('grant_id, COUNT(*) as successful_reads, MAX(created_at) as last_read_at')->groupBy('grant_id');
 
         return view('admin.reporting.connections', ['resource' => $this->oauth->resource(),
             'grants' => DB::table('reporting_oauth_grants as g')->join('reporting_oauth_clients as c', 'c.id', '=', 'g.client_id')
-                ->where('g.actor_id', $owner->id)->orderByDesc('g.created_at')->limit(100)->get(['g.id', 'c.name', 'g.company_ids', 'g.expires_at', 'g.revoked_at', 'g.created_at'])]);
+                ->leftJoinSub($reads, 'reads', fn ($join) => $join->on('reads.grant_id', '=', 'g.id'))
+                ->where('g.actor_id', $owner->id)->orderByDesc('g.created_at')->limit(100)
+                ->get(['g.id', 'c.name', 'g.company_ids', 'g.expires_at', 'g.revoked_at', 'g.created_at', 'reads.successful_reads', 'reads.last_read_at'])]);
     }
 
     public function revoke(Request $request, string $id)

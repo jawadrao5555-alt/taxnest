@@ -1,7 +1,7 @@
-title: "WhatsApp setup aur delivery ki wazeh tasdeeq"
-audience: pos
+title: "Read-only reporting connection ki verification rehnumai"
+audience: all
 type: improvement
 points:
-  - "Auto-send settings mein saved setup checklist aur company ki delivered/read evidence nazar aati hai."
-  - "Unreadable saved token par auto-send ON nahi hota; OFF karna mumkin rehta hai."
-  - "Sent provider acceptance hai; customer delivery ki tasdeeq alag dikhai jati hai."
+  - "Owner reporting connections par successful report-read evidence dekh sakta hai."
+  - "Known billing, tax, credit notes aur payments match karne ke steps shamil hain."
+  - "Active access ko ChatGPT connection ya billing verification complete nahi kaha jata."

@@ -1779,7 +1779,7 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
   });
   const long=short.locator('[data-search-result-name]');
   const longMetrics=await long.evaluate(el=>({clipped:el.scrollWidth>el.clientWidth+1,ellipsis:getComputedStyle(el).textOverflow==='ellipsis'}));
-  if(longMetrics.clipped||longMetrics.ellipsis)throw new Error('Long search name was clipped rather than wrapped');
+   if(longMetrics.clipped||longMetrics.ellipsis)throw new Error('Long search name was clipped rather than wrapped: '+JSON.stringify(longMetrics));
   await saveEvidenceScreenshot(page,'compact-search-name-price-'+v.width+'.png');
   for(const n of [13,14,15,16]) {
     const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});

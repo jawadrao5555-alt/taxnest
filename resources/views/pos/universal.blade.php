@@ -286,6 +286,8 @@
 .letter-W,.letter-X { background: linear-gradient(135deg, #818cf8, #6366f1, #4f46e5) !important; }
 .letter-Y,.letter-Z { background: linear-gradient(135deg, #a3e635, #84cc16, #65a30d) !important; }
 .cat-pill { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); white-space: nowrap; position: relative; overflow: hidden; }
+/* Alpine's selected-row :style replaces inline styles; keep wrapping in CSS. */
+.tn-sale-root [data-search-result-name] { display: block; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .cat-pill:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .cat-pill.active { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; box-shadow: 0 1px 2px rgba(0,0,0,.08); transform: scale(1.05); }
 .cart-item { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -1177,7 +1179,7 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                         <div class="min-w-0 flex items-center gap-1.5" style="flex:0 1 auto;">
-                            <span data-search-result-name style="overflow-wrap:anywhere;" class="min-w-0 text-sm font-semibold leading-snug text-gray-800 dark:text-gray-100" :style="i === highlightIndex ? 'color:white;' : ''" x-text="s.name"></span>
+                            <span data-search-result-name class="min-w-0 text-sm font-semibold leading-snug text-gray-800 dark:text-gray-100" :style="i === highlightIndex ? 'color:white;' : ''" x-text="s.name"></span>
                             @if($company->inventory_enabled)
                             <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot flex-shrink-0" :class="'stock-' + s.stockStatus"></span></template>
                             @endif

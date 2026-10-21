@@ -12,6 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 21 Oct 2026: Agent package identity advances to 1.13.21 to release
+// the already-reviewed redirect patch without overwriting immutable v1.13.20.
+// Dependency versions, edges, integrity values and source checks are unchanged.
 // Reviewed 21 Oct 2026: Vite 7.3.7 (root/mockup) and follow-redirects
 // 1.16.1 (root/Agent) address GHSA-587h-7wmj-h5pm and GHSA-q3jh-wrc6-jgq8
 // plus related advisories. Only those version, resolved and integrity fields
@@ -43,7 +46,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '5f39a9574100cf433971fdc38ebe74f5376d0cac1c0495b4012e7269b9fe55c3',
+    graph: 'b00a6afe0716e9b66815d401a38c270e9b3235738ac61de35a38c28b5d4ee730',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

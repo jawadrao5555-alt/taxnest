@@ -1,7 +1,6 @@
-title: "Read-only reporting connection ki verification rehnumai"
-audience: all
+title: "Agent security dependency ke liye nayi release version"
+audience: pos
 type: improvement
 points:
-  - "Owner reporting connections par successful report-read evidence dekh sakta hai."
-  - "Known billing, tax, credit notes aur payments match karne ke steps shamil hain."
-  - "Active access ko ChatGPT connection ya billing verification complete nahi kaha jata."
+  - "Security dependency patch ke liye Agent version 1.13.21 ki release tyari hai."
+  - "Purani release overwrite nahi hogi; build aur rollout ki tasdeeq alag required hai."

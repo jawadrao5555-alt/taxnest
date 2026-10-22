@@ -537,7 +537,10 @@
     if (info && info.available) {
       $('updateBanner').style.display = 'block';
       $('upToDateBanner').style.display = 'none';
-      if (info.downloading) {
+      if (info.recoveryPending) {
+        $('updateBtn').style.display = 'inline-block';
+        $('updateMsg').textContent = 'Pichli update mukammal nahi hui. Windows dobara shuru karke apne account mein login karein; Agent ki purani copy wapas chalane ki koshish hogi. Masla rahe to nayi copy download karke install karein.';
+      } else if (info.downloading) {
         // Auto-update in progress — no button, just progress.
         $('updateBtn').style.display = 'none';
         const pct = typeof info.progress === 'number' ? ` (${info.progress}%)` : '';

@@ -1,6 +1,6 @@
-title: "Agent ki khabar ab asaan alfaaz mein"
+title: "Agent ki adhoori update ke liye recovery"
 audience: pos
 type: improvement
 points:
-  - "Agent ki Settings mein version aur banne ki tareekh wali khabar ab asaan alfaaz mein samajh aayegi."
-  - "Is tabdeeli ke liye aap ko koi setting badalne ki zaroorat nahi."
+  - "Naye Agent mein update ke beech PC band ho jaye to aglay Windows login par purani copy wapas chalane ki koshish hogi."
+  - "Yeh hifazat naya Agent install hone ke baad milegi. Company aur printer ki saved settings badalne ki zaroorat nahi."

@@ -16,6 +16,7 @@ const { SafeStorageKeyProvider, loadOrCreateCoreKey } = require('../src/local-co
 const { canonicalJson } = require('../src/local-core/snapshot-sync');
 const { laravelJson } = require('../src/local-core/lease-chain');
 const holdFixture = require('../../tests/Fixtures/local-core-held-order.json');
+const { managedProcess, stopManagedProcess: stopElectron } = require('./helpers/managed-process');
 
 const token = 'electron-harness-token';
 // Kitchen slip that rides INSIDE order.hold — never a separate print.enqueue
@@ -60,14 +61,6 @@ function eventually(check, label, timeout) {
       setTimeout(tick, 100);
     }; tick();
   });
-}
-async function stopElectron(instance) {
-  if (!instance || instance.child.exitCode !== null || instance.child.signalCode !== null) return;
-  const exited = new Promise(resolve => instance.child.once('exit', resolve));
-  instance.child.kill('SIGTERM');
-  const graceful = await Promise.race([exited.then(() => true), new Promise(resolve => setTimeout(() => resolve(false), 5000))]);
-  if (!graceful && instance.child.exitCode === null && instance.child.signalCode === null) instance.child.kill('SIGKILL');
-  if (!graceful) await exited;
 }
 function wireSale() {
   return {
@@ -288,12 +281,13 @@ function launch(origin) {
     PRA_HARNESS_SAFE_STORAGE_PROFILE: root,
     PRA_HARNESS_SAFE_STORAGE_KEY: harnessKey,
   });
-  const options = { cwd: path.join(__dirname, '..'), env, stdio: ['ignore', 'pipe', 'pipe'] };
+  const processGroup = process.platform !== 'win32';
+  const options = { cwd: path.join(__dirname, '..'), env, detached: processGroup, stdio: ['ignore', 'pipe', 'pipe'] };
   const child = hasXvfb
     ? childProcess.spawn(command, ['-a', electron].concat(args), options)
     : childProcess.spawn(electron, args, options);
   let output = '';
-  const instance = { child, output: () => output, command: hasXvfb ? command + ' -a' : electron + ' (headless fallback)', exited: false };
+  const instance = Object.assign(managedProcess(child, processGroup), { output: () => output, command: hasXvfb ? command + ' -a' : electron + ' (headless fallback)', exited: false });
   child.stdout.on('data', b => { output += b; });
   child.stderr.on('data', b => { output += b; });
   child.once('exit', () => { instance.exited = true; });

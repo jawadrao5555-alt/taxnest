@@ -336,15 +336,16 @@ class AppUpdate extends Model
         return self::containsOperationalDetails((string) $this->title, (array) $this->points);
     }
 
-    /**
-     * Shop-facing title. Strips the CI `[deploy {sha}]` suffix so customers
-     * never see release provenance. The stored title is unchanged.
-     */
+    /** Plain display copy; the stored points and content identity stay unchanged. */
     public function customerPoints(): array
     {
         return \App\Support\CustomerFacingUpdateText::points((array) $this->points);
     }
 
+    /**
+     * Shop-facing title. Strips the CI `[deploy {sha}]` suffix so customers
+     * never see release provenance. The stored title is unchanged.
+     */
     public function customerTitle(): string
     {
         return \App\Support\CustomerFacingUpdateTitle::display((string) $this->title);

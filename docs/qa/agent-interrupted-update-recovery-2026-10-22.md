@@ -66,7 +66,7 @@ contract, syntax and whitespace pass. This host has no PHP, Chrome or Windows.
 
 New PR-only read-only Windows workflow runs the real generated recovery body
 in disposable folders (including spaces), with damaged/old/new fictional files
-and a harmless fake-agent.cmd launcher. Covers before-backup, mid-copy,
+and a harmless compiled Windows fixture executable. Covers before-backup, mid-copy,
 completed copy and missing backup; checks actual restored bytes and launcher
 probe. Registry operations are injected no-ops in that filesystem acceptance;
 registration command generation is separately tested. It never installs or
@@ -85,9 +85,11 @@ Windows workflow before calling source review-ready. All fresh results pending.
 - Recovery is on the next login of the same Windows user, not an immediate
   offline reboot service. Restricted Windows policy/filesystem permissions,
   disk failure/full disk or a lost/corrupt backup can still need manual repair.
-- Backups are intentionally retained for repair; cleanup/retention needs final
-  review before rollout to avoid accumulated disk use. Do not silently discard
-  the sole recovery copy merely to save space.
+- Completed-backup retention is now scoped to the exact install subtree: keep
+  two newest completions plus the journal-referenced copy; never remove the only
+  rollback copy. Failed/pending/unknown/unreadable/link-bearing attempts and
+  other installs remain untouched. Those exceptional copies can still require
+  manual disk review; disk exhaustion safely fails the backup before replacement.
 - No Windows release build/assets/update discovery/fleet rollout is triggered
   or proven here. Offline Agent root cause remains separate. No customer or
   production access, secret, real print, approval, merge or deploy.
@@ -95,3 +97,30 @@ Windows workflow before calling source review-ready. All fresh results pending.
 PR remains DRAFT until actual checks and stated acceptance requirements are
 reviewed. #238 is separately being prepared as next release; #236 correction
 continues; #237 HOLD remains untouched.
+
+## Fresh CI correction — 22 October
+
+Windows run39735650547/job119680583375 failed the three launch cases with EBUSY
+at cleanup, masking a sixty-second command timeout. START of the fictional .cmd
+launcher opens a persistent command shell whose CWD locks the installation;
+the real product launches an .exe. Replace only that fixture with a harmless
+C# WindowsApplication executable compiled using the existing Windows PowerShell
+Add-Type tool. It writes a probe beside itself and exits. Retain every actual
+copy/result/launch assertion, all four interruption stages, real production
+recovery script and no-op registry injection. Cleanup retries file-handle
+release briefly, still fails on error and preserves the primary test error if
+cleanup also fails. No blanket process termination or skipped Windows checks.
+Fresh Windows CI must confirm this correction; Linux cannot run it.
+
+The audit/build failure in old generic run39735650480 was not an advisory:
+registry.npmjs.org bulk audit returned HTTP503 after300seconds, followed by the
+retired fallback endpoint's HTTP400. No audit bypass/dependency change was made;
+the intentional new HEAD will get a new full locked audit, not a superseded-head
+retry. Old fullPHP/MariaDB/Chrome/Node/workflow/release lanes passed.
+
+Real disposable filesystem regressions now verify retention keeps current and
+sole rollback copies, two recent completions, all uncertain attempts, foreign
+installations and external symlink targets. Existing dependency/release identity
+and gates remain. Latest local combined focused count is26pass/fourWindows
+skipped; fresh all8plusWindows checks still required. Real Windows login/RunOnce,
+full packaged DLL replacement and physical power-loss acceptance remain gaps.

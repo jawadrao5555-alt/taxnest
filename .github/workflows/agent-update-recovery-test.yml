@@ -19,4 +19,4 @@ jobs:
       - name: Actual disposable Windows copy and recovery; no Agent, registry or release
         run: |
           node -e "if (process.platform !== 'win32') process.exit(1)"
-          node --test pra-agent/test/update-recovery.test.js pra-agent/test/update-install-result.test.js pra-agent/test/update-retry.test.js
+          node --test pra-agent/test/update-recovery.test.js pra-agent/test/update-recovery-retention.test.js pra-agent/test/update-install-result.test.js pra-agent/test/update-retry.test.js

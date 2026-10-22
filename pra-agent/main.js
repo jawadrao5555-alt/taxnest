@@ -19,6 +19,7 @@ const { validateUpdateInfo } = require('./src/release-manifest');
 const { registerPortableUninstall } = require('./src/windows-uninstall');
 const { buildUpdateHandoffScript } = require('./src/update-handoff');
 const { buildRecoveryScript, registerRecovery } = require('./src/update-recovery');
+const { pruneCompletedRecovery } = require('./src/update-recovery-retention');
 const { shouldStopHandoff, nextHandoff } = require('./src/update-retry');
 const { failedHandoff, recoveryPending } = require('./src/update-install-result');
 const { retireLegacyElectronLogin } = require('./src/windows-login-item');
@@ -283,7 +284,11 @@ async function handleAgentUpdate(info) {
     // Do not put the only rollback copy in TEMP: Windows cleanup or the next
     // download's sweep may remove it after an interrupted installation.
     const installKey = crypto.createHash('sha256').update(destDir.toLowerCase()).digest('hex').slice(0, 20);
-    const recoveryDir = path.join(app.getPath('userData'), 'update-recovery', installKey, String(Date.now()));
+    const recoveryRoot = path.join(app.getPath('userData'), 'update-recovery', installKey);
+    // This runs only after the pending-handoff guard above. Never delete a
+    // pending/failed backup or the copy referenced by the durable journal.
+    pruneCompletedRecovery(recoveryRoot, priorHandoff.recoveryPath);
+    const recoveryDir = path.join(recoveryRoot, String(Date.now()));
     fs.mkdirSync(recoveryDir, { recursive: true });
     const backupDir = path.join(recoveryDir, 'backup');
     const cmdPath = path.join(recoveryDir, 'apply-update.cmd');

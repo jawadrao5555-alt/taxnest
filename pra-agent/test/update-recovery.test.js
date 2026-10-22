@@ -81,21 +81,32 @@ test('arming recovery is awaited and a Windows policy failure is not ignored',as
   await assert.rejects(registerRecovery(paths.exePath,paths.recoveryPath,(_p,_a,_o,cb)=>cb(Error('policy denied'))),/policy denied/);
 });
 
+function makeWindowsFixtureAgent(exePath) {
+  // STARTing a .cmd file opens a persistent command shell and locks its CWD.
+  // A tiny real Windows executable models the production launch and exits.
+  const code='using System; using System.IO; public static class FixtureAgent { public static void Main() { File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "started.probe"), "started"); } }';
+  const literal=value=>"'"+value.replace(/'/g,"''")+"'";
+  const compile="$ErrorActionPreference='Stop';Add-Type -TypeDefinition "+literal(code)+
+    ' -Language CSharp -OutputAssembly '+literal(exePath)+' -OutputType WindowsApplication';
+  execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(compile,'utf16le').toString('base64')],{timeout:30000,stdio:'pipe'});
+}
+
 // Windows-only disposable filesystem acceptance: no real Agent, installer,
 // registry, restart, printer, company config or network. Registry commands are
 // injected no-ops; the generated production rollback/copy/launch body is real.
 for(const stage of ['before-backup','during-copy','completed','missing-backup']) {
  test('Windows actual recovery at '+stage,{skip:process.platform!=='win32'},async()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'taxnest recovery test-'));
+  let primaryError;
   try {
     const destDir=path.join(root,'install with spaces'),backupDir=path.join(root,'safe recovery','backup');
     fs.mkdirSync(path.join(destDir,'resources'),{recursive:true});
     fs.mkdirSync(path.join(backupDir,'resources'),{recursive:true});
-    const p={destDir,backupDir,exePath:path.join(destDir,'fake-agent.cmd'),readyPath:path.join(root,'ready'),
+    const p={destDir,backupDir,exePath:path.join(destDir,'FixtureAgent.exe'),readyPath:path.join(root,'ready'),
       resultPath:path.join(root,'result'),logPath:path.join(root,'log'),recoveryPath:path.join(root,'repair.cmd')};
-    const probe=path.join(root,'started');
-    const launch=`@echo off\r\necho started>"${probe}"\r\nexit /b 0\r\n`;
-    fs.writeFileSync(p.exePath,launch);fs.writeFileSync(path.join(backupDir,'fake-agent.cmd'),launch);
+    const probe=path.join(destDir,'started.probe');
+    makeWindowsFixtureAgent(p.exePath);
+    fs.copyFileSync(p.exePath,path.join(backupDir,'FixtureAgent.exe'));
     fs.writeFileSync(path.join(backupDir,'resources','app.asar'),'verified old app');
     fs.writeFileSync(path.join(destDir,'resources','app.asar'),stage==='during-copy'?'TRUNCATED':'completed new app');
     if(stage!=='before-backup')fs.writeFileSync(p.readyPath,'ready');
@@ -103,20 +114,26 @@ for(const stage of ['before-backup','during-copy','completed','missing-backup'])
     if(stage==='missing-backup')fs.rmSync(backupDir,{recursive:true});
     // No registry access in this fixture; verify real registration separately.
     fs.writeFileSync(p.recoveryPath,buildRecoveryScript(p,{registration:{register:'rem register fixture',unregister:'rem unregister fixture'}}));
-    let code=0;
-    try {execFileSync('cmd.exe',['/d','/v:off','/s','/c',`""${p.recoveryPath}""`],{windowsVerbatimArguments:true,timeout:60000,stdio:'pipe'});}catch(e){code=e.status;}
+    let code=0,runError;
+    try {execFileSync('cmd.exe',['/d','/v:off','/s','/c',`""${p.recoveryPath}""`],{windowsVerbatimArguments:true,timeout:60000,stdio:'pipe'});}catch(e){code=e.status;runError=e;}
     if(stage==='missing-backup') {
       assert.equal(code,1);assert.equal(fs.readFileSync(p.resultPath,'utf8').trim(),'failed_restore');
       assert.equal(fs.existsSync(probe),false);
     } else {
-      assert.equal(code,0);
+      assert.equal(code,0,'Recovery command failed: '+String(runError?.stderr||runError?.message||'')+'; log: '+(fs.existsSync(p.logPath)?fs.readFileSync(p.logPath,'utf8'):''));
       assert.equal(fs.readFileSync(p.resultPath,'utf8').trim(),stage==='during-copy'?'recovered_old_version':stage==='before-backup'?'recovered_before_copy':'installed');
       assert.equal(fs.readFileSync(path.join(destDir,'resources','app.asar'),'utf8'),stage==='during-copy'?'verified old app':'completed new app');
       for(let i=0;i<100&&!fs.existsSync(probe);i++)await new Promise(resolve=>setTimeout(resolve,50));
       assert.equal(fs.existsSync(probe),true,'the recovered fictional launcher actually ran');
       assert.equal(fs.readFileSync(path.join(backupDir,'resources','app.asar'),'utf8'),'verified old app');
     }
-  } finally {fs.rmSync(root,{recursive:true,force:true});}
+  } catch(error) { primaryError=error; }
+  try { fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:50}); }
+  catch(cleanupError) {
+    if(primaryError)throw new AggregateError([primaryError,cleanupError],'Recovery assertion and fixture cleanup both failed');
+    throw cleanupError;
+  }
+  if(primaryError)throw primaryError;
  });
 }
 

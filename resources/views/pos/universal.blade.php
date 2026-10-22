@@ -12539,10 +12539,14 @@ function restaurantPos() {
         pdFiltered(list) {
             const q = (this.pdSearch || '').trim().toLowerCase();
             if (!q) return list;
+            // Match contact numbers independently of spaces/dashes, without
+            // treating digits in a mixed customer-name query as a phone query.
+            const digits = /^[+\d\s().-]+$/.test(q) ? q.replace(/\D/g, '') : '';
             return list.filter(b => [
                 b.display_number, b.bill_token, b.invoice_number, b.customer_name, b.customer_phone,
                 b.delivery_address, b.rider_name, b.delivery_status,
-            ].some(v => v && String(v).toLowerCase().includes(q)));
+            ].some(v => v && String(v).toLowerCase().includes(q)) ||
+                (digits.length >= 3 && String(b.customer_phone || '').replace(/\D/g, '').includes(digits)));
         },
         // Prepaid ⇄ Back to Cash from the popup — reuses the SAME endpoints as
         // the Deliveries board (pos.deliveries.mark-prepaid / unmark-prepaid);

@@ -5111,7 +5111,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_days_short' => 'din',
     'rider_day_summary_title' => 'Rider Khulasa',
     'rider_day_summary_total' => 'Kul',
-    'del_search_ph' => 'Bill / customer / rider / address dhoondein…',
+    'del_search_ph' => 'Phone / bill / customer / rider / address dhoondein…',
     'del_no_match' => 'Koi milta bill nahi',
     'delivery_took_mins' => ':mins minute mein deliver hui',
     'nav_my_panel' => 'Mera Panel',

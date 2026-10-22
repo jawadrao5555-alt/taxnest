@@ -1,6 +1,6 @@
-title: "Agent ki khabar ab asaan alfaaz mein"
+title: "Delivery bill phone number se asani se dhoondein"
 audience: pos
 type: improvement
 points:
-  - "Agent ki Settings mein version aur banne ki tareekh wali khabar ab asaan alfaaz mein samajh aayegi."
-  - "Is tabdeeli ke liye aap ko koi setting badalne ki zaroorat nahi."
+  - "Phone number mein space ya dash ho, tab bhi delivery bill dhoonda ja sakta hai."
+  - "Naam, bill number, rider aur pate se talash bhi pehle ki tarah chalegi."

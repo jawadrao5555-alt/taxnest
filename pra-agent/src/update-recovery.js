@@ -57,7 +57,10 @@ function buildRecoveryScript({exePath, destDir, backupDir, readyPath, resultPath
   const ready = quote(readyPath), result = quote(resultPath), log = quote(logPath);
   return [
     '@echo off', 'setlocal DisableDelayedExpansion',
-    `findstr /x /c:"installed" ${result} >nul 2>&1`,
+    // FINDSTR /x can miss a complete marker without trailing CRLF. Compare
+    // exact trimmed content so a finished install is never rolled back merely
+    // because the final newline was not persisted.
+    `${psCommand(`try {if ([IO.File]::ReadAllText(${literal(resultPath)}).Trim() -ceq 'installed') {exit 0}} catch {};exit 1`)} >>${log} 2>&1`,
     'if not errorlevel 1 goto launch', // a completed copy must not be rolled back
     `if not exist ${ready} goto untouched`, // copy has not started; old install is intact
     // A normal login may also start the Agent. Never copy over an active

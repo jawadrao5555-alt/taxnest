@@ -56,7 +56,7 @@ remains. Other install/drive roots: refused. Other languages/configuration and
 normal download progress remain unchanged; actual settings render function is
 exercised. Legacy handoffs keep their existing policy.
 
-Local Node checks (Linux): 23 pass, four Windows-only cases skipped. Tests cover
+Local Node checks (Linux): 23 pass, five Windows-only cases skipped. Tests cover
 registration scope/encoding, awaited registration failure, safe directory
 boundaries, installer ordering, pending journal/overlap handling, outcome
 telemetry, bounded repair, real settings banner, existing PID/rollback/login
@@ -106,7 +106,7 @@ launcher opens a persistent command shell whose CWD locks the installation;
 the real product launches an .exe. Replace only that fixture with a harmless
 C# WindowsApplication executable compiled using the existing Windows PowerShell
 Add-Type tool. It writes a probe beside itself and exits. Retain every actual
-copy/result/launch assertion, all four interruption stages, real production
+copy/result/launch assertion, all original interruption stages, real production
 recovery script and no-op registry injection. Cleanup retries file-handle
 release briefly, still fails on error and preserves the primary test error if
 cleanup also fails. No blanket process termination or skipped Windows checks.
@@ -121,6 +121,16 @@ retry. Old fullPHP/MariaDB/Chrome/Node/workflow/release lanes passed.
 Real disposable filesystem regressions now verify retention keeps current and
 sole rollback copies, two recent completions, all uncertain attempts, foreign
 installations and external symlink targets. Existing dependency/release identity
-and gates remain. Latest local combined focused count is26pass/fourWindows
+and gates remain. Latest local combined focused count is27pass/fiveWindows
 skipped; fresh all8plusWindows checks still required. Real Windows login/RunOnce,
 full packaged DLL replacement and physical power-loss acceptance remain gaps.
+
+
+The corrected executable fixture exposed a real marker-parser gap in fresh
+Windows39741532558/job119699645205: before-backup/mid-copy/missing-backup and
+retention passed, but completed-without-newline read as recovered_old_version.
+Windows FINDSTR /x did not match that EOF marker. Compare exact trimmed file
+content with PowerShell instead; only installed is success, unreadable/partial
+markers still take the guarded recovery path. Retain the no-newline regression
+and add the production echo CRLF variant. Do not relax the completed-install
+assertion or claim Windows acceptance until the new exact-HEAD run passes.

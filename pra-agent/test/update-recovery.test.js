@@ -53,6 +53,15 @@ test('interrupted outcomes never claim successful installation',()=>{
   }
 });
 
+test('completed marker is compared as exact trimmed file content, including missing final newline',()=>{
+  const script=buildRecoveryScript(paths);
+  const encoded=script.split('\r\n').find(line=>line.includes('-EncodedCommand')&&decode(line.split(' >>')[0]).includes('ReadAllText'));
+  assert.ok(encoded);
+  const check=decode(encoded.split(' >>')[0]);
+  assert.ok(check.includes(paths.resultPath));assert.match(check,/Trim\(\) -ceq 'installed'/);
+  assert.ok(script.indexOf(encoded)<script.indexOf('robocopy'));
+});
+
 test('automatic recovery is bounded and retains manual repair after repeated failure',()=>{
   const script=buildRecoveryScript(paths);
   assert.match(script,/retry1/);assert.match(script,/retry2/);
@@ -94,7 +103,7 @@ function makeWindowsFixtureAgent(exePath) {
 // Windows-only disposable filesystem acceptance: no real Agent, installer,
 // registry, restart, printer, company config or network. Registry commands are
 // injected no-ops; the generated production rollback/copy/launch body is real.
-for(const stage of ['before-backup','during-copy','completed','missing-backup']) {
+for(const stage of ['before-backup','during-copy','completed','completed-crlf','missing-backup']) {
  test('Windows actual recovery at '+stage,{skip:process.platform!=='win32'},async()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'taxnest recovery test-'));
   let primaryError;
@@ -110,7 +119,7 @@ for(const stage of ['before-backup','during-copy','completed','missing-backup'])
     fs.writeFileSync(path.join(backupDir,'resources','app.asar'),'verified old app');
     fs.writeFileSync(path.join(destDir,'resources','app.asar'),stage==='during-copy'?'TRUNCATED':'completed new app');
     if(stage!=='before-backup')fs.writeFileSync(p.readyPath,'ready');
-    fs.writeFileSync(p.resultPath,stage==='completed'?'installed':'copying');
+    fs.writeFileSync(p.resultPath,stage==='completed'?'installed':stage==='completed-crlf'?'installed\r\n':'copying');
     if(stage==='missing-backup')fs.rmSync(backupDir,{recursive:true});
     // No registry access in this fixture; verify real registration separately.
     fs.writeFileSync(p.recoveryPath,buildRecoveryScript(p,{registration:{register:'rem register fixture',unregister:'rem unregister fixture'}}));

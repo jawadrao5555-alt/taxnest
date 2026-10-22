@@ -1,6 +1,6 @@
-title: "Agent security dependency ke liye nayi release version"
+title: "Agent ki khabar ab asaan alfaaz mein"
 audience: pos
 type: improvement
 points:
-  - "Security dependency patch ke liye Agent version 1.13.21 ki release tyari hai."
-  - "Purani release overwrite nahi hogi; build aur rollout ki tasdeeq alag required hai."
+  - "Agent ki Settings mein version aur banne ki tareekh wali khabar ab asaan alfaaz mein samajh aayegi."
+  - "Is tabdeeli ke liye aap ko koi setting badalne ki zaroorat nahi."

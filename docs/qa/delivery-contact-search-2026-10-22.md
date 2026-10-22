@@ -81,3 +81,29 @@ wrong phone filter or genuinely hidden old row still fails. No runtime product
 code, gates or assertions are removed. The mechanism is established from the
 handler/Alpine code; fresh real browser CI must confirm this correction rather
 than treating the suspected timing cause as customer acceptance.
+
+
+## Refresh after owner-deployed #238 — 22 October
+
+Owner handoff39742749962 bound approved PR238 HEAD565cdf51aa0ed27d25bc567be09d66e96bc712bf
+to squash7101db90b404f9950d15d97aa4cc50da588bb49f. Exact Deploy39742816381
+succeeded; job119704281151 logged live SHA/extended NestPOS markers PASS at
+07:48:40Z, and callback119704977836 returned succeeded for the same SHA/approval.
+This is Actions verification, not broad independent customer screen acceptance.
+
+Merge this deployed main into the existing #236 history. Resolve only the
+announcement conflict with this PR's unique phone-search benefit; preserve all
+#238 helper/display/read-state regressions and notification browser fixtures.
+Agent1.13.21/Electron42.11.3/lock graph7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25
+and #227 recording/output/CI contracts remain. No runtime feature changes in
+this refresh.
+
+Fresh local checks: actual-method/board/held/address22/22, Agent release and
+legacy build display9/9, tutorial2/2; release-chain, locked graphs plus negative
+fork integrity, active/proposed fail-closed CI contracts, JS syntax and whitespace
+pass. Node24.19.0; PHP and installed Chrome absent, so no new local application
+or browser acceptance. Earlier exact-HEAD run39733347959 passed all8 and actual
+contact search at1366/390; promotion run39740569434 audit hit an external npm
+HTTP503. Neither old run establishes this refreshed HEAD: require its own all8,
+actual desktop390 browser and final validate plus clean mergeability. No retry
+of the superseded head, audit bypass, approval, merge or deploy.

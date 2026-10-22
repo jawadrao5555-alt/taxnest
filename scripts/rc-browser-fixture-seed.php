@@ -349,7 +349,9 @@ foreach (['pra' => $hotel, 'fbr' => $fiscal, 'di' => $notificationDi] as $panel 
     }
     for ($i = 1; $i <= 7; $i++) {
         AppUpdate::create([
-            'title' => 'Synthetic routine '.$panel.' '.$i, 'points' => ['Reception notice'],
+            'title' => 'Synthetic routine '.$panel.' '.$i, 'points' => $i === 1
+                ? ['Reception notice', 'Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga.']
+                : ['Reception notice'],
             'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
             'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => false,
@@ -358,7 +360,8 @@ foreach (['pra' => $hotel, 'fbr' => $fiscal, 'di' => $notificationDi] as $panel 
     if ($panel === 'di') continue;
     foreach (['a', 'b'] as $receipt) {
         AppUpdate::create([
-            'title' => 'Synthetic featured '.$panel, 'points' => ['Important reception notice'],
+            'title' => 'Synthetic featured '.$panel, 'points' => ['Important reception notice',
+                'Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga.'],
             'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
             'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => true,

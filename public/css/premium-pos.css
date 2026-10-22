@@ -84,6 +84,16 @@ body[data-theme="midnight"] .tn-premium-sale .bg-gray-50 {
     outline-offset: 2px;
 }
 
+/* Keep order-type focus inside its overflow-hidden switcher. This scoped rule
+   must follow the shared premium control outline, which outranks utilities. */
+.tn-premium-sale [data-tn-order-type-switcher] button:focus-visible {
+    outline: 2px solid #000;
+    outline-offset: -2px;
+}
+.dark .tn-premium-sale [data-tn-order-type-switcher] button:focus-visible {
+    outline-color: #fff;
+}
+
 /* Product workspace: designed to enhance the current structure, not replace it. */
 .tn-premium-sale .tn-product-panel,
 .tn-premium-sale .tn-left-col {

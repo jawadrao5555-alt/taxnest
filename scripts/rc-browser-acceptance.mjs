@@ -1556,22 +1556,28 @@ async function tableOrderWorkflow(page,t,v) {
       if(m.font<14||m.minHeight<44||m.height<44||m.contrast<4.5)throw new Error('Order-type hover readability failed: '+JSON.stringify({dark,i,...m}));
     }
     await page.mouse.move(0,0);
+    // POS deliberately reserves forward Tab for its product grid. Preserve
+    // that shortcut: native backward traversal still reaches all three pills.
     await buttons.first().focus();
-    await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
-    for(let i=0;i<3;i++){
+    await buttons.last().focus();
+    for(let i=2;i>=0;i--){
       const button=buttons.nth(i);
       await button.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{}))));
       const m=await button.evaluate(metrics);
       if(!m.focused||m.outline<2||m.offset>-2||m.focusContrast<3||m.contrast<4.5)throw new Error('Order-type keyboard focus failed: '+JSON.stringify({dark,i,...m}));
-      if(i<2)await page.keyboard.press('Tab');
+      if(i>0)await page.keyboard.press('Shift+Tab');
     }
     const pressed=await buttons.evaluateAll(nodes=>nodes.map(el=>el.getAttribute('aria-pressed')));
     if(pressed.filter(x=>x==='true').length!==1||pressed.some(x=>!['true','false'].includes(x)))throw new Error('Order-type selection accessibility failed: '+JSON.stringify(pressed));
     await saveEvidenceScreenshot(page,'order-type-buttons-'+(dark?'dark':'light')+'-'+v.width+'.png');
     pass(t.name+'/'+v.width+': order-type labels, real hover, keyboard focus and selected state readable in '+(dark?'dark':'light'));
   }
-  await buttons.last().blur();
+  await buttons.first().focus();
+  await page.keyboard.press('Tab');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===true);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===false);
   await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),wasDark);
 
   for(const expected of t.tableOrderWorkflow) {

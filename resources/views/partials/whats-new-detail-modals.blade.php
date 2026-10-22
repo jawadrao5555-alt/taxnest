@@ -82,7 +82,7 @@
                          onclick="window.open(this.src, '_blank')">
                 @endif
                 <ul class="space-y-3">
-                    @foreach(($detailUpdate->points ?? []) as $detailPoint)
+                    @foreach(($detailUpdate->customerPoints() ?? []) as $detailPoint)
                         <li class="flex items-start gap-3 text-sm sm:text-base text-gray-700 dark:text-gray-200">
                             <span class="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mt-0.5">
                                 <svg class="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">

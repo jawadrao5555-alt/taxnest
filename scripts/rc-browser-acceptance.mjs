@@ -937,6 +937,12 @@ async function restaurantTopSellingWorkflow(page,t,v) {
 }
 
 async function notificationWorkflow(page, t, v, diagnostics) {
+  const plain='Agent banne ki tareekh Settings mein nazar aayegi. Purane Agent mein yeh tareekh na mile to "Build date available nahi" likha hoga.';
+  const legacy='Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga.';
+  const assertPlain=async(surface,label)=>{
+    const text=await surface.innerText();
+    if(!text.includes(plain)||text.includes(legacy))throw new Error(label+': known Agent notice is not plain customer language');
+  };
   const panel=t.notificationWorkflow, prefix=panel==='di'?'':panel==='fbr'?'/fbr-pos':'/pos';
   await page.goto(baseUrl+(panel==='di'?'/profile':prefix+'/my-profile'),{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
@@ -945,6 +951,8 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   const modal=page.locator('[data-wn-featured="1"]:visible');
   await modal.waitFor({state:'visible',timeout:15000});
   if(await modal.count()!==1)throw new Error('duplicate featured receipts rendered multiple popups');
+  await assertPlain(modal,'Featured notice');
+  await saveEvidenceScreenshot(page,'plain-featured-'+panel+'-'+v.width);
   const dismissButton=modal.locator('button').last();
   const endpoint='**'+prefix+'/whats-new/seen';
   let injectedFailures=0;
@@ -981,6 +989,7 @@ async function notificationWorkflow(page, t, v, diagnostics) {
     await page.locator('[data-tn-topnav-control="notification"]').first().click();
     const bell=page.locator('[x-show="bellOpen"]:visible').first();
     await bell.waitFor({state:'visible',timeout:5000});
+    await assertPlain(bell,'Bell history');
     const text=await bell.innerText();
     for(let i=1;i<=7;i++)if(!text.includes('Synthetic routine '+panel+' '+i))throw new Error('routine bell history disappeared after refresh');
     if(panel!=='di'&&(text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
@@ -1003,6 +1012,8 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   if(!detailAck.ok()||!(await detailAck.json()).ok)throw new Error('opening detail did not persist read status');
   const detail=page.locator('[data-whats-new-detail-id]:visible');
   await detail.waitFor({state:'visible'});
+  await assertPlain(detail,'Notice detail');
+  await saveEvidenceScreenshot(page,'plain-detail-'+panel+'-'+v.width);
   await page.waitForFunction(expected=>[...document.querySelectorAll('[data-tn-topnav-control="notification"] [x-text="unseen"]')].some(x=>Number(x.textContent.trim())===expected),before-1);
   await detail.getByRole('button',{name:'Close',exact:true}).click();
   await notificationButton.click();

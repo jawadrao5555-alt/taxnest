@@ -134,3 +134,30 @@ content with PowerShell instead; only installed is success, unreadable/partial
 markers still take the guarded recovery path. Retain the no-newline regression
 and add the production echo CRLF variant. Do not relax the completed-install
 assertion or claim Windows acceptance until the new exact-HEAD run passes.
+
+
+## Refresh after owner-deployed #238 — 22 October
+
+Verified owner handoff39742749962 and exact Deploy39742816381 for
+7101db90b404f9950d15d97aa4cc50da588bb49f: live SHA/extended NestPOS markers
+PASS in job119704281151 at07:48:40Z; callback119704977836 returned succeeded.
+Merge that deployed main into this existing draft without changing recovery
+runtime behavior. Resolve only the announcement conflict with this PR's unique
+recovery benefit. Preserve #238 display helper, immutable notice/read-state
+behavior and actual notification browser regressions, plus #227 tutorial/CI
+contracts. Agent1.13.22, Electron42.11.3 and reviewed graph
+4d7ee4ae41ce6ca650d026c98a09aea935629bc3c3f746903dbe31972122b1c5 remain.
+
+Fresh local focused checks:27pass/five Windows-only skips, including actual
+settings renderer, recovery registration/result/path policy, legacy PID/login,
+retention filesystem isolation, pinned identity and legacy build display.
+Release-chain/locked graphs/negative-integrity/CI contracts/JS/whitespace pass.
+Node24.19.0; PHP, installed Chrome and native Windows absent. Previous exact
+cbcf41fe Windows39742081559/job119701503827 passed20/20, no skips; that result
+is historical after this merge. Require fresh own all8 plus actual disposable
+Windows workflow on the new HEAD. Keep DRAFT: real Windows login/RunOnce,
+concurrent startup, full packaged DLL replacement, physical power loss and
+first legacy upgrade remain separate unverified acceptance; no universal
+recovery/fleet claim. Failed exceptional backup disk review still applies.
+No production/release workflow, real Agent/registry/login/reboot/print or owner
+approval/merge/deploy performed.

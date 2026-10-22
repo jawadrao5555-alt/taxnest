@@ -12,6 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 22 Oct 2026: interrupted-update recovery is Agent 1.13.22; only
+// root/top release identity changes from deployed 1.13.21. All dependency
+// entries, edges, integrities and Electron 42.11.3 remain identical.
 // Reviewed 22 Oct 2026: pin Electron/package/build runtime 42.11.3 for
 // GHSA-fw47-9c62-h3vw. Only the root Electron spec and Electron package entry
 // change; all other locked entries, counts and local-fork hashes stay pinned.
@@ -49,7 +52,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25',
+    graph: '4d7ee4ae41ce6ca650d026c98a09aea935629bc3c3f746903dbe31972122b1c5',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

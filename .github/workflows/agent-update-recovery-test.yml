@@ -1,0 +1,22 @@
+name: Agent update recovery (Windows disposable)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'pra-agent/**'
+      - '.github/workflows/agent-update-recovery-test.yml'
+permissions:
+  contents: read
+jobs:
+  interrupted-update-recovery:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - name: Actual disposable Windows copy and recovery; no Agent, registry or release
+        run: |
+          node -e "if (process.platform !== 'win32') process.exit(1)"
+          node --test pra-agent/test/update-recovery.test.js pra-agent/test/update-install-result.test.js pra-agent/test/update-retry.test.js

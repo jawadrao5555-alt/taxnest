@@ -1,6 +1,6 @@
-title: "Agent security dependency ke liye nayi release version"
+title: "Agent ki adhoori update ke liye recovery"
 audience: pos
 type: improvement
 points:
-  - "Security dependency patch ke liye Agent version 1.13.21 ki release tyari hai."
-  - "Purani release overwrite nahi hogi; build aur rollout ki tasdeeq alag required hai."
+  - "Naye Agent mein update ke beech PC band ho jaye to aglay Windows login par purani copy wapas chalane ki koshish hogi."
+  - "Yeh hifazat naya Agent install hone ke baad milegi. Company aur printer ki saved settings badalne ki zaroorat nahi."

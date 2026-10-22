@@ -335,6 +335,14 @@ jobs:
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
+      - name: Install patched Electron runtime for real BrowserWindow acceptance
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libatk-bridge2.0-0
+          node pra-agent/node_modules/electron/install.js
+      - name: Exercise real Electron offline reconnect and encrypted persistence
+        timeout-minutes: 8
+        run: bash scripts/rc-safe-run -- node pra-agent/test/local-core-internet-cut.test.js
       - name: Check isolated tutorial recording paths
         run: bash scripts/rc-safe-run -- node --test scripts/tests/tutorial-recording.test.mjs
       - name: Check Android beta artifact inventory

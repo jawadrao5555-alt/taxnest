@@ -12,6 +12,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 22 Oct 2026: pin Electron/package/build runtime 42.11.3 for
+// GHSA-fw47-9c62-h3vw. Only the root Electron spec and Electron package entry
+// change; all other locked entries, counts and local-fork hashes stay pinned.
+// Reviewed 21 Oct 2026: Agent package identity advances to 1.13.21 to release
+// the already-reviewed redirect patch without overwriting immutable v1.13.20.
+// Dependency versions, edges, integrity values and source checks are unchanged.
 // Reviewed 21 Oct 2026: Vite 7.3.7 (root/mockup) and follow-redirects
 // 1.16.1 (root/Agent) address GHSA-587h-7wmj-h5pm and GHSA-q3jh-wrc6-jgq8
 // plus related advisories. Only those version, resolved and integrity fields
@@ -43,7 +49,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '5f39a9574100cf433971fdc38ebe74f5376d0cac1c0495b4012e7269b9fe55c3',
+    graph: '7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

@@ -83,3 +83,12 @@ Cloud Agents may run `scripts/cloud-live-ops-request.sh` (diagnose) and
 `scripts/cloud-live-ops-remediate-request.sh` (propose / request
 approve+execute). Trusted runners hold secrets. Diagnosis never equals approval.
 Owner phrase: `OWNER_APPROVES_LIVE_OPS_FIX`.
+
+## Customer notification language
+
+Use ordinary shop-owner language in every customer announcement: what changed,
+where to find it, and any action they need to take. Avoid internal terms such as
+metadata, packaging, SHA, CI, callback or workflow. Keep implementation details
+in PR/QA documentation. Do not promise a release, rollout or fix without its
+actual acceptance evidence. Preserve notification targeting and read state when
+correcting wording.

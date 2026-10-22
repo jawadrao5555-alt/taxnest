@@ -56,4 +56,28 @@ class AppUpdateCustomerPrivacyTest extends TestCase
         );
         $this->assertSame('', CustomerFacingUpdateTitle::display(null));
     }
+
+    public function test_legacy_build_date_notice_is_plain_without_rewriting_history_or_identity(): void
+    {
+        $old = 'Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga.';
+        $update = new AppUpdate(['id' => 12, 'title' => 'Desktop Agent par actual version aur build date', 'points' => [$old, 'Saved company, device aur printer settings barqarar rahengi.']]);
+        $update->syncOriginal();
+        $identity = $update->contentKey();
+        $display = $update->customerPoints();
+        $this->assertStringNotContainsString('metadata', $display[0]);
+        $this->assertStringNotContainsString('packaging', $display[0]);
+        $this->assertStringContainsString('Settings', $display[0]);
+        $this->assertStringContainsString('Build date available nahi', $display[0]);
+        $this->assertSame($old, $update->points[0]);
+        $this->assertSame($identity, $update->contentKey());
+        $this->assertSame($update->points[1], $display[1]);
+        $this->assertFalse($update->isDirty());
+    }
+
+    public function test_other_languages_and_unrelated_notice_points_are_not_rewritten(): void
+    {
+        $points = ['آپ کی پرنٹر سیٹنگ محفوظ ہے۔', 'Your saved printer stays selected.'];
+        $this->assertSame($points, \App\Support\CustomerFacingUpdateText::points($points));
+        $this->assertSame([], \App\Support\CustomerFacingUpdateText::points([]));
+    }
 }

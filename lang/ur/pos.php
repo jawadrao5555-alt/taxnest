@@ -5109,7 +5109,7 @@ return [
     'rt_days_short' => 'دن',
     'rider_day_summary_title' => 'رائیڈر خلاصہ',
     'rider_day_summary_total' => 'کُل',
-    'del_search_ph' => 'بل / گاہک / رائیڈر / پتہ تلاش کریں…',
+    'del_search_ph' => 'فون / بل / گاہک / رائیڈر / پتہ تلاش کریں…',
     'del_no_match' => 'کوئی ملتا جلتا بل نہیں',
     'delivery_took_mins' => ':mins منٹ میں ڈیلیور ہوئی',
     'nav_my_panel' => 'میرا پینل',

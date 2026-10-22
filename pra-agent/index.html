@@ -228,7 +228,9 @@
     </p>
     <div class="btn-row" style="margin-bottom:14px;">
       <button id="openPosBtn" class="btn btn-primary">🖥️ Open POS Screen</button>
+      <button id="openPosBrowserBtn" class="btn btn-secondary">Browser mein POS kholein</button>
     </div>
+    <p id="posLaunchStatus" role="status" aria-live="polite" style="font-size:13px;color:#fff;line-height:1.5;margin-bottom:12px;"></p>
     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:8px; font-size:13px; color:#fff;">
       <input type="checkbox" id="posStartup" style="width:auto; margin:0;">
       Open POS screen automatically when this PC starts
@@ -312,6 +314,7 @@
 </div>
 
 <script src="src/build-info-view.js"></script>
+<script src="src/pos-launch-ui.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
 
@@ -658,7 +661,7 @@
   $('posStartup').addEventListener('change', savePosSettings);
   $('posKiosk').addEventListener('change', savePosSettings);
   $('posOffline').addEventListener('change', savePosSettings);
-  $('openPosBtn').addEventListener('click', () => window.agentAPI.openPosWindow());
+  window.TnPosLaunch.bindPosLaunch($('openPosBtn'), $('openPosBrowserBtn'), $('posLaunchStatus'), window.agentAPI);
   loadPosSettings();
 
   // ─── LAN Mode (shop's own local server) ───

@@ -1843,10 +1843,16 @@ async function riderRealtimeWorkflow(page,t,v) {
     const root=document.querySelector('[x-data^="riderTracking("]');
     return root&&window.Alpine?.$data(root)?.markers?.[id];
   },t.riderRealtime.id);
+  // Each fictional upload starts a real duty session; long suites may cross
+  // the nightly cutoff after seeding. Keep production auto-off enforcement.
+  const duty=await page.request.post(baseUrl+'/api/rider-app/v1/duty',{
+    headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{on:true}});
+  if(!duty.ok()||!(await duty.json()).duty)throw new Error('Synthetic rider duty start failed: HTTP '+duty.status());
   const at=Date.now(),lat=v.width===390?31.522:31.521,lng=74.322;
   const response=await page.request.post(baseUrl+'/api/rider-app/v1/locations',{
     headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{points:[{lat,lng,acc:8,at}]}});
-  if(!response.ok()||!(await response.json()).acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged');
+  const uploaded=await response.json();
+  if(!response.ok()||!uploaded.acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged: HTTP '+response.status()+' '+JSON.stringify(uploaded));
   await page.waitForFunction(({id,lat,lng})=>{
     const d=window.Alpine.$data(document.querySelector('[x-data^="riderTracking("]'));
     const m=d.markers[id]?.getLatLng();return m&&Math.abs(m.lat-lat)<.000001&&Math.abs(m.lng-lng)<.000001;

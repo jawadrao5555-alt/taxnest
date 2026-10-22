@@ -1,6 +1,6 @@
-title: "Delivery bill phone number se asani se dhoondein"
+title: "Dashboard par khabar araam se parhein"
 audience: pos
 type: improvement
 points:
-  - "Phone number mein space ya dash ho, tab bhi delivery bill dhoonda ja sakta hai."
-  - "Naam, bill number, rider aur pate se talash bhi pehle ki tarah chalegi."
+  - "Dashboard par khabar khol kar parhte waqt woh khud se band nahi hogi."
+  - "Khabar band karne ke baad dashboard pehle ki tarah taza hota rahega."

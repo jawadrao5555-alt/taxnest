@@ -1573,11 +1573,32 @@ async function tableOrderWorkflow(page,t,v) {
     await saveEvidenceScreenshot(page,'order-type-buttons-'+(dark?'dark':'light')+'-'+v.width+'.png');
     pass(t.name+'/'+v.width+': order-type labels, real hover, keyboard focus and selected state readable in '+(dark?'dark':'light'));
   }
-  await buttons.first().focus();
-  await page.keyboard.press('Tab');
-  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===true);
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===false);
+  // This fictional table-order company can have no menu products. enterGridMode
+  // correctly refuses an empty list: explicitly supply a temporary in-memory deal
+  // before asserting its non-empty Tab branch, then restore the original catalog.
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    window.__tnOrderTypeTabFixture={deals:d.allDeals,query:d.searchQuery,showProducts:d.showProducts};
+    d.allDeals=[...d.allDeals,{id:999999991,type:'deal',name:'QA Order Type Tab Probe',price:100,show_on_sale:true}];
+    d.showProducts=true; // temporary UI state only; do not call a preference-saving toggle
+  });
+  try {
+    await root.locator('[x-ref="searchInput"]').fill('QA Order Type Tab Probe');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).displayItems.some(i=>i.name==='QA Order Type Tab Probe'),null,{timeout:5000});
+    await root.locator('.prod-card').filter({hasText:'QA Order Type Tab Probe'}).waitFor({state:'visible',timeout:5000});
+    await buttons.first().focus();
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===true);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===false);
+    pass(t.name+'/'+v.width+': existing Tab enters a non-empty product grid and Escape returns');
+  } finally {
+    await page.evaluate(()=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]')),saved=window.__tnOrderTypeTabFixture;
+      d.allDeals=saved.deals;d.searchQuery=saved.query;d.showProducts=saved.showProducts;d.filterProducts();
+      delete window.__tnOrderTypeTabFixture;
+    });
+  }
   await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),wasDark);
 
   for(const expected of t.tableOrderWorkflow) {

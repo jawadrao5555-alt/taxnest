@@ -1,5 +1,36 @@
-# Readable order-type controls
+# Readable order-type controls — refreshed 22 October 2026
 
-Owner source: 4ba007ac-34ea-4d27-8e20-6058ba6dcacc.mov. The restaurant order-type buttons use 12px labels and faint inactive gray text. Increase labels to 14px, minimum control height to 44px, and inactive text to gray-800 / dark gray-200. Add a visible keyboard focus outline and aria-pressed selection state. Preserve all handlers, feature gates, table picker, selected table/waiter badges and saved appearance settings.
+Owner source: `4ba007ac-34ea-4d27-8e20-6058ba6dcacc.mov`. Dine In / Takeaway / Delivery labels were small and faint. This existing PR increases labels from 12 to 14 CSS pixels, sets a 44 CSS-pixel minimum height, and darkens inactive text. No order handler, feature gate, saved appearance setting, tenant query, fiscal calculation or printer behavior changes.
 
-Compatibility: selected/unselected, light/dark, desktop/390px, Dine In picker and existing Takeaway/Delivery transitions. The existing real Chrome table-order acceptance now checks computed font/minimum height and actual text/background contrast >=4.5:1 in both modes, captures screenshots, then continues its real table-order workflow. JS syntax/whitespace pass locally. Supported PHP 8.4/local application/browser sockets unavailable; visual/full acceptance remains pending CI, not independently live verified. No arbitrary Tailwind dimensions introduced; no functional keyboard changes. The misleading F2 hint is a separate issue.
+## Prerequisite and baseline
+
+Owner-approved #240 HEAD `233d85cf2c57e49464bf696ad352e23bab3e29ea` was squash-merged as `db5ab4c75b149229dfe4e8efd6aefed6801e005f`. Owner handoff run39806479305/job119920952468 binds the approved PR/head to that squash and exact Deploy39806568026. Deploy job119921620336 logged `CI LIVE VERIFY: PASS` for matching SHA and extended NestPOS markers at2026-10-22T15:40:23Z. Callback119922882116 returned succeeded for the same SHA/approvalc2ff1067-8635-4385-9a93-9cd7c9034189. This is Actions proof, not independent customer production screen acceptance. No production action by this agent.
+
+Refresh history-preservingly merges this deployed main into the existing PR branch. Preserve #240 caller/Delivery/address/cart safeguards and tests; #239 dashboard reading/in-flight refresh; #238 ordinary notice identity/audience/read state; #236 formatted-phone/current-old/company-scoped search; #235 Agent1.13.21/Electron42.11.3/package-lock/build/pinned identity/graph7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25; immutable release tags and #227 tutorial/output/CI contracts. Unique ordinary customer announcement added. No unrelated draft changes or Agent1.13.22 copied from #256.
+
+## Reproduction and correction
+
+Fresh inspection of the actual deployed Blade switcher confirmed `text-xs` (compiled Tailwind .75rem), no44px minimum, and gray500/gray400 inactive text. This establishes the source size problem, not a fresh rendered-browser reproduction. The old inactive palette alone measures4.63:1 in light and5.78:1 in dark at rest; do not misreport those as failing4.5:1.
+
+Review also found the previous draft's dark inactive hover applied light gray100 behind gray200 text (calculated1.13:1). Add dark:hover:bg-gray700 (8.33:1). Its external focus outline was clipped by the retained overflow-hidden switcher; move the2px outline inside the button with black in light/white in dark. Selected purple600 focus contrast is3.90:1/5.38:1 respectively. Palette ratios and generated CSS are source checks, not browser acceptance.
+
+## Compatibility and actual browser coverage
+
+Use the existing real rendered table-order journey at1366/390. Preserve all original address, unsaved-caller, table claim, payment-enabled, KOT deletion and cashier-handoff assertions. The added checks use actual pointer hover for each button in both modes, wait for real CSS transitions, measure computed font/minimum/target height and text contrast>=4.5:1; traverse buttons with real Tab/Shift+Tab and verify focus-visible/inset outline>=2px with contrast>=3:1. Verify exactly one aria-pressed state and Dine In selection after each actual table claim. Capture light/dark desktop/mobile screenshots and restore the previous appearance mode. No arbitrary Tailwind dimensions or changed keyboard bindings. F2's misleading hint is a separate PR.
+
+## Local commands and results
+
+Node24.19.0. Native PHP8.4/installed Chrome absent. A fresh Playwright headless Chromium download failed as a truncated/non-ZIP response, so full local application/browser acceptance was not run. Existing root parser/Tailwind dependencies reused solely for checks; no dependency/lock changes. Actual supported acceptance remains required in fresh disposable GitHub CI.
+
+- `node --test scripts/tests/caller-order-type.test.mjs scripts/tests/dashboard-notice-reading.test.mjs scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs scripts/tests/delivery-phone-search.test.mjs scripts/tests/delivery-address-state.test.mjs scripts/tests/tutorial-recording.test.mjs pra-agent/test/build-info.test.js`:48/48pass.
+- `node --test pra-agent/test/build-info.test.js pra-agent/test/release-manifest.test.js`:9/9pass (4 build-info overlap,53 unique passing regressions total).
+- `bash scripts/tests/agent-release-chain-check.sh`:allpass.
+- `bash scripts/tests/npm-lock-portability-test.sh`:all five reviewed graphs and private-source/local-fork negative probes pass; Agent graph7160... unchanged.
+- `bash scripts/tests/rc-ci-gates-check.sh`:active/proposed mandatory DAG/container/runtime contracts pass.
+- `node node_modules/tailwindcss/lib/cli.js -i resources/css/app.css -o /tmp/taxnest-buttons241.css --minify`:compiled; confirms standard14px/inset-focus utilities. Browserslist warns existing caniuse data is old; no dependency update attempted.
+- `node --check scripts/rc-browser-acceptance.mjs` and `git diff --check`:pass.
+- An extra initial build-downloader compatibility test could not resolve absent local app-builder-lib. This is an unrun optional local builder test, not a green result or evidence against runtime; full locked Agent/build verification remains mandatory in CI. No audit/platform/test weakened to hide it.
+
+## Acceptance boundary
+
+Keep draft until ALL EIGHT fresh exact-HEAD mandatory checks, actual light/dark1366/390 original journey and clean mergeability. After promotion require any new same-HEAD run's own8 including validate. Old39671297518six non-audit successes and shared old Electron audit failure are historical, not readiness proof. Update the PR body with exact published HEAD/tree and actual fresh results. No actual customer screen, real telephony, Windows installation, physical print or independent live UI acceptance claimed. Stop for fresh owner approval; no agent merge/deploy. #237 HOLD; #256 has no owner HOLD but separate Windows acceptance gaps.

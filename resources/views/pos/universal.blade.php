@@ -1009,14 +1009,14 @@ window.addEventListener('popstate', function() {
                  Teal count chip = waiter orders waiting in the picker (Table-se-Bill
                  badge — top Table button ke saath yahan shift hua; INLINE chip,
                  absolute nahi — parent div overflow-hidden badge kaat deta). --}}
-            <button data-video="counter-dine-in" @click="setOrderType('dine_in')" :aria-pressed="orderType === 'dine_in'" style="min-height:44px;" class="flex items-center gap-1 px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100'">
+            <button data-video="counter-dine-in" @click="setOrderType('dine_in')" :aria-pressed="orderType === 'dine_in'" style="min-height:44px;" class="flex items-center gap-1 px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black dark:focus-visible:outline-white" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'">
                 <span x-text="selectedTable ? window.TXT.dine_in_t_prefix + selectedTable.table_number : window.TXT.dine_in"></span>
                 <span x-show="incomingOrders.length > 0" x-cloak class="min-w-[16px] h-[16px] px-1 bg-teal-600 text-white text-[9px] rounded-full inline-flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
             </button>
             @endif
-            <button @click="setOrderType('takeaway')" :aria-pressed="orderType === 'takeaway'" style="min-height:44px;" class="px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100'">{{ __('pos.takeaway') }}</button>
+            <button @click="setOrderType('takeaway')" :aria-pressed="orderType === 'takeaway'" style="min-height:44px;" class="px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black dark:focus-visible:outline-white border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'">{{ __('pos.takeaway') }}</button>
             @if($features->delivery)
-            <button @click="setOrderType('delivery')" :aria-pressed="orderType === 'delivery'" style="min-height:44px;" class="px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100'">{{ __('pos.delivery') }}</button>
+            <button @click="setOrderType('delivery')" :aria-pressed="orderType === 'delivery'" style="min-height:44px;" class="px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black dark:focus-visible:outline-white" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'">{{ __('pos.delivery') }}</button>
             @endif
             <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>
@@ -12539,10 +12539,14 @@ function restaurantPos() {
         pdFiltered(list) {
             const q = (this.pdSearch || '').trim().toLowerCase();
             if (!q) return list;
+            // Match contact numbers independently of spaces/dashes, without
+            // treating digits in a mixed customer-name query as a phone query.
+            const digits = /^[+\d\s().-]+$/.test(q) ? q.replace(/\D/g, '') : '';
             return list.filter(b => [
                 b.display_number, b.bill_token, b.invoice_number, b.customer_name, b.customer_phone,
                 b.delivery_address, b.rider_name, b.delivery_status,
-            ].some(v => v && String(v).toLowerCase().includes(q)));
+            ].some(v => v && String(v).toLowerCase().includes(q)) ||
+                (digits.length >= 3 && String(b.customer_phone || '').replace(/\D/g, '').includes(digits)));
         },
         // Prepaid ⇄ Back to Cash from the popup — reuses the SAME endpoints as
         // the Deliveries board (pos.deliveries.mark-prepaid / unmark-prepaid);
@@ -14094,18 +14098,18 @@ function restaurantPos() {
             const phone = (m && m.phone) || ev.phone || '';
             if (m && m.customer_id) {
                 this.selectCustomerWithStats({ id: m.customer_id, name: name, phone: phone, address: m.address || '' });
-                // v2: delivery jump — caller = delivery order 9 times out of 10.
-                // Only when this shop actually HAS the Delivery type; setOrderType
-                // itself pulls the customer's saved addresses for the prefill.
-                if (this.guidedOrderTypes().includes('delivery') && this.orderType !== 'delivery') {
-                    this.setOrderType('delivery');
-                }
             } else {
                 // No saved customer — attach name/phone to the bill as-is (walk-in
                 // with phone); cashier can save the customer from the picker later.
                 this.selectedCustomer = { id: null, name: name || phone, phone: phone };
                 this.customerPhoneQuery = (name ? name : '') + (name && phone ? ' · ' : '') + (phone || '');
                 this.showToast(window.TXT.customer_prefix + (name || phone), 'success');
+            }
+            // Explicit Bill/attach action follows the same policy for saved and
+            // unsaved callers. A passive incoming ring never changes the cart.
+            // Keep feature gating and the existing setOrderType transition.
+            if (this.guidedOrderTypes().includes('delivery') && this.orderType !== 'delivery') {
+                this.setOrderType('delivery');
             }
         },
         // ── Task 1381: POS se hi call back ──────────────────────────────────

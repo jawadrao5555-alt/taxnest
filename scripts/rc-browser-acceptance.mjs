@@ -1276,6 +1276,10 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   for(const query of ['03001234567','0300 123-4567','1234567']) {
     await search.fill(query);
     await page.waitForFunction(()=>document.querySelector('#del-count')?.textContent==='1');
+    // The board input updates the count synchronously, but its existing
+    // CustomEvent opens the old list on Alpine's next DOM tick. Wait for that
+    // real row to be visible; a genuinely broken filter/expansion still fails.
+    await old.filter({hasText:'Synthetic Contact Old'}).waitFor({state:'visible',timeout:5000});
     if(!await current.filter({hasText:'Synthetic Contact A'}).isVisible()
       ||await current.filter({hasText:'Synthetic Contact B'}).isVisible()
       ||!await old.filter({hasText:'Synthetic Contact Old'}).isVisible())

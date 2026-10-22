@@ -63,3 +63,21 @@ Windows build 39726967316 and published v1.13.21 assets succeeded; installed
 Windows update discovery/fleet acceptance and Offline Agent root cause remain
 separate. No production/customer access, physical print, approval, merge or
 deployment was performed by this agent. #237 remains HOLD; other drafts untouched.
+
+## Fresh browser failure follow-up
+
+Run 39729547432 on HEAD 6156862e4a8ea625c1efdf61da2b55d1d518e792
+passed all six non-browser mandatory lanes, including audit/build, full PHP,
+MariaDB and real Electron. Browser job 119661195622 failed the first desktop
+phone-filter current/old visibility assertion. It had already confirmed the
+real API's three authorized bills, two current rows, one old row and filtered
+current count one. The board handler changes the count synchronously and
+opens the old section via the existing tn-open-olddel Alpine event. The test
+checked old-row visibility before waiting for that DOM expansion.
+
+Wait up to five seconds for the actual matching old row to become visible,
+then retain every existing current/old/filter assertion. A missing event,
+wrong phone filter or genuinely hidden old row still fails. No runtime product
+code, gates or assertions are removed. The mechanism is established from the
+handler/Alpine code; fresh real browser CI must confirm this correction rather
+than treating the suspected timing cause as customer acceptance.

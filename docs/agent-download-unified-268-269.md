@@ -43,8 +43,12 @@ retain the existing printing-only default. Local Core/tenant data are not reset.
 - New Laravel Feature tests cover actual controller routes, first-run key/hash,
   nonce replay/expiry, changed tenant/login, role/guard denial, rotation/disable,
   existing explicit routing, plan locking/grandfathering and shared download
-  version/digest headers. PHP8.4/application execution must pass in fresh CI;
-  local PHP8.3 was used for syntax only, without weakening platform requirements.
+  version/digest headers. Supported local PHP8.4.27 with locked Composer dependencies
+  passed 48 tests / 290 assertions across DesktopAgentPairing, AgentReleaseAvailability,
+  AgentReleaseManifest and FbrAgentAndFeatureToggles. No platform requirement was lowered.
+  Initial plan-lock fixture lacked the subscriptions table and exercised the existing
+  schema-lag fallback; adding an empty real table fixed that fixture without changing
+  application behavior or assertions. Forged-nonce and restricted-manager cases also pass.
 - Existing release availability regressions add no-cache headers and expired
   inventory/invalid newer release checks. Full supported 1366/390 browser,
   PHP8.4/MariaDB, Node22 real Electron and all eight gates remain mandatory.

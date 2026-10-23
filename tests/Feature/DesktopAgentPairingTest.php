@@ -24,7 +24,11 @@ class DesktopAgentPairingTest extends TestCase
         });
         Schema::create('users', function(Blueprint $t) {
             $t->id();$t->string('name');$t->unsignedBigInteger('company_id');$t->string('role');
-            $t->string('pos_role');$t->boolean('is_active')->default(true);$t->timestamps();
+            $t->string('pos_role');$t->text('pos_custom_access')->nullable();$t->boolean('is_active')->default(true);$t->timestamps();
+        });
+        Schema::create('subscriptions', function(Blueprint $t) {
+            $t->id();$t->unsignedBigInteger('company_id');$t->boolean('active')->default(true);
+            $t->unsignedBigInteger('pricing_plan_id')->nullable();$t->timestamps();
         });
         // Controller security is tested directly through the actual declared HTTP
         // routes; unrelated panel layout/branch bootstrap is covered by existing tests.
@@ -130,6 +134,19 @@ class DesktopAgentPairingTest extends TestCase
                 $this->assertStringContainsString('no-store',$r->headers->get('Cache-Control'));
             }
         }
+    }
+
+    public function test_forged_confirmation_never_creates_credentials(): void
+    {
+        $a=$this->owner();$this->actingAs($a,'pos');$this->getJson($this->path())->assertOk();
+        $this->postJson($this->path(),['nonce'=>str_repeat('x',64),'company_id'=>41])->assertStatus(409);
+        $this->assertNull(Company::find(41)->agent_api_key);
+    }
+    public function test_manager_custom_access_restriction_is_preserved(): void
+    {
+        $a=$this->owner();$a->forceFill(['role'=>'pos_user','pos_role'=>'pos_manager','pos_custom_access'=>[]])->save();
+        $this->actingAs($a,'pos')->getJson($this->path())->assertForbidden();
+        $this->assertNull(Company::find(41)->agent_api_key);
     }
 
 }

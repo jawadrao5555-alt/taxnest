@@ -1,6 +1,6 @@
-title: "Naye caller ka delivery bill asani se banayein"
+title: "Bill ke lafzon ka font aur size apni pasand se rakhein"
 audience: pos
 type: improvement
 points:
-  - "Caller ID mein naye number par Bill dabane se Delivery select ho jayegi, agar aapki dukan mein Delivery chalu hai."
-  - "Sirf call aane se bill ki qisam nahi badlegi. Cart mein mojood cheezein bhi barqarar rahengi."
+  - "Receipt Settings mein font, cheezon ke lafzon ka size aur naam ke liye zyada jagah chun sakte hain."
+  - "Nayi choice save karne tak aapke mojooda bills ki shakal nahi badlegi. Cheezon ke poore naam aur amounts barqarar rahengi."

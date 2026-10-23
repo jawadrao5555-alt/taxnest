@@ -28,9 +28,10 @@
 
     <div class="p-4 sm:p-5 bg-gray-100 dark:bg-gray-800 flex justify-center">
         <div class="shadow-lg tn-rcpt-prev" :class="thBold() ? 'tn-prev-bold' : ''"
-             :style="'width:' + (paper === '58mm' ? '219px' : '302px') + ';font-size:' + (paper === '58mm' ? '11px' : '12px')"
+             data-tn-typography-preview :style="'width:' + (paper === '58mm' ? '219px' : '302px') + ';font-size:' + (paper === '58mm' ? '11px' : '12px')"
              style="background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;padding:12px 10px;line-height:1.35;word-wrap:break-word;font-weight:500;">
 
+            <style x-text="typographyPreviewCss()"></style>
             {{-- ── Header: logo + business name (theme-driven layout) ── --}}
             <div x-show="showLogoNow() && thLogo() === 'center'" style="text-align:center;padding-top:2px;">
                 @if($tnLogoUri)
@@ -92,7 +93,7 @@
             </table>
 
             {{-- ── Items ── --}}
-            <table style="width:100%;border-collapse:collapse;margin:4px 0;table-layout:fixed;">
+            <table class="tn-preview-items" style="width:100%;border-collapse:collapse;margin:4px 0;table-layout:fixed;">
                 <tr>
                     <td style="width:44%;font-size:10px;font-weight:bold;text-transform:uppercase;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:3px 1px;">Item</td>
                     <td style="width:12%;font-size:10px;font-weight:bold;text-transform:uppercase;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:3px 1px;text-align:center;">Qty</td>
@@ -186,6 +187,7 @@ if (!window.rcptThemePicker) {
         return {
             tab: 'pra',
             theme: cfg.theme,
+            typography: Object.assign({font_family:'legacy',item_text:'legacy',wide_names:false},cfg.typography||{}),
             paper: cfg.paper || '80mm',
             p: Object.assign({}, cfg.prefs || {}),
             init: function () {
@@ -216,6 +218,8 @@ if (!window.rcptThemePicker) {
                     var om = form.querySelector('input[name="' + omName + '"]:checked');
                     this.p.orderMatch = om ? om.value : (this.p.orderMatch || 'off');
                 }
+                ['font_family','item_text'].forEach(function(key){var el=form.querySelector('[name="rp_'+key+'"]');if(el)self.typography[key]=el.value;});
+                var wn=form.querySelector('[name="rp_wide_names"]');if(wn)this.typography.wide_names=wn.checked;
                 if (cfg.live) {
                     var pre = this.tab === 'local' ? 'lp_' : 'rp_';
                     // Missing checkbox = page doesn't expose that toggle — keep the
@@ -262,6 +266,13 @@ if (!window.rcptThemePicker) {
                         });
                     });
                 }
+            },
+            typographyPreviewCss: function () {
+                var t=this.typography,css='',scope='[data-tn-typography-preview]';
+                if(t.font_family==='sans'||t.font_family==='mono')css+=scope+','+scope+' *{font-family:'+(t.font_family==='mono'?'"Courier New",Courier,monospace':'Arial,Helvetica,sans-serif')+' !important;}';
+                if(t.item_text==='compact'||t.item_text==='large')css+=scope+' .tn-preview-items td{font-size:'+(t.item_text==='compact'?(this.paper==='58mm'?9:10):(this.paper==='58mm'?12:14))+'px !important;}';
+                if(t.wide_names)css+=scope+' .tn-preview-items tr>:nth-child(1){width:52% !important;}'+scope+' .tn-preview-items tr>:nth-child(2){width:12% !important;}'+scope+' .tn-preview-items tr>:nth-child(3){width:16% !important;}'+scope+' .tn-preview-items tr>:nth-child(4){width:20% !important;}';
+                return css;
             },
             thBold: function () {
                 var t = cfg.themes[this.theme];

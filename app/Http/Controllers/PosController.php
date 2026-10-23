@@ -378,6 +378,9 @@ class PosController extends Controller
                 ],
                 'rp_align_center' => 'nullable|in:0,1',
                 'rp_left_margin_mm' => 'nullable|integer|min:0|max:30',
+                'rp_font_family' => 'sometimes|required|in:legacy,sans,mono',
+                'rp_item_text' => 'sometimes|required|in:legacy,compact,large',
+                'rp_wide_names' => 'sometimes|boolean',
             ], [
                 'rp_delivery_receipt_on_assign.required' => __('pos.delivery_receipt_default_invalid'),
             ]);
@@ -473,10 +476,16 @@ class PosController extends Controller
                 }
                 // bold/logo: always read-modify-write via the fresh style so a bare/stale
                 // POST never silently resets them (e.g. theme-picker not in old cached form).
-                $prefs['pos_style'] = [
+                $prefs['pos_style'] = array_replace($origStyle, [
                     'bold' => $styleBoldLogo['bold'],
                     'logo' => $styleBoldLogo['logo'],
-                ];
+                ]);
+                foreach (['font_family', 'item_text'] as $key) {
+                    if ($request->has('rp_'.$key)) $prefs['pos_style'][$key] = $request->input('rp_'.$key);
+                }
+                if ($request->has('rp_typography_present')) {
+                    $prefs['pos_style']['wide_names'] = $request->boolean('rp_wide_names');
+                }
                 // Checkbox-based pos_style keys (show_logo, logo_finals_only, show_menu_qr)
                 // and pdf_paper are only written when rp_pos_style_present is in the request,
                 // meaning the form was freshly rendered and the user's intent is known.

@@ -7181,5 +7181,11 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_no_document_reason_store_slip_disabled' => 'Store slip band hai',
     'print_no_document_reason_held_sale_missing' => 'Held sale ab dastiyab nahi',
     'return_not_allowed_hotel_credit_required' => 'Is bill ke liye Hotel Return / Credit Note screen use karein. Payment refund alag hai.',
+    'receipt_font_family' => 'Bill ka font',
+    'receipt_item_text' => 'Cheezon ke lafzon ka size',
+    'receipt_text_current' => 'Mojooda setting',
+    'receipt_text_compact' => 'Chhota',
+    'receipt_text_large' => 'Bara',
+    'receipt_wide_names' => 'Cheezon ke naam ko zyada jagah dein',
 ];
 

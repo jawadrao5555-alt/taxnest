@@ -1525,7 +1525,19 @@ async function ingredientUnitAudit(page,t,v) {
   pass(t.name+'/'+v.width+': real unused pcs-to-kg edit, visible stocked-unit refusal and invalid-unit rejection');
 }
 
+async function receiptTypographyPreviewWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/receipt-settings',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  await page.locator('[name="rp_font_family"]').selectOption('sans');
+  await page.locator('[name="rp_item_text"]').selectOption('compact');
+  await page.locator('[name="rp_wide_names"]').check();
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-tn-typography-preview] .tn-preview-items td');return e&&parseFloat(getComputedStyle(e).fontSize)<=10;});
+  await saveEvidenceScreenshot(page,'receipt-typography-preview-'+v.width+'.png');
+  pass(t.name+'/'+v.width+': actual receipt font/compact/wide-name controls update live preview without saving');
+}
+
 async function tableOrderWorkflow(page,t,v) {
+  await receiptTypographyPreviewWorkflow(page,t,v);
   await catalogSearchCompleteWorkflow(page,t,v);
   await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});

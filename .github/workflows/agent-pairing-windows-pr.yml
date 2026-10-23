@@ -1,4 +1,4 @@
-# Disposable PR verification only. No release publishing, install, registry or printer access.
+# Disposable PR verification only. No production Agent, release publishing, install, registry or printer access.
 name: Agent pairing and packaging (Windows PR only)
 on:
   pull_request:
@@ -37,3 +37,16 @@ jobs:
           $zip = Get-Item 'pra-agent/dist/TaxNest-PRA-Agent-Windows.zip'
           if ($setup.Length -lt 1000000 -or $zip.Length -lt 1000000) { throw 'Invalid Windows output size' }
           Write-Output "Disposable installer and portable archive exist for $version; no release was published."
+      - name: Install exact reviewed Electron runtime for disposable native harness
+        working-directory: pra-agent
+        run: node node_modules/electron/install.js
+      - name: Actual packaged sandbox renderer and native company confirmation
+        working-directory: pra-agent
+        run: node test/native-pairing-launcher.js dist/win-unpacked/resources/app.asar
+      - name: Preserve fictional native-window evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-native-windows-evidence
+          path: pra-agent/.local/browser-evidence/agent-native/
+          if-no-files-found: warn

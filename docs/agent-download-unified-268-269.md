@@ -58,6 +58,8 @@ retain the existing printing-only default. Local Core/tenant data are not reset.
 - Physical Windows installation, signature/SmartScreen behavior and first-run
   pairing on an owner device remain unverified. This PR does not claim signing
   keys or universal power-loss recovery; draft #256 remains separate.
-- Existing feature/* head still fails the owner handoff cursor/replit prefix.
-  Do not weaken that gate or rename it blindly (open head rename closes PR).
-  A safe owner-authorized linked replacement route remains a release blocker.
+- The owner-authorized replacement PR274 uses cursor/agent-download-pairing-270;
+  the earlier feature-branch prefix blocker is resolved. No gate was weakened.
+- Native acceptance correction and exact test scope:
+  docs/qa/agent274-native-pairing-2026-10-23.md. The expanded fresh Windows gate
+  must pass before claiming native button/confirmation acceptance.

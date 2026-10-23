@@ -29,3 +29,21 @@ test('renderer has visible bridge failure diagnostic', () => {
   assert.match(html, /typeof window\.agentAPI\.testConnection/);
   assert.match(html, /Agent interface failed to load/);
 });
+
+test('sandboxed production preload exposes operational buttons without loading CommonJS files', async () => {
+  let bridge;
+  const calls = [];
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8'), {
+    require(name) {
+      if (name !== 'electron') throw Error('Sandbox cannot load ' + name);
+      return {
+        contextBridge: { exposeInMainWorld(name, api) { assert.equal(name, 'agentAPI'); bridge = api; } },
+        ipcRenderer: { invoke: async (channel, ...args) => { calls.push({channel, args}); return {ok:true}; }, on() {} },
+      };
+    },
+  });
+  assert.ok(bridge);
+  await bridge.testConnection({companyId:1}); await bridge.saveConfig({companyId:1});
+  await bridge.toggleAgent(true); await bridge.openPosWindow();
+  assert.deepEqual(calls.map(c => c.channel), ['test-connection','save-config','toggle-agent','open-pos-window']);
+});

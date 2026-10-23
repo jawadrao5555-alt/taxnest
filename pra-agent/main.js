@@ -45,8 +45,7 @@ const {
 } = require('./src/server-url');
 
 const DOWNLOAD_URL = 'https://taxnest.pk/download/agent?type=exe';
-const { companyPairing } = require('./src/company-pairing');
-let companyPairingBusy = false;
+const { createCompanyConfigurator } = require('./src/company-configurator');
 const BUILD_INFO = require('./src/build-info').loadBuildInfo(app.getVersion(), path.join(__dirname, 'build-info.json'));
 const BUILD_TIMESTAMP = BUILD_INFO.build;
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
@@ -973,47 +972,21 @@ function createNestposShortcuts(showNote) {
 // Authenticated first-run pairing confirms the company's identity before any
 // new company or rotated key replaces local credentials. Legacy Agents retain
 // their existing endpoint; this new client never falls back around confirmation.
-async function autoConfigureAgent(ses, origin, panel = 'pos', isCurrent = () => true) {
-  if (companyPairingBusy) return false;
-  companyPairingBusy = true;
-  try {
-    const before = getMigratedAgentConfig() || {};
-    const paired = await companyPairing({ session: ses, origin, panel,
-      existing: before, isCurrent,
-      confirm: async ({ companyId, companyName, switching }) => {
-        const result = await dialog.showMessageBox({ type: 'question',
-          title: 'Connect TaxNest Agent', buttons: ['Cancel', 'Connect'], defaultId: 0, cancelId: 0,
-          message: 'Connect this Agent to ' + companyName + '?',
-          detail: 'Company ID: ' + companyId + (switching
-            ? '\nThis replaces the company currently connected on this PC.'
-            : '\nConfirm this is the company you want to connect. No company credentials are included in the installer.'),
-        });
-        return result.response === 1;
-      },
-    });
-    if (!paired.ok) return false;
-    if (!paired.config) return true; // unchanged or explicitly cancelled
-    if (!isCurrent()) return false;
-    const current = getMigratedAgentConfig() || {};
-    if (['companyId', 'apiKey', 'serverUrl'].some(key => current[key] !== before[key])) return false;
-    const nextConfig = { ...current, companyId: paired.config.companyId,
-      apiKey: paired.config.apiKey, serverUrl: paired.config.serverUrl };
-    store.set('config', nextConfig);
+const autoConfigureAgent = createCompanyConfigurator({
+  getConfig: () => getMigratedAgentConfig(),
+  saveConfig: config => store.set('config', config),
+  showMessageBox: options => dialog.showMessageBox(options),
+  onConfigured: config => {
     clearTrustedPosScope();
     stopAgent();
-    startAgent(withAppMeta(nextConfig), sendStatusUpdate, handleAgentUpdate);
+    startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
     try {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('config-autofilled', { companyId: paired.config.companyId });
+        mainWindow.webContents.send('config-autofilled', { companyId: config.companyId });
       }
     } catch (_) {}
-    return true;
-  } catch (_) {
-    // Never log a fetch exception that could contain request headers or nonce.
-    console.log('[company-pairing] Connection was not completed; saved configuration retained.');
-    return false;
-  } finally { companyPairingBusy = false; }
-}
+  },
+});
 
 function createWindow(startHidden) {
   mainWindow = new BrowserWindow({

@@ -339,6 +339,7 @@
   });
 </script>
 <script src="src/build-info-view.js"></script>
+<script src="src/ims-visibility.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
 
@@ -426,7 +427,7 @@
   }
 
   function renderStatus(s) {
-    const mode = window.agentAPI.imsMode(s);
+    const mode = window.TaxNestImsVisibility.imsMode(s);
     if (mode !== currentImsMode) {
       currentImsMode = mode;
       imsGeneration++;

@@ -1,0 +1,56 @@
+# PR274 disposable native Windows acceptance
+
+## Reproduced cause
+Settings use Electron's default sandbox with context isolation and no Node integration.
+The previous preload called `require('./src/ims-visibility')`. Electron's sandbox
+loader cannot load local CommonJS files, so it throws before exposing agentAPI.
+A renderer can parse perfectly while Test Connection, Save & Connect, Start and
+Open POS remain inert. The restricted-loader reproduction on the prior source
+produced `Sandbox cannot load ./src/ims-visibility`, with no bridge exposed.
+Electron documents this restriction at https://www.electronjs.org/docs/latest/tutorial/sandbox.
+
+## Correction
+The pure IMS visibility helper also exposes a browser-only frozen API; the
+settings page loads that local script. The preload now requires only Electron.
+Sandbox, context isolation, Node isolation and fiscal/IMS visibility rules remain.
+The existing company configurator is extracted without changing its decisions,
+so both production main and the native acceptance harness execute the same
+confirmation, revision, concurrent-manual-identity and preference-write logic.
+Only production main connects the existing Agent lifecycle callbacks.
+
+## Native Windows gate
+The PR-only Windows workflow builds the real installer and portable ZIP, then
+opens the actual packaged app.asar HTML/preload in an isolated Electron harness.
+It never executes production main.js, installs an Agent, changes registry, uses
+customer configuration, enumerates actual printers or physically prints.
+
+The gate uses real mouse input for all four settings buttons; real packaged
+PRA/FBR BrowserWindows and cookie-bearing Electron Session.fetch; and Windows
+UI Automation to read the company name and invoke the real native Connect/Cancel
+buttons. The coordinator persists only fictional settings in a disposable profile.
+The HTTP server is a loopback protocol fixture, not Laravel; Laravel security and
+plan/tenant/CSRF behavior remain independently covered by actual Feature tests.
+Every non-loopback HTTP request is blocked. Confirmation text is checked not to
+contain fixture credentials. Screenshots include only the public fictional page.
+
+Required cases: rendered settings bridge and visible test result; save retaining
+printer/silent-off; Start/Open POS click IPC; first PRA pairing; same-company
+re-login without another prompt/write; Cancel switch without a credential POST;
+server-rejected exchange retaining old config; FBR successful pairing preserving
+printer/device preferences. Harness errors, preload errors and deadlines fail.
+All prior mandatory eight gates and package output assertions remain required.
+
+## Local evidence / limits
+- Node24.19.0: same platform-independent selection as PR CI: 106/106 PASS, zero skips.
+- Behavioral sandbox bridge regression passes; coordinator concurrent manual
+  identity rejection and latest-preference preservation pass.
+- JS syntax / workflow YAML / whitespace and existing release-chain tests pass.
+- Sparse checkout initially omitted test fixtures/public scripts: the broad local
+  invocation failed for missing files, then all 106 passed after materializing them.
+- Native Windows is unavailable locally. Electron42.11.9 downloaded successfully;
+  Linux graphical acceptance was not run (no display; Xvfb package retrieval was
+  denied by container setgroups permissions). No local native acceptance claim.
+- Fresh exact-source all eight checks plus the expanded Windows gate must pass.
+  Prior 21fe3d8 all-green runs do not verify this correction.
+- This is packaged-source native acceptance, not NSIS installation/SmartScreen,
+  physical printer, fleet rollout or universal interrupted-update proof.

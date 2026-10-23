@@ -78,3 +78,20 @@ for(const panel of ['pos','fbrpos']) test(panel+' login hook rearms and invalida
   await new Promise(r=>setImmediate(r));url=origin+prefix+'dashboard';wc.emit('did-finish-load');assert.equal(calls,2);
   finish(true);await new Promise(r=>setImmediate(r));wc.emit('did-finish-load');assert.equal(calls,2);
 });
+
+test('production configurator preserves current preferences and rejects concurrent manual identity changes', async () => {
+  const { createCompanyConfigurator } = require('../src/company-configurator');
+  for (const identityChanged of [false,true]) {
+    const { options } = setup();
+    let config={companyId:40,apiKey:'old',serverUrl:origin+'/api/agent',receiptPrinter:'Kitchen A',silentPrint:false};
+    let writes=0,starts=0;
+    const configure=createCompanyConfigurator({getConfig:()=>({...config}),saveConfig:c=>{config=c;writes++;},onConfigured:()=>{starts++;},showMessageBox:async()=>{
+      config.pcName='Updated Counter'; if(identityChanged)config.companyId=99;
+      return {response:1};
+    }});
+    assert.equal(await configure(options.session,origin,'pos'),!identityChanged);
+    assert.equal(writes,identityChanged?0:1); assert.equal(starts,identityChanged?0:1);
+    assert.equal(config.receiptPrinter,'Kitchen A');assert.equal(config.silentPrint,false);assert.equal(config.pcName,'Updated Counter');
+    assert.equal(config.companyId,identityChanged?99:41);
+  }
+});

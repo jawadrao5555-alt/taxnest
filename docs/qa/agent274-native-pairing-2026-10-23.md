@@ -81,3 +81,11 @@ and has a Win32 native Button fallback, strictly matching PID, dialog title,
 visible company text and button name. It never fabricates a response; the harness
 still requires actual dialog resolution and expected POST/write counts. This is
 a source-supported driver correction, not yet a passing Windows acceptance claim.
+
+## Native dialog diagnostic follow-up
+HEAD e272b5a Windows40006788782/job120596631784 again reached native confirmation
+but both bounded UIA/Win32 lookup timed out. This is not evidence of a successful
+confirmation. The next source adds only own-process native window title/class
+diagnostics (no control values/keys) and an explicit post-settings stage marker,
+to distinguish a runner desktop limitation from a title/hierarchy mismatch.
+No assertion, native dialog, identity match or deadline is bypassed.

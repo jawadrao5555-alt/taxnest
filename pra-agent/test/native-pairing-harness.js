@@ -124,6 +124,7 @@ async function logout(win,panel) {
   await click(settings,'#saveBtn');await wait(()=>calls.save===1,'actual Save & Connect click');assert.equal(config.silentPrint,false);assert.equal(config.receiptPrinter,'Fictional Kitchen');assert.equal(config.printerExplicit,false);
   await click(settings,'#toggleBtn');await wait(()=>calls.toggle===1,'actual Start click');assert.equal(running,true);
   await click(settings,'#openPosBtn');await wait(()=>calls.open===1,'actual Open POS click');
+  console.log('PASS: real packaged sandbox preload and four settings mouse-click/IPC paths; native pairing follows.');
   let win=await login('pos'); assert.equal(lastResult,true);assert.equal(config.companyId,101);assert.equal(posts,1);assert.equal(saves,1);
   assert.equal(config.pcName,'Fictional Counter');assert.equal(config.receiptPrinter,'Fictional Kitchen');assert.equal(config.silentPrint,false);
   let count=nativeDialogs;await logout(win,'pos');lastResult=undefined;await click(win,'#fixtureLogin');await wait(()=>lastResult!==undefined,'same-company login');assert.equal(lastResult,true);assert.equal(nativeDialogs,count);assert.equal(saves,1);assert.equal(posts,1);

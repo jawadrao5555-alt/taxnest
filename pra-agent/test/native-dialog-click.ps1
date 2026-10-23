@@ -21,6 +21,13 @@ public static class NativePairingDialog {
   [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint message, IntPtr w, IntPtr l);
   static string Text(IntPtr h) { var s=new StringBuilder(2048); GetWindowText(h,s,s.Capacity); return s.ToString(); }
+  public static string Describe(uint pid) {
+    var rows=new List<string>();
+    EnumWindows((h,p)=>{uint owner;GetWindowThreadProcessId(h,out owner);
+      if(owner==pid) {var cls=new StringBuilder(128);GetClassName(h,cls,cls.Capacity);rows.Add(cls+" | "+Text(h)+" | visible="+IsWindowVisible(h));}
+      return true;},IntPtr.Zero);
+    return String.Join("; ",rows);
+  }
   public static bool Click(uint pid, string company, string button) {
     bool found=false;
     EnumWindows((h,p)=>{
@@ -61,4 +68,5 @@ while ([DateTime]::UtcNow -lt $deadline) {
   if ([NativePairingDialog]::Click([uint32]$TargetProcessId, $ExpectedCompany, $Button)) { exit 0 }
   Start-Sleep -Milliseconds 100
 }
+Write-Error ('Own-process native window diagnostics: ' + [NativePairingDialog]::Describe([uint32]$TargetProcessId)) -ErrorAction Continue
 throw 'Expected native company confirmation/button did not appear'

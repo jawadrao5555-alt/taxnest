@@ -54,3 +54,11 @@ All prior mandatory eight gates and package output assertions remain required.
   Prior 21fe3d8 all-green runs do not verify this correction.
 - This is packaged-source native acceptance, not NSIS installation/SmartScreen,
   physical printer, fleet rollout or universal interrupted-update proof.
+
+## First Windows harness result (historical HEAD637e79e)
+Windows40004950589/job120590374696 built the actual installer/ZIP and passed
+24 focused tests. Its launcher then failed before Electron started: plain Node's
+fs.existsSync cannot traverse app.asar. The launcher now checks the archive file,
+while the actual Electron harness requires the packaged coordinator and therefore
+still fails for a missing module. No native assertions removed. A new exact-source
+Windows run and mandatory eight remain required; this attempt is not UI proof.

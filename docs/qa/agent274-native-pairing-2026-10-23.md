@@ -120,3 +120,13 @@ CommandLink_/CommandButton_ identifier (or a real numeric ID), after verifying
 PID/title/company/exact name, and sends documented TDM_CLICK_BUTTON to that
 real dialog. No response-index mapping/guessing. Actual Electron response and
 POST/write assertions still decide acceptance. New exact-source pass required.
+
+## Build-display browser fixture correction after native success
+
+On a65ab665, Windows40009299928/job120605219812 passed24/24 and the full packaged native journey. PR40009300060 browser120605220853 subsequently failed at agent-build-display-smoke.mjs:62, after required synthetic app journeys passed. Its loopback server served HTML for the newly externalized /src/ims-visibility.js, producing Unexpected token '<' and undefined imsMode. This was a fixture resource-routing error; the actual packaged helper had already passed Windows.
+
+Reproduced the exact two page errors locally with real Chromium. The fixture now serves the actual production IMS script as JavaScript and removes its obsolete synthetic IPC imsMode method. All existing build-date, missing/failed IPC, page-error and no-settings-write assertions remain. The original command then passed:
+
+CHROMIUM_BIN=/tmp/cursor-sandbox-cache/taxnest-local/chromium node scripts/agent-build-display-smoke.mjs
+
+JS syntax and git diff --check passed. This local browser pass is the Agent settings preview only, not a full Laravel app acceptance claim. No runtime/dependency/security gate changed. New HEAD requires fresh mandatory eight plus Windows; prior native success remains historical evidence only for that new HEAD.

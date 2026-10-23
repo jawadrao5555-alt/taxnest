@@ -84,7 +84,13 @@ while ([DateTime]::UtcNow -lt $deadline) {
               if (-not [string]::IsNullOrWhiteSpace($legacy.Current.DefaultAction)) { $legacy.DoDefaultAction(); exit 0 }
             } catch {}
             $controlId = 0
-            if ([int]::TryParse($node.Current.AutomationId, [ref]$controlId) -and $controlId -gt 0 -and [NativePairingDialog]::ClickTaskButton($handle,$controlId)) { exit 0 }
+            $automationId = $node.Current.AutomationId
+            # Actual Windows TaskDialog providers expose CommandLink_101 /
+            # CommandButton_2, not a bare integer. Parse the observed control
+            # identifier; do not map from expected response/button order.
+            if ($automationId -match '^Command(?:Link|Button)_([1-9][0-9]*)$') { $controlId = [int]$Matches[1] }
+            else { [void][int]::TryParse($automationId, [ref]$controlId) }
+            if ($controlId -gt 0 -and [NativePairingDialog]::ClickTaskButton($handle,$controlId)) { exit 0 }
           }
         }
       }

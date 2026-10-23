@@ -110,3 +110,13 @@ InvokePattern or LegacyIAccessible DoDefaultAction rather than assuming a comman
 link must expose ControlType.Button; actual dialog result and POST/write counts
 remain mandatory. Failure metadata adds only this fixture dialog's control type
 and AutomationId. This is not a fake response or assertion removal.
+
+## Exact Windows provider root cause (historical HEAD69612a0)
+Windows40008700919/job120603151434 reports Connect as ControlType.Pane /
+AutomationId CommandLink_101 and Cancel as ControlType.Pane / CommandButton_2,
+with correct company text. Neither exposed the prior expected action/plain
+numeric ID. The driver now parses only the actual observed native provider
+CommandLink_/CommandButton_ identifier (or a real numeric ID), after verifying
+PID/title/company/exact name, and sends documented TDM_CLICK_BUTTON to that
+real dialog. No response-index mapping/guessing. Actual Electron response and
+POST/write assertions still decide acceptance. New exact-source pass required.

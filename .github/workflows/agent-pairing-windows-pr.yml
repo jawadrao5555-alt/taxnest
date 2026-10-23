@@ -42,7 +42,16 @@ jobs:
         run: node node_modules/electron/install.js
       - name: Actual packaged sandbox renderer and native company confirmation
         working-directory: pra-agent
-        run: node test/native-pairing-launcher.js dist/win-unpacked/resources/app.asar
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Canonical packaging intentionally removes win-unpacked. Test the
+          # actual delivered portable ZIP, not a deleted intermediate directory.
+          Expand-Archive -Path dist/TaxNest-PRA-Agent-Windows.zip -DestinationPath dist/native-acceptance -Force
+          $archive = 'dist/native-acceptance/TaxNest-PRA-Agent/resources/app.asar'
+          if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw 'Delivered ZIP has no app.asar' }
+          node test/native-pairing-launcher.js $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve fictional native-window evidence
         if: always()
         uses: actions/upload-artifact@v4

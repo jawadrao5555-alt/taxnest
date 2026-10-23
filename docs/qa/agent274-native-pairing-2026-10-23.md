@@ -62,3 +62,12 @@ fs.existsSync cannot traverse app.asar. The launcher now checks the archive file
 while the actual Electron harness requires the packaged coordinator and therefore
 still fails for a missing module. No native assertions removed. A new exact-source
 Windows run and mandatory eight remain required; this attempt is not UI proof.
+
+## Second Windows harness result (historical HEAD91ae5ef)
+Windows40005558602/job120592445001 again passed package output checks but the
+launcher correctly rejected the absent archive. Source review of package-portable.js
+confirmed canonical packaging intentionally removes win-unpacked after creating
+the ZIP, protecting it from an old overwrite step. The workflow now extracts the
+actual delivered ZIP into a disposable directory, requires its app.asar, and runs
+the same native assertions on that delivered content. Packaging behavior and all
+checks remain intact. This fixture correction needs fresh exact-HEAD verification.

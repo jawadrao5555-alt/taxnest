@@ -148,6 +148,7 @@
     </style>
     @endif
     @php $printStyle = $company->posReceiptStyle(); @endphp
+    <style>{!! \App\Support\PosReceiptTypography::css($company->invoice_display_prefs['pos_style'] ?? [], '58mm') !!}</style>
     @if($printStyle['bold'])
     <style>
         /* BOLD PRINT STYLE (customer request Jul 2026 — Pizza Master): whole

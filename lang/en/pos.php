@@ -7193,5 +7193,11 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'print_no_document_reason_store_slip_disabled' => 'Store slip is switched off',
     'print_no_document_reason_held_sale_missing' => 'Held sale is no longer available',
     'return_not_allowed_hotel_credit_required' => 'Use the Hotel Return / Credit Note screen for this bill. Payment refunds are separate.',
+    'receipt_font_family' => 'Receipt font',
+    'receipt_item_text' => 'Item text size',
+    'receipt_text_current' => 'Current setting',
+    'receipt_text_compact' => 'Compact',
+    'receipt_text_large' => 'Large',
+    'receipt_wide_names' => 'Give item names more space',
 ];
 

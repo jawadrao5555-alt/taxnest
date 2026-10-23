@@ -7178,5 +7178,11 @@ return [
     'print_no_document_reason_store_slip_disabled' => 'اسٹور سلپ بند ہے',
     'print_no_document_reason_held_sale_missing' => 'ہولڈ سیل اب دستیاب نہیں',
     'return_not_allowed_hotel_credit_required' => 'اس بل کے لیے ہوٹل واپسی / کریڈٹ نوٹ استعمال کریں۔ رقم کی واپسی الگ ہے۔',
+    'receipt_font_family' => 'رسید کا فونٹ',
+    'receipt_item_text' => 'اشیاء کے متن کا سائز',
+    'receipt_text_current' => 'موجودہ ترتیب',
+    'receipt_text_compact' => 'چھوٹا',
+    'receipt_text_large' => 'بڑا',
+    'receipt_wide_names' => 'اشیاء کے نام کو زیادہ جگہ دیں',
 ];
 

@@ -62,6 +62,25 @@ class PosProfitFreezeTest extends TestCase
     // UNIT / REFLECTION TESTS
     // ─────────────────────────────────────────────────────────────────────────
 
+    public function test_pdf_menu_order_is_stable_and_includes_every_sold_product(): void
+    {
+        for ($i = 18; $i >= 1; $i--) {
+            $product = $this->makeProduct(cost: 10);
+            $product->update(['category' => 'Drinks']);
+            $this->makeSaleItem($product->id, qty: 1, subtotal: 100 + $i, frozenCost: 10);
+            PosTransactionItem::where('item_id', $product->id)->update(['item_name' => 'Item '.$i]);
+        }
+        $ranked = $this->runRangeAnalytics();
+        $pdf = $this->runRangeAnalytics(true);
+        $this->assertCount(15, $ranked->categories['Drinks']->products);
+        $this->assertCount(18, $pdf->categories['Drinks']->products);
+        $this->assertSame('Item 1', $pdf->categories['Drinks']->products->keys()->first());
+        $this->assertSame('Item 18', $pdf->categories['Drinks']->products->keys()->last());
+        $this->assertEquals($ranked->categories['Drinks']->revenue, $pdf->categories['Drinks']->revenue);
+        $this->assertEquals($ranked->categories['Drinks']->tax, $pdf->categories['Drinks']->tax);
+        $this->assertEquals($ranked->profit, $pdf->profit);
+    }
+
     /** Range analytics profit is stable after a cost edit (frozen snapshot). */
     public function test_range_analytics_profit_unchanged_after_rate_edit(): void
     {
@@ -406,7 +425,7 @@ class PosProfitFreezeTest extends TestCase
         ]);
     }
 
-    private function runRangeAnalytics(): object
+    private function runRangeAnalytics(bool $menuOrder = false): object
     {
         $user = new class { public function isPosAdmin(): bool { return true; } };
         $ctrl = new \App\Http\Controllers\PosController();
@@ -414,7 +433,7 @@ class PosProfitFreezeTest extends TestCase
         $ref->setAccessible(true);
         return $ref->invoke($ctrl, $this->companyId,
             Carbon::today()->startOfDay(), Carbon::today()->endOfDay(),
-            'pra', 'all', $this->company, $user);
+            'pra', 'all', $this->company, $user, $menuOrder);
     }
 
     /**

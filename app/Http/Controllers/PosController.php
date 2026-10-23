@@ -7247,7 +7247,7 @@ class PosController extends Controller
         }
 
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
-        $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+        $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user, true);
 
          return $this->renderReportPdf(
             'pos.reports-analytics-pdf',
@@ -14929,7 +14929,7 @@ class PosController extends Controller
      * customers, payment split. Respects the tab (pra|local) + cashier filter
      * exactly like the rest of the reports page (applyReportFilters).
      */
-    private function buildReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, string $tab, $cashierFilter, ?Company $company, $user): object
+    private function buildReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, string $tab, $cashierFilter, ?Company $company, $user, bool $menuOrder = false): object
     {
         $isAdminView = (bool) ($user?->isPosAdmin());
 
@@ -15009,7 +15009,7 @@ class PosController extends Controller
         });
 
         $revenueTotal = (float) $items->sum('subtotal');
-        $categories = $items->groupBy('resolved_category')->map(function ($g) use ($revenueTotal, $isAdminView) {
+        $categories = $items->groupBy('resolved_category')->map(function ($g) use ($revenueTotal, $isAdminView, $menuOrder) {
             $revenue = (float) $g->sum('subtotal');
             $withCost = $g->filter(fn ($it) => $it->resolved_cost !== null);
             $cost = (float) $withCost->sum('resolved_cost');
@@ -15025,9 +15025,9 @@ class PosController extends Controller
                         'qty' => (float) $pg->sum('quantity'),
                         'revenue' => (float) $pg->sum('subtotal'),
                     ];
-                })->sortByDesc('revenue')->take(15),
+                })->when($menuOrder, fn ($rows) => $rows->sortKeys(SORT_NATURAL | SORT_FLAG_CASE), fn ($rows) => $rows->sortByDesc('revenue')->take(15)),
             ];
-        })->sortByDesc('revenue');
+        })->when($menuOrder, fn ($rows) => $rows->sortKeys(SORT_NATURAL | SORT_FLAG_CASE), fn ($rows) => $rows->sortByDesc('revenue'));
 
         // Profit summary (ADMIN-ONLY): only items whose product has a cost_price
         // set count toward cost — coverage_pct tells the admin how complete it is.

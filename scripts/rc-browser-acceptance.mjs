@@ -1525,7 +1525,40 @@ async function ingredientUnitAudit(page,t,v) {
   pass(t.name+'/'+v.width+': real unused pcs-to-kg edit, visible stocked-unit refusal and invalid-unit rejection');
 }
 
+async function tableSettingsVisibilityWorkflow(originalPage,t,v) {
+  const ownerContext=await originalPage.context().browser().newContext({viewport:v});
+  const page=await ownerContext.newPage();
+  try {
+    await login(page,t.settingsOwner);
+  await page.goto(baseUrl+'/pos/restaurant/table-management',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  for(const dark of [false,true]) {
+    await page.evaluate(d=>document.documentElement.classList.toggle('dark',d),dark);
+    const controls=page.locator('.tn-table-setting-checkbox');
+    if(await controls.count()!==2)throw new Error('Table setup lost a setting control');
+    for(let i=0;i<2;i++) {
+      const c=controls.nth(i); await c.scrollIntoViewIfNeeded();
+      const m=await c.evaluate(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height,opacity:getComputedStyle(e).opacity,appearance:getComputedStyle(e).appearance}));
+      if(!await c.isVisible()||m.w<20||m.h<20||Number(m.opacity)<1||m.appearance==='none')throw new Error('Table setting not visibly operable: '+JSON.stringify(m));
+      await c.focus();
+      if(!await c.evaluate(e=>document.activeElement===e))throw new Error('Table setting not focusable');
+    }
+    await saveEvidenceScreenshot(page,'table-settings-'+(dark?'dark':'light')+'-'+v.width+'.png');
+  }
+  await page.evaluate(()=>document.documentElement.classList.remove('dark'));
+  for(const name of ['tables_first_flow','table_click_direct_open']) {
+    const c=page.locator('input[type=checkbox][name="'+name+'"]');
+    const was=await c.isChecked();
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),c.setChecked(!was)]);
+    if(await page.locator('input[type=checkbox][name="'+name+'"]').isChecked()===was)throw new Error('Table setting did not persist');
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('input[type=checkbox][name="'+name+'"]').setChecked(was)]);
+  }
+  pass(t.name+'/'+v.width+': visible native table settings, keyboard focus and persisted on/off');
+  } finally { await ownerContext.close(); }
+}
+
 async function tableOrderWorkflow(page,t,v) {
+  await tableSettingsVisibilityWorkflow(page,t,v);
   await catalogSearchCompleteWorkflow(page,t,v);
   await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});

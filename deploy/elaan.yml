@@ -1,6 +1,6 @@
-title: "Naye caller ka delivery bill asani se banayein"
+title: "Table Setup ke switches ab wazeh hain"
 audience: pos
 type: improvement
 points:
-  - "Caller ID mein naye number par Bill dabane se Delivery select ho jayegi, agar aapki dukan mein Delivery chalu hai."
-  - "Sirf call aane se bill ki qisam nahi badlegi. Cart mein mojood cheezein bhi barqarar rahengi."
+  - "Table Setup mein dono options ke ON/OFF controls zyada saaf nazar aayenge."
+  - "Aapki pehle se saved settings khud nahi badlein gi."

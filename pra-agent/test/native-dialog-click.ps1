@@ -70,13 +70,19 @@ while ([DateTime]::UtcNow -lt $deadline) {
     $window = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
     $nodes = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
     $names = @($nodes | ForEach-Object { $_.Current.Name })
-    $lastNativeLabels = $names -join ' | '
+    $lastNativeLabels = ($nodes | ForEach-Object { $_.Current.Name + ' [type=' + $_.Current.ControlType.ProgrammaticName + ', id=' + $_.Current.AutomationId + ']' }) -join ' | '
     if (($names -join ' ').Contains($ExpectedCompany)) {
       foreach ($node in $nodes) {
-        if ($node.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $node.Current.Name.Replace('&','').Trim() -eq $Button) {
+        # Native command links are not consistently exposed as ControlType.Button.
+        # Require the exact name plus a real invokable/default-action provider.
+        if ($node.Current.Name.Replace('&','').Trim() -eq $Button) {
           try { $node.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); exit 0 } catch {
             # Some native command-link providers expose the real control ID
             # but not InvokePattern. Never guess the ID from response order.
+            try {
+              $legacy = $node.GetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern)
+              if (-not [string]::IsNullOrWhiteSpace($legacy.Current.DefaultAction)) { $legacy.DoDefaultAction(); exit 0 }
+            } catch {}
             $controlId = 0
             if ([int]::TryParse($node.Current.AutomationId, [ref]$controlId) -and $controlId -gt 0 -and [NativePairingDialog]::ClickTaskButton($handle,$controlId)) { exit 0 }
           }

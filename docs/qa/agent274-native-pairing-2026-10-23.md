@@ -101,3 +101,12 @@ actual AutomationId can drive documented native TDM_CLICK_BUTTON; no guessed
 response ID or fabricated success. Native result/POST/write assertions stay.
 Failure diagnostics may include only this known fixture dialog's static labels,
 never settings values. This still requires a fresh native pass.
+
+## Actual dialog control evidence (historical HEADa4b3d2e)
+Windows40008040267/job120600887338 read the exact visible company message
+`Connect this Agent to Fixture 101?`, Company ID101, Connect and Cancel. It still
+timed out invocation. The driver now supports the exact named control's real
+InvokePattern or LegacyIAccessible DoDefaultAction rather than assuming a command
+link must expose ControlType.Button; actual dialog result and POST/write counts
+remain mandatory. Failure metadata adds only this fixture dialog's control type
+and AutomationId. This is not a fake response or assertion removal.

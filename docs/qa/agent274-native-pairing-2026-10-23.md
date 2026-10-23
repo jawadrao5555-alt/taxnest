@@ -71,3 +71,13 @@ the ZIP, protecting it from an old overwrite step. The workflow now extracts the
 actual delivered ZIP into a disposable directory, requires its app.asar, and runs
 the same native assertions on that delivered content. Packaging behavior and all
 checks remain intact. This fixture correction needs fresh exact-HEAD verification.
+
+## Third Windows result (historical HEAD837be305)
+Windows40006149877/job120594446113 reached the actual delivered ASAR harness,
+passed the settings-button/HTTP path before native confirmation, then its UIA
+driver timed out locating the dialog. The driver previously searched only direct
+desktop children; owned dialogs can be below the owner. It now searches descendants
+and has a Win32 native Button fallback, strictly matching PID, dialog title,
+visible company text and button name. It never fabricates a response; the harness
+still requires actual dialog resolution and expected POST/write counts. This is
+a source-supported driver correction, not yet a passing Windows acceptance claim.

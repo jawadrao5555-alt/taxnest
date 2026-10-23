@@ -44,7 +44,9 @@ const {
   migrateAgentConfig,
 } = require('./src/server-url');
 
-const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
+const DOWNLOAD_URL = 'https://taxnest.pk/download/agent?type=exe';
+const { companyPairing } = require('./src/company-pairing');
+let companyPairingBusy = false;
 const BUILD_INFO = require('./src/build-info').loadBuildInfo(app.getVersion(), path.join(__dirname, 'build-info.json'));
 const BUILD_TIMESTAMP = BUILD_INFO.build;
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
@@ -857,8 +859,8 @@ function openPos() {
         setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
         buildTrayMenu();
       },
-      onLoggedIn: async (ses, origin) => {
-        const configured = await autoConfigureAgent(ses, origin);
+      onLoggedIn: async (ses, origin, isCurrent) => {
+        const configured = await autoConfigureAgent(ses, origin, 'pos', isCurrent);
         await refreshTrustedPosScope(ses, origin);
         return configured;
       },
@@ -895,7 +897,9 @@ function openFbrPos() {
     const config = getMigratedAgentConfig();
     const posConfig =
       config && config.serverUrl ? config : { serverUrl: DEFAULT_SERVER_URL };
-    openFbrPosWindow(posConfig, { isQuitting: () => isQuitting });
+    openFbrPosWindow(posConfig, { isQuitting: () => isQuitting,
+      onLoggedIn: (ses, origin, isCurrent) => autoConfigureAgent(ses, origin, 'fbrpos', isCurrent),
+    });
     return true;
   } catch (e) {
     console.log('[fbr-window] open failed:', e && e.message);
@@ -966,72 +970,49 @@ function createNestposShortcuts(showNote) {
   }
 }
 
-// Agent AUTO-CONFIG (v1.5.0): pull the company's agent credentials from the
-// server using the POS window's logged-in session cookie. Zero manual setup —
-// silent printing + PRA sync start working right after the first POS login.
-// v1.5.0 beta4 (owner rule): the agent FOLLOWS the POS login — if a DIFFERENT
-// company logs into the POS window, the agent swaps to that company's key
-// automatically (no manual copy-paste, ever). Same company + same key = no-op;
-// same company with a regenerated key also self-heals.
-async function autoConfigureAgent(ses, origin) {
+// Authenticated first-run pairing confirms the company's identity before any
+// new company or rotated key replaces local credentials. Legacy Agents retain
+// their existing endpoint; this new client never falls back around confirmation.
+async function autoConfigureAgent(ses, origin, panel = 'pos', isCurrent = () => true) {
+  if (companyPairingBusy) return false;
+  companyPairingBusy = true;
   try {
-    const existing = getMigratedAgentConfig();
-    const res = await ses.fetch(origin + '/pos/desktop/agent-config', {
-      headers: { Accept: 'application/json' },
+    const before = getMigratedAgentConfig() || {};
+    const paired = await companyPairing({ session: ses, origin, panel,
+      existing: before, isCurrent,
+      confirm: async ({ companyId, companyName, switching }) => {
+        const result = await dialog.showMessageBox({ type: 'question',
+          title: 'Connect TaxNest Agent', buttons: ['Cancel', 'Connect'], defaultId: 0, cancelId: 0,
+          message: 'Connect this Agent to ' + companyName + '?',
+          detail: 'Company ID: ' + companyId + (switching
+            ? '\nThis replaces the company currently connected on this PC.'
+            : '\nConfirm this is the company you want to connect. No company credentials are included in the installer.'),
+        });
+        return result.response === 1;
+      },
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    if (!data || !data.success || !data.api_key || !data.company_id) return false;
-    const serverUrl = canonicalAgentServerUrl(
-      data.server_url || origin + '/api/agent'
-    );
-    if (
-      existing && existing.serverUrl && existing.apiKey && existing.companyId &&
-      String(existing.companyId) === String(data.company_id) &&
-      existing.apiKey === data.api_key &&
-      existing.serverUrl === serverUrl
-    ) {
-      return true; // same company, same key — already configured
-    }
-    const switching = !!(
-      existing && existing.companyId &&
-      String(existing.companyId) !== String(data.company_id)
-    );
-    const config = {
-      serverUrl,
-      apiKey: data.api_key,
-      companyId: data.company_id,
-    };
-    store.set('config', config);
+    if (!paired.ok) return false;
+    if (!paired.config) return true; // unchanged or explicitly cancelled
+    if (!isCurrent()) return false;
+    const current = getMigratedAgentConfig() || {};
+    if (['companyId', 'apiKey', 'serverUrl'].some(key => current[key] !== before[key])) return false;
+    const nextConfig = { ...current, companyId: paired.config.companyId,
+      apiKey: paired.config.apiKey, serverUrl: paired.config.serverUrl };
+    store.set('config', nextConfig);
     clearTrustedPosScope();
     stopAgent();
-    startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
-    console.log(
-      '[auto-config] ' +
-      (switching ? 'company switch — agent reconfigured' : 'agent configured') +
-      ' from POS login (company ' + data.company_id + ')'
-    );
-    // Company switch is a big deal on fiscal_device shops (the agent is the ONLY
-    // PRA submission path) — surface it as an OS notification so staff notice
-    // that sync + printing now run for the newly logged-in company.
-    try {
-      if (switching && Notification.isSupported()) {
-        new Notification({
-          title: 'TaxNest Agent',
-          body: 'Agent ab "' + (data.company_name || ('company ' + data.company_id)) + '" ke liye chal raha hai (PRA sync + printing).',
-        }).show();
-      }
-    } catch (e) {}
+    startAgent(withAppMeta(nextConfig), sendStatusUpdate, handleAgentUpdate);
     try {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('config-autofilled', { companyId: data.company_id });
+        mainWindow.webContents.send('config-autofilled', { companyId: paired.config.companyId });
       }
-    } catch (e) {}
+    } catch (_) {}
     return true;
-  } catch (e) {
-    console.log('[auto-config] failed:', e && e.message);
+  } catch (_) {
+    // Never log a fetch exception that could contain request headers or nonce.
+    console.log('[company-pairing] Connection was not completed; saved configuration retained.');
     return false;
-  }
+  } finally { companyPairingBusy = false; }
 }
 
 function createWindow(startHidden) {

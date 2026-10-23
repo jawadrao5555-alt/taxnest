@@ -1,6 +1,6 @@
-title: "Agent ki hifazat aur kharabi ke paighamat mein behtari"
+title: "Agent ko apni company se jorna ab zyada wazeh hai"
 audience: pos
 type: improvement
 points:
-  - "Naya Agent install karne ke baad application ki hifazat mein behtari milegi."
-  - "Agent ki screen mein kharabi aaye to uski wazeh nishandahi hogi, taake madad lena asaan ho."
+  - "Naye Agent mein apne POS account se login ke baad company ka naam dekh kar connection confirm kar sakenge."
+  - "PRA aur FBR POS ke liye ek hi Agent download hoga. Pehle se saved printer settings barqarar rahengi."

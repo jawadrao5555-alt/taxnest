@@ -1525,7 +1525,11 @@ async function ingredientUnitAudit(page,t,v) {
   pass(t.name+'/'+v.width+': real unused pcs-to-kg edit, visible stocked-unit refusal and invalid-unit rejection');
 }
 
-async function tableSettingsVisibilityWorkflow(page,t,v) {
+async function tableSettingsVisibilityWorkflow(originalPage,t,v) {
+  const ownerContext=await originalPage.context().browser().newContext({viewport:v});
+  const page=await ownerContext.newPage();
+  try {
+    await login(page,t.settingsOwner);
   await page.goto(baseUrl+'/pos/restaurant/table-management',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   for(const dark of [false,true]) {
@@ -1550,6 +1554,7 @@ async function tableSettingsVisibilityWorkflow(page,t,v) {
     await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('input[type=checkbox][name="'+name+'"]').setChecked(was)]);
   }
   pass(t.name+'/'+v.width+': visible native table settings, keyboard focus and persisted on/off');
+  } finally { await ownerContext.close(); }
 }
 
 async function tableOrderWorkflow(page,t,v) {

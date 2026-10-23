@@ -12,6 +12,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 23 Oct 2026: Electron/package/build runtime 42.11.9 addresses
+// GHSA-x562-297c-g43g, GHSA-3qxv-5xgr-q7w9 and GHSA-h3v5-h239-pg29.
+// Agent source identity 1.13.22 preserves immutable released v1.13.21.
+// Only the root identity/Electron spec and Electron package entry change;
+// all remaining 306 entries, dependency edges, counts and fork hashes stay pinned.
 // Reviewed 22 Oct 2026: pin Electron/package/build runtime 42.11.3 for
 // GHSA-fw47-9c62-h3vw. Only the root Electron spec and Electron package entry
 // change; all other locked entries, counts and local-fork hashes stay pinned.
@@ -49,7 +54,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25',
+    graph: '6dc1d270218097c4148dbfcba6d4c93a36bb074ee20661b995b38f1134d959a5',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

@@ -1531,6 +1531,76 @@ async function tableOrderWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  const switcher=page.locator('[data-tn-order-type-switcher]');
+  const buttons=switcher.locator('button');
+  const wasDark=await page.evaluate(()=>document.documentElement.classList.contains('dark'));
+  const metrics=el=>{
+    const s=getComputedStyle(el),r=el.getBoundingClientRect();
+    const lum=rgb=>{const c=rgb.match(/[\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;});return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2];};
+    const ratio=(a,b)=>(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+    const bg=lum(s.backgroundColor);
+    return {font:parseFloat(s.fontSize),minHeight:parseFloat(s.minHeight),height:r.height,
+      contrast:ratio(lum(s.color),bg),focused:document.activeElement===el&&el.matches(':focus-visible'),
+      outline:parseFloat(s.outlineWidth),offset:parseFloat(s.outlineOffset),focusContrast:ratio(lum(s.outlineColor),bg)};
+  };
+  for(const dark of [false,true]){
+    await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
+    await page.mouse.move(0,0);
+    for(let i=0;i<3;i++){
+      const button=buttons.nth(i);
+      // Real pointer hover must remain readable in dark mode too. Wait for the
+      // existing colour transition to settle, not just its starting colour.
+      await button.hover();
+      await button.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{}))));
+      const m=await button.evaluate(metrics);
+      if(m.font<14||m.minHeight<44||m.height<44||m.contrast<4.5)throw new Error('Order-type hover readability failed: '+JSON.stringify({dark,i,...m}));
+    }
+    await page.mouse.move(0,0);
+    // POS deliberately reserves forward Tab for its product grid. Preserve
+    // that shortcut: native backward traversal still reaches all three pills.
+    await buttons.first().focus();
+    await page.keyboard.press('Shift+Tab');
+    await buttons.last().focus();
+    for(let i=2;i>=0;i--){
+      const button=buttons.nth(i);
+      await button.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{}))));
+      const m=await button.evaluate(metrics);
+      if(!m.focused||m.outline<2||m.offset>-2||m.focusContrast<3||m.contrast<4.5)throw new Error('Order-type keyboard focus failed: '+JSON.stringify({dark,i,...m}));
+      if(i>0)await page.keyboard.press('Shift+Tab');
+    }
+    const pressed=await buttons.evaluateAll(nodes=>nodes.map(el=>el.getAttribute('aria-pressed')));
+    if(pressed.filter(x=>x==='true').length!==1||pressed.some(x=>!['true','false'].includes(x)))throw new Error('Order-type selection accessibility failed: '+JSON.stringify(pressed));
+    await saveEvidenceScreenshot(page,'order-type-buttons-'+(dark?'dark':'light')+'-'+v.width+'.png');
+    pass(t.name+'/'+v.width+': order-type labels, real hover, keyboard focus and selected state readable in '+(dark?'dark':'light'));
+  }
+  // This fictional table-order company can have no menu products. enterGridMode
+  // correctly refuses an empty list: explicitly supply a temporary in-memory deal
+  // before asserting its non-empty Tab branch, then restore the original catalog.
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    window.__tnOrderTypeTabFixture={deals:d.allDeals,query:d.searchQuery,showProducts:d.showProducts};
+    d.allDeals=[...d.allDeals,{id:999999991,type:'deal',name:'QA Order Type Tab Probe',price:100,show_on_sale:true}];
+    d.showProducts=true; // temporary UI state only; do not call a preference-saving toggle
+  });
+  try {
+    await root.locator('[x-ref="searchInput"]').fill('QA Order Type Tab Probe');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).displayItems.some(i=>i.name==='QA Order Type Tab Probe'),null,{timeout:5000});
+    await root.locator('.prod-card').filter({hasText:'QA Order Type Tab Probe'}).waitFor({state:'visible',timeout:5000});
+    await buttons.first().focus();
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===true);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===false);
+    pass(t.name+'/'+v.width+': existing Tab enters a non-empty product grid and Escape returns');
+  } finally {
+    await page.evaluate(()=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]')),saved=window.__tnOrderTypeTabFixture;
+      d.allDeals=saved.deals;d.searchQuery=saved.query;d.showProducts=saved.showProducts;d.filterProducts();
+      delete window.__tnOrderTypeTabFixture;
+    });
+  }
+  await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),wasDark);
+
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});
@@ -1550,6 +1620,7 @@ async function tableOrderWorkflow(page,t,v) {
       return Number(d.incomingOrderId)===orderId&&Number(d.selectedTable?.id)===id
         &&d.cart.length===1&&d.cart[0].item_name===name&&d.orderType==='dine_in'&&!d.showTablePicker;
     },{id:expected.tableId,orderId:expected.orderId,name:expected.itemName});
+    if(await buttons.first().getAttribute('aria-pressed')!=='true')throw new Error('Dine In selected state lost after actual table claim');
     await openMobileCart(page,v,['Current Order']);
     await root.getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
     if(!await page.locator('[data-video="open-payment"]').isEnabled())throw new Error(expected.status+' table lost its payment action');

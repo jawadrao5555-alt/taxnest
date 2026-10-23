@@ -1002,21 +1002,21 @@ window.addEventListener('popstate', function() {
              the whole widget is hidden unless a restaurant feature (tables/KOT/kitchen)
              or Delivery is enabled. orderType silently stays 'takeaway' underneath. --}}
         @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
-        <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="{{ __('pos.ti_press_f2_cycle') }}">
+        <div data-tn-order-type-switcher class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="{{ __('pos.ti_press_f2_cycle') }}">
             @if($features->tables)
             {{-- Dine In pill (owner, 26 Jul 2026): selected table isi pill mein
                  dikhta hai ("Dine In · T-3"); dobara click = picker (table change).
                  Teal count chip = waiter orders waiting in the picker (Table-se-Bill
                  badge — top Table button ke saath yahan shift hua; INLINE chip,
                  absolute nahi — parent div overflow-hidden badge kaat deta). --}}
-            <button data-video="counter-dine-in" @click="setOrderType('dine_in')" class="flex items-center gap-1 px-3.5 py-2 text-xs font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">
+            <button data-video="counter-dine-in" @click="setOrderType('dine_in')" :aria-pressed="orderType === 'dine_in'" style="min-height:44px;" class="flex items-center gap-1 px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black dark:focus-visible:outline-white" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'">
                 <span x-text="selectedTable ? window.TXT.dine_in_t_prefix + selectedTable.table_number : window.TXT.dine_in"></span>
                 <span x-show="incomingOrders.length > 0" x-cloak class="min-w-[16px] h-[16px] px-1 bg-teal-600 text-white text-[9px] rounded-full inline-flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
             </button>
             @endif
-            <button @click="setOrderType('takeaway')" class="px-3.5 py-2 text-xs font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.takeaway') }}</button>
+            <button @click="setOrderType('takeaway')" :aria-pressed="orderType === 'takeaway'" style="min-height:44px;" class="px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black dark:focus-visible:outline-white border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'">{{ __('pos.takeaway') }}</button>
             @if($features->delivery)
-            <button @click="setOrderType('delivery')" class="px-3.5 py-2 text-xs font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.delivery') }}</button>
+            <button @click="setOrderType('delivery')" :aria-pressed="orderType === 'delivery'" style="min-height:44px;" class="px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black dark:focus-visible:outline-white" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'">{{ __('pos.delivery') }}</button>
             @endif
             <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>

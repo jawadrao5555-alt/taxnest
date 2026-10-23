@@ -7181,5 +7181,6 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_no_document_reason_store_slip_disabled' => 'Store slip band hai',
     'print_no_document_reason_held_sale_missing' => 'Held sale ab dastiyab nahi',
     'return_not_allowed_hotel_credit_required' => 'Is bill ke liye Hotel Return / Credit Note screen use karein. Payment refund alag hai.',
+    'recalled_additions_final_confirm' => 'Order wapas kholne ke baad yeh cheezein barhai gayi hain. Yeh final bill mein shamil hongi. In cart tabdeeliyon ke liye Send to Kitchen nahi dabaya gaya. Payment jari rakhein? Cancel kar ke pehle cart dekhein ya kitchen ko bhejein.',
 ];
 

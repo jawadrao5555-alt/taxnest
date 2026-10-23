@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source=fs.readFileSync(new URL('../../resources/views/pos/universal.blade.php',import.meta.url),'utf8');
+const methods=['cartEditFingerprint','confirmRecalledAdditions'].map(name=>{const start=source.indexOf('        '+name+'() {');assert.ok(start>0);return source.slice(start,source.indexOf('\n        },',start)+11);}).join('\n');
+const item=(id,name,quantity=1,extra={})=>({item_id:id,item_type:'product',item_name:name,quantity,unit_price:80,...extra});
+function fixture(answer=true){const prompts=[];const ui=vm.runInNewContext('({'+methods+'})',{window:{TXT:{recalled_additions_final_confirm:'Review additions'}},confirm:text=>{prompts.push(text);return answer;}});Object.assign(ui,{kotFeatureEnabled:true,recalledOrderId:12,cart:[item(1,'Pizza')]});ui._recallCartBaseline=ui.cartEditFingerprint();return{ui,prompts};}
+test('declining final payment for an extra unsent bottle leaves cart and baseline untouched',()=>{const{ui,prompts}=fixture(false);ui.cart.push(item(2,'Bottle'));const cart=ui.cart;const before=ui.cartEditFingerprint();assert.equal(ui.confirmRecalledAdditions(),false);assert.match(prompts[0],/Bottle × 1/);assert.equal(ui.cart,cart);assert.equal(ui.cartEditFingerprint(),before);});
+test('approval covers the same attempt only; changed quantity or another order asks again',()=>{const{ui,prompts}=fixture();ui.cart.push(item(2,'Bottle'));assert.equal(ui.confirmRecalledAdditions(),true);assert.equal(ui.confirmRecalledAdditions(),true);assert.equal(prompts.length,1);ui.cart[1].quantity=2;ui.confirmRecalledAdditions();assert.match(prompts[1],/Bottle × 2/);ui.recalledOrderId=13;ui.confirmRecalledAdditions();assert.equal(prompts.length,3);});
+test('unchanged/reduced/split-equivalent rows and kitchen-skipped fees do not warn',()=>{const{ui,prompts}=fixture();ui.cart[0].quantity=2;ui._recallCartBaseline=ui.cartEditFingerprint();ui.cart=[item(1,'Pizza'),item(1,'Pizza'),item(3,'Delivery fee',1,{skip_kitchen:true})];assert.equal(ui.confirmRecalledAdditions(),true);ui.cart[0].quantity=0;ui.confirmRecalledAdditions();assert.equal(prompts.length,0);});
+test('retail/no KOT/new direct sale and old missing baseline remain compatible',()=>{for(const change of [{kotFeatureEnabled:false},{recalledOrderId:null},{_recallCartBaseline:null}]){const{ui,prompts}=fixture();ui.cart.push(item(2,'Bottle'));Object.assign(ui,change);assert.equal(ui.confirmRecalledAdditions(),true);assert.equal(prompts.length,0);}});

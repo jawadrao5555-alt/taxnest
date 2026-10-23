@@ -7178,5 +7178,6 @@ return [
     'print_no_document_reason_store_slip_disabled' => 'اسٹور سلپ بند ہے',
     'print_no_document_reason_held_sale_missing' => 'ہولڈ سیل اب دستیاب نہیں',
     'return_not_allowed_hotel_credit_required' => 'اس بل کے لیے ہوٹل واپسی / کریڈٹ نوٹ استعمال کریں۔ رقم کی واپسی الگ ہے۔',
+    'recalled_additions_final_confirm' => 'آرڈر دوبارہ کھولنے کے بعد یہ اشیاء بڑھائی گئی ہیں۔ یہ فائنل بل میں شامل ہوں گی۔ ان تبدیلیوں کے لیے Send to Kitchen نہیں دبایا گیا۔ ادائیگی جاری رکھیں؟ پہلے جائزہ لینے یا کچن کو بھیجنے کے لیے Cancel کریں۔',
 ];
 

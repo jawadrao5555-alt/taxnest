@@ -7193,5 +7193,6 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'print_no_document_reason_store_slip_disabled' => 'Store slip is switched off',
     'print_no_document_reason_held_sale_missing' => 'Held sale is no longer available',
     'return_not_allowed_hotel_credit_required' => 'Use the Hotel Return / Credit Note screen for this bill. Payment refunds are separate.',
+    'recalled_additions_final_confirm' => 'New or increased items were added after recalling this order. They will be included in the final bill. Send to Kitchen has not been pressed for these cart changes. Continue to payment? Cancel to review or send them first.',
 ];
 

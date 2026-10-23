@@ -1,6 +1,6 @@
-title: "Naye caller ka delivery bill asani se banayein"
+title: "Wapas kholay gaye order ki nayi cheezon ka jaiza"
 audience: pos
 type: improvement
 points:
-  - "Caller ID mein naye number par Bill dabane se Delivery select ho jayegi, agar aapki dukan mein Delivery chalu hai."
-  - "Sirf call aane se bill ki qisam nahi badlegi. Cart mein mojood cheezein bhi barqarar rahengi."
+  - "Purana order khol kar cheezein barhane ke baad payment se pehle yaad-dihani nazar aayegi."
+  - "Cancel kar ke cart ka jaiza lein ya pehle kitchen ko bhejein. Tasdeeq karne par nayi cheezein bhi bill mein shamil rahengi."

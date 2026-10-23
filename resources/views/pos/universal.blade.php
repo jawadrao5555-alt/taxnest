@@ -5207,6 +5207,7 @@ function restaurantPos() {
         // "Restaurant module not enabled"). For retail companies we route
         // EVERY processPayment call through processPaymentManual which uses
         // pos.invoice.store — a universal endpoint with no restaurant guard.
+        kotFeatureEnabled: {{ ($features->kot ?? false) ? 'true' : 'false' }},
         isRestaurantMode: {{ (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false)) ? 'true' : 'false' }},
         // ── PROVISIONAL BILLS (header shortcut, F10) ──────────────────────────
         // Lazy-loaded list of all bills with pra_status='local' for current company.
@@ -8437,6 +8438,40 @@ function restaurantPos() {
                 dval: Number(this.discountValue) || 0,
             });
         },
+        // A final bill includes the whole cart. Warn about additions made AFTER
+        // recall before any hold/edit/payment write; never silently drop them.
+        confirmRecalledAdditions() {
+            if (!this.kotFeatureEnabled || !(this.recalledOrderId || this.incomingOrderId) || !this._recallCartBaseline) return true;
+            let baseline;
+            try { baseline = JSON.parse(this._recallCartBaseline).items; } catch (_) { return true; }
+            if (!Array.isArray(baseline)) return true;
+            const fingerprint = this.cartEditFingerprint();
+            const approvalKey = JSON.stringify([this.recalledOrderId || null, this.incomingOrderId || null, this._recallCartBaseline, fingerprint]);
+            if (this._confirmedRecalledAdditions === approvalKey) return true;
+            const key = row => JSON.stringify([row[0], row[1], row[2], row[4], row[5]]);
+            const old = new Map();
+            for (const row of baseline) {
+                if (row[9]) continue;
+                old.set(key(row), (old.get(key(row)) || 0) + Number(row[3] || 0));
+            }
+            const current = new Map();
+            for (const row of JSON.parse(fingerprint).items) {
+                if (row[9]) continue;
+                const k = key(row);
+                const entry = current.get(k) || { name: row[2], quantity: 0 };
+                entry.quantity += Number(row[3] || 0);
+                current.set(k, entry);
+            }
+            const additions = [];
+            for (const [k, row] of current) {
+                const extra = row.quantity - (old.get(k) || 0);
+                if (extra > 0) additions.push(row.name + ' × ' + extra);
+            }
+            if (!additions.length) return true;
+            if (!confirm(window.TXT.recalled_additions_final_confirm + '\n\n' + additions.join('\n'))) return false;
+            this._confirmedRecalledAdditions = approvalKey;
+            return true;
+        },
         recalledCartDirty() {
             if (!(this.recalledOrderId || this.incomingOrderId)) return false;
             // Snapshot hi na ho (purane path se aaya state) → pichhle task (1027)
@@ -11081,6 +11116,7 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
+            if (!this.confirmRecalledAdditions()) return;
             if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             if (this.submitting) return;
             if (this.incomingOrderId && this.recalledCartDirty() && !await this.saveIncomingOrder()) return;
@@ -11261,6 +11297,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            if (!this.confirmRecalledAdditions()) return;
             if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).
             if (this.submitting) return;

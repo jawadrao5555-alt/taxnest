@@ -21,6 +21,17 @@ public static class NativePairingDialog {
   [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint message, IntPtr w, IntPtr l);
   static string Text(IntPtr h) { var s=new StringBuilder(2048); GetWindowText(h,s,s.Capacity); return s.ToString(); }
+  public static IntPtr Find(uint pid) {
+    IntPtr result=IntPtr.Zero;
+    EnumWindows((h,p)=>{uint owner;GetWindowThreadProcessId(h,out owner);
+      if(owner==pid && IsWindowVisible(h) && Text(h)=="Connect TaxNest Agent") {result=h;return false;}
+      return true;},IntPtr.Zero);
+    return result;
+  }
+  public static bool ClickTaskButton(IntPtr h, int id) {
+    // Documented TDM_CLICK_BUTTON: delivered to the real native TaskDialog.
+    return PostMessage(h,0x0400+102,new IntPtr(id),IntPtr.Zero);
+  }
   public static string Describe(uint pid) {
     var rows=new List<string>();
     EnumWindows((h,p)=>{uint owner;GetWindowThreadProcessId(h,out owner);
@@ -50,23 +61,33 @@ public static class NativePairingDialog {
 }
 '@
 $deadline = [DateTime]::UtcNow.AddSeconds(20)
+$lastNativeLabels = ''
 while ([DateTime]::UtcNow -lt $deadline) {
-  $filter = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $TargetProcessId)
-  $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Descendants, $filter)
-  foreach ($window in $windows) {
-    if ($window.Current.Name -ne 'Connect TaxNest Agent') { continue }
+  $handle = [NativePairingDialog]::Find([uint32]$TargetProcessId)
+  if ($handle -ne [IntPtr]::Zero) {
+    # Bind UIA directly to the already verified native HWND. Owned TaskDialogs
+    # need not appear in the desktop RootElement's filtered descendant walk.
+    $window = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
     $nodes = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
     $names = @($nodes | ForEach-Object { $_.Current.Name })
-    if (-not (($names -join ' ').Contains($ExpectedCompany))) { throw 'Native confirmation does not identify intended fixture company' }
-    foreach ($node in $nodes) {
-      if ($node.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $node.Current.Name.Replace('&','') -eq $Button) {
-        $node.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-        exit 0
+    $lastNativeLabels = $names -join ' | '
+    if (($names -join ' ').Contains($ExpectedCompany)) {
+      foreach ($node in $nodes) {
+        if ($node.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $node.Current.Name.Replace('&','').Trim() -eq $Button) {
+          try { $node.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); exit 0 } catch {
+            # Some native command-link providers expose the real control ID
+            # but not InvokePattern. Never guess the ID from response order.
+            $controlId = 0
+            if ([int]::TryParse($node.Current.AutomationId, [ref]$controlId) -and $controlId -gt 0 -and [NativePairingDialog]::ClickTaskButton($handle,$controlId)) { exit 0 }
+          }
+        }
       }
     }
   }
   if ([NativePairingDialog]::Click([uint32]$TargetProcessId, $ExpectedCompany, $Button)) { exit 0 }
   Start-Sleep -Milliseconds 100
 }
+# Only this known fixture dialog's static labels; never the settings controls.
+Write-Error ('Own native confirmation labels: ' + $lastNativeLabels) -ErrorAction Continue
 Write-Error ('Own-process native window diagnostics: ' + [NativePairingDialog]::Describe([uint32]$TargetProcessId)) -ErrorAction Continue
 throw 'Expected native company confirmation/button did not appear'

@@ -89,3 +89,15 @@ confirmation. The next source adds only own-process native window title/class
 diagnostics (no control values/keys) and an explicit post-settings stage marker,
 to distinguish a runner desktop limitation from a title/hierarchy mismatch.
 No assertion, native dialog, identity match or deadline is bypassed.
+
+## Exact native diagnostic (HEAD6cee9e)
+Windows40007398837/job120598690273 confirmed the own-process #32770 native
+`Connect TaxNest Agent` dialog exists and is visible, alongside the real settings
+and NestPOS windows. This rules out an absent dialog/desktop for that attempt.
+The driver now binds UI Automation directly with FromHandle to the HWND already
+validated by PID/title/visibility, checks the actual company text/button name,
+then invokes that control. If its provider lacks InvokePattern, only a parsed
+actual AutomationId can drive documented native TDM_CLICK_BUTTON; no guessed
+response ID or fabricated success. Native result/POST/write assertions stay.
+Failure diagnostics may include only this known fixture dialog's static labels,
+never settings values. This still requires a fresh native pass.

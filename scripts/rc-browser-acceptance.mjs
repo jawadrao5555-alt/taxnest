@@ -1531,6 +1531,26 @@ async function tableOrderWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  await root.evaluate(el=>{
+    const d=window.Alpine.$data(el);
+    window.__additionFixture={cart:d.cart,recalledOrderId:d.recalledOrderId,incomingOrderId:d.incomingOrderId,baseline:d._recallCartBaseline,approval:d._confirmedRecalledAdditions};
+    d.cart=[{item_id:990001,item_type:'product',item_name:'Fictional pizza',quantity:1,unit_price:100}];
+    d.recalledOrderId=990001;d.incomingOrderId=null;d._recallCartBaseline=d.cartEditFingerprint();
+    d.cart.push({item_id:990002,item_type:'product',item_name:'Fictional bottle',quantity:1,unit_price:80});
+  });
+  try {
+    for(const accept of [false,true]) {
+      const dialog=page.waitForEvent('dialog');
+      const result=root.evaluate(el=>window.Alpine.$data(el).confirmRecalledAdditions());
+      const prompt=await dialog;
+      if(!prompt.message().includes('Fictional bottle'))throw new Error('Missing unsaved bottle confirmation');
+      if(accept)await prompt.accept();else await prompt.dismiss();
+      if(await result!==accept)throw new Error('Recalled addition confirmation choice ignored');
+    }
+    await saveEvidenceScreenshot(page,'recalled-additions-review-'+v.width);
+  } finally {
+    await root.evaluate(el=>{const d=window.Alpine.$data(el),f=window.__additionFixture;d.cart=f.cart;d.recalledOrderId=f.recalledOrderId;d.incomingOrderId=f.incomingOrderId;d._recallCartBaseline=f.baseline;d._confirmedRecalledAdditions=f.approval;delete window.__additionFixture;});
+  }
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});

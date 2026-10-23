@@ -645,6 +645,7 @@ $fixture = [
                 'refundPath' => '/pos/hotel/stays/'.$refundStay->id.'/credit-notes']],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
+            'settingsOwner' => ['name'=>'synthetic-settings-owner','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login'],
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],

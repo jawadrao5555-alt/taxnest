@@ -5,3 +5,11 @@ Sources AUDIO-2026-10-22-00-52-38.m4a and b019f539-8c39-405e-bd4b-0480a78718e6.m
 Settings use fresh-row merge; stale form leaves new keys untouched and sibling display sets survive. Add regression to actual settings HTTP test for save/stale/invalid enum. Existing authorization/tenant tests retained. Browser CI now selects actual controls and observes preview before retained original table/caller/billing journey, desktop/mobile. No production/printing.
 
 Local: PHP8.3 syntax-only; production typography CSS helper + actual receipt CSS rendered in isolated Chromium153 at58/80mm passed font size, no overflow, full text and unchanged money. Legacy/invalid inputs emit no CSS. Preview JS syntax and whitespace pass. Native PHP8.4/full app/MariaDB/rendered receipt HTTP and settings acceptance pending real CI; keep draft. Standard browser download failed truncated ZIP; component browser uses an independently installed local binary, not a production browser session.
+
+Fresh browser CI exposed that the settings preview was visited as the existing
+cashier, which is correctly denied this settings screen. Use the already-seeded
+same-company owner in a separate browser context and close it afterward; retain
+preview selection/screenshot and every original cashier journey. No production
+permissions changed. Shared main Electron42.11.3 now fails newly published audit
+advisories, including GHSA-x562-297c-g43g. Audit remains enforced; no unrelated
+dependency edits. New exact-head full acceptance is required; keep draft.

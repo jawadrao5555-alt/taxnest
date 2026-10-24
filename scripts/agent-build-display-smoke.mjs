@@ -24,12 +24,15 @@ const server = createServer((request, response) => {
   const bridge = `<script>
     window.__unexpectedAgentCalls=[];
     window.__emitStatus=null;
+    window.__imsInstalls=0;
+    window.__imsRunning=false;
     window.agentAPI=new Proxy({
       getVersion:async()=>{if(${JSON.stringify(mode)}==='ipc-error')throw new Error('Synthetic identity IPC unavailable');return ${JSON.stringify(info)};},
       getConfig:async()=>({serverUrl:location.origin+'/api/agent',companyId:'Fictional company',apiKey:''}),
       getPrinters:async()=>({printers:[]}),getStatus:async()=>({running:false,connected:false}),
       onStatusUpdate:fn=>{window.__emitStatus=fn;},
-      checkImsService:async()=>({running:false}),
+      checkImsService:async()=>({running:window.__imsRunning}),
+      installFbrIms:async()=>{window.__imsInstalls++;return {ok:true};},
       checkUpdate:async()=>({available:false}),
       getPosSettings:async()=>({}),getLanSettings:async()=>({enabled:false}),getLanStatus:async()=>({enabled:false}),
     },{get:(target,key)=>key in target?target[key]:String(key).startsWith('on')?()=>{}:async()=>{window.__unexpectedAgentCalls.push(String(key));return {};}});
@@ -67,22 +70,41 @@ try {
     assert.equal(await page.locator('#serverUrl').inputValue(), origin + '/api/agent');
     assert.deepEqual(await page.evaluate(() => window.__unexpectedAgentCalls), []);
     if (mode === 'valid') {
-      for (const connectionMode of ['cloud', 'fiscal_device']) {
+      for (const connectionMode of ['cloud', 'fiscal_device', null]) {
         await page.evaluate(connectionMode => window.__emitStatus({running:true,connected:true,
           serverInfo:{product_type:'fbrpos',fbr_connection_mode:connectionMode}}), connectionMode);
         await page.waitForFunction(() => document.getElementById('imsInstallBtn').style.display === 'inline-block');
         assert(await page.locator('#imsCard').isVisible());
         assert(await page.locator('#imsInstallBtn').isVisible());
-        if (connectionMode === 'cloud') assert.match(await page.locator('#imsRoutingNote').textContent(), /remains unchanged/);
+        if (connectionMode !== 'fiscal_device') assert.match(await page.locator('#imsRoutingNote').textContent(), /remains unchanged/);
+        assert.equal(await page.evaluate(() => window.__imsInstalls), 0, 'discovery never installs automatically');
       }
+      await page.locator('#imsInstallBtn').click();
+      await page.waitForFunction(() => document.getElementById('imsProgress').textContent.includes('installer launched'));
+      assert.equal(await page.evaluate(() => window.__imsInstalls), 1, 'explicit click reaches only the fictional installer');
+      await page.evaluate(() => { window.__imsRunning=true; });
+      await page.locator('#imsCheckBtn').click();
+      await page.waitForFunction(() => document.getElementById('imsBadge').textContent.includes('IMS Running'));
+      assert.equal(await page.locator('#imsInstallBtn').isVisible(), false);
+      await page.evaluate(() => { window.__imsRunning=false; window.__emitStatus({running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device'}}); });
+      await page.waitForFunction(() => document.getElementById('praImsSteps').style.display === 'block');
+      assert(await page.locator('#imsCard').isVisible());
+      assert.match(await page.locator('#imsHeading').textContent(), /PRA/);
+      assert.equal(await page.locator('#imsInstallBtn').isVisible(), false);
+      await page.evaluate(() => document.getElementById('imsInstallBtn').click());
+      assert.equal(await page.evaluate(() => window.__imsInstalls), 1, 'PRA cannot invoke FBR installer even through a hidden control');
       await page.evaluate(() => window.__emitStatus({running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'cloud'}}));
+      assert.equal(await page.locator('#imsCard').isVisible(), false);
+      await page.evaluate(() => window.__emitStatus({running:true,connected:true,serverInfo:{product_type:'unknown'}}));
       assert.equal(await page.locator('#imsCard').isVisible(), false);
       await page.evaluate(() => window.__emitStatus({running:false,connected:false}));
       assert.equal(await page.locator('#imsCard').isVisible(), false);
+      assert.deepEqual(await page.evaluate(() => window.__unexpectedAgentCalls), []);
+      await saveEvidenceScreenshot(page, 'agent-ims-discovery');
     }
     assert.deepEqual(errors, []);
   }
-  console.log('PASS: actual Agent settings HTML shows version/build date; missing/failed IPC honest; no settings writes');
+  console.log('PASS: actual Agent version/build date and FBR cloud/fiscal/unknown-mode IMS; explicit fictional install, running service, PRA fiscal/cloud, unknown/disconnected; no settings writes or pageerrors');
 } finally {
   if (browser) await browser.close();
   await new Promise(resolve => server.close(resolve));

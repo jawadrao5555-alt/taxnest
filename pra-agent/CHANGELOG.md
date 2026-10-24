@@ -1,3 +1,10 @@
+## v1.13.23 (2026-10-24)
+**FBR IMS preparation remains visible after company pairing**
+
+- An authenticated FBR company can check or explicitly install its local IMS from Agent settings in both cloud and fiscal-device reporting modes. The screen explains that installing IMS does not change the company reporting mode.
+- PRA fiscal-device guidance stays scoped to PRA; PRA cloud, disconnected and unknown-product states do not show the FBR installer. Saved company, device, printer and reporting configuration is preserved.
+- Package this change under a new immutable version; published v1.13.22 is preserved. Version and actual build date remain visible. Distribution requires the separate owner approval and exact-source Windows release; no installer runs automatically because this card becomes visible.
+
 ## v1.13.20 (2026-10-17)
 **Actual Agent version and packaging date on the settings screen**
 

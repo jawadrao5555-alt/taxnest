@@ -1,6 +1,10 @@
-title: "FBR Agent mein IMS ki maloomat zyada wazeh"
-audience: pos
+title: "Agent 1.13.23: FBR IMS setup ab asani se milay"
+audience: all
 type: improvement
 points:
-  - "FBR Agent ki settings mein IMS check aur installation ka hissa wazeh nazar aayega."
-  - "IMS install karne se company ka bill reporting tareeqa khud se nahi badlega."
+  - "Yeh desktop Agent ka update hai. PRA POS aur FBR POS dono isi Agent ko istemal karte hain. Naya version milnay par Agent update karein; sirf website kholnay se PC ka purana Agent nahi badalta."
+  - "FBR POS company connect honay ke baad Agent ki Settings mein FBR IMS Fiscal Service ka hissa nazar aayega, chahe company abhi cloud par bills report kar rahi ho ya local fiscal device par."
+  - "Re-check se isi PC par IMS service ka haal dekhein. Service na milay to Install FBR IMS ka button milega. Download aur installer sirf aap ke button dabane par shuru hoga; phir FBR ki setup aur activation hidayat mukammal karein."
+  - "IMS install karne se company ka bill reporting tareeqa khud se nahi badlega. Cloud reporting se local fiscal reporting par jana ho to pehle apni company ki munasib setting aur FBR activation mukammal karein."
+  - "PRA POS mein pehle wali IMS rehnumai aur reporting apni jagah rahegi. Company, counter aur printer ki saved settings dobara bharne ki zaroorat nahi."
+  - "Agent ki Settings ke upar version aur build ki tareekh dekhein. Is update ka version 1.13.23 hai; agar purana version nazar aaye to PC par naya Agent abhi nahi chala."

@@ -228,7 +228,7 @@ $kdsOrdersJson = $orders->map(function($o) use ($stationItemMap) {
     $kdsStart = $o->kot_sent_at ?: $o->created_at;
     $elapsed = (int) $kdsStart->diffInMinutes(now());
     $items = $o->items->map(function($i) use ($stationItemMap) {
-        return ['name' => $i->item_name, 'qty' => $i->quantity, 'notes' => $i->special_notes, 'station_id' => $stationItemMap[$i->id] ?? 0];
+        return ['name' => $i->item_name, 'qty' => $i->quantity, 'notes' => trim(\App\Support\PosFulfillment::label($i->fulfillment) . ' ' . ($i->special_notes ?? '')), 'station_id' => $stationItemMap[$i->id] ?? 0];
     })->values();
     return [
         'id' => $o->id,

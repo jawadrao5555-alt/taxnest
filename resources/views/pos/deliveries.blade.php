@@ -142,7 +142,7 @@
         @php
             $open = $khataBills[$rider->id] ?? collect();
             // Khata remaining — partial receipts (Task 525) already handed over are deducted.
-            $owed = (float) $open->sum(fn ($b) => (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0));
+            $owed = (float) $open->sum(fn ($b) => \App\Models\PosRider::remainingAmount($b));
         @endphp
         {{-- id= dashboard ke "Rider settlement pending" alert ka nishana hai
              (25 Aug 2026): wahan se click seedha isi rider ke card par utarta
@@ -233,7 +233,7 @@
                         @csrf
                         <div class="space-y-1.5 mb-4">
                             @foreach($open as $b)
-                            @php $rem = (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0); @endphp
+                            @php $rem = \App\Models\PosRider::remainingAmount($b); @endphp
                             <div class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60"
                                  :class="settlePrepaid[{{ $b->id }}] ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : ''">
                                 <input type="checkbox" name="bill_ids[]" value="{{ $b->id }}" data-amount="{{ $rem }}" data-settle-bill="{{ $b->id }}" checked
@@ -453,7 +453,14 @@
                             </div>
                             @endif
                         </td>
-                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}
+                            @if($b->rider_collection_amount !== null)
+                                <p class="mt-1 text-xs text-teal-700 dark:text-teal-300">{{ __('pos.fulfill_rider_cash') }}: Rs. {{ number_format(\App\Models\PosRider::remainingAmount($b), 2) }}</p>
+                                @foreach($b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false) as $deliveryItem)
+                                    <p class="text-xs text-gray-600 dark:text-gray-300">{{ (float) $deliveryItem->quantity }} × {{ $deliveryItem->item_name }}</p>
+                                @endforeach
+                            @endif
+                        </td>
                         <td class="px-4 py-3">
                             @if($b->payment_method === 'cash')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
@@ -705,7 +712,14 @@
                             <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
                             @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
                         </td>
-                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}
+                            @if($b->rider_collection_amount !== null)
+                                <p class="mt-1 text-xs text-teal-700 dark:text-teal-300">{{ __('pos.fulfill_rider_cash') }}: Rs. {{ number_format(\App\Models\PosRider::remainingAmount($b), 2) }}</p>
+                                @foreach($b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false) as $deliveryItem)
+                                    <p class="text-xs text-gray-600 dark:text-gray-300">{{ (float) $deliveryItem->quantity }} × {{ $deliveryItem->item_name }}</p>
+                                @endforeach
+                            @endif
+                        </td>
                         <td class="px-4 py-3">
                             @if($b->payment_method === 'cash')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>

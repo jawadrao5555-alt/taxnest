@@ -130,3 +130,53 @@ Reproduced the exact two page errors locally with real Chromium. The fixture now
 CHROMIUM_BIN=/tmp/cursor-sandbox-cache/taxnest-local/chromium node scripts/agent-build-display-smoke.mjs
 
 JS syntax and git diff --check passed. This local browser pass is the Agent settings preview only, not a full Laravel app acceptance claim. No runtime/dependency/security gate changed. New HEAD requires fresh mandatory eight plus Windows; prior native success remains historical evidence only for that new HEAD.
+
+
+## 24 October promotion audit correction
+
+Same source 6f4698b passed its initial mandatory eight and Windows, but the
+ready-for-review run40051147709/job120743896882 correctly failed new public
+security advisories. Local `npm audit --package-lock-only --json` independently
+reproduced Agent electron/undici/fast-uri and mockup zod failures. No rerun or
+audit suppression can repair this graph.
+
+Reviewed upstream fixes (registry metadata includes exact SRI):
+- Electron42.11.9 →42.11.16, package/lock/build/test pins aligned:
+  https://github.com/advisories/GHSA-jr5w-w6x2-84p9
+- Undici6.28.1 →6.29.1 and7.29.1 →7.30.1, preserving each parent's major range:
+  https://github.com/nodejs/undici/releases/tag/v6.29.1
+  https://github.com/nodejs/undici/releases/tag/v7.30.1
+- fast-uri3.1.8 →3.1.9:
+  https://github.com/fastify/fast-uri/releases/tag/v3.1.9
+- Mockup Zod3.25.76 →exact4.6.6:
+  https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
+  No mockup source imports Zod/zodResolver, no parent package depends on it,
+  and the unchanged resolver's peer contract is react-hook-form only. Clean
+  install and actual Vite production build pass with the new direct version.
+
+Only five locked package entries plus direct specs change. Registry metadata
+confirms unchanged dependency edges/engine requirements for the four Agent
+entries; Zod has no dependency edges. All package counts and other versions,
+integrities, dependency edges and reviewed local-fork source hashes stay intact.
+Reviewed graph fingerprints updated explicitly; every guard remains enforced.
+Source release identity1.13.22 unchanged; no tag, release or production action.
+Existing company/printer/device/manual-pairing preferences and PRA/FBR flows
+are untouched; fresh native gate must verify them on the patched runtime.
+
+Local Node24.19.0 evidence:
+- Clean root/Agent/mockup npm ci --ignore-scripts --no-audit --no-fund: PASS.
+- Agent and mockup original npm audit command: PASS, zero vulnerabilities each.
+- Same platform-independent PR Agent selection:106/106 PASS, zero skips.
+- Focused release/pairing/renderer/downloader selection:26/26 PASS.
+- PORT=5173 BASE_PATH=/ NODE_ENV=production npm run build (mockup): PASS.
+  First invocation omitted required PORT/BASE_PATH and failed before compilation;
+  providing the existing documented config resolved it, with no source change.
+- Lock portability plus isolated mutation/source-integrity regressions, release
+  chain, active/proposed CI safety contract, whitespace: PASS.
+- Optional mockup npm run typecheck could not run: the existing manifest does
+  not install tsc. No typecheck pass is claimed or unrelated dependency added.
+
+PHP8.4/MariaDB/browser and native Windows acceptance are not available in this
+local environment; fresh current-HEAD mandatory eight and Windows CI remain
+required. Prior same-source runs and old Windows passes cannot verify this new
+runtime. Owner approval/relay is separate after all new gates succeed.

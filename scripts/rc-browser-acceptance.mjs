@@ -1938,6 +1938,22 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
   const input=page.locator('[x-ref="searchInput"]');await input.fill('QA Deal');
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
   const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
+  const short=dropdown.locator('[data-search-result]').first();
+  const shortGap=await short.evaluate(el=>{
+    const name=el.querySelector('[data-search-result-name]').getBoundingClientRect();
+    const price=el.querySelector('[data-search-result-price]').getBoundingClientRect();
+    return price.left-name.right;
+  });
+  if(shortGap>32||shortGap<0)throw new Error('Price is not beside its matching product name: gap '+shortGap);
+  if((await input.boundingBox()).width>641)throw new Error('Search input still spans the full wide workspace');
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.searchSuggestions[0].name='QA Deal No 1 '+('Long readable item name ').repeat(8);
+  });
+  const long=short.locator('[data-search-result-name]');
+  const longMetrics=await long.evaluate(el=>({clipped:el.scrollWidth>el.clientWidth+1,ellipsis:getComputedStyle(el).textOverflow==='ellipsis'}));
+   if(longMetrics.clipped||longMetrics.ellipsis)throw new Error('Long search name was clipped rather than wrapped: '+JSON.stringify(longMetrics));
+  await saveEvidenceScreenshot(page,'compact-search-name-price-'+v.width+'.png');
   for(const n of [13,14,15,16]) {
     const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});
     await item.scrollIntoViewIfNeeded();if(!await item.isVisible())throw new Error('matching deal '+n+' is hidden from search');

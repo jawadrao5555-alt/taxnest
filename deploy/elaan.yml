@@ -1,6 +1,6 @@
-title: "Ek hi bill mein yahin khana, parcel aur delivery"
+title: "Bill dobara saada: parcel ke liye item note"
 audience: pos
-type: feature
+type: improvement
 categories:
   - restaurant
   - cafe
@@ -10,15 +10,10 @@ categories:
   - catering
   - bakery
 points:
-  - "Ab ek hi bill mein kuch items yahin khanay ke liye, kuch parcel aur kuch delivery ke liye rakh sakte hain. In mein se koi bhi do ya teeno tareeqay ek saath istemal kar sakte hain."
-  - "POS mein Current Order ke andar New items will be se Serve Here (yahin khana), Parcel (saath le jana) ya Delivery (pattay par bhejna) chunein. Is ke baad add kiya gaya item usi tareeqay se lagega."
-  - "Ek hi item ki quantity baantni ho to cart mein us item ke Serve Here, Parcel ya Delivery wale chhotay button par click karein. Har hissay ki quantity likhein aur Save dabayein. Teeno hisson ki jama asal quantity ke barabar honi chahiye."
-  - "Misaal: 3 pizza mein 1 yahin khana hai, 1 parcel karna hai aur 1 ghar bhejna hai. Ek hi bill mein har pizza ke samnay us ka tareeqa alag nazar aayega. Pura bill Parcel ya Delivery mein badalna zaroori nahi."
-  - "Yeh taqseem shuru mein bhi kar sakte hain aur baad mein isi khulay bill mein naye items bhi add kar sakte hain. Table wala bill usi table ke saath rahega. Kitchen ko pehle bhejay huay items dobara tayyar karne ke liye nahi jayenge; aglay add-on mein sirf nayi quantity jayegi."
-  - "Kitchen ki parchi par SERVE HERE ka matlab yahin serve karna, PACK / TAKEAWAY ka matlab parcel aur PACK / DELIVERY ka matlab delivery ke liye pack karna hai. Item ki khaas hidayat, jaise mirch kam, alag rahegi."
-  - "Delivery ka hissa ho to customer ka phone aur delivery ka patta zaroor dein. Ek bill ki delivery ek hi pattay par jayegi. Delivery ka option aap ke package aur company ki chalu sahulat ke mutabiq milega."
-  - "Delivery payment mein Paid at counter chunein agar customer poori raqam counter par de raha hai. Is surat mein rider customer se bill ki koi raqam nahi lega."
-  - "Agar customer delivery ki raqam ghar par dega to Rider collects delivery portion chunein. Serve Here aur Parcel ki raqam counter par li jayegi; rider sirf delivery ke hissay aur us ke delivery charges ki raqam lega. Payment se pehle dono raqmein check kar lein."
-  - "Misaal: tax, discount aur charges ke baad bill Rs. 400 hai aur delivery ka hissa Rs. 100 hai. Paid at counter mein Rs. 400 counter par aur rider ke liye Rs. 0 hoga. Rider collection mein Rs. 300 counter par aur Rs. 100 rider ko lena hoga. Card payment mein rider ki cash collection nahi hogi."
-  - "Bill preview aur print par har item ka tareeqa aur counter ki raqam aur rider ki raqam alag nazar aayegi. Dono hisson ki jama wahi ek bill ka total hogi. Pehle se kitchen ko bhejay huay hissay ka tareeqa seedha badalnay ke bajaye us ki cancellation ya correction karein."
-  - "Is naye mixed order ko save aur pay karne ke liye internet zaroori hai. Connection na ho to cart ke items sambhalay rahenge; internet wapas anay par dobara koshish karein."
+  - "Bill bananay ka pehle wala saada tareeqa wapas hai. Ab item ki quantity ko Serve Here, Parcel aur Delivery ke alag hisson mein baantna nahi padega."
+  - "Jo item parcel dena ho, us item ke saath note ka chhota button dabayein aur Parcel likh dein. Yeh note usi line ki poori quantity par lagega aur kitchen ki parchi aur bill par nazar aayega."
+  - "Misaal: ek pizza parcel aur do yahin khanay ke liye hon to pehle ek pizza add karke us par Parcel note dein, phir do pizza add karein. Naye pizza parcel wale note mein nahi milenge."
+  - "Kitchen ko bhejay huay items mein naya item khud se nahi milega. Baad mein item add karke kitchen ko bhejein to add-on par sirf nayi quantity aur us ka note aayega. Pehle bheja hua khana dobara tayyar karne ke liye nahi jayega."
+  - "Kitchen ko bhejay huay item ki hidayat badalni ho to order ki correction ya cancellation ka tareeqa istemal karein. Naye item ka note kitchen ko bhejnay se pehle likhein."
+  - "Delivery ka bill pehle ki tarah alag banayein. Usi bill par customer ka phone, patta, delivery charges aur rider ka kaam rahega; table wale bill ki raqam ko hisson mein baantna nahi hoga."
+  - "Pehle se banay huay bills, unki payment aur rider ka hisaab apni jagah mehfooz hain. Purane bill ka record is tabdeeli se dobara nahi likha jayega."

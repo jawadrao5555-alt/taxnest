@@ -4450,7 +4450,7 @@ class PosController extends Controller
             }
         }
 
-        \App\Support\PosFulfillment::validate($request, $company);
+        \App\Support\PosFulfillment::validate($request, $company, $transaction);
         $companyItems = $this->resolveItemExemptions($request->items, $companyId, $request->input('order_type'));
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
         $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));

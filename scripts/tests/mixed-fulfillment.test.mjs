@@ -10,7 +10,7 @@ function method(name) {
   return source.slice(start, source.indexOf('\n        },', start) + 11).trim();
 }
 function fixture() {
-  const ui = vm.runInNewContext('({' + ['addToCart', 'openFulfillmentSplit', 'applyFulfillmentSplit', 'restoreFulfillmentCart', 'hasDeliveryPortion', 'hasMixedService', '_localCoreHold', 'payModalRiderCash', 'heldOrderEstimate'].map(method).join('\n') + '})', {
+  const ui = vm.runInNewContext('({' + ['addToCart', 'toggleItemNote', 'historicalMixedPayment', 'restoreFulfillmentCart', 'hasDeliveryPortion', 'hasMixedService', '_localCoreHold', 'payModalRiderCash', 'heldOrderEstimate'].map(method).join('\n') + '})', {
     window: { TXT: {}, NestPosLocal: { heldOrder: { hold() { throw Error('must not silently print mixed service'); } } } }, setTimeout() {},
   });
   Object.assign(ui, { cart: [], typeFlowGate: true, orderType: 'dine_in', fulfillmentMode: null, animateQty() {}, scrollToCartItem() {}, showToast() {}, removeDeliveryCharge() {} });
@@ -18,36 +18,32 @@ function fixture() {
 }
 const pizza = { id: 1, type: 'product', name: 'Fixture pizza', price: 500 };
 
-test('same product supports all three initial portions without changing the table/bill type', () => {
-  const ui = fixture();
-  ui.addToCart(pizza); ui.fulfillmentMode = 'takeaway'; ui.addToCart(pizza); ui.fulfillmentMode = 'delivery'; ui.addToCart(pizza);
-  assert.equal(ui.cart.length, 3); assert.equal(ui.orderType, 'dine_in');
-  assert.deepEqual(Array.from(ui.cart, i => i.fulfillment), ['dine_in', 'takeaway', 'delivery']);
-  assert.equal(new Set(ui.cart.map(i => i.cart_uid)).size, 3);
+test('ordinary product clicks create an unlabelled single-type bill without service portions', () => {
+  const ui = fixture(); ui.fulfillmentMode = 'delivery'; // stale browser state cannot reactivate removed controls
+  ui.addToCart(pizza); ui.addToCart(pizza);
+  assert.equal(ui.cart.length, 1); assert.equal(ui.cart[0].quantity, 2);
+  assert.equal(ui.cart[0].fulfillment, null); assert.equal(ui.orderType, 'dine_in');
+});
+test('Parcel note stays on exactly its quantity; later product clicks use a clean row', () => {
+  const ui = fixture(); ui.addToCart(pizza); ui.cart[0].special_notes = 'Parcel';
+  ui.addToCart(pizza); ui.addToCart(pizza);
+  assert.equal(ui.cart.length, 2); assert.equal(ui.cart[0].quantity, 1);
+  assert.equal(ui.cart[0].special_notes, 'Parcel'); assert.equal(ui.cart[1].quantity, 2);
+  assert.equal(ui.cart[1].special_notes, '');
   assert.equal(ui.cart.reduce((n, i) => n + i.quantity * i.unit_price, 0), 1500);
 });
-test('new parcel addition never increments a previously sent serve-here row', () => {
-  const ui = fixture(); ui.addToCart(pizza); const first = ui.cart[0]; first.kot_sent_quantity = 1;
-  ui.fulfillmentMode = 'takeaway'; ui.addToCart(pizza);
-  assert.equal(first.quantity, 1); assert.equal(first.kot_sent_quantity, 1); assert.equal(ui.cart[1].quantity, 1);
+test('new additions do not change already sent food or inherit its kitchen notes', () => {
+  const ui = fixture(); ui.addToCart(pizza); const sent=ui.cart[0]; sent.kot_sent_quantity=1;
+  ui.addToCart(pizza); assert.equal(ui.cart.length,2); assert.equal(sent.quantity,1);
+  ui.cart[1].special_notes='Parcel'; ui.toggleItemNote(0);
+  assert.equal(sent._showNote,undefined); assert.equal(sent.special_notes,'');
 });
-test('a quantity split preserves totals, notes and an amount discount exactly', () => {
-  const ui = fixture(); ui.addToCart(pizza); ui.cart[0].quantity = 3;
-  Object.assign(ui.cart[0], { item_discount_type: 'amount', item_discount_value: 10, special_notes: 'No onions' });
-  ui.openFulfillmentSplit(0); Object.assign(ui.fulfillmentSplit, { dine_in: 1, takeaway: 1, delivery: 1 });
-  assert.equal(ui.applyFulfillmentSplit(), true);
-  assert.equal(ui.cart.reduce((n, i) => n + i.quantity, 0), 3);
-  assert.equal(ui.cart.reduce((n, i) => n + i.item_discount_value, 0), 10);
-  assert(ui.cart.every(i => i.special_notes === 'No onions' && i.unit_price === 500));
-});
-test('invalid totals, negative values, excessive precision and sent-line relabeling retain the cart', () => {
-  for (const changes of [{ dine_in: 0, takeaway: 2 }, { dine_in: -1, takeaway: 2 }, { dine_in: .333, takeaway: .667 }]) {
-    const ui = fixture(); ui.addToCart(pizza); ui.openFulfillmentSplit(0); Object.assign(ui.fulfillmentSplit, changes);
-    assert.equal(ui.applyFulfillmentSplit(), false); assert.equal(ui.cart.length, 1); assert.equal(ui.cart[0].quantity, 1);
-  }
-  const ui = fixture(); ui.addToCart(pizza); ui.cart[0].kot_sent_quantity = 1;
-  ui.openFulfillmentSplit(0); Object.assign(ui.fulfillmentSplit, { dine_in: 0, takeaway: 1 });
-  assert.equal(ui.applyFulfillmentSplit(), false); assert.equal(ui.cart[0].fulfillment, 'dine_in');
+test('ordinary Delivery stays a separate bill and does not expose mixed collection choices', () => {
+  const ui = fixture(); ui.orderType='delivery'; ui.addToCart(pizza);
+  assert.equal(ui.cart[0].fulfillment,null); assert.equal(ui.hasDeliveryPortion(),true);
+  assert.equal(ui.historicalMixedPayment(),false);
+  ui.cart.push({...ui.cart[0],fulfillment:'dine_in'});
+  assert.equal(ui.historicalMixedPayment(),true); // saved historical mixed record keeps settlement compatibility
 });
 test('recall consolidates only matching stable portions and retains their sent quantities', () => {
   const ui = fixture(); const rows = ui.restoreFulfillmentCart([
@@ -58,7 +54,7 @@ test('recall consolidates only matching stable portions and retains their sent q
   assert.equal(rows.length, 2); assert.equal(rows[0].quantity, 2); assert.equal(rows[0].kot_sent_quantity, 1); assert.equal(rows[1].quantity, 1);
 });
 test('older Local Core cannot silently turn mixed kitchen instructions into one order type', async () => {
-  const ui = fixture(); ui.addToCart(pizza); ui.fulfillmentMode = 'delivery'; ui.addToCart(pizza);
+  const ui = fixture(); ui.addToCart(pizza); ui.cart.push({...ui.cart[0],fulfillment:'delivery'});
   const result = await ui._localCoreHold(); assert.equal(result.success, false); assert.equal(ui.cart.length, 2);
 });
 

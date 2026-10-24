@@ -7059,6 +7059,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+        $reportBusinessDate = \App\Services\PosBusinessDay::current((int) $companyId);
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
@@ -7218,7 +7219,7 @@ class PosController extends Controller
             $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
         }
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics'));
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
     }
 
     /**
@@ -15326,19 +15327,26 @@ class PosController extends Controller
 
     /**
      * Shared range parsing for the reports analytics surfaces: a fresh visit
-     * defaults to today, swaps reversed inputs, caps the window at 366 days.
+     * defaults to the active business day, swaps reversed inputs and caps the
+     * window at 366 days. Explicit/partial date ranges retain calendar dates.
      *
      * @return array{0:\Carbon\Carbon,1:\Carbon\Carbon}
      */
     private function resolveReportRange(Request $request): array
     {
+        $defaultDate = now()->toDateString();
+        // Fresh analytics follows the shop's active day, including the hours
+        // after midnight. Explicit/partial ranges keep their previous meaning.
+        if (!$request->filled('from') && !$request->filled('to') && app()->bound('currentCompanyId')) {
+            $defaultDate = \App\Services\PosBusinessDay::current((int) app('currentCompanyId'));
+        }
         try {
-            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : now()->startOfDay();
+            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : \Carbon\Carbon::parse($defaultDate)->startOfDay();
         } catch (\Throwable) {
             $from = now()->startOfDay();
         }
         try {
-            $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to'))->endOfDay() : now()->endOfDay();
+            $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to'))->endOfDay() : \Carbon\Carbon::parse($defaultDate)->endOfDay();
         } catch (\Throwable) {
             $to = now()->endOfDay();
         }

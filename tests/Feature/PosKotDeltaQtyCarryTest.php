@@ -1345,4 +1345,147 @@ class PosKotDeltaQtyCarryTest extends TestCase
         $txId = RestaurantOrder::find($orderId)->pos_transaction_id;
         $this->assertSame(2, DB::table('pos_transaction_items')->where('transaction_id', $txId)->count(), 'distinct notes = distinct bill lines');
     }
+    private function mixedContext(): array
+    {
+        $migration = require base_path('database/migrations/2026_10_24_120000_add_line_fulfillment_to_restaurant_bills.php');
+        $migration->up();
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->string('order_type')->nullable(); $t->unsignedBigInteger('rider_id')->nullable(); $t->string('delivery_status')->nullable();
+        });
+        foreach (['restaurant_order_items', 'pos_transaction_items'] as $name) Schema::table($name, fn (Blueprint $t) => $t->boolean('skip_kitchen')->default(false));
+        $c = $this->makeCompany();
+        $c->update(['feature_flags' => ['tables' => true, 'kot' => true, 'kitchen' => true, 'delivery' => true, 'customer_profile' => true]]);
+        $this->subscribe($c); $this->makeCashier($c);
+        return [$c, $this->makeTable($c)];
+    }
+
+    private function mixedPayload(int $table, array $items): array
+    {
+        return ['items' => $items, 'order_type' => 'dine_in', 'table_id' => $table,
+            'customer_name' => 'Fictional guest', 'customer_phone' => '03000000000', 'delivery_address' => 'Fictional test destination',
+            'delivery_collection_mode' => 'rider', 'hold_uuid' => (string) \Illuminate\Support\Str::uuid()];
+    }
+
+    public function test_mixed_delivery_contact_and_offline_safety_reject_without_writing_orders(): void
+    {
+        [, $table] = $this->mixedContext();
+        $payload = $this->mixedPayload($table, [$this->bottle(1, ['fulfillment' => 'delivery', 'line_uid' => 'd'])]);
+        foreach ([['customer_phone' => ''], ['delivery_address' => ''], ['offline_uuid' => 'offline-mixed'], ['items' => [$this->bottle(1, ['fulfillment' => 'delivery', 'line_uid' => 'invalid uid'])]]]
+            as $invalid) {
+            try {
+                $this->hold(array_replace($payload, $invalid));
+                $this->fail('Unsafe mixed order was accepted');
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $this->assertNotEmpty($e->errors());
+            }
+        }
+        $this->assertSame(0, RestaurantOrder::count());
+    }
+
+    public function test_initial_three_service_portions_and_kitchen_labels_remain_distinct(): void
+    {
+        [$c, $table] = $this->mixedContext();
+        $payload = $this->mixedPayload($table, array_map(fn ($mode) => $this->bottle(1, ['fulfillment' => $mode, 'line_uid' => $mode]), ['dine_in', 'takeaway', 'delivery']));
+        $res = $this->hold($payload); $this->assertSame(200, $res->getStatusCode(), $res->getContent());
+        $order = RestaurantOrder::with('items')->findOrFail($res->getData(true)['order']['id']);
+        $this->assertSame('dine_in', $order->order_type); $this->assertSame($table, $order->table_id);
+        $this->assertSame(['dine_in', 'takeaway', 'delivery'], $order->items->pluck('fulfillment')->all());
+        $this->assertEquals(300, $order->total_amount);
+        $html = $this->renderTicket(['order' => $order, 'ticketItems' => $order->items, 'grouped' => collect(['ALL' => $order->items])]);
+        foreach (['SERVE HERE', 'PACK / TAKEAWAY', 'PACK / DELIVERY'] as $label) $this->assertStringContainsString($label, $html);
+        $replay = $this->hold($payload); $this->assertSame($order->id, $replay->getData(true)['order']['id']);
+        $this->assertSame(1, RestaurantOrder::where('company_id', $c->id)->count());
+    }
+
+    public function test_sent_serve_here_then_new_parcel_has_only_parcel_as_addon(): void
+    {
+        [, $table] = $this->mixedContext();
+        $serve = $this->bottle(1, ['fulfillment' => 'dine_in', 'line_uid' => 'serve']);
+        $first = $this->hold($this->mixedPayload($table, [$serve])); $id = $first->getData(true)['order']['id'];
+        $this->stampPrinted($id);
+        $payload = $this->mixedPayload($table, [$serve, $this->bottle(1, ['fulfillment' => 'takeaway', 'line_uid' => 'parcel'])]);
+        $payload['recalled_order_id'] = $id;
+        $res = $this->hold($payload); $this->assertSame(200, $res->getStatusCode(), $res->getContent());
+        $new = RestaurantOrder::with('items')->find($res->getData(true)['order']['id']);
+        $this->assertCount(1, $new->items->whereNull('kot_printed_at'));
+        $this->assertSame('takeaway', $new->items->whereNull('kot_printed_at')->first()->fulfillment);
+        $this->assertSame(RestaurantOrder::find($id)->token_no, $new->token_no);
+    }
+
+    public function test_sent_line_cannot_be_relabelled_and_original_order_survives(): void
+    {
+        [, $table] = $this->mixedContext();
+        $first = $this->hold($this->mixedPayload($table, [$this->bottle(1, ['fulfillment' => 'dine_in', 'line_uid' => 'serve'])]));
+        $id = $first->getData(true)['order']['id']; $this->stampPrinted($id);
+        $payload = $this->mixedPayload($table, [$this->bottle(1, ['fulfillment' => 'takeaway', 'line_uid' => 'serve'])]); $payload['recalled_order_id'] = $id;
+        try { $this->hold($payload); $this->fail('Sent service change must fail.'); } catch (\Illuminate\Validation\ValidationException $e) { $this->assertArrayHasKey('items', $e->errors()); }
+        $this->assertSame('held', RestaurantOrder::find($id)->status);
+        $this->assertSame('dine_in', RestaurantOrderItem::where('order_id', $id)->first()->fulfillment);
+    }
+
+    public function test_counter_paid_mixed_delivery_has_zero_rider_cash(): void { $this->assertMixedPayment('counter', 0); }
+
+    public function test_cod_mixed_delivery_only_assigns_delivery_share_to_rider(): void { $this->assertMixedPayment('rider', 100); }
+
+    private function assertMixedPayment(string $mode, float $due): void
+    {
+            [, $table] = $this->mixedContext();
+            $payload = $this->mixedPayload($table, array_map(fn ($m) => $this->bottle(1, ['fulfillment' => $m, 'line_uid' => $m]), ['dine_in', 'takeaway', 'delivery']));
+            $res = $this->hold($payload); $this->assertSame(200, $res->getStatusCode(), $res->getContent()); $id = $res->getData(true)['order']['id'];
+            $request = Request::create('/pay', 'POST', ['payment_method' => 'cash', 'delivery_collection_mode' => $mode, 'pay_uuid' => (string) \Illuminate\Support\Str::uuid()]);
+            $pay = app(RestaurantPosController::class)->payOrder($request, $id);
+            $this->assertSame(200, $pay->getStatusCode(), $pay->getContent());
+            $tx = \App\Models\PosTransaction::findOrFail(RestaurantOrder::find($id)->pos_transaction_id);
+            $this->assertSame('dine_in', $tx->order_type); $this->assertTrue($tx->has_delivery_items);
+            $this->assertEquals($due, $tx->rider_collection_amount); $this->assertEquals(300 - $due, $tx->cash_received);
+            $this->assertSame('Fictional test destination', $tx->delivery_address);
+            $this->assertCount(3, $tx->items); $this->assertEquals(300, $tx->total_amount);
+            $this->assertSame(['dine_in', 'takeaway', 'delivery'], $tx->items->pluck('fulfillment')->all());
+    }
+
+    public function test_mixed_delivery_feature_gate_and_invalid_service_are_enforced(): void
+    {
+        [$c, $table] = $this->mixedContext();
+        $c->update(['feature_flags' => ['tables' => true, 'delivery' => false, 'customer_profile' => true]]);
+        $payload = $this->mixedPayload($table, [$this->bottle(1, ['fulfillment' => 'delivery', 'line_uid' => 'delivery'])]);
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->hold($payload);
+    }
+
+    public function test_old_unlabelled_sent_line_upgrades_without_reprinting_it(): void
+    {
+        [, $table] = $this->mixedContext();
+        $first = $this->hold($this->mixedPayload($table, [$this->bottle(1)]));
+        $id = $first->getData(true)['order']['id']; $this->stampPrinted($id);
+        $payload = $this->mixedPayload($table, [$this->bottle(1, ['fulfillment' => 'dine_in', 'line_uid' => 'upgraded']), $this->bottle(1, ['fulfillment' => 'takeaway', 'line_uid' => 'new-parcel'])]);
+        $payload['recalled_order_id'] = $id;
+        $res = $this->hold($payload); $this->assertSame(200, $res->getStatusCode(), $res->getContent());
+        $lines = RestaurantOrderItem::where('order_id', $res->getData(true)['order']['id'])->get();
+        $this->assertCount(1, $lines->whereNull('kot_printed_at'));
+        $this->assertSame('takeaway', $lines->whereNull('kot_printed_at')->first()->fulfillment);
+    }
+
+    public function test_mixed_delivery_fee_is_one_hidden_kitchen_line_and_copies_to_bill(): void
+    {
+        [, $table] = $this->mixedContext();
+        $payload = $this->mixedPayload($table, [$this->bottle(1, ['fulfillment' => 'dine_in', 'line_uid' => 's']), $this->bottle(1, ['fulfillment' => 'delivery', 'line_uid' => 'd']),
+            $this->bottle(1, ['item_name' => 'Delivery Charges', 'unit_price' => 20, 'skip_kitchen' => true, 'fulfillment' => 'delivery', 'line_uid' => 'fee'])]);
+        $res = $this->hold($payload); $this->assertSame(200, $res->getStatusCode(), $res->getContent()); $id = $res->getData(true)['order']['id'];
+        $order = RestaurantOrder::with('items')->find($id);
+        $this->assertCount(2, \App\Support\PosKitchenLines::only($order->items));
+        $pay = app(RestaurantPosController::class)->payOrder(Request::create('/pay', 'POST', ['payment_method' => 'cash', 'delivery_collection_mode' => 'rider']), $id);
+        $this->assertSame(200, $pay->getStatusCode(), $pay->getContent());
+        $tx = \App\Models\PosTransaction::with('items')->find(RestaurantOrder::find($id)->pos_transaction_id);
+        $this->assertEquals(220, $tx->total_amount); $this->assertEquals(120, $tx->rider_collection_amount);
+        $this->assertTrue($tx->items->firstWhere('item_name', 'Delivery Charges')->skip_kitchen);
+    }
+
+    public function test_foreign_or_stale_recall_cannot_fork_a_new_mixed_order(): void
+    {
+        [, $table] = $this->mixedContext();
+        $payload = $this->mixedPayload($table, [$this->bottle(1, ['fulfillment' => 'dine_in', 'line_uid' => 's'])]); $payload['recalled_order_id'] = 999999;
+        try { $this->hold($payload); $this->fail('Unknown recall must not create another order'); } catch (\Illuminate\Validation\ValidationException $e) { $this->assertArrayHasKey('recalled_order_id', $e->errors()); }
+        $this->assertSame(0, RestaurantOrder::count());
+    }
+
 }

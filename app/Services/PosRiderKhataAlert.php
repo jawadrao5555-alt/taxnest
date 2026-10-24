@@ -61,6 +61,7 @@ class PosRiderKhataAlert
             ->where('company_id', $companyId)
             ->whereNotNull('rider_id')
             ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
             ->whereNull('rider_settlement_id')
             ->where(function ($s) {
                 $s->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
@@ -140,8 +141,9 @@ class PosRiderKhataAlert
 
         $q = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('order_type', 'delivery')
+            ->where(function ($q) { $q->where('order_type', 'delivery'); if (Schema::hasColumn('pos_transactions', 'has_delivery_items')) $q->orWhere('has_delivery_items', true); })
             ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
             ->whereNull('rider_id')
             ->whereNull('delivery_status')
             ->whereNull('rider_settlement_id')
@@ -164,7 +166,7 @@ class PosRiderKhataAlert
             app(BranchContextService::class)->applyToQuery($q, 'branch_id');
         }
 
-        $row = $q->selectRaw('COUNT(*) as c, COALESCE(SUM(total_amount), 0) as amt, MIN(created_at) as oldest')->first();
+        $row = $q->selectRaw('COUNT(*) as c, COALESCE(SUM(' . PosRider::remainingExpr('pos_transactions') . '), 0) as amt, MIN(created_at) as oldest')->first();
 
         $count = (int) ($row->c ?? 0);
         if ($count < 1) {

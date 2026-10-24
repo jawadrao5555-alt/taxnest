@@ -7193,5 +7193,20 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'print_no_document_reason_store_slip_disabled' => 'Store slip is switched off',
     'print_no_document_reason_held_sale_missing' => 'Held sale is no longer available',
     'return_not_allowed_hotel_credit_required' => 'Use the Hotel Return / Credit Note screen for this bill. Payment refunds are separate.',
+
+    // Mixed service on one bill.
+    'fulfill_serve_here' => 'Serve Here',
+    'fulfill_parcel' => 'Parcel',
+    'fulfill_new_items' => 'New items will be',
+    'fulfill_split' => 'Split item quantity',
+    'fulfill_split_invalid' => 'The portions must add up to the original quantity. Use zero or positive quantities, with up to two decimal places.',
+    'fulfill_sent_locked' => 'This quantity was already sent to the kitchen. Keep its service type; add a new portion or cancel the old one explicitly.',
+    'fulfill_collection' => 'Delivery payment',
+    'fulfill_paid_counter' => 'Paid at counter — rider collects nothing',
+    'fulfill_rider_cash' => 'Rider collects delivery portion only',
+    'fulfill_online_required' => 'Mixed service needs an internet connection. Your cart is kept; reconnect and try again.',
+    'fulfill_delivery_contact' => 'Select a customer, phone number and delivery address before saving the delivery portion.',
+    'fulfill_counter_amount' => 'Collect at counter:',
+    'fulfill_rider_amount' => 'Rider collects:',
 ];
 

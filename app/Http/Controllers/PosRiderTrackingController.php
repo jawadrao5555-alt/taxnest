@@ -731,6 +731,7 @@ class PosRiderTrackingController extends Controller
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->orderBy('id')
             ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'delivery_address', 'total_amount', 'payment_method', 'delivery_status', 'created_at',
+                   ...(Schema::hasColumn('pos_transactions', 'rider_collection_amount') ? ['rider_collection_amount'] : []),
                    ...($hasAssignedAt ? ['rider_assigned_at'] : []),
                    ...($hasCustomerId ? ['customer_id'] : []),
                    ...($hasDestination ? ['customer_lat', 'customer_lng'] : []),
@@ -796,14 +797,16 @@ class PosRiderTrackingController extends Controller
             }
             // Task 285: is_prepaid = customer pre-paid online; rider should NOT
             // collect cash. Non-cash payment_method is the signal.
-            $isPrepaid = $b->payment_method !== 'cash';
+            $isPrepaid = $b->payment_method !== 'cash' || ($b->rider_collection_amount !== null && (float) $b->rider_collection_amount <= 0);
             return [
                 'id'             => (int) $b->id,
                 'invoice_number' => $b->invoice_number,
                 'customer_name'  => $b->customer_name,
                 'customer_phone' => $b->customer_phone,
                 'address'        => $b->delivery_address,
-                'amount'         => (float) $b->total_amount,
+                'amount'         => \App\Models\PosRider::collectionAmount($b),
+                'bill_total_amount' => (float) $b->total_amount,
+                'delivery_items' => $b->rider_collection_amount !== null ? $b->items->where('fulfillment', 'delivery')->filter(fn ($i) => !$i->skip_kitchen)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
                 'payment_method' => $b->payment_method,
                 'is_prepaid'     => $isPrepaid,
                 'status'         => $b->delivery_status,

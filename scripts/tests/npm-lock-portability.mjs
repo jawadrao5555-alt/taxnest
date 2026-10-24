@@ -12,6 +12,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 24 Oct 2026: exact Electron runtime 42.11.16 blocks compromised
+// eMudhra certificates (GHSA-jr5w-w6x2-84p9). Undici 6.29.1/7.30.1 and
+// fast-uri 3.1.9 close the new build-tool advisories. Mockup Zod 4.6.6
+// closes GHSA-mrhx-c7xc-m3w5; no source imports Zod. Only these five
+// package entries and direct specs change; counts, dependency edges and local
+// fork hashes remain pinned. Fresh lock audits and native packaging required.
+// Reviewed 23 Oct 2026: Electron/package/build runtime 42.11.9 addresses
+// GHSA-x562-297c-g43g, GHSA-3qxv-5xgr-q7w9 and GHSA-h3v5-h239-pg29.
+// Agent source identity 1.13.22 preserves immutable released v1.13.21.
+// Only the root identity/Electron spec and Electron package entry change;
+// all remaining 306 entries, dependency edges, counts and fork hashes stay pinned.
 // Reviewed 22 Oct 2026: pin Electron/package/build runtime 42.11.3 for
 // GHSA-fw47-9c62-h3vw. Only the root Electron spec and Electron package entry
 // change; all other locked entries, counts and local-fork hashes stay pinned.
@@ -43,13 +54,13 @@ const LOCKS = [
     lock: 'artifacts/mockup-sandbox/package-lock.json',
     packages: 318,
     resolved: 311,
-    graph: '6ffd45847b225822d72d5c7b76e2c756007957ffe215e7ec99f9262a16283ac3',
+    graph: '0afcf5508dabc193fce98a83ba74efd4e9d2d603292028f60f21daf070c77ecc',
   },
   {
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '7160c23b726d468b39e3137c520e7e70922cef37953827119ee29b6eb9d6fc25',
+    graph: '150ff06998d67f965514d6f70327143335ddca011bd29472502422a8115505d6',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

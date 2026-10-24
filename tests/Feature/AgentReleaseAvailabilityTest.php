@@ -67,4 +67,33 @@ class AgentReleaseAvailabilityTest extends TestCase
         $this->assertStringContainsString('Fiscal Connectivity', $admin);
         $this->assertStringContainsString('Callback Queue', $admin);
     }
+    public function test_download_redirect_is_not_browser_cached_and_exposes_verified_identity(): void
+    {
+        $hash = str_repeat('a', 64);
+        Cache::put('taxnest_agent_latest_release', [
+            'tag' => 'v1.13.22', 'version' => '1.13.22', 'available' => true,
+            'exe' => ['url' => 'https://github.com/fictional/release/releases/download/v1.13.22/setup.exe', 'sha256' => $hash],
+            'zip' => ['url' => 'https://github.com/fictional/release/releases/download/v1.13.22/windows.zip', 'sha256' => $hash],
+        ], 600);
+        foreach (['exe', 'zip'] as $type) {
+            $response = $this->get(route('public.agent.download', ['type' => $type]));
+            $response->assertRedirect()->assertHeader('X-Agent-Version', '1.13.22')->assertHeader('X-Agent-SHA256', $hash);
+            $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        }
+    }
+
+    public function test_unverified_new_release_does_not_reuse_expired_cached_download(): void
+    {
+        Cache::put('taxnest_agent_latest_release', ['tag' => 'v1.13.21', 'available' => true,
+            'exe' => ['url' => 'https://github.com/fictional/old.exe', 'sha256' => str_repeat('a', 64)]], 600);
+        $this->travel(601)->seconds();
+        Http::fake([
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/latest' => Http::response([
+                'tag_name' => 'v1.13.22', 'assets' => [],
+            ]),
+            '*' => Http::response([], 404),
+        ]);
+        $this->get(route('public.agent.download'))->assertStatus(503)->assertJsonPath('reason', 'manifest_missing_or_ambiguous');
+    }
+
 }

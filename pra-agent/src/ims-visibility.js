@@ -14,4 +14,5 @@ function imsMode(status) {
   return null; // unknown / legacy responses fail closed for this optional UI
 }
 
-module.exports = { imsMode };
+if (typeof module === 'object' && module.exports) module.exports = { imsMode };
+else window.TaxNestImsVisibility = Object.freeze({ imsMode });

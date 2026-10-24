@@ -1,0 +1,61 @@
+# Disposable PR verification only. No production Agent, release publishing, install, registry or printer access.
+name: Agent pairing and packaging (Windows PR only)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'pra-agent/**'
+      - '.github/workflows/agent-pairing-windows-pr.yml'
+permissions:
+  contents: read
+jobs:
+  windows-agent:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - name: Install locked Agent dependencies without running application
+        working-directory: pra-agent
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Actual Windows pairing state machine and release identity
+        run: node --test pra-agent/test/company-pairing.test.js pra-agent/test/renderer-buttons.test.js pra-agent/test/release-manifest.test.js
+      - name: Build actual disposable Windows installer and portable package; publish never
+        working-directory: pra-agent
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run build:win
+      - name: Require real package outputs without installing or launching any Agent
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content pra-agent/package.json | ConvertFrom-Json).version
+          $setup = Get-Item "pra-agent/dist/TaxNest-Agent-Setup-$version.exe"
+          $zip = Get-Item 'pra-agent/dist/TaxNest-PRA-Agent-Windows.zip'
+          if ($setup.Length -lt 1000000 -or $zip.Length -lt 1000000) { throw 'Invalid Windows output size' }
+          Write-Output "Disposable installer and portable archive exist for $version; no release was published."
+      - name: Install exact reviewed Electron runtime for disposable native harness
+        working-directory: pra-agent
+        run: node node_modules/electron/install.js
+      - name: Actual packaged sandbox renderer and native company confirmation
+        working-directory: pra-agent
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Canonical packaging intentionally removes win-unpacked. Test the
+          # actual delivered portable ZIP, not a deleted intermediate directory.
+          Expand-Archive -Path dist/TaxNest-PRA-Agent-Windows.zip -DestinationPath dist/native-acceptance -Force
+          $archive = 'dist/native-acceptance/TaxNest-PRA-Agent/resources/app.asar'
+          if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw 'Delivered ZIP has no app.asar' }
+          node test/native-pairing-launcher.js $archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve fictional native-window evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-native-windows-evidence
+          path: pra-agent/.local/browser-evidence/agent-native/
+          if-no-files-found: warn

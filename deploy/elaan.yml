@@ -1,6 +1,6 @@
-title: "Bill ki qisam ke buttons ab zyada saaf nazar aayenge"
+title: "Agent ko apni company se jorna ab zyada wazeh hai"
 audience: pos
 type: improvement
 points:
-  - "Dine In, Takeaway aur Delivery ke buttons par likhai bari aur zyada wazeh kar di gayi hai."
-  - "Light aur dark dono rangon mein buttons ko parhna aur keyboard se chunna asaan hoga. Bill banane ka pehle wala tareeqa barqarar hai."
+  - "Naye Agent mein apne POS account se login ke baad company ka naam dekh kar connection confirm kar sakenge."
+  - "PRA aur FBR POS ke liye ek hi Agent download hoga. Pehle se saved printer settings barqarar rahengi."

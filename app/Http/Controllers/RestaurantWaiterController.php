@@ -1450,6 +1450,10 @@ class RestaurantWaiterController extends Controller
             ], 422);
         }
 
+        if ($request->boolean('online_payment_confirmed')) {
+            \App\Services\PosOnlinePaymentVerification::requireAuthorized(auth('pos')->user(), (int) $companyId);
+        }
+
         if (!self::settleWaiterOrder($companyId, (int) $id, $txn, auth('pos')->user(), $request->boolean('online_payment_confirmed'))) {
             return response()->json(['success' => false, 'message' => 'Order already settled.'], 409);
         }
@@ -1492,6 +1496,7 @@ class RestaurantWaiterController extends Controller
         // bill; this condition rides on the atomic claim itself so a mark set in
         // the race window (another terminal, the table board) still wins — the
         // claim simply fails and the caller's transaction rolls back.
+        $onlineConfirmed = $onlineConfirmed && \App\Services\PosOnlinePaymentVerification::allowed($user, (int) $companyId);
         if (!$onlineConfirmed && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
             $claimQuery->whereNull('online_payment_awaited_at');
         }

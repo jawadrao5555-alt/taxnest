@@ -4,6 +4,7 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'online_payment_manager_required' => 'Ask the owner or manager to check that the online payment has arrived, then confirm this bill. Do not mark a cash payment as online.',
     'restaurant_top_selling_scope' => 'Completed restaurant orders for the selected business dates, ranked by quantity. Amounts are item subtotals before bill-level discounts and tax. Select an item to see its orders.',
     'orders_count_label' => 'Orders',
     'notification_read_failed' => 'Could not save read status. This notification remains unread.',

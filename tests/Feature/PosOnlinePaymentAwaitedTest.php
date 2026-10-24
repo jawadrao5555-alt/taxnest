@@ -841,4 +841,45 @@ class PosOnlinePaymentAwaitedTest extends TestCase
         $this->assertStringContainsString("await this.boardFinalPay('qr_payment');", $saleScreen);
         $this->assertStringContainsString('online_payment_confirmed', $saleScreen);
     }
+
+    public function test_cashier_cannot_self_confirm_an_online_transfer_via_either_payment_endpoint(): void
+    {
+        $companyId = $this->makeShop();
+        $user = $this->makeCashier($companyId);
+        $user->forceFill(['role' => 'user', 'pos_role' => 'pos_cashier'])->save();
+        $orderId = $this->makeOrder($companyId, ['source' => 'waiter']);
+        $this->mark($orderId, $user, true)->assertOk();
+
+        $this->pay($orderId, $user, ['online_payment_confirmed' => true])
+            ->assertStatus(403)->assertJson(['code' => 'online_payment_manager_required']);
+        $this->settleAtCounter($orderId, $user, ['online_payment_confirmed' => true])
+            ->assertStatus(403)->assertJson(['code' => 'online_payment_manager_required']);
+        $this->assertSame('held', DB::table('restaurant_orders')->where('id', $orderId)->value('status'));
+        $this->assertNotNull($this->awaitedAt($orderId));
+        $this->assertSame(0, DB::table('pos_transactions')->count());
+    }
+
+    public function test_cashier_cannot_bypass_confirmation_by_posting_a_direct_online_payment(): void
+    {
+        $companyId = $this->makeShop();
+        $user = $this->makeCashier($companyId);
+        $user->forceFill(['role' => 'user', 'pos_role' => 'pos_cashier'])->save();
+        $orderId = $this->makeOrder($companyId);
+        foreach (['qr_payment', 'online'] as $method) {
+            $this->pay($orderId, $user, ['payment_method' => $method])->assertStatus(403);
+        }
+        $this->settleAtCounter($orderId, $user, ['payment_method' => 'qr_payment'])->assertStatus(403);
+        $this->assertSame(0, DB::table('pos_transactions')->count());
+        // The previously working cash path remains available to the cashier.
+        $this->pay($orderId, $user)->assertOk()->assertJson(['success' => true]);
+    }
+
+    public function test_online_confirmation_policy_never_accepts_another_companys_owner(): void
+    {
+        $companyId = $this->makeShop();
+        $owner = $this->makeCashier($companyId);
+        $this->assertTrue(\App\Services\PosOnlinePaymentVerification::allowed($owner, $companyId));
+        $this->assertFalse(\App\Services\PosOnlinePaymentVerification::allowed($owner, $companyId + 1));
+        $this->assertFalse(\App\Services\PosOnlinePaymentVerification::allowed(null, $companyId));
+    }
 }

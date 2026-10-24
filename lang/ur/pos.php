@@ -4,6 +4,7 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'online_payment_manager_required' => 'مالک یا مینیجر سے آن لائن رقم موصول ہونے کی تصدیق کروائیں، پھر بل مکمل کریں۔ نقد وصولی کو آن لائن ادائیگی نہ لکھیں۔',
     'restaurant_top_selling_scope' => 'منتخب کاروباری تاریخوں کے مکمل ریسٹورنٹ آرڈر، مقدار کے لحاظ سے۔ رقم بل کی رعایت اور ٹیکس سے پہلے آئٹم کا سب ٹوٹل ہے۔ تفصیل کے لیے آئٹم کھولیں۔',
     'orders_count_label' => 'آرڈرز',
     'notification_read_failed' => 'پڑھے جانے کی حالت محفوظ نہیں ہوئی۔ یہ اطلاع ابھی غیر پڑھی ہے۔',

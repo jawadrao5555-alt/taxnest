@@ -10,7 +10,7 @@ function method(name) {
   return source.slice(start, source.indexOf('\n        },', start) + 11).trim();
 }
 function fixture() {
-  const ui = vm.runInNewContext('({' + ['addToCart', 'openFulfillmentSplit', 'applyFulfillmentSplit', 'restoreFulfillmentCart', 'hasDeliveryPortion', 'hasMixedService', '_localCoreHold', 'payModalRiderCash'].map(method).join('\n') + '})', {
+  const ui = vm.runInNewContext('({' + ['addToCart', 'openFulfillmentSplit', 'applyFulfillmentSplit', 'restoreFulfillmentCart', 'hasDeliveryPortion', 'hasMixedService', '_localCoreHold', 'payModalRiderCash', 'heldOrderEstimate'].map(method).join('\n') + '})', {
     window: { TXT: {}, NestPosLocal: { heldOrder: { hold() { throw Error('must not silently print mixed service'); } } } }, setTimeout() {},
   });
   Object.assign(ui, { cart: [], typeFlowGate: true, orderType: 'dine_in', fulfillmentMode: null, animateQty() {}, scrollToCartItem() {}, showToast() {}, removeDeliveryCharge() {} });
@@ -72,4 +72,17 @@ test('payment modal quotes the same discounted taxable delivery share as the ser
   assert.equal(ui.payModalRiderCash, 122.51);
   ui.deliveryCollectionMode = 'counter'; assert.equal(ui.payModalRiderCash, 0);
   ui.deliveryCollectionMode = 'rider'; ui.payMethodIndex = 1; assert.equal(ui.payModalRiderCash, 0);
+});
+
+test('recalled held bill keeps an explicit zero-percent tax when quoting counter and rider amounts', () => {
+  const ui = fixture();
+  const bill = { id: 42, order_type: 'dine_in', discount_amount: 0, items: [
+    { fulfillment: 'dine_in', subtotal: 100 }, { fulfillment: 'takeaway', subtotal: 200 }, { fulfillment: 'delivery', subtotal: 100 }] };
+  Object.assign(ui, { heldOrders: [bill], payingHeldOrderId: 42, deliveryCollectionMode: 'rider', payMethodIndex: 0,
+    taxInclusive: false, taxRules: { cash: 0, card: 0 }, taxRate: 16 });
+  assert.equal(ui.heldOrderEstimate('cash'), 400);
+  assert.equal(ui.heldOrderEstimate('card'), 400);
+  ui.payModalTotal = ui.heldOrderEstimate('cash');
+  assert.equal(ui.payModalRiderCash, 100);
+  assert.equal(ui.payModalTotal - ui.payModalRiderCash, 300);
 });

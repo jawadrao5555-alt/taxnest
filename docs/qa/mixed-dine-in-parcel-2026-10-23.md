@@ -82,7 +82,7 @@ customer data, real printer or external service calls.
   relabel refusal, legacy printed-order upgrade, stale recall refusal, contact /
   UID /offline validation, delivery fee copy, both cash choices, partial rider
   settlements, counter attribution/tenant isolation and single/bulk return safety.
-- Production-function Node tests: 22 passed, including exact split, notes and
+- Production-function Node tests: 23 passed, including exact split, notes and
   discount preservation, sent quantity safety, matching-identity recall and
   the mixed Dine In address-loading barrier.
 - Actual Chrome journeys at1366 and390: both counter/rider choices passed real
@@ -92,6 +92,9 @@ customer data, real printer or external service calls.
 - An actual pointer failure exposed controls/customer details hiding cart rows
   behind the payment dock. Variable-height details now share the cart scroller;
   the test uses normal pointer actions, without forced clicks.
+- A production-function regression reproduced a recalled zero-tax bill quote as
+ 464 instead of400. Held payment estimates now preserve explicitly configured
+  zero cash/card rates; the same vector quotes counter300 and rider100.
 - Announcement spec parser and dry run:12 points, POS audience,7 food presets.
   The customer wording explains every choice in ordinary Roman Urdu, with a
   pizza example and both payment examples. No release notification is inserted

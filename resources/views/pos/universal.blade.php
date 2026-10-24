@@ -11689,8 +11689,8 @@ function restaurantPos() {
             const ratio = sub > 0 ? Math.max(0, (sub - disc) / sub) : 1;
             const taxable = items.filter(i => !i.is_tax_exempt).reduce((s, i) => s + (parseFloat(i.subtotal) || 0), 0);
             const rate = method === 'card'
-                ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
-                : (this.taxRules['cash'] || 16);
+                ? (this.taxRules['debit_card'] ?? this.taxRules['card'] ?? 8)
+                : (this.taxRules['cash'] ?? this.taxRate ?? 16);
             // Inclusive mode: menu total is method-independent (tax already inside) —
             // EXCEPT card-save mode, where a non-menu rate makes the total cheaper.
             if (this.taxInclusive) {

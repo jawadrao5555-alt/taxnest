@@ -13,6 +13,9 @@ const root = path.resolve(process.argv[2]);
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'taxnest-native-pairing-'));
 app.setPath('userData', temp);
 const { createCompanyConfigurator } = require(path.join(root, 'src/company-configurator'));
+const packagedVersion = require(path.join(root, 'package.json')).version;
+const { loadBuildInfo } = require(path.join(root, 'src/build-info'));
+const packagedIdentity = loadBuildInfo(packagedVersion, path.join(root, 'build-info.json'));
 const windows = require(path.join(root, 'src/pos-window'));
 let server, settings, origin, config, running = false, mode = 'Connect', posts = 0, saves = 0, nativeDialogs = 0;
 let fixtureCompany = 101, reject = false, lastResult, nativeError;
@@ -106,19 +109,45 @@ async function logout(win,panel) {
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+server.address().port;
   config={serverUrl:origin+'/api/agent',apiKey:'fixture-old',companyId:100,pcName:'Fictional Counter',receiptPrinter:'Fictional Kitchen',silentPrint:false};
-  handle('get-config',()=>config);handle('get-status',status);handle('get-version',()=>({version:'fixture'}));
+  assert.ok(packagedIdentity.builtAt, 'Delivered package must contain its actual build date');
+  handle('get-config',()=>config);handle('get-status',status);handle('get-version',()=>packagedIdentity);
   handle('get-printers',()=>({printers:[{name:'Fictional Kitchen'}]}));
   handle('test-connection',()=>{calls.test++;return {ok:true,data:{company:{id:100,name:'Fixture 100',pra_pos_id:'TEST'}}};});
   handle('save-config',(_e,c)=>{calls.save++;config={...config,...c};return{ok:true};});
   handle('toggle-agent',(_e,on)=>{calls.toggle++;running=on;return{ok:true};});
   handle('get-pos-settings',()=>({}));handle('get-lan-settings',()=>({}));handle('get-lan-status',()=>({enabled:false}));
   handle('lan-list-devices',()=>({devices:[]}));handle('lan-core-list-devices',()=>({devices:[]}));
-  handle('check-update',()=>({available:false}));handle('check-ims-service',()=>({}));
+  let imsRunning=false, imsInstalls=0;
+  handle('check-update',()=>({available:false}));handle('check-ims-service',()=>({running:imsRunning}));
+  handle('install-fbr-ims',()=>{imsInstalls++;return {ok:true};}); // Fictional IPC only; never download or launch FBR software.
   handle('open-pos-window',()=>{calls.open++;return{ok:true};});
   settings=watch(new BrowserWindow({width:900,height:900,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,preload:path.join(root,'preload.js')}}));
   await settings.loadFile(path.join(root,'index.html'));
   await wait(()=>settings.webContents.executeJavaScript("!!window.agentAPI && document.getElementById('apiKey').value==='fixture-old'"),'real sandbox preload bridge');
   assert.equal(settings.webContents.getLastWebPreferences().sandbox,true);
+  await wait(()=>settings.webContents.executeJavaScript(`document.getElementById('agentVersion').textContent===${JSON.stringify('v'+packagedVersion)}`),'packaged version display');
+  assert.equal(await settings.webContents.executeJavaScript("document.getElementById('buildVer').getAttribute('datetime')"),packagedIdentity.builtAt);
+  for(const connectionMode of ['cloud','fiscal_device',null]) {
+    settings.webContents.send('status-update',{running:true,connected:true,serverInfo:{product_type:'fbrpos',fbr_connection_mode:connectionMode}});
+    await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsCard').style.display==='block' && document.getElementById('imsInstallBtn').style.display==='inline-block'"),'packaged FBR IMS '+connectionMode);
+    if(connectionMode!=='fiscal_device') assert.match(await settings.webContents.executeJavaScript("document.getElementById('imsRoutingNote').textContent"),/remains unchanged/);
+    assert.equal(imsInstalls,0,'visibility must never auto-install');
+  }
+  await click(settings,'#imsInstallBtn');await wait(()=>imsInstalls===1,'explicit fictional IMS installation IPC');
+  imsRunning=true;await click(settings,'#imsCheckBtn');
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsBadge').textContent.includes('IMS Running')"),'running IMS badge');
+  assert.equal(await settings.webContents.executeJavaScript("document.getElementById('imsInstallBtn').style.display"),'none');
+  imsRunning=false;
+  settings.webContents.send('status-update',{running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device'}});
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('praImsSteps').style.display==='block'"),'packaged PRA fiscal guidance');
+  await settings.webContents.executeJavaScript("document.getElementById('imsInstallBtn').click()");
+  assert.equal(imsInstalls,1,'PRA must not invoke the FBR installer');
+  for(const s of [{running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'cloud'}},{running:true,connected:true,serverInfo:{product_type:'unknown'}},{running:false,connected:false}]) {
+    settings.webContents.send('status-update',s);
+    await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsCard').style.display==='none'"),'hidden out-of-scope IMS');
+  }
+  assert.equal(saves,0);assert.equal(calls.save,0);assert.equal(config.silentPrint,false);
+  console.log('PASS: delivered app.asar version/build date and IMS cloud/fiscal/running/PRA/disconnected matrix through actual sandbox preload; no automatic install or configuration writes.');
   await click(settings,'#testBtn');await wait(()=>calls.test===1,'actual Test Connection click');
   await wait(()=>settings.webContents.executeJavaScript("document.getElementById('testResult').textContent.includes('Connected to Fixture 100')"),'visible connection result');
   await click(settings,'#saveBtn');await wait(()=>calls.save===1,'actual Save & Connect click');assert.equal(config.silentPrint,false);assert.equal(config.receiptPrinter,'Fictional Kitchen');assert.equal(config.printerExplicit,false);

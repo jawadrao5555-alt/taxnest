@@ -7208,5 +7208,6 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'fulfill_delivery_contact' => 'Select a customer, phone number and delivery address before saving the delivery portion.',
     'fulfill_counter_amount' => 'Collect at counter:',
     'fulfill_rider_amount' => 'Rider collects:',
+    'item_note_sent_locked' => 'This item was already sent to the kitchen. Use order correction or cancellation to change its instructions.',
 ];
 

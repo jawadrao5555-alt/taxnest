@@ -46,3 +46,21 @@ No local PHP runtime/MariaDB exists in this fresh environment; full PHPUnit and 
 ## Owner boundary and limits
 
 After fresh checks pass, stop for a **new PR #275 exact-HEAD admin approval**. The owner-controlled merge flow detects Agent changes and dispatches the exact-squash Windows release as documented in `docs/ops/owner-merge-and-deploy.md`. Preparing this PR neither publishes 1.13.23 nor replaces any existing tag/assets. Server deployment alone cannot replace installed desktop binaries. Actual test-PC installation, authenticated company pairing and fiscal/physical-printer acceptance remain post-release owner work; no field-installation or live IMS claim is made here.
+
+## Refresh after the simple-billing correction (PR276)
+
+PR276 is now LIVE VERIFIED: approved head `eea249038c20f2f6927778606272d33ffce25c55`, actual squash/deployed main `65fddf64a3d8ea8e3d93948b44d600d884db131e`. [Deploy Production40121120158](https://github.com/jawadrao5555-alt/taxnest/actions/runs/40121120158) completed successfully: exact live SHA, extended verification PASS and outcome callback succeeded for request `9b6e35f9-d0bb-43ff-8a7a-5a67ee286f75`. Prior relay success alone was not treated as proof.
+
+The existing PR275 branch incorporates that verified main history-preservingly. The sole merge conflict was `deploy/elaan.yml`; this PR retains its reviewed Agent-specific announcement. The previously deployed simple-billing announcement remains in publication history/read state. No duplicate PR, production/release action or settings migration.
+
+A diff against the new main confirms the application, PRA Blade, language files, simple-note browser workflow, note/address/caller tests and KOT/drawer/rider PHP regression sources are unchanged. PR276's removed portion controls stay removed; Parcel notes, sent-line/KOT delta guards, separate Delivery and historical financial compatibility remain intact. No whole-tree checkout from the old Agent branch is used.
+
+Fresh local checks after merging main:
+
+- Reviewed Node22.23.2 clean runner: all **107/107** platform-independent Agent tests PASS, no skips.
+- New simple-note/address/phone/caller production-function regressions: **35/35 PASS**.
+- Private supported PHP8.4.27 runtime is now available: the targeted simple-note/KOT/rider/drawer plus existing accessibility/responsive suites PASS (exact count recorded in PR body). This supersedes the initial preparation's missing-local-PHP limitation; no local MariaDB acceptance is claimed.
+- Actual Chrome settings smoke PASS: FBR cloud/fiscal/missing-mode IMS, explicit fictional installation IPC, running service, PRA fiscal/cloud, unknown/disconnected, actual version/build-date display and missing/failed identity IPC. No settings writes or pageerrors; no real installation/download/printer/customer account.
+- Reviewed lock graph, immutable release-chain and announcement checks PASS. Package/lock/identity remain1.13.23;1.13.23 tag was absent during refresh and published1.13.22 is preserved. No dependency or binary source changes beyond this existing reviewed PR.
+
+The previous7414ba78 head's CI/Windows results are historical and are not reused. The refreshed exact head requires all eight mandatory checks, genuine MariaDB/browser/full PHP and actual Windows package/native acceptance. Results and the final approval SHA belong in the PR body. Owner approval for276 does not approve275.

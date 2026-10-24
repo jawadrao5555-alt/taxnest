@@ -7196,5 +7196,6 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'fulfill_delivery_contact' => 'Delivery save karne se pehle customer, phone aur delivery address select karein.',
     'fulfill_counter_amount' => 'Counter par lein:',
     'fulfill_rider_amount' => 'Rider le ga:',
+    'item_note_sent_locked' => 'Yeh item kitchen ko bheja ja chuka hai. Hidayat badalne ke liye order correction ya cancellation istemal karein.',
 ];
 

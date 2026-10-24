@@ -282,6 +282,7 @@
 
   <div class="card" id="imsCard" style="display:none;">
     <h3 id="imsHeading">IMS Fiscal Service</h3>
+    <p id="imsRoutingNote" style="font-size:12px; margin-bottom:10px;"></p>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
       <span id="imsBadge" class="badge offline"><span class="dot"></span> Checking…</span>
       <div class="btn-row">
@@ -428,6 +429,9 @@
 
   function renderStatus(s) {
     const mode = window.TaxNestImsVisibility.imsMode(s);
+    $('imsRoutingNote').textContent = mode === 'fbr' && s.serverInfo?.fbr_connection_mode !== 'fiscal_device'
+      ? 'FBR company connected. Local IMS can be checked or installed here. Current reporting mode remains unchanged; installing IMS does not switch bills to local fiscal reporting.'
+      : (mode ? 'Local fiscal-device mode. Check or prepare the required IMS service below.' : '');
     if (mode !== currentImsMode) {
       currentImsMode = mode;
       imsGeneration++;

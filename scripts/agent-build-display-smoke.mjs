@@ -23,10 +23,13 @@ const server = createServer((request, response) => {
   const info = mode === 'missing' ? { version, builtAt: null } : identity;
   const bridge = `<script>
     window.__unexpectedAgentCalls=[];
+    window.__emitStatus=null;
     window.agentAPI=new Proxy({
       getVersion:async()=>{if(${JSON.stringify(mode)}==='ipc-error')throw new Error('Synthetic identity IPC unavailable');return ${JSON.stringify(info)};},
       getConfig:async()=>({serverUrl:location.origin+'/api/agent',companyId:'Fictional company',apiKey:''}),
       getPrinters:async()=>({printers:[]}),getStatus:async()=>({running:false,connected:false}),
+      onStatusUpdate:fn=>{window.__emitStatus=fn;},
+      checkImsService:async()=>({running:false}),
       checkUpdate:async()=>({available:false}),
       getPosSettings:async()=>({}),getLanSettings:async()=>({enabled:false}),getLanStatus:async()=>({enabled:false}),
     },{get:(target,key)=>key in target?target[key]:String(key).startsWith('on')?()=>{}:async()=>{window.__unexpectedAgentCalls.push(String(key));return {};}});
@@ -63,6 +66,20 @@ try {
     }
     assert.equal(await page.locator('#serverUrl').inputValue(), origin + '/api/agent');
     assert.deepEqual(await page.evaluate(() => window.__unexpectedAgentCalls), []);
+    if (mode === 'valid') {
+      for (const connectionMode of ['cloud', 'fiscal_device']) {
+        await page.evaluate(connectionMode => window.__emitStatus({running:true,connected:true,
+          serverInfo:{product_type:'fbrpos',fbr_connection_mode:connectionMode}}), connectionMode);
+        await page.waitForFunction(() => document.getElementById('imsInstallBtn').style.display === 'inline-block');
+        assert(await page.locator('#imsCard').isVisible());
+        assert(await page.locator('#imsInstallBtn').isVisible());
+        if (connectionMode === 'cloud') assert.match(await page.locator('#imsRoutingNote').textContent(), /remains unchanged/);
+      }
+      await page.evaluate(() => window.__emitStatus({running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'cloud'}}));
+      assert.equal(await page.locator('#imsCard').isVisible(), false);
+      await page.evaluate(() => window.__emitStatus({running:false,connected:false}));
+      assert.equal(await page.locator('#imsCard').isVisible(), false);
+    }
     assert.deepEqual(errors, []);
   }
   console.log('PASS: actual Agent settings HTML shows version/build date; missing/failed IPC honest; no settings writes');

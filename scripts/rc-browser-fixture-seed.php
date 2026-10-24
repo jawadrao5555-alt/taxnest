@@ -146,6 +146,27 @@ $waShop->forceFill(['wa_api_enabled' => true, 'wa_phone_number_id' => '123456789
     'wa_api_token' => \Illuminate\Support\Facades\Crypt::encryptString('synthetic-api-token'),
     'wa_template_name' => 'invoice_notification', 'wa_app_secret' => 'synthetic-app-secret', 'wa_attach_pdf' => true])->save();
 $waOwner = $user($waShop, 'Synthetic WhatsApp Owner', 'wa-auto-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+// Mixed fulfillment uses its own fictional company, products, customer and tables.
+$mixedShop = $company('Synthetic Mixed Service', 'mixed-company@rc-browser.invalid', 'RCBROWSERMIXED', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
+    'feature_flags' => array_merge(PosFeatureService::defaultsForCategory('restaurant'), ['inventory' => false, 'delivery' => true, 'customer_profile' => true]),
+    'inventory_enabled' => false, 'pos_setup_completed' => true, 'table_click_direct_open' => true,
+    'pos_guided_flow_enabled' => false, 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
+    'pra_reporting_enabled' => false, 'pos_cash_received_enabled' => true,
+]);
+$mixedOwner = $user($mixedShop, 'Synthetic Mixed Owner', 'mixed-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$mixedPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Mixed Plan', 'product_type' => 'pos', 'invoice_limit' => 100, 'price' => 100, 'is_trial' => false, 'restaurant_enabled' => true, 'riders_enabled' => true]);
+\App\Models\Subscription::create(['company_id' => $mixedShop->id, 'pricing_plan_id' => $mixedPlan->id, 'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(), 'active' => true]);
+$mixedProduct = \App\Models\PosProduct::forceCreate(['company_id' => $mixedShop->id, 'name' => 'Synthetic mixed pizza', 'price' => 100, 'is_active' => true, 'is_tax_exempt' => false]);
+$mixedCustomer = \App\Models\PosCustomer::create(['company_id' => $mixedShop->id, 'name' => 'Synthetic mixed guest', 'phone' => '03000000888', 'address' => 'Synthetic mixed delivery lane', 'type' => 'unregistered']);
+$mixedFloor = RestaurantFloor::create(['company_id' => $mixedShop->id, 'name' => 'Mixed floor', 'is_active' => true]);
+$mixedTables = [];
+foreach ([1366, 390] as $width) foreach (['counter', 'rider'] as $mode) {
+    $number = 'MX'.$width.($mode === 'counter' ? 'C' : 'R');
+    $table = RestaurantTable::create(['company_id' => $mixedShop->id, 'floor_id' => $mixedFloor->id, 'table_number' => $number, 'seats' => 4, 'status' => 'available', 'is_active' => true]);
+    $mixedTables[$width][$mode] = ['id' => $table->id, 'number' => $number];
+}
+
 $tableShop = $company('Synthetic Table Order Recovery', 'table-orders-company@rc-browser.invalid', 'RCBROWSERTABLES', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant',
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
@@ -643,6 +664,7 @@ $fixture = [
             'paths' => ['/pos/hotel/stays/'.$creditStay->id.'/credit-notes'],
             'hotelCreditReview' => ['billId' => $creditBill->id, 'path' => '/pos/hotel/stays/'.$creditStay->id.'/credit-notes',
                 'refundPath' => '/pos/hotel/stays/'.$refundStay->id.'/credit-notes']],
+        ['name' => 'mixed-fulfillment', 'login' => $mixedOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mixedFulfillment' => ['tables' => $mixedTables, 'phone' => $mixedCustomer->phone, 'customer' => $mixedCustomer->name, 'product' => $mixedProduct->name]],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,

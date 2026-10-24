@@ -500,6 +500,7 @@
                 <tr>
                     <td class="name">
                         <span class="bold">{{ $item->item_name }}</span>@if(($newItemIds ?? collect())->contains($item->id)) <span class="kot-new-tag">{{ __('pos.kot_new_tag') }}</span>@endif
+                        @if(!empty($item->fulfillment))<br><strong>{{ \App\Support\PosFulfillment::label($item->fulfillment) }}</strong>@endif
                         @if($item->special_notes)
                             <br><span class="note"><span class="note-label">&raquo; {{ __('pos.kot_note') }}</span><span class="note-text">{{ $item->special_notes }}</span></span>
                         @endif

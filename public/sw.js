@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260911-131414-b2e32163'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-mixed-service-20261024'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -208,6 +208,10 @@ self.addEventListener('fetch', e => {
         e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE), caches.delete(WAITER_CACHE), caches.delete(TN_TABLES_META)]));
         return;
     }
+
+    // Pairing nonces/credentials and mutable Agent download redirects must
+    // never enter any offline runtime cache, even when opened as navigation.
+    if (url.pathname.includes('/desktop/agent-') || url.pathname === '/download/agent') return;
 
     if (req.method !== 'GET') return;
 

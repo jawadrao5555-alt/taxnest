@@ -1,100 +1,114 @@
-# Mixed Dine In and Parcel items — owner request, 23 October 2026
+# Mixed Serve Here, Parcel and Delivery — PR 272
 
-**Design draft / queued implementation only. No application fix or acceptance is claimed.**
+## Problem and implemented behavior
 
-## Owner-confirmed requirement and priority
+The original cart merged identical products before considering their service
+instruction. On a table bill, a second pizza intended as parcel increased the
+already served pizza's quantity. A single note could then make the kitchen
+interpret both pizzas as parcel. The original production addToCart function was
+reproduced locally before changing it: two different service intentions became
+one unlabelled quantity-2 row.
 
-Owner supplied video `23064bbb-1da6-4a6f-8377-c66c9b4eb2e6.mov`, then clarified in text:
-one Malai Boti pizza was eaten at the table and a second identical pizza was
-requested as parcel; the kitchen slip showed quantity 2 under a parcel note.
-The owner additionally requires the same flow when both portions are ordered
-at the outset. The exact spoken audio was not independently transcribed.
+A single bill now supports any two or all three portions: Serve Here, Parcel,
+and Delivery. The cashier chooses how newly added items will be served, or
+clicks a line's service badge to split its unsent quantity. The portions must
+be nonnegative, have at most two decimal places and sum exactly to the line's
+quantity. A portion already sent to the kitchen cannot be silently relabelled.
 
-Latest instruction: create this PR and prepare it **immediately after #270**.
-This supersedes the previous #266 → #228 preparation order for the next slot.
-Do not silently advance those or other drafts ahead of this item.
-Release sequence: owner approves/releases #270, exact deployed SHA/live-check
-and successful outcome are verified, then refresh/implement/test this PR on
-that proven base and stop for a separate fresh owner approval.
-No chat instruction here approves either PR for merge/deploy.
+Each portion retains a stable line identity alongside its service instruction.
+The product/deal identity, choices, notes, quantities, line discount, unit price,
+tax treatment and table/fiscal bill type keep their existing roles. Free-text
+notes remain separate. Delivery charges remain one verified fee line excluded
+from kitchen preparation. No company/device identity is hard-coded.
 
-## Cashier flow
+## Kitchen, recall and payment
 
-Keep one Dine In bill and its table. Each relevant food line can be **Serve Here**
-or **Parcel**; the entire bill must not switch to Takeaway to parcel one item.
+The first kitchen ticket shows SERVE HERE, PACK / TAKEAWAY and PACK / DELIVERY
+beside the relevant lines. Recall combines only matching identity/service/note/
+price/discount chunks. Re-holding an increased portion carries its previous
+printed quantity and creates only the additional unprinted quantity. Historical
+reprints retain their original snapshots. Bill settlement does not prepare old
+food again. Stale/foreign recalled-order IDs fail instead of opening a new bill.
 
-1. Initial mixed order: enter total quantity 2, choose “Parcel: 1”; produce two
-   separate lines of quantity 1, one Serve Here and one Parcel.
-2. Later addition: first pizza already sent/served, add another and select Parcel;
-   only the new parcel quantity goes on the next ADD-ON KOT.
-3. Adding an identical item with a different fulfillment instruction must not
-   increment/overwrite the existing served or kitchen-sent line.
-4. Cashier can split an unsent quantity into serve/parcel portions; validate
-   nonnegative portions, allowed quantity precision and exact sum. Reject invalid
-   or excess splits server-side. Do not impose food-piece integer rules on all
-   product UOMs without reviewing existing support.
-5. Show readable per-line badges in the cart, held/recalled order and KOT. KOT
-   uses English **SERVE HERE** / **PACK / TAKEAWAY**. No forced packaging charges.
-   Keep the ordinary flow fast: default from current order type; extra selection
-   only for mixed service.
+Delivery portions use one destination per bill and retain the selected customer,
+phone and address. They appear in the delivery board and rider payload even
+while the bill stays Dine In and retains its table. Delivery feature/package
+gates still apply. This does not introduce multiple delivery addresses.
 
-## Kitchen behavior
+The owner explicitly requested both payment choices:
 
-When both portions are first sent together:
+- Paid at counter: the whole invoice is collected at the counter; rider debt is
+  zero even when a rider is assigned for transport.
+- Rider collection: the counter receives Serve Here/Parcel and the rider receives
+  only the Delivery share plus the verified delivery fee. Card payments create
+  no rider cash debt.
 
-| Item | Qty | Instruction |
-| --- | ---: | --- |
-| Malai Boti Pizza S | 1 | SERVE HERE |
-| Malai Boti Pizza S | 1 | PACK / TAKEAWAY |
+The existing invoice total is partitioned using final net line weights, existing
+bill discount and applicable tax/exemption. Whole-invoice rounding is allocated
+proportionally to delivery; counter cash is the exact residual. The two amounts
+sum to the unchanged invoice total. Example: total400, delivery100 -> counter300
+and rider100; counter-paid -> counter400 and rider0. Partial rider settlements,
+khata, cash drawer and alerts use the remaining delivery debt. Old NULL collection
+snapshots retain legacy whole-bill debt. A mixed-delivery return requires a
+credit note for the delivery lines before a single or bulk Returned action can
+drop its debt; served/collected food is never automatically refunded in full.
 
-When quantity 1 was already sent, the ADD-ON contains only quantity 1 PACK.
-Never resend the old served quantity just because its product ID matches.
-Reprint of a previous KOT retains that KOT's actual historical snapshot.
-A later fulfillment correction for an already-sent line must be an explicit,
-auditable correction/cancellation flow, not a silent replay of an old order.
-Payment/receipt reprints must never enqueue another kitchen preparation.
+The print/preview retains per-line labels and counter/rider amounts. The success
+popup uses the server's counter change amount rather than subtracting the whole
+invoice from counter cash. Lost-response replays carry the same allocation.
 
-## Required implementation and compatibility
+## Compatibility boundary
 
-- Inspect actual cart merge, split, held-line persistence, recall, kitchen delta,
-  receipt, device print snapshot, Local Core/offline and server validation paths.
-- Use stable line identity plus fulfillment and existing deal/variant/note identity;
-  product ID alone is insufficient. Free-text special notes remain separate.
-- Store/serialize line fulfillment consistently. Old records/clients without the
-  field retain existing meaning; no historical quantity/note rewrites.
-- Keep one bill/table, existing unit prices, quantity totals, discounts, taxes,
-  stock movements, payment, reporting state and fiscal routing unchanged.
-- Preserve unrelated line notes, deals/choices, recipes, skip-kitchen rules,
-  table-claim/concurrent cashier safeguards, permissions and tenant boundaries.
-- Same behavior across compatible restaurant tenants and one/many counters or
-  printers; no company/device hardcoding, no real customer data or physical print.
+Mixed service requires an online save/payment in this release. The browser
+retains the cart and clearly refuses old Local Core/offline paths that cannot
+preserve these instructions. HTTP offline replay and the restaurant projector
+also reject new mixed-service input rather than stripping its labels. Existing
+single-service/legacy offline flows keep their contract. No Agent release or
+physical-printer acceptance is claimed by this web feature.
 
-Source observation only: deployed `pos/universal.blade.php:addToCart` currently
-matches item ID/type and deal-choice key, then increments a matching row; the
-cart's `special_notes` is a row field. This supports investigating merging as
-the cause but is **not a completed end-to-end reproduction**.
+Nullable fields preserve existing order/bill meaning. Restaurant and transaction
+lines carry fulfillment/line_uid; the held order carries collection mode; the
+settled bill carries has_delivery_items and nullable rider_collection_amount.
+No historical bill backfill or tax/fiscal identity rewrite is performed.
 
-## Acceptance matrix before Ready for Review
+## Local acceptance evidence
 
-- Reproduce original same-pizza/parcel-note problem on a disposable fictional shop.
-- Initial 1 serve + 1 parcel produces two correct lines on first KOT.
-- Already-sent 1 serve + later 1 parcel produces only new parcel on ADD-ON.
-- Multiple quantities, split/rejoin unsent portions, invalid/excess splits, mixed
-  products/deals/notes, quantity edits and cancellation preserve totals/identity.
-- Hold/recall/reload, final payment and KOT/receipt reprint do not duplicate KOT.
-- Existing all-Dine-In, all-Takeaway and Delivery flows remain unchanged.
-- Second tenant cannot read/change another company's held line; concurrent cashier
-  and retry/idempotency behavior remains correct.
-- Old client/no field, Local Core synchronization and printer routing retain safe
-  behavior; do not claim offline compatibility from a web-only check.
-- Actual 1366/390 browser journeys/screenshots plus relevant supported PHP 8.4 /
-  MariaDB tests, full mandatory exact-HEAD eight checks and clean mergeability.
-  Promotion-triggered runs require their own eight checks including final validate.
-- Customer announcement in ordinary wording added with actual implementation.
-  No feature announcement on deployment of this specification alone.
+Disposable fictional company only, loopback Chrome, no production credentials,
+customer data, real printer or external service calls.
 
-## Current evidence
+- Original addToCart merging reproduced before the fix.
+- Supported PHP8.4.27 targeted suite: 71 tests /392 assertions passed, including
+  initial three portions, held retry identity, later parcel-only delta, sent
+  relabel refusal, legacy printed-order upgrade, stale recall refusal, contact /
+  UID /offline validation, delivery fee copy, both cash choices, partial rider
+  settlements, counter attribution/tenant isolation and single/bulk return safety.
+- Production-function Node tests: 22 passed, including exact split, notes and
+  discount preservation, sent quantity safety, matching-identity recall and
+  the mixed Dine In address-loading barrier.
+- Actual Chrome journeys at1366 and390: both counter/rider choices passed real
+  product selection, three-way split, hold, kitchen-ticket render with print
+  stamps, reload/table recall, parcel quantity increment, delta render, payment
+  and saved receipt/contact/collection snapshots. Page errors were empty.
+- An actual pointer failure exposed controls/customer details hiding cart rows
+  behind the payment dock. Variable-height details now share the cart scroller;
+  the test uses normal pointer actions, without forced clicks.
+- Announcement spec parser and dry run:12 points, POS audience,7 food presets.
+  The customer wording explains every choice in ordinary Roman Urdu, with a
+  pizza example and both payment examples. No release notification is inserted
+  from this local environment.
 
-This commit changes only this specification. No UI/backend/schema/Agent change,
-no application test, no complete bug fix, and no deploy-ready claim.
-Implementation is queued behind #270. Never approve/merge/deploy from the agent.
+These local browser runs use a disposable fully migrated SQLite application.
+They are not MariaDB acceptance. The mandatory GitHub Actions lanes must prove
+MariaDB10.6, full browser/role/fiscal compatibility, assets/audit, full PHPUnit
+and owner-promotion checks on the published exact HEAD before owner approval.
+Do not reuse old green checks. Any final check links/counts belong in the PR
+body so adding verification metadata does not itself replace the tested HEAD.
+
+## Release boundary
+
+Base is the owner-released274 main commit8f3a5db2b811710d05481bc21837611f955fdcd5.
+Its deploy40055067843 passed exact-SHA extended live verify and successful
+outcome callback. This only proves the prerequisite, not272 deployment.
+After272's own fresh checks, STOP for separate owner admin-panel approval and
+Approval Relay. No merge, deployment, Windows release or live company smoke is
+authorized to this agent.

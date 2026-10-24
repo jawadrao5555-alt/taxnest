@@ -1505,13 +1505,46 @@ window.addEventListener('popstate', function() {
                 </template>
             </div>
 
+            <div class="tn-cart-list flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
+            @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false))
+            <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 space-y-2" data-fulfillment-controls>
+                <p class="text-xs font-semibold">{{ __('pos.fulfill_new_items') }}</p>
+                <div class="flex flex-wrap gap-1">
+                    <button type="button" data-fulfillment-mode="dine_in" @click="chooseFulfillment('dine_in')" :aria-pressed="(fulfillmentMode || orderType) === 'dine_in'" class="px-3 py-2 rounded border text-xs font-bold focus-visible:ring-2" :class="(fulfillmentMode || orderType) === 'dine_in' ? 'bg-teal-100 text-teal-900' : ''">{{ __('pos.fulfill_serve_here') }}</button>
+                    <button type="button" data-fulfillment-mode="takeaway" @click="chooseFulfillment('takeaway')" :aria-pressed="(fulfillmentMode || orderType) === 'takeaway'" class="px-3 py-2 rounded border text-xs font-bold focus-visible:ring-2" :class="(fulfillmentMode || orderType) === 'takeaway' ? 'bg-teal-100 text-teal-900' : ''">{{ __('pos.fulfill_parcel') }}</button>
+                    @if($features->delivery ?? false)
+                    <button type="button" data-fulfillment-mode="delivery" @click="chooseFulfillment('delivery')" :aria-pressed="(fulfillmentMode || orderType) === 'delivery'" class="px-3 py-2 rounded border text-xs font-bold focus-visible:ring-2" :class="(fulfillmentMode || orderType) === 'delivery' ? 'bg-teal-100 text-teal-900' : ''">{{ __('pos.delivery') }}</button>
+                    @endif
+                </div>
+                <template x-if="fulfillmentSplit">
+                    <div role="dialog" aria-label="{{ __('pos.fulfill_split') }}" class="p-2 rounded border border-teal-500 space-y-2" data-fulfillment-split>
+                        <p class="text-sm font-bold">{{ __('pos.fulfill_split') }} <span x-text="fulfillmentSplit.total"></span></p>
+                        <label class="flex justify-between gap-2 text-xs">{{ __('pos.fulfill_serve_here') }}<input data-split-mode="dine_in" type="number" min="0" step="0.01" x-model.number="fulfillmentSplit.dine_in" class="w-20 text-black rounded"></label>
+                        <label class="flex justify-between gap-2 text-xs">{{ __('pos.fulfill_parcel') }}<input data-split-mode="takeaway" type="number" min="0" step="0.01" x-model.number="fulfillmentSplit.takeaway" class="w-20 text-black rounded"></label>
+                        @if($features->delivery ?? false)
+                        <label class="flex justify-between gap-2 text-xs">{{ __('pos.delivery') }}<input data-split-mode="delivery" type="number" min="0" step="0.01" x-model.number="fulfillmentSplit.delivery" class="w-20 text-black rounded"></label>
+                        @endif
+                        <div class="flex gap-2"><button type="button" data-apply-split @click="applyFulfillmentSplit()" class="rounded px-3 py-2 bg-teal-700 text-white text-xs font-bold">{{ __('pos.save_btn') }}</button><button type="button" @click="fulfillmentSplit = null" class="rounded px-3 py-2 border text-xs">{{ __('pos.cancel') }}</button></div>
+                    </div>
+                </template>
+                <template x-if="hasDeliveryPortion()">
+                    <label class="block text-xs font-semibold">{{ __('pos.fulfill_collection') }}
+                        <select data-delivery-collection :value="deliveryCollectionMode || (orderType === 'delivery' ? 'rider' : 'counter')" @change="deliveryCollectionMode = $event.target.value; cashReceived = ''" class="mt-1 w-full rounded text-sm text-gray-900">
+                            <option value="counter">{{ __('pos.fulfill_paid_counter') }}</option>
+                            <option value="rider">{{ __('pos.fulfill_rider_cash') }}</option>
+                        </select>
+                    </label>
+                </template>
+            </div>
+            @endif
+
             {{-- Item #3 relocation (customer feedback, 25 Jul 2026): Delivery charges input
                  lives HERE in the cart's Delivery section (was: top action bar) — visible
                  whenever order type = Delivery, with or without a selected customer.
                  Mechanism unchanged: setDeliveryCharge() adds/updates the TAX-EXEMPT manual
                  "Delivery Charges" cart line; switching order type removes it. --}}
             @if($features->delivery ?? false)
-            <template x-if="orderType === 'delivery'">
+            <template x-if="hasDeliveryPortion()">
                 <div class="px-3 py-2 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/20 flex items-center gap-2">
                     <svg class="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                     <span class="text-xs font-bold text-purple-700 dark:text-purple-300 flex-1">{{ __('pos.delivery_charges') }}</span>
@@ -1538,7 +1571,7 @@ window.addEventListener('popstate', function() {
                         {{-- Item #1 (Jul 2026): delivery-address picker — Delivery orders only.
                              Saved addresses (address #1 + extras) in a dropdown; "+ New" saves an
                              extra address to the customer AND selects it for this bill. --}}
-                        <template x-if="orderType === 'delivery'">
+                        <template x-if="hasDeliveryPortion()">
                             <div class="mt-1 space-y-1">
                                 <div class="flex items-center gap-1">
                                     <select x-model="selectedDeliveryAddress" @change="_deliveryAddressChoiceVersion = (_deliveryAddressChoiceVersion || 0) + 1" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
@@ -1612,7 +1645,6 @@ window.addEventListener('popstate', function() {
                     <button @click="cancelEditMode()" class="text-[10px] font-bold px-2 py-1 rounded-lg bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 transition whitespace-nowrap">{{ __('pos.cancel') }}</button>
                 </div>
             </template>
-            <div class="tn-cart-list flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
                 <template x-if="cart.length === 0">
                     <div class="tn-empty flex flex-col items-center justify-center h-full text-gray-400 py-16 px-6 text-center">
                         <div class="tn-empty-icon w-24 h-24 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mb-5">
@@ -1634,11 +1666,12 @@ window.addEventListener('popstate', function() {
                 <template x-for="(item, index) in cart" :key="item.cart_uid">
                     <div class="tn-cart-line cart-item cart-item-enter px-3 py-1.5 cursor-pointer relative"
                         :class="activeCartIndex === index ? 'cart-row-active' : ''"
-                        @click="selectCartRow(index)" :data-cart-index="index">
+                        @click="selectCartRow(index)" :data-cart-index="index" :data-cart-fulfillment="item.fulfillment || orderType">
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
                                     <span class="truncate" x-text="item.item_name"></span>
+                                    <button type="button" x-show="typeFlowGate && !item.skip_kitchen" data-split-line @click.stop="openFulfillmentSplit(index)" class="text-[10px] font-bold px-1 py-1 border rounded shrink-0 max-w-[95px] truncate" :aria-label="window.TXT.fulfill_split + ': ' + item.item_name" x-text="fulfillmentLabel(item.fulfillment || orderType)"></button>
                                     <template x-if="item._isQuickCreated">
                                         <span class="flex-shrink-0 whitespace-nowrap text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
                                     </template>
@@ -1905,7 +1938,7 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="grid gap-2 {{ ($features->tables ?? false) ? 'grid-cols-2' : 'grid-cols-3' }}">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
-                        <button @click="retailHold ? retailHoldStart() : holdOrder()" :disabled="cart.length === 0 || submitting || (!retailHold && (holdBlockedByManual() || hasDealItems()))" :title="(!retailHold && (holdBlockedByManual() || hasDealItems())) ? window.TXT.ti_manual_deals_pay_first : window.TXT.hs_hold_title" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button data-hold-order @click="retailHold ? retailHoldStart() : holdOrder()" :disabled="cart.length === 0 || submitting || (!retailHold && (holdBlockedByManual() || hasDealItems()))" :title="(!retailHold && (holdBlockedByManual() || hasDealItems())) ? window.TXT.ti_manual_deals_pay_first : window.TXT.hs_hold_title" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -2067,6 +2100,8 @@ window.addEventListener('popstate', function() {
                      method-aware estimate computed from the held order itself (server total
                      from payOrder stays authoritative on the receipt). --}}
                 <p class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(payModalTotal).toLocaleString()"></p>
+                <label x-show="payModalHasDelivery" class="block text-sm font-semibold mt-2">{{ __('pos.fulfill_collection') }}<select data-pay-delivery-collection :value="deliveryCollectionMode || (payModalOrderType() === 'delivery' ? 'rider' : 'counter')" @change="deliveryCollectionMode = $event.target.value; cashReceived = ''" class="mt-1 w-full rounded text-sm text-gray-900"><option value="counter">{{ __('pos.fulfill_paid_counter') }}</option><option value="rider">{{ __('pos.fulfill_rider_cash') }}</option></select></label>
+                <div x-show="payModalRiderCash > 0" class="text-sm mt-2 space-y-1" data-payment-collection-summary><p><span>{{ __('pos.fulfill_counter_amount') }}</span> <strong x-text="'Rs. ' + payModalCounterCash.toLocaleString()"></strong></p><p><span>{{ __('pos.fulfill_rider_amount') }}</span> <strong x-text="'Rs. ' + payModalRiderCash.toLocaleString()"></strong></p></div>
                 <p x-show="!payingHeldOrderId && Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? window.TXT.rounded_up_by : window.TXT.rounded_down_by) + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 {{-- Card-save mode: live bachat hint — total above is method-aware. --}}
                 <p x-show="modalCardSaving > 0" x-cloak class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1" x-text="payMethodIndex === 1 ? (window.TXT.card_discount_rs + Number(modalCardSaving).toLocaleString() + window.TXT.savings_suffix) : (window.TXT.card_pay_rs_prefix + Number(modalCardSaving).toLocaleString() + window.TXT.saved_amount_sfx)"></p>
@@ -2118,8 +2153,8 @@ window.addEventListener('popstate', function() {
                         <button type="button" @click="cashReceived = String(amt)" class="px-2.5 py-2 rounded-lg text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition" x-text="amt >= 1000 ? (amt/1000) + 'k' : amt"></button>
                     </template>
                 </div>
-                <p x-show="parseFloat(cashReceived) - payModalTotal > 0.001" x-cloak class="mt-1.5 text-center text-base font-black text-green-600 dark:text-green-400" x-text="window.TXT.change_rs_prefix + Math.round(parseFloat(cashReceived) - payModalTotal).toLocaleString()"></p>
-                <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && payModalTotal - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="window.TXT.short_by_rs + Math.round(payModalTotal - parseFloat(cashReceived)).toLocaleString() + window.TXT.more_needed_sfx"></p>
+                <p x-show="parseFloat(cashReceived) - payModalCounterCash > 0.001" x-cloak class="mt-1.5 text-center text-base font-black text-green-600 dark:text-green-400" x-text="window.TXT.change_rs_prefix + Math.round(parseFloat(cashReceived) - payModalCounterCash).toLocaleString()"></p>
+                <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && payModalCounterCash - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="window.TXT.short_by_rs + Math.round(payModalCounterCash - parseFloat(cashReceived)).toLocaleString() + window.TXT.more_needed_sfx"></p>
             </div>
             @endif
             {{-- Bill note (owner, 26 Jul 2026): per-item note inputs removed from cart rows —
@@ -3059,6 +3094,12 @@ window.addEventListener('popstate', function() {
                             </div>
                             <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
+                        <template x-if="bill.rider_collection_amount != null">
+                            <div class="text-xs font-semibold text-teal-700 dark:text-teal-300 mb-2">
+                                <p x-text="window.TXT.fulfill_rider_cash + ': Rs. ' + Number(Math.max(0, Number(bill.rider_collection_amount) - Number(bill.rider_partial_paid || 0))).toLocaleString()"></p>
+                                <p x-text="(bill.delivery_items || []).map(i => i.quantity + ' × ' + i.name).join(' · ')"></p>
+                            </div>
+                        </template>
                         <template x-if="bill.customer_name || bill.customer_phone">
                             <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
                                 <svg class="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -4147,7 +4188,7 @@ window.addEventListener('popstate', function() {
                 {{-- Cash Received / Wapsi — big green change-due line for the cashier. --}}
                 <div x-show="lastCashReceived > 0" x-cloak class="relative mt-2 mx-auto max-w-xs py-2 px-3 rounded-xl bg-green-600/10 border border-green-500/30">
                     <p class="text-[11px] font-bold text-gray-600 dark:text-gray-300" x-text="window.TXT.cash_received_rs + Number(lastCashReceived).toLocaleString()"></p>
-                    <p x-show="lastCashReceived - lastTotal > 0.001" class="text-xl font-black text-green-600 dark:text-green-400" x-text="window.TXT.change_caps_prefix + Math.round(lastCashReceived - lastTotal).toLocaleString()"></p>
+                    <p x-show="lastChangeDue > 0.001" class="text-xl font-black text-green-600 dark:text-green-400" x-text="window.TXT.change_caps_prefix + Number(lastChangeDue).toLocaleString()"></p>
                 </div>
                 {{-- PRA fiscal invoice number — shown only once PRA returns it (real "production" number) --}}
                 <div x-show="lastPraNumber" class="relative mt-3 mx-auto max-w-xs py-2 px-3 rounded-xl bg-emerald-600/10 border border-emerald-500/30">
@@ -4651,6 +4692,7 @@ $heldOrdersJson = $heldOrders->map(function ($o) use ($recipes) {
         'customer_phone' => $o->customer_phone,
         'kitchen_notes' => $o->kitchen_notes,
         'delivery_address' => $o->delivery_address ?? null,
+        'delivery_collection_mode' => $o->delivery_collection_mode,
         // Owner batch 26 Aug 2026 — held window shows the full ticket: who took
         // the order, and whether it is waiting on an online transfer.
         'staff_name' => $o->creator?->name,
@@ -4674,6 +4716,7 @@ $heldOrdersJson = $heldOrders->map(function ($o) use ($recipes) {
             'quantity' => (float) $i->quantity,
             'unit_price' => (float) $i->unit_price,
             'subtotal' => (float) $i->subtotal,
+            'fulfillment' => $i->fulfillment, 'line_uid' => $i->line_uid, 'kot_printed_at' => $i->kot_printed_at,
             'special_notes' => $i->special_notes,
             'is_tax_exempt' => (bool) ($i->is_tax_exempt ?? false),
             'item_discount_type' => $i->item_discount_type,
@@ -5047,6 +5090,9 @@ function restaurantPos() {
         // (no provisional); Takeaway = direct final bill only (no hold, no provisional).
         // Plain retail (widget hidden, orderType silently 'takeaway') stays ungated.
         typeFlowGate: {{ (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false)) ? 'true' : 'false' }},
+        fulfillmentMode: null,
+        deliveryCollectionMode: null,
+        fulfillmentSplit: null,
         deliveryChargeInput: '',
         customerAddresses: [],
         selectedDeliveryAddress: '',
@@ -5103,6 +5149,7 @@ function restaurantPos() {
         // Reset on every modal open; lastCashReceived rides to the success popup.
         cashReceived: '',
         lastCashReceived: 0,
+        lastChangeDue: 0,
         // PROVISIONAL BILL FLOW — when true, the Pay modal saves the bill with
         // pra_status='local' (no PRA submission). Bill stays editable/deletable
         // and can be promoted to final later via the "Submit to PRA — Make Final"
@@ -6336,6 +6383,7 @@ function restaurantPos() {
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
         async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
+            if (this.hasMixedService()) { this.showToast(window.TXT.fulfill_online_required, 'error'); return false; }
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
             // reopen the lost-response duplicate window. Fallback only if absent.
@@ -7206,6 +7254,76 @@ function restaurantPos() {
             this.addToCart(deal, selections);
             this.showToast(window.TXT.added_prefix + deal.name, 'success');
         },
+        fulfillmentLabel(mode) {
+            return mode === 'dine_in' ? window.TXT.fulfill_serve_here : mode === 'delivery' ? window.TXT.delivery : window.TXT.fulfill_parcel;
+        },
+        hasDeliveryPortion() {
+            return this.orderType === 'delivery' || (this.cart || []).some(c => !c.skip_kitchen && c.fulfillment === 'delivery');
+        },
+        hasMixedService() {
+            const modes = new Set(this.cart.filter(c => !c.skip_kitchen).map(c => c.fulfillment || this.orderType));
+            return modes.size > 1 || (modes.size === 1 && !modes.has(this.orderType));
+        },
+        chooseFulfillment(mode) {
+            this.fulfillmentMode = mode;
+            if (mode === 'delivery' && this.selectedCustomer) this.loadCustomerAddresses(this.selectedDeliveryAddress || '');
+        },
+        openFulfillmentSplit(index) {
+            const item = this.cart[index];
+            if (!item || item.skip_kitchen) return;
+            const mode = item.fulfillment || this.orderType;
+            this.fulfillmentSplit = { index, uid: item.cart_uid, total: Number(item.quantity), dine_in: 0, takeaway: 0, delivery: 0 };
+            this.fulfillmentSplit[mode] = Number(item.quantity);
+            this.$nextTick?.(() => this.$refs.cartList?.querySelector('[data-fulfillment-split]')?.scrollIntoView({ block: 'nearest' }));
+        },
+        applyFulfillmentSplit() {
+            const split = this.fulfillmentSplit;
+            if (!split) return false;
+            const item = this.cart[split.index];
+            const modes = ['dine_in', 'takeaway', 'delivery'];
+            if (!item || item.cart_uid !== split.uid || Number(item.quantity) !== split.total) return false;
+            const cents = modes.map(mode => Math.round(Number(split[mode]) * 100));
+            if (modes.some((mode, i) => !Number.isFinite(Number(split[mode])) || Number(split[mode]) < 0 || Math.abs(Number(split[mode]) * 100 - cents[i]) > 0.00001)
+                || cents.reduce((a, b) => a + b, 0) !== Math.round(split.total * 100)) {
+                this.showToast(window.TXT.fulfill_split_invalid, 'error'); return false;
+            }
+            const oldMode = item.fulfillment || this.orderType;
+            const sent = Number(item.kot_sent_quantity || 0);
+            if (Number(split[oldMode]) < sent) {
+                this.showToast(window.TXT.fulfill_sent_locked, 'error'); return false;
+            }
+            const rows = modes.filter(mode => Number(split[mode]) > 0).map(mode => {
+                const qty = Number(split[mode]);
+                const oldIdentity = mode === oldMode;
+                const uid = oldIdentity ? item.cart_uid : 'c' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+                return { ...item, cart_uid: uid, line_uid: oldIdentity ? (item.line_uid || item.cart_uid) : uid,
+                    quantity: qty, fulfillment: mode, kot_sent_quantity: oldIdentity ? sent : 0,
+                    item_discount_value: item.item_discount_type === 'amount' ? Math.round(Number(item.item_discount_value || 0) * qty / split.total * 100) / 100 : item.item_discount_value };
+            });
+            // Last portion absorbs the amount-discount rounding residual.
+            if (item.item_discount_type === 'amount' && rows.length) {
+                rows[rows.length - 1].item_discount_value = Math.round((Number(item.item_discount_value || 0) - rows.slice(0, -1).reduce((sum, row) => sum + Number(row.item_discount_value || 0), 0)) * 100) / 100;
+            }
+            this.cart.splice(split.index, 1, ...rows);
+            this.fulfillmentSplit = null;
+            if (this.hasDeliveryPortion() && this.selectedCustomer) this.loadCustomerAddresses(this.selectedDeliveryAddress || '');
+            if (!this.hasDeliveryPortion()) this.removeDeliveryCharge();
+            return true;
+        },
+        restoreFulfillmentCart(rows) {
+            const groups = new Map();
+            return rows.reduce((out, row) => {
+                const key = row.line_uid && [row.line_uid, row.fulfillment, row.special_notes, row.unit_price, row.item_discount_type].join('|');
+                const item = { ...row, cart_uid: row.line_uid || row.cart_uid || 'c' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+                    quantity: Number(row.quantity), kot_sent_quantity: row.kot_printed_at ? Number(row.quantity) : Number(row.kot_sent_quantity || 0) };
+                if (key && groups.has(key)) {
+                    const current = groups.get(key); current.quantity += item.quantity; current.kot_sent_quantity += item.kot_sent_quantity;
+                    if (item.item_discount_type === 'amount') current.item_discount_value = Number(current.item_discount_value || 0) + Number(item.item_discount_value || 0);
+                } else { out.push(item); if (key) groups.set(key, item); }
+                return out;
+            }, []);
+        },
+
         addToCart(item, selectedDealChoices = null) {
             const isChoiceDeal = item.type === 'deal'
                 && (item.choice_groups || []).some(group => Array.isArray(group.options) && group.options.length > 0);
@@ -7215,7 +7333,8 @@ function restaurantPos() {
             const choiceKey = isChoiceDeal
                 ? selectedDealChoices.map(c => c.group_id + ':' + c.product_id).join('|')
                 : '';
-            const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type
+            const serviceMode = this.typeFlowGate ? (this.fulfillmentMode || this.orderType) : null;
+            const existing = this.cart.find(c => (c.fulfillment || (this.typeFlowGate ? this.orderType : null)) === serviceMode && c.item_id === item.id && c.item_type === item.type
                 && (item.type !== 'deal' || (c._dealChoiceKey || '') === choiceKey));
             if (existing) {
                 existing.quantity++;
@@ -7224,7 +7343,7 @@ function restaurantPos() {
             } else {
                 const fixedComponents = item.type === 'deal' ? (item.component_rows || []) : [];
                 const selectedComponents = (selectedDealChoices || []).map(choice => ({ name: choice.name, quantity: choice.quantity }));
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey, deal_components: [...fixedComponents, ...selectedComponents],
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, fulfillment: serviceMode, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey, deal_components: [...fixedComponents, ...selectedComponents],
                     has_recipe: !!item.hasRecipe,
                     recipe_snapshot: Array.isArray(item.recipe_snapshot) ? item.recipe_snapshot.map(part => ({ ...part })) : [],
                     deal_snapshot: item.type === 'deal'
@@ -8388,7 +8507,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.fulfillmentMode = null; this.fulfillmentSplit = null; this.deliveryCollectionMode = null; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -8430,7 +8549,7 @@ function restaurantPos() {
         // (unke async loaders bina-tabdeeli recall par false-positive bana dete).
         cartEditFingerprint() {
             return JSON.stringify({
-                items: this.cart.map(i => [i.item_id ?? null, i.item_type || '', i.item_name || '', Number(i.quantity) || 0, Number(i.unit_price) || 0, i.special_notes || '', !!i.is_tax_exempt, i.item_discount_type || 'percentage', Number(i.item_discount_value) || 0, !!i.skip_kitchen]),
+                items: this.cart.map(i => [i.item_id ?? null, i.item_type || '', i.item_name || '', Number(i.quantity) || 0, Number(i.unit_price) || 0, i.special_notes || '', i.fulfillment || '', i.line_uid || i.cart_uid || '', !!i.is_tax_exempt, i.item_discount_type || 'percentage', Number(i.item_discount_value) || 0, !!i.skip_kitchen]),
                 notes: this.kitchenNotes || '',
                 priority: !!this.priorityOrder,
                 dtype: this.discountType || 'percentage',
@@ -8601,7 +8720,7 @@ function restaurantPos() {
                 // KABHI nahi — bawarchi ke liye "Delivery Charges" koi dish nahi.
                 // Nishan row ke saath DB tak jata hai, is liye reprint aur purane
                 // orders bhi wahi sach parhte hain.
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: null, item_type: 'manual', _delivery: true, skip_kitchen: true, item_name: 'Delivery Charges', quantity: 1, unit_price: amt, special_notes: '', is_tax_exempt: true, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: null, item_type: 'manual', fulfillment: 'delivery', _delivery: true, skip_kitchen: true, item_name: 'Delivery Charges', quantity: 1, unit_price: amt, special_notes: '', is_tax_exempt: true, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
             }
         },
         removeDeliveryCharge() {
@@ -8630,7 +8749,7 @@ function restaurantPos() {
                     const res = await this._fetchWithTimeout('/pos/api/customer-addresses?customer_id=' + c.id, { headers: { 'Accept': 'application/json' } });
                     if (!res.ok) { load.failed = true; return; }
                     const data = await res.json();
-                    if (this.selectedCustomer !== c || this._deliveryAddressGeneration !== generation || this.orderType !== 'delivery') return;
+                    if (this.selectedCustomer !== c || this._deliveryAddressGeneration !== generation || !this.hasDeliveryPortion()) return;
                     const addresses = Array.isArray(data.addresses) ? data.addresses.filter(a => a && String(a.address || '').trim()) : [];
                     const selected = this.selectedDeliveryAddress;
                     if (selected && !addresses.some(a => a.address === selected)) addresses.unshift({ id: null, label: null, address: selected });
@@ -8650,7 +8769,7 @@ function restaurantPos() {
             // If a new current lookup replaced the one we awaited, wait for that one too.
             for (;;) {
                 const load = this._deliveryAddressLoad;
-                if (!load || load.customer !== this.selectedCustomer || this.orderType !== 'delivery') return true;
+                if (!load || load.customer !== this.selectedCustomer || !this.hasDeliveryPortion()) return true;
                 await load.pending;
                 if (this._deliveryAddressLoad === load) {
                     if (load.failed && !this.selectedDeliveryAddress) {
@@ -9655,7 +9774,7 @@ function restaurantPos() {
             const parts = items.slice(0, 12).map(it => {
                 const q = parseFloat(it.quantity) || 1;
                 const qty = (Math.round(q * 100) / 100).toString();
-                return qty + '\u00D7 ' + (it.name || it.item_name || '');
+                return qty + '\u00D7 ' + (it.name || it.item_name || '') + (it.fulfillment ? ' [' + this.fulfillmentLabel(it.fulfillment) + ']' : '');
             });
             if (items.length > 12) parts.push('+' + (items.length - 12));
             return parts.join('  \u00B7  ');
@@ -10061,7 +10180,7 @@ function restaurantPos() {
             if (!this.customerLookupResult || !this.customerLookupResult.found) return;
             const c = this.customerLookupResult.customer;
             this.selectedCustomer = c;
-            if (this.orderType === 'delivery') this.loadCustomerAddresses();
+            if (this.hasDeliveryPortion()) this.loadCustomerAddresses();
             this.customerStats = this.customerLookupResult.stats;
             this.customerPhoneQuery = c.name + (c.phone ? " · " + c.phone : "");
             this.showCustomerPicker = false;
@@ -10071,7 +10190,7 @@ function restaurantPos() {
 
         async selectCustomerWithStats(c) {
             this.selectedCustomer = c;
-            if (this.orderType === 'delivery') this.loadCustomerAddresses();
+            if (this.hasDeliveryPortion()) this.loadCustomerAddresses();
             this.customerStats = null;
             this.customerPhoneQuery = c.name + (c.phone ? " · " + c.phone : "");
             this.showCustomerPicker = false;
@@ -10262,7 +10381,7 @@ function restaurantPos() {
             this.customerPhoneDropdown = false;
             this.customerPhoneResults = [];
             // Item #1: on a Delivery order the address picker should be ready instantly.
-            if (this.orderType === 'delivery') this.loadCustomerAddresses();
+            if (this.hasDeliveryPortion()) this.loadCustomerAddresses();
             else { this.customerAddresses = []; this.selectedDeliveryAddress = ''; }
             this.showToast(window.TXT.customer_prefix + cr.name + (cr.stats && cr.stats.is_frequent ? ' (VIP)' : ''), 'success');
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
@@ -10316,7 +10435,7 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data.success) {
                     this.selectedCustomer = { id: data.customer.id, name: data.customer.name, phone: data.customer.phone, address: data.customer.address };
-                    if (this.orderType === 'delivery') this.loadCustomerAddresses();
+                    if (this.hasDeliveryPortion()) this.loadCustomerAddresses();
                     this.customerStats = { total_orders: 0, total_spent: 0, is_frequent: false, last_order_date: null };
                     this.customerPhoneQuery = data.customer.name + (data.customer.phone ? ' · ' + data.customer.phone : '');
                     if (this.guidedFlow) this.flowStep = 'items';
@@ -10580,6 +10699,7 @@ function restaurantPos() {
         },
 
         async _localCoreHold() {
+            if (this.hasMixedService()) return { success: false, message: window.TXT.fulfill_online_required };
             if (!window.NestPosLocal) return null;
             const orderId = String(this.recalledOrderId ||
                 (this.holdAttemptUuid = this.holdAttemptUuid || this._newOfflineUuid()));
@@ -10615,7 +10735,7 @@ function restaurantPos() {
                         amount_cents: Math.round(itemDiscount * 100),
                     },
                     net_line_cents: Math.round((quantity * unitPrice - itemDiscount) * 100),
-                    special_notes: item.special_notes || null,
+                    fulfillment: item.fulfillment || null, line_uid: item.line_uid || item.cart_uid, special_notes: item.special_notes || null,
                     has_recipe: !!item.has_recipe,
                     recipe_snapshot: recipe,
                     deal_snapshot: deal,
@@ -10729,7 +10849,8 @@ function restaurantPos() {
         },
 
         async holdOrder(opts) {
-            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
+            if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
+            if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.selectedCustomer?.phone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
             // EDIT MODE: a provisional bill can't be turned into a held order —
             // F9 Update Bill is the only save path while editing.
             if (this.editingBillId) {
@@ -10772,7 +10893,7 @@ function restaurantPos() {
             try {
                 const res = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null, hold_uuid: this.holdAttemptUuid }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null, hold_uuid: this.holdAttemptUuid }),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -10932,6 +11053,7 @@ function restaurantPos() {
             if (!eb || !eb.id) return;
             this.editingBillId = eb.id;
             this.editingBillNumber = eb.invoice_number || '';
+            this.deliveryCollectionMode = eb.rider_collection_amount == null ? null : (Number(eb.rider_collection_amount) > 0 ? 'rider' : 'counter');
             this.cart = (eb.items || []).map(i => ({
                 cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9),
                 item_id: i.item_id || null,
@@ -10939,7 +11061,8 @@ function restaurantPos() {
                 item_name: i.item_name,
                 quantity: parseFloat(i.quantity) || 1,
                 unit_price: parseFloat(i.unit_price) || 0,
-                special_notes: i.special_notes || '',
+                fulfillment: i.fulfillment || null, line_uid: i.line_uid || null, kot_printed_at: i.kot_printed_at || null, special_notes: i.special_notes || '',
+                skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen,
                 is_tax_exempt: !!i.is_tax_exempt,
                 item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
             }));
@@ -10952,13 +11075,13 @@ function restaurantPos() {
             if (this.discountValue > 0) this.showDiscount = true;
             this.kitchenNotes = eb.notes || '';
             this.recalcDiscount();
-            if (this.orderType === 'delivery') this.loadCustomerAddresses(eb.delivery_address || '');
+            if (this.hasDeliveryPortion()) this.loadCustomerAddresses(eb.delivery_address || '');
         },
         cancelEditMode() {
             window.location.href = '{{ route('pos.invoice.create') }}';
         },
         async updateProvisionalBill() {
-            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
+            if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             if (this.submitting || !this.editingBillId) return;
             if (this.cart.length === 0) { this.showToast(window.TXT.cart_empty_add_or_delete, 'error'); return; }
             if (!navigator.onLine) { this.showToast(window.TXT.offline_update_online_only, 'error'); return; }
@@ -10972,7 +11095,7 @@ function restaurantPos() {
                         type: c.item_type === 'service' ? 'service' : (c.item_type === 'deal' ? 'deal' : 'product'),
                         item_id: c.item_id || null,
                         is_tax_exempt: !!c.is_tax_exempt,
-                        special_notes: c.special_notes || null,
+                        fulfillment: c.fulfillment || null, line_uid: c.line_uid || c.cart_uid, special_notes: c.special_notes || null,
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
                         // KOT par na chhapne wali line (Delivery Charges).
                         skip_kitchen: !!c.skip_kitchen,
@@ -10995,7 +11118,7 @@ function restaurantPos() {
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,
                     customer_name: this.selectedCustomer?.name || null,
                     customer_phone: this.selectedCustomer?.phone || null,
-                    delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
+                    delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
                     kitchen_notes: this.kitchenNotes,
                     terminal_id: (this.editingBillData && this.editingBillData.terminal_id) || null,
                 };
@@ -11081,7 +11204,8 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
-            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
+            if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
+            if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.selectedCustomer?.phone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
             if (this.submitting) return;
             if (this.incomingOrderId && this.recalledCartDirty() && !await this.saveIncomingOrder()) return;
             // A recalled/held online-marked order has already chosen its payment
@@ -11175,7 +11299,7 @@ function restaurantPos() {
                     // action. Backend skips the dine_in-only flow gate when this flag is set;
                     // the explicit Hold button / F5 (holdOrder fn above) sends no flag and
                     // stays gated client + server.
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, pay_uuid: this.payAttemptUuid, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, pay_uuid: this.payAttemptUuid, delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
                 });
                 let holdRes;
                 try {
@@ -11261,7 +11385,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
-            if (this.orderType === 'delivery' && await this.waitForDeliveryAddress() === false) return;
+            if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).
             if (this.submitting) return;
             const now = Date.now();
@@ -11281,7 +11405,7 @@ function restaurantPos() {
                         type: c.item_type === 'service' ? 'service' : (c.item_type === 'deal' ? 'deal' : 'product'),
                         item_id: c.item_id || null,
                         is_tax_exempt: !!c.is_tax_exempt,
-                        special_notes: c.special_notes || null,
+                        fulfillment: c.fulfillment || null, line_uid: c.line_uid || c.cart_uid, special_notes: c.special_notes || null,
                         // Flag manual cart lines so the backend doesn't auto-
                         // create a permanent product for them.
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
@@ -11315,7 +11439,7 @@ function restaurantPos() {
                     customer_name: this.selectedCustomer?.name || null,
                     customer_phone: this.selectedCustomer?.phone || null,
                     // Item #1: delivery-address snapshot — only rides on Delivery orders.
-                    delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
+                    delivery_collection_mode: this.deliveryCollectionMode || (this.orderType === 'delivery' ? 'rider' : 'counter'), delivery_address: this.hasDeliveryPortion() ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
                     kitchen_notes: this.kitchenNotes,
                     // Dine-In picker — backend auto-frees this reserved table once the
                     // bill is stored (reserved → available; occupied untouched).
@@ -11469,6 +11593,7 @@ function restaurantPos() {
                 // The server's settled bill is authoritative; the pre-pay quote
                 // can be stale when discount/tax/payment method changed.
                 this.lastTotal = Math.round(Number(data.total_amount ?? savedTotal ?? 0));
+                this.lastChangeDue = Number(data.change_due ?? Math.max(0, this.lastCashReceived - this.lastTotal));
                 this.lastPaymentMethod = method;
                 this.lastPraNumber = data.pra_invoice_number || '';
                 this.lastPraStatus = data.pra_status || '';
@@ -11597,6 +11722,33 @@ function restaurantPos() {
             return type === 'delivery' ? window.TXT.delivery
                 : (type === 'dine_in' ? window.TXT.dine_in : window.TXT.takeaway);
         },
+        get payModalHasDelivery() {
+            const held = this.payingHeldOrderId ? this.heldOrders.find(o => o.id === this.payingHeldOrderId) : null;
+            return held ? (held.order_type === 'delivery' || held.items?.some(i => i.fulfillment === 'delivery')) : this.hasDeliveryPortion();
+        },
+        get payModalRiderCash() {
+            const held = this.payingHeldOrderId ? this.heldOrders.find(o => o.id === this.payingHeldOrderId) : null;
+            const items = held ? held.items : this.cart;
+            const orderType = held?.order_type || this.orderType;
+            const mode = this.deliveryCollectionMode || held?.delivery_collection_mode || (orderType === 'delivery' ? 'rider' : 'counter');
+            if (this.payMethodIndex === 1 || mode !== 'rider' || !items?.some(i => i.fulfillment === 'delivery')) return 0;
+            const inclusive = !!this.taxInclusive;
+            const rate = Number(this.taxRules?.cash ?? this.taxRate ?? 0);
+            const sub = items.reduce((sum, item) => sum + (held ? Number(item.subtotal || 0) : this.getItemTotal(item)), 0);
+            const discount = Number(held ? held.discount_amount : this.discountAmount) || 0;
+            const ratio = sub > 0 ? Math.max(0, 1 - discount / sub) : 1;
+            const r2 = amount => Math.round((amount + Number.EPSILON) * 100) / 100;
+            let all = 0, delivery = 0;
+            for (const item of items) {
+                const base = held ? Number(item.subtotal || 0) : this.getItemTotal(item);
+                const net = Math.max(0, r2(base * ratio));
+                const weight = Math.round((net + (inclusive || item.is_tax_exempt ? 0 : r2(net * rate / 100))) * 100);
+                all += weight;
+                if (item.fulfillment === 'delivery' || item.skip_kitchen) delivery += weight;
+            }
+            return all > 0 ? Math.round(this.payModalTotal * delivery / all * 100) / 100 : 0;
+        },
+        get payModalCounterCash() { return Math.round((this.payModalTotal - this.payModalRiderCash) * 100) / 100; },
         get payModalTotal() {
             if (this.payingHeldOrderId) return this.heldOrderEstimate(this.payMethodIndex === 1 ? 'card' : 'cash');
             // Method-aware for the live cart in EVERY tax mode (Jul 2026 redesign):
@@ -12025,7 +12177,7 @@ function restaurantPos() {
                         edit_uuid: editUuid,
                         items: this.cart.map(i => ({
                             item_id: i.item_id, item_type: i.item_type, line_id: i.line_id || null, name: i.item_name,
-                            quantity: i.quantity, unit_price: i.unit_price, special_notes: i.special_notes || ''
+                            quantity: i.quantity, unit_price: i.unit_price, fulfillment: i.fulfillment || null, line_uid: i.line_uid || i.cart_uid, special_notes: i.special_notes || ''
                         }))
                     })
                 });
@@ -12042,7 +12194,7 @@ function restaurantPos() {
                         cart_uid: old[idx]?.cart_uid || ('inc' + data.order.id + '_' + idx),
                         item_id: it.item_id || null, item_type: it.item_type || (it.item_id ? 'product' : 'manual'), line_id: it.line_id || it.id || null,
                         item_name: it.name, quantity: Number(it.quantity) || 1,
-                        unit_price: Number(it.unit_price) || 0, special_notes: it.special_notes || '',
+                        unit_price: Number(it.unit_price) || 0, fulfillment: it.fulfillment || null, line_uid: it.line_uid || null, kot_printed_at: it.kot_printed_at || null, special_notes: it.special_notes || '',
                         is_tax_exempt: !!it.is_tax_exempt,
                     }));
                     this.incomingOrderInfo = data.order;
@@ -12167,7 +12319,7 @@ function restaurantPos() {
                 item_name: it.name,
                 quantity: parseFloat(it.quantity) || 1,
                 unit_price: parseFloat(it.unit_price) || 0,
-                special_notes: it.special_notes || '',
+                fulfillment: it.fulfillment || null, line_uid: it.line_uid || null, kot_printed_at: it.kot_printed_at || null, special_notes: it.special_notes || '',
                 is_tax_exempt: !!(it.is_tax_exempt || it.is_third_schedule),
                 is_third_schedule: !!it.is_third_schedule,
                 item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
@@ -12503,7 +12655,7 @@ function restaurantPos() {
         // business_date (pre-migration window) are included rather than hidden.
         pendingDeliveryBills() {
             const isToday = b => (!this.bizToday || !b.business_date || b.business_date === this.bizToday);
-            const prov = this.localBills.filter(b => b.order_type === 'delivery' && isToday(b));
+            const prov = this.localBills.filter(b => (b.order_type === 'delivery' || b.has_delivery_items) && isToday(b));
             // FINAL delivery bills bhi (3 Aug 2026): jo abhi deliver nahi hue ya
             // cash rider ke khaate par hai — popup ki ginti ab rider app se milti hai.
             // Task 513: UNASSIGNED bills (rider NULL + status NULL) ride the 7-din
@@ -13148,6 +13300,7 @@ function restaurantPos() {
             // held-order/override se capture ho chuka) — tables-first wapsi ka gate.
             this.lastOrderType = payOrderType || null;
             this.lastTotal = Math.round(Number(data.total_amount ?? savedTotal ?? 0)); this.lastPaymentMethod = method;
+            this.lastChangeDue = Number(data.change_due ?? Math.max(0, this.lastCashReceived - this.lastTotal));
             this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
             this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
             // Task 921: clear the claimed-waiter state once its order is paid so the NEXT
@@ -13301,7 +13454,7 @@ function restaurantPos() {
                     item_id: item.item_id || null,
                     is_tax_exempt: !!item.is_tax_exempt,
                     _manual: item.item_id == null,
-                    special_notes: item.special_notes || null,
+                    fulfillment: item.fulfillment || null, line_uid: item.line_uid || item.cart_uid, special_notes: item.special_notes || null,
                     item_discount_type: item.item_discount_type || 'percentage',
                     item_discount_value: Number(item.item_discount_value || 0),
                     deal_snapshot: item.item_type === 'deal' && Array.isArray(item.deal_snapshot)
@@ -13434,7 +13587,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null, terminal_id: this.terminalId || null, online_payment_confirmed: !!this._onlineOkByOrder[orderId] }) });
+                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_collection_mode: this.deliveryCollectionMode || heldOrd?.delivery_collection_mode || (payOrderType === 'delivery' ? 'rider' : 'counter'), delivery_address: (payOrderType === 'delivery' || heldOrd?.items?.some(i => i.fulfillment === 'delivery')) ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null, terminal_id: this.terminalId || null, online_payment_confirmed: !!this._onlineOkByOrder[orderId] }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));
@@ -13634,11 +13787,12 @@ function restaurantPos() {
             // skip_kitchen wapas cart par: yehi nishan Delivery Charges line ko
             // dobara "_delivery" banata hai, warna recall ke baad woh aam manual
             // line ban kar re-hold rok deti aur KOT par chhap jati.
-            this.cart = order.items.map(i => ({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0, skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen }));
+            this.cart = this.restoreFulfillmentCart(order.items).map(i => ({ cart_uid: i.cart_uid, kot_sent_quantity: i.kot_sent_quantity, item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), fulfillment: i.fulfillment || null, line_uid: i.line_uid || null, kot_printed_at: i.kot_printed_at || null, special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0, skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen }));
             // Delivery-fee input bhi bhar do, warna cashier ko lagta hai fee gayab
             // hai aur dobara type karne par doosri line ban jati.
             const recalledFee = this.cart.find(c => c && c._delivery);
             this.deliveryChargeInput = recalledFee ? recalledFee.unit_price : '';
+            this.fulfillmentMode = null; this.fulfillmentSplit = null; this.deliveryCollectionMode = order.delivery_collection_mode || null;
             this.kitchenNotes = order.kitchen_notes || '';
             this.recalledOrderId = order.id;
             this.priorityOrder = order.priority || false;
@@ -13653,7 +13807,7 @@ function restaurantPos() {
             // pattern as enterEditMode: the snapshot shows instantly; the saved
             // address book merges in behind it (loadCustomerAddresses resets the
             // list + auto-selects the default, so re-pin after it finishes).
-            if (this.orderType === 'delivery') this.loadCustomerAddresses(order.delivery_address || '');
+            if (this.hasDeliveryPortion()) this.loadCustomerAddresses(order.delivery_address || '');
             // Task 781: meta snapshot for the in-panel table actions — the order
             // leaves heldOrders on the next line, so KOT gating + the cancel
             // modal would otherwise lose kot_sent_at / order_number.
@@ -13694,7 +13848,7 @@ function restaurantPos() {
         },
         _selectQuickCustomer(cust, msg, tone) {
             this.selectedCustomer = cust; this.showQuickAdd = false;
-            if (this.orderType === 'delivery') this.loadCustomerAddresses();
+            if (this.hasDeliveryPortion()) this.loadCustomerAddresses();
             this.customerPhoneQuery = cust.phone || cust.name;
             this.quickCustomerName = ''; this.quickCustomerPhone = ''; this.quickCustomerAddress = ''; this.showCustomerPicker = false;
             this.showToast(msg, tone);

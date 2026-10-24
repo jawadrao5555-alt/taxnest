@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class RestaurantOrder extends Model
 {
     protected $fillable = [
-        'company_id', 'order_number', 'table_id', 'order_type', 'status',
+        'delivery_collection_mode', 'company_id', 'order_number', 'table_id', 'order_type', 'status',
         'customer_id', 'customer_name', 'customer_phone', 'delivery_address',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount', 'tax_amount', 'total_amount',
         'payment_method', 'kitchen_notes', 'priority', 'pos_transaction_id', 'created_by',

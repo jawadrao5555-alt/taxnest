@@ -10,10 +10,14 @@ const version = require('../pra-agent/package.json').version;
 const identity = parseBuildInfo(createBuildInfo(version, new Date('2026-10-17T14:05:06.000Z')), version);
 const html = readFileSync(new URL('../pra-agent/index.html', import.meta.url), 'utf8');
 const displayScript = readFileSync(new URL('../pra-agent/src/build-info-view.js', import.meta.url), 'utf8');
+const imsScript = readFileSync(new URL('../pra-agent/src/ims-visibility.js', import.meta.url), 'utf8');
 const server = createServer((request, response) => {
   const mode = new URL(request.url, 'http://127.0.0.1').searchParams.get('mode') || 'valid';
   if (request.url.split('?')[0] === '/src/build-info-view.js') {
     response.writeHead(200, { 'Content-Type': 'text/javascript' }); response.end(displayScript); return;
+  }
+  if (request.url.split('?')[0] === '/src/ims-visibility.js') {
+    response.writeHead(200, { 'Content-Type': 'text/javascript' }); response.end(imsScript); return;
   }
   if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
   const info = mode === 'missing' ? { version, builtAt: null } : identity;
@@ -23,7 +27,7 @@ const server = createServer((request, response) => {
       getVersion:async()=>{if(${JSON.stringify(mode)}==='ipc-error')throw new Error('Synthetic identity IPC unavailable');return ${JSON.stringify(info)};},
       getConfig:async()=>({serverUrl:location.origin+'/api/agent',companyId:'Fictional company',apiKey:''}),
       getPrinters:async()=>({printers:[]}),getStatus:async()=>({running:false,connected:false}),
-      imsMode:()=>null,checkUpdate:async()=>({available:false}),
+      checkUpdate:async()=>({available:false}),
       getPosSettings:async()=>({}),getLanSettings:async()=>({enabled:false}),getLanStatus:async()=>({enabled:false}),
     },{get:(target,key)=>key in target?target[key]:String(key).startsWith('on')?()=>{}:async()=>{window.__unexpectedAgentCalls.push(String(key));return {};}});
   </script>`;

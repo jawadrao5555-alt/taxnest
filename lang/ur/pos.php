@@ -7178,5 +7178,8 @@ return [
     'print_no_document_reason_store_slip_disabled' => 'اسٹور سلپ بند ہے',
     'print_no_document_reason_held_sale_missing' => 'ہولڈ سیل اب دستیاب نہیں',
     'return_not_allowed_hotel_credit_required' => 'اس بل کے لیے ہوٹل واپسی / کریڈٹ نوٹ استعمال کریں۔ رقم کی واپسی الگ ہے۔',
+    'settle_select_all_cash' => 'تمام کیش بل منتخب کریں',
+    'settle_selected_delivery_hint' => 'جو بل ابھی باقی رکھنے ہیں ان کا نشان ہٹا دیں۔ منتخب بلوں کی پوری رقم وصول ہونے پر وہ ڈیلیورڈ ہو جائیں گے۔ باقی بل نہیں بدلیں گے۔',
+    'settle_selection_confirm' => ':count منتخب کیش بلوں کے لیے :amount روپے وصول کریں؟ پوری رقم والے بل ڈیلیورڈ ہو جائیں گے۔ غیر منتخب بل نہیں بدلیں گے۔',
 ];
 

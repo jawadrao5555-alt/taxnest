@@ -7193,5 +7193,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'print_no_document_reason_store_slip_disabled' => 'Store slip is switched off',
     'print_no_document_reason_held_sale_missing' => 'Held sale is no longer available',
     'return_not_allowed_hotel_credit_required' => 'Use the Hotel Return / Credit Note screen for this bill. Payment refunds are separate.',
+    'settle_select_all_cash' => 'Select all cash bills',
+    'settle_selected_delivery_hint' => 'Untick any bills you want to leave pending. Fully paid selected bills will be marked Delivered; bills left unselected stay unchanged.',
+    'settle_selection_confirm' => 'Receive Rs. :amount against :count selected cash bills? Fully paid bills will be marked Delivered. Unselected bills stay unchanged.',
 ];
 

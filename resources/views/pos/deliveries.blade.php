@@ -30,10 +30,12 @@
 <link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}?v=1">
 <script src="{{ asset('vendor/leaflet/leaflet.js') }}?v=1"></script>
 @endif
+<script src="{{ asset('js/rider-settlement-selection.js') }}?v=1"></script>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
-     x-data="{ settleRider: null, settleTotal: 0, settleAmount: '', settlePrepaid: {}, settlePrepaidBusy: {}, retBill: null, retBulk: null, retCount: 0, recalcSettle(form) {
+     x-data="{ settleSelectionVersion: 0, settleSelection(form) { this.settleSelectionVersion; return window.TnRiderSettlement.selection(form); }, selectSettlementBills(form, checked) { window.TnRiderSettlement.selectAll(form, checked); this.recalcSettle(form); }, confirmSettlement(form) { return window.TnRiderSettlement.confirmSelection(form, this.settleAmount, this.settleTotal, this.settlePrepaidPending(), message => window.confirm(message), {{ Js::from(__('pos.settle_selection_confirm')) }}); }, settleRider: null, settleTotal: 0, settleAmount: '', settlePrepaid: {}, settlePrepaidBusy: {}, retBill: null, retBulk: null, retCount: 0, recalcSettle(form) {
          let t = 0;
          form.querySelectorAll('input[name=\'bill_ids[]\']:checked').forEach(cb => t += parseFloat(cb.dataset.amount || 0));
+         this.settleSelectionVersion++;
          this.settleTotal = t;
          this.settleAmount = t > 0 ? t : '';
       }, settlePrepaidPending() {
@@ -187,7 +189,7 @@
             @if($owed > 0)
                 <div class="text-lg font-bold text-amber-600 dark:text-amber-400">Rs. {{ number_format($owed) }}</div>
                 <div class="text-[11px] text-gray-400 mb-3">{{ __('pos.unsettled_cash_bills', ['count' => $open->count()]) }}</div>
-                <button type="button" class="w-full px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition"
+                <button type="button" data-rider-settlement-open="{{ $rider->id }}" class="w-full px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition"
                         @click="settleRider = {{ $rider->id }}; settleTotal = {{ $owed }}; settleAmount = {{ $owed }}">{{ __('pos.settle_cash') }}</button>
             @else
                 <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">{{ __('pos.clear') }}</div>
@@ -219,7 +221,7 @@
         {{-- Settle modal (one per rider with open bills) --}}
         @if($owed > 0)
         <template x-teleport="body">
-            <div x-show="settleRider === {{ $rider->id }}" x-cloak @keydown.escape.window="if (settleRider === {{ $rider->id }}) settleRider = null" @keydown.escape.prevent.stop="settleRider = null" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div data-rider-settlement-dialog="{{ $rider->id }}" style="z-index:80;" x-show="settleRider === {{ $rider->id }}" x-cloak @keydown.escape.window="if (settleRider === {{ $rider->id }}) settleRider = null" @keydown.escape.prevent.stop="settleRider = null" class="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <div class="absolute inset-0 bg-black/50" @click="settleRider = null"></div>
                 <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-lg p-5 max-h-[85vh] overflow-y-auto">
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — {{ $rider->name }}</h3>
@@ -229,8 +231,16 @@
                     @else
                     <div class="mb-4"></div>
                     @endif
-                    <form method="POST" action="{{ route('pos.riders.settle', $rider->id) }}" x-init="recalcSettle($el)" @change="if ($event.target.name === 'bill_ids[]') recalcSettle($event.target.closest('form'))">
+                    <form method="POST" action="{{ route('pos.riders.settle', $rider->id) }}" @submit="if (!confirmSettlement($event.target)) $event.preventDefault()" x-init="recalcSettle($el)" @change="if ($event.target.name === 'bill_ids[]') recalcSettle($event.target.closest('form'))">
                         @csrf
+                        <label class="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-sm font-semibold text-purple-900 dark:text-purple-100">
+                            <input type="checkbox" data-settle-select-all
+                                   @change="selectSettlementBills($event.target.closest('form'), $event.target.checked)"
+                                   x-effect="const state = settleSelection($el.closest('form')); $el.checked = state.count > 0 && state.selected === state.count; $el.indeterminate = state.selected > 0 && state.selected < state.count"
+                                   class="rounded border-purple-400 text-purple-600 focus:ring-purple-500">
+                            {{ __('pos.settle_select_all_cash') }}
+                        </label>
+                        <p class="mb-3 text-xs text-gray-800 dark:text-gray-200">{{ __('pos.settle_selected_delivery_hint') }}</p>
                         <div class="space-y-1.5 mb-4">
                             @foreach($open as $b)
                             @php $rem = (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0); @endphp

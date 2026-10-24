@@ -1473,6 +1473,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
+  if (t.riderBulkSelection) return riderBulkSelectionWorkflow(page,t,v);
   if (t.restaurantTopSelling) return restaurantTopSellingWorkflow(page,t,v);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v,diagnostics);
@@ -1914,10 +1915,16 @@ async function riderRealtimeWorkflow(page,t,v) {
     const root=document.querySelector('[x-data^="riderTracking("]');
     return root&&window.Alpine?.$data(root)?.markers?.[id];
   },t.riderRealtime.id);
+  // Each fictional upload starts a real duty session; long suites may cross
+  // the nightly cutoff after seeding. Keep production auto-off enforcement.
+  const duty=await page.request.post(baseUrl+'/api/rider-app/v1/duty',{
+    headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{on:true}});
+  if(!duty.ok()||!(await duty.json()).duty)throw new Error('Synthetic rider duty start failed: HTTP '+duty.status());
   const at=Date.now(),lat=v.width===390?31.522:31.521,lng=74.322;
   const response=await page.request.post(baseUrl+'/api/rider-app/v1/locations',{
     headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{points:[{lat,lng,acc:8,at}]}});
-  if(!response.ok()||!(await response.json()).acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged');
+  const uploaded=await response.json();
+  if(!response.ok()||!uploaded.acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged: HTTP '+response.status()+' '+JSON.stringify(uploaded));
   await page.waitForFunction(({id,lat,lng})=>{
     const d=window.Alpine.$data(document.querySelector('[x-data^="riderTracking("]'));
     const m=d.markers[id]?.getLatLng();return m&&Math.abs(m.lat-lat)<.000001&&Math.abs(m.lng-lng)<.000001;
@@ -2014,4 +2021,29 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
   await page.emulateMedia({media:'screen'});
   pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
+}
+
+async function riderBulkSelectionWorkflow(page,t,v){
+  const fixture=t.riderBulkSelection[v.width];
+  await page.goto(baseUrl+'/pos/deliveries',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  await page.locator('[data-rider-settlement-open="'+fixture.riderId+'"]').click();
+  const modal=page.locator('[data-rider-settlement-dialog="'+fixture.riderId+'"]');await modal.waitFor({state:'visible'});
+  const all=modal.locator('[data-settle-select-all]');await all.uncheck();await all.check();
+  const skipped=modal.locator('[data-settle-bill="'+fixture.ids[2]+'"]');await skipped.uncheck();
+  if(!await all.evaluate(el=>el.indeterminate))throw new Error('Rider selection does not show omitted bills');
+  if(await modal.locator('[name="received_amount"]').inputValue()!=='200')throw new Error('Rider selected cash total includes omitted bills');
+  await saveEvidenceScreenshot(page,'rider-select-all-omit-'+v.width+'.png');
+  let posts=0;const count=r=>{if(r.method()==='POST'&&r.url()===baseUrl+'/pos/riders/'+fixture.riderId+'/settle')posts++;};page.on('request',count);
+  page.once('dialog',dialog=>dialog.dismiss());await modal.locator('button[type="submit"]').click();
+  if(posts!==0)throw new Error('Cancelled rider confirmation submitted money');
+  page.once('dialog',dialog=>dialog.accept());
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),modal.locator('button[type="submit"]').click()]);
+  if(posts!==1)throw new Error('Rider confirmation did not submit exactly once');
+  page.off('request',count);await waitForOperationalSurface(page);await dismiss(page);
+  await page.locator('[data-rider-settlement-open="'+fixture.riderId+'"]').click();
+  const remaining=page.locator('[data-rider-settlement-dialog="'+fixture.riderId+'"]');await remaining.waitFor({state:'visible'});
+  const remainingIds=await remaining.locator('[data-settle-bill]').evaluateAll(nodes=>nodes.map(el=>Number(el.value)));
+  if(remainingIds.length!==1||remainingIds[0]!==fixture.ids[2])throw new Error('Omitted cash bill did not remain pending after selected settlement');
+  await remaining.locator('button').filter({hasText:'Cancel'}).click();
 }

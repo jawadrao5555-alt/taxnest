@@ -33,7 +33,7 @@ final class PosFulfillment
         return false;
     }
 
-    public static function validate(Request $request, Company $company): void
+    public static function validate(Request $request, Company $company, ?\App\Models\PosTransaction $existingBill = null): void
     {
         $request->validate([
             'items.*.fulfillment' => 'nullable|in:dine_in,takeaway,delivery',
@@ -41,6 +41,29 @@ final class PosFulfillment
             'items.*.cart_uid' => 'nullable|string|max:100|regex:/^[A-Za-z0-9_-]+$/',
             'delivery_collection_mode' => 'nullable|in:counter,rider',
         ]);
+        // New bills have one order type. Item notes carry kitchen instructions.
+        // Persisted pre-simplification mixed orders retain their exact snapshots;
+        // a client flag or foreign recall ID can never opt a new bill into mixing.
+        $orderType = $request->input('order_type') ?? $existingBill?->order_type;
+        if (self::isMixed($request->input('items', []), $orderType)) {
+            $existing = $existingBill;
+            if (!$existing && ($request->filled('recalled_order_id') || $request->filled('hold_uuid'))) {
+                $query = \App\Models\RestaurantOrder::where('company_id', $company->id);
+                $existing = $request->filled('recalled_order_id')
+                    ? $query->whereIn('status', ['held', 'preparing', 'ready'])->find($request->recalled_order_id)
+                    : (Schema::hasColumn('restaurant_orders', 'hold_uuid') ? $query->where('hold_uuid', $request->hold_uuid)->first() : null);
+            }
+            $oldLines = $existing && (int) $existing->company_id === (int) $company->id
+                ? $existing->items->keyBy('line_uid') : collect();
+            foreach ($request->input('items', []) as $line) {
+                $mode = $line['fulfillment'] ?? null;
+                if (!$mode || $mode === $orderType) continue;
+                $old = $oldLines->get($line['line_uid'] ?? $line['cart_uid'] ?? '');
+                if (!$old || $old->fulfillment !== $mode || $existing->order_type !== $orderType) {
+                    throw ValidationException::withMessages(['items' => 'Use one order type per bill. Write Parcel in the item note; make a separate bill for Delivery.']);
+                }
+            }
+        }
         $uids = [];
         foreach ($request->input('items', []) as $line) {
             if (empty($line['fulfillment'])) continue;

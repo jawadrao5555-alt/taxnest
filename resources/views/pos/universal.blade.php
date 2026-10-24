@@ -1437,7 +1437,7 @@ window.addEventListener('popstate', function() {
             </div>
 
             <div class="tn-mobile-cart-bar md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
-                <button @click="mobileView = 'cart'" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-sm" aria-label="{{ __('pos.cart') }}">
+                <button @click="mobileView = 'cart'" data-cart-menu-open class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-sm" aria-label="{{ __('pos.cart') }}">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                     {{ __('pos.cart') }}
                     <span class="bg-white/20 px-1.5 rounded-full text-xs" x-text="Number(cartQtyCount.toFixed(2)).toLocaleString()"></span>
@@ -1461,7 +1461,7 @@ window.addEventListener('popstate', function() {
                  (wide) pane: header + banners + cart list. --}}
             <div class="tn-cart-main">
             <div class="tn-cart-header flex flex-shrink-0 items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
-                <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
+                <button @click="mobileView = 'menu'" data-cart-menu-back class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
                 <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
@@ -1506,39 +1506,7 @@ window.addEventListener('popstate', function() {
             </div>
 
             <div class="tn-cart-list flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
-            @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false))
-            <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 space-y-2" data-fulfillment-controls>
-                <p class="text-xs font-semibold">{{ __('pos.fulfill_new_items') }}</p>
-                <div class="flex flex-wrap gap-1">
-                    <button type="button" data-fulfillment-mode="dine_in" @click="chooseFulfillment('dine_in')" :aria-pressed="(fulfillmentMode || orderType) === 'dine_in'" class="px-3 py-2 rounded border text-xs font-bold focus-visible:ring-2" :class="(fulfillmentMode || orderType) === 'dine_in' ? 'bg-teal-100 text-teal-900' : ''">{{ __('pos.fulfill_serve_here') }}</button>
-                    <button type="button" data-fulfillment-mode="takeaway" @click="chooseFulfillment('takeaway')" :aria-pressed="(fulfillmentMode || orderType) === 'takeaway'" class="px-3 py-2 rounded border text-xs font-bold focus-visible:ring-2" :class="(fulfillmentMode || orderType) === 'takeaway' ? 'bg-teal-100 text-teal-900' : ''">{{ __('pos.fulfill_parcel') }}</button>
-                    @if($features->delivery ?? false)
-                    <button type="button" data-fulfillment-mode="delivery" @click="chooseFulfillment('delivery')" :aria-pressed="(fulfillmentMode || orderType) === 'delivery'" class="px-3 py-2 rounded border text-xs font-bold focus-visible:ring-2" :class="(fulfillmentMode || orderType) === 'delivery' ? 'bg-teal-100 text-teal-900' : ''">{{ __('pos.delivery') }}</button>
-                    @endif
-                </div>
-                <template x-if="fulfillmentSplit">
-                    <div role="dialog" aria-label="{{ __('pos.fulfill_split') }}" class="p-2 rounded border border-teal-500 space-y-2" data-fulfillment-split>
-                        <p class="text-sm font-bold">{{ __('pos.fulfill_split') }} <span x-text="fulfillmentSplit.total"></span></p>
-                        <label class="flex justify-between gap-2 text-xs">{{ __('pos.fulfill_serve_here') }}<input data-split-mode="dine_in" type="number" min="0" step="0.01" x-model.number="fulfillmentSplit.dine_in" class="w-20 text-black rounded"></label>
-                        <label class="flex justify-between gap-2 text-xs">{{ __('pos.fulfill_parcel') }}<input data-split-mode="takeaway" type="number" min="0" step="0.01" x-model.number="fulfillmentSplit.takeaway" class="w-20 text-black rounded"></label>
-                        @if($features->delivery ?? false)
-                        <label class="flex justify-between gap-2 text-xs">{{ __('pos.delivery') }}<input data-split-mode="delivery" type="number" min="0" step="0.01" x-model.number="fulfillmentSplit.delivery" class="w-20 text-black rounded"></label>
-                        @endif
-                        <div class="flex gap-2"><button type="button" data-apply-split @click="applyFulfillmentSplit()" class="rounded px-3 py-2 bg-teal-700 text-white text-xs font-bold">{{ __('pos.save_btn') }}</button><button type="button" @click="fulfillmentSplit = null" class="rounded px-3 py-2 border text-xs">{{ __('pos.cancel') }}</button></div>
-                    </div>
-                </template>
-                <template x-if="hasDeliveryPortion()">
-                    <label class="block text-xs font-semibold">{{ __('pos.fulfill_collection') }}
-                        <select data-delivery-collection :value="deliveryCollectionMode || (orderType === 'delivery' ? 'rider' : 'counter')" @change="deliveryCollectionMode = $event.target.value; cashReceived = ''" class="mt-1 w-full rounded text-sm text-gray-900">
-                            <option value="counter">{{ __('pos.fulfill_paid_counter') }}</option>
-                            <option value="rider">{{ __('pos.fulfill_rider_cash') }}</option>
-                        </select>
-                    </label>
-                </template>
-            </div>
-            @endif
-
-            {{-- Item #3 relocation (customer feedback, 25 Jul 2026): Delivery charges input
+                {{-- Item #3 relocation (customer feedback, 25 Jul 2026): Delivery charges input
                  lives HERE in the cart's Delivery section (was: top action bar) — visible
                  whenever order type = Delivery, with or without a selected customer.
                  Mechanism unchanged: setDeliveryCharge() adds/updates the TAX-EXEMPT manual
@@ -1671,7 +1639,7 @@ window.addEventListener('popstate', function() {
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
                                     <span class="truncate" x-text="item.item_name"></span>
-                                    <button type="button" x-show="typeFlowGate && !item.skip_kitchen" data-split-line @click.stop="openFulfillmentSplit(index)" class="text-[10px] font-bold px-1 py-1 border rounded shrink-0 max-w-[95px] truncate" :aria-label="window.TXT.fulfill_split + ': ' + item.item_name" x-text="fulfillmentLabel(item.fulfillment || orderType)"></button>
+                                    <span x-show="item.fulfillment && !item.skip_kitchen" class="text-[10px] font-semibold" x-text="fulfillmentLabel(item.fulfillment)"></span>
                                     <template x-if="item._isQuickCreated">
                                         <span class="flex-shrink-0 whitespace-nowrap text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
                                     </template>
@@ -1726,7 +1694,7 @@ window.addEventListener('popstate', function() {
                             {{-- ZFC (owner video, 23 Aug 2026): idle rang gray-300 tha — cashier ko
                                  pen sirf hover par nazar aata tha ("mouse le jao to dikhta hai").
                                  Ab idle par bhi amber tint + solid icon, note likha ho to bhara amber. --}}
-                            <button @click.stop="toggleItemNote(index)" title="{{ __('pos.item_note_btn') }}"
+                            <button @click.stop="toggleItemNote(index)" data-item-note-button title="{{ __('pos.item_note_btn') }}"
                                 :class="(item.special_notes || '').length ? 'text-amber-600 bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300' : 'text-amber-500/80 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400/80'"
                                 class="p-1.5 flex-shrink-0 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -2100,7 +2068,7 @@ window.addEventListener('popstate', function() {
                      method-aware estimate computed from the held order itself (server total
                      from payOrder stays authoritative on the receipt). --}}
                 <p class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(payModalTotal).toLocaleString()"></p>
-                <label x-show="payModalHasDelivery" class="block text-sm font-semibold mt-2">{{ __('pos.fulfill_collection') }}<select data-pay-delivery-collection :value="deliveryCollectionMode || (payModalOrderType() === 'delivery' ? 'rider' : 'counter')" @change="deliveryCollectionMode = $event.target.value; cashReceived = ''" class="mt-1 w-full rounded text-sm text-gray-900"><option value="counter">{{ __('pos.fulfill_paid_counter') }}</option><option value="rider">{{ __('pos.fulfill_rider_cash') }}</option></select></label>
+                <label x-show="payModalHasDelivery && historicalMixedPayment()" class="block text-sm font-semibold mt-2">{{ __('pos.fulfill_collection') }}<select data-pay-delivery-collection :value="deliveryCollectionMode || (payModalOrderType() === 'delivery' ? 'rider' : 'counter')" @change="deliveryCollectionMode = $event.target.value; cashReceived = ''" class="mt-1 w-full rounded text-sm text-gray-900"><option value="counter">{{ __('pos.fulfill_paid_counter') }}</option><option value="rider">{{ __('pos.fulfill_rider_cash') }}</option></select></label>
                 <div x-show="payModalRiderCash > 0" class="text-sm mt-2 space-y-1" data-payment-collection-summary><p><span>{{ __('pos.fulfill_counter_amount') }}</span> <strong x-text="'Rs. ' + payModalCounterCash.toLocaleString()"></strong></p><p><span>{{ __('pos.fulfill_rider_amount') }}</span> <strong x-text="'Rs. ' + payModalRiderCash.toLocaleString()"></strong></p></div>
                 <p x-show="!payingHeldOrderId && Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? window.TXT.rounded_up_by : window.TXT.rounded_down_by) + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 {{-- Card-save mode: live bachat hint — total above is method-aware. --}}
@@ -5090,9 +5058,7 @@ function restaurantPos() {
         // (no provisional); Takeaway = direct final bill only (no hold, no provisional).
         // Plain retail (widget hidden, orderType silently 'takeaway') stays ungated.
         typeFlowGate: {{ (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false)) ? 'true' : 'false' }},
-        fulfillmentMode: null,
         deliveryCollectionMode: null,
-        fulfillmentSplit: null,
         deliveryChargeInput: '',
         customerAddresses: [],
         selectedDeliveryAddress: '',
@@ -7257,58 +7223,18 @@ function restaurantPos() {
         fulfillmentLabel(mode) {
             return mode === 'dine_in' ? window.TXT.fulfill_serve_here : mode === 'delivery' ? window.TXT.delivery : window.TXT.fulfill_parcel;
         },
+        historicalMixedPayment() {
+            const held = this.heldOrders?.find(o => o.id === this.payingHeldOrderId);
+            const items = held?.items || this.cart || [];
+            const type = held?.order_type || this.orderType;
+            return items.some(i => !i.skip_kitchen && i.fulfillment && i.fulfillment !== type);
+        },
         hasDeliveryPortion() {
             return this.orderType === 'delivery' || (this.cart || []).some(c => !c.skip_kitchen && c.fulfillment === 'delivery');
         },
         hasMixedService() {
             const modes = new Set(this.cart.filter(c => !c.skip_kitchen).map(c => c.fulfillment || this.orderType));
             return modes.size > 1 || (modes.size === 1 && !modes.has(this.orderType));
-        },
-        chooseFulfillment(mode) {
-            this.fulfillmentMode = mode;
-            if (mode === 'delivery' && this.selectedCustomer) this.loadCustomerAddresses(this.selectedDeliveryAddress || '');
-        },
-        openFulfillmentSplit(index) {
-            const item = this.cart[index];
-            if (!item || item.skip_kitchen) return;
-            const mode = item.fulfillment || this.orderType;
-            this.fulfillmentSplit = { index, uid: item.cart_uid, total: Number(item.quantity), dine_in: 0, takeaway: 0, delivery: 0 };
-            this.fulfillmentSplit[mode] = Number(item.quantity);
-            this.$nextTick?.(() => this.$refs.cartList?.querySelector('[data-fulfillment-split]')?.scrollIntoView({ block: 'nearest' }));
-        },
-        applyFulfillmentSplit() {
-            const split = this.fulfillmentSplit;
-            if (!split) return false;
-            const item = this.cart[split.index];
-            const modes = ['dine_in', 'takeaway', 'delivery'];
-            if (!item || item.cart_uid !== split.uid || Number(item.quantity) !== split.total) return false;
-            const cents = modes.map(mode => Math.round(Number(split[mode]) * 100));
-            if (modes.some((mode, i) => !Number.isFinite(Number(split[mode])) || Number(split[mode]) < 0 || Math.abs(Number(split[mode]) * 100 - cents[i]) > 0.00001)
-                || cents.reduce((a, b) => a + b, 0) !== Math.round(split.total * 100)) {
-                this.showToast(window.TXT.fulfill_split_invalid, 'error'); return false;
-            }
-            const oldMode = item.fulfillment || this.orderType;
-            const sent = Number(item.kot_sent_quantity || 0);
-            if (Number(split[oldMode]) < sent) {
-                this.showToast(window.TXT.fulfill_sent_locked, 'error'); return false;
-            }
-            const rows = modes.filter(mode => Number(split[mode]) > 0).map(mode => {
-                const qty = Number(split[mode]);
-                const oldIdentity = mode === oldMode;
-                const uid = oldIdentity ? item.cart_uid : 'c' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
-                return { ...item, cart_uid: uid, line_uid: oldIdentity ? (item.line_uid || item.cart_uid) : uid,
-                    quantity: qty, fulfillment: mode, kot_sent_quantity: oldIdentity ? sent : 0,
-                    item_discount_value: item.item_discount_type === 'amount' ? Math.round(Number(item.item_discount_value || 0) * qty / split.total * 100) / 100 : item.item_discount_value };
-            });
-            // Last portion absorbs the amount-discount rounding residual.
-            if (item.item_discount_type === 'amount' && rows.length) {
-                rows[rows.length - 1].item_discount_value = Math.round((Number(item.item_discount_value || 0) - rows.slice(0, -1).reduce((sum, row) => sum + Number(row.item_discount_value || 0), 0)) * 100) / 100;
-            }
-            this.cart.splice(split.index, 1, ...rows);
-            this.fulfillmentSplit = null;
-            if (this.hasDeliveryPortion() && this.selectedCustomer) this.loadCustomerAddresses(this.selectedDeliveryAddress || '');
-            if (!this.hasDeliveryPortion()) this.removeDeliveryCharge();
-            return true;
         },
         restoreFulfillmentCart(rows) {
             const groups = new Map();
@@ -7333,8 +7259,11 @@ function restaurantPos() {
             const choiceKey = isChoiceDeal
                 ? selectedDealChoices.map(c => c.group_id + ':' + c.product_id).join('|')
                 : '';
-            const serviceMode = this.typeFlowGate ? (this.fulfillmentMode || this.orderType) : null;
-            const existing = this.cart.find(c => (c.fulfillment || (this.typeFlowGate ? this.orderType : null)) === serviceMode && c.item_id === item.id && c.item_type === item.type
+            // Notes apply only to their own row; sent food must never inherit a new note.
+            const serviceMode = null;
+            const existing = this.cart.find(c => !String(c.special_notes || '').trim()
+                && !Number(c.kot_sent_quantity || 0) && !c.kot_printed_at
+                && (!c.fulfillment || c.fulfillment === this.orderType) && c.item_id === item.id && c.item_type === item.type
                 && (item.type !== 'deal' || (c._dealChoiceKey || '') === choiceKey));
             if (existing) {
                 existing.quantity++;
@@ -8507,7 +8436,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.fulfillmentMode = null; this.fulfillmentSplit = null; this.deliveryCollectionMode = null; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.deliveryCollectionMode = null; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -8720,7 +8649,7 @@ function restaurantPos() {
                 // KABHI nahi — bawarchi ke liye "Delivery Charges" koi dish nahi.
                 // Nishan row ke saath DB tak jata hai, is liye reprint aur purane
                 // orders bhi wahi sach parhte hain.
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: null, item_type: 'manual', fulfillment: 'delivery', _delivery: true, skip_kitchen: true, item_name: 'Delivery Charges', quantity: 1, unit_price: amt, special_notes: '', is_tax_exempt: true, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: null, item_type: 'manual', fulfillment: null, _delivery: true, skip_kitchen: true, item_name: 'Delivery Charges', quantity: 1, unit_price: amt, special_notes: '', is_tax_exempt: true, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
             }
         },
         removeDeliveryCharge() {
@@ -12642,6 +12571,9 @@ function restaurantPos() {
         toggleItemNote(index) {
             const item = this.cart[index];
             if (!item) return;
+            if (Number(item.kot_sent_quantity || 0) > 0 || item.kot_printed_at) {
+                this.showToast(window.TXT.item_note_sent_locked, 'error'); return;
+            }
             item._showNote = !item._showNote;
             if (item._showNote) {
                 this.$nextTick(() => {
@@ -13792,7 +13724,7 @@ function restaurantPos() {
             // hai aur dobara type karne par doosri line ban jati.
             const recalledFee = this.cart.find(c => c && c._delivery);
             this.deliveryChargeInput = recalledFee ? recalledFee.unit_price : '';
-            this.fulfillmentMode = null; this.fulfillmentSplit = null; this.deliveryCollectionMode = order.delivery_collection_mode || null;
+            this.deliveryCollectionMode = order.delivery_collection_mode || null;
             this.kitchenNotes = order.kitchen_notes || '';
             this.recalledOrderId = order.id;
             this.priorityOrder = order.priority || false;

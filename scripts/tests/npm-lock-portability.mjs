@@ -12,6 +12,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 24 Oct 2026 (PR #275): Agent identity 1.13.23 packages IMS
+// discovery without replacing immutable v1.13.22. Only the two root version
+// fields change; all dependency entries, integrity values and edges stay pinned.
+// Reviewed 24 Oct 2026: exact Electron runtime 42.11.16 blocks compromised
+// eMudhra certificates (GHSA-jr5w-w6x2-84p9). Undici 6.29.1/7.30.1 and
+// fast-uri 3.1.9 close the new build-tool advisories. Mockup Zod 4.6.6
+// closes GHSA-mrhx-c7xc-m3w5; no source imports Zod. Only these five
+// package entries and direct specs change; counts, dependency edges and local
+// fork hashes remain pinned. Fresh lock audits and native packaging required.
+// Reviewed 23 Oct 2026: Electron/package/build runtime 42.11.9 addresses
+// GHSA-x562-297c-g43g, GHSA-3qxv-5xgr-q7w9 and GHSA-h3v5-h239-pg29.
+// Agent source identity 1.13.22 preserves immutable released v1.13.21.
+// Only the root identity/Electron spec and Electron package entry change;
+// all remaining 306 entries, dependency edges, counts and fork hashes stay pinned.
+// Reviewed 22 Oct 2026: pin Electron/package/build runtime 42.11.3 for
+// GHSA-fw47-9c62-h3vw. Only the root Electron spec and Electron package entry
+// change; all other locked entries, counts and local-fork hashes stay pinned.
+// Reviewed 21 Oct 2026: Agent package identity advances to 1.13.21 to release
+// the already-reviewed redirect patch without overwriting immutable v1.13.20.
+// Dependency versions, edges, integrity values and source checks are unchanged.
 // Reviewed 21 Oct 2026: Vite 7.3.7 (root/mockup) and follow-redirects
 // 1.16.1 (root/Agent) address GHSA-587h-7wmj-h5pm and GHSA-q3jh-wrc6-jgq8
 // plus related advisories. Only those version, resolved and integrity fields
@@ -37,13 +57,13 @@ const LOCKS = [
     lock: 'artifacts/mockup-sandbox/package-lock.json',
     packages: 318,
     resolved: 311,
-    graph: '6ffd45847b225822d72d5c7b76e2c756007957ffe215e7ec99f9262a16283ac3',
+    graph: '0afcf5508dabc193fce98a83ba74efd4e9d2d603292028f60f21daf070c77ecc',
   },
   {
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '5f39a9574100cf433971fdc38ebe74f5376d0cac1c0495b4012e7269b9fe55c3',
+    graph: 'fea69730790ee8d75438cc5f0e34818df2a8c6a4e39bbb08c2a47201782391d2',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

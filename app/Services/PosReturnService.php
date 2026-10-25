@@ -218,6 +218,7 @@ class PosReturnService
                     'item_type' => $orig->item_type,
                     'item_id' => $orig->item_id,
                     'item_name' => $orig->item_name,
+                    ...(Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $orig->fulfillment, 'line_uid' => $orig->line_uid] : []),
                     'quantity' => $qty,
                     'unit_price' => $orig->unit_price,
                     'cost_price' => $orig->cost_price,

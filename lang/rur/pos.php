@@ -5112,7 +5112,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_days_short' => 'din',
     'rider_day_summary_title' => 'Rider Khulasa',
     'rider_day_summary_total' => 'Kul',
-    'del_search_ph' => 'Bill / customer / rider / address dhoondein…',
+    'del_search_ph' => 'Phone / bill / customer / rider / address dhoondein…',
     'del_no_match' => 'Koi milta bill nahi',
     'delivery_took_mins' => ':mins minute mein deliver hui',
     'nav_my_panel' => 'Mera Panel',
@@ -7182,5 +7182,21 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_no_document_reason_store_slip_disabled' => 'Store slip band hai',
     'print_no_document_reason_held_sale_missing' => 'Held sale ab dastiyab nahi',
     'return_not_allowed_hotel_credit_required' => 'Is bill ke liye Hotel Return / Credit Note screen use karein. Payment refund alag hai.',
+
+    // Mixed service on one bill.
+    'fulfill_serve_here' => 'Yahin khana',
+    'fulfill_parcel' => 'Parcel',
+    'fulfill_new_items' => 'Naye items ka tareeqa',
+    'fulfill_split' => 'Item ki quantity taqseem karein',
+    'fulfill_split_invalid' => 'Hisson ka jor asal quantity ke barabar ho. Manfi quantity na dein; do decimal tak de sakte hain.',
+    'fulfill_sent_locked' => 'Yeh quantity kitchen ko ja chuki hai. Iska tareeqa barqarar rakhein; naya hissa add karein ya purana wazeh taur par cancel karein.',
+    'fulfill_collection' => 'Delivery ki payment',
+    'fulfill_paid_counter' => 'Counter par paid — rider paisay na le',
+    'fulfill_rider_cash' => 'Rider sirf delivery walay hissay ke paisay le',
+    'fulfill_online_required' => 'Mixed order ke liye internet chahiye. Cart mehfooz hai; internet aanay par dobara karein.',
+    'fulfill_delivery_contact' => 'Delivery save karne se pehle customer, phone aur delivery address select karein.',
+    'fulfill_counter_amount' => 'Counter par lein:',
+    'fulfill_rider_amount' => 'Rider le ga:',
+    'item_note_sent_locked' => 'Yeh item kitchen ko bheja ja chuka hai. Hidayat badalne ke liye order correction ya cancellation istemal karein.',
 ];
 

@@ -1,6 +1,7 @@
-title: "Naye POS tutorials ki synthetic recording tyari"
+title: "Order type aur F2 ki hidayat ab saaf hai"
 audience: pos
 type: improvement
 points:
-  - "Top Selling, WhatsApp, Rider map aur notifications ki review recordings ka process shamil hai."
-  - "Recordings mein synthetic data use hota hai; public videos owner review ke baad release hongi."
+  - "Sale screen par Dine In, Takeaway aur Delivery ke paas se ghalat F2 nishan hata diya gaya hai. Order ka tareeqa usi button se chunein."
+  - "F2 pehle ki tarah product search kholta hai. F1 ki madad wali list mein bhi isi ka sahi naam dikhaya gaya hai."
+  - "Table, cart aur aapki saved settings pehle ki tarah kaam karti hain."

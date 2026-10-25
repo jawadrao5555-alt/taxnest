@@ -5110,7 +5110,7 @@ return [
     'rt_days_short' => 'دن',
     'rider_day_summary_title' => 'رائیڈر خلاصہ',
     'rider_day_summary_total' => 'کُل',
-    'del_search_ph' => 'بل / گاہک / رائیڈر / پتہ تلاش کریں…',
+    'del_search_ph' => 'فون / بل / گاہک / رائیڈر / پتہ تلاش کریں…',
     'del_no_match' => 'کوئی ملتا جلتا بل نہیں',
     'delivery_took_mins' => ':mins منٹ میں ڈیلیور ہوئی',
     'nav_my_panel' => 'میرا پینل',
@@ -7179,5 +7179,21 @@ return [
     'print_no_document_reason_store_slip_disabled' => 'اسٹور سلپ بند ہے',
     'print_no_document_reason_held_sale_missing' => 'ہولڈ سیل اب دستیاب نہیں',
     'return_not_allowed_hotel_credit_required' => 'اس بل کے لیے ہوٹل واپسی / کریڈٹ نوٹ استعمال کریں۔ رقم کی واپسی الگ ہے۔',
+
+    // Mixed service on one bill.
+    'fulfill_serve_here' => 'یہیں کھانا',
+    'fulfill_parcel' => 'پارسل',
+    'fulfill_new_items' => 'نئے آئٹمز کا طریقہ',
+    'fulfill_split' => 'آئٹم کی مقدار تقسیم کریں',
+    'fulfill_split_invalid' => 'حصوں کا مجموعہ اصل مقدار کے برابر ہو۔ منفی مقدار نہ دیں؛ دو اعشاری ہندسوں تک دے سکتے ہیں۔',
+    'fulfill_sent_locked' => 'یہ مقدار کچن کو جا چکی ہے۔ اس کا طریقہ برقرار رکھیں؛ نیا حصہ شامل کریں یا پرانا واضح طور پر منسوخ کریں۔',
+    'fulfill_collection' => 'ڈیلیوری کی ادائیگی',
+    'fulfill_paid_counter' => 'کاؤنٹر پر ادا شدہ — رائیڈر پیسے نہ لے',
+    'fulfill_rider_cash' => 'رائیڈر صرف ڈیلیوری والے حصے کے پیسے لے',
+    'fulfill_online_required' => 'ملے جلے آرڈر کے لیے انٹرنیٹ چاہیے۔ کارٹ محفوظ ہے؛ انٹرنیٹ آنے پر دوبارہ کریں۔',
+    'fulfill_delivery_contact' => 'ڈیلیوری محفوظ کرنے سے پہلے گاہک، فون اور ڈیلیوری پتہ منتخب کریں۔',
+    'fulfill_counter_amount' => 'کاؤنٹر پر لیں:',
+    'fulfill_rider_amount' => 'رائیڈر لے گا:',
+    'item_note_sent_locked' => 'یہ آئٹم کچن کو بھیجا جا چکا ہے۔ ہدایت بدلنے کے لیے آرڈر کی تصحیح یا منسوخی استعمال کریں۔',
 ];
 

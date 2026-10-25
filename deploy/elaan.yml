@@ -1,7 +1,7 @@
-title: "Caller ka naam Current Order se save karein"
+title: "Product search mein naam aur price saath dekhein"
 audience: pos
 type: improvement
 points:
-  - "Naya caller bill ke saath attach ho aur popup band ho jaye to Current Order ke customer card par Save Customer dabayein."
-  - "Phone pehle se bhara milega. Naam likh kar maujooda customer form se save karein; mobile par zaroori form khud saamne aa jayega."
-  - "Cart ki items aur caller ka phone saath rehte hain. Pehle se saved customer ke liye naya customer banane ka button nahi dikhaya jata."
+  - "Sale screen par product search ki list mein har item ki price uske naam ke paas nazar aayegi."
+  - "Lambay product names agli line par poore dikhte hain, taake miltay-jultay items pehchanna asaan ho."
+  - "Search, barcode scan, keyboard se selection aur mazeed results kholne ka tareeqa pehle jaisa hai."

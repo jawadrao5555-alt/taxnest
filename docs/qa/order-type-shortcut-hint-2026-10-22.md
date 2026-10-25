@@ -13,3 +13,10 @@ Merged owner-deployed main `079a2d02ef7a0b06e7da3abf0fb42b0ee1510fb9` into the e
 Local focused regressions: 45/45 passing across caller order type, dashboard, acknowledgement/read state, delivery address/phone and tutorial contracts. Browser script syntax, whitespace and Agent release-chain guards pass. Root parser dependencies installed from lock with `npm ci --ignore-scripts`; initial sparse checkout lacked the local braces package, corrected by materializing `tools/` before successful install. Full supported Laravel/Chrome acceptance for this branch is still required in its new exact-head PR run. Old October22 six-lane results are historical only. No production/customer acceptance or deployment claim.
 
 Current-base verification also passes `npm run build`, the active/proposed fail-closed CI contract guard, and all five reviewed locked dependency graphs. The first lock-graph attempt lacked two sparse-checkout files; materializing those unchanged files made the complete guard pass. Build output is local-only and is excluded from the intentional commit/tree. Source/handler inspection confirms no keyboard runtime change; this branch's new actual Chrome F2/search assertions remain mandatory before readiness.
+
+Final refresh merged current owner-deployed `main` at
+`fe323620af8101e7ede4620d64a407d8b7875a4f` (#277). The only conflict remained
+the expected one-release `deploy/elaan.yml`; this PR keeps its own unique POS
+announcement. #277's Agent heartbeat/IMS identity code and regression test are
+inherited unchanged. The F2 handler and all fiscal, saved-setting, Agent and
+submission behavior remain outside this PR's application diff.

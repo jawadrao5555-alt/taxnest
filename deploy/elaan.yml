@@ -1,19 +1,10 @@
-title: "Bill dobara saada: parcel ke liye item note"
-audience: pos
+title: "Agent 1.13.23: FBR IMS setup ab asani se milay"
+audience: all
 type: improvement
-categories:
-  - restaurant
-  - cafe
-  - quick_service
-  - hotel
-  - marquee
-  - catering
-  - bakery
 points:
-  - "Bill bananay ka pehle wala saada tareeqa wapas hai. Ab item ki quantity ko Serve Here, Parcel aur Delivery ke alag hisson mein baantna nahi padega."
-  - "Jo item parcel dena ho, us item ke saath note ka chhota button dabayein aur Parcel likh dein. Yeh note usi line ki poori quantity par lagega aur kitchen ki parchi aur bill par nazar aayega."
-  - "Misaal: ek pizza parcel aur do yahin khanay ke liye hon to pehle ek pizza add karke us par Parcel note dein, phir do pizza add karein. Naye pizza parcel wale note mein nahi milenge."
-  - "Kitchen ko bhejay huay items mein naya item khud se nahi milega. Baad mein item add karke kitchen ko bhejein to add-on par sirf nayi quantity aur us ka note aayega. Pehle bheja hua khana dobara tayyar karne ke liye nahi jayega."
-  - "Kitchen ko bhejay huay item ki hidayat badalni ho to order ki correction ya cancellation ka tareeqa istemal karein. Naye item ka note kitchen ko bhejnay se pehle likhein."
-  - "Delivery ka bill pehle ki tarah alag banayein. Usi bill par customer ka phone, patta, delivery charges aur rider ka kaam rahega; table wale bill ki raqam ko hisson mein baantna nahi hoga."
-  - "Pehle se banay huay bills, unki payment aur rider ka hisaab apni jagah mehfooz hain. Purane bill ka record is tabdeeli se dobara nahi likha jayega."
+  - "Yeh desktop Agent ka update hai. PRA POS aur FBR POS dono isi Agent ko istemal karte hain. Naya version milnay par Agent update karein; sirf website kholnay se PC ka purana Agent nahi badalta."
+  - "FBR POS company connect honay ke baad Agent ki Settings mein FBR IMS Fiscal Service ka hissa nazar aayega, chahe company abhi cloud par bills report kar rahi ho ya local fiscal device par."
+  - "Re-check se isi PC par IMS service ka haal dekhein. Service na milay to Install FBR IMS ka button milega. Download aur installer sirf aap ke button dabane par shuru hoga; phir FBR ki setup aur activation hidayat mukammal karein."
+  - "IMS install karne se company ka bill reporting tareeqa khud se nahi badlega. Cloud reporting se local fiscal reporting par jana ho to pehle apni company ki munasib setting aur FBR activation mukammal karein."
+  - "PRA POS mein pehle wali IMS rehnumai aur reporting apni jagah rahegi. Company, counter aur printer ki saved settings dobara bharne ki zaroorat nahi."
+  - "Agent ki Settings ke upar version aur build ki tareekh dekhein. Is update ka version 1.13.23 hai; agar purana version nazar aaye to PC par naya Agent abhi nahi chala."

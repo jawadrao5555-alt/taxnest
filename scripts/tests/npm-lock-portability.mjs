@@ -12,6 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 24 Oct 2026 (PR #275): Agent identity 1.13.23 packages IMS
+// discovery without replacing immutable v1.13.22. Only the two root version
+// fields change; all dependency entries, integrity values and edges stay pinned.
 // Reviewed 24 Oct 2026: exact Electron runtime 42.11.16 blocks compromised
 // eMudhra certificates (GHSA-jr5w-w6x2-84p9). Undici 6.29.1/7.30.1 and
 // fast-uri 3.1.9 close the new build-tool advisories. Mockup Zod 4.6.6
@@ -60,7 +63,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '150ff06998d67f965514d6f70327143335ddca011bd29472502422a8115505d6',
+    graph: 'fea69730790ee8d75438cc5f0e34818df2a8c6a4e39bbb08c2a47201782391d2',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

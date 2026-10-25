@@ -284,6 +284,35 @@ class FbrPosSubmissionEvidenceTest extends TestCase
         $this->assertSame('unknown', $diagnostics['central_verification_state']);
     }
 
+    public function test_fbr_fiscal_heartbeat_identifies_ims_without_changing_routing_or_legacy_fields(): void
+    {
+        $company = $this->company();
+        $before = $company->getAttributes();
+        $other = Company::query()->forceCreate([
+            'name' => 'Other Fictional FBR Shop', 'product_type' => 'fbrpos',
+            'fbr_pos_enabled' => true, 'fbr_connection_mode' => 'fiscal_device',
+            'fbr_pos_id' => '777777', 'agent_enabled' => true,
+        ]);
+        foreach ([$company, $other] as $current) {
+            $request = Request::create('/api/agent/heartbeat', 'POST', ['version' => '1.13.23']);
+            $request->attributes->set('agent_company', $current);
+            $data = (new AgentController)->heartbeat($request)->getData(true);
+            $this->assertSame($current->id, $data['company']['id']);
+            $this->assertSame($current->name, $data['company']['name']);
+            $this->assertSame($current->fbr_pos_id, $data['company']['pra_pos_id']);
+            $this->assertSame($current->fbr_pos_environment, $data['company']['pra_environment']);
+            $this->assertSame('fbrpos', $data['company']['product_type'] ?? null);
+            $this->assertSame('fiscal_device', $data['company']['fbr_connection_mode'] ?? null);
+            $this->assertSame('cloud', $data['company']['pra_connection_mode'] ?? null);
+            $this->assertArrayNotHasKey('fbr_pos_token', $data['company']);
+            $this->assertArrayNotHasKey('agent_api_key', $data['company']);
+        }
+        $company->refresh();
+        foreach (['product_type', 'fbr_pos_enabled', 'fbr_connection_mode', 'fbr_pos_id'] as $field) {
+            $this->assertSame($before[$field], $company->getAttributes()[$field]);
+        }
+    }
+
     public function test_heartbeat_self_heals_only_explicit_code_100_history(): void
     {
         $accepted = $this->bill([

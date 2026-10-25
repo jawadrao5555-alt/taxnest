@@ -1,7 +1,7 @@
-title: "Product search mein naam aur price saath dekhein"
+title: "Product search mein wazeh naam aur right side price"
 audience: pos
 type: improvement
 points:
-  - "Sale screen par product search ki list mein har item ki price uske naam ke paas nazar aayegi."
-  - "Lambay product names agli line par poore dikhte hain, taake miltay-jultay items pehchanna asaan ho."
-  - "Search, barcode scan, keyboard se selection aur mazeed results kholne ka tareeqa pehle jaisa hai."
+  - "Sale screen ki search list mein product ka naam ab bold nazar aayega."
+  - "Har product ki price list ke right side par bold nazar aayegi."
+  - "Search bar ki chhoti width aur keyboard se selection pehle jaisa rahega."

@@ -1,6 +1,6 @@
-title: "Naye POS tutorials ki synthetic recording tyari"
+title: "Caller history ab upar ke menu ke neeche saaf nazar aaye"
 audience: pos
 type: improvement
 points:
-  - "Top Selling, WhatsApp, Rider map aur notifications ki review recordings ka process shamil hai."
-  - "Recordings mein synthetic data use hota hai; public videos owner review ke baad release hongi."
+  - "Caller ID ki recent calls wali list upar ke menu ke peechhe nahi chhupti; pichhli call se Bill ka button aasani se milta hai."
+  - "Chhoti screen par list ke andar scroll kar sakte hain. Payment ya zaroori confirmation khuli ho to caller panel beech mein nahi aata."

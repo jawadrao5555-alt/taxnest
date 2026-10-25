@@ -43,6 +43,9 @@ final class AgentCoreRestaurantProjector
             $data = $data['data'];
         }
         $scope = $scope ?: (array) ($event->event_scope ?? []);
+        if (\App\Support\PosFulfillment::isMixed($data['items'] ?? [], $data['order_type'] ?? null)) {
+            return $this->reject($event, 'mixed_service_requires_online', 'Mixed service must be saved online; this Local Core event has not changed the bill.');
+        }
         $command = (string) ($envelope['command_type'] ?? $data['command_type'] ?? '');
         $aggregate = (string) ($envelope['aggregate_id'] ?? $data['aggregate_id'] ?? '');
         $revision = (int) ($envelope['aggregate_revision'] ?? $data['aggregate_revision'] ?? 0);

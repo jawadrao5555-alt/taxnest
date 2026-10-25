@@ -1,3 +1,4 @@
+import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,7 +19,7 @@ const recorded = [];
 const regular = [...fixture.readOnlyJourneys, ...fixture.transactionalJourneys];
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
 // Exercise transactional table, settings and Hotel desk regressions first; retain every journey.
-const ordered = [...regular.filter(x=>x.tableOrderWorkflow), ...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>x.hotelWorkflow), ...regular.filter(x=>!x.hotelSettingsWorkflow&&!x.tableOrderWorkflow&&!x.hotelWorkflow)];
+const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>x.tableOrderWorkflow), ...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>x.hotelWorkflow), ...regular.filter(x=>!x.mixedFulfillment&&!x.hotelSettingsWorkflow&&!x.tableOrderWorkflow&&!x.hotelWorkflow)];
 const cases = requested.length ? ordered.filter(x => requested.includes(x.name)) : ordered;
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
@@ -289,6 +290,17 @@ async function surface(page,t,path,v) {
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
   await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigationWithReloadRetry(page,t,path,v); await openMobileCart(page,v,t.markers||[]);
+  if(t.riderRealtime && path==='/pos/riders/tracking') {
+    // This navigation mounts a fresh Alpine screen whose rider cards arrive
+    // from its real asynchronous data request. The earlier map journey was a
+    // different document; a fixed 300ms loading-shell pause is not readiness.
+    await page.waitForFunction(({id,markers})=>{
+      const root=document.querySelector('[x-data^="riderTracking("]');
+      const data=root&&window.Alpine?.$data(root);
+      return data?.riders?.some(r=>Number(r.id)===Number(id))
+        &&markers.every(marker=>root.innerText.includes(marker));
+    },{id:t.riderRealtime.id,markers:t.markers||[]},{timeout:15000});
+  }
   if(path==='/pos/inventory'){
     const tabs=page.locator('.tn-inventory-nav').first();
     if(!await tabs.count())fail(`${t.name}/${v.width}: inventory navigation missing`);
@@ -919,6 +931,23 @@ async function hotelCreditReview(page, t, v) {
 async function restaurantTopSellingWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  const dashboard=page.locator('[x-data="rDash()"]');
+  const bell=page.locator('[data-tn-topnav-control="notification"]').first();
+  await bell.click();
+  const history=page.locator('[x-show="bellOpen"]:visible');
+  await history.waitFor({state:'visible'});
+  await page.evaluate(async()=>{
+    window.__readingNoticeMarker='still-reading';
+    await window.Alpine.$data(document.querySelector('[x-data="rDash()"]')).refreshDashboard();
+  });
+  if(await page.evaluate(()=>window.__readingNoticeMarker)!=='still-reading')throw new Error('dashboard reloaded while notification history was open');
+  await history.locator('button').first().click();
+  const detail=page.locator('[data-whats-new-detail-id]:visible');
+  await detail.waitFor({state:'visible'});
+  await dashboard.evaluate(async el=>window.Alpine.$data(el).refreshDashboard());
+  if(!await detail.isVisible()||await page.evaluate(()=>window.__readingNoticeMarker)!=='still-reading')throw new Error('dashboard closed a notification being read');
+  await saveEvidenceScreenshot(page,'dashboard-reading-notice-'+v.width+'.png');
+  await detail.getByRole('button',{name:'Close',exact:true}).click();
   const viewAll=page.locator('a[href$="/pos/restaurant/top-selling"]').first();
   await Promise.all([page.waitForURL(u=>u.pathname==='/pos/restaurant/top-selling'),viewAll.click()]);
   const summary=page.locator('[data-top-selling-summary]');
@@ -937,6 +966,12 @@ async function restaurantTopSellingWorkflow(page,t,v) {
 }
 
 async function notificationWorkflow(page, t, v, diagnostics) {
+  const plain='Agent banne ki tareekh Settings mein nazar aayegi. Purane Agent mein yeh tareekh na mile to "Build date available nahi" likha hoga.';
+  const legacy='Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga.';
+  const assertPlain=async(surface,label)=>{
+    const text=await surface.innerText();
+    if(!text.includes(plain)||text.includes(legacy))throw new Error(label+': known Agent notice is not plain customer language');
+  };
   const panel=t.notificationWorkflow, prefix=panel==='di'?'':panel==='fbr'?'/fbr-pos':'/pos';
   await page.goto(baseUrl+(panel==='di'?'/profile':prefix+'/my-profile'),{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);
@@ -945,6 +980,8 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   const modal=page.locator('[data-wn-featured="1"]:visible');
   await modal.waitFor({state:'visible',timeout:15000});
   if(await modal.count()!==1)throw new Error('duplicate featured receipts rendered multiple popups');
+  await assertPlain(modal,'Featured notice');
+  await saveEvidenceScreenshot(page,'plain-featured-'+panel+'-'+v.width);
   const dismissButton=modal.locator('button').last();
   const endpoint='**'+prefix+'/whats-new/seen';
   let injectedFailures=0;
@@ -981,6 +1018,7 @@ async function notificationWorkflow(page, t, v, diagnostics) {
     await page.locator('[data-tn-topnav-control="notification"]').first().click();
     const bell=page.locator('[x-show="bellOpen"]:visible').first();
     await bell.waitFor({state:'visible',timeout:5000});
+    await assertPlain(bell,'Bell history');
     const text=await bell.innerText();
     for(let i=1;i<=7;i++)if(!text.includes('Synthetic routine '+panel+' '+i))throw new Error('routine bell history disappeared after refresh');
     if(panel!=='di'&&(text.match(new RegExp('Synthetic featured '+panel,'g'))||[]).length!==1)throw new Error('duplicate deployment receipts were not consolidated in bell history');
@@ -1003,6 +1041,8 @@ async function notificationWorkflow(page, t, v, diagnostics) {
   if(!detailAck.ok()||!(await detailAck.json()).ok)throw new Error('opening detail did not persist read status');
   const detail=page.locator('[data-whats-new-detail-id]:visible');
   await detail.waitFor({state:'visible'});
+  await assertPlain(detail,'Notice detail');
+  await saveEvidenceScreenshot(page,'plain-detail-'+panel+'-'+v.width);
   await page.waitForFunction(expected=>[...document.querySelectorAll('[data-tn-topnav-control="notification"] [x-text="unseen"]')].some(x=>Number(x.textContent.trim())===expected),before-1);
   await detail.getByRole('button',{name:'Close',exact:true}).click();
   await notificationButton.click();
@@ -1255,7 +1295,81 @@ async function companyDirectoryContrast(page,t,v) {
   } finally {await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);}
 }
 
+async function deliveryContactSearchWorkflow(page,t,v) {
+  const snapshot=async()=>{
+    const response=await page.request.get(baseUrl+'/pos/api/provisional-bills');
+    if(!response.ok())throw new Error('Contact-search authorized bill API unavailable');
+    const data=await response.json();
+    if(!data.success)throw new Error('Contact-search bill API did not succeed');
+    const bills=[...(data.bills||[]),...(data.final_deliveries||[])];
+    if(bills.length!==3||bills.some(b=>String(b.customer_name).includes('Foreign')))
+      throw new Error('Contact-search server collection crossed company boundary or lost fixture bills');
+    return JSON.stringify(bills.map(b=>[b.id,b.customer_phone,b.total_amount,b.rider_id,b.delivery_status]).sort((a,b)=>a[0]-b[0]));
+  };
+  const before=await snapshot();
+  await page.goto(baseUrl+'/pos/deliveries',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const search=page.locator('#del-search');
+  if(!/phone/i.test(await search.getAttribute('placeholder')))throw new Error('Phone search hint missing');
+  const current=page.locator('tr[data-delrow]'),old=page.locator('tr[data-oldrow]');
+  if(await current.count()!==2||await old.count()!==1)throw new Error('Current/old delivery groups changed');
+  for(const query of ['03001234567','0300 123-4567','1234567']) {
+    await search.fill(query);
+    await page.waitForFunction(()=>document.querySelector('#del-count')?.textContent==='1');
+    // The board input updates the count synchronously, but its existing
+    // CustomEvent opens the old list on Alpine's next DOM tick. Wait for that
+    // real row to be visible; a genuinely broken filter/expansion still fails.
+    await old.filter({hasText:'Synthetic Contact Old'}).waitFor({state:'visible',timeout:5000});
+    if(!await current.filter({hasText:'Synthetic Contact A'}).isVisible()
+      ||await current.filter({hasText:'Synthetic Contact B'}).isVisible()
+      ||!await old.filter({hasText:'Synthetic Contact Old'}).isVisible())
+      throw new Error('Actual board formatted-phone current/old filter failed: '+query);
+  }
+  await saveEvidenceScreenshot(page,'contact-search-board-'+v.width);
+  await search.fill('Synthetic Contact B');
+  if(!await current.filter({hasText:'Synthetic Contact B'}).isVisible()
+    ||await current.filter({hasText:'Synthetic Contact A'}).isVisible())throw new Error('Existing board name search changed');
+  await search.fill('');
+  if(await page.locator('#del-count').innerText()!=='2'
+    ||await current.evaluateAll(rows=>rows.filter(row=>getComputedStyle(row).display!=='none').length)!==2)
+    throw new Error('Clearing contact search did not restore current bills');
+  if((await page.locator('body').innerText()).includes('Synthetic Foreign Contact Bill'))throw new Error('Foreign contact rendered on board');
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const open=page.locator('xpath=//button[@*[name()="@click"]="openPendingDeliveries()"]');
+  await page.waitForFunction(()=>{
+    const root=document.querySelector('[data-tn-sale-root]');const d=root&&window.Alpine?.$data(root);
+    return d&&!d.localBillsLoading&&d.pendingDeliveryBills().length===2&&d.staleDeliveryBills().length===1;
+  },null,{timeout:15000});
+  let clicked=false;
+  for(const button of await open.all())if(await button.isVisible()){await button.click();clicked=true;break;}
+  if(!clicked)throw new Error('Actual delivery popup button unavailable');
+  const popup=page.locator('[x-show="showPendingDeliveries"]');
+  const input=popup.locator('[name="pdsearch_nofill"]');
+  await input.waitFor({state:'visible'});
+  await popup.locator('xpath=.//button[@*[name()="@click"]="showOldDeliveries = !showOldDeliveries"]').click();
+  for(const query of ['03001234567','0300-123-4567','1234567']) {
+    await input.fill(query);
+    await page.waitForFunction(()=>{
+      const popup=document.querySelector('[x-show="showPendingDeliveries"]');
+      return popup.innerText.includes('Synthetic Contact A')&&popup.innerText.includes('Synthetic Contact Old')&&!popup.innerText.includes('Synthetic Contact B');
+    });
+  }
+  await saveEvidenceScreenshot(page,'contact-search-popup-'+v.width);
+  await input.fill('Synthetic Contact B');
+  await page.waitForFunction(()=>{
+    const text=document.querySelector('[x-show="showPendingDeliveries"]').innerText;
+    return text.includes('Synthetic Contact B')&&!text.includes('Synthetic Contact A');
+  });
+  await input.fill('');
+  await page.waitForFunction(()=>document.querySelector('[x-show="showPendingDeliveries"]').innerText.includes('Synthetic Contact A'));
+  if((await popup.innerText()).includes('Synthetic Foreign Contact Bill')||await snapshot()!==before)
+    throw new Error('Search changed saved bill values or leaked a foreign contact');
+  pass(t.name+'/'+v.width+': actual board/popup formatted/full/partial phone, current/old counts, name/clear, scoped API and unchanged bill values');
+}
+
 async function workflow(page,t,v,diagnostics) {
+  if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
   if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
   if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
@@ -1369,6 +1483,7 @@ async function workflow(page,t,v,diagnostics) {
   }
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
+  if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.restaurantTopSelling) return restaurantTopSellingWorkflow(page,t,v);
@@ -1423,6 +1538,7 @@ async function ingredientUnitAudit(page,t,v) {
   pass(t.name+'/'+v.width+': real unused pcs-to-kg edit, visible stocked-unit refusal and invalid-unit rejection');
 }
 
+
 async function tableOrderWorkflow(page,t,v) {
   await catalogSearchCompleteWorkflow(page,t,v);
   await deliveryAddressSnapshotWorkflow(page,t,v);
@@ -1445,6 +1561,75 @@ async function tableOrderWorkflow(page,t,v) {
   await callerPanel.locator('button').filter({hasText:'Bill'}).first().click();
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.phone==='03000000000');
   await root.evaluate((el,style)=>{el.setAttribute('style',style||'');const d=window.Alpine.$data(el);d.clearAttachedCustomer();d.callerIdOn=false;},savedStyle);
+  const switcher=page.locator('[data-tn-order-type-switcher]');
+  const buttons=switcher.locator('button');
+  const wasDark=await page.evaluate(()=>document.documentElement.classList.contains('dark'));
+  const metrics=el=>{
+    const s=getComputedStyle(el),r=el.getBoundingClientRect();
+    const lum=rgb=>{const c=rgb.match(/[\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4;});return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2];};
+    const ratio=(a,b)=>(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+    const bg=lum(s.backgroundColor);
+    return {font:parseFloat(s.fontSize),minHeight:parseFloat(s.minHeight),height:r.height,
+      contrast:ratio(lum(s.color),bg),focused:document.activeElement===el&&el.matches(':focus-visible'),
+      outline:parseFloat(s.outlineWidth),offset:parseFloat(s.outlineOffset),focusContrast:ratio(lum(s.outlineColor),bg)};
+  };
+  for(const dark of [false,true]){
+    await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
+    await page.mouse.move(0,0);
+    for(let i=0;i<3;i++){
+      const button=buttons.nth(i);
+      // Real pointer hover must remain readable in dark mode too. Wait for the
+      // existing colour transition to settle, not just its starting colour.
+      await button.hover();
+      await button.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{}))));
+      const m=await button.evaluate(metrics);
+      if(m.font<14||m.minHeight<44||m.height<44||m.contrast<4.5)throw new Error('Order-type hover readability failed: '+JSON.stringify({dark,i,...m}));
+    }
+    await page.mouse.move(0,0);
+    // POS deliberately reserves forward Tab for its product grid. Preserve
+    // that shortcut: native backward traversal still reaches all three pills.
+    await buttons.first().focus();
+    await page.keyboard.press('Shift+Tab');
+    await buttons.last().focus();
+    for(let i=2;i>=0;i--){
+      const button=buttons.nth(i);
+      await button.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{}))));
+      const m=await button.evaluate(metrics);
+      if(!m.focused||m.outline<2||m.offset>-2||m.focusContrast<3||m.contrast<4.5)throw new Error('Order-type keyboard focus failed: '+JSON.stringify({dark,i,...m}));
+      if(i>0)await page.keyboard.press('Shift+Tab');
+    }
+    const pressed=await buttons.evaluateAll(nodes=>nodes.map(el=>el.getAttribute('aria-pressed')));
+    if(pressed.filter(x=>x==='true').length!==1||pressed.some(x=>!['true','false'].includes(x)))throw new Error('Order-type selection accessibility failed: '+JSON.stringify(pressed));
+    await saveEvidenceScreenshot(page,'order-type-buttons-'+(dark?'dark':'light')+'-'+v.width+'.png');
+    pass(t.name+'/'+v.width+': order-type labels, real hover, keyboard focus and selected state readable in '+(dark?'dark':'light'));
+  }
+  // This fictional table-order company can have no menu products. enterGridMode
+  // correctly refuses an empty list: explicitly supply a temporary in-memory deal
+  // before asserting its non-empty Tab branch, then restore the original catalog.
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    window.__tnOrderTypeTabFixture={deals:d.allDeals,query:d.searchQuery,showProducts:d.showProducts};
+    d.allDeals=[...d.allDeals,{id:999999991,type:'deal',name:'QA Order Type Tab Probe',price:100,show_on_sale:true}];
+    d.showProducts=true; // temporary UI state only; do not call a preference-saving toggle
+  });
+  try {
+    await root.locator('[x-ref="searchInput"]').fill('QA Order Type Tab Probe');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).displayItems.some(i=>i.name==='QA Order Type Tab Probe'),null,{timeout:5000});
+    await root.locator('.prod-card').filter({hasText:'QA Order Type Tab Probe'}).waitFor({state:'visible',timeout:5000});
+    await buttons.first().focus();
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===true);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).gridFocusMode===false);
+    pass(t.name+'/'+v.width+': existing Tab enters a non-empty product grid and Escape returns');
+  } finally {
+    await page.evaluate(()=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]')),saved=window.__tnOrderTypeTabFixture;
+      d.allDeals=saved.deals;d.searchQuery=saved.query;d.showProducts=saved.showProducts;d.filterProducts();
+      delete window.__tnOrderTypeTabFixture;
+    });
+  }
+  await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),wasDark);
 
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
@@ -1465,6 +1650,7 @@ async function tableOrderWorkflow(page,t,v) {
       return Number(d.incomingOrderId)===orderId&&Number(d.selectedTable?.id)===id
         &&d.cart.length===1&&d.cart[0].item_name===name&&d.orderType==='dine_in'&&!d.showTablePicker;
     },{id:expected.tableId,orderId:expected.orderId,name:expected.itemName});
+    if(await buttons.first().getAttribute('aria-pressed')!=='true')throw new Error('Dine In selected state lost after actual table claim');
     await openMobileCart(page,v,['Current Order']);
     await root.getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
     if(!await page.locator('[data-video="open-payment"]').isEnabled())throw new Error(expected.status+' table lost its payment action');
@@ -1719,7 +1905,7 @@ async function one(browser,label,v,t) {
   }
 }
 const {browser}=await launchLocalBrowser();
-try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.mixedFulfillment||t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);}
 if(videoDirectory) {
   if(recorded.length !== cases.length * views.length)throw new Error('Incomplete tutorial recordings');
@@ -1773,6 +1959,12 @@ async function riderRealtimeWorkflow(page,t,v) {
 async function catalogSearchCompleteWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  const beforeType=await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).orderType);
+  await page.keyboard.press('F2');
+  await page.waitForFunction(()=>document.activeElement===document.querySelector('[x-ref="searchInput"]'));
+  const hint=await page.locator('button[data-video="counter-dine-in"]').evaluate(el=>({title:el.parentElement.title,text:el.parentElement.innerText}));
+  if(/F2|cycle/i.test(hint.title+' '+hint.text))throw new Error('Order types still advertise the product-search shortcut');
+  if(await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).orderType)!==beforeType)throw new Error('F2 changed the order type');
   // Synthetic in-memory catalog: actual sale UI/methods, no company/product writes.
   await page.evaluate(()=>{
     const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
@@ -1782,6 +1974,22 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
   const input=page.locator('[x-ref="searchInput"]');await input.fill('QA Deal');
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
   const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
+  const short=dropdown.locator('[data-search-result]').first();
+  const shortGap=await short.evaluate(el=>{
+    const name=el.querySelector('[data-search-result-name]').getBoundingClientRect();
+    const price=el.querySelector('[data-search-result-price]').getBoundingClientRect();
+    return price.left-name.right;
+  });
+  if(shortGap>32||shortGap<0)throw new Error('Price is not beside its matching product name: gap '+shortGap);
+  if((await input.boundingBox()).width>641)throw new Error('Search input still spans the full wide workspace');
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.searchSuggestions[0].name='QA Deal No 1 '+('Long readable item name ').repeat(8);
+  });
+  const long=short.locator('[data-search-result-name]');
+  const longMetrics=await long.evaluate(el=>({clipped:el.scrollWidth>el.clientWidth+1,ellipsis:getComputedStyle(el).textOverflow==='ellipsis'}));
+   if(longMetrics.clipped||longMetrics.ellipsis)throw new Error('Long search name was clipped rather than wrapped: '+JSON.stringify(longMetrics));
+  await saveEvidenceScreenshot(page,'compact-search-name-price-'+v.width+'.png');
   for(const n of [13,14,15,16]) {
     const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});
     await item.scrollIntoViewIfNeeded();if(!await item.isVisible())throw new Error('matching deal '+n+' is hidden from search');
@@ -1807,6 +2015,33 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
 async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    if(!d.guidedOrderTypes().includes('delivery'))throw new Error('Delivery fixture is missing its supported feature');
+    d.orderType='takeaway';
+    const originalCart=d.cart;
+    d.callerBillFrom({phone:'03000000000'});
+    if(d.orderType!=='delivery'||d.selectedCustomer?.phone!=='03000000000'||d.cart!==originalCart)throw new Error('Unsaved caller Bill did not select Delivery without replacing cart');
+  });
+  await saveEvidenceScreenshot(page,'unsaved-caller-delivery-'+v.width+'.png');
+  const callerPhone='0300'+String(2000000+v.width);
+  await page.evaluate(phone=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.callerBillFrom({phone});
+  },callerPhone);
+  await openMobileCart(page,v,['Current Order']);
+  await page.locator('[data-save-attached-caller]:visible').click();
+  const name=page.locator('[x-ref="newCustomerNameInput"]');await name.waitFor({state:'visible'});
+  if(await name.inputValue()!=='')throw new Error('Caller phone was incorrectly prefilled as the customer name');
+  await name.fill('Synthetic caller name '+v.width);
+  const [callerSaved]=await Promise.all([
+    page.waitForResponse(r=>r.url()===baseUrl+'/pos/restaurant/api/customer-store'&&r.request().method()==='POST'),
+    page.locator('[x-show="showNewCustomerInline"] button').last().click(),
+  ]);
+  const callerData=await callerSaved.json();
+  if(!callerSaved.ok()||!callerData.success||!callerData.customer?.id)throw new Error('Actual caller customer save failed');
+  await page.waitForFunction(name=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.name===name,'Synthetic caller name '+v.width);
+  await saveEvidenceScreenshot(page,'attached-caller-saved-name-'+v.width+'.png');
   const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
   const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
   const address='Synthetic delivery lane '+v.width;

@@ -128,7 +128,7 @@ final class PosCounterDrawer
             $bills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('business_date', $date)
-                ->whereNotNull('rider_id')
+                ->where(function ($q) { $q->whereNotNull('rider_id'); if (Schema::hasColumn('pos_transactions', 'rider_collection_amount')) $q->orWhere('rider_collection_amount', '>', 0); })
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
                 ->when(!$branchId && Schema::hasColumn('pos_transactions', 'branch_id'),
@@ -145,7 +145,7 @@ final class PosCounterDrawer
                     continue;
                 }
                 $key = (int) ($t->terminal_id ?? 0);
-                $remaining = (float) $t->total_amount - ($hasPartial ? (float) ($t->rider_partial_paid ?? 0) : 0);
+                $remaining = \App\Models\PosRider::remainingAmount($t);
                 $out[$key] = ($out[$key] ?? 0.0) + $remaining;
             }
 

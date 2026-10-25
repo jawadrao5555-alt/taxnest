@@ -365,6 +365,28 @@ class PosCounterCashDrawerTest extends TestCase
 
     // ── 1. the drawers tile the shop ────────────────────────────────────────
 
+    public function test_mixed_delivery_cash_out_uses_only_uncollected_delivery_portion_and_stays_tenant_scoped(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->decimal('rider_collection_amount', 14, 2)->nullable();
+            $t->decimal('rider_partial_paid', 14, 2)->default(0);
+        });
+        $company = $this->makeCompany();
+        $counter = $this->makeCounter($company, 'Mixed counter');
+        $cod = $this->makeBill($company, 'MIX-COD', $counter, 900);
+        DB::table('pos_transactions')->where('id', $cod)->update(['rider_collection_amount' => 300, 'rider_partial_paid' => 50]);
+        $paid = $this->makeBill($company, 'MIX-PAID', $counter, 700);
+        DB::table('pos_transactions')->where('id', $paid)->update(['rider_id' => 1, 'rider_collection_amount' => 0]);
+        $legacy = $this->makeBill($company, 'LEGACY-COD', $counter, 400);
+        DB::table('pos_transactions')->where('id', $legacy)->update(['rider_id' => 1]);
+        $other = $this->makeCompany();
+        $foreign = $this->makeBill($other, 'FOREIGN-COD', $counter, 5000);
+        DB::table('pos_transactions')->where('id', $foreign)->update(['rider_collection_amount' => 5000]);
+        $out = PosCounterDrawer::riderCashOutByDrawer($company, null, $this->bizDate($company));
+        $this->assertSame(650.0, $out[$counter]);
+        $this->assertSame(2000.0, (float) $this->rows($company)->sum('cash_sales'));
+    }
+
     public function test_counter_rows_tile_the_shop_cash(): void
     {
         $companyId = $this->makeCompany();

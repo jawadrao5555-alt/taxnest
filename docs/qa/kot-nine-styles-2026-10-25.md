@@ -20,6 +20,9 @@ The reviewed compact preview board is a visual direction, not a pixel-perfect pr
 No company changes style automatically. Missing/null/new style field must resolve to its existing KOT renderer and existing saved font, size, paper width, header, printer and routing settings. No bulk reset, inferred migration, shared browser-storage preference or change to historical transactions. Company chooses a preview and explicitly Saves before its style changes; preview/cancel is non-mutating. Persist with existing authorized company settings flow and server-side style allowlist. A second tenant must be unaffected.
 Read the actual current receipt-settings and kitchen-settings KOT controls and unify behavior without conflicting settings. Existing arbitrary legacy typography must remain intact. Existing KOT design remains selectable even after choosing a new design.
 
+## Independent Local / Fiscal style selection
+Owner additionally confirms that Local and Fiscal KOT may independently select any of the nine styles, either the same or different. Both have non-mutating previews; only explicit authorized Save changes the selected scope. Absent per-mode selection inherits the company's existing KOT style/settings, with no migration/reset on deployment. Derive mode using existing authoritative transaction rules; do not change billing/reporting status. No prices, taxes or fiscal verification QR on KOT. Test independent selections, shared legacy fallback, preview/cancel and second-tenant isolation. Customer receipt styles are tracked separately in PR281.
+
 ## Content rules common to all nine
 - Preserve order/KOT identity, date/time, table when applicable, item/deal identity and options, quantities, kitchen routing and add-on/cancel/reprint semantics.
 - Whole-order TAKEAWAY or DELIVERY belongs in the header once. Do not automatically repeat PACK / TAKEAWAY beneath every ordinary item.

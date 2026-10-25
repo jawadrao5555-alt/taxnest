@@ -1574,6 +1574,10 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                     </div>
+                    <button type="button" data-save-attached-caller x-show="selectedCustomer && !selectedCustomer.id && selectedCustomer.phone" x-cloak
+                            @click="saveAttachedCallerCustomer()" class="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-bold text-purple-800 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200">
+                        {{ __('pos.caller_save_customer') }}
+                    </button>
                     {{-- Task 1380 (owner video, Aug 2026): attached customer ko YAHIN se
                          hatane ka rasta. Pehle clear ka ✕ sirf products column ke customer
                          search box par tha, is liye call se bana customer is card par
@@ -14294,6 +14298,16 @@ function restaurantPos() {
         // v2: unknown caller → open the existing quick-add customer panel with
         // the phone (and WhatsApp display name) prefilled so the address gets
         // saved right there.
+        saveAttachedCallerCustomer() {
+            const customer = this.selectedCustomer;
+            if (!customer || customer.id || !customer.phone) return;
+            // The existing inline name form lives in the menu pane on phones.
+            this.mobileView = 'menu';
+            this.callerSaveCustomer({
+                phone: customer.phone,
+                name: customer.name === customer.phone ? '' : (customer.name || ''),
+            });
+        },
         callerSaveCustomer(ev) {
             if (!ev || !ev.phone) { return; }
             const digits = String(ev.phone).replace(/[^0-9+]/g, '');

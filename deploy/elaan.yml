@@ -1,7 +1,7 @@
-title: "Order type aur F2 ki hidayat ab saaf hai"
+title: "Caller ka naam Current Order se save karein"
 audience: pos
 type: improvement
 points:
-  - "Sale screen par Dine In, Takeaway aur Delivery ke paas se ghalat F2 nishan hata diya gaya hai. Order ka tareeqa usi button se chunein."
-  - "F2 pehle ki tarah product search kholta hai. F1 ki madad wali list mein bhi isi ka sahi naam dikhaya gaya hai."
-  - "Table, cart aur aapki saved settings pehle ki tarah kaam karti hain."
+  - "Naya caller bill ke saath attach ho aur popup band ho jaye to Current Order ke customer card par Save Customer dabayein."
+  - "Phone pehle se bhara milega. Naam likh kar maujooda customer form se save karein; mobile par zaroori form khud saamne aa jayega."
+  - "Cart ki items aur caller ka phone saath rehte hain. Pehle se saved customer ke liye naya customer banane ka button nahi dikhaya jata."

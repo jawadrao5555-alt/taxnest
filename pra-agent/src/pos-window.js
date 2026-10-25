@@ -20,6 +20,7 @@ const { BrowserWindow, shell, app, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const offlineSnapshot = require('./offline-snapshot');
+const { wireCompanyLogin } = require('./company-login-hook');
 
 // NestPOS icon: packaged builds ship it via extraResources (stable path next
 // to app.asar); dev falls back to the repo assets folder.
@@ -234,34 +235,7 @@ function openPosWindow(config, opts = {}) {
   // Agent AUTO-CONFIG (v1.5.0): once the cashier is logged in (any authed
   // /pos/ page loaded), let main.js pull the company's agent credentials
   // with the session cookie — zero manual agent setup on shop PCs.
-  // onLoggedIn returns a promise resolving true on success; until then we
-  // keep retrying on subsequent page loads (e.g. first load was the login
-  // page, or the config fetch raced a network drop).
-  // v1.5.0 beta4: seeing the LOGIN page again re-arms the check — so after a
-  // logout + login as ANOTHER company, main.js re-fetches and the agent swaps
-  // to the new company's credentials automatically (owner rule: the agent
-  // follows whoever is logged into the POS window).
-  const onLoggedIn = typeof opts.onLoggedIn === 'function' ? opts.onLoggedIn : null;
-  let autoCfgDone = false;
-  let autoCfgInFlight = false;
-  let autoCfgGen = 0; // bumped on every login-page sighting — a stale fetch can't clobber a newer re-arm
-  posWindow.webContents.on('did-finish-load', () => {
-    try {
-      if (!onLoggedIn) return;
-      const cur = posWindow.webContents.getURL() || '';
-      // Login-page re-arm runs BEFORE the inFlight gate so a logout that races
-      // an in-flight config fetch still re-arms the check for the next login.
-      if (cur.startsWith(origin + '/pos/login')) { autoCfgDone = false; autoCfgGen++; return; }
-      if (autoCfgDone || autoCfgInFlight) return;
-      if (!cur.startsWith(origin + '/pos/')) return;
-      const gen = autoCfgGen;
-      autoCfgInFlight = true;
-      Promise.resolve(onLoggedIn(posWindow.webContents.session, origin))
-        .then((ok) => { if (gen === autoCfgGen) autoCfgDone = !!ok; })
-        .catch(() => {})
-        .finally(() => { autoCfgInFlight = false; });
-    } catch (e) { autoCfgInFlight = false; }
-  });
+  wireCompanyLogin(posWindow, origin, 'pos', opts.onLoggedIn);
 
   // Offline Mode (Beta): register the passthrough-first https interception on
   // the persist:pos partition BEFORE the first load, and snapshot the sale
@@ -420,6 +394,7 @@ function openFbrPosWindow(config, opts = {}) {
   });
 
   fbrWindow.on('page-title-updated', (e) => e.preventDefault());
+  wireCompanyLogin(fbrWindow, origin, 'fbrpos', opts.onLoggedIn);
 
   try {
     const ua = fbrWindow.webContents.getUserAgent() || '';

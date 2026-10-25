@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class PosTransactionItem extends Model
 {
     protected $fillable = [
+        'fulfillment', 'line_uid',
         'transaction_id', 'item_type', 'item_id', 'item_name', 'hotel_folio_entry_id',
         // Kitchen ki parchi par na chhapne wali line (Delivery Charges) — dekho
         // RestaurantOrderItem par isi naam ka field.

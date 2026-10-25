@@ -1,6 +1,7 @@
-title: "Naye POS tutorials ki synthetic recording tyari"
+title: "Caller ka naam Current Order se save karein"
 audience: pos
 type: improvement
 points:
-  - "Top Selling, WhatsApp, Rider map aur notifications ki review recordings ka process shamil hai."
-  - "Recordings mein synthetic data use hota hai; public videos owner review ke baad release hongi."
+  - "Naya caller bill ke saath attach ho aur popup band ho jaye to Current Order ke customer card par Save Customer dabayein."
+  - "Phone pehle se bhara milega. Naam likh kar maujooda customer form se save karein; mobile par zaroori form khud saamne aa jayega."
+  - "Cart ki items aur caller ka phone saath rehte hain. Pehle se saved customer ke liye naya customer banane ka button nahi dikhaya jata."

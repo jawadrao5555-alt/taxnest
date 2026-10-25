@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class RestaurantOrderItem extends Model
 {
     protected $fillable = [
+        'fulfillment', 'line_uid',
         'order_id', 'item_type', 'item_id', 'item_name',
         // Waiter "Add Items" replay guard — one uuid per append ATTEMPT, shared
         // by every row that attempt writes and by each of its retries.

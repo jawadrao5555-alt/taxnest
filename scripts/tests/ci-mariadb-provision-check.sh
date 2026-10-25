@@ -32,6 +32,8 @@ grep -Fq 'chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"' "$workflow" ||
     fail 'workflow must not replace a host MySQL installation with apt MariaDB'
 ! grep -Fq 'MariaDB.*10\\.6' "$workflow" ||
     fail 'workflow still contains the order-sensitive MariaDB version grep'
+grep -Eq '^[[:space:]]+libargon2-1[[:space:]]' "$provision" ||
+    fail 'PHP 8.4 runtime requires libargon2.so.1 in the minimal MariaDB container'
 grep -Fq '10.6.23' "$provision" ||
     fail 'provisioning helper must verify the exact MariaDB 10.6.23 patch'
 grep -Fq 'numeric token may precede MariaDB' "$provision" ||

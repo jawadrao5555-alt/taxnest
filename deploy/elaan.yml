@@ -1,6 +1,7 @@
-title: "Naye POS tutorials ki synthetic recording tyari"
+title: "Menu mein tax-exempt items aik jagah dekhein"
 audience: pos
 type: improvement
 points:
-  - "Top Selling, WhatsApp, Rider map aur notifications ki review recordings ka process shamil hai."
-  - "Recordings mein synthetic data use hota hai; public videos owner review ke baad release hongi."
+  - "Products ki list mein Exempt Items Only ka filter shamil hai. Is se aam exempt aur Third Schedule ke exempt items aik saath dekh sakte hain."
+  - "Naam ya category ki search ke saath bhi yeh filter istemal karein. Poori list wapas dekhne ke liye All chunein."
+  - "Yeh sirf list ko filter karta hai; products ki tax setting ya price khud se nahi badalta."

@@ -2911,6 +2911,7 @@ class PosController extends Controller
                     'id' => (int) $editTxn->id,
                     'invoice_number' => (string) $editTxn->invoice_number,
                     'order_type' => $editTxn->order_type ?: 'takeaway',
+                    'rider_collection_amount' => $editTxn->rider_collection_amount,
                     'customer_id' => $editCustomer ? (int) $editCustomer->id : null,
                     'customer_name' => $editTxn->customer_name,
                     'customer_phone' => $editTxn->customer_phone,
@@ -2930,6 +2931,8 @@ class PosController extends Controller
                         'item_name' => (string) $i->item_name,
                         'quantity' => (float) $i->quantity,
                         'unit_price' => (float) $i->unit_price,
+                        'fulfillment' => $i->fulfillment, 'line_uid' => $i->line_uid,
+                        'skip_kitchen' => (bool) $i->skip_kitchen,
                         'special_notes' => $i->special_notes,
                         'is_tax_exempt' => (bool) $i->is_tax_exempt,
                     ])->values()->all(),
@@ -3376,6 +3379,7 @@ class PosController extends Controller
                 'transaction_id' => $existing->id,
                 'invoice_number' => $existing->invoice_number,
                 'total_amount' => (float) $existing->total_amount,
+                ...\App\Support\PosFulfillment::paymentResponse($existing),
                 'pra_invoice_number' => $existing->pra_invoice_number,
                 'pra_status' => $existing->pra_status,
                 'message' => $replayMessage,
@@ -3547,6 +3551,7 @@ class PosController extends Controller
             }
         }
 
+        \App\Support\PosFulfillment::validate($request, $company);
         $companyItems = $this->resolveItemExemptions(
             $request->items,
             $companyId,
@@ -3827,7 +3832,7 @@ class PosController extends Controller
         $riderId = null;
         // Plan gate: riders is Pro+ — silently drop rider_id (NEVER reject the
         // bill itself: offline replays from a downgraded shop must still land).
-        if ($riderColumnsExist && $orderTypeSnapshot === 'delivery' && $request->filled('rider_id')
+        if ($riderColumnsExist && \App\Support\PosFulfillment::hasDelivery($request->items, $orderTypeSnapshot) && $request->filled('rider_id')
             && PosFeatureService::planAllows($company, 'riders_enabled')) {
             $riderId = \App\Models\PosRider::where('company_id', $companyId)
                 ->where('id', (int) $request->input('rider_id'))
@@ -4069,6 +4074,7 @@ class PosController extends Controller
                     'item_type' => $ri['type'],
                     'item_id' => $ri['item_id'],
                     'item_name' => $ri['name'],
+                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $ri['fulfillment'] ?? null, 'line_uid' => $ri['line_uid'] ?? null] : []),
                     'special_notes' => $ri['notes'] ?? null,
                     'deal_snapshot' => $ri['deal_snapshot'] ?? null,
                     'quantity' => $ri['quantity'],
@@ -4082,6 +4088,7 @@ class PosController extends Controller
                    $hasCostPriceCol ? ['cost_price' => $frozenCost] : []));
             }
 
+            \App\Support\PosFulfillment::applyCollection($transaction, $request, $subtotal > 0 ? max(0, 1 - $discountAmount / $subtotal) : 1, (float) $taxRate, $taxInclusive);
             PosPayment::create([
                 'transaction_id' => $transaction->id,
                 'payment_method' => $request->payment_method,
@@ -4295,6 +4302,7 @@ class PosController extends Controller
                 'success' => true,
                 'transaction_id' => $transaction->id,
                 'invoice_number' => $invoiceNumber,
+                ...\App\Support\PosFulfillment::paymentResponse($transaction),
                 'total_amount' => $totalAmount,
                 'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
                 'pra_status' => $transaction->pra_status ?? null,
@@ -4442,6 +4450,7 @@ class PosController extends Controller
             }
         }
 
+        \App\Support\PosFulfillment::validate($request, $company, $transaction);
         $companyItems = $this->resolveItemExemptions($request->items, $companyId, $request->input('order_type'));
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
         $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));
@@ -4595,6 +4604,7 @@ class PosController extends Controller
                     'item_type' => $ri['type'],
                     'item_id' => $ri['item_id'],
                     'item_name' => $ri['name'],
+                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $ri['fulfillment'] ?? null, 'line_uid' => $ri['line_uid'] ?? null] : []),
                     'special_notes' => $ri['notes'] ?? null,
                     'deal_snapshot' => $ri['deal_snapshot'] ?? null,
                     'quantity' => $ri['quantity'],
@@ -4608,6 +4618,8 @@ class PosController extends Controller
                    $hasCostPriceColEdit ? ['cost_price' => $frozenCostEdit] : []));
             }
 
+            $transaction->unsetRelation('items');
+            \App\Support\PosFulfillment::applyCollection($transaction, $request, $subtotal > 0 ? max(0, 1 - $discountAmount / $subtotal) : 1, (float) $taxRate, $editTaxInclusive);
             $transaction->payments()->delete();
             PosPayment::create([
                 'transaction_id' => $transaction->id,
@@ -5304,7 +5316,9 @@ class PosController extends Controller
             ->orderBy('id', 'desc')
             ->limit(100)
              ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at',
-                   ...($hasBillToken ? ['bill_token'] : []),
+                   ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'has_delivery_items') ? ['has_delivery_items', 'rider_collection_amount'] : []),
+                   ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid') ? ['rider_partial_paid'] : []),
+                       ...($hasBillToken ? ['bill_token'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : []),
                    ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
                    ...($hasBizDate ? ['business_date'] : [])]);
@@ -5363,7 +5377,7 @@ class PosController extends Controller
                         $qu->whereNull('rider_id')
                             ->whereNull('delivery_status')
                             ->whereNull('rider_settlement_id')
-                            ->where('order_type', 'delivery')
+                            ->where(function ($delivery) { $delivery->where('order_type', 'delivery'); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'has_delivery_items')) $delivery->orWhere('has_delivery_items', true); })
                             ->where('created_at', '>=', now()->subDays(7));
                     });
                 })
@@ -5389,6 +5403,8 @@ class PosController extends Controller
                 ->orderBy('id', 'desc')
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
+                       ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'has_delivery_items') ? ['has_delivery_items', 'rider_collection_amount'] : []),
+                   ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid') ? ['rider_partial_paid'] : []),
                        ...($hasBillToken ? ['bill_token'] : []),
                        ...($hasBizDate ? ['business_date'] : []),
                        // Owner video (25 Aug 2026): the popup now offers the same
@@ -5419,6 +5435,7 @@ class PosController extends Controller
                     ->where('company_id', $companyId)
                     ->whereIn('rider_id', $riderIds)
                     ->where('payment_method', 'cash')
+                    ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
                     ->whereNull('rider_settlement_id')
                     ->where(function ($q) {
                         $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
@@ -5474,6 +5491,10 @@ class PosController extends Controller
                 'order_type'       => $b->order_type,
                 'delivery_address' => $b->delivery_address,
                 'total_amount'     => (float) $b->total_amount,
+                'rider_collection_amount' => $b->rider_collection_amount === null ? null : (float) $b->rider_collection_amount,
+                'rider_partial_paid' => (float) ($b->rider_partial_paid ?? 0),
+                'has_delivery_items' => (bool) $b->has_delivery_items,
+                'delivery_items' => $b->has_delivery_items ? $b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
                 'payment_method'   => $b->payment_method,
                 // Wording comes from the ONE label authority (owner, 26 Aug
                 // 2026) — the sale screen used to tidy the raw stored value in
@@ -5533,6 +5554,10 @@ class PosController extends Controller
                 'order_type'       => $b->order_type,
                 'delivery_address' => $b->delivery_address,
                 'total_amount'     => (float) $b->total_amount,
+                'rider_collection_amount' => $b->rider_collection_amount === null ? null : (float) $b->rider_collection_amount,
+                'rider_partial_paid' => (float) ($b->rider_partial_paid ?? 0),
+                'has_delivery_items' => (bool) $b->has_delivery_items,
+                'delivery_items' => $b->has_delivery_items ? $b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
                 'payment_method'   => $b->payment_method,
                 // Wording comes from the ONE label authority (owner, 26 Aug
                 // 2026) — the sale screen used to tidy the raw stored value in
@@ -5548,7 +5573,7 @@ class PosController extends Controller
                 'assignment_revision' => $hasAssignmentRevision ? $b->rider_assignment_revision : null,
                 'rider_name'       => $b->rider_id ? ($riderNames[$b->rider_id] ?? null) : null,
                 // Cash bill jo rider ke khaate par hai (card bills khata par nahi hote).
-                'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && $b->delivery_status !== 'returned'),
+                'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && \App\Models\PosRider::remainingAmount($b) > 0 && $b->delivery_status !== 'returned'),
                 'rider_open_count' => $b->rider_id ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                 'rider_open_amount'=> $b->rider_id ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
                 // Task 524: purani unassigned = collapsed group + badge se bahar.
@@ -12911,7 +12936,7 @@ class PosController extends Controller
                 // na hua ho (ya client ne saaf saaf manual kaha ho).
                 'item_type'     => (!$itemId || !empty($item['_manual'])) ? 'manual' : 'product',
                 'item_name'     => $itemName,
-            ], $orderType, $skipUsed);
+            ], \App\Support\PosFulfillment::hasDelivery($requestItems, $orderType) ? 'delivery' : $orderType, $skipUsed);
             if ($skipKitchenLine) {
                 $skipUsed = true;
                 // Delivery fee ki exemption bhi server khud lagata hai — usay
@@ -12937,6 +12962,7 @@ class PosController extends Controller
                 // Task 636: same identity-autofill note discard as the waiter path —
                 // a note that is EXACTLY the cashier's login email/username/name/phone
                 // is browser autofill garbage, never a kitchen instruction.
+                ...\App\Support\PosFulfillment::fields($item),
                 'notes' => RestaurantWaiterController::stripIdentityNote(
                     isset($item['special_notes']) ? (string) $item['special_notes'] : null,
                     auth('pos')->user()
@@ -15397,7 +15423,7 @@ class PosController extends Controller
             $dayBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('business_date', $date)
-                ->whereNotNull('rider_id')
+                ->where(function ($q) { $q->whereNotNull('rider_id'); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_collection_amount')) $q->orWhere('rider_collection_amount', '>', 0); })
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 // Task 1360: rider cash reconciles against ONE branch's drawer.
                 ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
@@ -15476,7 +15502,7 @@ class PosController extends Controller
             // Khata remaining per bill — partial cash already received today is
             // IN the drawer, only the unpaid remainder is out with the rider.
             $hasPartialCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid');
-            $remainingOf = fn ($t) => (float) $t->total_amount - ($hasPartialCol ? (float) ($t->rider_partial_paid ?? 0) : 0);
+            $remainingOf = fn ($t) => \App\Models\PosRider::remainingAmount($t);
 
             $cashOut = (float) $dayBills
                 ->filter(fn ($t) => ($t->invoice_mode === 'pra' || $t->invoice_mode === null) && $isOpenCash($t))
@@ -15492,7 +15518,7 @@ class PosController extends Controller
                     'deliveries' => $rows->count(),
                     'delivered' => $rows->where('delivery_status', 'delivered')->count(),
                     'returned' => $rows->where('delivery_status', 'returned')->count(),
-                    'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === PosPaymentBuckets::CASH && $t->delivery_status !== 'returned')->sum('total_amount'), 2),
+                    'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === PosPaymentBuckets::CASH && $t->delivery_status !== 'returned')->sum(fn ($t) => \App\Models\PosRider::collectionAmount($t)), 2),
                     'cash_pending' => round((float) $rows->filter($isOpenCash)->sum($remainingOf), 2),
                 ];
             }

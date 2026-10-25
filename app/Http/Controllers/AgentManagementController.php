@@ -235,7 +235,7 @@ class AgentManagementController extends Controller
     }
 
     /**
-     * Latest GitHub release info (tag + assets), cached 10 minutes.
+     * Latest GitHub release info (tag + assets), cached 10 minutes (one shared inventory for every surface).
      * Shared by the download redirect, the /pos/agent page AND the agent
      * heartbeat's self-update advertisement (AgentController).
      */
@@ -375,15 +375,17 @@ class AgentManagementController extends Controller
             return response()->json([
                 'error' => 'Agent release is temporarily unavailable because its canonical manifest could not be verified.',
                 'reason' => $release['reason'] ?? 'manifest_invalid',
-            ], 503);
+            ], 503)->header('Cache-Control', 'no-store');
         }
         $asset = $type === 'zip' ? ($release['zip'] ?? null) : ($release['exe'] ?? null);
 
         if ($asset) {
-            return redirect()->away($asset['url']);
+            return redirect()->away($asset['url'])->header('Cache-Control', 'no-store, private')
+                ->header('Pragma', 'no-cache')->header('X-Agent-Version', $release['version'] ?? ltrim($release['tag'] ?? '', 'v'))
+                ->header('X-Agent-SHA256', $asset['sha256']);
         }
 
-        return response()->json(['error' => 'Requested canonical Agent asset is unavailable.'], 503);
+        return response()->json(['error' => 'Requested canonical Agent asset is unavailable.'], 503)->header('Cache-Control', 'no-store');
     }
 
     public function latestVersionInfo()

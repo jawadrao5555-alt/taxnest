@@ -103,6 +103,7 @@ class PosRider extends Model
             ->where('company_id', $this->company_id)
             ->where('rider_id', $this->id)
             ->where('payment_method', 'cash')
+            ->whereRaw(self::remainingExpr() . ' > 0')
             ->whereNull('rider_settlement_id')
             ->where(function ($q) {
                 $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
@@ -116,9 +117,20 @@ class PosRider extends Model
      */
     public static function remainingExpr(string $table = 'pos_transactions'): string
     {
+        $amount = \Illuminate\Support\Facades\Schema::hasColumn($table, 'rider_collection_amount')
+            ? 'COALESCE(rider_collection_amount, total_amount)' : 'total_amount';
         return \Illuminate\Support\Facades\Schema::hasColumn($table, 'rider_partial_paid')
-            ? '(total_amount - COALESCE(rider_partial_paid, 0))'
-            : 'total_amount';
+            ? '(' . $amount . ' - COALESCE(rider_partial_paid, 0))' : $amount;
+    }
+
+    public static function collectionAmount($bill): float
+    {
+        return (float) ($bill->rider_collection_amount ?? $bill->total_amount);
+    }
+
+    public static function remainingAmount($bill): float
+    {
+        return max(0, round(self::collectionAmount($bill) - (float) ($bill->rider_partial_paid ?? 0), 2));
     }
 
     /** Rider's khata remaining (open cash bills minus partial receipts). */

@@ -18,11 +18,18 @@ const good = {
   max_agent_version: '2.99.99',
 };
 
-test('package and lock release identity stay aligned beyond immutable v1.13.6', () => {
-  assert.equal(packageJson.version, '1.13.20');
+test('package and lock release identity stay aligned beyond immutable v1.13.22', () => {
+  assert.equal(packageJson.version, '1.13.23');
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
-  assert.notEqual(packageJson.version, '1.13.6');
+  assert.notEqual(packageJson.version, '1.13.22');
+});
+
+test('reviewed Electron runtime is identical in package, lock and Windows build configuration', () => {
+  assert.equal(packageJson.devDependencies.electron, '42.11.16');
+  assert.equal(packageJson.build.electronVersion, '42.11.16');
+  assert.equal(packageLock.packages[''].devDependencies.electron, '42.11.16');
+  assert.equal(packageLock.packages['node_modules/electron'].version, '42.11.16');
 });
 
 test('accepts a complete compatible canonical release manifest', () => {

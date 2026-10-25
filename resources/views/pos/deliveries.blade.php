@@ -142,7 +142,7 @@
         @php
             $open = $khataBills[$rider->id] ?? collect();
             // Khata remaining — partial receipts (Task 525) already handed over are deducted.
-            $owed = (float) $open->sum(fn ($b) => (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0));
+            $owed = (float) $open->sum(fn ($b) => \App\Models\PosRider::remainingAmount($b));
         @endphp
         {{-- id= dashboard ke "Rider settlement pending" alert ka nishana hai
              (25 Aug 2026): wahan se click seedha isi rider ke card par utarta
@@ -233,7 +233,7 @@
                         @csrf
                         <div class="space-y-1.5 mb-4">
                             @foreach($open as $b)
-                            @php $rem = (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0); @endphp
+                            @php $rem = \App\Models\PosRider::remainingAmount($b); @endphp
                             <div class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60"
                                  :class="settlePrepaid[{{ $b->id }}] ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : ''">
                                 <input type="checkbox" name="bill_ids[]" value="{{ $b->id }}" data-amount="{{ $rem }}" data-settle-bill="{{ $b->id }}" checked
@@ -418,7 +418,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($bills as $b)
-                    <tr data-delrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra') . ' ' . (!$b->rider_id && !empty($b->delivered_by) && !empty($deliveredByUsers[$b->delivered_by]) ? $deliveredByUsers[$b->delivered_by] : '')) }}">
+                    <tr data-delrow data-phone="{{ $b->customer_phone ?? '' }}" data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra') . ' ' . (!$b->rider_id && !empty($b->delivered_by) && !empty($deliveredByUsers[$b->delivered_by]) ? $deliveredByUsers[$b->delivered_by] : '')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                                 <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
@@ -453,7 +453,14 @@
                             </div>
                             @endif
                         </td>
-                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}
+                            @if($b->rider_collection_amount !== null)
+                                <p class="mt-1 text-xs text-teal-700 dark:text-teal-300">{{ __('pos.fulfill_rider_cash') }}: Rs. {{ number_format(\App\Models\PosRider::remainingAmount($b), 2) }}</p>
+                                @foreach($b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false) as $deliveryItem)
+                                    <p class="text-xs text-gray-600 dark:text-gray-300">{{ (float) $deliveryItem->quantity }} × {{ $deliveryItem->item_name }}</p>
+                                @endforeach
+                            @endif
+                        </td>
                         <td class="px-4 py-3">
                             @if($b->payment_method === 'cash')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
@@ -693,7 +700,7 @@
                     @foreach($oldUnassigned as $b)
                     {{-- Task 536: data-oldrow (data-delrow NAHIN — main count alag rahe) + same
                          data-search recipe as the main table so the one search box filters both. --}}
-                    <tr data-oldrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra')) }}">
+                    <tr data-oldrow data-phone="{{ $b->customer_phone ?? '' }}" data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
                                 <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
@@ -705,7 +712,14 @@
                             <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
                             @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
                         </td>
-                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}
+                            @if($b->rider_collection_amount !== null)
+                                <p class="mt-1 text-xs text-teal-700 dark:text-teal-300">{{ __('pos.fulfill_rider_cash') }}: Rs. {{ number_format(\App\Models\PosRider::remainingAmount($b), 2) }}</p>
+                                @foreach($b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false) as $deliveryItem)
+                                    <p class="text-xs text-gray-600 dark:text-gray-300">{{ (float) $deliveryItem->quantity }} × {{ $deliveryItem->item_name }}</p>
+                                @endforeach
+                            @endif
+                        </td>
                         <td class="px-4 py-3">
                             @if($b->payment_method === 'cash')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
@@ -881,8 +895,13 @@
     var oldEmpty = document.getElementById('del-old-search-empty');
     inp.addEventListener('input', function () {
         var q = inp.value.trim().toLowerCase(), shown = 0;
+        var digits = /^[+\d\s().-]+$/.test(q) ? q.replace(/\D/g, '') : '';
+        function matches(tr) {
+            return !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1 ||
+                (digits.length >= 3 && (tr.getAttribute('data-phone') || '').replace(/\D/g, '').indexOf(digits) !== -1);
+        }
         document.querySelectorAll('tr[data-delrow]').forEach(function (tr) {
-            var hit = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+            var hit = matches(tr);
             tr.style.display = hit ? '' : 'none';
             if (hit) shown++;
         });
@@ -893,7 +912,7 @@
         // section Alpine event se auto-khul jata hai aur header par match-ginti chip.
         var oldRows = document.querySelectorAll('tr[data-oldrow]'), oldShown = 0;
         oldRows.forEach(function (tr) {
-            var hit = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+            var hit = matches(tr);
             tr.style.display = hit ? '' : 'none';
             if (hit) oldShown++;
         });

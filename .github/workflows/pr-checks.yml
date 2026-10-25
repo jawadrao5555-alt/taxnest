@@ -333,8 +333,16 @@ jobs:
         run: |
           mapfile -t tests < <(find pra-agent/test -maxdepth 1 -type f -name '*.test.js' ! -name 'local-core-internet-cut.test.js' -printf '%p\n' | sort)
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
-          bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs
+          bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs scripts/tests/dashboard-notice-reading.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
+      - name: Install patched Electron runtime for real BrowserWindow acceptance
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libatk-bridge2.0-0
+          node pra-agent/node_modules/electron/install.js
+      - name: Exercise real Electron offline reconnect and encrypted persistence
+        timeout-minutes: 8
+        run: bash scripts/rc-safe-run -- node pra-agent/test/local-core-internet-cut.test.js
       - name: Check isolated tutorial recording paths
         run: bash scripts/rc-safe-run -- node --test scripts/tests/tutorial-recording.test.mjs
       - name: Check Android beta artifact inventory
@@ -358,7 +366,7 @@ jobs:
       - name: Check complete catalog search and exact scanner priority
         run: bash scripts/rc-safe-run -- node --test scripts/tests/catalog-search-results.test.mjs scripts/tests/menu-exempt-filter.test.mjs
       - name: Check delivery address race and snapshot preservation
-        run: bash scripts/rc-safe-run -- node --test scripts/tests/delivery-address-state.test.mjs
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/mixed-fulfillment.test.mjs scripts/tests/delivery-address-state.test.mjs scripts/tests/delivery-phone-search.test.mjs scripts/tests/caller-order-type.test.mjs
       - name: Run realtime gateway tests with egress blocked
         run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4

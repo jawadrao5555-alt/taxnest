@@ -1002,7 +1002,7 @@ window.addEventListener('popstate', function() {
              the whole widget is hidden unless a restaurant feature (tables/KOT/kitchen)
              or Delivery is enabled. orderType silently stays 'takeaway' underneath. --}}
         @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
-        <div data-tn-order-type-switcher class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="{{ __('pos.ti_press_f2_cycle') }}">
+        <div data-tn-order-type-switcher class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="{{ __('pos.ti_choose_order_type') }}">
             @if($features->tables)
             {{-- Dine In pill (owner, 26 Jul 2026): selected table isi pill mein
                  dikhta hai ("Dine In · T-3"); dobara click = picker (table change).
@@ -1018,7 +1018,6 @@ window.addEventListener('popstate', function() {
             @if($features->delivery)
             <button @click="setOrderType('delivery')" :aria-pressed="orderType === 'delivery'" style="min-height:44px;" class="px-3.5 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black dark:focus-visible:outline-white" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'">{{ __('pos.delivery') }}</button>
             @endif
-            <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>
 
         {{-- Item #3 (owner, Jul 2026): delivery charges input MOVED to the cart panel's
@@ -3796,7 +3795,7 @@ window.addEventListener('popstate', function() {
                                 <kbd style="background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F1</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.order_type_cycle') }}</span>
+                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.product_search') }}</span>
                                 <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F2</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">

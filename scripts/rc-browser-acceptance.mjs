@@ -1932,6 +1932,12 @@ async function riderRealtimeWorkflow(page,t,v) {
 async function catalogSearchCompleteWorkflow(page,t,v) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  const beforeType=await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).orderType);
+  await page.keyboard.press('F2');
+  await page.waitForFunction(()=>document.activeElement===document.querySelector('[x-ref="searchInput"]'));
+  const hint=await page.locator('button[data-video="counter-dine-in"]').evaluate(el=>({title:el.parentElement.title,text:el.parentElement.innerText}));
+  if(/F2|cycle/i.test(hint.title+' '+hint.text))throw new Error('Order types still advertise the product-search shortcut');
+  if(await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).orderType)!==beforeType)throw new Error('F2 changed the order type');
   // Synthetic in-memory catalog: actual sale UI/methods, no company/product writes.
   await page.evaluate(()=>{
     const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));

@@ -4675,6 +4675,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'ti_pra_disabled' => 'PRA reporting disabled hai',
     'ti_pra_mode_local' => 'Billing mode: LOCAL — is screen ke bills local rehte hain, PRA ko kuch nahi jata. (Yeh network ka status nahi — woh Auto-Sync pill hai.)',
     'ti_pra_mode_on' => 'Billing mode: PRA ON — is screen ke final bills PRA ko report hote hain. (Yeh network ka status nahi — woh Auto-Sync pill hai.)',
+    'ti_choose_order_type' => 'Yahan se Dine In, Takeaway ya Delivery chunein.',
     'ti_press_f2_cycle' => 'Cycle karne ke liye F2 dabayein',
     'ti_print_full_kot' => 'POORA kitchen ticket print karein (kisi bhi waqt reprint karein)',
     'ti_print_kot' => 'Kitchen Order Ticket print karein',

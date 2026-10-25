@@ -1,7 +1,7 @@
-title: "FBR fiscal device par IMS setup ki pehchan durust"
-audience: all
+title: "Order type aur F2 ki hidayat ab saaf hai"
+audience: pos
 type: improvement
 points:
-  - "FBR POS ki local fiscal-device setting istemal karne wali company ke liye Agent ko company ki pehchan ab mukammal milti hai, taake Settings mein FBR IMS ka hissa nazar aaye."
-  - "Agent 1.13.23 mein IMS service na milay to Install FBR IMS ka button dastiyab hai. Install sirf aapke button dabane par shuru hota hai."
-  - "Bill reporting ka tareeqa aur company ya printer ki saved settings nahi badaltin. Yeh website ki correction hai; is ke liye naya Agent installer nahi banaya gaya."
+  - "Sale screen par Dine In, Takeaway aur Delivery ke paas se ghalat F2 nishan hata diya gaya hai. Order ka tareeqa usi button se chunein."
+  - "F2 pehle ki tarah product search kholta hai. F1 ki madad wali list mein bhi isi ka sahi naam dikhaya gaya hai."
+  - "Table, cart aur aapki saved settings pehle ki tarah kaam karti hain."

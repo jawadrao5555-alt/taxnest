@@ -615,6 +615,7 @@
                 <td class="col-total">{{ number_format($lineAmt, 0) }}</td>
             </tr>
             {{-- Per-item comment (owner voice note, 23 Aug 2026) — 80mm ke saath parity. --}}
+            @if(!empty($item->fulfillment))<tr><td colspan="4" style="font-size:9px;">{{ \App\Support\PosFulfillment::label($item->fulfillment) }}</td></tr>@endif
             @if(!empty($item->special_notes))
             <tr>
                 <td class="col-item" colspan="4" style="padding-left:6px; font-size:8px; font-weight:normal;">&nbsp;&nbsp;* {{ $item->special_notes }}</td>
@@ -676,6 +677,10 @@
         </tr>
         {{-- Cash Received / Wapsi (owner request, Jul 2026) — mirrors receipt_80mm; keep in sync. --}}
         @include('pos.hotel._receipt-settlement')
+        @if($transaction->rider_collection_amount !== null)
+        <tr><td class="tot-label">PAID AT COUNTER</td><td class="tot-value">PKR {{ number_format(max(0, (float) $transaction->total_amount - (float) $transaction->rider_collection_amount), 2) }}</td></tr>
+        <tr><td class="tot-label">RIDER TO COLLECT</td><td class="tot-value">PKR {{ number_format((float) $transaction->rider_collection_amount, 2) }}</td></tr>
+        @endif
         @if(strtolower((string) $transaction->payment_method) === 'cash' && (float) ($transaction->cash_received ?? 0) > 0 && (float) ($transaction->change_due ?? 0) > 0.001)
         <tr>
             <td class="tot-label">{{ __('pos.receipt_cash') }}:</td>

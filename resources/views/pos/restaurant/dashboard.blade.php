@@ -132,15 +132,23 @@ function rDash() {
                 }
             });
         },
+        hasOpenDashboardOverlay() {
+            // Never replace a notice/dialog while the cashier is reading it.
+            // Layout rectangles distinguish an open Alpine overlay from its
+            // x-show="false" counterpart without reaching into Alpine internals.
+            return [...document.querySelectorAll('[role="dialog"], [data-wn-featured], [data-whats-new-detail-id], [x-show="bellOpen"]')]
+                .some(el => el.getClientRects().length > 0);
+        },
         async refreshDashboard() {
-            if (this.refreshing) return;
+            if (this.refreshing || this.hasOpenDashboardOverlay()) return;
             this.refreshing = true;
             this._lastRefresh = Date.now();
             try {
                 // Task 644: HEAD = body-less reachability probe (was a full-page
                 // GET whose 230KB body was thrown away before the reload refetched it).
                 const res = await fetch(window.location.href, { method: 'HEAD', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                if (res.ok) {
+                // A notice can open while the HEAD request is in flight.
+                if (res.ok && !this.hasOpenDashboardOverlay()) {
                     window.location.reload();
                 }
             } catch(e) {}

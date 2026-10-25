@@ -359,4 +359,20 @@ class PosRiderPartialSettlementTest extends TestCase
         $this->assertNotNull($this->tx($newest, $t)->rider_settlement_id);
         $this->assertSame(900.0, (float) DB::table('pos_rider_settlements')->sum('total_amount'));
     }
+    public function test_mixed_cod_settles_only_delivery_debt_and_counter_paid_bill_is_not_selected(): void
+    {
+        Schema::table('pos_transactions', fn (Blueprint $t) => $t->decimal('rider_collection_amount', 14, 2)->nullable());
+        $rider = $this->makeRider();
+        $cod = $this->makeBill($rider, ['total_amount' => 900, 'rider_collection_amount' => 300]);
+        $counterPaid = $this->makeBill($rider, ['total_amount' => 800, 'rider_collection_amount' => 0]);
+        $legacy = $this->makeBill($rider, ['total_amount' => 400]);
+        $res = $this->settle($rider, ['settle_all' => true, 'received_amount' => 300]);
+        $this->assertSame(200, $res->getStatusCode(), $res->getContent());
+        $this->assertEquals(400, $res->getData(true)['outstanding_after']);
+        $this->assertNotNull($this->tx($cod)->rider_settlement_id);
+        $this->assertNull($this->tx($counterPaid)->rider_settlement_id);
+        $this->assertNull($this->tx($legacy)->rider_settlement_id);
+        $this->assertEquals(300, DB::table('pos_rider_settlements')->value('total_amount'));
+    }
+
 }

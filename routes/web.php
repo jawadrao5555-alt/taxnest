@@ -880,6 +880,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('pos.agent.download');
     // NestPOS Desktop shell auto-config: shell fetches agent credentials with the
     // logged-in POS session cookie right after login (zero manual agent setup).
+    Route::get('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'preview'])
+        ->defaults('panel', 'pos')->middleware('throttle:10,1')->block(10, 10)->name('pos.desktop.pairing');
+    Route::post('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'confirm'])
+        ->defaults('panel', 'pos')->middleware('throttle:10,1')->block(10, 10)->name('pos.desktop.pairing.confirm');
     Route::get('/desktop/agent-config', [\App\Http\Controllers\AgentManagementController::class, 'desktopConfig'])->name('pos.desktop.agent-config');
 
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
@@ -2522,6 +2526,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // resolves the company from the POS guard only — on FBR routes it found no
     // user and skipped the plan gate entirely.
     Route::get('/agent', [\App\Http\Controllers\FbrAgentController::class, 'show'])->name('fbrpos.agent');
+    Route::get('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'preview'])
+        ->defaults('panel', 'fbrpos')->middleware('throttle:10,1')->block(10, 10)->name('fbrpos.desktop.pairing');
+    Route::post('/desktop/agent-pairing', [\App\Http\Controllers\DesktopAgentPairingController::class, 'confirm'])
+        ->defaults('panel', 'fbrpos')->middleware('throttle:10,1')->block(10, 10)->name('fbrpos.desktop.pairing.confirm');
     Route::post('/agent/generate', [\App\Http\Controllers\FbrAgentController::class, 'generateKey'])->name('fbrpos.agent.generate');
     Route::post('/agent/regenerate', [\App\Http\Controllers\FbrAgentController::class, 'regenerateKey'])->name('fbrpos.agent.regenerate');
     Route::get('/agent/download', [\App\Http\Controllers\FbrAgentController::class, 'download'])->name('fbrpos.agent.download');

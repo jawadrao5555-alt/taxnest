@@ -385,7 +385,7 @@ class RestaurantKdsController extends Controller
                     'items' => $o->items->map(fn($i) => [
                         'name' => $i->item_name,
                         'qty' => $i->quantity,
-                        'notes' => $i->special_notes,
+                        'notes' => trim(\App\Support\PosFulfillment::label($i->fulfillment) . ' ' . ($i->special_notes ?? '')),
                         'station_id' => $stationItemMap[$i->id] ?? 0,
                     ]),
                     'kitchen_notes' => $o->kitchen_notes,

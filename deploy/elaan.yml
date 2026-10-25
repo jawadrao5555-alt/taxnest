@@ -1,6 +1,7 @@
-title: "Naye POS tutorials ki synthetic recording tyari"
+title: "Product search mein naam aur price saath dekhein"
 audience: pos
 type: improvement
 points:
-  - "Top Selling, WhatsApp, Rider map aur notifications ki review recordings ka process shamil hai."
-  - "Recordings mein synthetic data use hota hai; public videos owner review ke baad release hongi."
+  - "Sale screen par product search ki list mein har item ki price uske naam ke paas nazar aayegi."
+  - "Lambay product names agli line par poore dikhte hain, taake miltay-jultay items pehchanna asaan ho."
+  - "Search, barcode scan, keyboard se selection aur mazeed results kholne ka tareeqa pehle jaisa hai."

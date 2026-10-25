@@ -32,6 +32,7 @@ class PosBillLineConsolidator
         foreach ($items as $item) {
             $discType = $item->item_discount_type ?? null;
             $key = implode('|', [
+                (string) ($item->line_uid ?? ''), (string) ($item->fulfillment ?? ''),
                 (string) $item->item_type,
                 $item->item_id !== null ? (string) $item->item_id : 'null',
                 mb_strtolower(trim((string) $item->item_name)),

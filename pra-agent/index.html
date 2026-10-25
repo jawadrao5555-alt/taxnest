@@ -282,6 +282,7 @@
 
   <div class="card" id="imsCard" style="display:none;">
     <h3 id="imsHeading">IMS Fiscal Service</h3>
+    <p id="imsRoutingNote" style="font-size:12px; margin-bottom:10px;"></p>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
       <span id="imsBadge" class="badge offline"><span class="dot"></span> Checking…</span>
       <div class="btn-row">
@@ -311,7 +312,35 @@
   </div>
 </div>
 
+<script>
+  // First-run diagnostics: keep failures visible even if the main renderer
+  // cannot attach its button handlers. Never display keys or raw config.
+  window.addEventListener('error', function (event) {
+    var el = document.getElementById('testResult');
+    if (el) {
+      el.style.color = '#fca5a5';
+      el.textContent = 'Agent screen error. Please update/reinstall the approved Agent build; saved settings are not deleted.';
+    }
+  });
+  window.addEventListener('unhandledrejection', function () {
+    var el = document.getElementById('testResult');
+    if (el) {
+      el.style.color = '#fca5a5';
+      el.textContent = 'Agent operation failed. Check Agent installation and connection; settings remain unchanged.';
+    }
+  });
+  window.addEventListener('DOMContentLoaded', function () {
+    if (!window.agentAPI || typeof window.agentAPI.testConnection !== 'function') {
+      var el = document.getElementById('testResult');
+      if (el) {
+        el.style.color = '#fca5a5';
+        el.textContent = 'Agent interface failed to load. Controls are unavailable; install a verified Agent release without resetting the company key.';
+      }
+    }
+  });
+</script>
 <script src="src/build-info-view.js"></script>
+<script src="src/ims-visibility.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
 
@@ -399,7 +428,10 @@
   }
 
   function renderStatus(s) {
-    const mode = window.agentAPI.imsMode(s);
+    const mode = window.TaxNestImsVisibility.imsMode(s);
+    $('imsRoutingNote').textContent = mode === 'fbr' && s.serverInfo?.fbr_connection_mode !== 'fiscal_device'
+      ? 'FBR company connected. Local IMS can be checked or installed here. Current reporting mode remains unchanged; installing IMS does not switch bills to local fiscal reporting.'
+      : (mode ? 'Local fiscal-device mode. Check or prepare the required IMS service below.' : '');
     if (mode !== currentImsMode) {
       currentImsMode = mode;
       imsGeneration++;
@@ -507,7 +539,19 @@
 
     tr.style.color = '#c4b5fd';
     tr.textContent = 'Saving…';
-    const res = await window.agentAPI.saveConfig(cfg);
+    let res;
+    try {
+      res = await window.agentAPI.saveConfig(cfg);
+    } catch (e) {
+      tr.style.color = '#fca5a5';
+      tr.textContent = 'Configuration could not be saved. Check the Agent installation and try again.';
+      return;
+    }
+    if (!res || !res.ok) {
+      tr.style.color = '#fca5a5';
+      tr.textContent = 'Configuration save failed. Previous settings were not confirmed.';
+      return;
+    }
     // The just-saved printer is now the baseline — a second Save click without
     // touching the dropdown must not count as another explicit pick.
     if (printerVal !== '') savedPrinter = printerVal;

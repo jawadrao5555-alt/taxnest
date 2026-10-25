@@ -78,6 +78,7 @@ install_build_tools() {
         ca-certificates \
         curl \
         git \
+        libargon2-1 \
         libicu-dev \
         libonig-dev \
         libsodium23 \

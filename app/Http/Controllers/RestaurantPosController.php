@@ -168,7 +168,7 @@ class RestaurantPosController extends Controller
             'items.*.item_id' => 'required_if:items.*.item_type,product,service|nullable|integer',
             'items.*.item_name' => 'required_if:items.*.item_type,manual|nullable|string|max:120',
             'items.*.unit_price' => 'required_if:items.*.item_type,manual|nullable|numeric|min:0|max:9999999',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|numeric|gt:0|decimal:0,2|max:999999',
             'items.*.item_discount_type' => 'nullable|in:percentage,amount',
             'items.*.item_discount_value' => 'nullable|numeric|min:0|max:999999',
             'items.*.is_tax_exempt' => 'nullable|boolean',
@@ -184,6 +184,9 @@ class RestaurantPosController extends Controller
             // Task 1001: per-hold-attempt idempotency key (standalone Hold / Send-to-Kitchen).
             'hold_uuid' => 'nullable|string|max:64',
         ]);
+
+        \App\Support\PosFulfillment::validate($request, $company);
+        $hasDeliveryPortion = \App\Support\PosFulfillment::hasDelivery($request->items, $request->order_type);
 
         // ── Task 1001: HOLD-ONLY RETRY-AFTER-LOST-RESPONSE short-circuit ─────
         // Standalone Hold (F5) and Send-to-Kitchen carry a hold_uuid per attempt.
@@ -239,6 +242,7 @@ class RestaurantPosController extends Controller
                     'transaction_id' => $existingTxn->id,
                     'invoice_number' => $existingTxn->invoice_number,
                     'total_amount' => (float) $existingTxn->total_amount,
+                    ...\App\Support\PosFulfillment::paymentResponse($existingTxn),
                     'pra_invoice_number' => $existingTxn->pra_invoice_number,
                     'pra_status' => $existingTxn->pra_status,
                 ]);
@@ -315,7 +319,7 @@ class RestaurantPosController extends Controller
 
         $resolvedItems = [];
         foreach ($request->items as $item) {
-            $qty = (int)$item['quantity'];
+            $qty = (float)$item['quantity'];
             if ($item['item_type'] === 'manual') {
                 // T006 — cashier-typed cart line. Trust the typed price within validator bounds;
                 // no product/service lookup, no recipe/stock binding, no master record created.
@@ -341,7 +345,7 @@ class RestaurantPosController extends Controller
                     'skip_kitchen' => $item['skip_kitchen'] ?? false,
                     'item_type'    => 'manual',
                     'item_name'    => $manualName,
-                ], $request->input('order_type'), $skipKitchenUsed);
+                ], $hasDeliveryPortion ? 'delivery' : $request->input('order_type'), $skipKitchenUsed);
                 if ($skipThisLine) {
                     $skipKitchenUsed = true;
                     $itemExempt = true;
@@ -431,6 +435,12 @@ class RestaurantPosController extends Controller
             }
         }
 
+        foreach ($resolvedItems as $idx => &$resolvedLine) {
+            $resolvedLine += \App\Support\PosFulfillment::fields($request->items[$idx]);
+            if (!empty($resolvedLine['skip_kitchen']) && isset($resolvedLine['fulfillment'])) $resolvedLine['fulfillment'] = 'delivery';
+        }
+        unset($resolvedLine);
+
         $subtotal = array_sum(array_column($resolvedItems, 'subtotal'));
         $orderNumber = 'ORD-' . date('ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
 
@@ -495,8 +505,8 @@ class RestaurantPosController extends Controller
             $printedPool = [];
             $hadPrintedRows = false;
             $oldOrder = null;
-            $kotCarryKey = function ($type, $id, $name, $notes) {
-                return implode('|', [$type, (string) $id, mb_strtolower(trim((string) $name)), trim((string) $notes)]);
+            $kotCarryKey = function ($type, $id, $name, $notes, $fulfillment = null, $uid = null) {
+                return json_encode([$type, (string) $id, mb_strtolower(trim((string) $name)), trim((string) $notes), $fulfillment, $uid]);
             };
             if ($request->recalled_order_id) {
                 $oldOrder = RestaurantOrder::where('id', $request->recalled_order_id)
@@ -504,6 +514,9 @@ class RestaurantPosController extends Controller
                     ->whereIn('status', ['held', 'preparing', 'ready'])
                     ->lockForUpdate()
                     ->first();
+                if (!$oldOrder) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['recalled_order_id' => 'This held order changed or is unavailable. Reload it before saving.']);
+                }
                 if ($oldOrder) {
                     $carriedKotCount = (int) ($oldOrder->kot_print_count ?? 0);
                     // Owner batch 26 Aug 2026: recall + re-hold ek NAYA row banata
@@ -513,7 +526,7 @@ class RestaurantPosController extends Controller
                     $carriedOnlineAwaited = $oldOrder->online_payment_awaited_at ?? null;
                     $carriedOnlineMarkedBy = $oldOrder->online_payment_marked_by ?? null;
                     foreach ($oldOrder->items()->whereNotNull('kot_printed_at')->orderBy('kot_batch_no')->orderBy('id')->get() as $oi) {
-                        $printedPool[$kotCarryKey($oi->item_type, $oi->item_id, $oi->item_name, $oi->special_notes)][] = [
+                        $printedPool[$kotCarryKey($oi->item_type, $oi->item_id, $oi->item_name, $oi->special_notes, $oi->fulfillment, $oi->line_uid)][] = [
                             'qty' => (float) $oi->quantity,
                             'kot_printed_at' => $oi->kot_printed_at,
                             'kot_batch_no' => $oi->kot_batch_no,
@@ -522,6 +535,17 @@ class RestaurantPosController extends Controller
                             'display_name' => $oi->item_name,
                         ];
                         $hadPrintedRows = true;
+                    }
+                    // A sent portion cannot silently become a different kitchen instruction.
+                    $sentModes = Schema::hasColumn('restaurant_order_items', 'line_uid') ? $oldOrder->items()->whereNotNull('kot_printed_at')->whereNotNull('line_uid')->get()->keyBy('line_uid') : collect();
+                    foreach ($resolvedItems as $line) {
+                        $sent = $sentModes->get($line['line_uid'] ?? '');
+                        if ($sent && ($line['fulfillment'] ?? null) !== $sent->fulfillment) {
+                            throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'A sent portion cannot change service type. Add a new portion or use the order cancellation flow.']);
+                        }
+                    }
+                    if ($sentModes->isNotEmpty() && !collect($resolvedItems)->contains(fn ($line) => isset($line['fulfillment']))) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'Reload this mixed-service order before editing it.']);
                     }
                     $oldOrder->items()->delete();
                     // Task 778 ORDER IDENTITY CARRY: the replacement order keeps the
@@ -595,7 +619,7 @@ class RestaurantPosController extends Controller
                 // Task 183: delivery-address snapshot on the HELD row (FBR Task 170
                 // parity) — recall restores it; pay falls back to it when the screen
                 // doesn't resend one.
-                'delivery_address' => ($request->input('order_type') === 'delivery' && $request->filled('delivery_address'))
+                'delivery_address' => ($hasDeliveryPortion && $request->filled('delivery_address'))
                     ? substr((string) $request->input('delivery_address'), 0, 500)
                     : null,
                 'subtotal' => $subtotal,
@@ -630,13 +654,23 @@ class RestaurantPosController extends Controller
                     $orderCreateData['online_payment_marked_by'] = $carriedOnlineMarkedBy;
                 }
             }
+            if (Schema::hasColumn('restaurant_orders', 'delivery_collection_mode')) {
+                $orderCreateData['delivery_collection_mode'] = $request->input('delivery_collection_mode');
+            }
             $order = RestaurantOrder::create($orderCreateData);
 
             foreach ($resolvedItems as $item) {
                 // Task 778 QUANTITY-AWARE CARRY: consume this identity's printed
                 // chunks first; any qty beyond the already-sent total becomes ONE
                 // unprinted delta row — every delta path then prints just that.
-                $ck = $kotCarryKey($item['item_type'], $item['item_id'], $item['item_name'], $item['special_notes'] ?? '');
+                $ck = $kotCarryKey($item['item_type'], $item['item_id'], $item['item_name'], $item['special_notes'] ?? '', $item['fulfillment'] ?? null, $item['line_uid'] ?? null);
+                // First edit after upgrading an old unlabelled order: consume its
+                // matching original service pool once, never a new parcel/delivery.
+                $legacyKey = $kotCarryKey($item['item_type'], $item['item_id'], $item['item_name'], $item['special_notes'] ?? '');
+                if (empty($printedPool[$ck]) && !empty($printedPool[$legacyKey])
+                    && ($item['fulfillment'] ?? null) === ($oldOrder?->order_type ?? $request->order_type)) {
+                    $printedPool[$ck] = $printedPool[$legacyKey]; unset($printedPool[$legacyKey]);
+                }
                 $lineQty = (float) $item['quantity'];
                 $chunks = [];
                 $remaining = $lineQty;
@@ -712,12 +746,12 @@ class RestaurantPosController extends Controller
                 }
                 if ($leftQty > 0.001) {
                     // Key format mirrors kotCarryKey(): type|id|name(lowercased)|notes.
-                    $parts = explode('|', $poolKey, 4);
+                    $parts = json_decode($poolKey, true);
                     $voidItems[] = [
                         'item_type' => $parts[0] ?? 'product',
                         'item_id'   => (isset($parts[1]) && $parts[1] !== '') ? $parts[1] : null,
                         'item_name' => $displayName ?? ($parts[2] ?? ''),
-                        'notes'     => $parts[3] ?? '',
+                        'notes'     => trim(\App\Support\PosFulfillment::label($parts[4] ?? null) . ' ' . ($parts[3] ?? '')),
                         'qty'       => round($leftQty, 2),
                     ];
                 }
@@ -841,6 +875,9 @@ class RestaurantPosController extends Controller
                 'kot_void_queued' => $kotVoidQueued,
                 'kot_void_url'    => $kotVoidUrl,
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
             // Task 1001: DUPLICATE-KEY RACE — two requests carrying the same
             // hold_uuid both passed the pre-transaction lookup (network retry
@@ -909,7 +946,7 @@ class RestaurantPosController extends Controller
                 'item_type' => $oi->item_type ?? 'product',
                 'item_id'   => $oi->item_id,
                 'item_name' => $oi->item_name ?? '',
-                'notes'     => $oi->special_notes ?? '',
+                'notes'     => trim(\App\Support\PosFulfillment::label($oi->fulfillment) . ' ' . ($oi->special_notes ?? '')),
                 'qty'       => (float) $oi->quantity,
             ];
         }
@@ -1160,6 +1197,7 @@ class RestaurantPosController extends Controller
                 // live shop (ZFC Pizza Point, 10 Aug 2026). Legacy 'online'/'split'
                 // kept for old tabs still open on the previous build.
                 'payment_method' => 'nullable|string|in:cash,card,debit_card,credit_card,qr_payment,online,split',
+                'delivery_collection_mode' => 'nullable|in:counter,rider',
                 // Task 994: per-sale-attempt idempotency key (client reuses it on
                 // every retry of the SAME sale) — mirrors storeInvoice's offline_uuid.
                 'pay_uuid' => 'nullable|string|max:64',
@@ -1421,7 +1459,7 @@ class RestaurantPosController extends Controller
                 // paid directly (no recall), so the address isn't silently dropped.
                 'delivery_address' => $request->filled('delivery_address')
                     ? substr((string) $request->input('delivery_address'), 0, 500)
-                    : (($order->order_type === 'delivery' && !empty($order->delivery_address))
+                    : ((\App\Support\PosFulfillment::hasDelivery($order->items, $order->order_type) && !empty($order->delivery_address))
                         ? substr((string) $order->delivery_address, 0, 500)
                         : null),
                 'subtotal' => $taxInclusive ? $inc['subtotal_col'] : (float) $subtotal,
@@ -1478,7 +1516,7 @@ class RestaurantPosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
                 $payRiderId = null;
                 // Plan gate (Aug 2026): riders is Pro+ — silently drop (never block payment).
-                if ($order->order_type === 'delivery' && $request->filled('rider_id')
+                if (\App\Support\PosFulfillment::hasDelivery($order->items, $order->order_type) && $request->filled('rider_id')
                     && \App\Services\PosFeatureService::planAllows($company, 'riders_enabled')) {
                     $payRiderId = \App\Models\PosRider::where('company_id', $companyId)
                         ->where('id', (int) $request->input('rider_id'))
@@ -1495,6 +1533,21 @@ class RestaurantPosController extends Controller
                     $transactionData['rider_assignment_revision'] = (string) \Illuminate\Support\Str::uuid();
                 }
             }
+            if (Schema::hasColumn('pos_transactions', 'has_delivery_items')) {
+                $transactionData['has_delivery_items'] = \App\Support\PosFulfillment::hasDelivery($order->items, $order->order_type);
+                if ($transactionData['has_delivery_items'] && \App\Support\PosFulfillment::isExplicit($order->items)) {
+                    $collectionMode = $request->input('delivery_collection_mode') ?? $order->delivery_collection_mode ?? ($order->order_type === 'delivery' ? 'rider' : 'counter');
+                    // A non-cash bill is already paid, never cash-on-delivery.
+                    if ($paymentMethod !== 'cash') $collectionMode = 'counter';
+                    $due = \App\Support\PosFulfillment::collectionAmount((float) $totalAmount, $order->items, $collectionMode, max(0, $discountRatio), (float) $taxRate, $taxInclusive);
+                    $transactionData['rider_collection_amount'] = $due;
+                    if ($paymentMethod === 'cash') {
+                        $counterDue = round($totalAmount - $due, 2);
+                        $transactionData['cash_received'] = $request->filled('cash_received') ? max(0, (float) $request->cash_received) : $counterDue;
+                        $transactionData['change_due'] = max(0, round($transactionData['cash_received'] - $counterDue, 2));
+                    }
+                }
+            }
             $transaction = PosTransaction::create($transactionData);
 
             // Task 778: KOT qty-carry may have SPLIT an increased line into
@@ -1506,7 +1559,7 @@ class RestaurantPosController extends Controller
                 $lineTax = $item->is_tax_exempt ? 0 : ($taxInclusive
                     ? \App\Services\PosTaxMath::inclusiveLineTax((float) $lineAfterOrderDisc, (float) $taxRate, $menuRate)
                     : round($lineAfterOrderDisc * $taxRate / 100, 2));
-                $itemQty = max(1, (int) $item->quantity);
+                $itemQty = (float) $item->quantity;
                 PosTransactionItem::create([
                     'transaction_id' => (int) $transaction->id,
                     'item_type' => $item->item_type,
@@ -1517,6 +1570,8 @@ class RestaurantPosController extends Controller
                     // lived only on the restaurant_order_item — the bill row was
                     // created without it, so the customer receipt could never print
                     // it. Consolidation keys ON the note, so merged lines share one.
+                    ...(Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $item->fulfillment, 'line_uid' => $item->line_uid] : []),
+                    ...(Schema::hasColumn('pos_transaction_items', 'skip_kitchen') ? ['skip_kitchen' => (bool) $item->skip_kitchen] : []),
                     'special_notes' => $item->special_notes ?: null,
                     'quantity' => $itemQty,
                     'unit_price' => (float) $item->unit_price,
@@ -1659,6 +1714,7 @@ class RestaurantPosController extends Controller
                 'message' => "Payment received. Invoice: {$invoiceNumber}",
                 'transaction_id' => $transaction->id,
                 'invoice_number' => $invoiceNumber,
+                ...\App\Support\PosFulfillment::paymentResponse($transaction),
                 'total_amount' => $totalAmount,
                 'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
                 'pra_status' => $transaction->pra_status ?? null,
@@ -1784,6 +1840,7 @@ class RestaurantPosController extends Controller
             'transaction_id' => $existingTxn->id,
             'invoice_number' => $existingTxn->invoice_number,
             'total_amount' => (float) $existingTxn->total_amount,
+            ...\App\Support\PosFulfillment::paymentResponse($existingTxn),
             'pra_invoice_number' => $existingTxn->pra_invoice_number,
             'pra_status' => $existingTxn->pra_status,
             'wa_phone' => $waShare['wa_phone'],
@@ -2071,6 +2128,7 @@ class RestaurantPosController extends Controller
                 'customer_phone'  => $o->customer_phone,
                 'kitchen_notes'   => $o->kitchen_notes,
                 'delivery_address'=> $o->delivery_address ?? null,
+                'delivery_collection_mode' => $o->delivery_collection_mode,
                 'discount_type'   => $o->discount_type,
                 'discount_value'  => (float) ($o->discount_value ?? 0),
                 'discount_amount' => (float) ($o->discount_amount ?? 0),
@@ -2089,6 +2147,9 @@ class RestaurantPosController extends Controller
                     'quantity'            => (float) $i->quantity,
                     'unit_price'          => (float) $i->unit_price,
                     'subtotal'            => (float) $i->subtotal,
+                    'fulfillment' => $i->fulfillment, 'line_uid' => $i->line_uid,
+                    'kot_printed_at' => $i->kot_printed_at,
+                    'skip_kitchen' => (bool) $i->skip_kitchen,
                     'special_notes'       => $i->special_notes,
                     'is_tax_exempt'       => (bool) ($i->is_tax_exempt ?? false),
                     'item_discount_type'  => $i->item_discount_type,
@@ -2762,6 +2823,7 @@ class RestaurantPosController extends Controller
                 'item_name' => $it->item_name,
                 'quantity' => $it->quantity,
                 'unit_price' => $it->unit_price,
+                'fulfillment' => $it->fulfillment, 'line_uid' => $it->line_uid,
                 'special_notes' => $it->special_notes,
             ]);
             $row->id = $it->id; // stable keys for the blade loops

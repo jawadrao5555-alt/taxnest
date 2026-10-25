@@ -1,7 +1,6 @@
-title: "Product search mein naam aur price saath dekhein"
+title: "Pending Deliveries aur delivery list kholne ki durusti"
 audience: pos
-type: improvement
+type: fix
 points:
-  - "Sale screen par product search ki list mein har item ki price uske naam ke paas nazar aayegi."
-  - "Lambay product names agli line par poore dikhte hain, taake miltay-jultay items pehchanna asaan ho."
-  - "Search, barcode scan, keyboard se selection aur mazeed results kholne ka tareeqa pehle jaisa hai."
+  - "Purane mixed delivery bills ki wajah se Pending Deliveries ya delivery list kholte waqt aane wali rukawat door ki gayi hai."
+  - "Delivery items aur rider ki raqam pehle ki tarah nazar aayegi; bill ki raqam aur settlement mein koi tabdeeli nahi."

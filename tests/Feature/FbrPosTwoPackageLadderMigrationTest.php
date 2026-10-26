@@ -276,6 +276,7 @@ class FbrPosTwoPackageLadderMigrationTest extends TestCase
 
         // A signup queued before the merge cannot be approved onto it.
         $companyId = DB::table('companies')->insertGetId([
+            'product_type' => 'fbrpos',
             'requested_plan_id' => $proId, 'status' => 'pending', 'company_status' => 'pending',
             'created_at' => now(), 'updated_at' => now(),
         ]);

@@ -2,20 +2,23 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Subscriptions</h1>
 
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6"
+         x-data="{ showForm: {{ $errors->has('pricing_plan_id') ? 'true' : 'false' }}, companyId: @js((string) old('company_id', '')), planId: @js((string) old('pricing_plan_id', '')), plans: @js($assignmentPlans), get availablePlans() { return this.plans.filter(plan => plan.company_ids.includes(Number(this.companyId))); } }">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-white">Assign Subscription</h3>
             <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'Assign New'"></button>
         </div>
         <form x-show="showForm" method="POST" action="{{ route('saas.admin.subscriptions.assign') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             @csrf
-            <select name="company_id" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+            <select name="company_id" required x-model="companyId" @change="planId = ''" aria-label="Company" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">Select Company</option>
                 @foreach($companies as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
             </select>
-            <select name="pricing_plan_id" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                <option value="">Select Plan</option>
-                @foreach($plans as $p)<option value="{{ $p->id }}">{{ $p->name }} (PKR {{ number_format($p->price) }})</option>@endforeach
+            <select name="pricing_plan_id" required x-model="planId" :disabled="!companyId" aria-label="Package" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <option value="" x-text="companyId ? 'Select a compatible package' : 'Select a company first'">Select a company first</option>
+                <template x-for="plan in availablePlans" :key="plan.id">
+                    <option :value="String(plan.id)" x-text="plan.label"></option>
+                </template>
             </select>
             <select name="billing_cycle" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="annual">Annual</option>

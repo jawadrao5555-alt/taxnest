@@ -1,6 +1,6 @@
-title: "POS screen dobara kholne mein behtari"
-audience: pos
+title: "Company ke liye durust package ka intikhab"
+audience: all
 type: improvement
 points:
-  - "Internet chalne par saved screen rakhne mein masla aaye to bhi durust sale screen khul sakti hai."
-  - "Recovery screen ka Try again fresh copy kholta hai. Pending offline bills aur printer settings tabdeel nahi hotin."
+  - "Company ka package chuntay waqt usi product ke packages samne aatay hain."
+  - "Naya package lagatay waqt company aur package ka product dobara check hota hai."

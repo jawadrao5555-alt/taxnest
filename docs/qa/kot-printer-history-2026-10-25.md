@@ -1,0 +1,11 @@
+# Explicit-day printer diagnostics
+
+An owner-approved report for a past KOT incident returned only25 latest jobs at22:20–23:15, although the requested incident was18:00–21:00 and207 jobs existed that day. Current PRINTER_HEALTH ignores date inputs and has an invisible25-row sample cap; current printing PASS cannot establish historical completeness or physical output.
+
+Reproduced with60 same-company synthetic jobs on one day (35at19:00,25at22:00), a foreign company row and an older-day row: explicit date report incorrectly returns25. A configured historical cap2 also ignored and returns3. Both tests fail before patch.
+
+Only explicit date_from/date_to on PRINTER_HEALTH opt into historical mode. Reuse existing validated max31-day range and tenancy/redaction/audit. Filter created_at across supplied calendar days in application timezone, preserve newest-ID order, default max500 redacted metadata jobs (hard ceiling1000); declare matching/returned/omitted/truncated and timestamp bounds. No dates retains latest25 and declares total/truncation unknown. Other operations/current company diagnostics retain previous sampling semantics. Existing recent_jobs/job_counts names preserved; job_counts.total_today still means today, distinct from date-window coverage.
+
+Use existing Live Ops Diagnose, operation PRINTER_HEALTH, company_id as resolved, date_from=2026-10-25,date_to=2026-10-25. For a Pakistan incident use returned offset-bearing created_at timestamps to isolate18:00–21:00. If truncated, do not claim whole-window completeness; narrower/paginated investigation remains necessary. A missing job cannot be proved without a relevant bill/order; done is software acknowledgement, not physical paper confirmation.
+
+Validation: PHP8.4.27 sqlite, all81 LiveOps tests/361assertions pass after patch. New tests cover older jobs beyond25, default compatibility, date exclusions, foreign tenant exclusion, cap disclosure and complete print-job row immutability. PHP syntax and whitespace checks pass. Pure backend diagnostic metadata; no UI browser flow changed. Full supported isolated CI required; local full suite not repeated after prior incomplete extracted-runtime failure. No production data in fixtures, no credentials, printer binding changes, retries, reprints, merge/deploy or live resolution claim.

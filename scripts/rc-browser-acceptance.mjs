@@ -290,6 +290,17 @@ async function surface(page,t,path,v) {
   }
   const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded',timeout:45000});
   await waitForOperationalSurface(page); await dismiss(page); await checkTopNavigationWithReloadRetry(page,t,path,v); await openMobileCart(page,v,t.markers||[]);
+  if(t.riderRealtime && path==='/pos/riders/tracking') {
+    // This navigation mounts a fresh Alpine screen whose rider cards arrive
+    // from its real asynchronous data request. The earlier map journey was a
+    // different document; a fixed 300ms loading-shell pause is not readiness.
+    await page.waitForFunction(({id,markers})=>{
+      const root=document.querySelector('[x-data^="riderTracking("]');
+      const data=root&&window.Alpine?.$data(root);
+      return data?.riders?.some(r=>Number(r.id)===Number(id))
+        &&markers.every(marker=>root.innerText.includes(marker));
+    },{id:t.riderRealtime.id,markers:t.markers||[]},{timeout:15000});
+  }
   if(path==='/pos/inventory'){
     const tabs=page.locator('.tn-inventory-nav').first();
     if(!await tabs.count())fail(`${t.name}/${v.width}: inventory navigation missing`);
@@ -1948,6 +1959,26 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
   const input=page.locator('[x-ref="searchInput"]');await input.fill('QA Deal');
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
   const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
+  const short=dropdown.locator('[data-search-result]').first();
+  const shortLayout=await short.evaluate(el=>{
+    const name=el.querySelector('[data-search-result-name]');
+    const price=el.querySelector('[data-search-result-price]');
+    const edge=el.getBoundingClientRect().right-parseFloat(getComputedStyle(el).paddingRight);
+    return {gap:price.getBoundingClientRect().left-name.getBoundingClientRect().right,
+      rightGap:Math.abs(edge-price.getBoundingClientRect().right),
+      nameWeight:Number(getComputedStyle(name).fontWeight),priceWeight:Number(getComputedStyle(price).fontWeight)};
+  });
+  if(shortLayout.gap<0||shortLayout.rightGap>2||shortLayout.nameWeight<700||shortLayout.priceWeight<700)
+    throw new Error('Search name must be bold and price bold at the right edge: '+JSON.stringify(shortLayout));
+  if((await input.boundingBox()).width>641)throw new Error('Search input still spans the full wide workspace');
+  await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.searchSuggestions[0].name='QA Deal No 1 '+('Long readable item name ').repeat(8);
+  });
+  const long=short.locator('[data-search-result-name]');
+  const longMetrics=await long.evaluate(el=>({clipped:el.scrollWidth>el.clientWidth+1,ellipsis:getComputedStyle(el).textOverflow==='ellipsis'}));
+   if(longMetrics.clipped||longMetrics.ellipsis)throw new Error('Long search name was clipped rather than wrapped: '+JSON.stringify(longMetrics));
+  await saveEvidenceScreenshot(page,'compact-search-name-price-'+v.width+'.png');
   for(const n of [13,14,15,16]) {
     const item=dropdown.locator('button').filter({hasText:'QA Deal No '+n});
     await item.scrollIntoViewIfNeeded();if(!await item.isVisible())throw new Error('matching deal '+n+' is hidden from search');
@@ -1982,6 +2013,24 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
     if(d.orderType!=='delivery'||d.selectedCustomer?.phone!=='03000000000'||d.cart!==originalCart)throw new Error('Unsaved caller Bill did not select Delivery without replacing cart');
   });
   await saveEvidenceScreenshot(page,'unsaved-caller-delivery-'+v.width+'.png');
+  const callerPhone='0300'+String(2000000+v.width);
+  await page.evaluate(phone=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.callerBillFrom({phone});
+  },callerPhone);
+  await openMobileCart(page,v,['Current Order']);
+  await page.locator('[data-save-attached-caller]:visible').click();
+  const name=page.locator('[x-ref="newCustomerNameInput"]');await name.waitFor({state:'visible'});
+  if(await name.inputValue()!=='')throw new Error('Caller phone was incorrectly prefilled as the customer name');
+  await name.fill('Synthetic caller name '+v.width);
+  const [callerSaved]=await Promise.all([
+    page.waitForResponse(r=>r.url()===baseUrl+'/pos/restaurant/api/customer-store'&&r.request().method()==='POST'),
+    page.locator('[x-show="showNewCustomerInline"] button').last().click(),
+  ]);
+  const callerData=await callerSaved.json();
+  if(!callerSaved.ok()||!callerData.success||!callerData.customer?.id)throw new Error('Actual caller customer save failed');
+  await page.waitForFunction(name=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.name===name,'Synthetic caller name '+v.width);
+  await saveEvidenceScreenshot(page,'attached-caller-saved-name-'+v.width+'.png');
   const token=await page.locator('meta[name="csrf-token"]').getAttribute('content');
   const headers={'Accept':'application/json','X-CSRF-TOKEN':token,'X-Requested-With':'XMLHttpRequest'};
   const address='Synthetic delivery lane '+v.width;

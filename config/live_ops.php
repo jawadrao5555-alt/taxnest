@@ -129,6 +129,7 @@ return [
         'max_log_chars_per_line' => 400,
         'max_pra_failures' => 25,
         'max_print_jobs' => 25,
+        'max_print_history_jobs' => 500,
         'max_devices' => 20,
         'agent_command_ttl_minutes' => 30,
         'remediation_ttl_hours' => 24,

@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-mixed-service-20261024'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-sale-cache-recovery-20261026'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -59,7 +59,7 @@ const STATIC_ASSETS = [
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Offline</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#059669,#047857);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;color:#fff}.box{text-align:center;background:rgba(255,255,255,.08);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:50px 40px;max-width:420px;box-shadow:0 25px 60px rgba(0,0,0,.3)}.ico{font-size:64px;margin-bottom:20px}h1{font-size:28px;margin-bottom:10px;font-weight:700}.sub{opacity:.85;font-size:15px;margin-bottom:30px;line-height:1.6}.status{background:rgba(0,0,0,.2);padding:16px;border-radius:12px;border-left:4px solid #fbbf24;text-align:left;font-size:14px}.btn{margin-top:24px;display:inline-block;background:#fff;color:#059669;padding:12px 28px;border-radius:10px;font-weight:600;text-decoration:none;border:none;cursor:pointer;font-size:15px}</style></head><body><div class="box"><div class="ico">📡</div><h1>You're Offline</h1><p class="sub">Internet connection nahi hai. Cached pages khol sakte hain — ya net wapas aane par auto-reload hoga.</p><div class="status"><strong>Tip:</strong> Net aate hi yeh page khud refresh ho jayega.</div><button class="btn" onclick="location.reload()">Try Again</button></div><script>window.addEventListener('online',()=>location.reload());setInterval(()=>{if(navigator.onLine)location.reload()},5000)</script></body></html>`;
-const SALE_RECOVERY_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Sale Screen Recovery</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f8fafc;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.box{max-width:440px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:34px;box-shadow:0 18px 42px rgba(15,23,42,.11)}h1{font-size:21px;margin:0 0 10px}p{color:#64748b;line-height:1.55;margin:0 0 22px}button{border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;padding:12px 22px;font-size:15px;cursor:pointer}</style></head><body><main class="box"><h1>Sale screen needs a fresh copy</h1><p>The saved screen was incomplete, so it was not opened. Check the internet connection and try again.</p><button onclick="location.reload()">Try again</button></main></body></html>`;
+const SALE_RECOVERY_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Sale Screen Recovery</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f8fafc;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.box{max-width:440px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:34px;box-shadow:0 18px 42px rgba(15,23,42,.11)}h1{font-size:21px;margin:0 0 10px}p{color:#64748b;line-height:1.55;margin:0 0 22px}button{border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;padding:12px 22px;font-size:15px;cursor:pointer}</style></head><body><main class="box"><h1>Sale screen needs a fresh copy</h1><p>The saved screen was incomplete, so it was not opened. Check the internet connection and try again.</p><button onclick="var u=new URL(location.href);u.searchParams.set('__tn_sale_recover','1');location.replace(u.href)">Try again</button></main></body></html>`;
 
 function saleDocumentLooksLikeLogin(response) {
     try {
@@ -98,9 +98,11 @@ async function saleDocumentBuildAssetsReady(response, allowNetwork = true) {
         // references means this is not a production-compatible sale document.
         if (!paths.length) return false;
 
-        const staticCache = await caches.open(STATIC_CACHE);
+        let staticCache;
+        try { staticCache = await caches.open(STATIC_CACHE); } catch (_) {}
         for (const path of paths) {
-            const cached = await staticCache.match(path) || await caches.match(path);
+            let cached;
+            try { cached = (staticCache && await staticCache.match(path)) || await caches.match(path); } catch (_) {}
             if (cached && cached.ok) continue;
             if (!allowNetwork) return false;
 
@@ -111,7 +113,9 @@ async function saleDocumentBuildAssetsReady(response, allowNetwork = true) {
                 return false;
             }
             if (!asset || !asset.ok) return false;
-            await staticCache.put(path, asset.clone());
+            // Storage/quota failure must not hide a healthy online document.
+            // Never clear IndexedDB, Local Core or another user's/offline queues.
+            try { if (staticCache) await staticCache.put(path, asset.clone()); } catch (_) {}
         }
         return true;
     } catch (_) {
@@ -138,7 +142,12 @@ async function fetchSaleDocument(request, cache, variant) {
     const response = await fetch(request);
     const valid = await isValidSaleDocument(response, variant)
         && await saleDocumentBuildAssetsReady(response);
-    if (valid) await cache.put(request, response.clone());
+    if (valid) {
+        try { await cache.put(request, response.clone()); } catch (_) {
+            // Cache persistence is optional while online. Existing validated
+            // offline copies remain untouched if this write cannot complete.
+        }
+    }
     return { response, valid };
 }
 
@@ -223,11 +232,16 @@ self.addEventListener('fetch', e => {
     // become the active offline copy. Offline with no valid copy → recovery page.
     if (req.mode === 'navigate' && SALE_DOCUMENT_MARKERS[url.pathname] && url.search === '') {
         e.respondWith((async () => {
-            const c = await caches.open(SALE_CACHE);
+            // CacheStorage may be disabled/full in a terminal profile. Keep
+            // network validation available without promising offline persistence.
+            let c;
+            try { c = await caches.open(SALE_CACHE); } catch (_) {}
+            c ||= { match: async () => undefined, put: async () => {}, delete: async () => false };
             const variant = SALE_DOCUMENT_MARKERS[url.pathname];
-            let cached = await c.match(req);
+            let cached;
+            try { cached = await c.match(req); } catch (_) {}
             if (cached && !(await isValidCachedSaleDocument(cached, variant))) {
-                await c.delete(req);
+                try { await c.delete(req); } catch (_) {}
                 cached = undefined;
             }
             const network = () => fetchSaleDocument(req, c, variant);

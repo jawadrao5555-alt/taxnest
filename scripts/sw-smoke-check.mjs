@@ -326,4 +326,39 @@ assert(!cacheStores.has(waiterName) || !(await getStore(waiterName).match('/pos/
 await dispatchMessage({ type: 'SKIP_WAITING' });
 await dispatchMessage(undefined);
 
+// Cache storage failures must not turn a healthy online sale into recovery.
+cacheStores.clear();
+networkHandler = async input => {
+  const path = new URL(typeof input === 'string' ? input : input.url, ORIGIN).pathname;
+  return path.startsWith('/build/') ? assetResponse() : htmlResponse(validHtml('pra', 'quota-online'), {variant:'pra',url:ORIGIN+'/pos/invoice/create'});
+};
+const quotaStatic = getStore(saleName.replace(/-sale$/, '-static'));
+quotaStatic.put = async () => { throw new Error('QuotaExceededError'); };
+served = await dispatchFetch(request('/pos/invoice/create'));
+assert((await served.text()).includes('quota-online'), 'healthy online sale was blocked by asset-cache quota failure');
+
+// Sale HTML writes can fail independently of asset caching.
+cacheStores.clear();
+const quotaSale = getStore(saleName);
+quotaSale.put = async () => { throw new Error('QuotaExceededError'); };
+served = await dispatchFetch(request('/pos/invoice/create'));
+assert((await served.text()).includes('quota-online'), 'healthy online sale was blocked by sale-cache quota failure');
+
+// Disabled CacheStorage must still permit validated online PRA/FBR documents.
+const openCache = sandbox.caches.open;
+const matchCache = sandbox.caches.match;
+sandbox.caches.open = async () => { throw new Error('SecurityError'); };
+sandbox.caches.match = async () => { throw new Error('SecurityError'); };
+for (const variant of ['pra', 'fbr']) {
+  networkHandler = async input => {
+    const path = new URL(typeof input === 'string' ? input : input.url, ORIGIN).pathname;
+    return path.startsWith('/build/') ? assetResponse() : htmlResponse(validHtml(variant, 'storage-disabled'), {variant,url:ORIGIN+path});
+  };
+  served = await dispatchFetch(request(variant === 'pra' ? '/pos/invoice/create' : '/fbr-pos/create'));
+  assert((await served.text()).includes('storage-disabled'), 'disabled cache blocked online '+variant);
+}
+sandbox.caches.open = openCache;
+sandbox.caches.match = matchCache;
+assert(src.includes("searchParams.set('__tn_sale_recover','1')"), 'recovery retry must bypass the failed cached navigation');
+
 console.log('SW SMOKE OK: validated PRA/FBR sale documents and their Vite assets, stale-hash replacement, waiter offline cold-start, hard-refresh network preference, offline fallback, invalid-cache eviction, auth cleanup, recovery UI, prime-cache and ordinary events.');

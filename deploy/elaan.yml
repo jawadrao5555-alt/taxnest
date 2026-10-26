@@ -1,6 +1,6 @@
-title: "Purani KOT ki jaanch mein behtari"
+title: "POS screen dobara kholne mein behtari"
 audience: pos
 type: improvement
 points:
-  - "Support team tareekh ke mutabiq purane printing records ki behtar jaanch kar sakti hai."
-  - "Is update se aapki printer setting ya pehle se bheji hui KOT dobara print nahi hogi."
+  - "Internet chalne par saved screen rakhne mein masla aaye to bhi durust sale screen khul sakti hai."
+  - "Recovery screen ka Try again fresh copy kholta hai. Pending offline bills aur printer settings tabdeel nahi hotin."

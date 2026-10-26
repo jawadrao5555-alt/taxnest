@@ -1,6 +1,6 @@
-title: "POS screen dobara kholne mein behtari"
-audience: pos
+title: "Company ke istemal ka durust record"
+audience: all
 type: improvement
 points:
-  - "Internet chalne par saved screen rakhne mein masla aaye to bhi durust sale screen khul sakti hai."
-  - "Recovery screen ka Try again fresh copy kholta hai. Pending offline bills aur printer settings tabdeel nahi hotin."
+  - "Company ki aakhri staff activity asal login aur session record se dikhai jati hai."
+  - "Jis product ka istemal record dastiyab na ho wahan wazeh nishan dikhaya jata hai."

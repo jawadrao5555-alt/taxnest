@@ -1,6 +1,6 @@
-title: "POS screen dobara kholne mein behtari"
-audience: pos
+title: "Intizami login par ghalat koshishon ki had"
+audience: all
 type: improvement
 points:
-  - "Internet chalne par saved screen rakhne mein masla aaye to bhi durust sale screen khul sakti hai."
-  - "Recovery screen ka Try again fresh copy kholta hai. Pending offline bills aur printer settings tabdeel nahi hotin."
+  - "Admin login par bar bar ghalat password ki koshish ke baad thori dair rukna hota hai."
+  - "Login screen dobara koshish ka waqt bata deti hai."

@@ -1975,12 +1975,16 @@ async function catalogSearchCompleteWorkflow(page,t,v) {
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).searchSuggestions.length===16);
   const dropdown=page.locator('[x-ref="searchDropdown"]');await dropdown.waitFor({state:'visible'});
   const short=dropdown.locator('[data-search-result]').first();
-  const shortGap=await short.evaluate(el=>{
-    const name=el.querySelector('[data-search-result-name]').getBoundingClientRect();
-    const price=el.querySelector('[data-search-result-price]').getBoundingClientRect();
-    return price.left-name.right;
+  const shortLayout=await short.evaluate(el=>{
+    const name=el.querySelector('[data-search-result-name]');
+    const price=el.querySelector('[data-search-result-price]');
+    const edge=el.getBoundingClientRect().right-parseFloat(getComputedStyle(el).paddingRight);
+    return {gap:price.getBoundingClientRect().left-name.getBoundingClientRect().right,
+      rightGap:Math.abs(edge-price.getBoundingClientRect().right),
+      nameWeight:Number(getComputedStyle(name).fontWeight),priceWeight:Number(getComputedStyle(price).fontWeight)};
   });
-  if(shortGap>32||shortGap<0)throw new Error('Price is not beside its matching product name: gap '+shortGap);
+  if(shortLayout.gap<0||shortLayout.rightGap>2||shortLayout.nameWeight<700||shortLayout.priceWeight<700)
+    throw new Error('Search name must be bold and price bold at the right edge: '+JSON.stringify(shortLayout));
   if((await input.boundingBox()).width>641)throw new Error('Search input still spans the full wide workspace');
   await page.evaluate(()=>{
     const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));

@@ -1177,13 +1177,13 @@ window.addEventListener('popstate', function() {
                                 <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
                             </div>
                         </template>
-                        <div class="min-w-0 flex items-center gap-1.5" style="flex:0 1 auto;">
-                            <span data-search-result-name class="min-w-0 text-sm font-semibold leading-snug text-gray-800 dark:text-gray-100" :style="i === highlightIndex ? 'color:white;' : ''" x-text="s.name"></span>
+                        <div class="min-w-0 flex flex-1 items-center gap-1.5">
+                            <span data-search-result-name class="min-w-0 text-sm font-bold leading-snug text-gray-800 dark:text-gray-100" :style="i === highlightIndex ? 'color:white;' : ''" x-text="s.name"></span>
                             @if($company->inventory_enabled)
                             <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot flex-shrink-0" :class="'stock-' + s.stockStatus"></span></template>
                             @endif
                         </div>
-                        <span data-search-result-price class="text-sm font-extrabold flex-shrink-0 text-purple-600 dark:text-purple-300" :style="i === highlightIndex ? 'color:white;' : ''" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
+                        <span data-search-result-price class="ml-auto text-right whitespace-nowrap text-sm font-extrabold flex-shrink-0 text-purple-600 dark:text-purple-300" :style="i === highlightIndex ? 'color:white;' : ''" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
                 <button type="button" x-show="searchSuggestions.length > searchDisplayCount" @click.stop="searchDisplayCount += 60; $refs.searchInput?.focus()" class="w-full px-4 py-3 text-sm font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-700">

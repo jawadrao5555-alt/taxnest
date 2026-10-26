@@ -1,0 +1,11 @@
+# Sale cache recovery — 26 October 2026
+
+Owner reports new-company/Pizza Italiano and ZFC Agent/online normal POS navigation showing Service Worker recovery; owner confirms query-string bypass opens POS. Exact customer storage failure has not been observed. Do not equate the reproduction below with proven incident root cause.
+
+Reproduced current worker defect with its actual FetchEvent handler in VM: healthy full PRA HTML and Vite assets plus asset Cache.put throwing QuotaExceededError returned recovery instead of sale. Added assertion fails before and passes after. Additional tests cover sale HTML write quota and CacheStorage SecurityError for PRA/FBR. Existing strict invalid/partial HTML rejection, wrong-family markers, logged-out cleanup, missing-hash eviction, offline valid fallback and waiter tests all pass. No acceptance gates removed.
+
+Fix: cache writes are best effort for a healthy validated online document; disabled cache/read failures do not prevent fresh validated network load. Still require full structural markers and successfully available Vite assets. No missing-assets/partial document admitted to offline cache. No IndexedDB, Local Core, bill queue, settings, printer or fiscal write. Invalid cached sale copy is already evicted/replaced automatically; recovery Try again now uses the existing query bypass instead of repeating the same navigation. Current worker version bumped using existing deployment mechanism; no timer or forced mid-bill reload introduced. No blanket new storage purge.
+
+Current local Node smoke, JS syntax and whitespace pass. Browser behavior and supported Node22 remain pending fresh CI. No full PHP suite or actual local Chrome pass claimed; PHP application code unchanged. Actual Agent installed Windows/offline company acceptance remains unverified. Run all eight mandatory jobs and verify current mergeability before owner readiness. Stop for owner Admin approval/relay, no agent merge/deploy.
+
+Owner temporary recovery: /pos/invoice/create?recovery=20261026 with internet. Do not clear browser/Agent storage or reinstall with pending offline bills. After owner deployment, normal online first boot then controlled offline reopen must be checked on the affected terminal before offline readiness is promised.

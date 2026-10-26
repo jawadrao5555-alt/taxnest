@@ -159,6 +159,29 @@ $mixedPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Mixed Plan', 
 \App\Models\Subscription::create(['company_id' => $mixedShop->id, 'pricing_plan_id' => $mixedPlan->id, 'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(), 'active' => true]);
 $mixedProduct = \App\Models\PosProduct::forceCreate(['company_id' => $mixedShop->id, 'name' => 'Synthetic mixed pizza', 'price' => 100, 'is_active' => true, 'is_tax_exempt' => false]);
 $mixedCustomer = \App\Models\PosCustomer::create(['company_id' => $mixedShop->id, 'name' => 'Synthetic mixed guest', 'phone' => '03000000888', 'address' => 'Synthetic mixed delivery lane', 'type' => 'unregistered']);
+// Historical mixed snapshots must stay readable even though new carts use one order type.
+foreach (['local', 'pra'] as $mode) {
+    for ($i = 0; $i < 2; $i++) {
+        $txn = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $mixedShop->id, 'created_by' => $mixedOwner->id,
+            'invoice_number' => 'RC-MIXED-HISTORY-'.$mode.'-'.$i,
+            'business_date' => \App\Services\PosBusinessDay::current($mixedShop->id),
+            'status' => 'completed', 'invoice_mode' => $mode,
+            'pra_status' => $mode === 'local' ? 'local' : null,
+            'order_type' => 'delivery', 'has_delivery_items' => true,
+            'rider_collection_amount' => 100, 'subtotal' => 100, 'tax_amount' => 0,
+            'total_amount' => 100, 'payment_method' => 'cash',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('pos_transaction_items')->insert([
+            'transaction_id' => $txn, 'item_type' => 'product', 'item_id' => $mixedProduct->id,
+            'item_name' => 'Synthetic historical delivery line', 'quantity' => 1,
+            'unit_price' => 100, 'subtotal' => 100, 'tax_amount' => 0,
+            'fulfillment' => 'delivery', 'skip_kitchen' => false,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+}
 $mixedFloor = RestaurantFloor::create(['company_id' => $mixedShop->id, 'name' => 'Mixed floor', 'is_active' => true]);
 $mixedTables = [];
 foreach ([1366, 390] as $width) foreach (['counter', 'rider'] as $mode) {

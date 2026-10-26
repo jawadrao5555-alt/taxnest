@@ -346,6 +346,43 @@ class PosOldUnassignedDeliveriesTest extends TestCase
 
     // ── 2. Board: pending split + counts ────────────────────────────────────
 
+    public function test_mixed_delivery_board_renders_under_production_lazy_loading_guard(): void
+    {
+        $cid = $this->buildSchema();
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->boolean('has_delivery_items')->default(false);
+            $t->decimal('rider_collection_amount', 12, 2)->nullable();
+        });
+        Schema::table('pos_transaction_items', function (Blueprint $t) {
+            $t->string('fulfillment')->nullable();
+            $t->boolean('skip_kitchen')->default(false);
+            $t->decimal('quantity', 12, 2)->default(1);
+        });
+        foreach (['assigned', 'delivered'] as $status) {
+            for ($i = 0; $i < 2; $i++) {
+                $id = $this->makeFinal($cid, ['rider_id' => $this->makeRider($cid),
+                    'delivery_status' => $status, 'has_delivery_items' => true, 'rider_collection_amount' => 100]);
+                DB::table('pos_transaction_items')->insert(['transaction_id' => $id,
+                    'item_name' => 'Synthetic mixed delivery', 'fulfillment' => 'delivery', 'quantity' => 2]);
+            }
+        }
+        $this->makeFinal($cid + 99, ['invoice_number' => 'FOREIGN-MIXED', 'has_delivery_items' => true]);
+        $this->makeFinal($cid, ['invoice_number' => 'LEGACY-DELIVERY']);
+        $before = DB::table('pos_transactions')->orderBy('id')->get()->toJson();
+        $this->actingAs($this->makeAdmin($cid), 'pos');
+        $previous = \Illuminate\Database\Eloquent\Model::preventsLazyLoading();
+        \Illuminate\Database\Eloquent\Model::preventLazyLoading();
+        try {
+            foreach (['pending', 'delivered'] as $tab) {
+                $this->get('/pos/deliveries?tab='.$tab)->assertOk()
+                    ->assertSee('Synthetic mixed delivery')->assertDontSee('FOREIGN-MIXED');
+            }
+            $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
+        } finally {
+            \Illuminate\Database\Eloquent\Model::preventLazyLoading($previous);
+        }
+    }
+
     public function test_board_pending_splits_old_unassigned_out_of_count_and_list(): void
     {
         $cid = $this->buildSchema();

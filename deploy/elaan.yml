@@ -1,6 +1,6 @@
-title: "POS screen dobara kholne mein behtari"
-audience: pos
+title: "Admin release approval mein behtari"
+audience: admin
 type: improvement
 points:
-  - "Internet chalne par saved screen rakhne mein masla aaye to bhi durust sale screen khul sakti hai."
-  - "Recovery screen ka Try again fresh copy kholta hai. Pending offline bills aur printer settings tabdeel nahi hotin."
+  - "GitHub ki taraf se arzi rukawat aaye to dobara koshish ka waqt wazeh nazar aayega."
+  - "Purani ya waqt guzar chuki approval se release aage nahi barhegi; nayi approval admin khud dega."

@@ -2,9 +2,8 @@
 
 namespace App\Services;
 
-use Illuminate\Http\Client\ConnectionException;
+use App\Exceptions\DeploymentGitHubUnavailable;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 
 class EligibleDeploymentPullRequestService
 {
@@ -40,21 +39,10 @@ class EligibleDeploymentPullRequestService
     private function fetchEligible(): array
     {
         try {
-            $response = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls', [
-                'state' => 'open',
-                'base' => 'main',
-                'per_page' => 50,
-            ]);
-        } catch (ConnectionException) {
-            $this->availabilityWarning = 'GitHub is temporarily unreachable. Existing approval history is still available, but no new release can be approved until eligibility is verified.';
-
-            return [];
-        }
-
-        if (! $response->successful()) {
-            $this->setRetryDelay($response);
-            $this->availabilityWarning = 'GitHub eligibility returned HTTP '.$response->status().'. Existing approval history is still available; retry after GitHub recovers.';
-
+            $response = app(DeploymentGitHubReader::class)->get('pulls?state=open&base=main&per_page=50', 'pull_list');
+        } catch (DeploymentGitHubUnavailable $e) {
+            $this->cacheSeconds = $e->retryAfter;
+            $this->availabilityWarning = $e->getMessage();
             return [];
         }
 
@@ -82,14 +70,7 @@ class EligibleDeploymentPullRequestService
     public function resolve(int $number): array
     {
         $this->availabilityWarning = null;
-        try {
-            $response = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/pulls/'.$number);
-        } catch (ConnectionException) {
-            throw new \InvalidArgumentException('GitHub eligibility check is temporarily unavailable. No approval was created.');
-        }
-        if (! $response->successful()) {
-            throw new \InvalidArgumentException('GitHub PR verification returned HTTP '.$response->status().'. No approval was created; retry after GitHub recovers.');
-        }
+        $response = app(DeploymentGitHubReader::class)->get('pulls/'.$number, 'pull_request');
         if (! $this->basicEligibility($response->json())) {
             throw new \InvalidArgumentException('Pull request is not an eligible open cursor/* or replit/* release.');
         }
@@ -107,17 +88,11 @@ class EligibleDeploymentPullRequestService
         }
         $sha = strtolower((string) data_get($pr, 'head.sha'));
         try {
-            $checks = $this->github()->get('https://api.github.com/repos/'.self::REPOSITORY.'/commits/'.$sha.'/check-runs', [
-                'per_page' => 100,
-            ]);
-        } catch (ConnectionException) {
-            $this->availabilityWarning = 'GitHub check status is temporarily unavailable. No approval was created; retry after GitHub recovers.';
-            throw new \InvalidArgumentException($this->availabilityWarning);
-        }
-        if (! $checks->successful()) {
-            $this->setRetryDelay($checks);
-            $this->availabilityWarning = 'GitHub check verification returned HTTP '.$checks->status().'. Release eligibility could not be verified. Retry after GitHub recovers; refreshing repeatedly will not help.';
-            throw new \InvalidArgumentException($this->availabilityWarning);
+            $checks = app(DeploymentGitHubReader::class)->get('commits/'.$sha.'/check-runs?per_page=100', 'check_runs');
+        } catch (DeploymentGitHubUnavailable $e) {
+            $this->cacheSeconds = $e->retryAfter;
+            $this->availabilityWarning = $e->getMessage();
+            throw $e;
         }
         $validate = collect($checks->json('check_runs', []))->firstWhere('name', 'validate');
         if (! $validate
@@ -146,23 +121,4 @@ class EligibleDeploymentPullRequestService
             && preg_match('/^[0-9a-f]{40}$/i', (string) data_get($pr, 'head.sha')) === 1;
     }
 
-    private function github()
-    {
-        return Http::withHeaders([
-            'Accept' => 'application/vnd.github+json',
-            'User-Agent' => 'TaxNest-owner-approval-relay',
-            'X-GitHub-Api-Version' => '2022-11-28',
-        ])->connectTimeout(2)->timeout(5);
-    }
-
-    private function setRetryDelay(\Illuminate\Http\Client\Response $response): void
-    {
-        $retry = $response->header('Retry-After');
-        $reset = $response->header('X-RateLimit-Reset');
-        $seconds = ctype_digit((string) $retry) ? (int) $retry : 60;
-        if (in_array($response->status(), [403, 429], true) && ctype_digit((string) $reset)) {
-            $seconds = max($seconds, (int) $reset - now()->timestamp);
-        }
-        $this->cacheSeconds = min(3600, max(60, $seconds));
-    }
 }

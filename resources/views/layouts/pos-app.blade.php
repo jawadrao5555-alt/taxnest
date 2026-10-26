@@ -848,7 +848,7 @@
                                                      onclick="window.open(this.src, '_blank')">
                                             @endif
                                             <ul class="mt-1.5 space-y-1">
-                                                @foreach(($wnu->points ?? []) as $wnp)
+                                                @foreach(($wnu->customerPoints() ?? []) as $wnp)
                                                     <li class="flex items-start gap-1.5 text-[12px] text-gray-600 dark:text-gray-300">
                                                         <svg class="w-3 h-3 mt-0.5 flex-shrink-0 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                                         <span>{{ $wnp }}</span>
@@ -1603,7 +1603,7 @@
                              onclick="window.open(this.src, '_blank')">
                     @endif
                     <ul class="space-y-2.5">
-                        @foreach(($whatsNewFeatured->points ?? []) as $wnpt)
+                        @foreach(($whatsNewFeatured->customerPoints() ?? []) as $wnpt)
                             <li class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
                                 <span class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5" style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
                                     <svg class="w-3 h-3" style="color: #b45309;" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.958a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.368 2.447a1 1 0 00-.363 1.118l1.287 3.957c.3.922-.755 1.688-1.539 1.118l-3.367-2.446a1 1 0 00-1.175 0l-3.367 2.446c-.784.57-1.838-.196-1.539-1.118l1.287-3.957a1 1 0 00-.363-1.118L2.063 9.385c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69l1.286-3.958z"/></svg>
@@ -1619,7 +1619,7 @@
                                 <div class="{{ $loop->first ? '' : 'mt-4 pt-3 border-t border-gray-100 dark:border-gray-800' }}">
                                     <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-1.5">{{ $wnp->customerTitle() }} <x-wn-type-badge :update="$wnp" /> <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
                                     <ul class="space-y-1.5">
-                                        @foreach(($wnp->points ?? []) as $wnpt)
+                                        @foreach(($wnp->customerPoints() ?? []) as $wnpt)
                                             <li class="flex items-start gap-2 text-[13px] text-gray-600 dark:text-gray-300">
                                                 <svg class="flex-shrink-0 w-3.5 h-3.5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                                 <span>{{ $wnpt }}</span>
@@ -1691,7 +1691,7 @@
                                  onclick="window.open(this.src, '_blank')">
                         @endif
                         <ul class="space-y-2.5">
-                            @foreach(($wnp->points ?? []) as $wnpt)
+                            @foreach(($wnp->customerPoints() ?? []) as $wnpt)
                                 <li class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
                                     <span class="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mt-0.5">
                                         <svg class="w-3 h-3 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>

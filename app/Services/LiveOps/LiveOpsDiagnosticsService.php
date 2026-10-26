@@ -58,7 +58,11 @@ class LiveOpsDiagnosticsService
             'AGENT_HEALTH' => $companyId
                 ? $this->agentHealth($companyId)
                 : $this->agentFleetHealth(),
-            'PRINTER_HEALTH' => $this->printerHealth($this->requireCompanyId($companyId)),
+            'PRINTER_HEALTH' => $this->printerHealth(
+                $this->requireCompanyId($companyId),
+                !empty($input['date_from']) || !empty($input['date_to']) ? $dateFrom : null,
+                $dateTo,
+            ),
             'ERROR_SUMMARY' => $companyId
                 ? $this->errorSummary($this->requireCompanyId($companyId), $dateFrom, $dateTo)
                 : $this->errorSummaryFleet($dateFrom, $dateTo),
@@ -475,18 +479,28 @@ class LiveOpsDiagnosticsService
         ];
     }
 
-    private function printerHealth(int $companyId): array
+    private function printerHealth(int $companyId, ?Carbon $from = null, ?Carbon $to = null): array
     {
         $c = $this->loadCompany($companyId);
         $settings = $c->printerSettings();
         $jobs = [];
+        $coverage = ['mode' => $from ? 'date_range' : 'latest', 'total_matching' => null,
+            'returned' => 0, 'omitted' => null, 'truncated' => null,
+            'from' => $from?->copy()->startOfDay()->toIso8601String(),
+            'to' => $from ? $to?->copy()->endOfDay()->toIso8601String() : null];
         if (Schema::hasTable('pos_print_jobs')) {
             $hasOrder = Schema::hasColumn('pos_print_jobs', 'restaurant_order_id');
             $hasFetched = Schema::hasColumn('pos_print_jobs', 'content_fetched_at');
             $hasLines = Schema::hasColumn('pos_print_jobs', 'printed_item_ids');
-            $jobs = PosPrintJob::where('company_id', $companyId)
-                ->orderByDesc('id')
-                ->limit((int) config('live_ops.limits.max_print_jobs', 25))
+            $query = PosPrintJob::where('company_id', $companyId);
+            $limit = (int) config('live_ops.limits.max_print_jobs', 25);
+            if ($from) {
+                $query->whereBetween('created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()]);
+                $coverage['total_matching'] = (clone $query)->count();
+                $limit = max(1, min(1000, (int) config('live_ops.limits.max_print_history_jobs', 500)));
+            }
+            $jobs = $query->orderByDesc('id')
+                ->limit($limit)
                 ->get()
                 ->map(function (PosPrintJob $j) use ($hasOrder, $hasFetched, $hasLines, $settings) {
                     $state = KotPrintState::forJob($j);
@@ -519,6 +533,12 @@ class LiveOpsDiagnosticsService
                         'updated_at' => optional($j->updated_at)?->toIso8601String(),
                     ];
                 })->all();
+        }
+
+        $coverage['returned'] = count($jobs);
+        if ($coverage['total_matching'] !== null) {
+            $coverage['omitted'] = max(0, $coverage['total_matching'] - count($jobs));
+            $coverage['truncated'] = $coverage['omitted'] > 0;
         }
 
         $devices = [];
@@ -556,6 +576,7 @@ class LiveOpsDiagnosticsService
             'agent_online' => $c->agentOnline(),
             'devices' => $devices,
             'recent_jobs' => $jobs,
+            'job_coverage' => $coverage,
             'failed_job_count' => collect($jobs)->where('status', 'failed')->count(),
             'stuck_job_count' => $this->stuckPrintCount($jobs),
             'job_counts' => $this->printJobCounts($companyId, $jobs),

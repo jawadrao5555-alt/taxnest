@@ -39,7 +39,7 @@
                                                      onclick="window.open(this.src, '_blank')">
                                             @endif
                                             <ul class="mt-1.5 space-y-1">
-                                                @foreach(($wnu->points ?? []) as $wnp)
+                                                @foreach(($wnu->customerPoints() ?? []) as $wnp)
                                                     <li class="flex items-start gap-1.5 text-[12px] text-gray-600 dark:text-gray-300">
                                                         <svg class="w-3 h-3 mt-0.5 flex-shrink-0 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                                         <span>{{ $wnp }}</span>

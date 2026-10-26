@@ -7,7 +7,7 @@ function method(name){const start=source.search(new RegExp('^        (?:async )?
 function fixture(){
  const requests=[];const fetch=(url)=>new Promise((resolve,reject)=>requests.push({url,resolve,reject}));
  const context=vm.createContext({fetch,console:{error(){}},window:{TXT:{}},setTimeout,clearTimeout});
- const names=['loadCustomerAddresses','saveNewAddress','selectLookedUpCustomer','selectCustomerWithStats','selectCustomerFromPhone','_selectQuickCustomer'];
+ const names=['hasDeliveryPortion','loadCustomerAddresses','saveNewAddress','selectLookedUpCustomer','selectCustomerWithStats','selectCustomerFromPhone','_selectQuickCustomer'];
  for(const name of ['waitForDeliveryAddress'])if(source.includes('        async '+name+'('))names.push(name);
  const ui=vm.runInContext('({'+names.map(method).join('\n')+'})',context);
  Object.assign(ui,{selectedCustomer:{id:1,name:'A',address:'A default'},orderType:'delivery',customerAddresses:[],selectedDeliveryAddress:'',showToast(){},$nextTick(){},_fetchWithTimeout:fetch});
@@ -82,4 +82,10 @@ test('confirmed address-book save replaces its temporary one-off without duplica
  const pending=f.ui.saveNewAddress();f.requests[0].resolve({json:async()=>({success:true,address:{id:7,address:'Saved office'}})});await pending;
  assert.equal(f.ui.customerAddresses.filter(a=>a.address==='Saved office').length,1);
  assert.equal(f.ui.customerAddresses.find(a=>a.address==='Saved office').id,7);
+});
+
+test('delivery portion on a Dine In bill accepts and awaits the same customer address response',async()=>{
+ const f=fixture();f.ui.orderType='dine_in';f.ui.cart=[{fulfillment:'delivery'}];f.ui.selectedCustomer={id:22,name:'Mixed guest'};
+ f.ui.loadCustomerAddresses();const wait=f.ui.waitForDeliveryAddress();f.reply(0,[{id:0,address:'Mixed destination'}]);
+ assert.equal(await wait,true);assert.equal(f.ui.selectedDeliveryAddress,'Mixed destination');
 });

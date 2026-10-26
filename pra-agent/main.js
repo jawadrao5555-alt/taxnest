@@ -44,7 +44,8 @@ const {
   migrateAgentConfig,
 } = require('./src/server-url');
 
-const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
+const DOWNLOAD_URL = 'https://taxnest.pk/download/agent?type=exe';
+const { createCompanyConfigurator } = require('./src/company-configurator');
 const BUILD_INFO = require('./src/build-info').loadBuildInfo(app.getVersion(), path.join(__dirname, 'build-info.json'));
 const BUILD_TIMESTAMP = BUILD_INFO.build;
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
@@ -857,8 +858,8 @@ function openPos() {
         setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
         buildTrayMenu();
       },
-      onLoggedIn: async (ses, origin) => {
-        const configured = await autoConfigureAgent(ses, origin);
+      onLoggedIn: async (ses, origin, isCurrent) => {
+        const configured = await autoConfigureAgent(ses, origin, 'pos', isCurrent);
         await refreshTrustedPosScope(ses, origin);
         return configured;
       },
@@ -895,7 +896,9 @@ function openFbrPos() {
     const config = getMigratedAgentConfig();
     const posConfig =
       config && config.serverUrl ? config : { serverUrl: DEFAULT_SERVER_URL };
-    openFbrPosWindow(posConfig, { isQuitting: () => isQuitting });
+    openFbrPosWindow(posConfig, { isQuitting: () => isQuitting,
+      onLoggedIn: (ses, origin, isCurrent) => autoConfigureAgent(ses, origin, 'fbrpos', isCurrent),
+    });
     return true;
   } catch (e) {
     console.log('[fbr-window] open failed:', e && e.message);
@@ -966,73 +969,24 @@ function createNestposShortcuts(showNote) {
   }
 }
 
-// Agent AUTO-CONFIG (v1.5.0): pull the company's agent credentials from the
-// server using the POS window's logged-in session cookie. Zero manual setup —
-// silent printing + PRA sync start working right after the first POS login.
-// v1.5.0 beta4 (owner rule): the agent FOLLOWS the POS login — if a DIFFERENT
-// company logs into the POS window, the agent swaps to that company's key
-// automatically (no manual copy-paste, ever). Same company + same key = no-op;
-// same company with a regenerated key also self-heals.
-async function autoConfigureAgent(ses, origin) {
-  try {
-    const existing = getMigratedAgentConfig();
-    const res = await ses.fetch(origin + '/pos/desktop/agent-config', {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    if (!data || !data.success || !data.api_key || !data.company_id) return false;
-    const serverUrl = canonicalAgentServerUrl(
-      data.server_url || origin + '/api/agent'
-    );
-    if (
-      existing && existing.serverUrl && existing.apiKey && existing.companyId &&
-      String(existing.companyId) === String(data.company_id) &&
-      existing.apiKey === data.api_key &&
-      existing.serverUrl === serverUrl
-    ) {
-      return true; // same company, same key — already configured
-    }
-    const switching = !!(
-      existing && existing.companyId &&
-      String(existing.companyId) !== String(data.company_id)
-    );
-    const config = {
-      serverUrl,
-      apiKey: data.api_key,
-      companyId: data.company_id,
-    };
-    store.set('config', config);
+// Authenticated first-run pairing confirms the company's identity before any
+// new company or rotated key replaces local credentials. Legacy Agents retain
+// their existing endpoint; this new client never falls back around confirmation.
+const autoConfigureAgent = createCompanyConfigurator({
+  getConfig: () => getMigratedAgentConfig(),
+  saveConfig: config => store.set('config', config),
+  showMessageBox: options => dialog.showMessageBox(options),
+  onConfigured: config => {
     clearTrustedPosScope();
     stopAgent();
     startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
-    console.log(
-      '[auto-config] ' +
-      (switching ? 'company switch — agent reconfigured' : 'agent configured') +
-      ' from POS login (company ' + data.company_id + ')'
-    );
-    // Company switch is a big deal on fiscal_device shops (the agent is the ONLY
-    // PRA submission path) — surface it as an OS notification so staff notice
-    // that sync + printing now run for the newly logged-in company.
-    try {
-      if (switching && Notification.isSupported()) {
-        new Notification({
-          title: 'TaxNest Agent',
-          body: 'Agent ab "' + (data.company_name || ('company ' + data.company_id)) + '" ke liye chal raha hai (PRA sync + printing).',
-        }).show();
-      }
-    } catch (e) {}
     try {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('config-autofilled', { companyId: data.company_id });
+        mainWindow.webContents.send('config-autofilled', { companyId: config.companyId });
       }
-    } catch (e) {}
-    return true;
-  } catch (e) {
-    console.log('[auto-config] failed:', e && e.message);
-    return false;
-  }
-}
+    } catch (_) {}
+  },
+});
 
 function createWindow(startHidden) {
   mainWindow = new BrowserWindow({

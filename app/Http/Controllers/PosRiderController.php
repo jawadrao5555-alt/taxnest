@@ -80,6 +80,7 @@ class PosRiderController extends Controller
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
                 ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
                 ->whereNull('rider_settlement_id')
                 ->where(function ($q) {
                     $q->whereNull('delivery_status')
@@ -167,6 +168,7 @@ class PosRiderController extends Controller
             ->where('company_id', $companyId)
             ->whereNotNull('rider_id')
             ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
             ->whereNull('rider_settlement_id')
             ->where(function ($q) {
                 $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
@@ -459,7 +461,7 @@ class PosRiderController extends Controller
         $billQuery = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where(function ($q) {
-                $q->where('order_type', 'delivery')->orWhereNotNull('rider_id');
+                $q->where('order_type', 'delivery')->orWhereNotNull('rider_id'); if (Schema::hasColumn('pos_transactions', 'has_delivery_items')) $q->orWhere('has_delivery_items', true);
             })
             ->whereIn('status', ['completed'])
             ->with('rider')
@@ -475,6 +477,9 @@ class PosRiderController extends Controller
         }
 
         $allBills = $billQuery->get();
+        // Both history and pending tabs render mixed-delivery item names.
+        // Explicit batch loading preserves production's lazy-loading guard.
+        $allBills->filter(fn ($bill) => $bill->has_delivery_items || $bill->rider_collection_amount !== null)->loadMissing('items');
 
         // Owner (7 Aug 2026, Touseef case): purane atke bills GHAYAB thay — pending
         // tab date-filtered thi, 3-4 din pehle ke assigned/dispatched bills default
@@ -487,7 +492,7 @@ class PosRiderController extends Controller
         $openBillsAll = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where(function ($q) {
-                $q->where('order_type', 'delivery')->orWhereNotNull('rider_id');
+                $q->where('order_type', 'delivery')->orWhereNotNull('rider_id'); if (Schema::hasColumn('pos_transactions', 'has_delivery_items')) $q->orWhere('has_delivery_items', true);
             })
             ->whereIn('status', ['completed'])
             // Task 512 (Zahid Irfan, 12 Aug 2026): UNASSIGNED delivery bills
@@ -512,6 +517,7 @@ class PosRiderController extends Controller
             ->orderBy(DB::raw($assignedTsExpr));
         $this->applyStreamScope($openBillsAll);
         $openBillsAll = $openBillsAll->get();
+        $openBillsAll->filter(fn ($bill) => $bill->has_delivery_items || $bill->rider_collection_amount !== null)->loadMissing('items');
 
         // Task 524 (customer voice note, 12 Aug 2026): purane (pichhle business
         // days ke) UNASSIGNED delivery bills pending list mein "Rider Not
@@ -569,6 +575,7 @@ class PosRiderController extends Controller
                             ->where('company_id', $companyId)
                             ->whereNotNull('rider_id')
                             ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
                             ->whereNull('rider_settlement_id')
                             ->where(function ($q2) {
                                 $q2->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
@@ -585,6 +592,7 @@ class PosRiderController extends Controller
             ->where('company_id', $companyId)
             ->whereIn('rider_id', $riders->pluck('id'))
             ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
             ->whereNull('rider_settlement_id')
             ->where(function ($q) {
                 $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
@@ -1109,7 +1117,7 @@ class PosRiderController extends Controller
             return $this->statusError($request, 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
         }
         // Only delivery-shaped bills can carry a rider.
-        if ($txn->order_type !== 'delivery' && !$txn->rider_id && !$txn->delivery_address) {
+        if ($txn->order_type !== 'delivery' && !$txn->has_delivery_items && !$txn->rider_id && !$txn->delivery_address) {
             return $this->statusError($request, 'Only delivery bills can be assigned to a rider.');
         }
 
@@ -1234,6 +1242,8 @@ class PosRiderController extends Controller
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)->findOrFail($txnId);
 
+        if ($txn->has_delivery_items) $txn->loadMissing('items');
+
         // Task 353: stream-locked staff cannot touch the other stream's bills.
         if (!$this->streamScopeAllowsTxn($txn)) {
             abort(403);
@@ -1249,7 +1259,7 @@ class PosRiderController extends Controller
             $newStatus = $request->input('delivery_status');
             if ($newStatus !== 'delivered'
                 || $txn->delivery_status !== null
-                || $txn->order_type !== 'delivery'
+                || ($txn->order_type !== 'delivery' && !$txn->has_delivery_items)
                 || $txn->status !== 'completed'
                 || $txn->rider_settlement_id) {
                 return $this->statusError($request, 'Unassigned delivery bills can only be marked delivered (once).');
@@ -1297,6 +1307,17 @@ class PosRiderController extends Controller
             return $this->statusError($request, 'This delivery is already delivered — it can only be marked returned.');
         }
 
+        // A mixed bill includes food already eaten/collected. Returning its
+        // delivery must never cancel/refund the entire invoice automatically.
+        if ($newStatus === 'returned' && $txn->has_delivery_items
+            && $txn->items->contains(fn ($i) => !$i->skip_kitchen && ($i->fulfillment ?? $txn->order_type) !== 'delivery')) {
+            $deliveryLines = $txn->items->filter(fn ($i) => $i->fulfillment === 'delivery' || $i->skip_kitchen);
+            if ($deliveryLines->contains(fn ($i) => (float) ($i->returned_quantity ?? 0) + 0.0001 < (float) $i->quantity)) {
+                return response()->json(['success' => false,
+                    'message' => 'For this mixed bill, create a return for the delivery items first. The items eaten here or collected as parcel must stay on the bill.',
+                    'return_url' => auth('pos')->user()?->posCashierBlocked() ? null : route('pos.transaction.return-form', $txn->id, false)], 422);
+            }
+        }
         $upd = ['delivery_status' => $newStatus];
         if ($newStatus === 'delivered' && !$txn->delivered_at
             && Schema::hasColumn('pos_transactions', 'delivered_at')) {
@@ -1376,6 +1397,9 @@ class PosRiderController extends Controller
      */
     private function attemptAutoReturn(PosTransaction $txn, bool $wastage): ?PosTransaction
     {
+        if ($txn->has_delivery_items) $txn->loadMissing('items');
+        if ($txn->has_delivery_items && $txn->items->contains(fn ($i) => !$i->skip_kitchen && ($i->fulfillment ?? $txn->order_type) !== 'delivery')) return null; // Manager selects only returned delivery lines.
+
         if (!Schema::hasColumn('pos_transactions', 'transaction_type')) {
             return null; // prod schema drift — manual prompt handles it
         }
@@ -1458,6 +1482,17 @@ class PosRiderController extends Controller
                 }
                 return back()->with('error', 'No open deliveries for ' . $rider->name . '.');
             }
+            // A bulk action must obey the same mixed-return boundary as a
+            // single delivery; otherwise it could silently drop unpaid cash.
+            $bills->filter(fn ($bill) => $bill->has_delivery_items)->loadMissing('items');
+            foreach ($bills as $bill) {
+                if ($bill->has_delivery_items
+                    && $bill->items->contains(fn ($i) => !$i->skip_kitchen && ($i->fulfillment ?? $bill->order_type) !== 'delivery')
+                    && $bill->items->filter(fn ($i) => $i->fulfillment === 'delivery' || $i->skip_kitchen)
+                        ->contains(fn ($i) => (float) ($i->returned_quantity ?? 0) + 0.0001 < (float) $i->quantity)) {
+                    return $this->statusError($request, 'Create a return for the delivery items in each mixed bill first. No delivery status has been changed.');
+                }
+            }
             $wastage = $request->boolean('wastage');
             $made = 0;
             $stampReturnedAt = Schema::hasColumn('pos_transactions', 'returned_at');
@@ -1524,6 +1559,7 @@ class PosRiderController extends Controller
                 ->where('company_id', $companyId)
                 ->where('rider_id', $rider->id)
                 ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
                 ->whereNull('rider_settlement_id')
                 ->where(function ($q) {
                     $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
@@ -1542,7 +1578,7 @@ class PosRiderController extends Controller
             }
 
             $hasPartialCol = Schema::hasColumn('pos_transactions', 'rider_partial_paid');
-            $remainingOf = fn ($b) => round((float) $b->total_amount - ($hasPartialCol ? (float) ($b->rider_partial_paid ?? 0) : 0), 2);
+            $remainingOf = fn ($b) => PosRider::remainingAmount($b);
             $outstanding = round((float) $bills->sum($remainingOf), 2);
 
             // Received amount: default = full outstanding of the selection.
@@ -1765,6 +1801,7 @@ class PosRiderController extends Controller
             ->where('company_id', $companyId)
             ->where('id', $txn->id)
             ->where('payment_method', 'cash')
+            ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
             ->update($upd);
         if ($written === 0) {
             $txn->refresh();

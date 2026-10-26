@@ -721,6 +721,12 @@ class AgentController extends Controller
                 'name' => $company->name,
                 'pra_pos_id' => $company->fbr_pos_id,
                 'pra_environment' => $company->fbr_pos_environment,
+                // The local-FBR branch returns early from heartbeat(). Keep the
+                // authenticated IMS UI identity here too; legacy Agent fields
+                // above intentionally retain their existing FBR values.
+                'product_type' => $company->product_type,
+                'pra_connection_mode' => $company->pra_connection_mode ?? 'cloud',
+                'fbr_connection_mode' => $company->fbr_connection_mode ?? 'cloud',
             ],
             'healed' => $healed,
             'repromoted' => $repromoted,

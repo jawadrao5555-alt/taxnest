@@ -146,6 +146,50 @@ $waShop->forceFill(['wa_api_enabled' => true, 'wa_phone_number_id' => '123456789
     'wa_api_token' => \Illuminate\Support\Facades\Crypt::encryptString('synthetic-api-token'),
     'wa_template_name' => 'invoice_notification', 'wa_app_secret' => 'synthetic-app-secret', 'wa_attach_pdf' => true])->save();
 $waOwner = $user($waShop, 'Synthetic WhatsApp Owner', 'wa-auto-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+// Mixed fulfillment uses its own fictional company, products, customer and tables.
+$mixedShop = $company('Synthetic Mixed Service', 'mixed-company@rc-browser.invalid', 'RCBROWSERMIXED', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
+    'feature_flags' => array_merge(PosFeatureService::defaultsForCategory('restaurant'), ['inventory' => false, 'delivery' => true, 'customer_profile' => true]),
+    'inventory_enabled' => false, 'pos_setup_completed' => true, 'table_click_direct_open' => true,
+    'pos_guided_flow_enabled' => false, 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
+    'pra_reporting_enabled' => false, 'pos_cash_received_enabled' => true,
+]);
+$mixedOwner = $user($mixedShop, 'Synthetic Mixed Owner', 'mixed-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$mixedPlan = \App\Models\PricingPlan::create(['name' => 'Synthetic Mixed Plan', 'product_type' => 'pos', 'invoice_limit' => 100, 'price' => 100, 'is_trial' => false, 'restaurant_enabled' => true, 'riders_enabled' => true]);
+\App\Models\Subscription::create(['company_id' => $mixedShop->id, 'pricing_plan_id' => $mixedPlan->id, 'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(), 'active' => true]);
+$mixedProduct = \App\Models\PosProduct::forceCreate(['company_id' => $mixedShop->id, 'name' => 'Synthetic mixed pizza', 'price' => 100, 'is_active' => true, 'is_tax_exempt' => false]);
+$mixedCustomer = \App\Models\PosCustomer::create(['company_id' => $mixedShop->id, 'name' => 'Synthetic mixed guest', 'phone' => '03000000888', 'address' => 'Synthetic mixed delivery lane', 'type' => 'unregistered']);
+// Historical mixed snapshots must stay readable even though new carts use one order type.
+foreach (['local', 'pra'] as $mode) {
+    for ($i = 0; $i < 2; $i++) {
+        $txn = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $mixedShop->id, 'created_by' => $mixedOwner->id,
+            'invoice_number' => 'RC-MIXED-HISTORY-'.$mode.'-'.$i,
+            'business_date' => \App\Services\PosBusinessDay::current($mixedShop->id),
+            'status' => 'completed', 'invoice_mode' => $mode,
+            'pra_status' => $mode === 'local' ? 'local' : null,
+            'order_type' => 'delivery', 'has_delivery_items' => true,
+            'rider_collection_amount' => 100, 'subtotal' => 100, 'tax_amount' => 0,
+            'total_amount' => 100, 'payment_method' => 'cash',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('pos_transaction_items')->insert([
+            'transaction_id' => $txn, 'item_type' => 'product', 'item_id' => $mixedProduct->id,
+            'item_name' => 'Synthetic historical delivery line', 'quantity' => 1,
+            'unit_price' => 100, 'subtotal' => 100, 'tax_amount' => 0,
+            'fulfillment' => 'delivery', 'skip_kitchen' => false,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+}
+$mixedFloor = RestaurantFloor::create(['company_id' => $mixedShop->id, 'name' => 'Mixed floor', 'is_active' => true]);
+$mixedTables = [];
+foreach ([1366, 390] as $width) foreach (['counter', 'rider'] as $mode) {
+    $number = 'MX'.$width.($mode === 'counter' ? 'C' : 'R');
+    $table = RestaurantTable::create(['company_id' => $mixedShop->id, 'floor_id' => $mixedFloor->id, 'table_number' => $number, 'seats' => 4, 'status' => 'available', 'is_active' => true]);
+    $mixedTables[$width][$mode] = ['id' => $table->id, 'number' => $number];
+}
+
 $tableShop = $company('Synthetic Table Order Recovery', 'table-orders-company@rc-browser.invalid', 'RCBROWSERTABLES', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant',
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
@@ -191,6 +235,38 @@ $riderLive = \App\Models\PosRider::create(['company_id' => $tableShop->id, 'name
 $riderLiveToken = $riderLive->id . '|' . $riderLiveToken;
 $riderLive->update(['app_token' => hash('sha256', $riderLiveToken)]);
 $tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
+// Separate fictional companies keep read-only phone-search proof independent of
+// transactional table/rider journeys and exercise the real company-scoped routes.
+$contactShop = $company('Synthetic Contact Search', 'contact-company@rc-browser.invalid', 'RCBROWSERCONTACT', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
+    'pos_integration_mode' => 'pra', 'pos_setup_completed' => true, 'pos_guided_flow_enabled' => false,
+    'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
+]);
+$contactOwner = $user($contactShop, 'Synthetic Contact Owner', 'contact-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$contactForeign = $company('Synthetic Foreign Contact', 'foreign-contact@rc-browser.invalid', 'RCBROWSERCONTACTX', 'pos');
+$contactDay = \App\Services\PosBusinessDay::current($contactShop->id);
+$contactOldDay = \Illuminate\Support\Carbon::parse($contactDay)->subDays(2)->toDateString();
+// This historical fixture is already closed; retain the real pending-day guard.
+\App\Models\PosDayCloseReport::forceCreate([
+    'company_id' => $contactShop->id, 'branch_id' => 0, 'report_date' => $contactOldDay,
+    'business_date' => $contactOldDay, 'report_number' => 'RC-CONTACT-CLOSED', 'closed_by' => $contactOwner->id,
+]);
+$contactCases = [
+    ['RC-CONTACT-A', 'Synthetic Contact A', '0300-123 4567', $contactDay, $contactShop->id],
+    ['RC-CONTACT-B', 'Synthetic Contact B', '0311 987-6543', $contactDay, $contactShop->id],
+    ['RC-CONTACT-OLD', 'Synthetic Contact Old', '0300 123-4567', $contactOldDay, $contactShop->id],
+    ['RC-CONTACT-FOREIGN', 'Synthetic Foreign Contact Bill', '0300-123 4567', $contactDay, $contactForeign->id],
+];
+foreach ($contactCases as [$number, $name, $phone, $day, $companyId]) {
+    \App\Models\PosTransaction::forceCreate([
+        'company_id' => $companyId, 'invoice_number' => $number, 'customer_name' => $name, 'customer_phone' => $phone,
+        'delivery_address' => 'Synthetic Garden Road', 'business_date' => $day,
+        'created_at' => $now, 'updated_at' => $now, 'created_by' => $companyId === $contactShop->id ? $contactOwner->id : null,
+        'order_type' => 'delivery', 'status' => 'completed', 'invoice_mode' => 'pra', 'pra_status' => 'failed',
+        'payment_method' => 'cash', 'subtotal' => 100, 'total_amount' => 100, 'tax_rate' => 0, 'tax_amount' => 0,
+    ]);
+}
 $printEvidenceShop = $company('Synthetic Print Evidence', 'print-evidence@rc-browser.invalid', 'RCBROWSERPRINT', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'), 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
@@ -331,7 +407,9 @@ foreach (['pra' => $hotel, 'fbr' => $fiscal, 'di' => $notificationDi] as $panel 
     }
     for ($i = 1; $i <= 7; $i++) {
         AppUpdate::create([
-            'title' => 'Synthetic routine '.$panel.' '.$i, 'points' => ['Reception notice'],
+            'title' => 'Synthetic routine '.$panel.' '.$i, 'points' => $i === 1
+                ? ['Reception notice', 'Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga.']
+                : ['Reception notice'],
             'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
             'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => false,
@@ -340,7 +418,8 @@ foreach (['pra' => $hotel, 'fbr' => $fiscal, 'di' => $notificationDi] as $panel 
     if ($panel === 'di') continue;
     foreach (['a', 'b'] as $receipt) {
         AppUpdate::create([
-            'title' => 'Synthetic featured '.$panel, 'points' => ['Important reception notice'],
+            'title' => 'Synthetic featured '.$panel, 'points' => ['Important reception notice',
+                'Build date packaging se aye gi; metadata na ho to unavailable bataya jaye ga.'],
             'audience' => $panel === 'di' ? 'di' : ($panel === 'fbr' ? 'fbr_pos' : 'pos'),
             'target_categories' => [$panel === 'di' ? 'di_retail' : ($panel === 'fbr' ? 'retail' : 'hotel')],
             'is_published' => true, 'is_featured' => true,
@@ -575,6 +654,8 @@ if (!$adminPreviewCsp) throw new RuntimeException('Production CSP missing from p
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name'=>'delivery-contact-search','login'=>$contactOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
+            'paths'=>['/pos/deliveries'],'markers'=>['Synthetic Contact A'],'deliveryContactSearch'=>true],
         ['name'=>'fbr-fiscal-receipt','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/transaction/'.$fiscalReceipt->id.'/receipt'],'markers'=>['FBR: 9000000000001','STRN: 1234567890123','Tax Asaan / SMS 9966'],'fiscalReceipt'=>true],
         ['name'=>'fbr-identity-settings','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/settings/identities'],'markers'=>['Branch / terminal FBR identity']],
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
@@ -620,6 +701,7 @@ $fixture = [
             'paths' => ['/pos/hotel/stays/'.$creditStay->id.'/credit-notes'],
             'hotelCreditReview' => ['billId' => $creditBill->id, 'path' => '/pos/hotel/stays/'.$creditStay->id.'/credit-notes',
                 'refundPath' => '/pos/hotel/stays/'.$refundStay->id.'/credit-notes']],
+        ['name' => 'mixed-fulfillment', 'login' => $mixedOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mixedFulfillment' => ['tables' => $mixedTables, 'phone' => $mixedCustomer->phone, 'customer' => $mixedCustomer->name, 'product' => $mixedProduct->name]],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,

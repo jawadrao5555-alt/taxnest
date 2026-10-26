@@ -306,6 +306,69 @@ class PosRiderAutoReturnTest extends TestCase
 
     // ── 1. PRA parent → full credit note, pending ────────────────────────────
 
+    private function mixedDelivery(): PosTransaction
+    {
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->boolean('has_delivery_items')->default(false);
+            $t->decimal('rider_collection_amount', 14, 2)->nullable();
+            $t->string('order_type')->nullable();
+        });
+        Schema::table('pos_transaction_items', function (Blueprint $t) {
+            $t->string('fulfillment')->nullable();
+            $t->boolean('skip_kitchen')->default(false);
+        });
+        $this->actAs('pos_cashier');
+        $bill = $this->seedDelivery(['has_delivery_items' => true, 'rider_collection_amount' => 1120, 'order_type' => 'dine_in']);
+        $lines = $bill->items->sortBy('id')->values();
+        $lines[0]->update(['fulfillment' => 'dine_in']);
+        $lines[1]->update(['fulfillment' => 'delivery']);
+        return $bill;
+    }
+
+    public function test_single_mixed_return_preserves_served_food_and_debt_until_delivery_credit_note_exists(): void
+    {
+        $bill = $this->mixedDelivery();
+        $response = $this->markReturned($bill);
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('dispatched', $bill->fresh()->delivery_status);
+        $this->assertCount(0, $this->returnRows($bill));
+        $this->assertSame(1120.0, \App\Models\PosRider::remainingAmount($bill->fresh()));
+    }
+
+    public function test_bulk_return_cannot_bypass_mixed_delivery_credit_note_requirement(): void
+    {
+        $bill = $this->mixedDelivery();
+        $this->bulkReturned();
+        $this->assertSame('dispatched', $bill->fresh()->delivery_status);
+        $this->assertCount(0, $this->returnRows($bill));
+        $this->assertSame(1120.0, \App\Models\PosRider::remainingAmount($bill->fresh()));
+    }
+
+    public function test_bulk_mixed_return_guard_handles_multiple_bills_without_lazy_loading(): void
+    {
+        $bill = $this->mixedDelivery();
+        $attributes = $bill->getAttributes();
+        unset($attributes['id']);
+        $attributes['invoice_number'] = 'SYNTHETIC-SECOND-MIXED';
+        $second = DB::table('pos_transactions')->insertGetId($attributes);
+        foreach ($bill->items as $item) {
+            $line = $item->getAttributes();
+            unset($line['id']);
+            $line['transaction_id'] = $second;
+            DB::table('pos_transaction_items')->insert($line);
+        }
+        $before = DB::table('pos_transactions')->orderBy('id')->get()->toJson();
+        $previous = \Illuminate\Database\Eloquent\Model::preventsLazyLoading();
+        \Illuminate\Database\Eloquent\Model::preventLazyLoading();
+        try {
+            $this->bulkReturned();
+            $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
+            $this->assertCount(0, $this->returnRows($bill));
+        } finally {
+            \Illuminate\Database\Eloquent\Model::preventLazyLoading($previous);
+        }
+    }
+
     public function test_cashier_marking_returned_creates_full_pending_credit_note(): void
     {
         $this->enableFiscalDevice();

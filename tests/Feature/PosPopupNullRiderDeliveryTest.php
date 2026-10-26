@@ -306,6 +306,49 @@ class PosPopupNullRiderDeliveryTest extends TestCase
         return $req;
     }
 
+    public function test_mixed_delivery_popup_loads_items_with_production_lazy_loading_guard(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->boolean('has_delivery_items')->default(false);
+            $t->decimal('rider_collection_amount', 12, 2)->nullable();
+        });
+        Schema::table('pos_transaction_items', function (Blueprint $t) {
+            $t->string('fulfillment')->nullable();
+            $t->boolean('skip_kitchen')->default(false);
+            $t->decimal('quantity', 12, 2)->default(1);
+        });
+        $ids = [];
+        foreach (['pra', 'local'] as $mode) {
+            for ($i = 0; $i < 2; $i++) {
+                $bill = $this->makeFinal(['has_delivery_items' => true,
+                    'invoice_mode' => $mode, 'pra_status' => $mode === 'local' ? 'local' : 'completed']);
+                $ids[] = $bill->id;
+                foreach (['delivery', 'takeaway'] as $fulfillment) {
+                    DB::table('pos_transaction_items')->insert(['transaction_id' => $bill->id,
+                        'item_name' => $fulfillment.' item', 'fulfillment' => $fulfillment, 'quantity' => 2]);
+                }
+            }
+        }
+        $foreign = $this->makeFinal(['company_id' => $this->companyId + 99, 'has_delivery_items' => true]);
+        $legacy = $this->makeFinal();
+        $before = DB::table('pos_transactions')->orderBy('id')->get()->toJson();
+        $this->actingAs($this->makeAdmin(), 'pos');
+        $previous = \Illuminate\Database\Eloquent\Model::preventsLazyLoading();
+        \Illuminate\Database\Eloquent\Model::preventLazyLoading();
+        try {
+            $data = (new PosController())->apiProvisionalBills(new Request())->getData(true);
+            $rows = collect($data['bills'])->merge($data['final_deliveries']);
+            foreach ($ids as $id) {
+                $this->assertSame([['name' => 'delivery item', 'quantity' => 2]], $rows->firstWhere('id', $id)['delivery_items']);
+            }
+            $this->assertNull($rows->firstWhere('id', $foreign->id));
+            $this->assertSame([], $rows->firstWhere('id', $legacy->id)['delivery_items']);
+            $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
+        } finally {
+            \Illuminate\Database\Eloquent\Model::preventLazyLoading($previous);
+        }
+    }
+
     // ── 1. NULL-rider bill: response shape ──────────────────────────────────
 
     /**

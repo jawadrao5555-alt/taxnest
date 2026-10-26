@@ -2,6 +2,20 @@
 export async function mixedFulfillmentWorkflow(page,t,v,helpers) {
   const {baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass}=helpers;
   const config=t.mixedFulfillment,root=()=>page.locator('[data-tn-sale-root]');
+  const popup=await page.request.get(baseUrl+'/pos/api/provisional-bills');
+  if(!popup.ok())throw Error('Historical mixed popup failed: '+popup.status());
+  const popupData=await popup.json();
+  for(const rows of [popupData.bills,popupData.final_deliveries]) {
+    if(rows.filter(row=>row.delivery_items?.some(item=>item.name==='Synthetic historical delivery line')).length!==2)
+      throw Error('Historical Local/Final delivery lines missing from popup');
+  }
+  const board=await page.goto(baseUrl+'/pos/deliveries',{waitUntil:'domcontentloaded'});
+  if(!board?.ok()||!await page.getByText('Synthetic historical delivery line',{exact:false}).count())
+    throw Error('Historical mixed deliveries board failed to render');
+  await saveEvidenceScreenshot(page,'historical-mixed-deliveries-'+v.width);
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  pass(t.name+'/'+v.width+': historical mixed Local/Final popup and actual Deliveries page render');
   const openCart=async()=>{ if(v.width<768) {const button=root().locator('[data-cart-menu-open]:visible');if(await button.count())await button.click();} };
   const checkCart=async()=>{
     const rows=root().locator('[data-cart-index]');

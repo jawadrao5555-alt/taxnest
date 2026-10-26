@@ -2063,6 +2063,7 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   const payload=savedResponse.request().postDataJSON();
   if(payload.delivery_address!==address)throw new Error('Selected delivery address missing from real bill payload');
   await page.unroute(bookUrl);
+  await recentBillPreviewWorkflow(page,t,v,saved.transaction_id,address);
   await page.goto(baseUrl+'/pos/transaction/'+saved.transaction_id+'/receipt',{waitUntil:'domcontentloaded'});
   const receipt=page.locator('body');
   if(!(await receipt.innerText()).includes(address))throw new Error('Persisted address absent from receipt preview');
@@ -2072,4 +2073,61 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
   await page.emulateMedia({media:'screen'});
   pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
+}
+
+// Use the actual seeded sale, chip, preview iframe and Print control. Printer
+// boundaries are spied so a disposable browser never submits physical output.
+async function recentBillPreviewWorkflow(page,t,v,id,address) {
+  await page.evaluate(async()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.showReceipt=false; d.cancelReceiptAutoClose(); d.stopPraPoll();
+    await d.loadReprintBills();
+    window.__recentBillPrints=[];
+    d.trySilentPrint=async payload=>{window.__recentBillPrints.push({kind:'silent',...payload});return true;};
+    d._printViaIframe=(_frame,url,_size,done)=>{window.__recentBillPrints.push({kind:'iframe',url});if(done)done();};
+  });
+  await page.locator('[x-show="showReceipt"]').waitFor({state:'hidden'});
+  await page.waitForFunction(id=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintBills.some(b=>b.id===id),id);
+  const popup=page.locator('[x-show="reprintPreviewBill"]');
+  const before=await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    return JSON.stringify({cart:d.cart,customer:d.selectedCustomer});
+  });
+  for(const silent of [true,false]) {
+    await page.evaluate(silent=>{window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).silentBillPrint=silent;window.__recentBillPrints=[];},silent);
+    if(v.width>=768) {
+      const chip=page.locator('template[x-for="bill in reprintBills.slice(0, 8)"]').locator('xpath=..').locator('button').filter({hasText:new RegExp('Rs\\.')}).first();
+      // The just-saved transaction is newest; assert identity as well as visibility.
+      const newest=await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintBills[0]?.id);
+      if(newest!==id)throw new Error('Recent bill fixture was not the newest sale');
+      if(silent)await chip.click();else {await chip.focus();await chip.press('Enter');}
+    } else {
+      // The strip is intentionally desktop-only. Preserve the mobile reprint
+      // drawer's existing eye action and the same popup/Print controls.
+      await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).openReprint());
+      const row=page.locator('[x-show="showReprint"] button').filter({has:page.locator('[x-text="bill.created_time"]')}).first();
+      await row.locator('xpath=.//span[@*[name()="@click.stop"]="openReprintPreview(bill)"]').click();
+    }
+    await popup.waitFor({state:'visible'});
+    await page.waitForFunction(id=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintPreviewBill?.id===id,id);
+    const frame=popup.locator('iframe');
+    const src=await frame.getAttribute('src');
+    if(!src||src.includes('auto_print'))throw new Error('Recent preview requested automatic printing');
+    const receipt=page.frameLocator('[x-show="reprintPreviewBill"] iframe');
+    await receipt.getByText(address,{exact:true}).waitFor({state:'visible'});
+    if(await page.evaluate(()=>window.__recentBillPrints.length))throw new Error('Browsing Recent Bills submitted a print');
+    const current=await page.evaluate(()=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return JSON.stringify({cart:d.cart,customer:d.selectedCustomer});
+    });
+    if(current!==before)throw new Error('Opening recent bill changed the current sale');
+    await saveEvidenceScreenshot(page,'recent-bill-preview-'+v.width+'-'+silent);
+    await popup.locator('button').last().click();
+    await page.waitForFunction(()=>window.__recentBillPrints.length===1);
+    const output=await page.evaluate(()=>window.__recentBillPrints[0]);
+    if(silent?(output.kind!=='silent'||output.transaction_id!==id):(output.kind!=='iframe'||!output.url.includes('auto_print=1')))throw new Error('Explicit preview Print did not retain its selected route');
+    await popup.waitFor({state:'hidden'});
+    await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintBusyId);
+  }
+  pass(t.name+'/'+v.width+': existing recent-bill preview renders stored receipt without printing; explicit Print retains silent/browser routes');
 }

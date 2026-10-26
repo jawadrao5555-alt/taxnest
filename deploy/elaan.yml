@@ -1,6 +1,6 @@
-title: "Purani KOT ki jaanch mein behtari"
+title: "Recent Bills se pehle bill dekhein"
 audience: pos
 type: improvement
 points:
-  - "Support team tareekh ke mutabiq purane printing records ki behtar jaanch kar sakti hai."
-  - "Is update se aapki printer setting ya pehle se bheji hui KOT dobara print nahi hogi."
+  - "Sale screen par Recent Bills mein bill dabayein to uska preview khulega."
+  - "Bill print karne ke liye preview ka Print button ya alag Reprint option istemal karein."

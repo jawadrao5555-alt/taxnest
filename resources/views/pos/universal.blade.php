@@ -1420,15 +1420,15 @@ window.addEventListener('popstate', function() {
             </div>
 
             {{-- ═══ AKHRI BILLS strip (Jul 2026 redesign) — today's last bills as one-click
-                 reprint chips. Reuses reprintBills/reprintBill() (Alt+R modal data); list is
+                 preview chips. Reuses the existing bill preview (Alt+R modal data); list is
                  loaded on init + refreshed after every successful sale. Desktop only. --}}
             <div x-show="reprintBills.length > 0" x-cloak class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 overflow-hidden">
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 flex-shrink-0">{{ __('pos.recent_bills') }}</span>
                 <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar min-w-0 flex-1">
                     <template x-for="bill in reprintBills.slice(0, 8)" :key="'strip-' + bill.id">
-                        <button type="button" @click="reprintBill(bill)" :disabled="reprintBusyId === bill.id"
+                        <button type="button" @click="openReprintPreview(bill)" :disabled="reprintBusyId === bill.id"
                             class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 dark:hover:bg-purple-900/20 transition flex-shrink-0 disabled:opacity-50"
-                            :title="'Reprint ' + (billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number)">
+                            :title="window.TXT.bill_preview_prefix + (billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number)">
                             <span x-text="billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number"></span>
                             <span class="font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs.' + Number(bill.total_amount).toLocaleString()"></span>
                         </button>

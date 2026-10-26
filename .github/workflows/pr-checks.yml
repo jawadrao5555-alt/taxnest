@@ -365,6 +365,8 @@ jobs:
           gradle -p rider-app --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug
       - name: Check complete catalog search and exact scanner priority
         run: bash scripts/rc-safe-run -- node --test scripts/tests/catalog-search-results.test.mjs
+      - name: Check recent bill preview and explicit reprint separation
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/recent-bill-preview.test.mjs
       - name: Check delivery address race and snapshot preservation
         run: bash scripts/rc-safe-run -- node --test scripts/tests/mixed-fulfillment.test.mjs scripts/tests/delivery-address-state.test.mjs scripts/tests/delivery-phone-search.test.mjs scripts/tests/caller-order-type.test.mjs scripts/tests/attached-caller-save.test.mjs
       - name: Run realtime gateway tests with egress blocked

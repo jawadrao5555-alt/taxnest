@@ -1,6 +1,6 @@
-title: "POS screen dobara kholne mein behtari"
-audience: pos
+title: "Intizami screens ke rang aur paigham saaf"
+audience: all
 type: improvement
 points:
-  - "Internet chalne par saved screen rakhne mein masla aaye to bhi durust sale screen khul sakti hai."
-  - "Recovery screen ka Try again fresh copy kholta hai. Pending offline bills aur printer settings tabdeel nahi hotin."
+  - "Admin panel mein chuna hua rang ab workspace, cards aur bunyadi buttons par bhi nazar aata hai."
+  - "Ghalti aur kamyabi ke paigham saaf rangon mein parhay ja sakte hain."

@@ -7,14 +7,10 @@
         </div>
     </div>
 
-    @if(session('success'))
-    <div class="bg-emerald-900/30 border border-emerald-700 rounded-lg p-3 mb-6 text-sm text-emerald-300">{{ session('success') }}</div>
-    @endif
-
     {{-- Task 1455: a ladder that is already broken must not be invisible. The
          editor only refuses NEW breakage, so anything standing is shown here. --}}
     @if(!empty($ladderWarnings))
-    <div class="bg-amber-900/30 border border-amber-700 rounded-lg p-4 mb-6">
+    <div role="alert" class="tn-admin-notice tn-admin-notice--warning rounded-lg p-4 mb-6">
         <div class="flex items-center gap-2 mb-2">
             <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
             <h3 class="text-sm font-semibold text-amber-200">Package ladder needs attention</h3>
@@ -70,11 +66,11 @@
         </form>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 mb-6">
-        <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
-        <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
-        <button @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
-        <button @click="activeTab = 'erps'" :class="activeTab === 'erps' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">{{ \App\Support\NestErps::LABEL }} Plans</button>
+    <div class="tn-admin-plan-tabs flex flex-wrap items-center gap-2 mb-6">
+        <button :aria-pressed="activeTab === 'di'" @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
+        <button :aria-pressed="activeTab === 'pos'" @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
+        <button :aria-pressed="activeTab === 'fbrpos'" @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
+        <button :aria-pressed="activeTab === 'erps'" @click="activeTab = 'erps'" :class="activeTab === 'erps' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">{{ \App\Support\NestErps::LABEL }} Plans</button>
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">

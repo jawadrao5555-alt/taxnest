@@ -363,6 +363,8 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
           gradle -p rider-app --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug
+      - name: Check sale cache recovery and offline trust boundaries
+        run: bash scripts/rc-safe-run -- node scripts/sw-smoke-check.mjs
       - name: Check complete catalog search and exact scanner priority
         run: bash scripts/rc-safe-run -- node --test scripts/tests/catalog-search-results.test.mjs scripts/tests/menu-exempt-filter.test.mjs
       - name: Check delivery address race and snapshot preservation

@@ -477,6 +477,9 @@ class PosRiderController extends Controller
         }
 
         $allBills = $billQuery->get();
+        // Both history and pending tabs render mixed-delivery item names.
+        // Explicit batch loading preserves production's lazy-loading guard.
+        $allBills->filter(fn ($bill) => $bill->has_delivery_items || $bill->rider_collection_amount !== null)->loadMissing('items');
 
         // Owner (7 Aug 2026, Touseef case): purane atke bills GHAYAB thay — pending
         // tab date-filtered thi, 3-4 din pehle ke assigned/dispatched bills default
@@ -514,6 +517,7 @@ class PosRiderController extends Controller
             ->orderBy(DB::raw($assignedTsExpr));
         $this->applyStreamScope($openBillsAll);
         $openBillsAll = $openBillsAll->get();
+        $openBillsAll->filter(fn ($bill) => $bill->has_delivery_items || $bill->rider_collection_amount !== null)->loadMissing('items');
 
         // Task 524 (customer voice note, 12 Aug 2026): purane (pichhle business
         // days ke) UNASSIGNED delivery bills pending list mein "Rider Not
@@ -1238,6 +1242,8 @@ class PosRiderController extends Controller
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)->findOrFail($txnId);
 
+        if ($txn->has_delivery_items) $txn->loadMissing('items');
+
         // Task 353: stream-locked staff cannot touch the other stream's bills.
         if (!$this->streamScopeAllowsTxn($txn)) {
             abort(403);
@@ -1391,6 +1397,7 @@ class PosRiderController extends Controller
      */
     private function attemptAutoReturn(PosTransaction $txn, bool $wastage): ?PosTransaction
     {
+        if ($txn->has_delivery_items) $txn->loadMissing('items');
         if ($txn->has_delivery_items && $txn->items->contains(fn ($i) => !$i->skip_kitchen && ($i->fulfillment ?? $txn->order_type) !== 'delivery')) return null; // Manager selects only returned delivery lines.
 
         if (!Schema::hasColumn('pos_transactions', 'transaction_type')) {
@@ -1477,6 +1484,7 @@ class PosRiderController extends Controller
             }
             // A bulk action must obey the same mixed-return boundary as a
             // single delivery; otherwise it could silently drop unpaid cash.
+            $bills->filter(fn ($bill) => $bill->has_delivery_items)->loadMissing('items');
             foreach ($bills as $bill) {
                 if ($bill->has_delivery_items
                     && $bill->items->contains(fn ($i) => !$i->skip_kitchen && ($i->fulfillment ?? $bill->order_type) !== 'delivery')

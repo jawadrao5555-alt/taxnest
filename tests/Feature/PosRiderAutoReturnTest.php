@@ -344,6 +344,31 @@ class PosRiderAutoReturnTest extends TestCase
         $this->assertSame(1120.0, \App\Models\PosRider::remainingAmount($bill->fresh()));
     }
 
+    public function test_bulk_mixed_return_guard_handles_multiple_bills_without_lazy_loading(): void
+    {
+        $bill = $this->mixedDelivery();
+        $attributes = $bill->getAttributes();
+        unset($attributes['id']);
+        $attributes['invoice_number'] = 'SYNTHETIC-SECOND-MIXED';
+        $second = DB::table('pos_transactions')->insertGetId($attributes);
+        foreach ($bill->items as $item) {
+            $line = $item->getAttributes();
+            unset($line['id']);
+            $line['transaction_id'] = $second;
+            DB::table('pos_transaction_items')->insert($line);
+        }
+        $before = DB::table('pos_transactions')->orderBy('id')->get()->toJson();
+        $previous = \Illuminate\Database\Eloquent\Model::preventsLazyLoading();
+        \Illuminate\Database\Eloquent\Model::preventLazyLoading();
+        try {
+            $this->bulkReturned();
+            $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
+            $this->assertCount(0, $this->returnRows($bill));
+        } finally {
+            \Illuminate\Database\Eloquent\Model::preventLazyLoading($previous);
+        }
+    }
+
     public function test_cashier_marking_returned_creates_full_pending_credit_note(): void
     {
         $this->enableFiscalDevice();

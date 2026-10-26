@@ -5477,6 +5477,16 @@ class PosController extends Controller
         }
 
         $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
+        // Mixed-delivery summaries read item rows below. Production refuses
+        // implicit loading; fetch only mixed bills in a batch before mapping.
+        // Empty/legacy collections keep their previous query behavior.
+        if ($bills->isNotEmpty()) {
+            $bills->filter(fn ($bill) => $bill->has_delivery_items)->loadMissing('items');
+        }
+        if ($finalBills->isNotEmpty()) {
+            $finalBills->filter(fn ($bill) => $bill->has_delivery_items)->loadMissing('items');
+        }
+
         $data = $bills->map(function ($b) use ($kotCompany, $kotOrders, $hasRiderCols, $hasBizDate, $riderNames, $riderOpen, $hasAssignmentRevision, $hasBillToken) {
             $kot = \App\Services\KotPrintService::deliveryPromoteKot($kotCompany, $b, $kotOrders[$b->id] ?? null);
             return [

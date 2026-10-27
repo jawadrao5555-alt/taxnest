@@ -22,9 +22,14 @@
             amber:   { accent: '#d97706', accentHover: '#b45309', accentBg: 'rgba(217,119,6,0.15)', accentText: '#fbbf24', sidebar: '#1c1304', sidebarBorder: '#3b2506', body: '#120d03', label: 'Amber' },
             purple:  { accent: '#7c3aed', accentHover: '#6d28d9', accentBg: 'rgba(124,58,237,0.15)', accentText: '#a78bfa', sidebar: '#1e1033', sidebarBorder: '#2e1065', body: '#0f0820', label: 'Purple' }
         };
-        function getAdminTheme() { return localStorage.getItem('admin_theme') || 'indigo'; }
+        function getAdminTheme() { try { return localStorage.getItem('admin_theme') || 'indigo'; } catch (_) { return 'indigo'; } }
         function applyAdminTheme(name) {
-            var t = adminThemes[name] || adminThemes.indigo;
+            name = Object.prototype.hasOwnProperty.call(adminThemes, name) ? name : 'indigo';
+            var t = adminThemes[name];
+            var canvases = { indigo: '#eef2ff', emerald: '#ecfdf5', cyan: '#ecfeff', rose: '#fff1f2', amber: '#fffbeb', purple: '#faf5ff' };
+            document.documentElement.dataset.adminTheme = name;
+            document.documentElement.style.setProperty('--admin-canvas', canvases[name]);
+            document.documentElement.style.setProperty('--admin-surface', '#ffffff');
             document.documentElement.style.setProperty('--admin-accent', t.accent);
             document.documentElement.style.setProperty('--admin-accent-hover', t.accentHover);
             document.documentElement.style.setProperty('--admin-accent-bg', t.accentBg);
@@ -32,7 +37,7 @@
             document.documentElement.style.setProperty('--admin-sidebar', t.sidebar);
             document.documentElement.style.setProperty('--admin-sidebar-border', t.sidebarBorder);
             document.documentElement.style.setProperty('--admin-body', t.body);
-            localStorage.setItem('admin_theme', name);
+            try { localStorage.setItem('admin_theme', name); } catch (_) { /* Apply the palette even when browser storage is unavailable. */ }
         }
         applyAdminTheme(getAdminTheme());
     </script>
@@ -424,13 +429,13 @@
                 </div>
                 @endif
                 @if(session('success'))
-                <div role="status" class="mx-4 mt-4 bg-emerald-50 border border-emerald-600 text-emerald-900 rounded-lg px-4 py-3 text-sm font-medium break-words">{{ session('success') }}</div>
+                <div role="status" class="tn-admin-notice tn-admin-notice--success mx-4 mt-4 rounded-lg px-4 py-3 text-sm font-medium break-words">{{ session('success') }}</div>
                 @endif
                 @if(session('error'))
-                <div role="alert" class="mx-4 mt-4 bg-red-50 border border-red-600 text-red-900 rounded-lg px-4 py-3 text-sm font-medium break-words">{{ session('error') }}</div>
+                <div role="alert" class="tn-admin-notice tn-admin-notice--error mx-4 mt-4 rounded-lg px-4 py-3 text-sm font-medium break-words">{{ session('error') }}</div>
                 @endif
                 @if($errors->any())
-                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg px-4 py-3 text-sm">
+                <div role="alert" class="tn-admin-notice tn-admin-notice--error mx-4 mt-4 rounded-lg px-4 py-3 text-sm">
                     <ul class="list-disc list-inside space-y-0.5">
                         @foreach($errors->all() as $err)
                         <li>{{ $err }}</li>
@@ -443,7 +448,7 @@
                      everything between as raw PHP (white-screens the whole admin panel). --}}
                 @php $tnMailFailure = \App\Services\MailHealth::current(); @endphp
                 @if($tnMailFailure)
-                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
+                <div role="alert" class="tn-admin-notice tn-admin-notice--error mx-4 mt-4 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
                         <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
                         <div class="min-w-0">
@@ -467,7 +472,7 @@
                 @endif
                 @php $tnSupportMailFailure = \App\Services\SupportMailHealth::current(); @endphp
                 @if($tnSupportMailFailure)
-                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
+                <div role="alert" class="tn-admin-notice tn-admin-notice--error mx-4 mt-4 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
                         <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
                         <div class="min-w-0">
@@ -488,7 +493,7 @@
                 @endif
                 @php $tnLogHealthFailure = \App\Services\LogHealth::current(); @endphp
                 @if($tnLogHealthFailure)
-                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
+                <div role="alert" class="tn-admin-notice tn-admin-notice--error mx-4 mt-4 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
                         <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
                         <div class="min-w-0">
@@ -511,7 +516,7 @@
                 @endif
                 @php $tnHeartbeatWarn = \App\Services\HeartbeatHealth::warning(); @endphp
                 @if($tnHeartbeatWarn)
-                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
+                <div role="alert" class="tn-admin-notice tn-admin-notice--error mx-4 mt-4 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
                         <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
                         <div class="min-w-0">
@@ -544,7 +549,7 @@
                 @php($tnMysqlBreachPct = \App\Models\SystemSetting::get('mysql_conn_last_breach_pct'))
                 @php($tnMysqlBreach = $tnMysqlBreachAt && \Illuminate\Support\Carbon::parse($tnMysqlBreachAt)->diffInMinutes(now()) <= 10)
                 @if($tnMysqlBreach)
-                <div class="mx-4 mt-4 bg-yellow-900/30 border border-yellow-600 rounded-lg px-4 py-3 text-sm">
+                <div role="alert" class="tn-admin-notice tn-admin-notice--warning mx-4 mt-4 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
                         <svg class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
                         <div class="min-w-0">

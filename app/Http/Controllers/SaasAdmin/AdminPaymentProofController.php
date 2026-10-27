@@ -95,7 +95,8 @@ class AdminPaymentProofController extends Controller
         // Product-line guard: the approved plan must stay on the same product
         // line the customer submitted for (operator-error protection).
         $proofPlanType = $proof->pricingPlan->product_type ?? null;
-        if ($proofPlanType && ($plan->product_type ?? 'di') !== $proofPlanType) {
+        if ($proofPlanType && \App\Services\PlanCompanyCompatibility::productKey($plan->product_type)
+            !== \App\Services\PlanCompanyCompatibility::productKey($proofPlanType)) {
             return back()->with('error', 'Selected package belongs to a different product line than this payment proof.');
         }
 

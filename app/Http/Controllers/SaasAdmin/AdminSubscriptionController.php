@@ -9,6 +9,7 @@ use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
 use App\Services\PlanSellabilityService;
 use App\Services\SubscriptionAssignmentService;
+use App\Services\PlanCompanyCompatibility;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -43,7 +44,15 @@ class AdminSubscriptionController extends Controller
             ->reject(fn (PricingPlan $plan) => PlanSellabilityService::isRetired($plan))
             ->values();
 
-        return view('saas-admin.subscriptions', compact('companiesPage', 'companySubscriptions', 'companies', 'plans'));
+        $assignmentPlans = $plans->map(fn (PricingPlan $plan) => [
+            'id' => (int) $plan->id,
+            'label' => $plan->name . ' · ' . PlanSellabilityService::productLabel($plan)
+                . ' · PKR ' . number_format(SubscriptionAssignmentService::computePrice($plan, 'annual')['base_price']) . '/year (base)',
+            'company_ids' => $companies->filter(fn (Company $company) => PlanCompanyCompatibility::matches($company, $plan))
+                ->pluck('id')->map(fn ($id) => (int) $id)->values(),
+        ])->values();
+
+        return view('saas-admin.subscriptions', compact('companiesPage', 'companySubscriptions', 'companies', 'plans', 'assignmentPlans'));
     }
 
     public function assign(Request $request)
@@ -91,6 +100,9 @@ class AdminSubscriptionController extends Controller
             }
 
             if (!$sub->active) {
+                PlanCompanyCompatibility::assertMatches(
+                    Company::withTrashed()->findOrFail($sub->company_id), $sub->pricingPlan
+                );
                 if (PlanSellabilityService::isRetired($sub->pricingPlan)) {
                     return ['error' => 'That historical package is retired and cannot be reactivated.'];
                 }

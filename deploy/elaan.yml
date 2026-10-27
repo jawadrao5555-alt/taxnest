@@ -1,9 +1,9 @@
-title: "PRA POS mein rozmarrah kaam ki behtari"
-audience: pos
+title: "Admin panel mein wazeh maloomat aur behtar controls"
+audience: all
 type: improvement
 points:
-  - "Purane bills tareekh, order ki qisam aur Cash/Card se dhoondein; Recent Bills se pehle preview kholein aur Print apni marzi se karein."
-  - "Caller history, customer ka naam aur phone, cart scrolling aur Table Setup ke controls mein behtari."
-  - "Rider ki muntakhib Cash bills settle karein; recalled order mein naye items hon to payment se pehle tasdeeq karein."
-  - "Reports mein business day aur tamam products ki list; Exempt Items ka alag filter."
-  - "Receipt ka font aur item name ki chaudai sirf apni pasand select karke Save karne par badlein; pehle se saved design khud nahi badlega."
+  - "Admin panel ka chuna hua rang andar ke safhon par bhi nazar aayega aur error paigham saaf parhay ja sakenge."
+  - "Company ke liye usi system aur business type ka package select karne ki hifazat shamil hai."
+  - "Usage Monitoring mein aakhri staff activity asal record se dikhayi jayegi; sirf safha kholne se activity ka waqt nahi badlega."
+  - "Bar bar ghalat admin password par arzi rukawat aur dobara koshish ka paigham milega."
+  - "Company filters aur Live Ops controls ko keyboard aur chhoti screen par parhna aur istemal karna behtar hoga."

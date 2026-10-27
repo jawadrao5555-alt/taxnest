@@ -12,8 +12,8 @@
     --tn-admin-accent: var(--admin-accent, var(--tn-brand));
     --tn-admin-accent-text: var(--admin-accent-text, var(--tn-accent));
     --tn-admin-accent-wash: var(--admin-accent-bg, rgba(10, 77, 92, .14));
-    --tn-admin-canvas: var(--tn-canvas, #edf1ee);
-    --tn-admin-surface: var(--tn-surface, #f8faf7);
+    --tn-admin-canvas: var(--admin-canvas, #eef2ff);
+    --tn-admin-surface: var(--admin-surface, #ffffff);
     --tn-admin-text: var(--tn-text, #19333a);
     --tn-admin-muted: var(--tn-muted, #64767a);
     --tn-admin-line: var(--tn-line, #d8e0dc);
@@ -523,10 +523,108 @@ body.admin-themed .tn-company-directory .tn-directory-alert :is(h2, a, span, svg
 .tn-company-directory .tn-directory-table [data-directory-status="pending"] { background: #fef3c7 !important; color: #78350f !important; }
 .tn-company-directory .tn-directory-table :is([data-directory-status="approved"], [data-directory-status="active"]) { background: #dcfce7 !important; color: #14532d !important; }
 .tn-company-directory .tn-directory-table [data-directory-status="rejected"] { background: #e2e8f0 !important; color: #334155 !important; }
-.tn-company-directory .tn-directory-actions :is(a, button) { display: inline-flex; align-items: center; min-height: 2rem; padding: .35rem .65rem; background: #e0e7ff !important; color: #312e81 !important; font-size: .8125rem; font-weight: 650; }
+body.admin-themed .tn-company-directory .tn-directory-actions :is(a, button) { display: inline-flex; align-items: center; min-height: 2rem; padding: .35rem .65rem; background: #e0e7ff !important; color: #312e81 !important; font-size: .8125rem; font-weight: 650; }
 .tn-company-directory :is(a, button, input, select):focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
 .tn-company-directory > div:first-child a { background: #3730a3 !important; color: #fff !important; }
 .tn-company-directory > div:first-child a:last-child { background: #1f2937 !important; color: #f1f5f9 !important; }
 body.admin-themed .tn-company-directory h1.text-white { color: var(--tn-admin-text) !important; }
 .tn-company-directory .tn-directory-table tbody tr { background: #111827 !important; }
 .tn-company-directory .tn-directory-table td::before { color: #cbd5e1 !important; }
+
+/* The selected admin palette reaches the canvas, native controls and legacy
+   dark cards. Native light ledgers keep their explicit surface contract. */
+body.admin-themed.tn-premium-shell {
+    --tn-brand: var(--admin-accent);
+    --tn-brand-deep: var(--admin-accent-hover);
+    --tn-brand-soft: var(--admin-canvas);
+    --tn-admin-legacy-panel: var(--admin-sidebar, #111827);
+    --tn-admin-legacy-raised: color-mix(in srgb, var(--tn-admin-legacy-panel) 84%, white);
+}
+body.admin-themed main :is(.text-gray-400, .text-gray-500, .text-gray-600) {
+    color: var(--tn-admin-muted) !important;
+}
+body.admin-themed main :is(h1, h2, h3).text-white { color: var(--tn-admin-text) !important; }
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
+    background-color: var(--tn-admin-legacy-panel) !important;
+}
+body.admin-themed main :is(.bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
+    background-color: var(--tn-admin-legacy-raised) !important;
+    color: #f1f5f9 !important;
+}
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(.text-gray-400, .text-gray-500, .text-gray-600) {
+    color: #cbd5e1 !important;
+}
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(h1, h2, h3).text-white {
+    color: #f8fafc !important;
+}
+body.admin-themed .tn-admin-sidebar nav > p { color: #cbd5e1 !important; }
+body.admin-themed .tn-company-directory :is(.tn-directory-table, .tn-directory-filters),
+body.admin-themed .tn-company-directory .tn-directory-table tbody tr {
+    background-color: var(--tn-admin-legacy-panel) !important;
+}
+body.admin-themed .tn-company-directory .tn-directory-filters :is(input, select, option) {
+    background-color: var(--tn-admin-legacy-raised) !important;
+}
+body.admin-themed .admin-btn,
+body.admin-themed main :is(.bg-indigo-600, .tn-detail-primary, .tn-detail-status[data-selected="true"]),
+body.admin-themed .tn-company-tabs button[aria-pressed="true"] {
+    background-color: var(--admin-accent-hover) !important;
+    color: #ffffff !important;
+    border-color: var(--admin-accent-hover) !important;
+}
+
+/* Status colours describe the result, independently of the chosen palette.
+   Opaque surfaces avoid pink-on-pink text when dark utility colours meet a light canvas. */
+body.admin-themed .tn-admin-notice {
+    border: 1px solid;
+    border-left-width: 4px;
+    opacity: 1 !important;
+    overflow-wrap: anywhere;
+}
+body.admin-themed .tn-admin-notice--error { background: #fff1f2 !important; color: #881337 !important; border-color: #be123c !important; }
+body.admin-themed .tn-admin-notice--success { background: #ecfdf5 !important; color: #064e3b !important; border-color: #047857 !important; }
+body.admin-themed .tn-admin-notice--warning { background: #fffbeb !important; color: #78350f !important; border-color: #b45309 !important; }
+body.admin-themed .tn-admin-notice :is(div, ul, ol, h1, h2, h3, h4, p, li, span, a, svg, code, strong) { color: inherit !important; }
+body.admin-themed .tn-admin-notice a { text-decoration: underline; }
+body.admin-themed .tn-admin-plan-tabs button[aria-pressed="true"] {
+    background-color: var(--admin-accent-hover) !important;
+    color: #ffffff !important;
+    box-shadow: inset 0 -3px 0 #ffffff;
+}
+body.admin-themed main :is(a, button).text-indigo-400 { color: var(--admin-accent-hover) !important; }
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(a, button).text-indigo-400 {
+    color: var(--admin-accent-text) !important;
+}
+/* Shared premium CSS also paints main; use the same palette on that actual
+   visible surface, rather than only on the shell behind it. */
+body.admin-themed .tn-admin-workspace,
+body.admin-themed main { background-color: var(--tn-admin-canvas) !important; }
+body.admin-themed main :is(input, select, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *)) {
+    color: #f1f5f9 !important;
+    border-color: #94a3b8 !important;
+    color-scheme: dark;
+}
+body.admin-themed main :is(input, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *))::placeholder {
+    color: #cbd5e1 !important;
+    opacity: 1;
+}
+
+/* Live Ops retains its existing dark cards in every saved theme/mode. Keep
+   secondary labels readable on those cards without recolouring light canvas
+   text or changing any tenant/POS surface. */
+.tn-live-ops :is(.bg-gray-900, .bg-gray-950) :is(.text-gray-500, .text-gray-600) {
+    color: #cbd5e1 !important;
+}
+.tn-live-ops :is(input, select, textarea, option) {
+    min-width: 0;
+    background-color: #030712 !important;
+    color: #f8fafc !important;
+    color-scheme: dark;
+}
+.tn-live-ops :is(input, textarea)::placeholder { color: #cbd5e1 !important; opacity: 1; }
+.tn-live-ops button.bg-amber-600 { background-color: #92400e !important; color: #fff !important; }
+.tn-live-ops :is(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid #60a5fa; outline-offset: 3px;
+}
+.tn-live-ops .grid > div { min-width: 0; }
+.tn-live-ops :is(li, code) { overflow-wrap: anywhere; }

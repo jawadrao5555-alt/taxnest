@@ -68,6 +68,58 @@ class LiveOpsDiagnosticsTest extends LiveOpsTestCase
         $this->assertCount(2, $report['data']['companies']);
     }
 
+    public function test_invoice_diagnostic_proves_saved_card_save_math_without_pii(): void
+    {
+        $pizza = $this->makeCompany('Pizza Fixture');
+        $other = $this->makeCompany('Other Fixture');
+        $bill = $this->makeTxn($pizza, [
+            'invoice_number' => 'P2240',
+            'payment_method' => 'card',
+            'subtotal' => 1379.31,
+            'discount_amount' => 0,
+            'tax_rate' => 8,
+            'tax_amount' => 110.34,
+            'total_amount' => 1490,
+            'tax_inclusive' => true,
+            'tax_menu_rate' => 16,
+        ]);
+        $this->makeTxn($other, [
+            'invoice_number' => 'P2240',
+            'subtotal' => 9999,
+            'total_amount' => 9999,
+        ]);
+        DB::table('pos_transaction_items')->insert([
+            ['transaction_id' => $bill, 'subtotal' => 700, 'is_tax_exempt' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['transaction_id' => $bill, 'subtotal' => 900, 'is_tax_exempt' => false, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $report = app(LiveOpsDiagnosticsService::class)->run('INVOICE_DIAGNOSTIC', [
+            'company_id' => $pizza,
+            'invoice_reference' => 'P2240',
+            'requester' => 'test',
+        ]);
+
+        $this->assertSame('INVOICE_DIAGNOSTIC', $report['operation']);
+        $this->assertSame('inclusive_card_save', $report['data']['pricing_snapshot']['inferred_mode']);
+        $this->assertSame(1600.0, $report['data']['saved_calculation']['menu_total_from_lines']);
+        $this->assertSame(110.34, $report['data']['saved_calculation']['tax_amount']);
+        $this->assertSame(1490.0, $report['data']['saved_calculation']['total_amount']);
+        $this->assertTrue($report['data']['recalculation']['matches_saved_snapshot']);
+        $this->assertTrue($report['data']['finding']['card_save_confirmed_from_saved_snapshot']);
+        $this->assertFalse($report['data']['privacy']['customer_details_returned']);
+        $this->assertStringNotContainsString('9999', json_encode($report));
+    }
+
+    public function test_invoice_diagnostic_requires_exact_company_scoped_reference(): void
+    {
+        $company = $this->makeCompany('Invoice Scope');
+        $this->expectException(\InvalidArgumentException::class);
+        app(LiveOpsDiagnosticsService::class)->run('INVOICE_DIAGNOSTIC', [
+            'company_id' => $company,
+            'invoice_reference' => '../P2240',
+        ]);
+    }
+
     public function test_cross_company_pra_health_cannot_see_other_company(): void
     {
         $a = $this->makeCompany('A');

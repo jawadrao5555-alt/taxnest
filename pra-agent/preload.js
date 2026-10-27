@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('agentAPI', {
   getPosSettings: () => ipcRenderer.invoke('get-pos-settings'),
   savePosSettings: (s) => ipcRenderer.invoke('save-pos-settings', s),
   openPosWindow: () => ipcRenderer.invoke('open-pos-window'),
+  openPosInBrowser: () => ipcRenderer.invoke('open-pos-browser'),
   // Task 1187: enumerate this PC's installed printers for the setup-form
   // Receipt Printer dropdown — populated on load + manual refresh.
   getPrinters: () => ipcRenderer.invoke('get-printers'),

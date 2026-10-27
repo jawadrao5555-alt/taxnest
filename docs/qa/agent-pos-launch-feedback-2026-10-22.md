@@ -1,0 +1,15 @@
+# Agent Open POS: observable failure and explicit browser recovery
+
+Owner video bdaf1daa-c016-4dbf-8651-5f5153d7024c.mp4 shows Open POS Screen producing no visible result, while the owner can use Chrome. Code-confirmed gap: the UI ignores `{ok:false}` and rejected IPC promises; main catches synchronous window-open failures and only logs them. This PR addresses that silent-failure/recovery gap, not a proven diagnosis of the owner's Windows failure.
+
+The real UI handler now reports refusal/rejection, avoids duplicate pending requests and offers an explicit Browser mein POS kholein action. Browser recovery opens only the configured server origin's fixed `/pos/invoice/create` entry through a dedicated no-URL-argument IPC; no credentials/query/path from renderer can be passed. Do not auto-switch browsers, clear cookies/cache, reset settings, restart Agent, change kiosk/offline mode or affect existing warm-window launch behavior. A successful IPC response says only that the request was accepted, not that a Windows window was independently observed.
+
+Actual UI module/URL regressions 3/3 pass locally (false/rejected/legacy IPC, no automatic fallback, busy/double click, explicit recovery, success wording, fixed trusted-origin path and rejected non-web schemes). Main/preload syntax/whitespace pass. CI's existing Node test discovery includes the new test. Actual Windows packaged launch/root-cause logs, native foreground/monitor behavior and browser handoff remain required separate acceptance; no Windows reproduction or customer issue FIXED claim. Local Electron/application display sockets are unavailable. No production visit/credentials/data or actual shell browser launch was executed.
+
+Actual settings-HTML smoke follow-up: its isolated loopback server originally returned HTML for the new script URL, aborting later settings initialization. Serve the exact new repository UI module in the existing fixture and retain the original config/build/zero-settings-write assertions. The actual Chrome settings page now also clicks Open POS against a synthetic refused IPC, checks visible failure/no automatic browser action, and clicks explicit browser recovery against a synthetic IPC. Native Windows handoff remains separate. Fresh exact-HEAD browser CI required.
+
+## Overnight CI follow-up
+
+Updated settings HTML failure/manual-recovery smoke passed in CI. An unrelated rider map fixture then crossed the 03:00 app-time duty cutoff between seeding and mobile upload. Start a real fictional duty session through the existing loopback API before each upload, check its response, and retain real upload acknowledgment/map polling. No production duty rule changed; fresh full browser CI pending.
+
+Local environment recheck: loopback binding is available in this run, but supported PHP 8.4 is absent and Chrome installation failed (truncated/non-zip download). Local pure JS/syntax checks are limited evidence; supported real browser/database/full PHP acceptance remains GitHub CI, not customer production acceptance.

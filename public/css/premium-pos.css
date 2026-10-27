@@ -504,7 +504,10 @@ body[data-theme="midnight"] .tn-premium-sale .bg-gray-50 {
     .tn-premium-sale[data-tn-sale-document="pra"] .tn-cart-col [x-ref="cartList"] {
         flex: 0 0 auto !important;
         min-height: 8rem !important;
-        overflow: visible !important;
+        max-height: 55vh;
+        max-height: 55dvh;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
     }
     .tn-premium-sale[data-tn-sale-document="pra"] .tn-cart-side {
         display: flex;

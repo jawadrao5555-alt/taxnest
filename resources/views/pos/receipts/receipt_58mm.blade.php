@@ -148,6 +148,7 @@
     </style>
     @endif
     @php $printStyle = $company->posReceiptStyle(); @endphp
+    <style>{!! \App\Support\PosReceiptTypography::css($company->invoice_display_prefs['pos_style'] ?? [], '58mm') !!}</style>
     @if($printStyle['bold'])
     <style>
         /* BOLD PRINT STYLE (customer request Jul 2026 — Pizza Master): whole
@@ -577,8 +578,8 @@
         // prices; header subtotal is ex-tax-consistent, so the receipt Subtotal
         // re-adds the included tax to read as the menu sum.
         $rcptInclusive = (bool) ($transaction->tax_inclusive ?? false);
-        // Card-save (mode 3) card/digital bills: "Menu Total" = item sum + explicit
-        // "Card Disc" saving line (visible even when Show-Tax is OFF).
+        // Card-save: retain the menu-price reference and stored inclusive tax/
+        // payable. Owner requested no separate Card Discount display line.
         $rcptMenuRate = $rcptInclusive ? ($transaction->tax_menu_rate ?? null) : null;
         $rcptCardSave = $rcptMenuRate !== null && (float) $rcptMenuRate > 0
             && abs((float) $rcptMenuRate - (float) $transaction->tax_rate) >= 0.005;
@@ -587,9 +588,6 @@
             : ($rcptInclusive
                 ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
                 : (float) $transaction->subtotal);
-        $rcptCardSaving = $rcptCardSave
-            ? max(0.0, round($rcptSubtotal - (float) $transaction->discount_amount - (float) $transaction->total_amount, 2))
-            : 0.0;
     @endphp
     <table class="items-table">
         <thead>
@@ -654,12 +652,6 @@
         <tr>
             <td class="tot-label">{{ __('pos.receipt_discount') }}:</td>
             <td class="tot-value">-{{ number_format($showTaxLines ? $transaction->discount_amount : round((float) $transaction->discount_amount), 2) }}</td>
-        </tr>
-        @endif
-        @if($rcptCardSave && $rcptCardSaving > 0.009)
-        <tr>
-            <td class="tot-label">{{ __('pos.receipt_card_discount') }}:</td>
-            <td class="tot-value">-{{ number_format($rcptCardSaving, 2) }}</td>
         </tr>
         @endif
         @if($showTaxLines)

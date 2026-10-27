@@ -146,6 +146,7 @@
         </div>
         <div class="flex flex-wrap gap-2 mb-5">
             @foreach([
+                __('pos.business_day_label') => [$reportBusinessDate, $reportBusinessDate],
                 __('pos.opt_today') => [today()->toDateString(), today()->toDateString()],
                 __('pos.preset_last_7_days') => [today()->subDays(6)->toDateString(), today()->toDateString()],
                 __('pos.opt_this_month') => [today()->startOfMonth()->toDateString(), today()->toDateString()],

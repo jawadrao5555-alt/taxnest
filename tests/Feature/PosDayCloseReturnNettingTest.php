@@ -569,9 +569,21 @@ class PosDayCloseReturnNettingTest extends TestCase
 
         Auth::guard('pos')->setUser($user);
         app()->instance('currentCompanyId', $companyId);
-        $request = Request::create('/pos/reports', 'GET');
+        // These fixtures deliberately belong to the calendar date. Keep the
+        // return-netting contract independent of the wall-clock cutoff.
+        $request = Request::create('/pos/reports', 'GET', [
+            'from' => now()->toDateString(), 'to' => now()->toDateString(),
+        ]);
 
         $ra = (new PosController())->reports($request)->getData()['rangeAnalytics'];
+
+        $businessDate = \App\Services\PosBusinessDay::current($companyId);
+        DB::table('pos_transactions')->where('company_id', $companyId)->update(['business_date' => $businessDate]);
+        $fresh = (new PosController())->reports(Request::create('/pos/reports', 'GET'))->getData();
+        $this->assertSame($businessDate, $fresh['reportBusinessDate']);
+        $this->assertSame(2, (int) $fresh['rangeAnalytics']->summary->bills);
+        $this->assertSame(1655.0, (float) $fresh['rangeAnalytics']->summary->revenue);
+        $this->assertSame(255.0, (float) $fresh['rangeAnalytics']->summary->tax);
 
         // Summary: sales-only, GROSS (excluded, not netted).
         $this->assertSame(2, (int) $ra->summary->bills);

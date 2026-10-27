@@ -324,7 +324,7 @@
     /* Browser zoom reduces the CSS viewport height. Keep the complete cart,
        totals and final actions reachable instead of clipping them at the root. */
     .tn-cart-col { min-height: 0; overflow-y: auto; }
-    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .tn-cart-col [x-ref="cartList"] { flex: 1 1 auto; min-height: 8rem; max-height: 55vh; max-height: 55dvh; overflow-y: auto; }
     .mobile-sticky-pay {
         position: sticky;
         bottom: 0;
@@ -337,7 +337,7 @@
 }
 @media (min-width: 768px) and (max-width: 1023px) {
     .tn-cart-col { min-height: 0; overflow-y: auto; }
-    .tn-cart-col [x-ref="cartList"] { flex: none; min-height: 8rem; overflow: visible; }
+    .tn-cart-col [x-ref="cartList"] { flex: 1 1 auto; min-height: 8rem; max-height: 55vh; max-height: 55dvh; overflow-y: auto; }
     .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
     .dark .mobile-sticky-pay { background: #111827; }
 }
@@ -351,6 +351,8 @@
    kabhi widecart nahi hota. Custom classes — no Tailwind rebuild dependency. */
 .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
 .tn-cart-side { display: contents; }
+/* Wheel/touch may chain from the list into its own footer rail, not the page. */
+.tn-cart-col { overscroll-behavior-y: contain; }
 /* Legacy fallback (no display:contents): wrappers become plain flex columns that
    reproduce the original stacking — cart list pane flexes, footer pane sizes to
    content — so old WebViews keep a working (normal) cart layout. */
@@ -410,7 +412,7 @@
        whole cart column scroll on mobile and dock the pay block with a SOLID
        background + top hairline so content scrolls cleanly underneath it. */
     .tn-cart-col { overflow-y: auto; }
-    .tn-cart-col [x-ref="cartList"] { flex: none; overflow: visible; }
+    .tn-cart-col [x-ref="cartList"] { flex: 1 1 auto; min-height: 8rem; max-height: 55vh; max-height: 55dvh; overflow-y: auto; }
     .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); box-shadow: 0 -10px 24px rgba(0,0,0,.10); padding-bottom: env(safe-area-inset-bottom, 0); }
     .dark .mobile-sticky-pay { background: #111827; }
     .mobile-collapse-header { cursor: pointer; user-select: none; }
@@ -1420,15 +1422,15 @@ window.addEventListener('popstate', function() {
             </div>
 
             {{-- ═══ AKHRI BILLS strip (Jul 2026 redesign) — today's last bills as one-click
-                 reprint chips. Reuses reprintBills/reprintBill() (Alt+R modal data); list is
+                 preview chips. Reuses the existing bill preview (Alt+R modal data); list is
                  loaded on init + refreshed after every successful sale. Desktop only. --}}
             <div x-show="reprintBills.length > 0" x-cloak class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 overflow-hidden">
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 flex-shrink-0">{{ __('pos.recent_bills') }}</span>
                 <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar min-w-0 flex-1">
                     <template x-for="bill in reprintBills.slice(0, 8)" :key="'strip-' + bill.id">
-                        <button type="button" @click="reprintBill(bill)" :disabled="reprintBusyId === bill.id"
+                        <button type="button" @click="openReprintPreview(bill)" :disabled="reprintBusyId === bill.id"
                             class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 dark:hover:bg-purple-900/20 transition flex-shrink-0 disabled:opacity-50"
-                            :title="'Reprint ' + (billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number)">
+                            :title="window.TXT.bill_preview_prefix + (billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number)">
                             <span x-text="billDisplayNumber(bill) || bill.pra_invoice_number || bill.invoice_number"></span>
                             <span class="font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs.' + Number(bill.total_amount).toLocaleString()"></span>
                         </button>
@@ -1580,6 +1582,9 @@ window.addEventListener('popstate', function() {
                             @click="saveAttachedCallerCustomer()" class="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-bold text-purple-800 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200">
                         {{ __('pos.caller_save_customer') }}
                     </button>
+                    <button type="button" data-edit-customer-contact x-show="selectedCustomer && selectedCustomer.id" x-cloak
+                            @click="editCustomerContact(selectedCustomer)" :disabled="editingCustomerId !== null"
+                            class="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-bold text-purple-800 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/40 disabled:opacity-50">{{ __('pos.edit') }}</button>
                     {{-- Task 1380 (owner video, Aug 2026): attached customer ko YAHIN se
                          hatane ka rasta. Pehle clear ka ✕ sirf products column ke customer
                          search box par tha, is liye call se bana customer is card par
@@ -3338,7 +3343,7 @@ window.addEventListener('popstate', function() {
                     <div>
                         <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <svg class="w-5 h-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                            {{ __('pos.reprint_todays_bills') }} <span class="text-xs font-medium text-teal-600 ml-1" x-text="'(' + filteredReprintBills().length + ')'"></span>
+                            {{ __('pos.reprint') }} <span class="text-xs font-medium text-teal-600 ml-1" x-text="'(' + filteredReprintBills().length + ')'"></span>
                         </h3>
                         <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.reprint_click_hint') }}</p>
                     </div>
@@ -3349,6 +3354,12 @@ window.addEventListener('popstate', function() {
                         <button @click="showReprint = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                 </div>
+                <label class="mt-3 flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
+                    {{ __('pos.date_label') }}
+                    <input type="date" x-model="reprintDate" @change="activeReprintIndex = 0; reprintPreviewBill = null; loadReprintBills()"
+                           :disabled="reprintBusyId !== null" class="rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm">
+                </label>
+                <p x-show="reprintLoadError" x-cloak role="alert" class="mt-2 text-sm font-semibold text-red-700 dark:text-red-300" x-text="window.TXT.network_error"></p>
                 <div class="mt-3 relative">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     {{-- Element-level keydown handlers REQUIRED: handleKey's global input-field
@@ -3363,6 +3374,25 @@ window.addEventListener('popstate', function() {
                            placeholder="{{ __('pos.ph_reprint_search') }}"
                            class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400">
                 </div>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <label class="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        {{ __('pos.order_type') }}
+                        <select x-model="reprintOrderType" @change="activeReprintIndex = 0; reprintPreviewBill = null" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <option value="">{{ __('pos.all_types') }}</option>
+                            <option value="dine_in">{{ __('pos.dine_in') }}</option>
+                            <option value="takeaway">{{ __('pos.takeaway') }}</option>
+                            <option value="delivery">{{ __('pos.delivery') }}</option>
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        {{ __('pos.payment_method') }}
+                        <select x-model="reprintPayment" @change="activeReprintIndex = 0; reprintPreviewBill = null" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <option value="">{{ __('pos.all_types') }}</option>
+                            <option value="cash">{{ __('pos.pm_cash') }}</option>
+                            <option value="card">{{ __('pos.pm_card') }}</option>
+                        </select>
+                    </label>
+                </div>
             </div>
             <div class="flex-1 overflow-y-auto">
                 <template x-if="reprintLoading && reprintBills.length === 0">
@@ -3374,8 +3404,8 @@ window.addEventListener('popstate', function() {
                 <template x-if="!reprintLoading && filteredReprintBills().length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <p class="text-sm font-medium" x-text="reprintSearch ? window.TXT.no_bill_found : window.TXT.no_bills_today"></p>
-                        <p class="text-[11px] text-gray-400 mt-1" x-text="reprintSearch ? window.TXT.change_search_try_again : window.TXT.todays_bills_appear_here"></p>
+                        <p class="text-sm font-medium" x-text="(reprintDate || reprintSearch || reprintOrderType || reprintPayment) ? window.TXT.no_bill_found : window.TXT.no_bills_today"></p>
+                        <p class="text-[11px] text-gray-400 mt-1" x-text="(reprintDate || reprintSearch || reprintOrderType || reprintPayment) ? window.TXT.change_search_try_again : window.TXT.todays_bills_appear_here"></p>
                     </div>
                 </template>
                 <template x-for="(bill, bi) in filteredReprintBills()" :key="bill.id">
@@ -4397,12 +4427,16 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- Viewport overlays must escape the sale root's zoom/overflow and clear
+         the actual header height, including compact/expanded toolbars. --}}
+    <template x-teleport="body">
+    <div data-tn-caller-overlays x-show="!callerBlocked()" @resize.window="callerOverlayEpoch++" style="position:relative;z-index:150;">
     {{-- ── Caller ID popup (Task 1039) — non-blocking incoming-call card.
-         Sits below the toast slot; z-[60] like the toast (payment/receipt
-         modals never coexist — callerBlocked() defers rings while they're up).
+         Viewport layer clears the measured header. Payment/receipt/PIN
+         blocks hide this layer and callerBlocked() still defers new rings.
          No NEW arbitrary Tailwind classes (vite-arbitrary-classes.md):
          width via inline style, z-[60]/text-[10px]/text-[11px] already built. --}}
-    <div x-show="callerPopup" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:330px; max-width:92vw;">
+    <div x-show="callerPopup" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 text-white" :class="callerPopup && callerPopup.source === 'whatsapp' ? 'bg-green-600' : 'bg-sky-600'">
                 <svg class="w-4 h-4 animate-pulse flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -4457,7 +4491,7 @@ window.addEventListener('popstate', function() {
          Small fixed pill under the popup slot; only rendered when the feature
          is baked ON. Unseen count = client-side localStorage cursor. --}}
     <template x-if="callerIdOn">
-        <div class="fixed top-20 right-4 z-50 flex flex-col items-end gap-1.5" x-show="!callerPopup" x-cloak>
+        <div class="fixed right-4 z-50 flex flex-col items-end gap-1.5" :style="callerOverlayStyle(0)" x-show="!callerPopup" x-cloak>
             {{-- Task 1397: hover par poora jumla BUTTON se milta hai — badge
                  khud 16px ka hai, us par theek se hover nahi hota. Alpine se
                  pehle static title chalta rehta hai. --}}
@@ -4480,7 +4514,7 @@ window.addEventListener('popstate', function() {
     </template>
 
     {{-- ── Caller ID v2: recent-calls panel (last 24h) --}}
-    <div x-show="showCallerLog" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:340px; max-width:92vw;">
+    <div x-show="showCallerLog" x-cloak x-transition.opacity data-tn-caller-history class="fixed right-4 z-[60]" :style="callerOverlayStyle(340)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-sky-600 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_log_title') }}</span>
@@ -4536,7 +4570,7 @@ window.addEventListener('popstate', function() {
          Wajah ka text server ke `reason` se banta hai, is liye teenon keys
          zabardasti bake karwani hain: --}}
     {{-- @posI18nExtra: caller_dial_no_device caller_dial_old_app caller_dial_notif_off --}}
-    <div x-show="callerDialFallback" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:330px; max-width:92vw;">
+    <div x-show="callerDialFallback" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_dial_title') }}</span>
@@ -4555,6 +4589,9 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
     </div>
+
+    </div>
+    </template>
 
     <div x-show="toast.show" class="fixed top-4 right-4 z-[60] max-w-sm" :class="toast.show ? 'toast-enter' : 'toast-exit'">
         {{-- ZFC issue #12 (28 Jul 2026): NEW 'info' toast type — blue, i-icon.
@@ -5225,6 +5262,7 @@ function restaurantPos() {
         // "Restaurant module not enabled"). For retail companies we route
         // EVERY processPayment call through processPaymentManual which uses
         // pos.invoice.store — a universal endpoint with no restaurant guard.
+        kotFeatureEnabled: {{ ($features->kot ?? false) ? 'true' : 'false' }},
         isRestaurantMode: {{ (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false)) ? 'true' : 'false' }},
         // ── PROVISIONAL BILLS (header shortcut, F10) ──────────────────────────
         // Lazy-loaded list of all bills with pra_status='local' for current company.
@@ -5287,6 +5325,11 @@ function restaurantPos() {
         activeReprintIndex: 0,
         reprintLoading: false,
         reprintSearch: '',
+        reprintDate: '',
+        reprintLoadError: false,
+        _reprintLoadVersion: 0,
+        reprintOrderType: '',
+        reprintPayment: '',
         reprintBusyId: null,
         reprintPreviewBill: null,   // Preview modal (ZFC 30 Jul 2026): bill being previewed
         // ── QUICK RETURN (Task 681) — bill number → return form ──────────
@@ -8490,6 +8533,42 @@ function restaurantPos() {
                 dval: Number(this.discountValue) || 0,
             });
         },
+        // A final bill includes the whole cart. Warn about additions made AFTER
+        // recall before any hold/edit/payment write; never silently drop them.
+        confirmRecalledAdditions() {
+            if (!this.kotFeatureEnabled || !(this.recalledOrderId || this.incomingOrderId) || !this._recallCartBaseline) return true;
+            let baseline;
+            try { baseline = JSON.parse(this._recallCartBaseline).items; } catch (_) { return true; }
+            if (!Array.isArray(baseline)) return true;
+            const fingerprint = this.cartEditFingerprint();
+            const approvalKey = JSON.stringify([this.recalledOrderId || null, this.incomingOrderId || null, this._recallCartBaseline, fingerprint]);
+            if (this._confirmedRecalledAdditions === approvalKey) return true;
+            const key = row => JSON.stringify([row[0], row[1], row[2], row[4], row[5]]);
+            const old = new Map();
+            for (const row of baseline) {
+                // cartEditFingerprint stores skip_kitchen after tax and discount fields.
+                if (row[11]) continue;
+                old.set(key(row), (old.get(key(row)) || 0) + Number(row[3] || 0));
+            }
+            const current = new Map();
+            for (const row of JSON.parse(fingerprint).items) {
+                // cartEditFingerprint stores skip_kitchen after tax and discount fields.
+                if (row[11]) continue;
+                const k = key(row);
+                const entry = current.get(k) || { name: row[2], quantity: 0 };
+                entry.quantity += Number(row[3] || 0);
+                current.set(k, entry);
+            }
+            const additions = [];
+            for (const [k, row] of current) {
+                const extra = row.quantity - (old.get(k) || 0);
+                if (extra > 0) additions.push(row.name + ' × ' + extra);
+            }
+            if (!additions.length) return true;
+            if (!confirm(window.TXT.recalled_additions_final_confirm + '\n\n' + additions.join('\n'))) return false;
+            this._confirmedRecalledAdditions = approvalKey;
+            return true;
+        },
         recalledCartDirty() {
             if (!(this.recalledOrderId || this.incomingOrderId)) return false;
             // Snapshot hi na ho (purane path se aaya state) → pichhle task (1027)
@@ -10058,7 +10137,7 @@ function restaurantPos() {
         handleGlobalWheel(e) {
             if (!e.deltaY) return;
             // Never hijack the wheel inside fixed overlays (modals, drawers).
-            if (e.target && e.target.closest && e.target.closest('.fixed')) return;
+            if (e.target && e.target.closest && (e.target.closest('.fixed') || e.target.closest('.tn-cart-col'))) return;
             let el = e.target;
             while (el && el !== document.body) {
                 if (el.scrollHeight > el.clientHeight + 1) {
@@ -10321,6 +10400,35 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
 
+        async editCustomerContact(customer) {
+            if (!customer || !customer.id || this.editingCustomerId) return;
+            const entered = window.prompt(window.TXT.edit_customer_name, customer.name || '');
+            if (entered === null) return;
+            const phone = window.prompt(window.TXT.edit_customer_phone, customer.phone || '');
+            if (phone === null) return;
+            const name = entered.trim();
+            if (!name) { this.showToast(window.TXT.customer_name_required, 'error'); return; }
+            this.editingCustomerId = customer.id;
+            try {
+                const response = await fetch('/pos/api/customers/' + encodeURIComponent(customer.id) + '/contact', {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ name, phone: phone.trim(), expected_phone: customer.phone || null }),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) { this.showToast(data.message || window.TXT.failed_update_customer_name, 'error'); return; }
+                const saved = data.customer;
+                for (const rows of [this.allCustomers, this.customerPhoneResults]) {
+                    if (Array.isArray(rows)) rows.filter(row => Number(row.id) === Number(saved.id)).forEach(row => Object.assign(row, saved));
+                }
+                Object.assign(customer, saved);
+                if (this.selectedCustomer && Number(this.selectedCustomer.id) === Number(saved.id)) {
+                    Object.assign(this.selectedCustomer, saved);
+                    this.customerPhoneQuery = saved.name + (saved.phone ? ' · ' + saved.phone : '');
+                }
+                this.showToast(window.TXT.customer_name_updated, 'success');
+            } catch (_) { this.showToast(window.TXT.network_error, 'error'); }
+            finally { this.editingCustomerId = null; }
+        },
         async editCustomerName(cr) {
             if (!cr || this.editingCustomerId) return;
             const entered = window.prompt(window.TXT.edit_customer_name, cr.name || '');
@@ -11138,6 +11246,7 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
+            if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.selectedCustomer?.phone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
             if (this.submitting) return;
@@ -11319,6 +11428,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).
             if (this.submitting) return;
@@ -12880,6 +12990,8 @@ function restaurantPos() {
         openReprint() {
             this.activeReprintIndex = 0;
             this.reprintSearch = '';
+            this.reprintOrderType = '';
+            this.reprintPayment = '';
             // Self-heal: _printViaIframe's onAfterPrint is skipped when the print
             // session goes stale (cancelPendingPrints) — never let a stuck busy
             // id dead-lock the whole reprint feature for the session.
@@ -12889,32 +13001,41 @@ function restaurantPos() {
             this.$nextTick(() => { const el = this.$refs.reprintSearchInput; if (el) el.focus(); });
         },
         async loadReprintBills() {
+            const version = ++this._reprintLoadVersion;
             this.reprintLoading = true;
+            this.reprintLoadError = false;
+            this.reprintBills = [];
+            this.reprintPreviewBill = null;
             try {
-                const res = await fetch('{{ url('/pos/api/todays-bills') }}', { headers: { 'Accept': 'application/json' } });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.success) {
-                        this.reprintBills = data.bills || [];
-                        if (this.activeReprintIndex >= this.reprintBills.length) {
-                            this.activeReprintIndex = Math.max(0, this.reprintBills.length - 1);
-                        }
-                    }
-                }
-            } catch (e) { console.warn('loadReprintBills error', e); }
-            this.reprintLoading = false;
+                const query = this.reprintDate ? '?date=' + encodeURIComponent(this.reprintDate) : '';
+                const res = await fetch('{{ url('/pos/api/todays-bills') }}' + query, { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('Bill list unavailable');
+                const data = await res.json();
+                if (!data || !data.success) throw new Error('Bill list unavailable');
+                if (version !== this._reprintLoadVersion) return;
+                this.reprintBills = data.bills || [];
+                this.reprintDate = data.business_date || this.reprintDate;
+                this.activeReprintIndex = 0;
+            } catch (e) {
+                if (version === this._reprintLoadVersion) this.reprintLoadError = true;
+            } finally {
+                if (version === this._reprintLoadVersion) this.reprintLoading = false;
+            }
         },
         filteredReprintBills() {
             const q = (this.reprintSearch || '').toLowerCase().trim();
-            if (!q) return this.reprintBills;
-            return this.reprintBills.filter(b =>
-                (b.display_number || '').toLowerCase().includes(q)
-                || (b.bill_token || '').toString().toLowerCase().includes(q)
-                || (b.invoice_number || '').toLowerCase().includes(q)
-                || (b.pra_invoice_number || '').toLowerCase().includes(q)
-                || (b.customer_name || '').toLowerCase().includes(q)
-                || String(b.total_amount || '').includes(q)
-            );
+            return this.reprintBills.filter(b => {
+                if (this.reprintOrderType && b.order_type !== this.reprintOrderType) return false;
+                const payment = String(b.payment_method || '').trim().toLowerCase();
+                if (this.reprintPayment === 'cash' && payment !== 'cash') return false;
+                if (this.reprintPayment === 'card' && !['card', 'debit_card', 'credit_card'].includes(payment)) return false;
+                return !q || (b.display_number || '').toLowerCase().includes(q)
+                    || (b.bill_token || '').toString().toLowerCase().includes(q)
+                    || (b.invoice_number || '').toLowerCase().includes(q)
+                    || (b.pra_invoice_number || '').toLowerCase().includes(q)
+                    || (b.customer_name || '').toLowerCase().includes(q)
+                    || String(b.total_amount || '').includes(q);
+            });
         },
         // Print the ORIGINAL receipt of any of today's bills — no COPY label
         // (owner rule 23 Jul 2026). Mirrors printReceipt() for an arbitrary
@@ -13881,6 +14002,17 @@ function restaurantPos() {
         // ─── Caller ID popup (Task 1039) ───────────────────────────────────
         // Non-blocking: silent while payment / receipt / manager-PIN / table-
         // switch prompts are up — deferred rings surface right after (queue).
+        callerOverlayEpoch: 0,
+        callerOverlayStyle(width) {
+            // Epoch makes window resize/fullscreen changes reactive.
+            this.callerOverlayEpoch;
+            const header = document.querySelector('[data-tn-topnav="pra"]');
+            const height = window.innerHeight;
+            const bottom = header ? header.getBoundingClientRect().bottom : 64;
+            const top = Math.min(Math.max(8, bottom + 8), Math.max(8, height - 120));
+            return 'top:' + top + 'px;max-height:' + Math.max(100, height - top - 8)
+                + 'px;max-width:calc(100vw - 32px);overflow-y:auto;width:' + (width ? width + 'px' : 'auto') + ';';
+        },
         callerBlocked() {
             return this.showPayModal || this.showReceipt || this.showManagerPinModal
                 || !!this.tableSwitchPrompt || this.submitting;

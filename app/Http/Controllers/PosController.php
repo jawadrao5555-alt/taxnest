@@ -378,6 +378,9 @@ class PosController extends Controller
                 ],
                 'rp_align_center' => 'nullable|in:0,1',
                 'rp_left_margin_mm' => 'nullable|integer|min:0|max:30',
+                'rp_font_family' => 'sometimes|required|in:legacy,sans,mono',
+                'rp_item_text' => 'sometimes|required|in:legacy,compact,large',
+                'rp_wide_names' => 'sometimes|boolean',
             ], [
                 'rp_delivery_receipt_on_assign.required' => __('pos.delivery_receipt_default_invalid'),
             ]);
@@ -473,10 +476,16 @@ class PosController extends Controller
                 }
                 // bold/logo: always read-modify-write via the fresh style so a bare/stale
                 // POST never silently resets them (e.g. theme-picker not in old cached form).
-                $prefs['pos_style'] = [
+                $prefs['pos_style'] = array_replace($origStyle, [
                     'bold' => $styleBoldLogo['bold'],
                     'logo' => $styleBoldLogo['logo'],
-                ];
+                ]);
+                foreach (['font_family', 'item_text'] as $key) {
+                    if ($request->has('rp_'.$key)) $prefs['pos_style'][$key] = $request->input('rp_'.$key);
+                }
+                if ($request->has('rp_typography_present')) {
+                    $prefs['pos_style']['wide_names'] = $request->boolean('rp_wide_names');
+                }
                 // Checkbox-based pos_style keys (show_logo, logo_finals_only, show_menu_qr)
                 // and pdf_paper are only written when rp_pos_style_present is in the request,
                 // meaning the form was freshly rendered and the user's intent is known.
@@ -5689,6 +5698,8 @@ class PosController extends Controller
     public function apiTodaysBills(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $validated = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']]);
+        $businessDate = $validated['date'] ?? \App\Services\PosBusinessDay::current($companyId);
 
         // Visibility MUST mirror receipt(): archived bills are listed ONLY when
         // invoice_mode='local' (post-finalize archive) — archived PRA bills stay
@@ -5703,7 +5714,7 @@ class PosController extends Controller
                       ->orWhere('invoice_mode', 'local');
                 }
             })
-            ->where('business_date', \App\Services\PosBusinessDay::current($companyId))
+            ->where('business_date', $businessDate)
             // Billing Scope (07 Aug 2026): stream-locked staff get ONLY their own
             // stream in the Reprint list — mirrors applyReportFilters' split.
             ->where(function ($q) {
@@ -5796,6 +5807,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'count'   => $data->count(),
+            'business_date' => $businessDate,
             'bills'   => $data,
         ]);
     }
@@ -7094,6 +7106,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+        $reportBusinessDate = \App\Services\PosBusinessDay::current((int) $companyId);
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
@@ -7253,7 +7266,7 @@ class PosController extends Controller
             $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
         }
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics'));
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
     }
 
     /**
@@ -7282,7 +7295,7 @@ class PosController extends Controller
         }
 
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
-        $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+        $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user, true);
 
          return $this->renderReportPdf(
             'pos.reports-analytics-pdf',
@@ -10230,6 +10243,56 @@ class PosController extends Controller
             });
 
         return response()->json(['addresses' => $addresses]);
+    }
+
+    /** Explicit contact correction; the legacy name-only API stays unchanged. */
+    public function apiUpdateCustomerContact(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $input = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['required', 'string', 'max:30', 'regex:/^[0-9+() \-]+$/'],
+            'expected_phone' => ['present', 'nullable', 'string', 'max:30'],
+        ]);
+        $name = trim($input['name']);
+        $phone = trim($input['phone']);
+        $digits = preg_replace('/\D+/', '', $phone);
+        if ($name === '' || strlen($digits) < 4 || strlen($digits) > 15) {
+            return response()->json(['success' => false, 'message' => __('pos.customer_contact_invalid')], 422);
+        }
+        // Fail closed if identity locking is unavailable. Share the existing
+        // create endpoint's mutex for equivalent local/international spellings.
+        $locks = [];
+        try {
+            foreach (\App\Services\PosCustomerPhoneIdentity::creationLockKeys($companyId, $phone) as $key) {
+                $lock = \Illuminate\Support\Facades\Cache::lock($key, 60);
+                $lock->block(3);
+                $locks[] = $lock;
+            }
+            return DB::transaction(function () use ($companyId, $id, $name, $phone, $input) {
+                // Serialize corrections and inspect only this company's identities.
+                Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+                $customers = PosCustomer::where('company_id', $companyId)->lockForUpdate()->get(['id', 'phone']);
+                $current = $customers->first(fn ($row) => (int) $row->id === (int) $id);
+                if (!$current) return response()->json(['success' => false, 'message' => __('pos.customer_not_found')], 404);
+                if (trim((string) $current->phone) !== trim((string) $input['expected_phone'])) {
+                    return response()->json(['success' => false, 'message' => __('pos.customer_contact_changed')], 409);
+                }
+                $canonical = \App\Services\PosCustomerPhoneIdentity::canonical($phone);
+                if ($customers->contains(fn ($row) => (int) $row->id !== (int) $id
+                    && \App\Services\PosCustomerPhoneIdentity::canonical($row->phone) === $canonical)) {
+                    return response()->json(['success' => false, 'message' => __('pos.customer_contact_duplicate')], 422);
+                }
+                $customer = PosCustomer::where('company_id', $companyId)->findOrFail((int) $id);
+                $customer->update(['name' => $name, 'phone' => $phone]);
+                return response()->json(['success' => true, 'customer' => $customer->only(['id', 'name', 'phone', 'address'])])
+                    ->header('Cache-Control', 'no-store, private');
+            }, 3);
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
+            return response()->json(['success' => false, 'message' => __('pos.customer_contact_changed')], 409);
+        } finally {
+            foreach (array_reverse($locks) as $lock) $lock->release();
+        }
     }
 
     /**
@@ -14965,7 +15028,7 @@ class PosController extends Controller
      * customers, payment split. Respects the tab (pra|local) + cashier filter
      * exactly like the rest of the reports page (applyReportFilters).
      */
-    private function buildReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, string $tab, $cashierFilter, ?Company $company, $user): object
+    private function buildReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, string $tab, $cashierFilter, ?Company $company, $user, bool $menuOrder = false): object
     {
         $isAdminView = (bool) ($user?->isPosAdmin());
 
@@ -15045,7 +15108,7 @@ class PosController extends Controller
         });
 
         $revenueTotal = (float) $items->sum('subtotal');
-        $categories = $items->groupBy('resolved_category')->map(function ($g) use ($revenueTotal, $isAdminView) {
+        $categories = $items->groupBy('resolved_category')->map(function ($g) use ($revenueTotal, $isAdminView, $menuOrder) {
             $revenue = (float) $g->sum('subtotal');
             $withCost = $g->filter(fn ($it) => $it->resolved_cost !== null);
             $cost = (float) $withCost->sum('resolved_cost');
@@ -15061,9 +15124,9 @@ class PosController extends Controller
                         'qty' => (float) $pg->sum('quantity'),
                         'revenue' => (float) $pg->sum('subtotal'),
                     ];
-                })->sortByDesc('revenue')->take(15),
+                })->when($menuOrder, fn ($rows) => $rows->sortKeys(SORT_NATURAL | SORT_FLAG_CASE), fn ($rows) => $rows->sortByDesc('revenue')->take(15)),
             ];
-        })->sortByDesc('revenue');
+        })->when($menuOrder, fn ($rows) => $rows->sortKeys(SORT_NATURAL | SORT_FLAG_CASE), fn ($rows) => $rows->sortByDesc('revenue'));
 
         // Profit summary (ADMIN-ONLY): only items whose product has a cost_price
         // set count toward cost — coverage_pct tells the admin how complete it is.
@@ -15362,19 +15425,26 @@ class PosController extends Controller
 
     /**
      * Shared range parsing for the reports analytics surfaces: a fresh visit
-     * defaults to today, swaps reversed inputs, caps the window at 366 days.
+     * defaults to the active business day, swaps reversed inputs and caps the
+     * window at 366 days. Explicit/partial date ranges retain calendar dates.
      *
      * @return array{0:\Carbon\Carbon,1:\Carbon\Carbon}
      */
     private function resolveReportRange(Request $request): array
     {
+        $defaultDate = now()->toDateString();
+        // Fresh analytics follows the shop's active day, including the hours
+        // after midnight. Explicit/partial ranges keep their previous meaning.
+        if (!$request->filled('from') && !$request->filled('to') && app()->bound('currentCompanyId')) {
+            $defaultDate = \App\Services\PosBusinessDay::current((int) app('currentCompanyId'));
+        }
         try {
-            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : now()->startOfDay();
+            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : \Carbon\Carbon::parse($defaultDate)->startOfDay();
         } catch (\Throwable) {
             $from = now()->startOfDay();
         }
         try {
-            $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to'))->endOfDay() : now()->endOfDay();
+            $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to'))->endOfDay() : \Carbon\Carbon::parse($defaultDate)->endOfDay();
         } catch (\Throwable) {
             $to = now()->endOfDay();
         }

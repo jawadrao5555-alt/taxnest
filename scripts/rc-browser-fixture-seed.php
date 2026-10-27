@@ -210,6 +210,20 @@ $addressProofPlan = \App\Models\PricingPlan::create([
 ]);
 $tableCashier = $user($tableShop, 'Synthetic Table Cashier', 'table-orders@rc-browser.invalid', 'user', 'pos_cashier');
 $tableWaiter = $user($tableShop, 'Synthetic Table Waiter', 'table-waiter@rc-browser.invalid', 'user', 'pos_waiter');
+// Historical receipt fixture belongs to an already-closed trading day; it
+// must not create an unrelated pending-day popup in later table journeys.
+DB::table('pos_day_close_reports')->insert([
+    'company_id' => $tableShop->id, 'report_date' => '2024-01-02',
+    'report_number' => 'RC-HISTORICAL-CLOSED', 'created_at' => $now, 'updated_at' => $now,
+]);
+DB::table('pos_transactions')->insert([
+    'company_id' => $tableShop->id, 'created_by' => $tableCashier->id,
+    'invoice_number' => 'RC-HISTORICAL-REPRINT', 'business_date' => '2024-01-02',
+    'status' => 'completed', 'invoice_mode' => 'local', 'pra_status' => 'local',
+    'customer_name' => 'Synthetic historical date proof', 'payment_method' => 'cash',
+    'subtotal' => 100, 'tax_rate' => 0, 'tax_amount' => 0, 'total_amount' => 100,
+    'created_at' => '2024-01-02 12:00:00', 'updated_at' => '2024-01-02 12:00:00',
+]);
 $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);
 $tableCases = [];
 $handoffCases = [];
@@ -371,6 +385,28 @@ foreach (['pos', 'fbr_pos'] as $audience) {
         'type' => 'improvement',
         'is_published' => true,
     ]);
+}
+
+$bulkRiderCompany = $company('Synthetic Bulk Rider Cash', 'bulk-rider@rc-browser.invalid', 'RCBULKRIDER', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'pos_setup_completed' => true,
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
+]);
+$bulkRiderOwner = $user($bulkRiderCompany, 'Synthetic Bulk Rider Owner', 'bulk-rider-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$bulkRiderCases = [];
+foreach ([1366, 390] as $width) {
+    $riderId = DB::table('pos_riders')->insertGetId(['company_id' => $bulkRiderCompany->id, 'name' => 'Synthetic Rider '.$width, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
+    $ids = [];
+    for ($i = 1; $i <= 3; $i++) {
+        $ids[] = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $bulkRiderCompany->id, 'created_by' => $bulkRiderOwner->id,
+            'invoice_number' => 'RC-RIDER-'.$width.'-'.$i, 'business_date' => \App\Services\PosBusinessDay::current($bulkRiderCompany->id),
+            'status' => 'completed', 'invoice_mode' => 'local', 'pra_status' => 'local',
+            'customer_name' => 'Synthetic rider customer '.$i, 'payment_method' => 'cash', 'order_type' => 'delivery',
+            'subtotal' => 100, 'tax_rate' => 0, 'tax_amount' => 0, 'total_amount' => 100,
+            'rider_id' => $riderId, 'delivery_status' => 'dispatched', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+    }
+    $bulkRiderCases[$width] = ['riderId' => $riderId, 'ids' => $ids];
 }
 
 $topSellingCompany = $company('Synthetic Top Selling', 'top-selling-company@rc-browser.invalid', 'RCTOPSELL001', 'pos', [
@@ -690,9 +726,13 @@ $fixture = [
         ['name' => 'mixed-fulfillment', 'login' => $mixedOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'mixedFulfillment' => ['tables' => $mixedTables, 'phone' => $mixedCustomer->phone, 'customer' => $mixedCustomer->name, 'product' => $mixedProduct->name]],
         ['name' => 'occupied-table-orders', 'login' => $tableCashier->email, 'password' => $password,
             'loginPath' => '/pos/login', 'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'],
+            'settingsOwner' => ['name'=>'synthetic-settings-owner','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login'],
             'tableOrderWorkflow' => $tableCases, 'kotDeleteCases' => $kotDeleteCases, 'cashierHandoff' => ['cases' => $handoffCases, 'cashierId' => $tableCashier->id,
                 'manager' => ['name' => 'synthetic-transfer-manager', 'login' => $tableManager->email, 'password' => $password, 'loginPath' => '/pos/login']]],
         ['name' => 'hotel-settings', 'login' => $settingsOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/customize'], 'hotelSettingsWorkflow' => true],
+        ['name' => 'reports-business-day', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/reports'], 'reportsBusinessDay' => \App\Services\PosBusinessDay::current($topSellingCompany->id)],
+        ['name' => 'rider-selected-settlement', 'login' => $bulkRiderOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/deliveries'], 'riderBulkSelection' => $bulkRiderCases],
+        ['name' => 'menu-exempt-filter', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/products'], 'menuExemptFilter' => true],
         ['name' => 'restaurant-top-selling', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/restaurant/top-selling'], 'restaurantTopSelling' => true, 'markers' => ['Synthetic complete item 16']],
         ['name' => 'notification-di', 'login' => $notificationUsers['di']['desktop'], 'mobileLogin' => $notificationUsers['di']['mobile'], 'preflightLogin' => $notificationUsers['di']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['di']['preflight-mobile'], 'password' => $password, 'loginPath' => '/login', 'paths' => ['/profile'], 'notificationWorkflow' => 'di'],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'preflightLogin' => $notificationUsers['pra']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['pra']['preflight-mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],

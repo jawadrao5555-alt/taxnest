@@ -1,4 +1,10 @@
 <x-pos-layout>
+<style>
+.tn-table-setting-control { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:8px; border:2px solid #6b7280; border-radius:8px; cursor:pointer; white-space:nowrap; color:#111827; background:#fff; }
+.tn-table-setting-checkbox { appearance:auto !important; position:static !important; opacity:1 !important; width:22px !important; height:22px !important; min-width:22px; accent-color:#7e22ce; clip:auto !important; }
+.tn-table-setting-control:focus-within { outline:2px solid #7e22ce; outline-offset:2px; }
+.dark .tn-table-setting-control { background:#111827; color:#fff; border-color:#9ca3af; }
+</style>
 <div x-data="{ showFloorModal: false, showTableModal: false, editFloor: null, editTable: null, selectedFloorId: null }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
@@ -23,14 +29,14 @@
     <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-between gap-4">
         <div>
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.tables_first_flow_title') }}</h3>
-            <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.tables_first_flow_hint') }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{{ __('pos.tables_first_flow_hint') }}</p>
         </div>
-        <form method="POST" action="{{ route('pos.restaurant.tables-first-flow') }}">
+        <form class="shrink-0" method="POST" action="{{ route('pos.restaurant.tables-first-flow') }}">
             @csrf
-            <label class="relative inline-flex items-center cursor-pointer">
+            <label class="tn-table-setting-control">
                 <input type="hidden" name="tables_first_flow" value="0">
-                <input type="checkbox" name="tables_first_flow" value="1" {{ ($company->tables_first_flow ?? false) ? 'checked' : '' }} onchange="this.form.submit()" class="sr-only peer">
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                <input type="checkbox" name="tables_first_flow" value="1" {{ ($company->tables_first_flow ?? false) ? 'checked' : '' }} onchange="this.form.submit()" class="tn-table-setting-checkbox">
+                <span>{{ __('pos.on_word') }} / {{ __('pos.off_word') }}</span>
             </label>
         </form>
     </div>
@@ -43,14 +49,14 @@
     <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-between gap-4">
         <div>
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.table_direct_open_title') }}</h3>
-            <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.table_direct_open_hint') }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{{ __('pos.table_direct_open_hint') }}</p>
         </div>
-        <form method="POST" action="{{ route('pos.restaurant.table-direct-open') }}">
+        <form class="shrink-0" method="POST" action="{{ route('pos.restaurant.table-direct-open') }}">
             @csrf
-            <label class="relative inline-flex items-center cursor-pointer">
+            <label class="tn-table-setting-control">
                 <input type="hidden" name="table_click_direct_open" value="0">
-                <input type="checkbox" name="table_click_direct_open" value="1" {{ ($company->table_click_direct_open ?? false) ? 'checked' : '' }} onchange="this.form.submit()" class="sr-only peer">
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                <input type="checkbox" name="table_click_direct_open" value="1" {{ ($company->table_click_direct_open ?? false) ? 'checked' : '' }} onchange="this.form.submit()" class="tn-table-setting-checkbox">
+                <span>{{ __('pos.on_word') }} / {{ __('pos.off_word') }}</span>
             </label>
         </form>
     </div>

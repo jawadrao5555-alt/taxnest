@@ -47,3 +47,11 @@ Local PHP 8.4.27, Node 24.22.1 and actual pinned Chromium headless shell 151.0.7
 - Local workflow safety checks passed up to the MariaDB discovery harness; that harness refuses this host's remapped temporary root. No allowlist/gate was loosened. CI remains authoritative.
 
 Deploy readiness requires this bulk PR's own current-head seven mandatory lanes plus validate (8/8), fresh clean mergeability and review. Historical source greens are not evidence for this combined tree. No approval, merge, relay dispatch, production access or physical print was performed. No background monitoring promise.
+
+## Readiness follow-up — 27 October 2026
+
+Run 40445972578 at head 9ef2a774ff3f80af3895ca4bd7d6f4c7e72f4a40 passed full PHP (5,589 tests / 44,848 assertions; 28 deprecations, 9 skips), MariaDB 10.6, Node 22, locked audit/build, workflow and release proof. Browser/validate failed at the cart wheel ancestor-position assertion. The same actual app run passed Table Setup persisted on/off, receipt preview, complete catalog, recent-bill no-print/explicit-Print routes and delivery address snapshots before that failure.
+
+The wheel probe captured ancestor scroll positions BEFORE Playwright hover. Hover itself scrolls the target into view. A separate actual Chromium 151 reproduction with an overflowing cart measured main=0 before hover, main=120 after hover, main=120 after wheel while cart advanced 0→800. The old comparison incorrectly attributes pointer preparation to the wheel.
+
+Move pointer preparation before the baseline, assert that the target is a visible native scroller, retain list movement, unchanged document/main/product-grid positions and last-item reachability. Include before/after positions in genuine failures. This changes only the acceptance probe; no product scrolling rules or mandatory CI gates are removed. Local production wheel tests 3/3 and JS parser/diff pass. Fresh full-app desktop/390px and all eight checks remain required for the new head.

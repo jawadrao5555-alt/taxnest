@@ -1775,11 +1775,22 @@ async function tableOrderWorkflow(page,t,v) {
         d.cart.push(...Array.from({length:24},(_,i)=>({cart_uid:'qa-scroll-'+i,item_id:null,item_type:'manual',item_name:'QA scroll item '+i,quantity:1,unit_price:100,is_tax_exempt:true,special_notes:''})));
       });
       const list=page.locator('[x-ref="cartList"]');await list.waitFor({state:'visible'});
+      // Playwright hover scrolls its target into view. Establish the wheel-only
+      // baseline AFTER that pointer preparation, not before its ancestor scroll.
+      await list.hover();
+      const wheelTarget=await list.evaluate(el=>{
+        const r=el.getBoundingClientRect();
+        const x=Math.max(0,r.left)+Math.min(r.width,innerWidth-r.left)/2;
+        const y=Math.max(0,r.top)+(Math.min(r.bottom,innerHeight)-Math.max(0,r.top))/2;
+        const hit=document.elementFromPoint(x,y);
+        return {scrollable:el.scrollHeight>el.clientHeight+1,hit:!!hit&&el.contains(hit)};
+      });
+      if(!wheelTarget.scrollable||!wheelTarget.hit)throw new Error('Cart wheel target is not a visible native scroller: '+JSON.stringify(wheelTarget));
       const before=await page.evaluate(()=>({doc:document.scrollingElement.scrollTop,main:document.querySelector('main')?.scrollTop||0,grid:document.querySelector('[x-ref="gridContainer"]')?.scrollTop||0}));
-      await list.hover();await page.mouse.wheel(0,800);
+      await page.mouse.wheel(0,800);
       await page.waitForFunction(()=>document.querySelector('[x-ref="cartList"]').scrollTop>0);
       const after=await page.evaluate(()=>({doc:document.scrollingElement.scrollTop,main:document.querySelector('main')?.scrollTop||0,grid:document.querySelector('[x-ref="gridContainer"]')?.scrollTop||0}));
-      if(JSON.stringify(before)!==JSON.stringify(after))throw new Error('Cart wheel scrolled the page/product grid instead of its items');
+      if(JSON.stringify(before)!==JSON.stringify(after))throw new Error('Cart wheel scrolled the page/product grid instead of its items: '+JSON.stringify({before,after}));
       const last=list.getByText('QA scroll item 23',{exact:true});await last.scrollIntoViewIfNeeded();
       if(!await last.isVisible())throw new Error('Last newly-added recalled-cart item is unreachable');
       await saveEvidenceScreenshot(page,'recalled-cart-scroll-'+v.width+'.png');

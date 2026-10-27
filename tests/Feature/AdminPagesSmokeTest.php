@@ -405,6 +405,24 @@ class AdminPagesSmokeTest extends TestCase
         $this->actingAsAdmin()->get('/admin/system-control')->assertStatus(200);
     }
 
+    public function test_admin_validation_and_flash_messages_have_readable_semantic_notices(): void
+    {
+        $errors = (new \Illuminate\Support\ViewErrorBag())->put('default',
+            new \Illuminate\Support\MessageBag(['name' => 'Synthetic validation message.']));
+        $this->actingAsAdmin()->withSession([
+            'errors' => $errors,
+            'error' => 'Synthetic failure message.',
+            'success' => 'Synthetic success message.',
+        ])->get('/admin/audit-logs')->assertOk()
+            ->assertSee('tn-admin-notice--error', false)
+            ->assertSee('tn-admin-notice--success', false)
+            ->assertSee('role="alert"', false)
+            ->assertSee('role="status"', false)
+            ->assertSee('Synthetic validation message.')
+            ->assertSee('Synthetic failure message.')
+            ->assertSee('Synthetic success message.');
+    }
+
     /** Unauthenticated visitors are redirected to admin login, never shown pages. */
     public function test_admin_pages_redirect_guests_to_admin_login(): void
     {

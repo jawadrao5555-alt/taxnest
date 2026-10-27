@@ -208,6 +208,24 @@ class PosReceiptStyleGuardTest extends TestCase
 
     // ── 1. Model defaults + explicit-false persistence ────────────────────
 
+    public function test_typography_save_and_stale_form_preserve_other_company_and_style(): void
+    {
+        $this->seedRichDisplayPrefs($this->posCompanyId);
+        $before = $this->rawPrefs($this->posCompanyId);
+        $this->actingAs(User::find($this->posAdminId), 'pos')->post('/pos/receipt-settings', [
+            'rp_font_family' => 'mono', 'rp_item_text' => 'compact',
+            'rp_typography_present' => '1', 'rp_wide_names' => '1',
+        ])->assertRedirect();
+        $saved = $this->rawPrefs($this->posCompanyId);
+        $this->assertSame('mono', $saved['pos_style']['font_family']);
+        $this->assertSame('compact', $saved['pos_style']['item_text']);
+        $this->assertTrue($saved['pos_style']['wide_names']);
+        $this->assertSame($before['fbrpos'], $saved['fbrpos']);
+        $this->actingAs(User::find($this->posAdminId), 'pos')->post('/pos/receipt-settings', ['rp_style_bold' => '1'])->assertRedirect();
+        $this->assertSame('mono', $this->rawPrefs($this->posCompanyId)['pos_style']['font_family']);
+        $this->actingAs(User::find($this->posAdminId), 'pos')->post('/pos/receipt-settings', ['rp_font_family' => 'url(evil)'])->assertSessionHasErrors('rp_font_family');
+    }
+
     public function test_pos_receipt_style_defaults(): void
     {
         $style = $this->company($this->posCompanyId)->posReceiptStyle();

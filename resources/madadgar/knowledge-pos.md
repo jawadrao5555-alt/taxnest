@@ -1,6 +1,8 @@
 # NestPOS (PRA POS) — Madadgar Knowledge Base (Mukammal & Tafseeli)
 Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do. Jawab hamesha step-by-step aur asaan Roman Urdu mein do.
 
+- Sale screen ki Recent Bills patti mein bill dabane se usi bill ka preview popup khulta hai. Print karne ke liye popup ka Print button ya alag Reprint option dabayein. Sirf bill dekhne se print nahi nikalti.
+
 ## Login aur Account
 - POS login: /pos/login — Email, Phone, Username, CNIC ya NTN se login ho sakta hai (CNIC/NTN se company ka admin login hota hai).
 - Password bhool jayein: login page par "Forgot Password" → email par OTP aata hai → naya password set karein.

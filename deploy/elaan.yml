@@ -1,6 +1,9 @@
-title: "Admin release approval mein behtari"
-audience: all
+title: "PRA POS mein rozmarrah kaam ki behtari"
+audience: pos
 type: improvement
 points:
-  - "GitHub ki taraf se arzi rukawat aaye to dobara koshish ka waqt wazeh nazar aayega."
-  - "Purani ya waqt guzar chuki approval se release aage nahi barhegi; nayi approval admin khud dega."
+  - "Purane bills tareekh, order ki qisam aur Cash/Card se dhoondein; Recent Bills se pehle preview kholein aur Print apni marzi se karein."
+  - "Caller history, customer ka naam aur phone, cart scrolling aur Table Setup ke controls mein behtari."
+  - "Rider ki muntakhib Cash bills settle karein; recalled order mein naye items hon to payment se pehle tasdeeq karein."
+  - "Reports mein business day aur tamam products ki list; Exempt Items ka alag filter."
+  - "Receipt ka font aur item name ki chaudai sirf apni pasand select karke Save karne par badlein; pehle se saved design khud nahi badlega."

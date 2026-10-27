@@ -600,6 +600,7 @@
                 <option value="active">{{ __('pos.active_only') }}</option>
                 <option value="inactive">{{ __('pos.inactive_only') }}</option>
                 @if($productsInventoryRelevant)<option value="low">{{ __('pos.low_stock') }}</option>@endif
+                <option value="exempt">{{ __('pos.tr_exempt_only') }}</option>
                 <option value="third">{{ __('pos.third_schedule_only') }}</option>
             </select>
             <select x-model="sortKey" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
@@ -1015,6 +1016,7 @@
                     if (this.statusFilter === 'active') list = list.filter(p => p.is_active);
                     else if (this.statusFilter === 'inactive') list = list.filter(p => !p.is_active);
                     else if (this.statusFilter === 'low') list = list.filter(p => this.isLow(p));
+                    else if (this.statusFilter === 'exempt') list = list.filter(p => p.is_tax_exempt);
                     else if (this.statusFilter === 'third') list = list.filter(p => p.is_third_schedule);
                     const dir = this.sortDir === 'asc' ? 1 : -1;
                     const key = this.sortKey;

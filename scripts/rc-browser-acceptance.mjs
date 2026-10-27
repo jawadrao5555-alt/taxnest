@@ -1486,6 +1486,9 @@ async function workflow(page,t,v,diagnostics) {
   if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
+  if (t.reportsBusinessDay) return reportsBusinessDayWorkflow(page,t,v);
+  if (t.riderBulkSelection) return riderBulkSelectionWorkflow(page,t,v);
+  if (t.menuExemptFilter) return menuExemptFilterWorkflow(page,t,v);
   if (t.restaurantTopSelling) return restaurantTopSellingWorkflow(page,t,v);
   if (t.notificationWorkflow) return notificationWorkflow(page,t,v,diagnostics);
   if (t.hotelWorkflow) return hotelWorkflow(page,t,v,diagnostics);
@@ -1538,13 +1541,119 @@ async function ingredientUnitAudit(page,t,v) {
   pass(t.name+'/'+v.width+': real unused pcs-to-kg edit, visible stocked-unit refusal and invalid-unit rejection');
 }
 
+async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
+  const ownerContext=await originalPage.context().browser().newContext({viewport:v});
+  await ownerContext.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
+  const page=await ownerContext.newPage();
+  try {
+    await login(page,t.settingsOwner);
+  await page.goto(baseUrl+'/pos/receipt-settings',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  await page.locator('[name="rp_font_family"]').selectOption('sans');
+  await page.locator('[name="rp_item_text"]').selectOption('compact');
+  await page.locator('[name="rp_wide_names"]').check();
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-tn-typography-preview] .tn-preview-items td');return e&&parseFloat(getComputedStyle(e).fontSize)<=10;});
+  await saveEvidenceScreenshot(page,'receipt-typography-preview-'+v.width+'.png');
+  pass(t.name+'/'+v.width+': actual receipt font/compact/wide-name controls update live preview without saving');
+  } finally { await ownerContext.close(); }
+}
+
+async function tableSettingsVisibilityWorkflow(originalPage,t,v) {
+  const ownerContext=await originalPage.context().browser().newContext({viewport:v});
+  await ownerContext.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
+  const page=await ownerContext.newPage();
+  try {
+    await login(page,t.settingsOwner);
+  await page.goto(baseUrl+'/pos/restaurant/table-management',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page); await dismiss(page);
+  for(const dark of [false,true]) {
+    await page.evaluate(d=>document.documentElement.classList.toggle('dark',d),dark);
+    const controls=page.locator('.tn-table-setting-checkbox');
+    if(await controls.count()!==2)throw new Error('Table setup lost a setting control');
+    for(let i=0;i<2;i++) {
+      const c=controls.nth(i); await c.scrollIntoViewIfNeeded();
+      const m=await c.evaluate(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height,opacity:getComputedStyle(e).opacity,appearance:getComputedStyle(e).appearance}));
+      if(!await c.isVisible()||m.w<20||m.h<20||Number(m.opacity)<1||m.appearance==='none')throw new Error('Table setting not visibly operable: '+JSON.stringify(m));
+      await c.focus();
+      if(!await c.evaluate(e=>document.activeElement===e))throw new Error('Table setting not focusable');
+    }
+    await saveEvidenceScreenshot(page,'table-settings-'+(dark?'dark':'light')+'-'+v.width+'.png');
+  }
+  await page.evaluate(()=>document.documentElement.classList.remove('dark'));
+  for(const name of ['tables_first_flow','table_click_direct_open']) {
+    const c=page.locator('input[type=checkbox][name="'+name+'"]');
+    const was=await c.isChecked();
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),c.setChecked(!was)]);
+    await waitForOperationalSurface(page); await dismiss(page);
+    if(await page.locator('input[type=checkbox][name="'+name+'"]').isChecked()===was)throw new Error('Table setting did not persist');
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('input[type=checkbox][name="'+name+'"]').setChecked(was)]);
+    await waitForOperationalSurface(page); await dismiss(page);
+  }
+  pass(t.name+'/'+v.width+': visible native table settings, keyboard focus and persisted on/off');
+  } catch(error) {
+    await saveEvidenceScreenshot(page,'table-settings-failure-'+v.width);
+    console.error('Table settings failure:',error.stack);throw error;
+  } finally { await ownerContext.close(); }
+}
 
 async function tableOrderWorkflow(page,t,v) {
+  await tableSettingsVisibilityWorkflow(page,t,v);
+  await receiptTypographyPreviewWorkflow(page,t,v);
   await catalogSearchCompleteWorkflow(page,t,v);
   await deliveryAddressSnapshotWorkflow(page,t,v);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  await root.evaluate(el=>window.Alpine.$data(el).openReprint());
+  const reprint=page.locator('[x-show="showReprint"]');
+  await reprint.waitFor({state:'visible'});
+  const date=reprint.locator('input[type="date"]');
+  await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintLoading);
+  await date.fill('2024-01-02');
+  await date.press('Tab');
+  await page.waitForFunction(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    return !d.reprintLoading&&d.reprintDate==='2024-01-02'&&d.reprintBills.some(b=>b.customer_name==='Synthetic historical date proof');
+  });
+  if(!(await reprint.innerText()).includes('Synthetic historical date proof'))throw new Error('Selected historical business date was not rendered in Reprint');
+  await saveEvidenceScreenshot(page,'historical-reprint-date-'+v.width+'.png');
+  await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintLoading);
+  await root.evaluate(el=>{
+    const d=window.Alpine.$data(el);
+    d.reprintBills=[
+      {id:990001,display_number:'QA-FILTER-CASH',customer_name:'QA cash delivery',order_type:'delivery',payment_method:'cash',total_amount:100,badge:'local'},
+      {id:990002,display_number:'QA-FILTER-CARD',customer_name:'QA card delivery',order_type:'delivery',payment_method:'debit_card',total_amount:100,badge:'local'},
+      {id:990003,display_number:'QA-FILTER-TAKE',customer_name:'QA card takeaway',order_type:'takeaway',payment_method:'card',total_amount:100,badge:'local'},
+    ];
+  });
+  await reprint.locator('[x-model="reprintOrderType"]').selectOption('delivery');
+  await reprint.locator('[x-model="reprintPayment"]').selectOption('card');
+  await page.waitForFunction(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return d.filteredReprintBills().length===1&&d.filteredReprintBills()[0].id===990002;
+  });
+  const text=await reprint.innerText();
+  if(!text.includes('QA card delivery')||text.includes('QA cash delivery')||text.includes('QA card takeaway'))throw new Error('Reprint filter controls rendered incorrect rows');
+  await saveEvidenceScreenshot(page,'reprint-type-payment-filters-'+v.width+'.png');
+  await reprint.locator('[x-model="reprintOrderType"]').selectOption('');
+  await reprint.locator('[x-model="reprintPayment"]').selectOption('');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).filteredReprintBills().length===3);
+  await root.evaluate(el=>{window.Alpine.$data(el).showReprint=false;});
+  const savedStyle=await root.getAttribute('style');
+  await root.evaluate(el=>{
+    el.style.zoom='0.8';
+    const d=window.Alpine.$data(el);d.callerIdOn=true;d.showCallerLog=true;
+    d.callerLog=[{id:990001,phone:'03000000000',name:'Synthetic previous call',at:'12:00',source:'sim'}];
+  });
+  const callerPanel=page.locator('[data-tn-caller-history]:visible');await callerPanel.waitFor({state:'visible'});
+  const placement=await callerPanel.evaluate(el=>{
+    const r=el.getBoundingClientRect(),h=document.querySelector('[data-tn-topnav="pra"]').getBoundingClientRect();
+    return {top:r.top,headerBottom:h.bottom,bottom:r.bottom,height:innerHeight,escaped:!document.querySelector('[data-tn-sale-root]').contains(el)};
+  });
+  if(!placement.escaped||placement.top<placement.headerBottom+4||placement.bottom>placement.height)throw new Error('Caller history is clipped by header/viewport: '+JSON.stringify(placement));
+  await saveEvidenceScreenshot(page,'caller-history-header-clearance-'+v.width+'.png');
+  await callerPanel.locator('button').filter({hasText:'Bill'}).first().click();
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.phone==='03000000000');
+  await root.evaluate((el,style)=>{el.setAttribute('style',style||'');const d=window.Alpine.$data(el);d.clearAttachedCustomer();d.callerIdOn=false;},savedStyle);
   const switcher=page.locator('[data-tn-order-type-switcher]');
   const buttons=switcher.locator('button');
   const wasDark=await page.evaluate(()=>document.documentElement.classList.contains('dark'));
@@ -1615,6 +1724,26 @@ async function tableOrderWorkflow(page,t,v) {
   }
   await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),wasDark);
 
+  await root.evaluate(el=>{
+    const d=window.Alpine.$data(el);
+    window.__additionFixture={cart:d.cart,recalledOrderId:d.recalledOrderId,incomingOrderId:d.incomingOrderId,baseline:d._recallCartBaseline,approval:d._confirmedRecalledAdditions};
+    d.cart=[{item_id:990001,item_type:'product',item_name:'Fictional pizza',quantity:1,unit_price:100}];
+    d.recalledOrderId=990001;d.incomingOrderId=null;d._recallCartBaseline=d.cartEditFingerprint();
+    d.cart.push({item_id:990002,item_type:'product',item_name:'Fictional bottle',quantity:1,unit_price:80});
+  });
+  try {
+    for(const accept of [false,true]) {
+      const dialog=page.waitForEvent('dialog');
+      const result=root.evaluate(el=>window.Alpine.$data(el).confirmRecalledAdditions());
+      const prompt=await dialog;
+      if(!prompt.message().includes('Fictional bottle'))throw new Error('Missing unsaved bottle confirmation');
+      if(accept)await prompt.accept();else await prompt.dismiss();
+      if(await result!==accept)throw new Error('Recalled addition confirmation choice ignored');
+    }
+    await saveEvidenceScreenshot(page,'recalled-additions-review-'+v.width);
+  } finally {
+    await root.evaluate(el=>{const d=window.Alpine.$data(el),f=window.__additionFixture;d.cart=f.cart;d.recalledOrderId=f.recalledOrderId;d.incomingOrderId=f.incomingOrderId;d._recallCartBaseline=f.baseline;d._confirmedRecalledAdditions=f.approval;delete window.__additionFixture;});
+  }
   for(const expected of t.tableOrderWorkflow) {
     await page.locator('[data-video="counter-dine-in"]').click();
     const tile=page.locator('[data-video="counter-table"]:visible').filter({hasText:'T-'+expected.number});
@@ -1638,6 +1767,25 @@ async function tableOrderWorkflow(page,t,v) {
     await openMobileCart(page,v,['Current Order']);
     await root.getByText(expected.itemName,{exact:true}).first().waitFor({state:'visible'});
     if(!await page.locator('[data-video="open-payment"]').isEnabled())throw new Error(expected.status+' table lost its payment action');
+    if(expected===t.tableOrderWorkflow[0]){
+      const originalViewport=page.viewportSize();
+      if(v.width>=768)await page.setViewportSize({width:v.width,height:620});
+      await root.evaluate(el=>{
+        const d=window.Alpine.$data(el);window.__cartScrollOriginal=[...d.cart];
+        d.cart.push(...Array.from({length:24},(_,i)=>({cart_uid:'qa-scroll-'+i,item_id:null,item_type:'manual',item_name:'QA scroll item '+i,quantity:1,unit_price:100,is_tax_exempt:true,special_notes:''})));
+      });
+      const list=page.locator('[x-ref="cartList"]');await list.waitFor({state:'visible'});
+      const before=await page.evaluate(()=>({doc:document.scrollingElement.scrollTop,main:document.querySelector('main')?.scrollTop||0,grid:document.querySelector('[x-ref="gridContainer"]')?.scrollTop||0}));
+      await list.hover();await page.mouse.wheel(0,800);
+      await page.waitForFunction(()=>document.querySelector('[x-ref="cartList"]').scrollTop>0);
+      const after=await page.evaluate(()=>({doc:document.scrollingElement.scrollTop,main:document.querySelector('main')?.scrollTop||0,grid:document.querySelector('[x-ref="gridContainer"]')?.scrollTop||0}));
+      if(JSON.stringify(before)!==JSON.stringify(after))throw new Error('Cart wheel scrolled the page/product grid instead of its items');
+      const last=list.getByText('QA scroll item 23',{exact:true});await last.scrollIntoViewIfNeeded();
+      if(!await last.isVisible())throw new Error('Last newly-added recalled-cart item is unreachable');
+      await saveEvidenceScreenshot(page,'recalled-cart-scroll-'+v.width+'.png');
+      await root.evaluate(el=>{const d=window.Alpine.$data(el);d.cart=window.__cartScrollOriginal;delete window.__cartScrollOriginal;});
+      await page.setViewportSize(originalViewport);
+    }
     pass(t.name+'/'+v.width+': '+expected.status+' exact occupied table opened with items and enabled payment');
     if(v.width<768) {
       // Return through the real mobile cart back button before opening another table.
@@ -1828,6 +1976,8 @@ async function customerAmountAudit(page,t,v) {
     await modal.locator('button').first().click();
     await page.goto(baseUrl+'/pos/transaction/'+bill.id+'/receipt',{waitUntil:'domcontentloaded'});
     if(!(await page.locator('body').innerText()).includes('PKR '+bill.payable+'.00'))throw new Error('actual receipt payable differs from history');
+    if((await page.locator('body').innerText()).includes('Card Discount'))throw new Error('Receipt still shows the removed Card Discount line');
+    await saveEvidenceScreenshot(page,'receipt-no-card-discount-'+bill.id+'-'+v.width+'.png');
     await page.goto(baseUrl+'/pos/transactions?tab=local',{waitUntil:'domcontentloaded'});
     await waitForOperationalSurface(page); await dismiss(page);
     const transactionRow=page.locator('tr').filter({has:page.locator('a[href$="/pos/transaction/'+bill.id+'"]')});
@@ -1928,10 +2078,16 @@ async function riderRealtimeWorkflow(page,t,v) {
     const root=document.querySelector('[x-data^="riderTracking("]');
     return root&&window.Alpine?.$data(root)?.markers?.[id];
   },t.riderRealtime.id);
+  // Each fictional upload starts a real duty session; long suites may cross
+  // the nightly cutoff after seeding. Keep production auto-off enforcement.
+  const duty=await page.request.post(baseUrl+'/api/rider-app/v1/duty',{
+    headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{on:true}});
+  if(!duty.ok()||!(await duty.json()).duty)throw new Error('Synthetic rider duty start failed: HTTP '+duty.status());
   const at=Date.now(),lat=v.width===390?31.522:31.521,lng=74.322;
   const response=await page.request.post(baseUrl+'/api/rider-app/v1/locations',{
     headers:{Authorization:'Bearer '+t.riderRealtime.token},data:{points:[{lat,lng,acc:8,at}]}});
-  if(!response.ok()||!(await response.json()).acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged');
+  const uploaded=await response.json();
+  if(!response.ok()||!uploaded.acknowledged_at?.includes(at))throw new Error('Real rider upload not acknowledged: HTTP '+response.status()+' '+JSON.stringify(uploaded));
   await page.waitForFunction(({id,lat,lng})=>{
     const d=window.Alpine.$data(document.querySelector('[x-data^="riderTracking("]'));
     const m=d.markers[id]?.getLatLng();return m&&Math.abs(m.lat-lat)<.000001&&Math.abs(m.lng-lng)<.000001;
@@ -2038,6 +2194,24 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   });
   const data=await response.json();
   if(!response.ok()||!data.success||!data.customer?.id)throw new Error('Synthetic delivery customer setup failed');
+  await page.evaluate(customer=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));d.selectedCustomer=customer;
+  },data.customer);
+  await openMobileCart(page,v,['Current Order']);
+  let contactPrompts=0;
+  const correctedPhone='0300'+String(3000000+v.width);
+  const acceptContact=dialog=>dialog.accept(contactPrompts++===0?'Synthetic corrected contact':correctedPhone);
+  page.on('dialog',acceptContact);
+  const [contactResponse]=await Promise.all([
+    page.waitForResponse(r=>r.url().endsWith('/pos/api/customers/'+data.customer.id+'/contact')&&r.request().method()==='PATCH'),
+    page.locator('[data-edit-customer-contact]:visible').click(),
+  ]);
+  page.off('dialog',acceptContact);
+  const corrected=await contactResponse.json();
+  if(!contactResponse.ok()||!corrected.success||corrected.customer.id!==data.customer.id||corrected.customer.phone!==correctedPhone)throw new Error('Actual customer contact correction failed');
+  data.customer=corrected.customer;
+  await page.waitForFunction(phone=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).selectedCustomer?.phone===phone,correctedPhone);
+  await saveEvidenceScreenshot(page,'customer-contact-corrected-'+v.width+'.png');
   let release;const gate=new Promise(resolve=>release=resolve);
   const bookUrl=baseUrl+'/pos/api/customer-addresses?customer_id='+data.customer.id;
   await page.route(bookUrl,async route=>{await gate;await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({addresses:[{id:0,label:'Default',address}]})});});
@@ -2063,6 +2237,7 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   const payload=savedResponse.request().postDataJSON();
   if(payload.delivery_address!==address)throw new Error('Selected delivery address missing from real bill payload');
   await page.unroute(bookUrl);
+  await recentBillPreviewWorkflow(page,t,v,saved.transaction_id,address);
   await page.goto(baseUrl+'/pos/transaction/'+saved.transaction_id+'/receipt',{waitUntil:'domcontentloaded'});
   const receipt=page.locator('body');
   if(!(await receipt.innerText()).includes(address))throw new Error('Persisted address absent from receipt preview');
@@ -2072,4 +2247,120 @@ async function deliveryAddressSnapshotWorkflow(page,t,v) {
   await saveEvidenceScreenshot(page,'delivery-address-preview-print-'+v.width);
   await page.emulateMedia({media:'screen'});
   pass(t.name+'/'+v.width+': delayed address lookup awaited; real provisional payload, receipt preview and print CSS retain address');
+}
+
+async function reportsBusinessDayWorkflow(page,t,v){
+  await page.goto(baseUrl+'/pos/reports',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const from=page.locator('input[type="date"][name="from"]');
+  const to=page.locator('input[type="date"][name="to"]');
+  if(await from.inputValue()!==t.reportsBusinessDay||await to.inputValue()!==t.reportsBusinessDay)throw new Error('Fresh reports did not use the active company business day');
+  await saveEvidenceScreenshot(page,'reports-active-business-day-'+v.width+'.png');
+  await from.fill('2024-01-02');await to.fill('2024-01-03');
+  await Promise.all([page.waitForURL(u=>u.searchParams.get('from')==='2024-01-02'&&u.searchParams.get('to')==='2024-01-03'),from.locator('xpath=ancestor::form').locator('button[type="submit"]').click()]);
+  if(await from.inputValue()!=='2024-01-02'||await to.inputValue()!=='2024-01-03')throw new Error('Explicit report dates were reset to the active day');
+}
+
+async function riderBulkSelectionWorkflow(page,t,v){
+  const fixture=t.riderBulkSelection[v.width];
+  await page.goto(baseUrl+'/pos/deliveries',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  await page.locator('[data-rider-settlement-open="'+fixture.riderId+'"]').click();
+  const modal=page.locator('[data-rider-settlement-dialog="'+fixture.riderId+'"]');await modal.waitFor({state:'visible'});
+  const all=modal.locator('[data-settle-select-all]');await all.uncheck();await all.check();
+  const skipped=modal.locator('[data-settle-bill="'+fixture.ids[2]+'"]');await skipped.uncheck();
+  if(!await all.evaluate(el=>el.indeterminate))throw new Error('Rider selection does not show omitted bills');
+  if(await modal.locator('[name="received_amount"]').inputValue()!=='200')throw new Error('Rider selected cash total includes omitted bills');
+  await saveEvidenceScreenshot(page,'rider-select-all-omit-'+v.width+'.png');
+  let posts=0;const count=r=>{if(r.method()==='POST'&&r.url()===baseUrl+'/pos/riders/'+fixture.riderId+'/settle')posts++;};page.on('request',count);
+  page.once('dialog',dialog=>dialog.dismiss());await modal.locator('button[type="submit"]').click();
+  if(posts!==0)throw new Error('Cancelled rider confirmation submitted money');
+  page.once('dialog',dialog=>dialog.accept());
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),modal.locator('button[type="submit"]').click()]);
+  if(posts!==1)throw new Error('Rider confirmation did not submit exactly once');
+  page.off('request',count);await waitForOperationalSurface(page);await dismiss(page);
+  await page.locator('[data-rider-settlement-open="'+fixture.riderId+'"]').click();
+  const remaining=page.locator('[data-rider-settlement-dialog="'+fixture.riderId+'"]');await remaining.waitFor({state:'visible'});
+  const remainingIds=await remaining.locator('[data-settle-bill]').evaluateAll(nodes=>nodes.map(el=>Number(el.value)));
+  if(remainingIds.length!==1||remainingIds[0]!==fixture.ids[2])throw new Error('Omitted cash bill did not remain pending after selected settlement');
+  await remaining.locator('button').filter({hasText:'Cancel'}).click();
+}
+
+// Use the actual seeded sale, chip, preview iframe and Print control. Printer
+// boundaries are spied so a disposable browser never submits physical output.
+async function recentBillPreviewWorkflow(page,t,v,id,address) {
+  await page.evaluate(async()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    d.showReceipt=false; d.cancelReceiptAutoClose(); d.stopPraPoll();
+    await d.loadReprintBills();
+    window.__recentBillPrints=[];
+    d.trySilentPrint=async payload=>{window.__recentBillPrints.push({kind:'silent',...payload});return true;};
+    d._printViaIframe=(_frame,url,_size,done)=>{window.__recentBillPrints.push({kind:'iframe',url});if(done)done();};
+  });
+  await page.locator('[x-show="showReceipt"]').waitFor({state:'hidden'});
+  await page.waitForFunction(id=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintBills.some(b=>b.id===id),id);
+  const popup=page.locator('[x-show="reprintPreviewBill"]');
+  const before=await page.evaluate(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    return JSON.stringify({cart:d.cart,customer:d.selectedCustomer});
+  });
+  for(const silent of [true,false]) {
+    await page.evaluate(silent=>{window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).silentBillPrint=silent;window.__recentBillPrints=[];},silent);
+    if(v.width>=768) {
+      const chip=page.locator('template[x-for="bill in reprintBills.slice(0, 8)"]').locator('xpath=..').locator('button').filter({hasText:new RegExp('Rs\\.')}).first();
+      // The just-saved transaction is newest; assert identity as well as visibility.
+      const newest=await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintBills[0]?.id);
+      if(newest!==id)throw new Error('Recent bill fixture was not the newest sale');
+      if(silent)await chip.click();else {await chip.focus();await chip.press('Enter');}
+    } else {
+      // The strip is intentionally desktop-only. Preserve the mobile reprint
+      // drawer's existing eye action and the same popup/Print controls.
+      await page.evaluate(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).openReprint());
+      const row=page.locator('[x-show="showReprint"] button').filter({has:page.locator('[x-text="bill.created_time"]')}).first();
+      await row.locator('xpath=.//span[@*[name()="@click.stop"]="openReprintPreview(bill)"]').click();
+    }
+    await popup.waitFor({state:'visible'});
+    await page.waitForFunction(id=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintPreviewBill?.id===id,id);
+    const frame=popup.locator('iframe');
+    const src=await frame.getAttribute('src');
+    if(!src||src.includes('auto_print'))throw new Error('Recent preview requested automatic printing');
+    const receipt=page.frameLocator('[x-show="reprintPreviewBill"] iframe');
+    await receipt.getByText(address,{exact:true}).waitFor({state:'visible'});
+    if(await page.evaluate(()=>window.__recentBillPrints.length))throw new Error('Browsing Recent Bills submitted a print');
+    const current=await page.evaluate(()=>{
+      const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+      return JSON.stringify({cart:d.cart,customer:d.selectedCustomer});
+    });
+    if(current!==before)throw new Error('Opening recent bill changed the current sale');
+    await saveEvidenceScreenshot(page,'recent-bill-preview-'+v.width+'-'+silent);
+    await popup.locator('button').last().click();
+    await page.waitForFunction(()=>window.__recentBillPrints.length===1);
+    const output=await page.evaluate(()=>window.__recentBillPrints[0]);
+    if(silent?(output.kind!=='silent'||output.transaction_id!==id):(output.kind!=='iframe'||!output.url.includes('auto_print=1')))throw new Error('Explicit preview Print did not retain its selected route');
+    await popup.waitFor({state:'hidden'});
+    await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintBusyId);
+  }
+  pass(t.name+'/'+v.width+': existing recent-bill preview renders stored receipt without printing; explicit Print retains silent/browser routes');
+}
+
+async function menuExemptFilterWorkflow(page,t,v){
+  await page.goto(baseUrl+'/pos/products',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const root=page.locator('[x-data="productCatalog()"]');
+  await root.evaluate(el=>{
+    const d=window.Alpine.$data(el);
+    d.products=[
+      {id:990001,name:'QA ordinary exempt',is_tax_exempt:true,is_third_schedule:false,is_active:true,category:'Drink',price:100,cost_price:0,stock_quantity:null},
+      {id:990002,name:'QA taxable',is_tax_exempt:false,is_third_schedule:false,is_active:true,category:'Meal',price:100,cost_price:0,stock_quantity:null},
+      {id:990003,name:'QA third exempt',is_tax_exempt:true,is_third_schedule:true,is_active:true,category:'Drink',price:100,cost_price:0,stock_quantity:null},
+    ];d.search='';d.catFilter='';d.statusFilter='';
+  });
+  await root.locator('select[x-model="statusFilter"]').selectOption('exempt');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[x-data="productCatalog()"]')).filtered.length===2);
+  const table=root.locator('[x-show="view === \'table\'"]');
+  const text=await table.innerText();
+  if(!text.includes('QA ordinary exempt')||!text.includes('QA third exempt')||text.includes('QA taxable'))throw new Error('Exempt filter did not render only exempt products');
+  await saveEvidenceScreenshot(page,'menu-exempt-filter-'+v.width+'.png');
+  await root.locator('select[x-model="statusFilter"]').selectOption('');
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[x-data="productCatalog()"]')).filtered.length===3);
 }

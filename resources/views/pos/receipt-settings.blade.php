@@ -36,6 +36,7 @@
         // UTF-8-safe encoded (footer text is user content; a bad byte must
         // never kill the whole page's Alpine scope — see replit.md pitfalls).
         $rcptThemeCfg = json_encode([
+            'typography' => \App\Support\PosReceiptTypography::from($company->invoice_display_prefs['pos_style'] ?? []),
             'theme'  => \App\Support\PosReceiptThemes::resolve($ps),
             'themes' => \App\Support\PosReceiptThemes::clientMap(),
             'mode'   => 'pra',
@@ -532,6 +533,25 @@
              fields from old cached forms. GLOBAL like paper size — applies to
              both PRA and Local receipts. Cards + live preview aside share the
              wrapper's rcptThemePicker() Alpine scope. --}}
+        @php $typography = \App\Support\PosReceiptTypography::from($company->invoice_display_prefs['pos_style'] ?? []); @endphp
+        <section class="p-5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 space-y-3">
+            <input type="hidden" name="rp_typography_present" value="1">
+            <label class="block text-sm font-semibold">{{ __('pos.receipt_font_family') }}
+                <select name="rp_font_family" class="w-full rounded-lg dark:bg-gray-800 dark:text-white">
+                    @foreach(['legacy' => __('pos.receipt_text_current'), 'sans' => 'Arial', 'mono' => 'Courier New'] as $key => $label)
+                    <option value="{{ $key }}" @selected($typography['font_family'] === $key)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="block text-sm font-semibold">{{ __('pos.receipt_item_text') }}
+                <select name="rp_item_text" class="w-full rounded-lg dark:bg-gray-800 dark:text-white">
+                    @foreach(['legacy' => __('pos.receipt_text_current'), 'compact' => __('pos.receipt_text_compact'), 'large' => __('pos.receipt_text_large')] as $key => $label)
+                    <option value="{{ $key }}" @selected($typography['item_text'] === $key)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="rp_wide_names" value="1" @checked($typography['wide_names'])>{{ __('pos.receipt_wide_names') }}</label>
+        </section>
         @include('pos.partials.receipt-theme-cards', ['accent' => 'purple'])
 
         {{-- Live preview on small screens (the lg aside is hidden there) --}}

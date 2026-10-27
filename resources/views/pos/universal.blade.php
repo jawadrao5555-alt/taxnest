@@ -4593,7 +4593,13 @@ window.addEventListener('popstate', function() {
     </div>
     </template>
 
-    <div x-show="toast.show" class="fixed top-4 right-4 z-[60] max-w-sm" :class="toast.show ? 'toast-enter' : 'toast-exit'">
+    {{-- All sale/print/caller feedback shares this toast. Escape the sale zoom
+         and clipping, clear the measured header, and never steal modal clicks. --}}
+    <template x-teleport="body">
+    <div data-tn-pos-toast-portal style="position:relative;z-index:150;pointer-events:none;">
+    <div data-tn-pos-toast x-show="toast.show" x-cloak role="status" aria-live="polite" aria-atomic="true"
+         class="fixed right-4 z-[60] max-w-sm" :style="toast.show ? callerOverlayStyle() : ''"
+         :class="toast.show ? 'toast-enter' : 'toast-exit'">
         {{-- ZFC issue #12 (28 Jul 2026): NEW 'info' toast type — blue, i-icon.
              Info messages (e.g. waiter order loaded) looked like RED errors. --}}
         <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border" :class="toast.type === 'success' ? 'bg-green-600/95 text-white border-green-500/30' : (toast.type === 'info' ? 'bg-blue-600/95 text-white border-blue-500/30' : 'bg-red-600/95 text-white border-red-500/30')" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.3);">
@@ -4602,9 +4608,11 @@ window.addEventListener('popstate', function() {
                 <svg x-show="toast.type === 'info'" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <svg x-show="toast.type !== 'success' && toast.type !== 'info'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </div>
-            <span class="text-sm font-semibold" x-text="toast.message"></span>
+            <span class="text-sm font-semibold min-w-0" style="overflow-wrap:anywhere;" x-text="toast.message"></span>
         </div>
     </div>
+    </div>
+    </template>
 
     {{-- Deal Choice Picker (Task 1531): fixed-only deals remain one-tap; a
          configured choice deal cannot enter cart until every required group

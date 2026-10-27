@@ -17,6 +17,12 @@ const requested = String(process.env.RC_BROWSER_ONLY || '').split(',').map(x => 
 const videoDirectory = recordingDirectory(process.env.RC_TUTORIAL_RECORDING, fixturePath, requested);
 const recorded = [];
 const regular = [...fixture.readOnlyJourneys, ...fixture.transactionalJourneys];
+// Use the existing fictional PRA cashier in a separate, non-financial journey.
+// Keep every original transactional regression and its fixture unchanged.
+const toastCashier = regular.find(t => t.tableOrderWorkflow);
+if (!toastCashier) throw new Error('PRA toast browser acceptance requires the table cashier fixture');
+regular.push({name:'sale-toast-header',login:toastCashier.login,password:toastCashier.password,loginPath:toastCashier.loginPath,
+  paths:['/pos/invoice/create'],markers:['Current Order'],toastViewportWorkflow:true});
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
 // Exercise transactional table, settings and Hotel desk regressions first; retain every journey.
 const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>x.tableOrderWorkflow), ...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>x.hotelWorkflow), ...regular.filter(x=>!x.mixedFulfillment&&!x.hotelSettingsWorkflow&&!x.tableOrderWorkflow&&!x.hotelWorkflow)];
@@ -1484,6 +1490,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
+  if (t.toastViewportWorkflow) return saleToastViewportWorkflow(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.reportsBusinessDay) return reportsBusinessDayWorkflow(page,t,v);
@@ -1594,6 +1601,47 @@ async function tableSettingsVisibilityWorkflow(originalPage,t,v) {
     await saveEvidenceScreenshot(page,'table-settings-failure-'+v.width);
     console.error('Table settings failure:',error.stack);throw error;
   } finally { await ownerContext.close(); }
+}
+
+async function saleToastViewportWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const root=page.locator('[data-tn-sale-root]'),toast=page.locator('[data-tn-pos-toast]');
+  // Let boot-time caller feedback finish before exercising its shared timer.
+  await page.waitForTimeout(3000);await toast.waitFor({state:'hidden'});
+  const saved=await root.evaluate(el=>({style:el.getAttribute('style'),toast:{...window.Alpine.$data(el).toast},submitting:window.Alpine.$data(el).submitting}));
+  let toastPhase='';
+  const check=async()=>{
+    await toast.waitFor({state:'visible'});await page.waitForTimeout(450);
+    const box=await toast.evaluate(el=>{
+      const r=el.getBoundingClientRect(),header=document.querySelector('[data-tn-topnav="pra"]').getBoundingClientRect();
+      const old=el.style.pointerEvents;el.style.pointerEvents='auto';
+      const hit=document.elementFromPoint(r.left+Math.min(20,r.width/2),r.top+Math.min(20,r.height/2));el.style.pointerEvents=old;
+      return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,header:header.bottom,width:innerWidth,height:innerHeight,
+        inside:!!el.closest('[data-tn-sale-root]'),painted:el.contains(hit),opacity:Number(getComputedStyle(el).opacity),
+        transparent:getComputedStyle(el.closest('[data-tn-pos-toast-portal]')).pointerEvents==='none'};
+    });
+    if(box.top<box.header+7||box.left<0||box.right>box.width+1||box.bottom>box.height+1||box.inside||!box.painted||box.opacity<.99||!box.transparent)throw new Error('Sale notification '+toastPhase+' is clipped/covered or intercepts input: '+JSON.stringify(box));
+  };
+  try {
+    for(const type of ['error','info','success']) {
+      toastPhase='production '+type;
+      await root.evaluate((el,type)=>window.Alpine.$data(el).showToast('Synthetic invoice/print/caller '+type+' notification: complete visible text.',type),type);
+      await check();await toast.waitFor({state:'hidden',timeout:4000});
+    }
+    for(const zoom of [.8,1,1.25])for(const type of ['error','info','success']) {
+      toastPhase='zoom '+zoom+' '+type;
+      await root.evaluate((el,{zoom,type})=>{el.style.zoom=zoom;window.Alpine.$data(el).toast={show:true,type,message:'Synthetic '+type+' '+('long-print-status-'.repeat(24))};},{zoom,type});
+      await check();
+    }
+    await root.evaluate(el=>{window.Alpine.$data(el).submitting=true;});await check();
+    await page.setViewportSize({width:v.width,height:600});await check();
+    await saveEvidenceScreenshot(page,'sale-toast-header-'+v.width);
+    pass(t.name+'/'+v.width+': real error/info/success toast methods and auto-hide; zoom80/100/125, busy state and resize remain visible below header without blocking input');
+  } finally {
+    await page.setViewportSize(v);
+    await root.evaluate((el,s)=>{if(s.style===null)el.removeAttribute('style');else el.setAttribute('style',s.style);const d=window.Alpine.$data(el);d.toast=s.toast;d.submitting=s.submitting;},saved);
+  }
 }
 
 async function tableOrderWorkflow(page,t,v) {

@@ -1,9 +1,6 @@
-title: "PRA POS mein rozmarrah kaam ki behtari"
+title: "PRA POS ke paigham poore nazar aayen"
 audience: pos
 type: improvement
 points:
-  - "Purane bills tareekh, order ki qisam aur Cash/Card se dhoondein; Recent Bills se pehle preview kholein aur Print apni marzi se karein."
-  - "Caller history, customer ka naam aur phone, cart scrolling aur Table Setup ke controls mein behtari."
-  - "Rider ki muntakhib Cash bills settle karein; recalled order mein naye items hon to payment se pehle tasdeeq karein."
-  - "Reports mein business day aur tamam products ki list; Exempt Items ka alag filter."
-  - "Receipt ka font aur item name ki chaudai sirf apni pasand select karke Save karne par badlein; pehle se saved design khud nahi badlega."
+  - "Sale screen par print, error aur kamyabi ke paigham upar wali patti ke neeche poore nazar aayen."
+  - "Mobile aur zoom badalne par bhi paigham screen ke andar rahen; kaam ke buttons istemal kar sakte hain."

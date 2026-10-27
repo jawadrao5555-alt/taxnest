@@ -9,8 +9,8 @@ class DeploymentGitHubUnavailable extends \InvalidArgumentException
         public readonly ?int $upstreamStatus = null,
         public readonly int $retryAfter = 30,
     ) {
-        parent::__construct('GitHub deployment validation unavailable ('.$stage.', '.
+        parent::__construct('GitHub deployment validation temporarily unavailable ('.$stage.', '.
             ($upstreamStatus === null ? 'connection failure' : 'HTTP '.$upstreamStatus).
-            '). No merge or deployment was authorized.');
+            '). Retry after '.$retryAfter.' seconds. No merge or deployment was authorized.');
     }
 }

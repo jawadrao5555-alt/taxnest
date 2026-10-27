@@ -256,6 +256,17 @@ class OwnerDeploymentApprovalService
             abort(409, 'Approval binding mismatch.');
         }
 
+        // Reject a stale lease before consuming GitHub quota. The locked
+        // check below remains authoritative if state changes during validation.
+        abort_unless(
+            $row->status === 'dispatching'
+            && $row->expires_at->greaterThan(now()->addMinutes((int) config('deployment_approval.handoff_min_remaining_minutes', 5)))
+            && $row->dispatch_lease_expires_at?->isFuture()
+            && !$row->provenance_receipt_hash,
+            409,
+            'Approval request is not claimable. Refresh the approval status; expired approvals need a new owner decision.'
+        );
+
         $this->validatePullRequest($row->pull_request_number, $row->head_sha, $row->merge_sha);
         $receipt = bin2hex(random_bytes(32));
 

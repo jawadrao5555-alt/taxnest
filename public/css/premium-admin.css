@@ -523,7 +523,7 @@ body.admin-themed .tn-company-directory .tn-directory-alert :is(h2, a, span, svg
 .tn-company-directory .tn-directory-table [data-directory-status="pending"] { background: #fef3c7 !important; color: #78350f !important; }
 .tn-company-directory .tn-directory-table :is([data-directory-status="approved"], [data-directory-status="active"]) { background: #dcfce7 !important; color: #14532d !important; }
 .tn-company-directory .tn-directory-table [data-directory-status="rejected"] { background: #e2e8f0 !important; color: #334155 !important; }
-.tn-company-directory .tn-directory-actions :is(a, button) { display: inline-flex; align-items: center; min-height: 2rem; padding: .35rem .65rem; background: #e0e7ff !important; color: #312e81 !important; font-size: .8125rem; font-weight: 650; }
+body.admin-themed .tn-company-directory .tn-directory-actions :is(a, button) { display: inline-flex; align-items: center; min-height: 2rem; padding: .35rem .65rem; background: #e0e7ff !important; color: #312e81 !important; font-size: .8125rem; font-weight: 650; }
 .tn-company-directory :is(a, button, input, select):focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
 .tn-company-directory > div:first-child a { background: #3730a3 !important; color: #fff !important; }
 .tn-company-directory > div:first-child a:last-child { background: #1f2937 !important; color: #f1f5f9 !important; }
@@ -544,17 +544,17 @@ body.admin-themed main :is(.text-gray-400, .text-gray-500, .text-gray-600) {
     color: var(--tn-admin-muted) !important;
 }
 body.admin-themed main :is(h1, h2, h3).text-white { color: var(--tn-admin-text) !important; }
-body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
     background-color: var(--tn-admin-legacy-panel) !important;
 }
-body.admin-themed main :is(.bg-gray-800):not(:where(.tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
+body.admin-themed main :is(.bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) {
     background-color: var(--tn-admin-legacy-raised) !important;
     color: #f1f5f9 !important;
 }
-body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(.text-gray-400, .text-gray-500, .text-gray-600) {
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(.text-gray-400, .text-gray-500, .text-gray-600) {
     color: #cbd5e1 !important;
 }
-body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(h1, h2, h3).text-white {
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800, .bg-slate-900, .bg-slate-950):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(h1, h2, h3).text-white {
     color: #f8fafc !important;
 }
 body.admin-themed .tn-admin-sidebar nav > p { color: #cbd5e1 !important; }
@@ -592,19 +592,19 @@ body.admin-themed .tn-admin-plan-tabs button[aria-pressed="true"] {
     box-shadow: inset 0 -3px 0 #ffffff;
 }
 body.admin-themed main :is(a, button).text-indigo-400 { color: var(--admin-accent-hover) !important; }
-body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800):not(:where(.tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(a, button).text-indigo-400 {
+body.admin-themed main :is(.bg-gray-900, .bg-gray-950, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel, .tn-audit-panel *)) :is(a, button).text-indigo-400 {
     color: var(--admin-accent-text) !important;
 }
 /* Shared premium CSS also paints main; use the same palette on that actual
    visible surface, rather than only on the shell behind it. */
 body.admin-themed .tn-admin-workspace,
 body.admin-themed main { background-color: var(--tn-admin-canvas) !important; }
-body.admin-themed main :is(input, select, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *)) {
+body.admin-themed main :is(input, select, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *)) {
     color: #f1f5f9 !important;
     border-color: #94a3b8 !important;
     color-scheme: dark;
 }
-body.admin-themed main :is(input, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *))::placeholder {
+body.admin-themed main :is(input, textarea):is(.bg-gray-900, .bg-gray-800):not(:where(.tn-company-directory, .tn-company-directory *, .tn-company-panel *, .tn-metric-ledger *, .tn-channel-ledger *, .tn-information-grid *, .tn-audit-panel *))::placeholder {
     color: #cbd5e1 !important;
     opacity: 1;
 }

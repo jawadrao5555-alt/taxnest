@@ -222,6 +222,7 @@ class OwnerDeploymentApprovalRelayTest extends TestCase
 
         $this->assertSame('dispatching', $row->fresh()->status);
         $this->assertNull($row->fresh()->provenance_receipt_hash);
+        Http::assertNothingSent();
     }
 
     public function test_approval_with_handoff_time_remains_claimable(): void

@@ -21,7 +21,7 @@ class SmartDeploymentApprovalTest extends TestCase
     {
         Http::fake([
             'https://api.github.com/repos/jawadrao5555-alt/taxnest/pulls*' => Http::response([$this->eligiblePr()], 200),
-            'https://api.github.com/repos/jawadrao5555-alt/taxnest/commits/*' => Http::response([], 403),
+            'https://api.github.com/repos/jawadrao5555-alt/taxnest/commits/*' => Http::response(['message' => 'private-upstream-detail'], 403, ['Retry-After' => '120']),
         ]);
         $owner = AdminUser::query()->create([
             'name' => 'Owner', 'email' => 'owner@example.test',
@@ -29,7 +29,9 @@ class SmartDeploymentApprovalTest extends TestCase
         ]);
         $this->actingAs($owner, 'admin')->get('/admin/deployment-approval')
             ->assertOk()
-            ->assertSee('GitHub check verification returned HTTP 403')
+            ->assertSee('GitHub deployment validation temporarily unavailable (check_runs, HTTP 403)')
+            ->assertSee('Retry after 120 seconds')
+            ->assertDontSee('private-upstream-detail')
             ->assertSee('PR availability could not be verified')
             ->assertDontSee('No eligible green cursor/* or replit/* PR is currently available.');
     }

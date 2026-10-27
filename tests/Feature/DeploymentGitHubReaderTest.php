@@ -6,10 +6,43 @@ use App\Exceptions\DeploymentGitHubUnavailable;
 use App\Services\DeploymentGitHubReader;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class DeploymentGitHubReaderTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Cache::flush();
+    }
+
+    public function test_configured_read_credential_is_sent_only_to_github_reads(): void
+    {
+        config(['deployment_approval.github_read_token' => 'synthetic-read-token']);
+        Http::fake(['*' => Http::response(['number' => 17])]);
+        app(DeploymentGitHubReader::class)->get('pulls/17', 'pull_request');
+        Http::assertSent(fn ($request) => $request->method() === 'GET'
+            && $request->hasHeader('Authorization', 'Bearer synthetic-read-token'));
+    }
+
+    public function test_rate_limit_blocks_new_reader_requests_until_reset_then_rechecks(): void
+    {
+        Http::fake(['*' => Http::sequence()->push([], 403, ['Retry-After' => '120'])->push(['number' => 17])]);
+        for ($i = 0; $i < 2; $i++) {
+            try {
+                (new DeploymentGitHubReader)->get('pulls/17', 'pull_request');
+                $this->fail('Rate limited validation must fail closed.');
+            } catch (DeploymentGitHubUnavailable $e) {
+                $this->assertSame(120, $e->retryAfter);
+            }
+        }
+        Http::assertSentCount(1);
+        $this->travel(121)->seconds();
+        $this->assertSame(17, (new DeploymentGitHubReader)->get('pulls/17', 'pull_request')->json('number'));
+        Http::assertSentCount(2);
+    }
+
     public function test_temporary_server_failure_recovers_with_a_read_only_retry(): void
     {
         Http::fake(['*' => Http::sequence()->push(['private' => 'secret'], 502)->push(['number' => 17])]);

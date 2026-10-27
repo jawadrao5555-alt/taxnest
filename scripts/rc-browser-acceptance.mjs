@@ -1268,7 +1268,22 @@ async function companyDirectoryContrast(page,t,v) {
     for(const theme of ['indigo','emerald','cyan','rose','amber','purple'])for(const dark of [false,true]) {
       await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
       const errors=await page.evaluate(()=>{
-        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)throw new Error('Unsupported computed colour '+s);const c=m[1].split(/[, /]+/).map(Number);return [...c.slice(0,3),c[3]??1];};
+        const rgb=s=>{
+          // Chromium may serialize color-mix() as normalized sRGB. Convert
+          // those channels to the same 0..255 scale as rgb(); keep alpha for
+          // the existing ancestor compositing and the unchanged 4.5:1 gate.
+          const srgb=s.match(/^color\(\s*srgb\s+(.+?)\s*\)$/);
+          const legacy=s.match(/^rgba?\(([^)]+)\)$/);
+          const match=srgb||legacy;
+          if(!match)throw new Error('Unsupported computed colour '+s);
+          const tokens=match[1].replace(/\//g,' ').split(/[,\s]+/).filter(Boolean);
+          if(tokens.length<3||tokens.length>4)throw new Error('Invalid computed colour '+s);
+          const component=(token,scale)=>token.endsWith('%')?Number(token.slice(0,-1))*scale/100:Number(token)*(srgb?scale:1);
+          const channels=tokens.slice(0,3).map(token=>component(token,255));
+          const alpha=tokens[3]==null?1:tokens[3].endsWith('%')?Number(tokens[3].slice(0,-1))/100:Number(tokens[3]);
+          if([...channels,alpha].some(value=>!Number.isFinite(value)))throw new Error('Invalid computed colour '+s);
+          return [...channels.map(value=>Math.max(0,Math.min(255,value))),Math.max(0,Math.min(1,alpha))];
+        };
         const over=(a,b)=>a.slice(0,3).map((x,i)=>x*a[3]+b[i]*(1-a[3]));
         const bg=el=>{const chain=[];for(let p=el;p;p=p.parentElement)chain.unshift(p);let c=[255,255,255];for(const p of chain)c=over(rgb(getComputedStyle(p).backgroundColor),c);return c;};
         const lum=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);

@@ -62,6 +62,7 @@ class PosAnnualOnlyPricingTest extends TestCase
         Schema::dropIfExists('companies');
         Schema::create('companies', function ($table) {
             $table->id();
+            $table->string('product_type')->default('pos');
             $table->softDeletes();
             $table->timestamps();
         });

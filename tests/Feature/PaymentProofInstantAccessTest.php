@@ -535,7 +535,8 @@ class PaymentProofInstantAccessTest extends TestCase
 
     public function test_approve_annual_ignores_a_historical_quarterly_price(): void
     {
-        $company = $this->makeLockedCompany();
+        // The annual-price scenario uses a PRA plan, so its company must be PRA too.
+        $company = $this->makeLockedCompany(['product_type' => 'pos']);
         $plan = \App\Models\PricingPlan::create([
             'name' => 'Business', 'product_type' => 'pos', 'price' => 24999, 'price_quarterly' => 7199, 'is_trial' => false,
         ]);

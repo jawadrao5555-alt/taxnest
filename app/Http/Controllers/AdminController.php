@@ -398,6 +398,8 @@ class AdminController extends Controller
             return back()->with('error', \App\Services\PlanSellabilityService::retiredMessage($plan));
         }
 
+        \App\Services\PlanCompanyCompatibility::assertMatches($company, $plan);
+
         Subscription::where('company_id', $company->id)->where('active', true)->update(['active' => false]);
 
         Subscription::create([

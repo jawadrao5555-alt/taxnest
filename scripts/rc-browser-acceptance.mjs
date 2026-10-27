@@ -17,6 +17,12 @@ const requested = String(process.env.RC_BROWSER_ONLY || '').split(',').map(x => 
 const videoDirectory = recordingDirectory(process.env.RC_TUTORIAL_RECORDING, fixturePath, requested);
 const recorded = [];
 const regular = [...fixture.readOnlyJourneys, ...fixture.transactionalJourneys];
+// Use the existing fictional PRA cashier in a separate, non-financial journey.
+// Keep every original transactional regression and its fixture unchanged.
+const toastCashier = regular.find(t => t.tableOrderWorkflow);
+if (!toastCashier) throw new Error('PRA toast browser acceptance requires the table cashier fixture');
+regular.push({name:'sale-toast-header',login:toastCashier.login,password:toastCashier.password,loginPath:toastCashier.loginPath,
+  paths:['/pos/invoice/create'],markers:['Current Order'],toastViewportWorkflow:true});
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
 // Exercise transactional table, settings and Hotel desk regressions first; retain every journey.
 const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>x.tableOrderWorkflow), ...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>x.hotelWorkflow), ...regular.filter(x=>!x.mixedFulfillment&&!x.hotelSettingsWorkflow&&!x.tableOrderWorkflow&&!x.hotelWorkflow)];
@@ -1260,6 +1266,45 @@ async function reportingConnectorWorkflow(page,t,v) {
   pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
 }
 
+async function liveOpsReadability(page,t,v) {
+  await page.goto(baseUrl+'/admin/live-ops',{waitUntil:'domcontentloaded'});
+  const root=page.locator('.tn-live-ops');
+  await root.waitFor({state:'visible'});
+  const saved=await page.evaluate(()=>({theme:getAdminTheme(),dark:document.documentElement.classList.contains('dark')}));
+  try {
+    for(const theme of ['indigo','emerald','cyan','rose','amber','purple'])for(const dark of [false,true]) {
+      await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
+      const errors=await root.evaluate(root=>{
+        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)throw new Error('Unsupported computed colour '+s);const c=m[1].split(/[, /]+/).map(Number);return [...c.slice(0,3),c[3]??1];};
+        const over=(a,b)=>a.slice(0,3).map((x,i)=>x*a[3]+b[i]*(1-a[3]));
+        const bg=el=>{const chain=[];for(let p=el;p;p=p.parentElement)chain.unshift(p);let c=[255,255,255];for(const p of chain)c=over(rgb(getComputedStyle(p).backgroundColor),c);return c;};
+        const lum=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
+        const contrast=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+        const errors=[];
+        const controls=root.querySelectorAll('.bg-gray-900 :is(label,p,li,input,select,option,textarea,button)');
+        if(!controls.length)throw new Error('Live Ops readability sample is empty');
+        for(const el of controls) {
+          if(el.tagName!=='OPTION'&&!el.getClientRects().length)continue;
+          const cs=getComputedStyle(el),back=bg(el),ratio=contrast(over(rgb(cs.color),back),back);
+          if(ratio<4.5)errors.push(el.tagName+' contrast '+ratio.toFixed(2));
+          if(el.placeholder) {
+            const ps=getComputedStyle(el,'::placeholder');
+            if(contrast(over(rgb(ps.color),back),back)<4.5)errors.push('Faint placeholder');
+          }
+        }
+        return errors;
+      });
+      if(errors.length)throw new Error('Live Ops '+theme+'/'+dark+': '+errors.join('; '));
+      await checkUsability(page,t,'/admin/live-ops',v);
+    }
+    for(const label of ['No remediation requests yet.','No agent commands yet.']) {
+      if(!(await root.innerText()).includes(label))throw new Error('Missing descriptive empty state: '+label);
+    }
+    await saveEvidenceScreenshot(page,'rc-'+v.width+'-live-ops-readability');
+    pass(t.name+'/'+v.width+': actual read-only Live Ops cards, controls, options and placeholders >=4.5 across six themes/two modes; descriptive empty states');
+  } finally {await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);}
+}
+
 async function companyDirectoryContrast(page,t,v) {
   await page.goto(baseUrl+'/admin/companies?search=Synthetic%20Contrast',{waitUntil:'domcontentloaded'});
   await page.locator('.tn-directory-alert').waitFor({state:'visible'});
@@ -1268,7 +1313,22 @@ async function companyDirectoryContrast(page,t,v) {
     for(const theme of ['indigo','emerald','cyan','rose','amber','purple'])for(const dark of [false,true]) {
       await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},{theme,dark});
       const errors=await page.evaluate(()=>{
-        const rgb=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)throw new Error('Unsupported computed colour '+s);const c=m[1].split(/[, /]+/).map(Number);return [...c.slice(0,3),c[3]??1];};
+        const rgb=s=>{
+          // Chromium may serialize color-mix() as normalized sRGB. Convert
+          // those channels to the same 0..255 scale as rgb(); keep alpha for
+          // the existing ancestor compositing and the unchanged 4.5:1 gate.
+          const srgb=s.match(/^color\(\s*srgb\s+(.+?)\s*\)$/);
+          const legacy=s.match(/^rgba?\(([^)]+)\)$/);
+          const match=srgb||legacy;
+          if(!match)throw new Error('Unsupported computed colour '+s);
+          const tokens=match[1].replace(/\//g,' ').split(/[,\s]+/).filter(Boolean);
+          if(tokens.length<3||tokens.length>4)throw new Error('Invalid computed colour '+s);
+          const component=(token,scale)=>token.endsWith('%')?Number(token.slice(0,-1))*scale/100:Number(token)*(srgb?scale:1);
+          const channels=tokens.slice(0,3).map(token=>component(token,255));
+          const alpha=tokens[3]==null?1:tokens[3].endsWith('%')?Number(tokens[3].slice(0,-1))/100:Number(tokens[3]);
+          if([...channels,alpha].some(value=>!Number.isFinite(value)))throw new Error('Invalid computed colour '+s);
+          return [...channels.map(value=>Math.max(0,Math.min(255,value))),Math.max(0,Math.min(1,alpha))];
+        };
         const over=(a,b)=>a.slice(0,3).map((x,i)=>x*a[3]+b[i]*(1-a[3]));
         const bg=el=>{const chain=[];for(let p=el;p;p=p.parentElement)chain.unshift(p);let c=[255,255,255];for(const p of chain)c=over(rgb(getComputedStyle(p).backgroundColor),c);return c;};
         const lum=c=>c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
@@ -1285,13 +1345,33 @@ async function companyDirectoryContrast(page,t,v) {
         return errors;
       });
       if(errors.length)throw new Error('Directory '+theme+'/'+dark+': '+errors.join('; '));
+      await checkUsability(page,t,'/admin/companies',v);
+      const search=page.getByRole('textbox',{name:'Search companies',exact:true});
+      await search.focus();
+      for(const name of ['Company product type','Company status','Filter']) {
+        await page.keyboard.press('Tab');
+        const focused=page.getByRole(name==='Filter'?'button':'combobox',{name,exact:true});
+        if(!await focused.evaluate(el=>document.activeElement===el))throw new Error('Directory keyboard order lost '+name);
+        const ring=await focused.evaluate(el=>{const s=getComputedStyle(el);return {width:parseFloat(s.outlineWidth),style:s.outlineStyle};});
+        if(ring.width<2||ring.style==='none')throw new Error('Directory keyboard focus is not visible on '+name);
+      }
+      const actions=page.locator('.tn-directory-actions :is(a,button)');
+      if(!await actions.count())throw new Error('Directory action sample is empty');
+      for(let i=0;i<await actions.count();i++) {
+        const action=actions.nth(i);
+        await action.scrollIntoViewIfNeeded();
+        await action.click({trial:true}); // never submit company status actions
+        const box=await action.boundingBox();
+        if(!box||box.width<20||box.height<28)throw new Error('Directory action is clipped or too small');
+      }
+
     }
     await saveEvidenceScreenshot(page,'rc-'+v.width+'-company-directory-contrast');
     await page.locator('select[name=status]').selectOption('approved');
     await Promise.all([page.waitForURL(u=>u.searchParams.get('status')==='approved'),page.getByRole('button',{name:'Filter',exact:true}).click()]);
     if(await page.locator('[data-directory-status]').count()!==1||await page.locator('[data-directory-status]').first().getAttribute('data-directory-status')!=='approved')throw new Error('Directory filter changed behavior');
     await page.locator('.tn-directory-actions a').first().click({trial:true});
-    pass(t.name+'/'+v.width+': actual alert/owner/status/actions/options >=4.5 contrast in six themes/light-dark; GET filter preserved');
+    pass(t.name+'/'+v.width+': actual alert/owner/status/actions/options >=4.5 contrast in six themes/light-dark; keyboard labels/focus/order and all status action hit targets; GET filter preserved');
   } finally {await page.evaluate(({theme,dark})=>{applyAdminTheme(theme);document.documentElement.classList.toggle('dark',dark);},saved);}
 }
 
@@ -1372,6 +1452,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
   if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
+  if(t.liveOpsReadability)return liveOpsReadability(page,t,v);
   if(t.companyDirectoryContrast)return companyDirectoryContrast(page,t,v);
   if(t.fbrReconciliation) {
     for(const [decision,id] of Object.entries(t.fbrReconciliation[v.width])) {
@@ -1484,6 +1565,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
+  if (t.toastViewportWorkflow) return saleToastViewportWorkflow(page,t,v);
   if (t.tableOrderWorkflow) return tableOrderWorkflow(page,t,v);
   if (t.hotelSettingsWorkflow) return hotelSettingsWorkflow(page,t,v,diagnostics);
   if (t.reportsBusinessDay) return reportsBusinessDayWorkflow(page,t,v);
@@ -1594,6 +1676,47 @@ async function tableSettingsVisibilityWorkflow(originalPage,t,v) {
     await saveEvidenceScreenshot(page,'table-settings-failure-'+v.width);
     console.error('Table settings failure:',error.stack);throw error;
   } finally { await ownerContext.close(); }
+}
+
+async function saleToastViewportWorkflow(page,t,v) {
+  await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
+  await waitForOperationalSurface(page);await dismiss(page);
+  const root=page.locator('[data-tn-sale-root]'),toast=page.locator('[data-tn-pos-toast]');
+  // Let boot-time caller feedback finish before exercising its shared timer.
+  await page.waitForTimeout(3000);await toast.waitFor({state:'hidden'});
+  const saved=await root.evaluate(el=>({style:el.getAttribute('style'),toast:{...window.Alpine.$data(el).toast},submitting:window.Alpine.$data(el).submitting}));
+  let toastPhase='';
+  const check=async()=>{
+    await toast.waitFor({state:'visible'});await page.waitForTimeout(450);
+    const box=await toast.evaluate(el=>{
+      const r=el.getBoundingClientRect(),header=document.querySelector('[data-tn-topnav="pra"]').getBoundingClientRect();
+      const old=el.style.pointerEvents;el.style.pointerEvents='auto';
+      const hit=document.elementFromPoint(r.left+Math.min(20,r.width/2),r.top+Math.min(20,r.height/2));el.style.pointerEvents=old;
+      return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,header:header.bottom,width:innerWidth,height:innerHeight,
+        inside:!!el.closest('[data-tn-sale-root]'),painted:el.contains(hit),opacity:Number(getComputedStyle(el).opacity),
+        transparent:getComputedStyle(el.closest('[data-tn-pos-toast-portal]')).pointerEvents==='none'};
+    });
+    if(box.top<box.header+7||box.left<0||box.right>box.width+1||box.bottom>box.height+1||box.inside||!box.painted||box.opacity<.99||!box.transparent)throw new Error('Sale notification '+toastPhase+' is clipped/covered or intercepts input: '+JSON.stringify(box));
+  };
+  try {
+    for(const type of ['error','info','success']) {
+      toastPhase='production '+type;
+      await root.evaluate((el,type)=>window.Alpine.$data(el).showToast('Synthetic invoice/print/caller '+type+' notification: complete visible text.',type),type);
+      await check();await toast.waitFor({state:'hidden',timeout:4000});
+    }
+    for(const zoom of [.8,1,1.25])for(const type of ['error','info','success']) {
+      toastPhase='zoom '+zoom+' '+type;
+      await root.evaluate((el,{zoom,type})=>{el.style.zoom=zoom;window.Alpine.$data(el).toast={show:true,type,message:'Synthetic '+type+' '+('long-print-status-'.repeat(24))};},{zoom,type});
+      await check();
+    }
+    await root.evaluate(el=>{window.Alpine.$data(el).submitting=true;});await check();
+    await page.setViewportSize({width:v.width,height:600});await check();
+    await saveEvidenceScreenshot(page,'sale-toast-header-'+v.width);
+    pass(t.name+'/'+v.width+': real error/info/success toast methods and auto-hide; zoom80/100/125, busy state and resize remain visible below header without blocking input');
+  } finally {
+    await page.setViewportSize(v);
+    await root.evaluate((el,s)=>{if(s.style===null)el.removeAttribute('style');else el.setAttribute('style',s.style);const d=window.Alpine.$data(el);d.toast=s.toast;d.submitting=s.submitting;},saved);
+  }
 }
 
 async function tableOrderWorkflow(page,t,v) {

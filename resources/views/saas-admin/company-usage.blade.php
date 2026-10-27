@@ -1,6 +1,7 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Company Usage Monitoring</h1>
+    <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">Billing, terminal and stock figures below cover PRA POS only; a dash means not applicable or unavailable. Staff activity comes from recorded logins and session heartbeats. Opening this page does not count as company activity.</p>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div class="overflow-x-auto">
@@ -8,12 +9,12 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-800 bg-gray-800/50">
                         <th class="px-4 py-3">Company</th>
-                        <th class="px-4 py-3 text-right">POS Transactions</th>
-                        <th class="px-4 py-3 text-right">Total Sales (PKR)</th>
+                        <th class="px-4 py-3 text-right">Completed PRA Bills</th>
+                        <th class="px-4 py-3 text-right">PRA Bill Total (PKR)</th>
                         <th class="px-4 py-3 text-right">Terminals</th>
                         <th class="px-4 py-3 text-right">Users</th>
                         <th class="px-4 py-3 text-right">Inventory Items</th>
-                        <th class="px-4 py-3">Last Activity</th>
+                        <th class="px-4 py-3">Last Staff Activity</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800">
@@ -21,12 +22,13 @@
                     <tr class="hover:bg-gray-800/50 {{ $loop->even ? 'bg-gray-800/20' : '' }}">
                         <td class="px-4 py-3 text-white font-medium">
                             <a href="{{ route('saas.admin.companies.show', $stat->company_id) }}" class="hover:text-indigo-400 transition">{{ $stat->company->name ?? 'Unknown' }}</a>
+                            <span class="block text-xs text-gray-500">{{ \App\Support\ProductCatalog::label($stat->company->product_type) }}</span>
                         </td>
-                        <td class="px-4 py-3 text-right text-gray-300 font-medium">{{ number_format($stat->total_pos_transactions) }}</td>
-                        <td class="px-4 py-3 text-right text-emerald-400 font-medium">{{ number_format($stat->total_sales_amount, 0) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_terminals }}</td>
-                        <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_users }}</td>
-                        <td class="px-4 py-3 text-right text-gray-300">{{ $stat->inventory_items }}</td>
+                        <td class="px-4 py-3 text-right text-gray-300 font-medium">{{ $stat->total_pos_transactions === null ? '—' : number_format($stat->total_pos_transactions) }}</td>
+                        <td class="px-4 py-3 text-right text-emerald-400 font-medium">{{ $stat->total_sales_amount === null ? '—' : number_format($stat->total_sales_amount, 2) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_terminals ?? '—' }}</td>
+                        <td class="px-4 py-3 text-right text-gray-300">{{ $stat->active_users ?? '—' }}</td>
+                        <td class="px-4 py-3 text-right text-gray-300">{{ $stat->inventory_items ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{{ $stat->last_activity_at?->diffForHumans() ?? '—' }}</td>
                     </tr>
                     @empty
@@ -36,5 +38,6 @@
             </table>
         </div>
     </div>
+    <div class="mt-4">{{ $companies->links() }}</div>
 </div>
 </x-admin-layout>

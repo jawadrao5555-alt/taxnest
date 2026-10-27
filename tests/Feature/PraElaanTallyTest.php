@@ -346,6 +346,27 @@ class PraElaanTallyTest extends TestCase
         $response->assertSee('1 response from 1 company', false);
     }
 
+    public function test_admin_suggestions_route_keeps_its_view_and_status_filter(): void
+    {
+        foreach ([['Pending route fixture', 'pending'], ['Planned route fixture', 'planned']] as [$title, $status]) {
+            DB::table('feature_suggestions')->insert([
+                'user_id' => $this->userA1Id, 'company_id' => $this->companyAId,
+                'product' => 'pos', 'title' => $title, 'status' => $status,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $this->actingAsAdmin()->get('/admin/feature-suggestions?status=planned')
+            ->assertOk()->assertViewIs('admin.feature-suggestions')
+            ->assertViewHas('suggestions', fn ($rows) => $rows->total() === 1
+                && $rows->first()->title === 'Planned route fixture')
+            ->assertSee('Planned route fixture')
+            ->assertDontSee('Sync from DRAP')
+            ->assertSee('href="'.route('admin.feature-suggestions').'"', false)
+            ->assertSee('href="'.route('admin.medicine-catalogue').'"', false);
+        $this->assertSame(2, DB::table('feature_suggestions')->count());
+    }
+
     public function test_admin_feature_suggestions_page_returns_200_without_data(): void
     {
         $response = $this->actingAsAdmin()->get('/admin/feature-suggestions');

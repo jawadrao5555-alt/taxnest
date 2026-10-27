@@ -40,6 +40,9 @@ abstract class TestCase extends BaseTestCase
         // reuses company id 1). Never let an earlier test's entitlement answer
         // leak into the next isolated fixture.
         \App\Services\PosFeatureService::flushGateCaches();
+        // Campaign pricing is memoized for one request. A long PHPUnit process
+        // must not carry another test's active sale into a fresh database.
+        \App\Models\SaleCampaign::clearActiveCache();
 
         $this->assertTestEnvironmentIsIsolated();
     }

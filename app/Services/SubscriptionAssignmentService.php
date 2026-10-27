@@ -141,6 +141,9 @@ class SubscriptionAssignmentService
             // the same company lock, so it can never attach a paid feature to a
             // package renewal that is being replaced at the same moment.
             $company = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            // Validate under the company lock, before touching the current
+            // subscription, payment attribution or commission history.
+            PlanCompanyCompatibility::assertMatches($company, $plan);
 
             // The admin Assign button is idempotent for a still-current plan.
             // Paid proof approval deliberately passes the default false: each
@@ -220,7 +223,8 @@ class SubscriptionAssignmentService
         // package that has since been retired (DI Sep 2026, both POS lines
         // 23 Aug 2026). Approving must not quietly resurrect it — the admin
         // assigns one of the current packages by hand instead.
-        if (!$plan || $plan->is_trial || PlanSellabilityService::isRetired($plan)) {
+        if (!$plan || $plan->is_trial || PlanSellabilityService::isRetired($plan)
+            || !PlanCompanyCompatibility::matches($company, $plan)) {
             return null;
         }
 

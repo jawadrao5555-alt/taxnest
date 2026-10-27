@@ -49,6 +49,19 @@ class LiveOpsAdminAndRunnerTest extends LiveOpsTestCase
             ->assertSee('UI Shop');
     }
 
+    public function test_empty_history_explains_each_section_without_enabling_actions(): void
+    {
+        $this->actingAsAdmin()->get('/admin/live-ops')->assertOk()
+            ->assertSee('No diagnostic reports yet.')
+            ->assertSee('No remediation requests yet.')
+            ->assertSee('No agent commands yet.')
+            ->assertSee('No audit events yet.')
+            ->assertSee('Propose remediation (does not execute)')
+            ->assertSee('tn-live-ops');
+        $this->assertSame(0, DB::table('live_ops_remediation_requests')->count());
+        $this->assertSame(0, DB::table('live_ops_agent_commands')->count());
+    }
+
     public function test_admin_propose_approve_execute_flow(): void
     {
         $id = $this->makeCompany('Fix Shop');

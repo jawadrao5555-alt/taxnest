@@ -38,6 +38,7 @@ class LiveOpsRunnerController extends Controller
             'operation' => 'required|string|max:64',
             'company_id' => 'nullable|integer|min:1',
             'company_name' => 'nullable|string|max:255',
+            'invoice_reference' => ['nullable', 'string', 'max:80', 'regex:/\\A[A-Za-z0-9][A-Za-z0-9._\\/-]{0,79}\\z/'],
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date',
             'requester' => 'nullable|string|max:120',

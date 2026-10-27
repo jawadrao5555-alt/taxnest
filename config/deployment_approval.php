@@ -1,5 +1,7 @@
 <?php
 return [
+    // Optional server-only read credential; never a workflow/merge credential.
+    'github_read_token' => env('TAXNEST_DEPLOYMENT_GITHUB_READ_TOKEN'),
     'repository' => 'jawadrao5555-alt/taxnest',
     'oidc_issuer' => 'https://token.actions.githubusercontent.com',
     'oidc_audience' => 'owner-approval-relay',

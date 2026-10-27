@@ -107,6 +107,7 @@ class AdminLiveOpsController extends Controller
             'operation' => 'required|string|max:64',
             'company_id' => 'nullable|integer|min:1',
             'company_name' => 'nullable|string|max:255',
+            'invoice_reference' => ['nullable', 'string', 'max:80', 'regex:/\\A[A-Za-z0-9][A-Za-z0-9._\\/-]{0,79}\\z/'],
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date',
         ]);
@@ -115,6 +116,7 @@ class AdminLiveOpsController extends Controller
             $report = $diagnostics->run($validated['operation'], [
                 'company_id' => $validated['company_id'] ?? null,
                 'company_name' => $validated['company_name'] ?? null,
+                'invoice_reference' => $validated['invoice_reference'] ?? null,
                 'date_from' => $validated['date_from'] ?? null,
                 'date_to' => $validated['date_to'] ?? null,
                 'requester' => auth('admin')->user()->email ?? 'admin',

@@ -1,9 +1,7 @@
-title: "Admin panel mein wazeh maloomat aur behtar controls"
-audience: all
+title: "Invoice ki tax calculation ab wazeh check ho sakegi"
+audience: pos
 type: improvement
 points:
-  - "Admin panel ka chuna hua rang andar ke safhon par bhi nazar aayega aur error paigham saaf parhay ja sakenge."
-  - "Company ke liye usi system aur business type ka package select karne ki hifazat shamil hai."
-  - "Usage Monitoring mein aakhri staff activity asal record se dikhayi jayegi; sirf safha kholne se activity ka waqt nahi badlega."
-  - "Bar bar ghalat admin password par arzi rukawat aur dobara koshish ka paigham milega."
-  - "Company filters aur Live Ops controls ko keyboard aur chhoti screen par parhna aur istemal karna behtar hoga."
+  - "Admin Live Ops mein company aur exact invoice number se saved bill calculation check ki ja sakegi."
+  - "Report menu total, discount, saved tax rates aur final total ko dobara match karegi; customer aur item ki tafseel nahi dikhayegi."
+  - "Yeh sirf read-only jaanch hai; bill, company settings, PRA status ya printing mein koi tabdeeli nahi karti."

@@ -1727,9 +1727,9 @@ async function tableOrderWorkflow(page,t,v) {
   await root.evaluate(el=>{
     const d=window.Alpine.$data(el);
     window.__additionFixture={cart:d.cart,recalledOrderId:d.recalledOrderId,incomingOrderId:d.incomingOrderId,baseline:d._recallCartBaseline,approval:d._confirmedRecalledAdditions};
-    d.cart=[{item_id:990001,item_type:'product',item_name:'Fictional pizza',quantity:1,unit_price:100}];
+    d.cart=[{cart_uid:'qa-confirm-pizza',item_id:990001,item_type:'product',item_name:'Fictional pizza',quantity:1,unit_price:100}];
     d.recalledOrderId=990001;d.incomingOrderId=null;d._recallCartBaseline=d.cartEditFingerprint();
-    d.cart.push({item_id:990002,item_type:'product',item_name:'Fictional bottle',quantity:1,unit_price:80});
+    d.cart.push({cart_uid:'qa-confirm-bottle',item_id:990002,item_type:'product',item_name:'Fictional bottle',quantity:1,unit_price:80});
   });
   try {
     for(const accept of [false,true]) {

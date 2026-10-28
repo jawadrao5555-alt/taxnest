@@ -110,6 +110,54 @@ class LiveOpsDiagnosticsTest extends LiveOpsTestCase
         $this->assertStringNotContainsString('9999', json_encode($report));
     }
 
+    public static function unavailableInvoiceEvidence(): array
+    {
+        return [
+            'legacy discount column absent' => ['discount_amount'],
+            'legacy exemption column absent' => ['is_tax_exempt'],
+            'no saved lines' => ['empty_lines'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unavailableInvoiceEvidence')]
+    public function test_invoice_diagnostic_cannot_confirm_from_unavailable_saved_evidence(string $missing): void
+    {
+        $company = $this->makeCompany('Legacy invoice evidence');
+        $bill = $this->makeTxn($company, [
+            'invoice_number' => 'LEGACY-P2240', 'payment_method' => 'card',
+            'subtotal' => $missing === 'empty_lines' ? 0 : 1379.31,
+            'discount_amount' => 0, 'tax_rate' => 8,
+            'tax_amount' => $missing === 'empty_lines' ? 0 : 110.34,
+            'total_amount' => $missing === 'empty_lines' ? 0 : 1490,
+            'tax_inclusive' => true, 'tax_menu_rate' => 16,
+        ]);
+        if ($missing !== 'empty_lines') {
+            DB::table('pos_transaction_items')->insert([
+                'transaction_id' => $bill, 'subtotal' => 1600, 'is_tax_exempt' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            \Illuminate\Support\Facades\Schema::table($missing === 'is_tax_exempt' ? 'pos_transaction_items' : 'pos_transactions', function ($table) use ($missing) {
+                $table->dropColumn($missing);
+            });
+        }
+        $before = DB::table('pos_transactions')->where('id', $bill)->first();
+        $data = app(\App\Services\LiveOps\LiveOpsInvoiceDiagnostic::class)->run($company, 'LEGACY-P2240');
+        $this->assertFalse($data['finding']['card_save_confirmed_from_saved_snapshot']);
+        $this->assertNull($data['recalculation']);
+        $this->assertNotEmpty($data['evidence_gaps']);
+        $this->assertEquals($before, DB::table('pos_transactions')->where('id', $bill)->first());
+    }
+
+    public function test_invoice_diagnostic_rejects_ambiguous_reference_within_same_company(): void
+    {
+        $company = $this->makeCompany('Duplicate reference fixture');
+        $this->makeTxn($company, ['invoice_number' => 'DUP-P2240']);
+        $this->makeTxn($company, ['invoice_number' => 'DUP-P2240', 'total_amount' => 9999]);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('multiple saved invoices');
+        app(\App\Services\LiveOps\LiveOpsInvoiceDiagnostic::class)->run($company, 'DUP-P2240');
+    }
+
     public function test_invoice_diagnostic_requires_exact_company_scoped_reference(): void
     {
         $company = $this->makeCompany('Invoice Scope');

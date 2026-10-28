@@ -28,3 +28,7 @@ The diagnostic never uses current company settings to reinterpret a historical b
 - Targeted Live Ops tests cover the PKR 1,600 / 16% menu / 8% card / PKR 110.34 / PKR 1,490 case and tenant isolation.
 - Admin and runner validation, shell/YAML parsing, PHP syntax, full PHP, MariaDB, actual browser, Node 22, locked dependency audit/build, workflow/release validation and all eight mandatory PR checks must pass.
 - Production diagnosis for P2240 remains owner-approved post-deploy acceptance; this PR contains no live customer evidence.
+
+
+## Final review — 28 October 2026
+Three additional real regressions reproduced false card-save confirmation when the saved discount column, line exemption column, or all saved lines were unavailable. The diagnostic now requires complete numeric line/taxability evidence and an actual saved discount, reports evidence gaps, and never substitutes zero for missing evidence. Non-numeric/non-finite values stay unavailable. Duplicate invoice references inside one company are rejected instead of selecting the first row. Existing exact P2240-like saved-snapshot/second-tenant/privacy proof remains covered. No historical data or production settings changed. Fresh final-head checks are required after this correction.

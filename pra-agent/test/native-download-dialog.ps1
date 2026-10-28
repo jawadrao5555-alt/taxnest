@@ -24,6 +24,7 @@ public static class NativeDownloadDialog {
   [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr h);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, string l);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr SendMessageTimeout(IntPtr h, uint m, UIntPtr w, StringBuilder l, uint flags, uint timeout, out UIntPtr result);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   static bool OwnControl(IntPtr dialog, IntPtr child, uint pid, string expectedClass, int id) {
     uint owner;GetWindowThreadProcessId(child,out owner);
@@ -33,8 +34,12 @@ public static class NativeDownloadDialog {
   public static bool SetFilename(IntPtr dialog, IntPtr child, uint pid, string value) {
     if(!OwnControl(dialog,child,pid,"Edit",1001))return false;
     if(SendMessage(child,0x000C,IntPtr.Zero,value)==IntPtr.Zero)return false;
-    var text=new StringBuilder(32768);GetWindowText(child,text,text.Capacity);
-    return text.ToString()==value;
+    // GetWindowText cannot read an Edit control in another process. A
+    // successful WM_SETTEXT must be verified with WM_GETTEXT, otherwise the
+    // caller never reaches Save even though the filename visibly changed.
+    var text=new StringBuilder(32768);UIntPtr copied;
+    if(SendMessageTimeout(child,0x000D,new UIntPtr((uint)text.Capacity),text,0x0002,2000,out copied)==IntPtr.Zero)return false;
+    return copied.ToUInt64()==(ulong)value.Length && text.ToString()==value;
   }
   public static bool Click(IntPtr dialog, IntPtr child, uint pid, int id) {
     return OwnControl(dialog,child,pid,"Button",id) && PostMessage(child,0x00F5,IntPtr.Zero,IntPtr.Zero);

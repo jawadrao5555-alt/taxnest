@@ -576,7 +576,12 @@ class Company extends Model
             && $transaction->pra_status !== null
             && $transaction->pra_status !== 'exempt_internal';
 
-        return $this->posReceiptPrefs($isPra ? 'pra' : 'local');
+        $prefs = $this->posReceiptPrefs($isPra ? 'pra' : 'local');
+        $options = \App\Support\PosReceiptOptions::forBill($this, $transaction);
+        foreach (['show_business_name', 'show_address', 'show_mobile', 'show_email', 'show_ntn', 'show_cashier', 'show_footer', 'show_developed_by', 'show_verify_line'] as $key) {
+            $prefs[$key] = \App\Support\PosReceiptOptions::visible($options, $key, (bool) ($prefs[$key] ?? true));
+        }
+        return $prefs;
     }
 
     /**

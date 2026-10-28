@@ -1,7 +1,8 @@
-title: "Invoice ki tax calculation ab wazeh check ho sakegi"
+title: "Receipt ki details apni zaroorat ke mutabiq chunain"
 audience: pos
 type: improvement
 points:
-  - "Admin Live Ops mein company aur exact invoice number se saved bill calculation check ki ja sakegi."
-  - "Report menu total, discount, saved tax rates aur final total ko dobara match karegi; customer aur item ki tafseel nahi dikhayegi."
-  - "Yeh sirf read-only jaanch hai; bill, company settings, PRA status ya printing mein koi tabdeeli nahi karti."
+  - "Receipt Settings mein Local aur Fiscal receipt ke liye details aur layout alag chun sakte hain."
+  - "Terminal, waiter, table, item columns, logo aur likhai ke mazeed controls milenge."
+  - "Keep current se aap ka mojooda design barqarar rehta hai; tabdeeli sirf Save par lagti hai."
+  - "Bill ki raqam, fiscal number aur verification QR barqarar rehte hain."

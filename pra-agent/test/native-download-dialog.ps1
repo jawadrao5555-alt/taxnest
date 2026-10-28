@@ -31,12 +31,7 @@ public static class NativeDownloadDialog {
     var cls=new StringBuilder(128);GetClassName(child,cls,cls.Capacity);
     return child!=IntPtr.Zero && owner==pid && IsChild(dialog,child) && GetDlgCtrlID(child)==id && cls.ToString()==expectedClass;
   }
-  public static bool SetFilename(IntPtr dialog, IntPtr child, uint pid, string value) {
-    if(!OwnControl(dialog,child,pid,"Edit",1001))return false;
-    if(SendMessage(child,0x000C,IntPtr.Zero,value)==IntPtr.Zero)return false;
-    // GetWindowText cannot read an Edit control in another process. A
-    // successful WM_SETTEXT must be verified with WM_GETTEXT, otherwise the
-    // caller never reaches Save even though the filename visibly changed.
+  static bool ReadFilename(IntPtr child,string value) {
     var text=new StringBuilder(32768);UIntPtr copied;
     if(SendMessageTimeout(child,0x000D,new UIntPtr((uint)text.Capacity),text,0x0002,2000,out copied)==IntPtr.Zero)return false;
     return copied.ToUInt64()==(ulong)value.Length && text.ToString()==value;
@@ -45,7 +40,12 @@ public static class NativeDownloadDialog {
     return OwnControl(dialog,child,pid,"Button",id) && PostMessage(child,0x00F5,IntPtr.Zero,IntPtr.Zero);
   }
   [StructLayout(LayoutKind.Sequential)] struct MouseInput { public int dx,dy; public uint data,flags,time; public UIntPtr extra; }
-  [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public MouseInput mouse; }
+  [StructLayout(LayoutKind.Sequential)] struct KeyInput { public ushort key,scan; public uint flags,time; public UIntPtr extra; }
+  [StructLayout(LayoutKind.Explicit)] struct InputData {
+    [FieldOffset(0)] public MouseInput mouse;
+    [FieldOffset(0)] public KeyInput keyboard;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public InputData data; }
   [StructLayout(LayoutKind.Sequential)] struct Point { public int x,y; public Point(int a,int b){x=a;y=b;} }
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
@@ -61,8 +61,23 @@ public static class NativeDownloadDialog {
     if(owner!=pid || (hit!=dialog && !IsChild(dialog,hit)))return false;
     if(!SetCursorPos(x,y))return false;
     var clicks=new Input[2];
-    clicks[0].mouse.flags=0x0002;clicks[1].mouse.flags=0x0004;
+    clicks[0].data.mouse.flags=0x0002;clicks[1].data.mouse.flags=0x0004;
     return SendInput(2,clicks,Marshal.SizeOf(typeof(Input)))==2;
+  }
+  static Input Key(ushort key,ushort scan,uint flags) {
+    var input=new Input();input.type=1;input.data.keyboard.key=key;input.data.keyboard.scan=scan;input.data.keyboard.flags=flags;return input;
+  }
+  public static bool TypeFilename(IntPtr dialog,IntPtr child,uint pid,int x,int y,string value) {
+    if(value.Length==0 || value.Length>32767 || !OwnControl(dialog,child,pid,"Edit",1001))return false;
+    if(!ClickPoint(dialog,pid,x,y))return false;
+    // Real focus, Ctrl+A and Unicode keyboard events. WM_SETTEXT alone can
+    // change Edit text without committing the shell dialog's filename state.
+    var keys=new Input[4+value.Length*2];
+    keys[0]=Key(0x11,0,0);keys[1]=Key(0x41,0,0);keys[2]=Key(0x41,0,2);keys[3]=Key(0x11,0,2);
+    for(int i=0;i<value.Length;i++){keys[4+i*2]=Key(0,value[i],4);keys[5+i*2]=Key(0,value[i],6);}
+    if(SendInput((uint)keys.Length,keys,Marshal.SizeOf(typeof(Input)))!=(uint)keys.Length)return false;
+    for(int i=0;i<50;i++){if(ReadFilename(child,value))return true;System.Threading.Thread.Sleep(20);}
+    return false;
   }
   public static string Describe(uint pid) {
     var result=new StringBuilder();
@@ -97,16 +112,9 @@ while ([DateTime]::UtcNow -lt $deadline) {
         $fields = $hostControl.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
         foreach ($control in $fields) {
           if ($control.Current.AutomationId -ne '1001') { continue }
-          try {
-            $control.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($target)
-            $edited = $true
-          } catch {
-            try {
-              $control.GetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern).SetValue($target)
-              $edited = $true
-            } catch {
-              $edited = [NativeDownloadDialog]::SetFilename($handle, [IntPtr]$control.Current.NativeWindowHandle, [uint32]$TargetProcessId, $target)
-            }
+          $fieldRect = $control.Current.BoundingRectangle
+          if ($fieldRect.Width -gt 0 -and $fieldRect.Height -gt 0) {
+            $edited = [NativeDownloadDialog]::TypeFilename($handle,[IntPtr]$control.Current.NativeWindowHandle,[uint32]$TargetProcessId,[int]($fieldRect.X+$fieldRect.Width/2),[int]($fieldRect.Y+$fieldRect.Height/2),$target)
           }
           if ($edited) { break }
         }

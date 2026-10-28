@@ -73,7 +73,11 @@ async function download(action, destination) {
   ask=true;
   const target = path.join(chosen,'renamed-native-report.csv');
   result = await download('Save',target);
-  assert.equal(result.state,'completed');assert.equal(result.path,target);assert.equal(fs.readFileSync(target,'utf8'),payload);
+  assert.equal(result.state,'completed');
+  // Native Windows dialogs can expand RUNNER~1 to runneradmin. Require the
+  // exact same existing file (including alternate folder/name), not spelling.
+  assert.equal(fs.realpathSync.native(result.path),fs.realpathSync.native(target));
+  assert.equal(fs.readFileSync(target,'utf8'),payload);
   const before = fs.readdirSync(downloads).sort();
   const cancelled = path.join(chosen,'cancelled.csv');
   result = await download('Cancel',cancelled);

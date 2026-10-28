@@ -39,6 +39,26 @@ public static class NativeDownloadDialog {
   public static bool Click(IntPtr dialog, IntPtr child, uint pid, int id) {
     return OwnControl(dialog,child,pid,"Button",id) && PostMessage(child,0x00F5,IntPtr.Zero,IntPtr.Zero);
   }
+  [StructLayout(LayoutKind.Sequential)] struct MouseInput { public int dx,dy; public uint data,flags,time; public UIntPtr extra; }
+  [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public MouseInput mouse; }
+  [StructLayout(LayoutKind.Sequential)] struct Point { public int x,y; public Point(int a,int b){x=a;y=b;} }
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point point);
+  [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
+  [DllImport("user32.dll", SetLastError=true)] static extern uint SendInput(uint count, Input[] inputs, int size);
+  public static bool ClickPoint(IntPtr dialog,uint pid,int x,int y) {
+    // Actual OS pointer input, only over this exact own-process modal dialog.
+    if(Find(pid)!=dialog)return false;
+    SetForegroundWindow(dialog);
+    if(GetForegroundWindow()!=dialog)return false;
+    IntPtr hit=WindowFromPoint(new Point(x,y));uint owner;GetWindowThreadProcessId(hit,out owner);
+    if(owner!=pid || (hit!=dialog && !IsChild(dialog,hit)))return false;
+    if(!SetCursorPos(x,y))return false;
+    var clicks=new Input[2];
+    clicks[0].mouse.flags=0x0002;clicks[1].mouse.flags=0x0004;
+    return SendInput(2,clicks,Marshal.SizeOf(typeof(Input)))==2;
+  }
   public static string Describe(uint pid) {
     var result=new StringBuilder();
     EnumWindows((h,p)=>{uint owner;GetWindowThreadProcessId(h,out owner);
@@ -97,6 +117,13 @@ while ([DateTime]::UtcNow -lt $deadline) {
         try { $control.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); exit 0 } catch {
           try { $control.GetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern).DoDefaultAction(); exit 0 } catch {
             if ([NativeDownloadDialog]::Click($handle,[IntPtr]$control.Current.NativeWindowHandle,[uint32]$TargetProcessId,[int]$buttonId)) { exit 0 }
+            # Some common-dialog providers expose no invokable pattern or HWND.
+            # Click the observed button rectangle through real OS pointer input.
+            # Foreground/PID/hit-test checks prevent clicking another window.
+            $rect = $control.Current.BoundingRectangle
+            if ($rect.Width -gt 0 -and $rect.Height -gt 0 -and
+                [NativeDownloadDialog]::ClickPoint($handle,[uint32]$TargetProcessId,[int]($rect.X+$rect.Width/2),[int]($rect.Y+$rect.Height/2))) { exit 0 }
+
           }
         }
       }

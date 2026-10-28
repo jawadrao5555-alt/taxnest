@@ -61,8 +61,9 @@ fi
 
 for lane in workflow-safety dependency-audit-build fullphpunit native-mariadb-di \
     browserdesktopmobile jsagentrealtime manifest-provenance; do
+    # Consume the full pipe: grep -q can close early and SIGPIPE the producer.
     grep -A120 "^  ${lane}:" "$workflow" |
-        grep -Fq 'actions/upload-artifact@v4' ||
+        grep -F 'actions/upload-artifact@v4' >/dev/null ||
         fail "$lane lacks its always-uploaded evidence artifact"
 done
 

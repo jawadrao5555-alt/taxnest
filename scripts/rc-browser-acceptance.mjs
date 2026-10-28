@@ -1775,21 +1775,21 @@ async function tableOrderWorkflow(page,t,v) {
   if(!(await reprint.innerText()).includes('Synthetic historical date proof'))throw new Error('Selected historical business date was not rendered in Reprint');
   await saveEvidenceScreenshot(page,'historical-reprint-date-'+v.width+'.png');
   await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintLoading);
-  await root.evaluate(el=>{
-    const d=window.Alpine.$data(el);
-    d.reprintBills=[
-      {id:990001,display_number:'QA-FILTER-CASH',customer_name:'QA cash delivery',order_type:'delivery',payment_method:'cash',total_amount:100,badge:'local'},
-      {id:990002,display_number:'QA-FILTER-CARD',customer_name:'QA card delivery',order_type:'delivery',payment_method:'debit_card',total_amount:100,badge:'local'},
-      {id:990003,display_number:'QA-FILTER-TAKE',customer_name:'QA card takeaway',order_type:'takeaway',payment_method:'card',total_amount:100,badge:'local'},
-    ];
+  // Real rows are seeded on this closed historical business date. Their
+  // source remains stable even when the sale screen's startup refresh fires.
+  await page.waitForFunction(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    const names=['Synthetic historical date proof','QA card delivery','QA card takeaway'];
+    return !d.reprintLoading&&d.reprintDate==='2024-01-02'&&d.reprintBills.length===3
+      &&names.every(name=>d.reprintBills.some(b=>b.customer_name===name));
   });
   await reprint.locator('[x-model="reprintOrderType"]').selectOption('delivery');
   await reprint.locator('[x-model="reprintPayment"]').selectOption('card');
   await page.waitForFunction(()=>{
-    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return d.filteredReprintBills().length===1&&d.filteredReprintBills()[0].id===990002;
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return d.filteredReprintBills().length===1&&d.filteredReprintBills()[0].customer_name==='QA card delivery';
   });
   const text=await reprint.innerText();
-  if(!text.includes('QA card delivery')||text.includes('QA cash delivery')||text.includes('QA card takeaway'))throw new Error('Reprint filter controls rendered incorrect rows');
+  if(!text.includes('QA card delivery')||text.includes('Synthetic historical date proof')||text.includes('QA card takeaway'))throw new Error('Reprint filter controls rendered incorrect rows');
   await saveEvidenceScreenshot(page,'reprint-type-payment-filters-'+v.width+'.png');
   await reprint.locator('[x-model="reprintOrderType"]').selectOption('');
   await reprint.locator('[x-model="reprintPayment"]').selectOption('');

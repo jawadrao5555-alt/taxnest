@@ -30,6 +30,7 @@ on:
           - PRINTER_HEALTH
           - ERROR_SUMMARY
           - COMPANY_DIAGNOSTIC
+          - INVOICE_DIAGNOSTIC
           - PROBLEMATIC_COMPANIES
       company_id:
         description: "Company ID (required for company-scoped ops)"
@@ -38,6 +39,11 @@ on:
         default: ""
       company_name:
         description: "Company name or account_code (owners never need a company ID)"
+        type: string
+        required: false
+        default: ""
+      invoice_reference:
+        description: "Exact POS invoice number (required for INVOICE_DIAGNOSTIC)"
         type: string
         required: false
         default: ""
@@ -78,7 +84,7 @@ jobs:
           set -euo pipefail
           OP="${{ github.event.inputs.operation }}"
           case "$OP" in
-            DAILY_OPS|SERVER_HEALTH|COMPANY_HEALTH|BILLING_SUMMARY|BILLING_BY_COMPANY|PRA_HEALTH|AGENT_HEALTH|PRINTER_HEALTH|ERROR_SUMMARY|COMPANY_DIAGNOSTIC|PROBLEMATIC_COMPANIES) ;;
+            DAILY_OPS|SERVER_HEALTH|COMPANY_HEALTH|BILLING_SUMMARY|BILLING_BY_COMPANY|PRA_HEALTH|AGENT_HEALTH|PRINTER_HEALTH|ERROR_SUMMARY|COMPANY_DIAGNOSTIC|INVOICE_DIAGNOSTIC|PROBLEMATIC_COMPANIES) ;;
             *) echo "Disallowed operation: $OP" >&2; exit 1 ;;
           esac
           CID="${{ github.event.inputs.company_id }}"
@@ -87,13 +93,39 @@ jobs:
             echo "$CID" | grep -Eq '^[0-9]+$' || { echo "company_id must be numeric" >&2; exit 1; }
           fi
           case "$OP" in
-            COMPANY_HEALTH|PRINTER_HEALTH|COMPANY_DIAGNOSTIC)
+            COMPANY_HEALTH|PRINTER_HEALTH|COMPANY_DIAGNOSTIC|INVOICE_DIAGNOSTIC)
               if [ -z "$CID" ] && [ -z "$CNAME" ]; then
                 echo "company_id or company_name is required for $OP" >&2
                 exit 1
               fi
               ;;
           esac
+          IREF="${{ github.event.inputs.invoice_reference }}"
+          if [ "$OP" = "INVOICE_DIAGNOSTIC" ]; then
+            [ -n "$IREF" ] || { echo "invoice_reference is required for INVOICE_DIAGNOSTIC" >&2; exit 1; }
+            echo "$IREF" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]{0,79} (HTTPS runner or SSH artisan)
+        env:
+          LIVE_OPS_RUNNER_TOKEN: ${{ secrets.LIVE_OPS_RUNNER_TOKEN }}
+          LIVE_OPS_BASE_URL: ${{ secrets.LIVE_OPS_BASE_URL }}
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          OPERATION: ${{ github.event.inputs.operation }}
+          COMPANY_ID: ${{ github.event.inputs.company_id }}
+          COMPANY_NAME: ${{ github.event.inputs.company_name }}
+          INVOICE_REFERENCE: ${{ github.event.inputs.invoice_reference }}
+          DATE_FROM: ${{ github.event.inputs.date_from }}
+          DATE_TO: ${{ github.event.inputs.date_to }}
+          REQUESTER: ${{ github.event.inputs.requester }}
+        run: bash scripts/ci-live-ops-diagnose.sh
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-ops-diagnostic
+          path: artifacts/live-ops-diagnostic.json
+          if-no-files-found: error
+          retention-days: 14
+ || { echo "invalid invoice_reference" >&2; exit 1; }
+          fi
 
       - name: Run diagnostic (HTTPS runner or SSH artisan)
         env:

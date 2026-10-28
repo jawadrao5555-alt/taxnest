@@ -32,3 +32,25 @@ Does not implement the remaining six-workstream #301 tracker, AI diagnostics #31
 
 ## Evidence
 Source changed-file lists and pinned document blobs were inspected: each source adds one Markdown specification, with no application changes. This consolidation adds those records plus this index only. No functional test pass, live behavior change or release readiness is claimed. Recheck stale source observations before implementation. No production credentials/data/settings, reprint, cache deletion, approval, merge or workflow dispatch used.
+
+
+## Runtime checkpoint — 28 October 2026
+
+Reports portion of #278 only; notification publishing/correct historical delivery
+(#279) and billing decisions/consent archive (#273) remain pending. Bulk stays draft.
+
+Two original real HTTP-rendered/CSV regressions failed before edits: missing
+transaction-specific status controls and irrelevant subscription CSV columns.
+After correction, portable PHP8.4.27 + disposable SQLite report/billing smoke
+suite: **15 tests / 234 assertions PASS**. Covers all thirteen screens, filtered
+counts/revenue/CSV, company/product denial, read-only PDF preview, legacy saved
+mode/status options, DI environment versus fiscal identity and unchanged records.
+Dashboard Company IDs/report shortcuts, relevant controls and table columns,
+plus actual canonical desktop/390px browser assertions were added. JS syntax
+and whitespace pass; those actual browser assertions are not yet executed.
+
+Full suite, Chrome, native MariaDB and own latest eight CI jobs remain required.
+The recovered local portable runtime lacks GD/exif/imap; locked dependencies
+were installed without scripts while temporarily ignoring those extension
+requirements only for these non-image tests. No lock/gate changes or full
+runtime/audit acceptance claimed. Neither bulk is complete or deploy-ready.

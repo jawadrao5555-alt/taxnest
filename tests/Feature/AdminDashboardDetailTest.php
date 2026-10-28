@@ -21,6 +21,43 @@ class AdminDashboardDetailTest extends TestCase {
   DB::table('subscriptions')->insert(['company_id'=>1,'active'=>true,'final_price'=>800]);
   DB::table('payment_proofs')->insert(['company_id'=>1,'status'=>'pending','amount'=>900]);
  }
+ public function test_invoice_report_controls_are_product_specific_and_do_not_imply_fiscal_success(): void {
+  $this->admin();
+  $this->get('/admin/dashboard/details/pos_transactions')->assertOk()
+   ->assertSee('Transaction status')->assertSee('Saved invoice mode')
+   ->assertDontSee('name="product"',false)->assertDontSee('Subscription dates')
+   ->assertSee('Company ID: 2');
+  $this->get('/admin/dashboard/details/di_invoices')->assertOk()
+   ->assertSee('Invoice status')->assertSee('DI environment')
+   ->assertDontSee('name="product"',false)->assertDontSee('Subscription dates')
+   ->assertSee('FBR invoice number');
+  $this->get('/admin/dashboard/details/total_users')->assertOk()->assertSee('Role');
+  $this->get('/admin/dashboard/details/active_subscriptions')->assertOk()->assertSee('Subscription dates');
+ }
+ public function test_unknown_saved_modes_remain_selectable_and_company_scope_matches_csv(): void {
+  $this->admin();
+  DB::table('pos_transactions')->where('status','completed')->update(['invoice_mode'=>'legacy_custom','pra_status'=>'legacy_waiting']);
+  $r=$this->get('/admin/dashboard/details/pos_transactions?company_id=2&mode=legacy_custom&fiscal_status=legacy_waiting');
+  $r->assertOk()->assertViewHas('count',1)->assertSee('value="legacy_custom"',false)->assertSee('value="legacy_waiting"',false);
+  $this->get('/admin/dashboard/details/pos_transactions?company_id=1&mode=legacy_custom')->assertOk()->assertViewHas('count',0);
+  $csv=$this->get('/admin/dashboard/details/pos_transactions?company_id=2&mode=legacy_custom&export=csv')->streamedContent();
+  $this->assertStringContainsString('legacy_custom',$csv);
+  $this->assertStringNotContainsString('subscription_start',$csv);
+ }
+ public function test_di_environment_is_separate_from_fiscal_identity_and_does_not_rewrite_history(): void {
+  $this->admin();
+  DB::table('invoices')->where('id',1)->update(['fbr_status'=>'production']);
+  DB::table('invoices')->where('id',2)->update(['fbr_status'=>'sandbox']);
+  $before=DB::table('invoices')->get()->toJson();
+  $this->get('/admin/dashboard/details/di_invoices?environment=production')->assertOk()->assertViewHas('count',1)
+   ->assertSee('No fiscal number recorded')->assertSee('does not by itself prove FBR reporting');
+  $this->get('/admin/dashboard/details/di_invoices?environment=sandbox')->assertOk()->assertViewHas('count',1);
+  $this->getJson('/admin/dashboard/details/di_invoices?environment=submitted')->assertUnprocessable();
+  $csv=$this->get('/admin/dashboard/details/di_invoices?environment=production&export=csv')->streamedContent();
+  $this->assertStringContainsString('production',$csv);
+  $this->assertStringNotContainsString('sandbox',$csv);
+  $this->assertSame($before,DB::table('invoices')->get()->toJson());
+ }
  private function admin(): void {$this->actingAs((new AdminUser)->forceFill(['id'=>50,'role'=>'super_admin','name'=>'Synthetic admin']),'admin');}
  public function test_all_thirteen_screens_render_and_csv_is_safe(): void {
   $this->admin();foreach(AdminDashboardDetail::LABELS as $metric=>$label) {

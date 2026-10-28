@@ -1487,6 +1487,13 @@ async function workflow(page,t,v,diagnostics) {
       await tab.click();
       if(await tab.getAttribute('aria-pressed')!=='true' || await page.locator('.tn-company-tabs button[aria-pressed="true"]').count()!==1) throw new Error('Selected admin company tab is not explicit: '+key);
       if(!await page.locator(`[data-company-panel="${key}"]`).isVisible() || await page.locator('[data-company-panel]:not([hidden])').count()!==1) throw new Error('Selected company tab does not show its own panel: '+key);
+      const panel=page.locator(`[data-company-panel="${key}"]`);
+      if(!(await panel.innerText()).includes('Company ID:'))throw new Error('Company ID hidden or missing: '+key);
+      const reportLink=panel.getByRole('link',{name:'Reports',exact:true}).first();
+      if(!await reportLink.isVisible())throw new Error('Company report shortcut missing: '+key);
+      const reportUrl=new URL(await reportLink.getAttribute('href'),baseUrl);
+      if(!reportUrl.searchParams.get('company_id') || !reportUrl.pathname.endsWith({di:'di_invoices',pos:'pos_transactions',fbrpos:'fbrpos_transactions'}[key]))throw new Error('Company report scope is incorrect: '+key);
+
     }
     const keys=await page.locator('[data-dashboard-metric]').evaluateAll(els=>els.map(el=>el.dataset.dashboardMetric));
     if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');
@@ -1498,6 +1505,18 @@ async function workflow(page,t,v,diagnostics) {
       if(!geometry || geometry.width<40 || geometry.height<40) throw new Error('Metric has no useful click area: '+key);
       await Promise.all([page.waitForURL('**/admin/dashboard/details/'+key,{waitUntil:'domcontentloaded'}),link.click()]);
       await page.locator(`[data-dashboard-detail="${key}"]`).waitFor({state:'visible'});
+      if(['di_invoices','pos_transactions','fbrpos_transactions'].includes(key)) {
+        if(await page.locator('[name="product"]').count())throw new Error('Fixed-product report exposes another product selector');
+        if((await page.locator('thead').innerText()).includes('Subscription dates'))throw new Error('Invoice report has irrelevant subscription dates');
+        const rows=await page.locator('tbody').innerText();
+        if(!rows.includes('No records match') && !rows.includes('Company ID:'))throw new Error('Report rows omit Company ID');
+        if(key==='di_invoices')await page.getByLabel('DI environment',{exact:true}).waitFor({state:'visible'});
+        else {
+          const mode=page.getByLabel('Saved invoice mode',{exact:true});
+          if(await mode.evaluate(el=>el.tagName)!=='SELECT')throw new Error('Saved mode is not a real selector');
+        }
+      }
+
       await checkUsability(page,t,key,v);
       await page.getByRole('link',{name:'Admin Dashboard',exact:false}).last().click();
       await page.waitForURL('**/admin/dashboard');

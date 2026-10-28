@@ -37,3 +37,38 @@ Keep DRAFT. Windows native login/RunOnce execution, startup concurrency, full pa
 Recovery protects only installations with the new updater already installed; a first upgrade from an old/broken Agent may still need manual repair without uninstalling saved settings. Corrupt/missing backups or failed/full disk may require explicit recovery. No universal power-loss, customer outage, offline/root-cause, fleet rollout, physical printing or production acceptance claim.
 
 No approval, merge, deploy, relay dispatch, registry changes or release assets were performed. Agent publication remains owner-controlled after all current-head gates and required acceptance.
+
+
+## Additional native acceptance — 28 October 2026
+
+Owner requested closing the remaining verification gaps. Add a fail-closed
+Windows packaging-job step using the actual delivered portable app.asar and
+its production POS BrowserWindow/download handler. The disposable Electron
+profile, Downloads directory and alternate folder are generated beneath a
+unique OS temp directory. A fictional loopback CSV is the only report.
+
+The new native harness verifies:
+- Existing POS window hides, returns as the same window, becomes visible/focused.
+- Default OFF keeps collision-safe Downloads and preserves the pre-existing file.
+- Opt-in opens the actual Windows Save As dialog; an own-process, exact-title UI
+  Automation driver enters a filename in the alternate fixture folder and clicks
+  the actual Save control. Assert completed status, chosen filename and bytes.
+- Actual Cancel reports cancelled, creates no selected file and does not silently
+  fall back to Downloads.
+- Switching OFF at runtime resumes collision-safe silent download on the same session.
+
+No dialog response mocking, automatic pass on unsupported OS, external browser
+launch, installed Agent, registry, production origin, printer or fiscal request.
+The added CI step is required to pass; missing real dialog controls fail the job.
+Local Node syntax and focused download/recovery/retention/result/retry group:
+24 tests, 19 pass, 5 Windows-only recovery skips, zero failures. Native Windows
+execution remains pending the new current-head CI, not established by Linux.
+
+Remaining honest limits: OS login-triggered RunOnce execution, startup race with
+an installed Agent, complete Electron/DLL replacement under Windows locks,
+external default-browser handoff and actual power-cut durability are not covered
+by this new test. They require an isolated Windows installation/VM and observed
+acceptance; never use an active customer's billing PC to manufacture a failure.
+A failed/full disk or legacy broken updater may still require manual recovery.
+Do not call these gaps cleared because the native download tests were added.
+All eight mandatory checks and both Windows jobs must pass on the new head.

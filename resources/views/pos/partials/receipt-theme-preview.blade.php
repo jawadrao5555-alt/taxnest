@@ -319,11 +319,9 @@ if (!window.rcptThemePicker) {
                 return t ? t.logo : 'center';
             },
             showLogoNow: function () {
-                if (!this.optionShow('show_logo',this.p.logo)) { return false; }
-                // Mirrors the real gate: logo_finals_only suppresses the logo on
-                // local/provisional bills (PRA panel's Local tab preview only).
-                if (cfg.mode === 'pra' && this.tab === 'local' && this.p.logoFinalsOnly) { return false; }
-                return true;
+                var legacy = !!this.p.logo;
+                if (cfg.mode === 'pra' && this.tab === 'local' && this.p.logoFinalsOnly) legacy = false;
+                return this.optionShow('show_logo', legacy);
             },
             serialNow: function () {
                 if (cfg.mode === 'fbr') { return 'INV-2026-00817'; }

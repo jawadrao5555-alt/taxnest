@@ -39,3 +39,11 @@ test('actual preview applies scoped optional styles without changing amounts or 
   assert.equal(state.thLogo(), 'center');
   assert.equal(state.typographyPreviewCss(), '');
 });
+
+test('explicit Local logo visibility overrides the legacy finals-only rule; inheritance preserves it', () => {
+  const state=make(); state.tab='local'; state.p.logo=true; state.p.logoFinalsOnly=true;
+  assert.equal(state.showLogoNow(),false);
+  state.optional={show_logo:'show'}; assert.equal(state.showLogoNow(),true);
+  state.optional={show_logo:'hide'}; assert.equal(state.showLogoNow(),false);
+  state.optional={}; assert.equal(state.showLogoNow(),false);
+});

@@ -304,9 +304,9 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         // suppress on local/provisional bills when that sub-option is set.
         // Reporting-OFF finals (invoice_mode='pra' + pra_status=NULL) are NOT local,
         // so logo still prints on them. Default OFF for logo_finals_only = unchanged.
-        $showLogo = $logoDataUri
-            && $optionVisible('show_logo', (bool) ($printStyle['show_logo'] ?? true))
+        $legacyShowLogo = (bool) ($printStyle['show_logo'] ?? true)
             && (!($printStyle['logo_finals_only'] ?? false) || !$rcptTopProvisional);
+        $showLogo = $logoDataUri && $optionVisible('show_logo', $legacyShowLogo);
         // show_menu_qr gate (Task #292): when false, suppress both the public-profile
         // Menu QR and the invoice JSON fallback QR on non-fiscal receipts.
         // The PRA Sahulat fiscal QR (pra_status='submitted') is NEVER affected.

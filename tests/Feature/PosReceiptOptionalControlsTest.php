@@ -321,6 +321,27 @@ class PosReceiptOptionalControlsTest extends TestCase
         $this->assertSame(['show_rate' => 'hide', 'show_business_name' => 'hide'], \App\Support\PosReceiptOptions::forBill($company, $bill));
     }
 
+    public function test_explicit_logo_choice_overrides_legacy_gate_but_inherit_keeps_it(): void
+    {
+        $original = Company::findOrFail($this->companyId);
+        $company = \Mockery::mock(Company::class)->makePartial();
+        $company->setRawAttributes($original->getAttributes());
+        $logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG2kAAAAASUVORK5CYII=';
+        $company->shouldReceive('receiptLogoDataUri')->andReturn($logo);
+        foreach (['80mm', '58mm'] as $paper) {
+            $company->invoice_display_prefs = ['pos_style' => ['show_logo' => true, 'logo_finals_only' => true, 'show_menu_qr' => false]];
+            $bill = $this->bill($company);
+            $bill->invoice_mode = 'local';
+            $html = view('pos.receipts.receipt_'.$paper, ['company' => $company, 'transaction' => $bill])->render();
+            $this->assertStringNotContainsString($logo, $html);
+            $prefs = $company->invoice_display_prefs;
+            $prefs['receipt_options']['local']['show_logo'] = 'show';
+            $company->invoice_display_prefs = $prefs;
+            $html = view('pos.receipts.receipt_'.$paper, ['company' => $company, 'transaction' => $bill])->render();
+            $this->assertStringContainsString($logo, $html);
+        }
+    }
+
     public function test_settings_get_is_read_only_and_exposes_both_option_sets(): void
     {
         $before = Company::findOrFail($this->companyId)->getAttributes();

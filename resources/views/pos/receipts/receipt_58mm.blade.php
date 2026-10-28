@@ -244,9 +244,9 @@
         $rcptTopProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
         // Logo gate (Task #292) — mirrors receipt_80mm; keep in sync.
         // show_logo is the master switch; logo_finals_only is the sub-gate.
-        $showLogo = $logoDataUri
-            && $optionVisible('show_logo', (bool) ($printStyle['show_logo'] ?? true))
+        $legacyShowLogo = (bool) ($printStyle['show_logo'] ?? true)
             && (!($printStyle['logo_finals_only'] ?? false) || !$rcptTopProvisional);
+        $showLogo = $logoDataUri && $optionVisible('show_logo', $legacyShowLogo);
         // show_menu_qr gate (Task #292) — mirrors receipt_80mm; keep in sync.
         // When false, suppress both Menu QR and invoice JSON QR. Fiscal QR unaffected.
         $showReceiptQr = $optionVisible('show_menu_qr', (bool) ($printStyle['show_menu_qr'] ?? true));

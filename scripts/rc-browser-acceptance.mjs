@@ -1637,6 +1637,40 @@ async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
   await page.waitForFunction(()=>{const e=document.querySelector('[data-tn-typography-preview] .tn-preview-items td');return e&&parseFloat(getComputedStyle(e).fontSize)<=10;});
   await saveEvidenceScreenshot(page,'receipt-typography-preview-'+v.width+'.png');
   pass(t.name+'/'+v.width+': actual receipt font/compact/wide-name controls update live preview without saving');
+  // Real optional controls: preview is read-only; explicit Save persists only the selected stream.
+  const option = (stream,key) => page.locator('[name="receipt_options_'+stream+'['+key+']"]');
+  const preview = page.locator('[data-tn-typography-preview]');
+  const openOptions = async stream => {
+    const panel=page.locator('[data-receipt-options="'+stream+'"]');
+    if(!await panel.evaluate(el=>el.open))await panel.locator('summary').click();
+  };
+  await openOptions('pra');
+  await option('pra','show_terminal').selectOption('hide');
+  await option('pra','total_size').selectOption('large');
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-optional-preview="terminal"]');return e&&getComputedStyle(e).display==='none';});
+  if(await preview.locator('[data-optional-total] td').first().evaluate(el=>getComputedStyle(el).fontSize)!=='20px')throw new Error('Optional TOTAL size did not update preview');
+  await page.locator('[data-receipt-tab="local"]').click();
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-optional-preview="terminal"]');return e&&getComputedStyle(e).display!=='none';});
+  await openOptions('local');
+  await option('local','show_waiter').selectOption('hide');
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-optional-preview="waiter"]');return e&&getComputedStyle(e).display==='none';});
+  await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
+  if(await option('pra','show_terminal').inputValue()!=='inherit'||await option('local','show_waiter').inputValue()!=='inherit')throw new Error('Preview changed saved settings without Save');
+  await openOptions('pra');await openOptions('local');
+  await option('pra','show_terminal').selectOption('hide');
+  await option('local','show_waiter').selectOption('hide');
+  const submit=async()=>{
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('#rcptSettingsForm button[type="submit"]').click()]);
+    await waitForOperationalSurface(page);await dismiss(page);
+  };
+  await submit();
+  if(await option('pra','show_terminal').inputValue()!=='hide'||await option('local','show_waiter').inputValue()!=='hide'||await option('local','show_terminal').inputValue()!=='inherit')throw new Error('Explicit save lost stream isolation');
+  await openOptions('pra');await openOptions('local');
+  await option('pra','show_terminal').selectOption('inherit');await option('local','show_waiter').selectOption('inherit');
+  await submit();
+  if(await option('pra','show_terminal').inputValue()!=='inherit'||await option('local','show_waiter').inputValue()!=='inherit')throw new Error('Keep current did not clear explicit override');
+  await saveEvidenceScreenshot(page,'receipt-optional-controls-'+v.width+'.png');
+  pass(t.name+'/'+v.width+': real optional Local/Fiscal controls, unsaved reload, explicit save, isolated settings and Keep current restore');
   } finally { await ownerContext.close(); }
 }
 

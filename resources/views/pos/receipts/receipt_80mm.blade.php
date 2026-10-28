@@ -180,7 +180,13 @@
         body { width: 72mm !important; max-width: 72mm !important; margin: 8mm 0 0 8mm !important; }
     </style>
     @endif
-    @php $printStyle = $company->posReceiptStyle(); @endphp
+    @php
+        $printStyle = $company->posReceiptStyle();
+        $receiptOptions = \App\Support\PosReceiptOptions::forBill($company, $transaction);
+        $optionVisible = fn (string $key, bool $legacy = true): bool => \App\Support\PosReceiptOptions::visible($receiptOptions, $key, $legacy);
+        if (in_array($receiptOptions['logo_position'] ?? '', ['center', 'side'], true)) $printStyle['logo'] = $receiptOptions['logo_position'];
+        $receiptItemCols = 2 + (int) $optionVisible('show_quantity') + (int) $optionVisible('show_rate');
+    @endphp
     <style>{!! \App\Support\PosReceiptTypography::css($company->invoice_display_prefs['pos_style'] ?? [], '80mm') !!}</style>
     @if($printStyle['bold'])
     <style>
@@ -193,6 +199,7 @@
         body, td, th, p, span, div, h1, strong { font-weight: bold !important; }
     </style>
     @endif
+<style>{!! \App\Support\PosReceiptOptions::css($receiptOptions, '80mm') !!}</style>
 @if(($hotelPaper ?? null) === 'a4')
 <style>
 @page { size: A4; margin: 14mm; }
@@ -298,12 +305,12 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         // Reporting-OFF finals (invoice_mode='pra' + pra_status=NULL) are NOT local,
         // so logo still prints on them. Default OFF for logo_finals_only = unchanged.
         $showLogo = $logoDataUri
-            && ($printStyle['show_logo'] ?? true)
+            && $optionVisible('show_logo', (bool) ($printStyle['show_logo'] ?? true))
             && (!($printStyle['logo_finals_only'] ?? false) || !$rcptTopProvisional);
         // show_menu_qr gate (Task #292): when false, suppress both the public-profile
         // Menu QR and the invoice JSON fallback QR on non-fiscal receipts.
         // The PRA Sahulat fiscal QR (pra_status='submitted') is NEVER affected.
-        $showReceiptQr = (bool) ($printStyle['show_menu_qr'] ?? true);
+        $showReceiptQr = $optionVisible('show_menu_qr', (bool) ($printStyle['show_menu_qr'] ?? true));
     @endphp
     <div class="header text-center">
         {{-- Logo placement (customer request Jul 2026): logo sits to the RIGHT of the
@@ -334,14 +341,14 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         @else
         @if($rp['show_business_name'] ?? true)<h1>{{ $company->name }}</h1>@endif
         @endif
-        @if($company->business_activity)<p>{{ $company->business_activity }}</p>@endif
+        @if($company->business_activity && $optionVisible('show_business_activity'))<p>{{ $company->business_activity }}</p>@endif
         @if(!empty($addressLine) && $rp['show_address'])<p>{{ $addressLine }}</p>@endif
         @if($phoneLine && $rp['show_mobile'])<p>{{ __('pos.rcpt_tel') }} {{ $phoneLine }}</p>@endif
         {{-- email_off wrappers (ZFC 13 Aug 2026): Cloudflare Scrape Shield rewrites
              bare emails into "[email protected]" in proxied HTML — receipts printed
              the literal placeholder. The comments disable obfuscation for this run. --}}
         @if($company->email && $rp['show_email'])<p><!--email_off-->{{ $company->email }}<!--/email_off--></p>@endif
-        @if($company->website)<p>{{ $company->website }}</p>@endif
+        @if($company->website && $optionVisible('show_website'))<p>{{ $company->website }}</p>@endif
         @if($company->ntn && $rp['show_ntn'])<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
     </div>
@@ -429,7 +436,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
             <span style="font-size:22px; font-weight:bold; color:#000;">{{ $rcptBillToken }}</span>
         </div>
         <table class="inv-table">
-            @if($omRcptFullNum)
+            @if($omRcptFullNum && $optionVisible('show_order_match'))
             <tr>
                 <td class="inv-label">Order #:</td>
                 <td class="inv-value" style="font-weight:900;">{{ $omRcptFullNum }}</td>
@@ -446,7 +453,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         </div>
         @endif
         <table class="inv-table">
-            @if($omRcptFullNum)
+            @if($omRcptFullNum && $optionVisible('show_order_match'))
             <tr>
                 <td class="inv-label">Order #:</td>
                 <td class="inv-value" style="font-weight:900;">{{ $omRcptFullNum }}</td>
@@ -501,7 +508,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
             default => null,
         };
     @endphp
-    @if($rcptOrderType)
+    @if($rcptOrderType && $optionVisible('show_order_type'))
     <div style="text-align:center; padding:2px 0 3px;">
         <span style="display:inline-block; border:1.5px solid #000; padding:1px 10px; font-size:11px; font-weight:bold; letter-spacing:1px;">{{ $rcptOrderType }}</span>
     </div>
@@ -531,12 +538,12 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
             }
         }
     @endphp
-    @if($omRcptToken)
+    @if($omRcptToken && $optionVisible('show_order_match'))
     <div style="text-align:center; padding:2px 0 3px;">
         <span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:16px; font-weight:900;">{{ __('pos.order_match_token_label') }} {{ $omRcptToken }}</span>
         <div style="font-size:9px; font-weight:400; padding-top:1px;">{{ __('pos.order_match_token_caption') }}</div>
     </div>
-    @elseif($omRcptCode && !$rcptPraFiscal)
+    @elseif($omRcptCode && !$rcptPraFiscal && $optionVisible('show_order_match'))
     {{-- Short-code box: only for non-fiscal bills; fiscal bills show the full order number in the top invoice box --}}
     <div style="text-align:center; padding:2px 0 3px;">
         <span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:14px; font-weight:900; letter-spacing:2px;">{{ $omRcptCode }}</span>
@@ -544,8 +551,10 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     @endif
 
     <table class="info-table">
-        <tr><td class="info-label">{{ __('pos.receipt_date') }}:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
-        @if($transaction->terminal)
+        @if($optionVisible('show_date'))
+        <tr><td class="info-label">{{ __('pos.receipt_date') }}:</td><td class="info-value">{{ $transaction->created_at->format(\App\Support\PosReceiptOptions::dateFormat($receiptOptions)) }}</td></tr>
+        @endif
+        @if($transaction->terminal && $optionVisible('show_terminal'))
         <tr><td class="info-label">{{ __('pos.receipt_terminal') }}:</td><td class="info-value">{{ $transaction->terminal->terminal_name }}</td></tr>
         @endif
         @if($transaction->customer_name)
@@ -581,14 +590,16 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                 }
             } catch (\Throwable $e) { $rcptClosedBy = null; }
         @endphp
-        @if($rcptClosedBy)
+        @if($rcptClosedBy && $optionVisible('show_closed_by'))
         <tr><td class="info-label">{{ __('pos.receipt_closed_by') }}:</td><td class="info-value">{{ $rcptClosedBy }}@if($rcptClosedAt) · {{ $rcptClosedAt }}@endif</td></tr>
         @endif
         {{-- ONE wording everywhere (owner, 26 Aug 2026): this info line, the boxed
              banner below and every report/export read the same label helper, so a
              prepaid delivery bill can never say "Qr Payment" here and something
              else three lines down. --}}
+        @if($optionVisible('show_payment'))
         <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value"><strong style="font-weight:bold; text-transform:uppercase;">{{ \App\Support\PosPaymentLabels::label($transaction->payment_method) }}</strong></td></tr>
+        @endif
         @if($transaction->creator && $rp['show_cashier'])
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
@@ -612,7 +623,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                 $rcptWaiterName = $rcptWaiterRO?->creator?->name;
             }
         @endphp
-        @if($rcptWaiterName)
+        @if($rcptWaiterName && $optionVisible('show_waiter'))
         <tr><td class="info-label">{{ __('pos.receipt_waiter') }}:</td><td class="info-value">{{ $rcptWaiterName }}</td></tr>
         @endif
         {{-- Table name (Aug 2026): dine-in receipts show the table label so staff
@@ -629,13 +640,13 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                     ->first();
                 if ($rcptTableRO && $rcptTableRO->table) {
                     $rcptTableLabel = 'T-' . $rcptTableRO->table->table_number;
-                    if ($rcptTableRO->table->floor && $rcptTableRO->table->floor->name) {
+                    if ($optionVisible('show_floor') && $rcptTableRO->table->floor && $rcptTableRO->table->floor->name) {
                         $rcptTableLabel .= ' — ' . $rcptTableRO->table->floor->name;
                     }
                 }
             }
         @endphp
-        @if($rcptTableLabel)
+        @if($rcptTableLabel && $optionVisible('show_table'))
         <tr><td class="info-label">{{ __('pos.receipt_table') }}:</td><td class="info-value">{{ $rcptTableLabel }}</td></tr>
         @endif
     </table>
@@ -674,8 +685,8 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         <thead>
             <tr>
                 <th class="col-item">{{ __('pos.receipt_item') }}</th>
-                <th class="col-qty">{{ __('pos.receipt_qty') }}</th>
-                <th class="col-rate">{{ __('pos.receipt_rate') }}</th>
+                @if($optionVisible('show_quantity'))<th class="col-qty">{{ __('pos.receipt_qty') }}</th>@endif
+                @if($optionVisible('show_rate'))<th class="col-rate">{{ __('pos.receipt_rate') }}</th>@endif
                 <th class="col-total">{{ __('pos.receipt_amount') }}</th>
             </tr>
         </thead>
@@ -687,29 +698,29 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
             @endphp
             <tr>
                 <td class="col-item">
-                    {{ $item->item_name }}@if($showTaxLines && $item->is_third_schedule)<span class="exempt-tag">3rd Sch</span>@elseif($showTaxLines && $item->is_tax_exempt)<span class="exempt-tag">NT</span>@endif
+                    @if($optionVisible('show_item_serial', false)){{ $loop->iteration }}. @endif{{ $item->item_name }}@if($showTaxLines && $item->is_third_schedule)<span class="exempt-tag">3rd Sch</span>@elseif($showTaxLines && $item->is_tax_exempt)<span class="exempt-tag">NT</span>@endif
                 </td>
-                <td class="col-qty">{{ rtrim(rtrim(number_format($item->quantity, 2, '.', ''), '0'), '.') ?: '0' }}</td>
-                <td class="col-rate">{{ number_format($lineRate, 0) }}</td>
+                @if($optionVisible('show_quantity'))<td class="col-qty">{{ rtrim(rtrim(number_format($item->quantity, 2, '.', ''), '0'), '.') ?: '0' }}</td>@endif
+                @if($optionVisible('show_rate'))<td class="col-rate">{{ number_format($lineRate, 0) }}</td>@endif
                 <td class="col-total">{{ number_format($lineAmt, 0) }}</td>
             </tr>
             {{-- Per-item comment (owner voice note, 23 Aug 2026): cart row ke pen se
                  likha note ab tak sirf KOT par chhapta tha — customer ke bill par
                  nazar hi nahi aata tha ("comments bill par print nahi hote"). --}}
-            @if(!empty($item->fulfillment))<tr><td colspan="4" style="font-size:9px;">{{ \App\Support\PosFulfillment::label($item->fulfillment) }}</td></tr>@endif
-            @if(!empty($item->special_notes))
+            @if(!empty($item->fulfillment))<tr><td colspan="{{ $receiptItemCols }}" style="font-size:9px;">{{ \App\Support\PosFulfillment::label($item->fulfillment) }}</td></tr>@endif
+            @if(!empty($item->special_notes) && $optionVisible('show_item_notes'))
             <tr>
-                <td class="col-item" colspan="4" style="padding-left:8px; font-size:9px; font-weight:normal;">&nbsp;&nbsp;* {{ $item->special_notes }}</td>
+                <td class="col-item" colspan="{{ $receiptItemCols }}" style="padding-left:8px; font-size:9px; font-weight:normal;">&nbsp;&nbsp;* {{ $item->special_notes }}</td>
             </tr>
             @endif
             {{-- Deal components (frozen snapshot) — indented, NO price columns: the
                  deal line above carries the money; these are informational only. --}}
-            @if($item->item_type === 'deal' && is_array($item->deal_snapshot))
+            @if($item->item_type === 'deal' && is_array($item->deal_snapshot) && $optionVisible('show_deal_components'))
             @foreach($item->deal_snapshot as $comp)
             <tr>
                 <td class="col-item" style="padding-left:8px; font-size:9px;">&nbsp;&nbsp;• {{ (int)($comp['qty'] ?? 1) }}x {{ $comp['name'] ?? 'Item' }}</td>
-                <td class="col-qty"></td>
-                <td class="col-rate"></td>
+                @if($optionVisible('show_quantity'))<td class="col-qty"></td>@endif
+                @if($optionVisible('show_rate'))<td class="col-rate"></td>@endif
                 <td class="col-total"></td>
             </tr>
             @endforeach
@@ -718,7 +729,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
         </tbody>
     </table>
 
-    @if(!empty($transaction->notes))
+    @if(!empty($transaction->notes) && $optionVisible('show_bill_notes'))
     <div class="separator"></div>
     <div style="font-size:10px; font-weight:normal; color:#000; padding:2px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
     @endif
@@ -726,7 +737,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     <div class="separator"></div>
 
     <table class="totals-table">
-        @if($showTaxLines || $rcptCardSave)
+        @if(($showTaxLines || $rcptCardSave) && $optionVisible('show_subtotal'))
         <tr>
             <td class="tot-label">{{ $rcptCardSave ? __('pos.receipt_menu_total') : __('pos.receipt_subtotal') }}:</td>
             <td class="tot-value">PKR {{ number_format($rcptSubtotal, 2) }}</td>
@@ -924,9 +935,9 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the
          serial badge now prints in the TOP box; only the QR remains down here. --}}
     @if($qrUrl)
-    <div class="qr-code">
+    <div class="qr-code receipt-extra-qr">
         <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 84px; height: 84px; margin: 3px auto;">
-        <p style="font-size: 10px; color: #000;">{{ $qrCaption }}</p>
+        @if($optionVisible('show_qr_caption'))<p style="font-size: 10px; color: #000;">{{ $qrCaption }}</p>@endif
     </div>
     @endif
     @endif
@@ -934,7 +945,8 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
     <div class="footer text-center">
         @if($rp['show_footer'])<p>{{ $hotelCreditSummary ? __('hotel_credit.receipt_footer', [], 'en') : ($rp['footer_text'] ?? __('pos.receipt_thank_purchase')) }}</p>@endif
         @if($rp['show_developed_by'] ?? true)<p>{{ __('pos.brand_developed_by') }}</p>@endif
-        <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
+        @if(!empty($receiptOptions['extra_note']) && is_string($receiptOptions['extra_note']))<p>{{ $receiptOptions['extra_note'] }}</p>@endif
+        @if($optionVisible('show_print_time'))<p>{{ now()->format('d/m/Y h:i:s A') }}</p>@endif
     </div>
 </body>
 </html>

@@ -82,17 +82,19 @@
              No marker + no fields of that set = leave the stored set untouched. --}}
         <input type="hidden" name="rp_present" value="1">
         <input type="hidden" name="lp_present" value="1">
+        @include('pos.partials.receipt-optional-controls', ['stream' => 'pra'])
+        @include('pos.partials.receipt-optional-controls', ['stream' => 'local'])
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
             {{-- Tab switcher --}}
             <div class="flex border-b border-gray-200 dark:border-gray-700">
-                <button type="button" @click="tab = 'pra'"
+                <button type="button" data-receipt-tab="pra" @click="tab = 'pra'"
                     :class="tab === 'pra' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
                     class="flex-1 px-4 py-3 text-sm font-semibold transition flex items-center justify-center gap-2">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     {{ __('pos.pra_receipt') }}
                 </button>
-                <button type="button" @click="tab = 'local'"
+                <button type="button" data-receipt-tab="local" @click="tab = 'local'"
                     :class="tab === 'local' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
                     class="flex-1 px-4 py-3 text-sm font-semibold transition flex items-center justify-center gap-2">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 4h6a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>

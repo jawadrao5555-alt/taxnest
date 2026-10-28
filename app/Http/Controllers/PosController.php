@@ -351,7 +351,7 @@ class PosController extends Controller
         if (!$company) { abort(404); }
 
         if ($request->isMethod('post')) {
-            $request->validate([
+            $request->validate(array_merge(\App\Support\PosReceiptOptions::rules(), [
                 'rp_footer_text' => 'nullable|string|max:150',
                 'lp_footer_text' => 'nullable|string|max:150',
                 'rp_printer_size' => 'nullable|in:80mm,58mm',
@@ -381,7 +381,7 @@ class PosController extends Controller
                 'rp_font_family' => 'sometimes|required|in:legacy,sans,mono',
                 'rp_item_text' => 'sometimes|required|in:legacy,compact,large',
                 'rp_wide_names' => 'sometimes|boolean',
-            ], [
+            ]), [
                 'rp_delivery_receipt_on_assign.required' => __('pos.delivery_receipt_default_invalid'),
             ]);
             // Stale-form guard, per display set (Task 1377 — owner 21 Aug 2026).
@@ -516,7 +516,7 @@ class PosController extends Controller
                     $prefs['pos_style']['show_menu_qr']     = $curStyle['show_menu_qr']      ?? true;
                 }
 
-                return $prefs;
+                return \App\Support\PosReceiptOptions::merge($prefs, $request);
             };
             $companyUpdates = [
                 // Paper size (owner request Jul 2026): same column PRA Settings writes —

@@ -20,6 +20,25 @@ public static class NativeDownloadDialog {
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsChild(IntPtr parent, IntPtr child);
+  [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr h);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, string l);
+  [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+  static bool OwnControl(IntPtr dialog, IntPtr child, uint pid, string expectedClass, int id) {
+    uint owner;GetWindowThreadProcessId(child,out owner);
+    var cls=new StringBuilder(128);GetClassName(child,cls,cls.Capacity);
+    return child!=IntPtr.Zero && owner==pid && IsChild(dialog,child) && GetDlgCtrlID(child)==id && cls.ToString()==expectedClass;
+  }
+  public static bool SetFilename(IntPtr dialog, IntPtr child, uint pid, string value) {
+    if(!OwnControl(dialog,child,pid,"Edit",1001))return false;
+    if(SendMessage(child,0x000C,IntPtr.Zero,value)==IntPtr.Zero)return false;
+    var text=new StringBuilder(32768);GetWindowText(child,text,text.Capacity);
+    return text.ToString()==value;
+  }
+  public static bool Click(IntPtr dialog, IntPtr child, uint pid, int id) {
+    return OwnControl(dialog,child,pid,"Button",id) && PostMessage(child,0x00F5,IntPtr.Zero,IntPtr.Zero);
+  }
   public static string Describe(uint pid) {
     var result=new StringBuilder();
     EnumWindows((h,p)=>{uint owner;GetWindowThreadProcessId(h,out owner);
@@ -46,19 +65,40 @@ while ([DateTime]::UtcNow -lt $deadline) {
     $lastControls = ($controls | ForEach-Object { $_.Current.ControlType.ProgrammaticName + ':' + $_.Current.AutomationId + ':' + $_.Current.Name }) -join ' | '
     if ($Action -eq 'Save') {
       $edited = $false
-      foreach ($control in $controls) {
-        if ($control.Current.ControlType -eq [System.Windows.Automation.ControlType]::Edit -and $control.Current.AutomationId -eq '1001') {
-          $control.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($target)
-          $edited = $true
-          break
+      foreach ($hostControl in $controls) {
+        # There is another AutomationId=1001 in the address bar. Scope to the
+        # actual filename host before accepting Value/Legacy/native providers.
+        if ($hostControl.Current.AutomationId -ne 'FileNameControlHost') { continue }
+        $fields = $hostControl.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+        foreach ($control in $fields) {
+          if ($control.Current.AutomationId -ne '1001') { continue }
+          try {
+            $control.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($target)
+            $edited = $true
+          } catch {
+            try {
+              $control.GetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern).SetValue($target)
+              $edited = $true
+            } catch {
+              $edited = [NativeDownloadDialog]::SetFilename($handle, [IntPtr]$control.Current.NativeWindowHandle, [uint32]$TargetProcessId, $target)
+            }
+          }
+          if ($edited) { break }
         }
+        if ($edited) { break }
       }
       if (-not $edited) { continue }
     }
+    $buttonId = if ($Action -eq 'Save') { '1' } else { '2' }
     foreach ($control in $controls) {
-      if ($control.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $control.Current.Name.Replace('&','').Trim() -eq $Action) {
-        $control.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-        exit 0
+      # Windows can expose the actual button as Pane; exact native ID and
+      # label still bind to the real dialog action, never a mocked result.
+      if ($control.Current.AutomationId -eq $buttonId -and $control.Current.Name.Replace('&','').Trim() -eq $Action) {
+        try { $control.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); exit 0 } catch {
+          try { $control.GetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern).DoDefaultAction(); exit 0 } catch {
+            if ([NativeDownloadDialog]::Click($handle,[IntPtr]$control.Current.NativeWindowHandle,[uint32]$TargetProcessId,[int]$buttonId)) { exit 0 }
+          }
+        }
       }
     }
   }

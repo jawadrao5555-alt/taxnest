@@ -27,6 +27,7 @@ class LiveOpsDiagnosticsService
         private LiveOpsAuditService $audit,
         private LiveOpsPlatformHealth $platform,
         private LiveOpsCompanyResolver $resolver,
+        private LiveOpsInvoiceDiagnostic $invoiceDiagnostic,
     ) {
     }
 
@@ -42,6 +43,7 @@ class LiveOpsDiagnosticsService
         $requester = isset($input['requester']) ? mb_substr((string) $input['requester'], 0, 120) : null;
         $companyId = isset($input['company_id']) ? (int) $input['company_id'] : null;
         $companyName = isset($input['company_name']) ? trim((string) $input['company_name']) : null;
+        $invoiceReference = isset($input['invoice_reference']) ? trim((string) $input['invoice_reference']) : null;
 
         if ($companyName && !$companyId) {
             $resolved = $this->resolver->resolve($companyName);
@@ -67,6 +69,7 @@ class LiveOpsDiagnosticsService
                 ? $this->errorSummary($this->requireCompanyId($companyId), $dateFrom, $dateTo)
                 : $this->errorSummaryFleet($dateFrom, $dateTo),
             'COMPANY_DIAGNOSTIC' => $this->companyDiagnostic($this->requireCompanyId($companyId), $dateFrom, $dateTo),
+            'INVOICE_DIAGNOSTIC' => $this->invoiceDiagnostic->run($this->requireCompanyId($companyId), $invoiceReference),
             'PROBLEMATIC_COMPANIES' => $this->problematicCompanies($dateFrom, $dateTo),
             'SERVER_HEALTH' => $this->serverHealth(),
             'DAILY_OPS' => $this->dailyOps($dateFrom, $dateTo),
@@ -83,6 +86,7 @@ class LiveOpsDiagnosticsService
                 'company_id' => $companyId,
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
+                'invoice_reference' => $invoiceReference,
             ],
             'result_count' => $this->countResults($payload),
             'summary_text' => $this->humanSummary($operation, $payload),
@@ -115,6 +119,7 @@ class LiveOpsDiagnosticsService
                 'company_id' => $companyId,
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
+                'invoice_reference' => $invoiceReference,
             ],
             artifactDigest: $envelope['artifact_digest'],
             resultStatus: 'ok',

@@ -15,6 +15,7 @@ class LiveOpsDiagnoseCommand extends Command
         {--operation=COMPANY_DIAGNOSTIC : Allow-listed diagnostic operation}
         {--company-id= : NestPOS company id}
         {--company-name= : Exact company name or account_code}
+        {--invoice-reference= : Exact company-scoped POS invoice number}
         {--date-from= : YYYY-MM-DD}
         {--date-to= : YYYY-MM-DD}
         {--requester=cloud-agent : Requester label for audit}
@@ -29,6 +30,7 @@ class LiveOpsDiagnoseCommand extends Command
                 'company_id' => $this->option('company-id') !== null && $this->option('company-id') !== ''
                     ? (int) $this->option('company-id') : null,
                 'company_name' => $this->option('company-name') ?: null,
+                'invoice_reference' => $this->option('invoice-reference') ?: null,
                 'date_from' => $this->option('date-from') ?: null,
                 'date_to' => $this->option('date-to') ?: null,
                 'requester' => $this->option('requester') ?: 'cli',

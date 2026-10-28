@@ -346,9 +346,20 @@ class PosOldUnassignedDeliveriesTest extends TestCase
 
     // ── 2. Board: pending split + counts ────────────────────────────────────
 
-    public function test_mixed_delivery_board_renders_under_production_lazy_loading_guard(): void
+    public static function mixedDeliveryClocks(): array
     {
+        return [
+            'after midnight before business cutoff' => ['2026-10-28 00:30:00'],
+            'daytime after business cutoff' => ['2026-10-28 12:30:00'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('mixedDeliveryClocks')]
+    public function test_mixed_delivery_board_renders_under_production_lazy_loading_guard(string $clock): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse($clock, 'Asia/Karachi'));
         $cid = $this->buildSchema();
+        $businessDate = PosBusinessDay::current($cid);
         Schema::table('pos_transactions', function (Blueprint $t) {
             $t->boolean('has_delivery_items')->default(false);
             $t->decimal('rider_collection_amount', 12, 2)->nullable();
@@ -361,7 +372,7 @@ class PosOldUnassignedDeliveriesTest extends TestCase
         foreach (['assigned', 'delivered'] as $status) {
             for ($i = 0; $i < 2; $i++) {
                 $id = $this->makeFinal($cid, ['rider_id' => $this->makeRider($cid),
-                    'delivery_status' => $status, 'has_delivery_items' => true, 'rider_collection_amount' => 100]);
+                    'business_date' => $businessDate, 'delivery_status' => $status, 'has_delivery_items' => true, 'rider_collection_amount' => 100]);
                 DB::table('pos_transaction_items')->insert(['transaction_id' => $id,
                     'item_name' => 'Synthetic mixed delivery', 'fulfillment' => 'delivery', 'quantity' => 2]);
             }
@@ -380,6 +391,7 @@ class PosOldUnassignedDeliveriesTest extends TestCase
             $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
         } finally {
             \Illuminate\Database\Eloquent\Model::preventLazyLoading($previous);
+            $this->travelBack();
         }
     }
 

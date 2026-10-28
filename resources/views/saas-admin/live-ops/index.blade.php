@@ -45,7 +45,7 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <h2 class="text-sm font-semibold text-white mb-3">Run diagnostic</h2>
-            <p class="text-[11px] text-gray-500 mb-3"><strong>DAILY_OPS</strong> is the all-company daily report (no company id). <strong>SERVER_HEALTH</strong> is host/app/DB/queue only. Company-scoped ops (<code>COMPANY_HEALTH</code>, <code>COMPANY_DIAGNOSTIC</code>, <code>PRINTER_HEALTH</code>) still need a company. Dual ops (<code>ERROR_SUMMARY</code>, <code>PRA_HEALTH</code>, <code>AGENT_HEALTH</code>, <code>BILLING_SUMMARY</code>) are fleet-wide when company is blank.</p>
+            <p class="text-[11px] text-gray-500 mb-3"><strong>DAILY_OPS</strong> is the all-company daily report (no company id). <strong>SERVER_HEALTH</strong> is host/app/DB/queue only. Company-scoped ops (<code>COMPANY_HEALTH</code>, <code>COMPANY_DIAGNOSTIC</code>, <code>PRINTER_HEALTH</code>) still need a company. <code>INVOICE_DIAGNOSTIC</code> also needs the exact POS invoice number and returns a redacted saved-calculation proof. Dual ops (<code>ERROR_SUMMARY</code>, <code>PRA_HEALTH</code>, <code>AGENT_HEALTH</code>, <code>BILLING_SUMMARY</code>) are fleet-wide when company is blank.</p>
             <form method="post" action="{{ route('saas.admin.live-ops.diagnose') }}" class="space-y-3">
                 @csrf
                 <div>
@@ -65,6 +65,10 @@
                         <label class="block text-xs text-gray-500 mb-1">Company name</label>
                         <input type="text" name="company_name" class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Exact POS invoice number (invoice diagnostic only)</label>
+                    <input type="text" name="invoice_reference" maxlength="80" placeholder="e.g. P2240" class="w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>

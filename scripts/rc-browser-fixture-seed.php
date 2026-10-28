@@ -216,14 +216,24 @@ DB::table('pos_day_close_reports')->insert([
     'company_id' => $tableShop->id, 'report_date' => '2024-01-02',
     'report_number' => 'RC-HISTORICAL-CLOSED', 'created_at' => $now, 'updated_at' => $now,
 ]);
-DB::table('pos_transactions')->insert([
-    'company_id' => $tableShop->id, 'created_by' => $tableCashier->id,
-    'invoice_number' => 'RC-HISTORICAL-REPRINT', 'business_date' => '2024-01-02',
-    'status' => 'completed', 'invoice_mode' => 'local', 'pra_status' => 'local',
-    'customer_name' => 'Synthetic historical date proof', 'payment_method' => 'cash',
-    'subtotal' => 100, 'tax_rate' => 0, 'tax_amount' => 0, 'total_amount' => 100,
-    'created_at' => '2024-01-02 12:00:00', 'updated_at' => '2024-01-02 12:00:00',
-]);
+// Use server-backed rows for the reprint filter proof. A startup/background
+// refresh must return the SAME evidence, not overwrite an injected JS-only list.
+foreach ([
+    ['RC-HISTORICAL-REPRINT', 'Synthetic historical date proof', 'delivery', 'cash'],
+    ['RC-HISTORICAL-REPRINT-CARD', 'QA card delivery', 'delivery', 'debit_card'],
+    ['RC-HISTORICAL-REPRINT-TAKE', 'QA card takeaway', 'takeaway', 'card'],
+] as [$serial, $customerName, $orderType, $paymentMethod]) {
+    DB::table('pos_transactions')->insert([
+        'company_id' => $tableShop->id, 'created_by' => $tableCashier->id,
+        'invoice_number' => $serial, 'business_date' => '2024-01-02',
+        'status' => 'completed', 'invoice_mode' => 'local', 'pra_status' => 'local',
+        'customer_name' => $customerName, 'payment_method' => $paymentMethod,
+        'order_type' => $orderType,
+        'subtotal' => 100, 'tax_rate' => 0, 'tax_amount' => 0, 'total_amount' => 100,
+        'created_at' => '2024-01-02 12:00:00', 'updated_at' => '2024-01-02 12:00:00',
+    ]);
+}
+
 $tableFloor = RestaurantFloor::create(['company_id' => $tableShop->id, 'name' => 'Synthetic Table Floor', 'is_active' => true]);
 $tableCases = [];
 $handoffCases = [];

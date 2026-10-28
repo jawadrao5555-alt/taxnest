@@ -67,6 +67,16 @@ abstract class LiveOpsTestCase extends TestCase
             $table->id();
             $table->unsignedBigInteger('company_id');
             $table->string('status')->default('completed');
+            $table->string('invoice_number')->nullable();
+            $table->string('payment_method')->nullable();
+            $table->string('discount_type')->nullable();
+            $table->decimal('discount_value', 12, 2)->default(0);
+            $table->decimal('discount_amount', 12, 2)->default(0);
+            $table->decimal('tax_rate', 8, 2)->default(0);
+            $table->decimal('exempt_amount', 12, 2)->default(0);
+            $table->boolean('tax_inclusive')->default(false);
+            $table->decimal('tax_menu_rate', 8, 2)->nullable();
+            $table->boolean('is_archived')->default(false);
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
             $table->decimal('total_amount', 12, 2)->default(0);
@@ -77,6 +87,14 @@ abstract class LiveOpsTestCase extends TestCase
             $table->string('invoice_mode')->nullable();
             $table->date('business_date')->nullable();
             $table->string('transaction_type')->default('sale');
+            $table->timestamps();
+        });
+
+        Schema::create('pos_transaction_items', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('transaction_id');
+            $table->decimal('subtotal', 12, 2)->default(0);
+            $table->boolean('is_tax_exempt')->default(false);
             $table->timestamps();
         });
 

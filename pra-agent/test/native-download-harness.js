@@ -27,7 +27,7 @@ function driver(action, destination) {
     '-TargetProcessId',String(process.pid),'-Action',action,'-FixtureRoot',temp,'-Destination',destination], {windowsHide:true});
   drivers.add(child);
   return new Promise((resolve,reject) => {
-    let error=''; child.stderr.on('data',d=>{error+=d;});
+    let error=''; child.stderr.on('data',d=>{error+=d;}); child.stdout.on('data',d=>{error+=d;});
     child.once('error',reject);
     child.once('exit',code=>{drivers.delete(child);code===0?resolve():reject(Error('Own native Save As driver: '+error));});
   });

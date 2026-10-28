@@ -187,4 +187,16 @@ class PosReceiptWaiterLineTest extends TestCase
             $this->assertStringNotContainsString(self::WAITER_NAME, $html, "$template: retail bill must not print waiter");
         }
     }
+
+    public function test_waiter_can_be_hidden_only_for_the_selected_receipt_stream(): void
+    {
+        $this->linkOrder('waiter', self::WAITER_ID);
+        $company = $this->makeCompany();
+        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => false], 'receipt_options' => ['local' => ['show_waiter' => 'hide']]];
+        foreach (self::TEMPLATES as $template) {
+            $this->assertStringNotContainsString(self::WAITER_NAME, $this->render($template, $company, $this->makeTransaction($company)));
+            $this->assertStringContainsString(self::WAITER_NAME, $this->render($template, $company, $this->makeTransaction($company, ['pra_status' => 'pending'])));
+        }
+    }
+
 }

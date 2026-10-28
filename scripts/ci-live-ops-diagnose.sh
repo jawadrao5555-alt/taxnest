@@ -9,7 +9,7 @@ OUT="artifacts/live-ops-diagnostic.json"
 OPERATION="${OPERATION:?}"
 
 if [ -n "${LIVE_OPS_RUNNER_TOKEN:-}" ] && [ -n "${LIVE_OPS_BASE_URL:-}" ]; then
-  export OPERATION COMPANY_ID COMPANY_NAME DATE_FROM DATE_TO REQUESTER
+  export OPERATION COMPANY_ID COMPANY_NAME INVOICE_REFERENCE DATE_FROM DATE_TO REQUESTER
   BODY=$(python3 - <<'PY'
 import json, os
 cid = os.environ.get("COMPANY_ID") or ""
@@ -17,6 +17,7 @@ print(json.dumps({
   "operation": os.environ["OPERATION"],
   "company_id": int(cid) if cid.isdigit() else None,
   "company_name": os.environ.get("COMPANY_NAME") or None,
+  "invoice_reference": os.environ.get("INVOICE_REFERENCE") or None,
   "date_from": os.environ.get("DATE_FROM") or None,
   "date_to": os.environ.get("DATE_TO") or None,
   "requester": os.environ.get("REQUESTER") or "github-actions",
@@ -63,7 +64,7 @@ case " ${LIVE_SSH_OPTS[*]} " in
 esac
 
 REMOTE=$(OPERATION="$OPERATION" COMPANY_ID="${COMPANY_ID:-}" COMPANY_NAME="${COMPANY_NAME:-}" \
-  DATE_FROM="${DATE_FROM:-}" DATE_TO="${DATE_TO:-}" REQUESTER="${REQUESTER:-github-actions}" \
+  INVOICE_REFERENCE="${INVOICE_REFERENCE:-}" DATE_FROM="${DATE_FROM:-}" DATE_TO="${DATE_TO:-}" REQUESTER="${REQUESTER:-github-actions}" \
   LIVE_DIR="$LIVE_DIR" LIVE_PHP="$LIVE_PHP" python3 - <<'PY'
 import os, shlex
 php = os.environ.get("LIVE_PHP", "/usr/bin/php")
@@ -74,6 +75,8 @@ if os.environ.get("COMPANY_ID"):
     args.append("--company-id=" + os.environ["COMPANY_ID"])
 if os.environ.get("COMPANY_NAME"):
     args.append("--company-name=" + os.environ["COMPANY_NAME"])
+if os.environ.get("INVOICE_REFERENCE"):
+    args.append("--invoice-reference=" + os.environ["INVOICE_REFERENCE"])
 if os.environ.get("DATE_FROM"):
     args.append("--date-from=" + os.environ["DATE_FROM"])
 if os.environ.get("DATE_TO"):

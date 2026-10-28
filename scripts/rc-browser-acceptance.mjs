@@ -1637,6 +1637,40 @@ async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
   await page.waitForFunction(()=>{const e=document.querySelector('[data-tn-typography-preview] .tn-preview-items td');return e&&parseFloat(getComputedStyle(e).fontSize)<=10;});
   await saveEvidenceScreenshot(page,'receipt-typography-preview-'+v.width+'.png');
   pass(t.name+'/'+v.width+': actual receipt font/compact/wide-name controls update live preview without saving');
+  // Real optional controls: preview is read-only; explicit Save persists only the selected stream.
+  const option = (stream,key) => page.locator('[name="receipt_options_'+stream+'['+key+']"]');
+  const preview = page.locator('[data-tn-typography-preview]');
+  const openOptions = async stream => {
+    const panel=page.locator('[data-receipt-options="'+stream+'"]');
+    if(!await panel.evaluate(el=>el.open))await panel.locator('summary').click();
+  };
+  await openOptions('pra');
+  await option('pra','show_terminal').selectOption('hide');
+  await option('pra','total_size').selectOption('large');
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-optional-preview="terminal"]');return e&&getComputedStyle(e).display==='none';});
+  if(await preview.locator('[data-optional-total] td').first().evaluate(el=>getComputedStyle(el).fontSize)!=='20px')throw new Error('Optional TOTAL size did not update preview');
+  await page.locator('[data-receipt-tab="local"]').click();
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-optional-preview="terminal"]');return e&&getComputedStyle(e).display!=='none';});
+  await openOptions('local');
+  await option('local','show_waiter').selectOption('hide');
+  await page.waitForFunction(()=>{const e=document.querySelector('[data-optional-preview="waiter"]');return e&&getComputedStyle(e).display==='none';});
+  await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
+  if(await option('pra','show_terminal').inputValue()!=='inherit'||await option('local','show_waiter').inputValue()!=='inherit')throw new Error('Preview changed saved settings without Save');
+  await openOptions('pra');await openOptions('local');
+  await option('pra','show_terminal').selectOption('hide');
+  await option('local','show_waiter').selectOption('hide');
+  const submit=async()=>{
+    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('#rcptSettingsForm button[type="submit"]').click()]);
+    await waitForOperationalSurface(page);await dismiss(page);
+  };
+  await submit();
+  if(await option('pra','show_terminal').inputValue()!=='hide'||await option('local','show_waiter').inputValue()!=='hide'||await option('local','show_terminal').inputValue()!=='inherit')throw new Error('Explicit save lost stream isolation');
+  await openOptions('pra');await openOptions('local');
+  await option('pra','show_terminal').selectOption('inherit');await option('local','show_waiter').selectOption('inherit');
+  await submit();
+  if(await option('pra','show_terminal').inputValue()!=='inherit'||await option('local','show_waiter').inputValue()!=='inherit')throw new Error('Keep current did not clear explicit override');
+  await saveEvidenceScreenshot(page,'receipt-optional-controls-'+v.width+'.png');
+  pass(t.name+'/'+v.width+': real optional Local/Fiscal controls, unsaved reload, explicit save, isolated settings and Keep current restore');
   } finally { await ownerContext.close(); }
 }
 
@@ -1741,21 +1775,21 @@ async function tableOrderWorkflow(page,t,v) {
   if(!(await reprint.innerText()).includes('Synthetic historical date proof'))throw new Error('Selected historical business date was not rendered in Reprint');
   await saveEvidenceScreenshot(page,'historical-reprint-date-'+v.width+'.png');
   await page.waitForFunction(()=>!window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).reprintLoading);
-  await root.evaluate(el=>{
-    const d=window.Alpine.$data(el);
-    d.reprintBills=[
-      {id:990001,display_number:'QA-FILTER-CASH',customer_name:'QA cash delivery',order_type:'delivery',payment_method:'cash',total_amount:100,badge:'local'},
-      {id:990002,display_number:'QA-FILTER-CARD',customer_name:'QA card delivery',order_type:'delivery',payment_method:'debit_card',total_amount:100,badge:'local'},
-      {id:990003,display_number:'QA-FILTER-TAKE',customer_name:'QA card takeaway',order_type:'takeaway',payment_method:'card',total_amount:100,badge:'local'},
-    ];
+  // Real rows are seeded on this closed historical business date. Their
+  // source remains stable even when the sale screen's startup refresh fires.
+  await page.waitForFunction(()=>{
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));
+    const names=['Synthetic historical date proof','QA card delivery','QA card takeaway'];
+    return !d.reprintLoading&&d.reprintDate==='2024-01-02'&&d.reprintBills.length===3
+      &&names.every(name=>d.reprintBills.some(b=>b.customer_name===name));
   });
   await reprint.locator('[x-model="reprintOrderType"]').selectOption('delivery');
   await reprint.locator('[x-model="reprintPayment"]').selectOption('card');
   await page.waitForFunction(()=>{
-    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return d.filteredReprintBills().length===1&&d.filteredReprintBills()[0].id===990002;
+    const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return d.filteredReprintBills().length===1&&d.filteredReprintBills()[0].customer_name==='QA card delivery';
   });
   const text=await reprint.innerText();
-  if(!text.includes('QA card delivery')||text.includes('QA cash delivery')||text.includes('QA card takeaway'))throw new Error('Reprint filter controls rendered incorrect rows');
+  if(!text.includes('QA card delivery')||text.includes('Synthetic historical date proof')||text.includes('QA card takeaway'))throw new Error('Reprint filter controls rendered incorrect rows');
   await saveEvidenceScreenshot(page,'reprint-type-payment-filters-'+v.width+'.png');
   await reprint.locator('[x-model="reprintOrderType"]').selectOption('');
   await reprint.locator('[x-model="reprintPayment"]').selectOption('');

@@ -34,6 +34,7 @@ Or SaaS `/admin/live-ops` → operation `DAILY_OPS` → Run (read-only).
 | **COMPANY_HEALTH** | COMPANY | company_id or unique name | Profile, PRA flags, agent online, devices | — |
 | **PRINTER_HEALTH** | COMPANY | company_id or unique name | Silent print, assigned printer, recent jobs | — |
 | **COMPANY_DIAGNOSTIC** | COMPANY | company_id or unique name | Composite company + billing + PRA + agent + printer + errors + likely cause (advisory) | — |
+| **INVOICE_DIAGNOSTIC** | COMPANY | company_id/name + exact invoice_reference | Stored bill pricing snapshot, redacted line totals, discount/tax/total recalculation and card-save proof | Required stored snapshot/line columns are absent |
 
 Company-scoped ops still throw `company_id (or resolvable company_name) is required` when blank. GitHub Actions now fail **before SSH** for those ops if both company fields are empty.
 
@@ -75,4 +76,5 @@ Audit rows and `live_ops_diagnostic_reports` are the only designed writes.
 - laravel.log is a **tail scan** (default 256 KiB), not a complete archive.
 - `systemctl is-active` is allow-listed unit names only; missing systemd → UNKNOWN.
 - NestPOS `product_type=pos` only. FBR POS / DI / Health are out of scope.
+- `INVOICE_DIAGNOSTIC` returns no customer details, item names or raw fiscal payloads and never uses current company settings to reinterpret a historical bill.
 - Desktop agent log files only arrive via owner-approved `UPLOAD_REDACTED_LOGS` (remediation), not this read path.

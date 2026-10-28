@@ -455,3 +455,6 @@ Agar aik workbook mein wohi Product Code/naam, Ingredient Code/naam-unit, ya woh
 - Same dish alag lines mein ho to har line apne ID se save hoti hai. Delete ke baad sirf hatayi hui printed quantity ki CANCEL slip banti hai; baqi dishes dobara ADD nahi hotin.
 - Order save ke baad table dobara khol kar items aur total check kar sakte hain. Agar stale-order conflict aaye to pehle reload karke latest order review karein.
 - Pehle se ghalat/double ho chukay bills ko khud se automatic clear nahi kiya jata; manager se actual order aur kitchen slip mila kar review karwayein.
+
+## Receipt ki optional details aur layout
+Receipt Settings mein **Fiscal receipt: optional details and layout** aur **Local receipt: optional details and layout** khol kar terminal, cashier/waiter, table/floor, item columns, notes, logo aur likhai ke controls alag chun sakte hain. **Keep current** mojooda design ko follow karta hai. Preview se setting save ya receipt print nahi hoti; tabdeeli sirf **Save** par lagti hai. Extra contact note plain text hota hai. Bill ki calculation, fiscal number aur fiscal verification QR nahi badalte. Paper width, alignment aur left margin ke purane printer controls isi safhay par hain. KOT design aur printer routing barqarar hain.

@@ -3548,6 +3548,10 @@ class PosController extends Controller
             $request->merge(['payment_method' => 'qr_payment']);
         }
 
+        if ($request->input('payment_method') === 'qr_payment' || $request->boolean('online_payment_confirmed')) {
+            \App\Services\PosOnlinePaymentVerification::requireAuthorized(auth('pos')->user(), (int) $companyId);
+        }
+
         // Cashier discount guardrail — mirrors RestaurantPosController::holdOrder.
         // Without this, a `pos_cashier` user could submit a 100 % percentage
         // discount through the manual-cart bypass / legacy form post and bypass
@@ -4446,6 +4450,10 @@ class PosController extends Controller
         // Normalize 'card' alias → 'debit_card' (see storeInvoice() for rationale).
         if ($request->input('payment_method') === 'card') {
             $request->merge(['payment_method' => 'debit_card']);
+        }
+
+        if ($request->input('payment_method') === 'qr_payment' && $transaction->payment_method !== 'qr_payment') {
+            \App\Services\PosOnlinePaymentVerification::requireAuthorized(auth('pos')->user(), (int) $companyId);
         }
 
         // Cashier discount guardrail (mirrors RestaurantPosController::holdOrder

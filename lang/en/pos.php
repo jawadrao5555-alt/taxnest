@@ -7224,5 +7224,6 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'receipt_text_large' => 'Large',
     'receipt_wide_names' => 'Give item names more space',
     'recalled_additions_final_confirm' => 'New or increased items were added after recalling this order. They will be included in the final bill. Send to Kitchen has not been pressed for these cart changes. Continue to payment? Cancel to review or send them first.',
+    'cannot_delete_uncertain_reporting_bill' => 'Only completed local bills can be deleted. Reconcile pending or uncertain PRA reporting first; use the existing retry/recovery flow.',
 ];
 

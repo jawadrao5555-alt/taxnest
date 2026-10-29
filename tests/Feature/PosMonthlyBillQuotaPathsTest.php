@@ -957,6 +957,19 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertDatabaseCount('pos_bill_deletions', 0);
     }
 
+    public function test_regular_delete_preserves_all_fiscal_pipeline_and_uncertain_states(): void
+    {
+        $company = $this->makeCompany(['invoice_limit_override'=>20]);
+        $this->actingAs($this->makeUser($company),'pos');
+        foreach(['pending','processing','submitting','submitted','verification_pending','failed','config_error','legacy_unknown'] as $status) {
+            $bill=$this->makeFinal($company,'PIPE-'.$status,['pra_status'=>$status]);
+            $before=(array)DB::table('pos_transactions')->find($bill);
+            $this->from("/pos/transaction/{$bill}")->delete("/pos/transaction/{$bill}")->assertRedirect()->assertSessionHas('error');
+            $this->assertEquals($before,(array)DB::table('pos_transactions')->find($bill));
+        }
+        $this->assertDatabaseCount('pos_bill_deletions',0);
+    }
+
     public function test_api_promote_local_final_bypass_stays_quota_free(): void
     {
         // send_to_pra=false = deliberate LOCAL FINAL — archived, stays local/local,

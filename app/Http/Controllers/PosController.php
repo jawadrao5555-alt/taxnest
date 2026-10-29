@@ -4766,6 +4766,16 @@ class PosController extends Controller
                         ? __('pos.cannot_delete_submitted_pra_num', ['number' => $locked->pra_invoice_number])
                         : __('pos.return_bill_immutable'));
             }
+            // No fiscal number alone does not prove local eligibility: an
+            // uncertain remote acceptance may still be waiting for its callback.
+            $knownLocal = $locked->status === 'completed'
+                && (($locked->invoice_mode === 'local' && in_array($locked->pra_status, ['local', null], true))
+                    || ($locked->pra_status === null && in_array($locked->invoice_mode, ['pra', null], true)));
+            if (!$knownLocal) {
+                DB::rollBack();
+                return redirect()->route('pos.transaction.show', $id)
+                    ->with('error', __('pos.cannot_delete_uncertain_reporting_bill'));
+            }
             $transaction = $locked->load('items');
             app(\App\Services\OptionalLocalBillArchive::class)->capture($transaction, 'pos', $transaction->items);
 

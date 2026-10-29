@@ -63,3 +63,19 @@ columns could be deleted. Regression first FAILED (delete succeeded); eligibilit
 now requires completed sale/nulllegacy type atomically in delete/promotion/day-close
 paths, preserving older schemas without the return-type column. Fiscal guards
 remain. Final targeted group result recorded after verification.
+
+Final review correction: regular PRA DELETE previously removed pending/uncertain
+unnumbered rows. Original pending regression first FAILED. Locked eligibility now
+matches the existing local portal stream (completed local with local/NULL status,
+or reporting-OFF PRA/NULL mode with NULL status). Pending/processing/submitting/
+submitted-without-number/verification-pending/failed/config-error/unknown states
+remain available for reconciliation/retry rather than hard deletion. Existing
+local bill stock/quota paths unchanged; monthly quota group36tests180assertions
+PASS including eight pipeline/unknown states. English/Urdu/Roman Urdu errors added.
+
+Initial local full run (started before service/test finalization):5680tests,
+45447assertions,1error/1failure,28existingdeprecations,7skipped. StaticPHP lacks
+GLOB_BRACE (unrelated health test); the archive tamper test used an obsolete
+in-memory-only mutation while the service had switched to authoritative DB reads.
+Final test corrupts the actual stored ciphertext and passes; do not count the
+initial full run as current-head green. Official full CI is still required.

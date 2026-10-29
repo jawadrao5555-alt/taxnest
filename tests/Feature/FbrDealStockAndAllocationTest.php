@@ -517,6 +517,22 @@ class FbrDealStockAndAllocationTest extends TestCase
             ->where('company_id', $this->companyId)->count(), 'one movement per component');
     }
 
+    public function test_fiscal_number_protects_stale_local_bill_from_delete_and_promote(): void
+    {
+        $response = $this->callStore($this->dealPayload(1, ['save_as_provisional' => 1]));
+        $id = (int) $response->getData(true)['transaction_id'];
+        DB::table('fbr_pos_transactions')->where('id', $id)->update(['fbr_invoice_number' => 'FISCAL-PRESERVE-123']);
+        $before = DB::table('fbr_pos_transactions')->where('id', $id)->first();
+        $stock = [$this->stockQty($this->burgerId), $this->stockQty($this->friesId), $this->stockQty($this->drinkId)];
+        $controller = new FbrPosController();
+        $request = Request::create('/fictional/provisional', 'POST');
+        $request->headers->set('Accept', 'application/json');
+        $this->assertFalse($controller->apiDeleteProvisional($request, $id)->getData(true)['success']);
+        $this->assertFalse($controller->apiPromoteProvisional($request, $id)->getData(true)['success']);
+        $this->assertEquals($before, DB::table('fbr_pos_transactions')->where('id', $id)->first());
+        $this->assertSame($stock, [$this->stockQty($this->burgerId), $this->stockQty($this->friesId), $this->stockQty($this->drinkId)]);
+    }
+
     public function test_provisional_delete_restores_frozen_fixed_and_repeated_choice_components(): void
     {
         // The drink is already a fixed 2x component. Add a choice group which

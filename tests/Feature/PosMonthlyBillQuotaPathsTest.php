@@ -921,6 +921,42 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);
     }
 
+    public function test_fiscal_identity_blocks_local_final_and_provisional_delete_even_with_stale_local_columns(): void
+    {
+        $companyId = $this->makeCompany(['invoice_limit_override' => 10]);
+        $billId = $this->makeProvisional($companyId, 'L-FISCAL');
+        DB::table('pos_transactions')->where('id', $billId)->update(['pra_invoice_number' => 'FISCAL-SAFE-123']);
+        $before = (array) DB::table('pos_transactions')->where('id', $billId)->first();
+        $this->actingAs($this->makeUser($companyId), 'pos');
+        $this->postJson("/pos/api/provisional-bills/{$billId}/promote", ['send_to_pra' => false])->assertStatus(422);
+        $this->postJson("/pos/api/provisional-bills/{$billId}/delete")->assertStatus(422);
+        $this->assertEquals($before, (array) DB::table('pos_transactions')->where('id', $billId)->first());
+        $this->assertDatabaseCount('pos_bill_deletions', 0);
+    }
+
+    public function test_delete_rechecks_fiscal_number_after_initial_read_before_any_quota_or_stock_change(): void
+    {
+        $companyId = $this->makeCompany(['invoice_limit_override' => 10]);
+        $billId = $this->makeFinal($companyId, 'L-RACE');
+        $this->actingAs($this->makeUser($companyId), 'pos');
+        $injected = false;
+        DB::listen(function ($event) use ($billId, &$injected) {
+            if (!$injected && DB::transactionLevel() === 0
+                && str_starts_with(strtolower($event->sql), 'select * from "pos_transactions"')
+                && str_contains($event->sql, 'limit 1')) {
+                $injected = true;
+                // A callback committed after the first stale read, before the
+                // delete's row lock. No external service or actual fiscal call.
+                DB::table('pos_transactions')->where('id', $billId)->update(['pra_invoice_number' => 'FISCAL-RACED-123']);
+            }
+        });
+        $this->from("/pos/transaction/{$billId}")->delete("/pos/transaction/{$billId}")
+            ->assertRedirect()->assertSessionHas('error');
+        $this->assertTrue($injected);
+        $this->assertDatabaseHas('pos_transactions', ['id' => $billId, 'pra_invoice_number' => 'FISCAL-RACED-123']);
+        $this->assertDatabaseCount('pos_bill_deletions', 0);
+    }
+
     public function test_api_promote_local_final_bypass_stays_quota_free(): void
     {
         // send_to_pra=false = deliberate LOCAL FINAL — archived, stays local/local,

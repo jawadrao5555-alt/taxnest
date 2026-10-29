@@ -331,6 +331,7 @@ class FbrPosController extends Controller
             ->where('id', $id)
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
             ->first();
         if (!$bill) {
             return response()->json(['success' => false, 'message' => __('pos.provisional_bill_not_found')], 404);
@@ -341,6 +342,7 @@ class FbrPosController extends Controller
                     ->where('id', $bill->id)
                     ->where('invoice_mode', 'local')
                     ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                     ->lockForUpdate()
                     ->firstOrFail();
                 $items = \App\Models\FbrPosTransactionItem::where('transaction_id', $locked->id)
@@ -400,6 +402,7 @@ class FbrPosController extends Controller
             ->where('company_id', $companyId)
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
             ->update([
                 'invoice_mode' => 'fbr',
                 'fbr_status' => $reportingOn ? 'pending' : null,
@@ -902,6 +905,7 @@ class FbrPosController extends Controller
             ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
             ->when($onlyIds !== null, fn ($q) => $q->whereIn('id', $onlyIds))
             ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
             ->orderBy('id')
@@ -919,6 +923,7 @@ class FbrPosController extends Controller
                 ->where('company_id', $companyId)
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                 ->update([
                     'invoice_mode' => 'fbr',
                     'fbr_status' => $reportingOn ? 'pending' : null,
@@ -1031,6 +1036,7 @@ class FbrPosController extends Controller
                 ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                 ->get();
             $hasBizCol = \Schema::hasColumn('fbr_pos_transactions', 'business_date');
             $localSummary['provisional'] = [
@@ -1076,6 +1082,7 @@ class FbrPosController extends Controller
                 ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                 ->get();
             $guard = fn ($t) => $riderReady
                 && $t->rider_id
@@ -1102,6 +1109,7 @@ class FbrPosController extends Controller
                         ->whereIn('id', $ids)
                         ->where('invoice_mode', 'local')
                         ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                         ->orderBy('id')
                         ->lockForUpdate()
                         ->get();
@@ -1124,6 +1132,7 @@ class FbrPosController extends Controller
                         ->whereIn('id', $deleteRows->pluck('id'))
                         ->where('invoice_mode', 'local')
                         ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                         ->delete();
                 });
             }
@@ -1160,7 +1169,8 @@ class FbrPosController extends Controller
             'report_date' => $date,
             'total_invoices' => $saleRows->count(),
             'fbr_invoices' => $saleRows->where('fbr_status', 'submitted')->count(),
-            'local_invoices' => $saleRows->where('fbr_status', 'local')->count(),
+            'local_invoices' => $saleRows->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')->count(),
             'failed_invoices' => $saleRows->whereIn('fbr_status', ['failed', 'pending'])->count(),
             'gross_sales' => $saleRows->sum('subtotal') - $returnRows->sum('subtotal'),
             'total_discount' => $saleRows->sum('discount_amount') - $returnRows->sum('discount_amount'),

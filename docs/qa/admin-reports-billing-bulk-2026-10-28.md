@@ -78,3 +78,18 @@ Added the first #273 report slice, not financial decision execution or archive c
 Composable billing disposition, Local/unreported grouping (including pending/failed), branch, business date and payment filters share the same SQL query for rows/counts/totals/CSV. Existing company/product constraints and created-at filters remain. PHP rendered/CSV suite now **16 tests /306 assertions PASS**, including 20 state fixtures across PRA/FBR, fiscal-number precedence over failed status/routing, missing-number submitted state, legacy values, all aggregate/filter/CSV matches and unchanged records. Added actual desktop/390px selector assertion and 20 native MariaDB SQL/row equivalence cases; final-head browser/native execution pending.
 
 Still required: owner/company policy decision actions, races and all optional archive consent/storage/expiry/revocation/restore acceptance. No financial state changed and no readiness claim.
+
+
+## Financial decision guard checkpoint — 29 October 2026
+
+Future queue and owner priority are maintained in planning PR #314; it is not a deployment candidate.
+
+At head `91fdd0167db653c40344084cc6fd08c5e631aad3`, CI40835527970 completed all eight mandatory jobs including validate successfully, with actual desktop/390px, full PHPUnit, native MariaDB, Node22, locked dependency audit/build and workflow/release proof. These greens become historical once the following new changes are committed; they do not complete #273 or optional archive acceptance.
+
+Reproduced two PRA failures before correction: fiscal-number-bearing stale local rows could be finalized locally; and a callback writing a fiscal number between the initial read and locked delete was not rechecked before deletion/quota side effects. Also reproduced FBR provisional deletion of a stale local row already carrying a fiscal number. These are synthetic fixtures, not proof of a specific customer incident.
+
+PRA delete now trusts/rechecks the locked row before stock/quota changes; provisional deletion locks/revalidates and loads items under that lock. Local Final uses a transaction/row lock and checks fiscal identity, return status and current local eligibility; repeat finalization preserves its original archive timestamp. Core promote also rejects existing fiscal identity/returns. PRA day-close selection is ordered and row-locked. FBR provisional delete, atomic promote and day-close actions require absent fiscal number. Existing reporting-OFF NULL semantics, company settings, PIN/role/tenant/isolation, quotas and stock behavior remain unchanged.
+
+Local PHP8.4 decision/stock/day-close group: **121 tests /726 assertions PASS**. Includes reproduced regressions plus normal quota/delete/finalize paths, cashier isolation, stock restoration, mixed deal components, per-bill day-close and bulk close behavior. Focused whitespace check passes. Native concurrent acceptance and own latest full eight CI must be refreshed; SQLite alone is not row-lock concurrency evidence.
+
+Remaining #273 work still includes optional owner consent, encrypted/minimized deletion snapshots, retention/revocation/purge, access auditing and backup/restore acceptance. Do not mark bulk complete or remove draft based on the parent greens.

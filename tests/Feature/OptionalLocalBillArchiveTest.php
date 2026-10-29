@@ -411,4 +411,39 @@ class OptionalLocalBillArchiveTest extends TestCase
         $this->assertSame(1, DB::table('pos_transactions')->count());
     }
 
+    public static function invalidEnabledGrantMetadata(): array
+    {
+        return [
+            'enabled preference with no grant' => [['grant_id' => null], [], false],
+            'enabled preference with missing grant row' => [[], [], true],
+            'enabled preference points to another tenant grant' => [[], ['company_id' => 2], false],
+            'enabled preference points to non-grant action' => [[], ['action' => 'stop'], false],
+            'grant missing consent validity' => [[], ['valid_until' => null], false],
+            'grant missing retention period' => [[], ['retention_days' => null], false],
+            'grant retention period zero' => [[], ['retention_days' => 0], false],
+            'grant retention period exceeds accepted scope' => [[], ['retention_days' => 366], false],
+            'grant missing encryption key identity' => [[], ['key_id' => null], false],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidEnabledGrantMetadata')]
+    public function test_invalid_enabled_grant_metadata_rolls_back_bill_deletion(array $preferenceChanges, array $grantChanges, bool $removeGrant): void
+    {
+        $grant = $this->grant(); $bill = $this->bill();
+        if ($preferenceChanges) DB::table('support_bill_archive_prefs')->where('company_id', 1)->update($preferenceChanges);
+        if ($grantChanges) DB::table('support_bill_archive_consents')->where('id', $grant)->update($grantChanges);
+        if ($removeGrant) DB::table('support_bill_archive_consents')->where('id', $grant)->delete();
+        try {
+            DB::transaction(function () use ($bill) {
+                $this->archive->capture($bill, 'pos', $this->items());
+                DB::table('pos_transactions')->where('id', $bill->id)->delete();
+            });
+            $this->fail('Enabled retention with invalid grant metadata must cancel deletion');
+        } catch (\RuntimeException $e) {
+            $this->assertNotSame('', $e->getMessage());
+        }
+        $this->assertTrue(DB::table('pos_transactions')->where('id', $bill->id)->exists());
+        $this->assertSame(0, DB::table('support_bill_archives')->count());
+    }
+
 }

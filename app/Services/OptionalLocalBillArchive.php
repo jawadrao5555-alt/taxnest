@@ -110,13 +110,26 @@ class OptionalLocalBillArchive
         }
         $companyId = (int) $bill->getAttribute('company_id');
         $prefs = DB::table('support_bill_archive_prefs')->where('company_id', $companyId)->lockForUpdate()->first();
-        if (!$prefs || !$prefs->enabled || !$prefs->grant_id) {
+        if (!$prefs || !$prefs->enabled) {
             return null;
         }
+        if (!$prefs->grant_id) {
+            throw new RuntimeException('Active optional support consent is inconsistent; deletion cancelled.');
+        }
+        // An outer deletion transaction may already have a repeatable-read
+        // snapshot from loading items. Preferences are a current locking read;
+        // read their referenced grant the same way so a committed renewal
+        // cannot disappear in that older snapshot and silently lose the copy.
         $grant = DB::table('support_bill_archive_consents')->where('company_id', $companyId)
-            ->where('id', $prefs->grant_id)->where('action', 'grant')->first();
-        if (!$grant || !$grant->valid_until || Carbon::parse($grant->valid_until)->lte(now())) {
+            ->where('id', $prefs->grant_id)->where('action', 'grant')->lockForUpdate()->first();
+        if (!$grant || !$grant->valid_until) {
+            throw new RuntimeException('Active optional support consent is unavailable; deletion cancelled.');
+        }
+        if (Carbon::parse($grant->valid_until)->lte(now())) {
             return null;
+        }
+        if (!is_string($grant->key_id) || (int) $grant->retention_days < 1 || (int) $grant->retention_days > 365) {
+            throw new RuntimeException('Active optional support consent is inconsistent; deletion cancelled.');
         }
         $key = $this->readKey($grant->key_id); // A promised copy may not silently disappear.
         $payload = $this->snapshot($bill, $product, $items ?? $bill->items()->orderBy('id')->get());

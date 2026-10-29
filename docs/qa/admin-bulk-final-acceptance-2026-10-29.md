@@ -98,3 +98,28 @@ copy only for the genuinely deleted sale. Final focused day-close/local-series/
 archive/quota matrix:142 tests /954 assertions PASS. All six capture callsites
 were traced inside actual deletion transactions, with items captured before bulk
 deletion. Full current-head CI remains required after this correction.
+
+## Consent renewal and repeatable-read acceptance
+
+A final native regression reproduced a promised-copy loss under continuous active
+consent: actual deletion's plain item read fixed an old InnoDB RR view; an
+independent owner renewal committed grant2; locked preferences saw grant2 but
+plain grant lookup could not see it in the old view. Original actual-controller
+native test FAILED with the bill deleted and its new-grant copy missing.
+
+Capture now reads the exact company/id/action grant with FOR UPDATE after the
+preference lock. Enabled preferences with missing/inconsistent active grant
+metadata fail closed before deletion. OFF/absent preferences and valid expired
+consent keep their existing behavior. No global/session production isolation or
+company setting changes; the native test alone forces/asserts RR.
+
+The identical real-controller two-connection renewal test now PASSES and requires
+a decryptable copy tied to the newly committed 90-day grant. Existing fiscal
+callback/delete and stop/capture races remain PASS. Committed socket/loopback
+safety checks are unchanged; local execution used the temporary protected TCP
+counterpart because Unix socket creation is unavailable here. Feature archive
+matrix27 tests/147 assertions PASS including nine inconsistent-enabled-grant
+rollback cases. Final focused archive/day-close/local-series/quota matrix151
+tests/981 assertions PASS. PHP syntax, scoped whitespace and focused code review
+PASS. The new source head still requires its own latest eight mandatory CI jobs;
+all prior successful implementation/promotion runs are historical after this fix.

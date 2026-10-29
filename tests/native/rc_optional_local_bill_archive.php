@@ -73,6 +73,23 @@ function waitForLock(string $marker): void
     } while (true);
 }
 
+// Force the production-relevant isolation; a READ COMMITTED lab would hide
+// the consent-renewal consistent-read regression.
+DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+requireProof(strtoupper((string) DB::selectOne('SELECT @@tx_isolation AS isolation_level')->isolation_level) === 'REPEATABLE-READ', 'Native archive proof requires REPEATABLE READ');
+
+if (($argv[1] ?? '') === 'renew') {
+    [$company, $userId] = [(int) $argv[2], (int) $argv[3]];
+    $root = $argv[4]; $marker = $argv[5];
+    requireProof(str_starts_with($root, dirname($socket).'/') && str_starts_with($marker, dirname($socket).'/'), 'Unsafe renewal worker paths');
+    config(['local_bill_archive.key_root' => $root]);
+    $newGrant = app(OptionalLocalBillArchive::class)->grant($company, User::findOrFail($userId), 90, now()->addDays(8));
+    requireProof(DB::transactionLevel() === 0, 'Renewal marker may only follow commit');
+    file_put_contents($marker, (string) $newGrant);
+    echo "Renewal committed\n";
+    exit(0);
+}
+
 if (($argv[1] ?? '') === 'delete') {
     [$company, $userId, $bill] = [(int) $argv[2], (int) $argv[3], (int) $argv[4]];
     $root = $argv[5]; $marker = $argv[6];
@@ -153,10 +170,39 @@ try {
     requireProof(!DB::table('pos_transactions')->where('id', $bill)->exists(), 'Active-consent deletion failed');
     $copy = DB::table('support_bill_archives')->where('company_id', $company)->where('source_id', $bill)->first();
     requireProof($copy !== null && $archive->readPayload($copy) !== [], 'Native actual delete did not retain decryptable facts');
+    // The real controller creates a consistent read of items after locking
+    // its bill. A separate owner then renews consent and commits. Capture must
+    // read that new grant with the same current-read semantics as its locked
+    // preference, rather than missing it in the older REPEATABLE READ view.
+    $oldGrant = (int) DB::table('support_bill_archive_prefs')->where('company_id', $company)->value('grant_id');
+    $bill = localBill($company, $userId);
+    $renewMarker = dirname($socket).'/archive-renew-'.bin2hex(random_bytes(6)); $markers[] = $renewMarker;
+    $renewed = false;
+    DB::listen(function ($query) use (&$renewed, $company, $userId, $root, $renewMarker) {
+        if ($renewed || DB::transactionLevel() < 1 || !str_contains(strtolower($query->sql), 'select')
+            || !str_contains($query->sql, 'pos_transaction_items') || str_contains(strtolower($query->sql), 'for update')) return;
+        $renewed = true;
+        $process = proc_open([PHP_BINARY, __FILE__, 'renew', (string) $company, (string) $userId, $root, $renewMarker],
+            [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        requireProof(is_resource($process), 'Renewal worker launch failed');
+        $output = '';
+        foreach ($pipes as $pipe) { $output .= stream_get_contents($pipe); fclose($pipe); }
+        requireProof(proc_close($process) === 0 && str_contains($output, 'Renewal committed') && is_file($renewMarker), 'Renewal did not commit: '.$output);
+    });
+    auth('pos')->setUser($user);
+    app()->instance('currentCompanyId', $company);
+    (new PosController)->deleteTransaction($bill);
+    requireProof($renewed, 'Actual deletion did not create the intended item ReadView');
+    $newGrant = (int) file_get_contents($renewMarker);
+    requireProof($newGrant > $oldGrant, 'Independent owner did not renew consent');
+    requireProof(!DB::table('pos_transactions')->where('id', $bill)->exists(), 'Renewed-consent actual deletion failed');
+    $renewedCopy = DB::table('support_bill_archives')->where('company_id', $company)->where('source_id', $bill)->first();
+    requireProof($renewedCopy !== null && (int) $renewedCopy->grant_id === $newGrant
+        && $archive->readPayload($renewedCopy) !== [], 'REPEATABLE READ renewed consent was lost: actual deletion must retain a decryptable copy using the newly committed grant');
     requireProof((array) DB::table('companies')->find($company) === $companyBefore, 'Archive rewrote company settings');
     requireProof((array) DB::table('companies')->find($other) === $otherBefore, 'Second company changed');
     requireProof(DB::table('support_bill_archives')->where('company_id', $other)->count() === 0, 'Second company copied without consent');
-    echo "PASS: native InnoDB callback/delete and stop/capture pending FOR UPDATE; actual controller capture; existing settings and second tenant preserved\n";
+    echo "PASS: native InnoDB callback/delete and stop/capture pending FOR UPDATE; actual controller capture and REPEATABLE READ renewal; existing settings and second tenant preserved\n";
 } finally {
     if (DB::transactionLevel()) DB::rollBack();
     foreach ($workers as [$process, $pipes]) {

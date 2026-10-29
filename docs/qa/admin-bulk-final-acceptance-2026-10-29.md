@@ -85,3 +85,16 @@ an independent synthetic super-admin at each viewport, verify no consent form,
 read the exact company-scoped list, download and compare the exact owner export,
 and require clean page/console/request/HTTP diagnostics. Owner session/settings
 are unchanged; stop/purge testing then continues in its original context.
+
+Final immutable-return audit found the PRA provisional wash lacked the return
+predicate already present on final-local wash. Original save-policy reproduction
+FAILED because the stale local/local credit note became archived. Move the
+existing schema-guarded immutable-return predicate into the shared wash base so
+both save/delete sets and per-bill actions protect it. Original final-local and
+legacy pre-return-column behavior remain unchanged. New actual performDayClose
+integration enables owner consent and verifies both save/delete policies, exact
+return/items/settings preservation, no return copy, and a decryptable one-item
+copy only for the genuinely deleted sale. Final focused day-close/local-series/
+archive/quota matrix:142 tests /954 assertions PASS. All six capture callsites
+were traced inside actual deletion transactions, with items captured before bulk
+deletion. Full current-head CI remains required after this correction.

@@ -16205,6 +16205,11 @@ class PosController extends Controller
                     ->where('business_date', '<=', $date)
                     ->whereNull('pra_invoice_number')
                     ->where('is_archived', false)
+                    // Credit notes remain immutable even with stale local/local
+                    // routing fields. Protect both wash sets and every action.
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
+                        $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return'));
+                    })
                     ->where(fn ($q) => $this->scopeToBranch($q, $branchId));
             };
 
@@ -16235,16 +16240,7 @@ class PosController extends Controller
                         ->where(function ($q) {
                             $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
                         })
-                        ->whereNull('pra_status')
-                        // Returns/credit notes (Task 570) are NEVER washed:
-                        // deleting one would desync the parent's returned_quantity,
-                        // un-net the reports, and (via deleted_final_count) eat
-                        // quota the return never consumed. Schema-guarded.
-                        ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
-                            $q->where(function ($w) {
-                                $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
-                            });
-                        }),
+                        ->whereNull('pra_status'),
                 ],
             ];
 

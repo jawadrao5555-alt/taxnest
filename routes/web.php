@@ -968,6 +968,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/features', [PosController::class, 'updateFeatureSettings'])->name('pos.features.update');
     Route::post('/features/reset', [PosController::class, 'resetFeaturesToCategory'])->name('pos.features.reset');
     Route::get('/customize', [PosController::class, 'customize'])->name('pos.customize');
+    Route::get('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'index'])->name('pos.local-support-copies');
+    Route::post('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'update'])->middleware('throttle:10,1')->name('pos.local-support-copies.update');
+    Route::get('/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'download'])->whereNumber('id')->middleware('throttle:20,1')->name('pos.local-support-copies.download');
+
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store')->middleware('plan.limit:invoices');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
@@ -1546,6 +1550,9 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
+    Route::get('/companies/{companyId}/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminIndex'])->whereNumber('companyId')->name('saas.admin.local-support-copies');
+    Route::get('/companies/{companyId}/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminDownload'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-support-copies.download');
+
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('saas.admin.dashboard');
     Route::get('/dashboard/invoices/{product}/{company}/{record}/{action}', [\App\Http\Controllers\SaasAdmin\AdminInvoicePreviewController::class, 'show'])->whereIn('product', ['di', 'pos', 'fbrpos'])->whereNumber(['company', 'record'])->whereIn('action', ['preview', 'download'])->name('saas.admin.invoice.document');
     Route::get('/dashboard/details/{metric}', [\App\Http\Controllers\SaasAdmin\AdminDashboardDetailController::class, 'show'])->name('saas.admin.dashboard.detail');
@@ -2588,6 +2595,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // per-item store notes); each carries its own plan gate in-controller.
     Route::post('/settings/feature-toggle', [FbrPosController::class, 'updateFbrFeatureToggle'])->name('fbrpos.settings.feature-toggle');
     Route::get('/customize', [FbrPosController::class, 'customize'])->name('fbrpos.customize');
+    Route::get('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'index'])->name('fbrpos.local-support-copies');
+    Route::post('/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'update'])->middleware('throttle:10,1')->name('fbrpos.local-support-copies.update');
+    Route::get('/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'download'])->whereNumber('id')->middleware('throttle:20,1')->name('fbrpos.local-support-copies.download');
+
     // Caller ID (Task 1353 — FBR twin of the PRA routes): admin toggle +
     // paired-phone revoke on the customize hub. PosCallerIdController resolves
     // the company from currentCompanyId (bound by FbrPosAuth too) and the user

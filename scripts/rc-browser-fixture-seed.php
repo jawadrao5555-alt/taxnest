@@ -668,6 +668,47 @@ $adminPreviewDocuments = [
  ['metric'=>'fbrpos_transactions','product'=>'fbrpos','company'=>$fiscal->id,'record'=>$previewFbr->id,'reference'=>$previewFbr->invoice_number],
 ];
 
+// Dedicated disposable owner-consent companies isolate each product and viewport.
+// No archive preference is seeded: the real UI must begin with retention OFF.
+$optionalArchiveJourneys = [];
+foreach (['pos' => '/pos', 'fbrpos' => '/fbr-pos'] as $archiveProduct => $archivePrefix) {
+    $archiveCases = [];
+    foreach ([1366, 390] as $archiveWidth) {
+        $archiveCompany = $company('Synthetic Optional Archive '.$archiveProduct.' '.$archiveWidth,
+            'archive-'.$archiveProduct.'-'.$archiveWidth.'@rc-browser.invalid',
+            'RCARCHIVE'.$archiveProduct.$archiveWidth, $archiveProduct, [
+                'business_category'=>'retail', 'pos_type'=>'retail', 'pos_setup_completed'=>true,
+                'fbr_pos_enabled'=>$archiveProduct==='fbrpos', 'inventory_enabled'=>false,
+                'pos_tax_rate_cash'=>0, 'pos_tax_rate_card'=>0,
+            ]);
+        $archiveOwner = $user($archiveCompany, 'Synthetic Optional Archive Owner',
+            'archive-owner-'.$archiveProduct.'-'.$archiveWidth.'@rc-browser.invalid', 'company_admin', 'pos_admin');
+        $archiveModel = $archiveProduct === 'pos' ? \App\Models\PosTransaction::class : \App\Models\FbrPosTransaction::class;
+        $archiveItemModel = $archiveProduct === 'pos' ? \App\Models\PosTransactionItem::class : \App\Models\FbrPosTransactionItem::class;
+        $archiveBill = $archiveModel::forceCreate([
+            'company_id'=>$archiveCompany->id, 'created_by'=>$archiveOwner->id,
+            'invoice_number'=>'RC-OPTIONAL-'.$archiveProduct.'-'.$archiveWidth,
+            'invoice_mode'=>'local', ($archiveProduct==='pos'?'pra_status':'fbr_status')=>'local',
+            'status'=>'completed', 'subtotal'=>100, 'tax_amount'=>0, 'total_amount'=>100,
+            'payment_method'=>'cash', 'business_date'=>now()->toDateString(),
+        ]);
+        $archiveItem = ['transaction_id'=>$archiveBill->id, 'item_name'=>'Synthetic optional support line',
+            'quantity'=>1, 'unit_price'=>100, 'subtotal'=>100, 'tax_amount'=>0];
+        if ($archiveProduct==='pos') $archiveItem += ['item_type'=>'product', 'item_id'=>0];
+        else $archiveItem += ['total'=>100, 'tax_rate'=>0];
+        $archiveItemModel::forceCreate($archiveItem);
+        $archiveCases[$archiveWidth] = ['login'=>$archiveOwner->email, 'billId'=>$archiveBill->id,
+            'reference'=>$archiveBill->invoice_number, 'companyId'=>$archiveCompany->id];
+    }
+    $optionalArchiveJourneys[] = [
+        'name'=>'optional-support-copies-'.$archiveProduct, 'login'=>$archiveCases[1366]['login'],
+        'password'=>$password, 'loginPath'=>$archivePrefix.'/login',
+        'paths'=>[$archivePrefix.'/local-support-copies'], 'markers'=>['Optional local bill support copies','Retention OFF'],
+        'optionalArchive'=>['prefix'=>$archivePrefix, 'cases'=>$archiveCases, 'validUntil'=>now()->addDays(7)->toDateString(),
+            'admin'=>['login'=>$admin->email, 'password'=>$password, 'loginPath'=>'/admin/login']],
+    ];
+}
+
 // Enforce the actual production policy in the disposable invoice-preview browser
 // journey; application/runtime/database remain isolated and synthetic.
 $fixtureEnvironment = app()->environment();
@@ -722,7 +763,7 @@ $fixture = [
         ['name' => 'fiscal-admin-manage-topnav', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login', 'submitPath' => "/admin/companies/{$fiscal->id}", 'submitSelector' => 'form[action$="/impersonate"]:has(input[name="mode"][value="full"])', 'paths' => ['/fbr-pos/create'], 'markers' => ['Current Order'], 'mainMarkers' => ['Current Order'], 'topNavPanel' => 'fbr', 'topNavFactory' => 'restaurantPos'],
         ['name' => 'hotel-denied', 'login' => $hotelDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/hotel', '/pos/hotel/restaurant'], 'denied' => true],
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
-    ], $categoryJourneys),
+    ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
         ['name' => 'fbr-owner-reconciliation', 'login' => $fiscalUser->email, 'password' => $password,
             'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/fail-queue'],

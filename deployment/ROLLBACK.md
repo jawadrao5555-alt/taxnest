@@ -122,6 +122,19 @@ Compare row counts per table against live before you trust it. Counts that are
 a few rows short on `pos_transactions` are normal — those are bills rung after
 the dump, not a broken backup. Check the timestamps before concluding anything.
 
+### Optional local-bill support copies — quarantine before exposure
+
+Any SQL or volume restore can contain old owner consent and optional ciphertext.
+Before any restored application serves requests or jobs, keep it offline and run
+`php artisan local-support-copies:restore-quarantine --confirm="Quarantine optional copies"`
+against that restored database with the restored private keyring mounted. This
+invalidates optional consent and discards optional copies/keys; it does not change
+live invoices or mandatory accounting records. Verify OFF/empty before exposure.
+Do not restore an older keyring over the current keyring on a running application.
+See `docs/ops/optional-local-bill-archive-restore.md` for SQL-only versus whole-volume
+restore, expiry, backup limitations and the required operator checklist. Cloud
+agents must not perform a production restore or run this command in production.
+
 ### Proving a backup, which is the only thing that makes it a backup
 
 A dump that has never been restored is a file, not a backup. The pre-deploy

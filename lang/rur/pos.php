@@ -7212,5 +7212,6 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_text_large' => 'Bara',
     'receipt_wide_names' => 'Cheezon ke naam ko zyada jagah dein',
     'recalled_additions_final_confirm' => 'Order wapas kholne ke baad yeh cheezein barhai gayi hain. Yeh final bill mein shamil hongi. In cart tabdeeliyon ke liye Send to Kitchen nahi dabaya gaya. Payment jari rakhein? Cancel kar ke pehle cart dekhein ya kitchen ko bhejein.',
+    'cannot_delete_uncertain_reporting_bill' => 'Sirf mukammal local bill delete ho sakta hai. Pending ya ghair yaqini PRA reporting pehle verify karein; mojooda retry ya recovery ka tareeqa use karein.',
 ];
 

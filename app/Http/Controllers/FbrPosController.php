@@ -331,6 +331,10 @@ class FbrPosController extends Controller
             ->where('id', $id)
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
             ->first();
         if (!$bill) {
             return response()->json(['success' => false, 'message' => __('pos.provisional_bill_not_found')], 404);
@@ -341,10 +345,15 @@ class FbrPosController extends Controller
                     ->where('id', $bill->id)
                     ->where('invoice_mode', 'local')
                     ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
                     ->lockForUpdate()
                     ->firstOrFail();
                 $items = \App\Models\FbrPosTransactionItem::where('transaction_id', $locked->id)
                     ->lockForUpdate()->get();
+                app(\App\Services\OptionalLocalBillArchive::class)->capture($locked, 'fbrpos', $items);
                 \App\Services\InventoryService::restoreFbrTransaction(
                     (int) $companyId,
                     $items,
@@ -400,6 +409,10 @@ class FbrPosController extends Controller
             ->where('company_id', $companyId)
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
             ->update([
                 'invoice_mode' => 'fbr',
                 'fbr_status' => $reportingOn ? 'pending' : null,
@@ -902,6 +915,7 @@ class FbrPosController extends Controller
             ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
             ->when($onlyIds !== null, fn ($q) => $q->whereIn('id', $onlyIds))
             ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
             ->orderBy('id')
@@ -919,6 +933,7 @@ class FbrPosController extends Controller
                 ->where('company_id', $companyId)
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                 ->update([
                     'invoice_mode' => 'fbr',
                     'fbr_status' => $reportingOn ? 'pending' : null,
@@ -1031,6 +1046,7 @@ class FbrPosController extends Controller
                 ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                 ->get();
             $hasBizCol = \Schema::hasColumn('fbr_pos_transactions', 'business_date');
             $localSummary['provisional'] = [
@@ -1076,6 +1092,7 @@ class FbrPosController extends Controller
                 ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
                 ->get();
             $guard = fn ($t) => $riderReady
                 && $t->rider_id
@@ -1102,12 +1119,17 @@ class FbrPosController extends Controller
                         ->whereIn('id', $ids)
                         ->where('invoice_mode', 'local')
                         ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
                         ->orderBy('id')
                         ->lockForUpdate()
                         ->get();
                     foreach ($deleteRows as $deleteRow) {
                         $items = FbrPosTransactionItem::where('transaction_id', $deleteRow->id)
                             ->lockForUpdate()->get();
+                        app(\App\Services\OptionalLocalBillArchive::class)->capture($deleteRow, 'fbrpos', $items);
                         \App\Services\InventoryService::restoreFbrTransaction(
                             (int) $companyId,
                             $items,
@@ -1124,6 +1146,10 @@ class FbrPosController extends Controller
                         ->whereIn('id', $deleteRows->pluck('id'))
                         ->where('invoice_mode', 'local')
                         ->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
                         ->delete();
                 });
             }
@@ -1160,7 +1186,8 @@ class FbrPosController extends Controller
             'report_date' => $date,
             'total_invoices' => $saleRows->count(),
             'fbr_invoices' => $saleRows->where('fbr_status', 'submitted')->count(),
-            'local_invoices' => $saleRows->where('fbr_status', 'local')->count(),
+            'local_invoices' => $saleRows->where('fbr_status', 'local')
+                    ->whereNull('fbr_invoice_number')->count(),
             'failed_invoices' => $saleRows->whereIn('fbr_status', ['failed', 'pending'])->count(),
             'gross_sales' => $saleRows->sum('subtotal') - $returnRows->sum('subtotal'),
             'total_discount' => $saleRows->sum('discount_amount') - $returnRows->sum('discount_amount'),

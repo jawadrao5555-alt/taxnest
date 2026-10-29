@@ -423,6 +423,47 @@ class PosDayCloseReturnNettingTest extends TestCase
         $this->assertSame(1, (int) $report->deleted_final_count);
     }
 
+    public function test_provisional_wash_preserves_stale_local_returns_and_archives_only_real_deleted_sales(): void
+    {
+        (require database_path('migrations/2026_12_20_090000_create_optional_local_bill_archive.php'))->up();
+        config(['app.key'=>'base64:'.base64_encode(str_repeat('d',32))]);
+        $root=sys_get_temp_dir().'/taxnest-archive-dayclose-'.bin2hex(random_bytes(8));
+        config(['local_bill_archive.key_root'=>$root]);
+        $archive=app(\App\Services\OptionalLocalBillArchive::class);
+        try {
+            foreach(['save','delete'] as $action) {
+                $company=$this->makeCompany(['pos_dayclose_provisional_action'=>$action]);
+                $owner=$this->makePosUser($company);
+                DB::table('users')->where('id',$owner->id)->update(['role'=>'company_admin']);
+                $archive->grant($company,$owner->refresh(),7,now()->addDays(2));
+                $sale=$this->makeTxn($company,'LOCAL-'.$action,['invoice_mode'=>'local','pra_status'=>'local','pra_invoice_number'=>null,'subtotal'=>100,'total_amount'=>100],
+                    [['item_name'=>'Stored sale','quantity'=>1,'unit_price'=>100,'subtotal'=>100]]);
+                $return=$this->makeTxn($company,'RETURN-'.$action,['transaction_type'=>'return','parent_transaction_id'=>$sale,'invoice_mode'=>'local','pra_status'=>'local','pra_invoice_number'=>null,'subtotal'=>40,'total_amount'=>40],
+                    [['item_name'=>'Immutable credit note','quantity'=>1,'unit_price'=>40,'subtotal'=>40]]);
+                $before=(array)DB::table('pos_transactions')->find($return);
+                $items=DB::table('pos_transaction_items')->where('transaction_id',$return)->get()->toJson();
+                $settings=(array)DB::table('companies')->find($company);
+                $result=(new PosController())->performDayClose($company,now()->toDateString(),null);
+                $this->assertSame('created',$result['status']);
+                $this->assertEquals($before,(array)DB::table('pos_transactions')->find($return),'Return must stay byte-for-byte unchanged under '.$action);
+                $this->assertSame($items,DB::table('pos_transaction_items')->where('transaction_id',$return)->get()->toJson());
+                $this->assertSame($settings,(array)DB::table('companies')->find($company));
+                $this->assertSame(0,DB::table('support_bill_archives')->where('company_id',$company)->where('source_id',$return)->count());
+                if($action==='delete') {
+                    $this->assertNull(DB::table('pos_transactions')->find($sale));
+                    $copy=$archive->available($company)->first();
+                    $this->assertSame('LOCAL-delete',$archive->readPayload($copy)['header']['invoice_number']);
+                    $this->assertCount(1,$archive->readPayload($copy)['items']);
+                } else {
+                    $this->assertTrue((bool)DB::table('pos_transactions')->find($sale)->is_archived);
+                    $this->assertSame(0,$archive->available($company)->count());
+                }
+            }
+        } finally {
+            if(is_dir($root)) \Illuminate\Support\Facades\File::deleteDirectory($root);
+        }
+    }
+
     // ── 3. dayCloseReport preview matches the stored netting ─────────────────
 
     public function test_day_close_preview_stats_net_returns_like_the_stored_report(): void

@@ -7,7 +7,7 @@ on the runner (stdlib only).
 
 Schema:
   title: string (required)
-  audience: pos | fbr_pos | all  (default pos)
+  audience: pos | fbr_pos | di | all (required)
   body: string (optional; used as a point if points is empty)
   points: list of strings (required unless body is set)
   category: string (optional singular)
@@ -27,7 +27,19 @@ RESERVED_TITLES = frozenset(
         "Daily L001 ke liye roz Reset dabana zaroori nahi",
     }
 )
-AUDIENCES = frozenset({"pos", "fbr_pos", "all"})
+AUDIENCES = frozenset({"pos", "fbr_pos", "di", "all"})
+POS_CATEGORIES = frozenset("restaurant cafe quick_service salon hotel marquee catering laundry gym workshop courier photography event_management travel_agent rent_a_car property_dealer advertising it_services security_services clinic education consultant architect construction manpower cargo warehouse cleaning repair_service printing media_production entertainment financial_services equipment_rental tailoring other_service general retail pharmacy grocery wholesale hybrid_cafe_retail clothing electronics hardware autoparts bakery".split())
+DI_CATEGORIES = frozenset("di_manufacturing di_services di_trading di_it_software di_textiles di_pharmaceuticals di_agriculture di_construction di_retail di_export di_unspecified".split())
+
+
+def validate_scope(audience: str, categories: list[str]) -> None:
+    if audience not in AUDIENCES:
+        raise ValueError("audience must be pos, fbr_pos, di, or all")
+    allowed = DI_CATEGORIES if audience == "di" else POS_CATEGORIES
+    if any(category not in allowed for category in categories):
+        raise ValueError("unknown or incompatible announcement category")
+
+
 KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*?)\s*$")
 
 
@@ -69,6 +81,8 @@ def parse_restricted_yaml(text: str) -> dict:
             "type",
         ):
             raise ValueError(f"line {lineno}: unknown key '{key}'")
+        if key in data:
+            raise ValueError(f"line {lineno}: duplicate key {key}")
         current_list = None
         if rest == "":
             if key not in ("points", "categories"):
@@ -76,6 +90,8 @@ def parse_restricted_yaml(text: str) -> dict:
             data[key] = []
             current_list = key
             continue
+        if key in ("points", "categories"):
+            raise ValueError(f"line {lineno}: {key} must be a list")
         data[key] = _unquote(rest)
 
     title = str(data.get("title") or "").strip()
@@ -87,9 +103,9 @@ def parse_restricted_yaml(text: str) -> dict:
             "the Daily L001 announcement) — pick a new unique title"
         )
 
-    audience = str(data.get("audience") or "pos").strip()
+    audience = str(data.get("audience") or "").strip()
     if audience not in AUDIENCES:
-        raise ValueError("audience must be pos, fbr_pos, or all")
+        raise ValueError("audience must be pos, fbr_pos, di, or all")
 
     points: list[str] = []
     if isinstance(data.get("points"), list):
@@ -115,6 +131,8 @@ def parse_restricted_yaml(text: str) -> dict:
         if c not in seen:
             seen.add(c)
             uniq.append(c)
+
+    validate_scope(audience, uniq)
 
     spec_type = str(data.get("type") or "").strip()
     if spec_type and spec_type not in ("feature", "improvement"):

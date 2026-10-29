@@ -1,4 +1,7 @@
 <x-fbr-pos-layout>
+    @if(auth('fbrpos')->user()?->role === 'company_admin' && !auth('admin')->check() && !session()->has('impersonation'))
+        <div class="m-4"><a class="inline-block rounded bg-white text-slate-900 border border-slate-500 px-4 py-3 underline" href="{{ route('fbrpos.local-support-copies') }}">Optional local bill support copies</a></div>
+    @endif
     @php
         $fbrOn       = (bool) ($company->fbr_pos_enabled ?? false);
         $reportingOn = (bool) ($company->fbr_reporting_enabled ?? false);

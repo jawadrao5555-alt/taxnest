@@ -8,8 +8,8 @@
 # Usage:
 #   elaan_freshness_check <live_head_before> <target_sha>
 #
-# NEW SHA: requires a published pos/all AppUpdate with created_at after the
-# last deploy marker (unchanged).
+# NEW SHA: requires a published exact-scope AppUpdate with created_at after the
+# last deploy marker, exact TARGET_SHA receipt and committed audience/categories.
 #
 # SAME SHA rerun (live HEAD == target SHA == marker commit): when the
 # time-based count is zero, PASS only if the internal deployment_key matches
@@ -51,9 +51,16 @@ elaan_freshness_check() {
     return 0
   fi
 
+  local SPEC SCOPE_SQL SCOPE_B64
+  SPEC=$(elaan_committed_spec_path)
+  [ -n "$SPEC" ] || fail "elaan check: committed announcement specification missing"
+  SCOPE_SQL=$(python3 "$ROOT/scripts/lib/elaan-scope-sql.py" "$SPEC" "$TARGET_SHA") \
+    || fail "elaan check: invalid committed announcement scope or SHA"
+  SCOPE_B64=$(printf '%s' "$SCOPE_SQL" | base64 | tr -d '\n')
+
   local ELAAN_OUT ELAAN_RC
   ELAAN_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "LIVE_DIR='$LIVE_DIR' MARKER_FILE='$LIVE_DEPLOY_MARKER' bash -s" 2>&1 <<'EOFELAAN'
+    "LIVE_DIR='$LIVE_DIR' MARKER_FILE='$LIVE_DEPLOY_MARKER' TARGET_SHA='$TARGET_SHA' SCOPE_B64='$SCOPE_B64' bash -s" 2>&1 <<'EOFELAAN'
 if [ ! -f "$MARKER_FILE" ]; then
   echo "ELAAN_NO_MARKER"
   exit 0
@@ -72,7 +79,7 @@ if [ -z "$SINCE" ]; then
   echo "ELAAN_MARKER_PARSE_ERROR"
   exit 0
 fi
-cd "$LIVE_DIR"
+cd "$LIVE_DIR" || { echo "ELAAN_DB_ERROR"; exit 0; }
 DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
 [ -z "$DB_HOST" ] && DB_HOST=127.0.0.1
 DB_USER=$(grep '^DB_USERNAME=' .env | head -1 | sed 's/^DB_USERNAME=//' | tr -d "\"'")
@@ -82,8 +89,18 @@ if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
   echo "ELAAN_DB_CREDS_MISSING"
   exit 0
 fi
+SCOPE_SQL=$(printf '%s' "$SCOPE_B64" | base64 -d) || { echo "ELAAN_DB_ERROR"; exit 0; }
+HAS_KEY=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
+  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='deployment_key'" 2>/dev/null) || { echo "ELAAN_DB_ERROR"; exit 0; }
+# A pre-key legacy schema cannot prove a new receipt. Fail closed; owner must
+# complete the approved schema transition before claiming exact-SHA evidence.
+if [ "$HAS_KEY" != "1" ]; then echo "ELAAN_DB_ERROR"; exit 0; fi
+HAS_ARCHIVE=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
+  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='archived_at'" 2>/dev/null) || { echo "ELAAN_DB_ERROR"; exit 0; }
+[ "$HAS_ARCHIVE" = "0" ] || [ "$HAS_ARCHIVE" = "1" ] || { echo "ELAAN_DB_ERROR"; exit 0; }
+[ "$HAS_ARCHIVE" = "0" ] || SCOPE_SQL="$SCOPE_SQL AND archived_at IS NULL"
 COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND created_at > '$SINCE'" 2>&1)
+  -e "SELECT COUNT(*) FROM app_updates WHERE $SCOPE_SQL AND deployment_key = '$TARGET_SHA' AND created_at > '$SINCE'" 2>&1)
 MYSQL_RC=$?
 if [ $MYSQL_RC -ne 0 ] || ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
   echo "ELAAN_DB_ERROR"
@@ -124,7 +141,7 @@ EOFELAAN
       local TITLE_B64 TITLE_OUT TITLE_RC
       TITLE_B64=$(printf '%s' "$TITLE" | base64 -w0 2>/dev/null || printf '%s' "$TITLE" | base64)
       TITLE_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-        "LIVE_DIR='$LIVE_DIR' TITLE_B64='$TITLE_B64' TARGET_SHA='$TARGET_SHA' bash -s" 2>&1 <<'EOFTITLE'
+        "LIVE_DIR='$LIVE_DIR' TITLE_B64='$TITLE_B64' TARGET_SHA='$TARGET_SHA' SCOPE_B64='$SCOPE_B64' bash -s" 2>&1 <<'EOFTITLE'
 cd "$LIVE_DIR" || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
 DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
 [ -z "$DB_HOST" ] && DB_HOST=127.0.0.1
@@ -140,18 +157,19 @@ if [ -z "$TITLE" ]; then
   echo "ELAAN_TITLE_DB_ERROR"
   exit 0
 fi
-export TITLE
-# Escape for a MySQL single-quoted string literal (title only; never prints secrets).
-TITLE_SQL=$(python3 -c "import os; s=os.environ['TITLE']; print(\"'\" + s.replace('\\\\', '\\\\\\\\').replace(\"'\", \"''\") + \"'\")")
 HAS_KEY=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
   -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='deployment_key'" 2>/dev/null || echo 0)
+SCOPE_SQL=$(printf '%s' "$SCOPE_B64" | base64 -d) || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
+HAS_ARCHIVE=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
+  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='archived_at'" 2>/dev/null) || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
+[ "$HAS_ARCHIVE" = "0" ] || [ "$HAS_ARCHIVE" = "1" ] || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
+[ "$HAS_ARCHIVE" = "0" ] || SCOPE_SQL="$SCOPE_SQL AND archived_at IS NULL"
 if [ "$HAS_KEY" = "1" ]; then
   COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-    -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND deployment_key = '$TARGET_SHA'" 2>&1)
+    -e "SELECT COUNT(*) FROM app_updates WHERE $SCOPE_SQL AND deployment_key = '$TARGET_SHA'" 2>&1)
 else
-  # Transitional first deployment, before the new internal column exists.
-  COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-    -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND title = ${TITLE_SQL}" 2>&1)
+  echo "ELAAN_TITLE_DB_ERROR"
+  exit 0
 fi
 MYSQL_RC=$?
 if [ $MYSQL_RC -ne 0 ] || ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
@@ -213,7 +231,7 @@ EOFTITLE
       fail "elaan missing on same-SHA rerun — deploy/elaan.yml title required to prove the original announcement still exists (do not use skip_elaan as the normal fix)"
       ;;
     *same_sha_title_missing*)
-      fail "elaan missing on same-SHA rerun — committed title not found as published pos/all AppUpdate (unrelated old announcements do not count)"
+      fail "elaan missing on same-SHA rerun — committed title not found as published exact-scope AppUpdate (unrelated old announcements do not count)"
       ;;
     *)
       fail "elaan missing — create announcement then re-run, or skip_elaan/--no-elaan for emergencies"

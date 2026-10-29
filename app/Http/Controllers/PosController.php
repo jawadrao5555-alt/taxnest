@@ -4757,6 +4757,28 @@ class PosController extends Controller
                     ->with('success', __('pos.invoice_deleted_success', ['number' => $transaction->invoice_number]));
             }
 
+            // Fiscal callbacks can commit after the first read. The locked
+            // state is authoritative before quota, inventory or deletion.
+            if ($locked->pra_invoice_number || ($locked->transaction_type ?? 'sale') === 'return') {
+                DB::rollBack();
+                return redirect()->route('pos.transaction.show', $id)->with('error',
+                    $locked->pra_invoice_number
+                        ? __('pos.cannot_delete_submitted_pra_num', ['number' => $locked->pra_invoice_number])
+                        : __('pos.return_bill_immutable'));
+            }
+            // No fiscal number alone does not prove local eligibility: an
+            // uncertain remote acceptance may still be waiting for its callback.
+            $knownLocal = $locked->status === 'completed'
+                && (($locked->invoice_mode === 'local' && in_array($locked->pra_status, ['local', null], true))
+                    || ($locked->pra_status === null && in_array($locked->invoice_mode, ['pra', null], true)));
+            if (!$knownLocal) {
+                DB::rollBack();
+                return redirect()->route('pos.transaction.show', $id)
+                    ->with('error', __('pos.cannot_delete_uncertain_reporting_bill'));
+            }
+            $transaction = $locked->load('items');
+            app(\App\Services\OptionalLocalBillArchive::class)->capture($transaction, 'pos', $transaction->items);
+
             // QUOTA LEDGER (Task 1372) — write it BEFORE the row disappears.
             // A deleted bill that already consumed this month's quota must keep
             // consuming it (same rule as the day-close DELETE policy), otherwise
@@ -5832,32 +5854,25 @@ class PosController extends Controller
         }
 
         $company = Company::find($companyId);
-        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->with('items')->first();
-
-        if (!$tx) {
-            return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
-        }
-        if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
-            return response()->json([
-                'success' => false,
-                'message' => __('pos.only_provisional_deleted_endpoint'),
-            ], 422);
-        }
-
-        // Provisional bills deduct stock at sale time just like finals, so the
-        // F10 "Local" modal delete must restore it too — same rule as
-        // deleteTransaction (only when tracking + restock-on-void are on).
-        $restoreItems = ($company && $company->inventory_enabled && $company->pos_restock_on_void)
-            ? $this->expandDealComponentsForStock($tx->items->map(fn ($i) => [
-                'type' => $i->item_type ?? 'product',
-                'item_id' => $i->item_id,
-                'quantity' => (float) $i->quantity,
-                'unit_price' => (float) $i->unit_price,
-                'deal_snapshot' => $i->deal_snapshot,
-            ])->all())
-            : [];
-
-        DB::transaction(function () use ($tx, $companyId, $restoreItems) {
+        return DB::transaction(function () use ($companyId, $company, $id) {
+            $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)
+                ->lockForUpdate()->first();
+            if (!$tx) {
+                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
+            }
+            if ($tx->pra_invoice_number || ($tx->transaction_type ?? 'sale') === 'return'
+                || $tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
+                return response()->json(['success' => false,
+                    'message' => __('pos.only_provisional_deleted_endpoint')], 422);
+            }
+            $tx->load('items');
+            app(\App\Services\OptionalLocalBillArchive::class)->capture($tx, 'pos', $tx->items);
+            $restoreItems = ($company && $company->inventory_enabled && $company->pos_restock_on_void)
+                ? $this->expandDealComponentsForStock($tx->items->map(fn ($i) => [
+                    'type' => $i->item_type ?? 'product', 'item_id' => $i->item_id,
+                    'quantity' => (float) $i->quantity, 'unit_price' => (float) $i->unit_price,
+                    'deal_snapshot' => $i->deal_snapshot,
+                ])->all()) : [];
             if (!empty($restoreItems)) {
                 PosInventoryController::restoreStockForInvoice(
                     $companyId, $restoreItems, $tx->id, $tx->invoice_number, auth('pos')->id(), 'pos_void', $tx->branch_id ?? null
@@ -5866,9 +5881,8 @@ class PosController extends Controller
             PosTransactionItem::where('transaction_id', $tx->id)->delete();
             PosPayment::where('transaction_id', $tx->id)->delete();
             $tx->delete();
+            return response()->json(['success' => true, 'message' => __('pos.provisional_bill_deleted_msg'), 'id' => $id]);
         });
-
-        return response()->json(['success' => true, 'message' => __('pos.provisional_bill_deleted_msg'), 'id' => $id]);
     }
 
     /**
@@ -5906,7 +5920,8 @@ class PosController extends Controller
                 if (!$tx) {
                     throw new \RuntimeException('NOT_FOUND');
                 }
-                if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
+                if ($tx->pra_invoice_number || ($tx->transaction_type ?? 'sale') === 'return'
+                    || $tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
                     throw new \RuntimeException('NOT_PROVISIONAL:' . $tx->status . '/' . $tx->pra_status);
                 }
 
@@ -6071,26 +6086,24 @@ class PosController extends Controller
         // pra_status stays 'local' + invoice_mode stays 'local' (deliberate local bill,
         // consistent with the Reporting-OFF Finals Invariant).
         if (!$request->boolean('send_to_pra', true)) {
-            $tx = PosTransaction::withoutGlobalScope('hide_archived')
-                ->where('company_id', $companyId)
-                ->where('id', $id)
-                ->where('status', 'completed')
-                ->where('invoice_mode', 'local')
-                ->where('pra_status', 'local')
-                ->first();
-            if (!$tx) {
-                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
-            }
-            $tx->update(['is_archived' => true, 'archived_at' => now()]);
-            return response()->json([
-                'success'        => true,
-                'submitted'      => false,
-                'local_final'    => true,
-                'invoice_number' => $tx->invoice_number,
-                'total_amount'   => (float) $tx->total_amount,
-                'message'        => __('pos.bill_finalized_local_not_pra', ['number' => $tx->invoice_number, 'amount' => number_format((float) $tx->total_amount)]),
-                'id'             => $tx->id,
-            ]);
+            return DB::transaction(function () use ($companyId, $id) {
+                $tx = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)->where('id', $id)->lockForUpdate()->first();
+                if (!$tx) {
+                    return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
+                }
+                if ($tx->pra_invoice_number || ($tx->transaction_type ?? 'sale') === 'return'
+                    || $tx->status !== 'completed' || $tx->invoice_mode !== 'local' || $tx->pra_status !== 'local') {
+                    return response()->json(['success' => false, 'message' => __('pos.only_provisional_deleted_endpoint')], 422);
+                }
+                $tx->update(['is_archived' => true, 'archived_at' => $tx->archived_at ?? now()]);
+                return response()->json([
+                    'success' => true, 'submitted' => false, 'local_final' => true,
+                    'invoice_number' => $tx->invoice_number, 'total_amount' => (float) $tx->total_amount,
+                    'message' => __('pos.bill_finalized_local_not_pra', ['number' => $tx->invoice_number, 'amount' => number_format((float) $tx->total_amount)]),
+                    'id' => $tx->id,
+                ]);
+            });
         }
 
         // Cashier picks the settlement method AT promote time — cash vs card carry
@@ -9045,6 +9058,9 @@ class PosController extends Controller
             $rows = $this->archivedLocalSeriesRows($companyId, ['*'], true);
             if ($rows->isEmpty()) {
                 return;
+            }
+            foreach ($rows as $archiveRow) {
+                app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
             }
             $ids = $rows->pluck('id')->all();
             $dates = $rows->map(fn ($t) => $t->business_date ?: $t->created_at?->toDateString())->filter()->sort()->values();
@@ -16189,6 +16205,11 @@ class PosController extends Controller
                     ->where('business_date', '<=', $date)
                     ->whereNull('pra_invoice_number')
                     ->where('is_archived', false)
+                    // Credit notes remain immutable even with stale local/local
+                    // routing fields. Protect both wash sets and every action.
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
+                        $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return'));
+                    })
                     ->where(fn ($q) => $this->scopeToBranch($q, $branchId));
             };
 
@@ -16219,16 +16240,7 @@ class PosController extends Controller
                         ->where(function ($q) {
                             $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
                         })
-                        ->whereNull('pra_status')
-                        // Returns/credit notes (Task 570) are NEVER washed:
-                        // deleting one would desync the parent's returned_quantity,
-                        // un-net the reports, and (via deleted_final_count) eat
-                        // quota the return never consumed. Schema-guarded.
-                        ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
-                            $q->where(function ($w) {
-                                $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
-                            });
-                        }),
+                        ->whereNull('pra_status'),
                 ],
             ];
 
@@ -16240,7 +16252,7 @@ class PosController extends Controller
             $monthStart = \Carbon\Carbon::parse($date)->startOfMonth();
             $monthEnd = \Carbon\Carbon::parse($date)->endOfMonth();
             foreach ($sets as $billKind => $set) {
-                $rows = $set['query']->get();
+                $rows = $set['query']->orderBy('id')->lockForUpdate()->get();
                 // Comprehensive Z-report detail (owner request Jul 2026): what was
                 // washed, how much it was worth, and how much of it was backlog
                 // from earlier un-closed dates.
@@ -16333,6 +16345,9 @@ class PosController extends Controller
                         if (!empty($snapshots)) {
                             \App\Models\PosCustomerSpendSnapshot::insert($snapshots);
                         }
+                    }
+                    foreach ($deleteRows as $archiveRow) {
+                        app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
                     }
                     $ids = $deleteRows->pluck('id')->all();
                     \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)->delete();

@@ -921,6 +921,55 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);
     }
 
+    public function test_fiscal_identity_blocks_local_final_and_provisional_delete_even_with_stale_local_columns(): void
+    {
+        $companyId = $this->makeCompany(['invoice_limit_override' => 10]);
+        $billId = $this->makeProvisional($companyId, 'L-FISCAL');
+        DB::table('pos_transactions')->where('id', $billId)->update(['pra_invoice_number' => 'FISCAL-SAFE-123']);
+        $before = (array) DB::table('pos_transactions')->where('id', $billId)->first();
+        $this->actingAs($this->makeUser($companyId), 'pos');
+        $this->postJson("/pos/api/provisional-bills/{$billId}/promote", ['send_to_pra' => false])->assertStatus(422);
+        $this->postJson("/pos/api/provisional-bills/{$billId}/delete")->assertStatus(422);
+        $this->assertEquals($before, (array) DB::table('pos_transactions')->where('id', $billId)->first());
+        $this->assertDatabaseCount('pos_bill_deletions', 0);
+    }
+
+    public function test_delete_rechecks_fiscal_number_after_initial_read_before_any_quota_or_stock_change(): void
+    {
+        $companyId = $this->makeCompany(['invoice_limit_override' => 10]);
+        $billId = $this->makeFinal($companyId, 'L-RACE');
+        $this->actingAs($this->makeUser($companyId), 'pos');
+        $injected = false;
+        DB::listen(function ($event) use ($billId, &$injected) {
+            if (!$injected && DB::transactionLevel() === 0
+                && str_starts_with(strtolower($event->sql), 'select * from "pos_transactions"')
+                && str_contains($event->sql, 'limit 1')) {
+                $injected = true;
+                // A callback committed after the first stale read, before the
+                // delete's row lock. No external service or actual fiscal call.
+                DB::table('pos_transactions')->where('id', $billId)->update(['pra_invoice_number' => 'FISCAL-RACED-123']);
+            }
+        });
+        $this->from("/pos/transaction/{$billId}")->delete("/pos/transaction/{$billId}")
+            ->assertRedirect()->assertSessionHas('error');
+        $this->assertTrue($injected);
+        $this->assertDatabaseHas('pos_transactions', ['id' => $billId, 'pra_invoice_number' => 'FISCAL-RACED-123']);
+        $this->assertDatabaseCount('pos_bill_deletions', 0);
+    }
+
+    public function test_regular_delete_preserves_all_fiscal_pipeline_and_uncertain_states(): void
+    {
+        $company = $this->makeCompany(['invoice_limit_override'=>20]);
+        $this->actingAs($this->makeUser($company),'pos');
+        foreach(['pending','processing','submitting','submitted','verification_pending','failed','config_error','legacy_unknown'] as $status) {
+            $bill=$this->makeFinal($company,'PIPE-'.$status,['pra_status'=>$status]);
+            $before=(array)DB::table('pos_transactions')->find($bill);
+            $this->from("/pos/transaction/{$bill}")->delete("/pos/transaction/{$bill}")->assertRedirect()->assertSessionHas('error');
+            $this->assertEquals($before,(array)DB::table('pos_transactions')->find($bill));
+        }
+        $this->assertDatabaseCount('pos_bill_deletions',0);
+    }
+
     public function test_api_promote_local_final_bypass_stays_quota_free(): void
     {
         // send_to_pra=false = deliberate LOCAL FINAL — archived, stays local/local,
@@ -1072,6 +1121,36 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     // the bill in pos_bill_deletions and PlanLimitService adds it back — same
     // contract as the day-close DELETE policy.
     // ════════════════════════════════════════════════════════════════════════
+
+    public function test_optional_copy_is_atomic_with_real_deletion_and_does_not_change_quota(): void
+    {
+        (require database_path('migrations/2026_12_20_090000_create_optional_local_bill_archive.php'))->up();
+        config(['app.key'=>'base64:'.base64_encode(str_repeat('q',32))]);
+        $root=sys_get_temp_dir().'/taxnest-archive-quota-'.bin2hex(random_bytes(8));
+        config(['local_bill_archive.key_root'=>$root]);
+        $company=$this->makeCompany(['invoice_limit_override'=>1]);
+        $owner=$this->makeUser($company);
+        $archive=app(\App\Services\OptionalLocalBillArchive::class);
+        try {
+            $archive->grant($company,$owner,7,now()->addDays(2));
+            $bill=$this->makeProvisional($company,'L-COPY-001');
+            $this->actingAs($owner,'pos')->postJson("/pos/api/provisional-bills/{$bill}/delete")->assertOk();
+            $this->assertDatabaseMissing('pos_transactions',['id'=>$bill]);
+            $this->assertDatabaseHas('support_bill_archives',['company_id'=>$company,'source_id'=>$bill]);
+            $this->assertSame(0,DB::table('pos_bill_deletions')->count());
+            $copy=$archive->available($company)->first();
+            $this->assertSame('L-COPY-001',$archive->readPayload($copy)['header']['invoice_number']);
+            $final=$this->makeFinal($company,'L-COPY-002');
+            foreach(glob($root.'/*.key') as $key) unlink($key);
+            $this->actingAs($owner,'pos')->from("/pos/transaction/{$final}")->delete("/pos/transaction/{$final}")->assertSessionHas('error');
+            $this->assertDatabaseHas('pos_transactions',['id'=>$final]);
+            $this->assertSame(0,DB::table('pos_bill_deletions')->count());
+            $this->assertFalse(PlanLimitService::canCreatePosBill($company)['allowed']);
+            $this->assertSame(1,DB::table('support_bill_archives')->count());
+        } finally {
+            if(is_dir($root)) \Illuminate\Support\Facades\File::deleteDirectory($root);
+        }
+    }
 
     public function test_deleting_a_final_bill_does_not_give_back_monthly_quota(): void
     {

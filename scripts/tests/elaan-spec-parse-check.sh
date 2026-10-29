@@ -94,10 +94,10 @@ KNOWN_LIVE_OR_RETIRED_TITLES = {
     "Production update — NestPOS Live Ops diagnose aur owner-approved fix ab ready hai",
 }
 assert title not in KNOWN_LIVE_OR_RETIRED_TITLES, title
-assert d["audience"] in ("pos", "all")
+assert d["audience"] in ("pos", "fbr_pos", "di", "all")
 PY
   then
-    ok "committed spec is a new unique pos/all title (not L001, not a known live title)"
+    ok "committed spec is a new unique explicitly scoped title (not L001, not a known live title)"
   else
     bad "committed spec must use a new unique title that can pass the freshness gate"
   fi

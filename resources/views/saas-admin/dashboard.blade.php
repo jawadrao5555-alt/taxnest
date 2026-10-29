@@ -146,6 +146,7 @@
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-emerald-400 transition">{{ $company->name }}</a>
                                 <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
+                                <p class="text-xs">Company ID: {{ $company->id }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'di_invoices','company_id'=>$company->id]) }}">Reports</a></p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
@@ -194,6 +195,7 @@
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-purple-400 transition">{{ $company->name }}</a>
                                 <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
+                                <p class="text-xs">Company ID: {{ $company->id }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'pos_transactions','company_id'=>$company->id]) }}">Reports</a></p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->pra_pos_id ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>
@@ -242,6 +244,7 @@
                             <td class="px-4 py-3">
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-blue-400 transition">{{ $company->name }}</a>
                                 <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->email ?? '' }}</p>
+                                <p class="text-xs">Company ID: {{ $company->id }} · <a href="{{ route('saas.admin.dashboard.detail',['metric'=>'fbrpos_transactions','company_id'=>$company->id]) }}">Reports</a></p>
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{{ $company->owner_name ?? '—' }}</td>

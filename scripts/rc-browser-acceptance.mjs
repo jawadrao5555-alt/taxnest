@@ -1449,6 +1449,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.optionalArchive)return optionalArchiveWorkflow(page,t,v);
   if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
   if(t.riderRealtime)return riderRealtimeWorkflow(page,t,v);
@@ -1487,6 +1488,13 @@ async function workflow(page,t,v,diagnostics) {
       await tab.click();
       if(await tab.getAttribute('aria-pressed')!=='true' || await page.locator('.tn-company-tabs button[aria-pressed="true"]').count()!==1) throw new Error('Selected admin company tab is not explicit: '+key);
       if(!await page.locator(`[data-company-panel="${key}"]`).isVisible() || await page.locator('[data-company-panel]:not([hidden])').count()!==1) throw new Error('Selected company tab does not show its own panel: '+key);
+      const panel=page.locator(`[data-company-panel="${key}"]`);
+      if(!(await panel.innerText()).includes('Company ID:'))throw new Error('Company ID hidden or missing: '+key);
+      const reportLink=panel.getByRole('link',{name:'Reports',exact:true}).first();
+      if(!await reportLink.isVisible())throw new Error('Company report shortcut missing: '+key);
+      const reportUrl=new URL(await reportLink.getAttribute('href'),baseUrl);
+      if(!reportUrl.searchParams.get('company_id') || !reportUrl.pathname.endsWith({di:'di_invoices',pos:'pos_transactions',fbrpos:'fbrpos_transactions'}[key]))throw new Error('Company report scope is incorrect: '+key);
+
     }
     const keys=await page.locator('[data-dashboard-metric]').evaluateAll(els=>els.map(el=>el.dataset.dashboardMetric));
     if(keys.length!==13 || new Set(keys).size!==13) throw new Error('All 13 distinct dashboard links are required');
@@ -1498,6 +1506,19 @@ async function workflow(page,t,v,diagnostics) {
       if(!geometry || geometry.width<40 || geometry.height<40) throw new Error('Metric has no useful click area: '+key);
       await Promise.all([page.waitForURL('**/admin/dashboard/details/'+key,{waitUntil:'domcontentloaded'}),link.click()]);
       await page.locator(`[data-dashboard-detail="${key}"]`).waitFor({state:'visible'});
+      if(['di_invoices','pos_transactions','fbrpos_transactions'].includes(key)) {
+        if(await page.locator('[name="product"]').count())throw new Error('Fixed-product report exposes another product selector');
+        if((await page.locator('thead').innerText()).includes('Subscription dates'))throw new Error('Invoice report has irrelevant subscription dates');
+        const rows=await page.locator('tbody').innerText();
+        if(!rows.includes('No records match') && !rows.includes('Company ID:'))throw new Error('Report rows omit Company ID');
+        if(key==='di_invoices')await page.getByLabel('DI environment',{exact:true}).waitFor({state:'visible'});
+        else {
+          await page.getByLabel('Billing disposition',{exact:true}).waitFor({state:'visible'});
+          const mode=page.getByLabel('Saved invoice mode',{exact:true});
+          if(await mode.evaluate(el=>el.tagName)!=='SELECT')throw new Error('Saved mode is not a real selector');
+        }
+      }
+
       await checkUsability(page,t,key,v);
       await page.getByRole('link',{name:'Admin Dashboard',exact:false}).last().click();
       await page.waitForURL('**/admin/dashboard');
@@ -2188,6 +2209,7 @@ async function healthIsolation(browser,label,v,iso) {
   } finally {await saveEvidenceScreenshot(p,`rc-${label}-health-isolation`).catch(()=>{});await c.close();}
 }
 async function one(browser,label,v,t) {
+  if(t.optionalArchive) t={...t, login:t.optionalArchive.cases[v.width].login};
   valid(t); const failuresBefore = failures;
   const c=await browser.newContext({viewport:v,serviceWorkers:'allow',...(videoDirectory?{recordVideo:{dir:join(videoDirectory,'raw'),size:v}}:{})}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
   try { await login(p,t.notificationWorkflow?{...t,login:requested.length?(v.width<768?t.preflightMobileLogin:t.preflightLogin):(v.width<768?t.mobileLogin:t.login)}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
@@ -2531,4 +2553,106 @@ async function menuExemptFilterWorkflow(page,t,v){
   await saveEvidenceScreenshot(page,'menu-exempt-filter-'+v.width+'.png');
   await root.locator('select[x-model="statusFilter"]').selectOption('');
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[x-data="productCatalog()"]')).filtered.length===3);
+}
+
+async function optionalArchiveWorkflow(page,t,v) {
+  const {prefix,cases,validUntil}=t.optionalArchive, sample=cases[v.width];
+  const path=prefix+'/local-support-copies';
+  const open=async()=>{
+    const response=await page.goto(baseUrl+path,{waitUntil:'domcontentloaded'});
+    if(!response?.ok())throw new Error('Optional-copy owner screen unavailable');
+    await waitForOperationalSurface(page);await dismiss(page);
+  };
+  const save=async action=>{
+    await page.getByLabel('Archive action',{exact:true}).selectOption(action);
+    // The actual owner chooses both duration and consent end; no implicit opt-in.
+    if(action==='grant') {
+      await page.getByLabel('Retention days',{exact:true}).fill('7');
+      await page.getByLabel('Consent valid through',{exact:true}).fill(validUntil);
+    }
+    await page.getByLabel('Confirm owner decision',{exact:true}).check();
+    const submitted=page.waitForResponse(r=>new URL(r.url()).pathname===path&&r.request().method()==='POST');
+    await Promise.all([
+      page.waitForNavigation({waitUntil:'domcontentloaded'}),
+      page.getByRole('button',{name:'Save archive choice',exact:true}).click(),
+    ]);
+    const response=await submitted;
+    if(![200,302,303].includes(response.status()))throw new Error('Owner archive choice failed '+response.status());
+    await page.waitForLoadState('domcontentloaded');
+    await open();
+  };
+  await open();
+  if(!await page.locator('.tn-copy-state').filter({hasText:'Retention OFF'}).isVisible()
+    ||await page.getByLabel('Confirm owner decision',{exact:true}).isChecked())
+    throw new Error('Optional support retention did not start OFF/unconfirmed');
+  if(await page.getByRole('link',{name:'Download support copy',exact:true}).count())
+    throw new Error('OFF fixture unexpectedly contains an optional historical copy');
+  await checkUsability(page,t,path,v);
+  await save('grant');
+  if(!await page.locator('.tn-copy-state').filter({hasText:'Retention ON'}).isVisible())throw new Error('Explicit owner grant did not activate');
+  // Enabling must not retroactively copy a still-live bill.
+  if(await page.getByRole('link',{name:'Download support copy',exact:true}).count())throw new Error('Grant retroactively copied live history');
+  const csrf=await page.locator('meta[name="csrf-token"]').getAttribute('content');
+  if(!csrf)throw new Error('Owner screen CSRF token is absent');
+  const deleted=await page.request.post(baseUrl+`${prefix}/api/provisional-bills/${sample.billId}/delete`,{
+    headers:{'X-CSRF-TOKEN':csrf,'Accept':'application/json'},data:{}
+  });
+  if(!deleted.ok()||!(await deleted.json()).success)throw new Error('Actual fictional local bill deletion failed '+deleted.status());
+  await open();
+  const row=page.locator('tr').filter({hasText:sample.reference});
+  if(await row.count()!==1)throw new Error('Deleted local bill did not create exactly one owner-visible copy');
+  const download=row.getByRole('link',{name:'Download support copy',exact:true});
+  const [file]=await Promise.all([page.waitForEvent('download'),download.click()]);
+  const document=JSON.parse(readFileSync(await file.path(),'utf8'));
+  if(document.header?.invoice_number!==sample.reference||Number(document.header?.total_amount)!==100
+    ||Number(document.company_id)!==Number(sample.companyId)||!Array.isArray(document.items)||document.items.length!==1)
+    throw new Error('Actual support export lost its persisted bill identity/monetary facts');
+  if(JSON.stringify(document).includes('customer_phone')||JSON.stringify(document).includes('private_note'))
+    throw new Error('Optional support export includes excluded personal/free-form fields');
+  await saveEvidenceScreenshot(page,`rc-optional-copy-${prefix.slice(1)}-${v.width}`);
+  // A separate signed-in platform session must expose a company-scoped,
+  // read-only archive screen and a real download, without changing owner consent.
+  const adminContext=await page.context().browser().newContext({viewport:v});
+  await adminContext.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
+  const adminPage=await adminContext.newPage(),adminDiagnostics=attachDiagnostics(adminPage);
+  try {
+    const adminCase={name:t.name+'-admin',...t.optionalArchive.admin};
+    valid(adminCase);await login(adminPage,adminCase);await waitForOperationalSurface(adminPage);await dismiss(adminPage);
+    const adminPath=`/admin/companies/${sample.companyId}/local-support-copies`;
+    const response=await adminPage.goto(baseUrl+adminPath,{waitUntil:'domcontentloaded'});
+    if(!response?.ok())throw new Error('Privileged archive read-only screen unavailable');
+    await waitForOperationalSurface(adminPage);await dismiss(adminPage);
+    const adminSurface=adminPage.locator('[data-optional-support-copies]');
+    if(!await adminSurface.getByText('Platform read-only view.',{exact:true}).isVisible()
+      ||await adminSurface.locator('form').count()
+      ||await adminSurface.getByRole('button',{name:'Save archive choice',exact:true}).count())
+      throw new Error('Platform archive screen exposed an owner consent mutation');
+    const adminRow=adminSurface.locator('tr').filter({hasText:sample.reference});
+    if(await adminRow.count()!==1)throw new Error('Platform archive list lost the selected company copy');
+    const [adminDownload]=await Promise.all([adminPage.waitForEvent('download'),
+      adminRow.getByRole('link',{name:'Download support copy',exact:true}).click()]);
+    const exported=JSON.parse(readFileSync(await adminDownload.path(),'utf8'));
+    if(exported.header?.invoice_number!==sample.reference||Number(exported.header?.total_amount)!==100
+      ||Number(exported.company_id)!==Number(sample.companyId)||JSON.stringify(exported)!==JSON.stringify(document))
+      throw new Error('Platform support export changed or crossed the selected company identity/amount');
+    await checkUsability(adminPage,adminCase,adminPath,v);
+    const consoleErrors=adminDiagnostics.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));
+    const failedRequests=adminDiagnostics.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));
+    if(adminDiagnostics.pageErrors.length||consoleErrors.length||failedRequests.length||adminDiagnostics.httpErrors.length)
+      throw new Error('Platform archive browser diagnostics failed: '+adminDiagnostics.summary());
+    pass(`${t.name}/${v.width}: platform read-only company list and exact JSON download`);
+  } finally {
+    await saveEvidenceScreenshot(adminPage,`rc-optional-copy-admin-${prefix.slice(1)}-${v.width}`).catch(()=>{});
+    await adminContext.close();
+  }
+  await save('stop');
+  if(!await page.locator('.tn-copy-state').filter({hasText:'Retention OFF'}).isVisible()
+    ||await page.getByRole('link',{name:'Download support copy',exact:true}).count()!==1)
+    throw new Error('Stop-future-retention silently purged an existing unexpired copy');
+  await save('purge');
+  if(!await page.locator('.tn-copy-state').filter({hasText:'Retention OFF'}).isVisible()
+    ||await page.getByRole('link',{name:'Download support copy',exact:true}).count())
+    throw new Error('Confirmed optional-copy purge did not leave retention OFF and list empty');
+  await checkUsability(page,t,path,v);
+  pass(`${t.name}/${v.width}: real owner OFF → explicit consent → atomic local deletion → exact JSON export → stop → purge`);
 }

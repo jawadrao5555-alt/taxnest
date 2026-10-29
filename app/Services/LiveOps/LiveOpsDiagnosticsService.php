@@ -453,33 +453,46 @@ class LiveOpsDiagnosticsService
 
     private function agentFleetHealth(): array
     {
-        $limit = (int) config('live_ops.limits.max_companies_in_report', 200);
+        $limit = max(0, (int) config('live_ops.limits.max_companies_in_report', 200));
+        // The detail cap must not turn a newest-first sample into fleet totals.
+        // Stream matching rows once; only the exported detail list is bounded.
         $companies = $this->posCompaniesQuery()
             ->where('agent_enabled', true)
-            ->orderByDesc('agent_last_seen')
-            ->limit($limit)
-            ->get(['id', 'name', 'agent_last_seen', 'agent_version', 'agent_enabled', 'pos_printer_settings', 'agent_update_stage', 'agent_update_error']);
+            ->orderByDesc('agent_last_seen')->orderByDesc('id')
+            ->select(['id', 'name', 'agent_last_seen', 'agent_version', 'agent_enabled', 'pos_printer_settings', 'agent_update_stage', 'agent_update_error'])
+            ->cursor();
 
-        $rows = $companies->map(function (Company $c) {
-            return [
+        $counts = ['enabled' => 0, 'online' => 0, 'long_offline' => 0];
+        $rows = [];
+        foreach ($companies as $c) {
+            $online = $c->agentOnline();
+            $longOffline = $c->agentLongOffline();
+            $counts['enabled']++;
+            $counts['online'] += (int) $online;
+            $counts['long_offline'] += (int) $longOffline;
+            if (count($rows) >= $limit) {
+                continue;
+            }
+            $rows[] = [
                 'company_id' => $c->id,
                 'name' => $c->name,
-                'online' => $c->agentOnline(),
-                'long_offline' => $c->agentLongOffline(),
+                'online' => $online,
+                'long_offline' => $longOffline,
                 'last_seen' => optional($c->agent_last_seen)?->toIso8601String(),
                 'version' => $c->agent_version,
                 'silent_print' => $c->printerSettings()['silent_print_enabled'],
                 'update_stage' => $c->agent_update_stage ?? null,
                 'update_error' => $this->redactor->redactString((string) ($c->agent_update_error ?? '')),
             ];
-        })->all();
+        }
 
         return [
             'agents' => $rows,
-            'counts' => [
-                'enabled' => count($rows),
-                'online' => count(array_filter($rows, fn ($r) => $r['online'])),
-                'long_offline' => count(array_filter($rows, fn ($r) => $r['long_offline'])),
+            'counts' => $counts,
+            'coverage' => [
+                'total' => $counts['enabled'],
+                'returned' => count($rows),
+                'truncated' => count($rows) < $counts['enabled'],
             ],
         ];
     }
@@ -1545,6 +1558,12 @@ class LiveOpsDiagnosticsService
                 !empty($payload['agent']['online']) ? 'online' : 'offline',
                 $payload['likely_root_cause'] ?? 'unknown'
             ),
+            'AGENT_HEALTH' => isset($payload['counts'])
+                ? sprintf('Agent Health: %d enabled; %d online; %d long offline. Detail rows: %d of %d. Physical outage cause UNKNOWN from heartbeat alone.',
+                    $payload['counts']['enabled'], $payload['counts']['online'], $payload['counts']['long_offline'],
+                    count($payload['agents'] ?? []), $payload['coverage']['total'] ?? $payload['counts']['enabled'])
+                : sprintf('Agent Health: last heartbeat %s; version %s. Physical outage cause UNKNOWN from heartbeat alone.',
+                    $payload['company']['agent_last_seen'] ?? 'not recorded', $payload['company']['agent_version'] ?? 'not reported'),
             'BILLING_SUMMARY', 'BILLING_BY_COMPANY' => sprintf(
                 'Billing: %d companies, %d invoices, gross %.2f.',
                 $payload['totals']['company_count'] ?? 0,

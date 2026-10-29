@@ -18,8 +18,10 @@ const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridg
 const { validateUpdateInfo } = require('./src/release-manifest');
 const { registerPortableUninstall } = require('./src/windows-uninstall');
 const { buildUpdateHandoffScript } = require('./src/update-handoff');
+const { buildRecoveryScript, registerRecovery } = require('./src/update-recovery');
+const { pruneCompletedRecovery } = require('./src/update-recovery-retention');
 const { shouldStopHandoff, nextHandoff } = require('./src/update-retry');
-const { failedHandoff } = require('./src/update-install-result');
+const { failedHandoff, recoveryPending } = require('./src/update-install-result');
 const { retireLegacyElectronLogin } = require('./src/windows-login-item');
 const { heartbeatDiagnostics } = require('./src/heartbeat-diagnostics');
 const offlineSnapshot = require('./src/offline-snapshot');
@@ -120,6 +122,16 @@ async function handleAgentUpdate(info) {
     if (updateInProgress) return;
     if (!isNewerVersion(info.version, app.getVersion())) return;
     const priorHandoff = store.get('updateHandoffState') || {};
+    if (recoveryPending(priorHandoff, (file, encoding) => fs.readFileSync(file, encoding))) {
+      updateInfo = {
+        available: true, downloading: false, latestBuild: info.version,
+        currentBuild: app.getVersion(), downloadUrl: DOWNLOAD_URL,
+        recoveryPending: true, manualRequired: true,
+        error: 'An earlier installation has not finished. Windows recovery is pending.',
+      };
+      sendUpdateState();
+      return; // do not overlap a live/interrupted copy or sweep its source ZIP
+    }
     if (shouldStopHandoff(priorHandoff, info.version)) {
       updateInfo = {
         available: true, downloading: false, latestBuild: info.version,
@@ -187,7 +199,12 @@ async function handleAgentUpdate(info) {
     try {
       for (const entry of fs.readdirSync(os.tmpdir())) {
         if (!/^taxnest-agent-update(-\d+)?$/.test(entry)) continue;
-        try { fs.rmSync(path.join(os.tmpdir(), entry), { recursive: true, force: true }); } catch (e) {}
+        try {
+          const stale = path.join(os.tmpdir(), entry), stat = fs.lstatSync(stale);
+          // Never sweep another installation's live download/extraction.
+          if (stat.isDirectory() && !stat.isSymbolicLink() && Date.now() - stat.mtimeMs > 7 * 86400e3)
+            fs.rmSync(stale, { recursive: true, force: true });
+        } catch (e) {}
       }
     } catch (e) {}
     fs.mkdirSync(workDir, { recursive: true });
@@ -265,9 +282,20 @@ async function handleAgentUpdate(info) {
 
     updStage = 'handoff';
     const destDir = path.dirname(process.execPath);
-    const backupDir = path.join(workDir, 'backup');
-    const cmdPath = path.join(workDir, 'apply-update.cmd');
-    const resultPath = path.join(workDir, 'apply-update.result');
+    // Do not put the only rollback copy in TEMP: Windows cleanup or the next
+    // download's sweep may remove it after an interrupted installation.
+    const installKey = crypto.createHash('sha256').update(destDir.toLowerCase()).digest('hex').slice(0, 20);
+    const recoveryRoot = path.join(app.getPath('userData'), 'update-recovery', installKey);
+    // This runs only after the pending-handoff guard above. Never delete a
+    // pending/failed backup or the copy referenced by the durable journal.
+    pruneCompletedRecovery(recoveryRoot, priorHandoff.recoveryPath);
+    const recoveryDir = path.join(recoveryRoot, String(Date.now()));
+    fs.mkdirSync(recoveryDir, { recursive: true });
+    const backupDir = path.join(recoveryDir, 'backup');
+    const cmdPath = path.join(recoveryDir, 'apply-update.cmd');
+    const resultPath = path.join(recoveryDir, 'apply-update.result');
+    const recoveryPath = path.join(recoveryDir, 'repair-update.cmd');
+    const readyPath = path.join(recoveryDir, 'backup.ready');
     const exePath = path.join(destDir, exeName);
     // Shut down this instance via stopAgent()/app.quit() below. The
     // single-instance lock prevents a twin on this profile.
@@ -275,19 +303,33 @@ async function handleAgentUpdate(info) {
     // uninstalling another installation or touching saved config.
     const script = buildUpdateHandoffScript({
       exePath, srcDir, destDir, backupDir,
-      logPath: path.join(workDir, 'apply-update.log'),
-      resultPath, sourcePid: process.pid,
+      logPath: path.join(recoveryDir, 'apply-update.log'),
+      resultPath, sourcePid: process.pid, recoveryPath, readyPath,
     });
+    fs.writeFileSync(recoveryPath, buildRecoveryScript({
+      exePath, destDir, backupDir, readyPath, resultPath, recoveryPath,
+      logPath: path.join(recoveryDir, 'repair-update.log'),
+    }));
     fs.writeFileSync(cmdPath, script);
+    // Arm recovery before persisting handoff or quitting. If Windows refuses
+    // registration, keep this running installation and use normal backoff.
+    await registerRecovery(exePath, recoveryPath);
+    fs.writeFileSync(resultPath, 'preparing');
 
     console.log('[self-update] handing off to updater script, quitting…');
     lastUpdateAttempt = { target: info.version, stage: 'handoff', error: null, at: new Date().toISOString() };
     updateInfo = { ...updateInfo, downloading: false, downloaded: true, progress: 100 };
     sendUpdateState();
 
-    store.set('updateHandoffState', { ...nextHandoff(priorHandoff, info.version), resultPath });
-    const child = spawn('cmd.exe', ['/c', cmdPath], { detached: true, stdio: 'ignore', windowsHide: true, cwd: workDir });
-    child.unref();
+    store.set('updateHandoffState', { ...nextHandoff(priorHandoff, info.version), resultPath, recoveryPath });
+    await new Promise((resolve, reject) => {
+      const child = spawn('cmd.exe', ['/d', '/v:off', '/s', '/c', `""${cmdPath}""`], { windowsVerbatimArguments: true, detached: true, stdio: 'ignore', windowsHide: true, cwd: recoveryDir });
+      child.once('error', error => {
+        try { fs.writeFileSync(resultPath, 'failed_updater_start'); } catch (_) {}
+        reject(error);
+      });
+      child.once('spawn', () => { child.unref(); resolve(); });
+    });
     isQuitting = true;
     stopAgent();
     setTimeout(() => {
@@ -362,14 +404,17 @@ function getMigratedAgentConfig() {
 // ─── NestPOS Desktop (POS screen shell) settings ────────────────────────────
 function getPosSettings() {
   const s = store.get('posSettings') || {};
-  return { openOnStartup: !!s.openOnStartup, kiosk: !!s.kiosk, offlineMode: !!s.offlineMode };
+  return { openOnStartup: !!s.openOnStartup, kiosk: !!s.kiosk, offlineMode: !!s.offlineMode, askDownloadLocation: !!s.askDownloadLocation };
 }
 
 function setPosSettings(next) {
+  const current = store.get('posSettings') || {};
   store.set('posSettings', {
+    ...current,
     openOnStartup: !!next.openOnStartup,
     kiosk: !!next.kiosk,
     offlineMode: !!next.offlineMode,
+    askDownloadLocation: typeof next.askDownloadLocation === 'boolean' ? next.askDownloadLocation : !!current.askDownloadLocation,
   });
 }
 
@@ -854,6 +899,7 @@ function openPos() {
     openPosWindow(posConfig, {
       kiosk: s.kiosk,
       isOfflineEnabled: () => getPosSettings().offlineMode,
+      shouldAskDownloadLocation: () => getPosSettings().askDownloadLocation,
       onKioskToggle: (kioskNow) => {
         setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
         buildTrayMenu();
@@ -1424,6 +1470,16 @@ ipcMain.handle('save-pos-settings', (event, s) => {
 });
 
 ipcMain.handle('open-pos-window', () => ({ ok: openPos() }));
+
+// Explicit owner/cashier click only; no renderer-supplied destination.
+ipcMain.handle('open-pos-browser', async () => {
+  try {
+    const { posBrowserUrl } = require('./src/pos-browser-url');
+    const config = getMigratedAgentConfig();
+    await shell.openExternal(posBrowserUrl(config && config.serverUrl ? config.serverUrl : DEFAULT_SERVER_URL));
+    return { ok: true };
+  } catch (_) { return { ok: false }; }
+});
 
 // Sensitive Core ingress is Electron IPC only. The exact POS webContents is
 // the authentication boundary; no HTTP/LAN route exists for these records.

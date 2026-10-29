@@ -28,7 +28,7 @@ class AdminDashboardDetailTest extends TestCase {
    ->assertDontSee('name="product"',false)->assertDontSee('Subscription dates')
    ->assertSee('Company ID: 2');
   $this->get('/admin/dashboard/details/di_invoices')->assertOk()
-   ->assertSee('Invoice status')->assertSee('DI environment')
+   ->assertSee('Invoice status')->assertSee('aria-label="DI environment"',false)
    ->assertDontSee('name="product"',false)->assertDontSee('Subscription dates')
    ->assertSee('FBR invoice number');
   $this->get('/admin/dashboard/details/total_users')->assertOk()->assertSee('Role');

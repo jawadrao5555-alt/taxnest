@@ -18,11 +18,11 @@ const good = {
   max_agent_version: '2.99.99',
 };
 
-test('package and lock release identity stay aligned beyond immutable v1.13.22', () => {
-  assert.equal(packageJson.version, '1.13.23');
+test('package and lock release identity stay aligned beyond existing v1.13.23', () => {
+  assert.equal(packageJson.version, '1.13.24');
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[''].version, packageJson.version);
-  assert.notEqual(packageJson.version, '1.13.22');
+  assert.notEqual(packageJson.version, '1.13.23');
 });
 
 test('reviewed Electron runtime is identical in package, lock and Windows build configuration', () => {

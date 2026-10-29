@@ -9,8 +9,10 @@ const root = path.resolve(process.argv[2] || path.join(__dirname, '..'));
 if (!fs.existsSync(root) || (!root.endsWith('.asar') && !fs.existsSync(path.join(root, 'src/company-configurator.js')))) {
   throw Error('Missing tested package/source');
 }
+const harness = process.argv[3] === 'downloads' ? 'native-download-harness.js' : 'native-pairing-harness.js';
+if (process.argv[3] && process.argv[3] !== 'downloads') throw Error('Unknown native harness');
 const executable = require('electron');
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-const r = spawnSync(executable, [path.join(__dirname, 'native-pairing-harness.js'), root], { env, stdio: 'inherit', timeout: 180000 });
+const r = spawnSync(executable, [path.join(__dirname, harness), root], { env, stdio: 'inherit', timeout: 180000 });
 if (r.error) throw r.error;
 if (r.status !== 0) process.exit(r.status || 1);

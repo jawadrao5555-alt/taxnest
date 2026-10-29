@@ -1,8 +1,8 @@
-title: "Receipt ki details apni zaroorat ke mutabiq chunain"
+title: "Agent mein POS aur report save karne ki behtari"
 audience: pos
 type: improvement
 points:
-  - "Receipt Settings mein Local aur Fiscal receipt ke liye details aur layout alag chun sakte hain."
-  - "Terminal, waiter, table, item columns, logo aur likhai ke mazeed controls milenge."
-  - "Keep current se aap ka mojooda design barqarar rehta hai; tabdeeli sirf Save par lagti hai."
-  - "Bill ki raqam, fiscal number aur verification QR barqarar rehte hain."
+  - "POS na khulne par wazeh paigham aur apni marzi se browser mein kholne ka button milega."
+  - "Reports save karte waqt folder poochne ki sahulat Settings se khud ON kar sakte hain; purana download tareeqa pehle ki tarah rahega."
+  - "Agent Health mein tamam shamil companies ki ginti aur aakhri rabtay ki maloomat zyada wazeh hogi."
+  - "Naye updater mein adhoori update ke liye backup aur recovery ki tayyari shamil hai; saved company aur printer settings barqarar rahengi."

@@ -66,6 +66,8 @@ class FbrPosPendingDeliveriesPanelTest extends TestCase
             $table->string('status')->nullable();
             $table->string('invoice_mode')->nullable();
             $table->string('fbr_status')->nullable();
+            // Fiscal identity is present in every real FBR transaction schema.
+            $table->string('fbr_invoice_number')->nullable();
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
             $table->decimal('total_amount', 12, 2)->default(0);
@@ -188,6 +190,15 @@ class FbrPosPendingDeliveriesPanelTest extends TestCase
         $bill->refresh();
         $this->assertSame('cash', $bill->payment_method);
         $this->assertSame('fbr', $bill->invoice_mode);
+    }
+
+    public function test_existing_fiscal_identity_blocks_promotion_without_changing_payment_or_amounts(): void
+    {
+        $bill = $this->makeProvisional(['fbr_invoice_number' => 'FISCAL-KEEP']);
+        $before = $bill->fresh()->getRawOriginal();
+        $res = (new FbrPosController())->apiPromoteProvisional(Request::create('/', 'POST', ['payment_method' => 'card']), $bill->id);
+        $this->assertSame(409, $res->getStatusCode());
+        $this->assertSame($before, $bill->fresh()->getRawOriginal());
     }
 
     public function test_promote_double_claim_rejected(): void

@@ -8,7 +8,7 @@
 #     --title "Naya update — August 2026" \
 #     --point "Pehla kaam theek hua" \
 #     --point "Doosra feature add kiya" \
-#     [--audience pos|fbr_pos|all]   (default: pos) \
+#     [--audience pos|fbr_pos|di|all]   (default: pos) \
 #     [--category restaurant] [--category pharmacy] ...   (repeatable; none = all shops)
 #
 # Usage (dev local DB):
@@ -100,9 +100,17 @@ if [ -n "$DEPLOY_SHA" ] && ! printf '%s' "$DEPLOY_SHA" | grep -qE '^[0-9a-fA-F]{
   fail "--deploy-sha must be exactly 40 hexadecimal characters"
 fi
 [ ${#POINTS[@]} -gt 0 ] || fail "at least one --point is required"
-case "$AUDIENCE" in pos|fbr_pos|all) ;; *) fail "--audience must be pos, fbr_pos, or all" ;; esac
+case "$AUDIENCE" in pos|fbr_pos|di|all) ;; *) fail "--audience must be pos, fbr_pos, di, or all" ;; esac
 case "$ELAAN_TYPE" in feature|improvement|"") ;; *) fail "type must be feature or improvement" ;; esac
 [ -n "$ELAAN_TYPE" ] || ELAAN_TYPE="improvement"
+
+# Validate command-line scope too, before dry-run/transport. No application or DB boot.
+python3 - "$AUDIENCE" "${CATEGORIES[@]}" <<'PY_SCOPE' || fail "invalid announcement scope"
+import sys
+sys.path.insert(0, 'scripts/lib')
+from importlib import import_module
+import_module('elaan-spec-parse').validate_scope(sys.argv[1], sys.argv[2:])
+PY_SCOPE
 
 if [ "$DRY_RUN" = "1" ]; then
   echo "ELAAN_DRY_RUN title=$TITLE"
@@ -180,7 +188,8 @@ if (empty(\$points)) {
 \$cats = $PHP_CATS_ARRAY;
 \$cats = array_values(array_filter(array_map('trim', \$cats), fn(\$c) => \$c !== ''));
 foreach (\$cats as \$c) {
-    if (! App\Services\PosFeatureService::isKnownCategory(\$c)) {
+    if (!(('$AUDIENCE_ESCAPED' === 'di' && array_key_exists(\$c, App\Models\AppUpdate::DI_SECTORS))
+        || ('$AUDIENCE_ESCAPED' !== 'di' && App\Services\PosFeatureService::isKnownCategory(\$c)))) {
         fwrite(STDERR, "ERROR: unknown business category '" . \$c . "' — elaan NOT created.\n");
         exit(1);
     }

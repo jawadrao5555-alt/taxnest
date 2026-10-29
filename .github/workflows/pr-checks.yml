@@ -113,6 +113,11 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosRestaurantDashboardCountsTest.php
       - name: Check notification read state and product targeting
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FeaturedWhatsNewTest.php tests/Feature/WhatsNewAudienceTargetingTest.php
+      - name: Check strict announcement publication and exact receipt scope
+        run: |
+          python3 scripts/tests/elaan-scope-check.py
+          bash scripts/tests/elaan-spec-parse-check.sh
+          bash scripts/tests/elaan-same-sha-freshness-check.sh
       - name: Check combined FBR identity, exclusive claim and owner recovery
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FbrPosIdentityTest.php tests/Feature/FbrPosFiscalReceiptIdentityTest.php tests/Feature/FbrPosReceiptSerialWithFiscalTest.php tests/Feature/FbrPosReceiptOrderMatchLayoutTest.php tests/Feature/FbrPosSubmissionEvidenceTest.php tests/Feature/FbrPosOwnerReconciliationTest.php
       - name: Check Smart DI import safeguards and legacy import regression

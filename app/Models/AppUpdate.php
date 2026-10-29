@@ -296,6 +296,16 @@ class AppUpdate extends Model
         // Legacy 'all' means both POS panels only, never DI.
         $audiences = $panel === 'di' ? ['di'] : ($panel === 'fbr' ? ['fbr_pos', 'all'] : ['pos', 'all']);
         $query->whereIn('audience', $audiences)->customerCanonical();
+        // Correct only the immutable FBR release receipt whose stored audience
+        // was accidentally 'all'. Read-time delivery correction preserves its
+        // content key, original dates and every existing acknowledgement.
+        if ($panel === 'pra' && \Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'deployment_key')) {
+            $query->where(function ($q) {
+                $q->whereNull('app_updates.deployment_key')->orWhere('app_updates.deployment_key', '!=',
+                    'fe323620af8101e7ede4620d64a407d8b7875a4f');
+            });
+        }
+
 
         if (!\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')) {
             return $query; // mid-deploy: column not there yet = everything is universal

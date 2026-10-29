@@ -189,6 +189,38 @@ class WhatsNewAudienceTargetingTest extends TestCase
         $this->seedFixtures();
     }
 
+    public function test_exact_historical_fbr_receipt_is_not_delivered_to_pra_or_republished(): void
+    {
+        Schema::table('app_updates', fn (Blueprint $t) => $t->string('deployment_key', 40)->nullable());
+        $notice = AppUpdate::create([
+            'title' => 'HISTORICAL-FBR-RECEIPT', 'points' => ['Original copy'],
+            'audience' => 'all', 'is_published' => true,
+            'deployment_key' => 'fe323620af8101e7ede4620d64a407d8b7875a4f',
+        ]);
+        // A same-title manual notice and a shared Agent notice remain shared.
+        $manual = AppUpdate::create(['title' => 'HISTORICAL-FBR-RECEIPT',
+            'points' => ['Separate manual copy'], 'audience' => 'all', 'is_published' => true]);
+        $before = DB::table('app_updates')->where('id', $notice->id)->first();
+        AppUpdateSeen::create(['user_id' => $this->fbrAdminId, 'app_update_id' => $notice->id]);
+        $seenBefore = DB::table('app_update_seens')->get()->toArray();
+
+        $pra = AppUpdate::bellForCompany(\App\Models\Company::find($this->posCompanyId), 'pra', $this->posAdminId);
+        $fbr = AppUpdate::bellForCompany(\App\Models\Company::find($this->fbrCompanyId), 'fbr', $this->fbrAdminId);
+        $this->assertNotContains($notice->id, $pra['updates']->modelKeys());
+        $this->assertContains($manual->id, $pra['updates']->modelKeys());
+        $this->assertContains($this->updateId(self::T_ALL), $pra['updates']->modelKeys());
+        $this->assertContains($notice->id, $fbr['updates']->modelKeys());
+        $this->assertNotContains($notice->id, $fbr['unseenIds']);
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->postJson('/pos/whats-new/seen', ['update_id' => $notice->id])->assertNotFound();
+        $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile')
+            ->assertOk()->assertDontSee('Original copy')->assertSee('Separate manual copy');
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile')
+            ->assertOk()->assertSee('Original copy');
+        $this->assertEquals($before, DB::table('app_updates')->where('id', $notice->id)->first());
+        $this->assertEquals($seenBefore, DB::table('app_update_seens')->get()->toArray());
+    }
+
     private function seedFixtures(): void
     {
         $now = now();

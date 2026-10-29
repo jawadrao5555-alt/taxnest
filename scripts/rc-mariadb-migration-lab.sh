@@ -95,6 +95,7 @@ concurrency(){
     export DB_DATABASE="$FULL_DB"
     clean_php php "$ROOT/tests/native/rc_mariadb_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
+    clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
 }
 di(){
     reset "$DI_DB"

@@ -189,6 +189,8 @@ class OptionalLocalBillArchiveTest extends TestCase
     {
         $this->grant(); $id = $this->capture($this->bill());
         $copy = (array) DB::table('support_bill_archives')->find($id);
+        $oldKeyring = [];
+        foreach (glob($this->keyRoot.'/*.key') as $keyFile) $oldKeyring[basename($keyFile)] = file_get_contents($keyFile);
         $prefs = (array) DB::table('support_bill_archive_prefs')->where('company_id', 1)->first();
         $this->archive->stop(1, $this->owner());
         $this->assertNull($this->capture($this->bill()));
@@ -200,7 +202,18 @@ class OptionalLocalBillArchiveTest extends TestCase
         DB::table('support_bill_archive_prefs')->where('company_id', 1)->update($prefs);
         try { $this->archive->readPayload((object) $copy); $this->fail('SQL restore must not restore a destroyed external key'); }
         catch (\RuntimeException $e) { $this->assertNotSame('', $e->getMessage()); }
+        // A restored whole-volume image can bring back old keys as well as
+        // ciphertext. Prove the documented pre-exposure quarantine, rather than
+        // implying SQL-only crypto-erasure protects an arbitrary old image.
+        foreach ($oldKeyring as $name => $contents) {
+            file_put_contents($this->keyRoot.'/'.$name, $contents);
+            chmod($this->keyRoot.'/'.$name, 0600);
+        }
+        $this->assertNotEmpty($this->archive->readPayload((object) $copy));
+        $financialBefore = DB::table('pos_transactions')->get()->toJson();
         $this->archive->quarantineAfterRestore();
+        $this->assertSame([], glob($this->keyRoot.'/*.key'));
+        $this->assertSame($financialBefore, DB::table('pos_transactions')->get()->toJson());
         $this->assertSame(0, DB::table('support_bill_archives')->count());
         $this->assertFalse((bool) DB::table('support_bill_archive_prefs')->where('company_id', 1)->value('enabled'));
         $this->assertGreaterThanOrEqual(3, DB::table('support_bill_archive_consents')->where('company_id', 1)->count());

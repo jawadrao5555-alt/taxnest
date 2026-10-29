@@ -69,3 +69,12 @@ Notification correction:
 Local PHP8.4.27: reports/billing smoke **15 tests /234 assertions PASS**; notification plus password reset/email verification **91 tests /383 assertions PASS**; strict scope/parser/same-SHA suites PASS; PHP/bash syntax and whitespace PASS. Portable runtime still lacks GD/exif/imap; local Node is 24, not the required CI Node22. Native MariaDB/Unix sockets are unavailable in this container, so no local native acceptance is claimed; the new MariaDB probe and final full/browser/Node22 evidence must pass in current-head CI.
 
 Billing #273 remains explicitly unimplemented. In particular, a read-only label must not become deletion eligibility; owner-only default-OFF consent, atomic snapshots, financial/stock/quota invariants, expiry/revocation and restore suppression still need implementation and acceptance. No companies opted in, settings changed, stored financial history rewritten, production workflows dispatched or deployment claimed.
+
+
+## Read-only billing classification checkpoint — 29 October 2026
+
+Added the first #273 report slice, not financial decision execution or archive consent. Actual fiscal number establishes Reported. Known pending/failed/submitted-without-number states stay Reporting Pending/Failed; known persisted reporting-OFF finals (completed + PRA/FBR/null routing + null status) are Local Final independently of current company settings. Local/local provisionals remain Pending Decision. Unknown legacy states remain explicitly unclassified, never silently Local. These labels are **not** used for deletion permission or mutation.
+
+Composable billing disposition, Local/unreported grouping (including pending/failed), branch, business date and payment filters share the same SQL query for rows/counts/totals/CSV. Existing company/product constraints and created-at filters remain. PHP rendered/CSV suite now **16 tests /306 assertions PASS**, including 20 state fixtures across PRA/FBR, fiscal-number precedence over failed status/routing, missing-number submitted state, legacy values, all aggregate/filter/CSV matches and unchanged records. Added actual desktop/390px selector assertion and 20 native MariaDB SQL/row equivalence cases; final-head browser/native execution pending.
+
+Still required: owner/company policy decision actions, races and all optional archive consent/storage/expiry/revocation/restore acceptance. No financial state changed and no readiness claim.

@@ -1512,6 +1512,7 @@ async function workflow(page,t,v,diagnostics) {
         if(!rows.includes('No records match') && !rows.includes('Company ID:'))throw new Error('Report rows omit Company ID');
         if(key==='di_invoices')await page.getByLabel('DI environment',{exact:true}).waitFor({state:'visible'});
         else {
+          await page.getByLabel('Billing disposition',{exact:true}).waitFor({state:'visible'});
           const mode=page.getByLabel('Saved invoice mode',{exact:true});
           if(await mode.evaluate(el=>el.tagName)!=='SELECT')throw new Error('Saved mode is not a real selector');
         }

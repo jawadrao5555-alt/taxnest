@@ -96,6 +96,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_mariadb_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
+    clean_php php "$ROOT/tests/native/rc_admin_bill_disposition.php"
 }
 di(){
     reset "$DI_DB"

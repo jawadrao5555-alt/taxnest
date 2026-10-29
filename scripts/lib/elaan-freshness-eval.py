@@ -6,11 +6,11 @@ Pure decision helper — no SSH, no DB, no secrets. Used by:
   - scripts/tests/elaan-same-sha-freshness-check.sh
 
 Rules:
-  - Time-fresh published pos/all rows (created_at > marker) always PASS
+  - Time-fresh exact-receipt/exact-scope published rows (created_at > marker) PASS
     for both new and same SHA.
   - SAME-SHA rerun (live HEAD == target SHA == marker commit) may PASS
-    only when the SHA-qualified published title still exists as a
-    published pos/all AppUpdate. Unrelated old announcements (including
+    only when the published exact receipt still exists in the committed scope.
+    Counts are supplied only after strict SQL scope filtering by the caller. Unrelated old announcements (including
     the same human title from an older SHA) do NOT count.
   - NEW SHA with no time-fresh row FAIL (unchanged).
   - ELAAN_EXISTS alone is never treated as fresh.

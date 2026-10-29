@@ -9,7 +9,7 @@ class AdminDashboardDetailTest extends TestCase {
  protected function setUp(): void {
   parent::setUp();Schema::dropAllTables();
   Schema::create('companies',function(Blueprint $t){$t->id();$t->string('name');$t->string('product_type');$t->string('status');$t->string('agent_api_key')->nullable();$t->softDeletes();$t->timestamps();});
-  foreach(['invoices','pos_transactions','fbr_pos_transactions'] as $table) Schema::create($table,function(Blueprint $t){$t->id();$t->integer('company_id');$t->string('invoice_number');$t->string('status');$t->decimal('total_amount',12,2);$t->string('invoice_mode')->nullable();$t->string('fbr_status')->nullable();$t->string('pra_status')->nullable();$t->timestamps();});
+  foreach(['invoices','pos_transactions','fbr_pos_transactions'] as $table) Schema::create($table,function(Blueprint $t){$t->id();$t->integer('company_id');$t->string('invoice_number');$t->string('status');$t->decimal('total_amount',12,2);$t->string('invoice_mode')->nullable();$t->string('fbr_status')->nullable();$t->string('pra_status')->nullable();$t->string('pra_invoice_number')->nullable();$t->string('fbr_invoice_number')->nullable();$t->integer('branch_id')->nullable();$t->string('payment_method')->nullable();$t->date('business_date')->nullable();$t->timestamps();});
   Schema::create('payment_proofs',function(Blueprint $t){$t->id();$t->integer('company_id');$t->string('status');$t->decimal('amount',12,2);$t->timestamps();});
   Schema::create('subscriptions',function(Blueprint $t){$t->id();$t->integer('company_id');$t->boolean('active');$t->decimal('final_price',12,2);$t->timestamps();});
   Schema::create('users',function(Blueprint $t){$t->id();$t->integer('company_id');$t->string('name');$t->string('role');$t->string('password');$t->timestamps();});
@@ -57,6 +57,41 @@ class AdminDashboardDetailTest extends TestCase {
   $this->assertStringContainsString('production',$csv);
   $this->assertStringNotContainsString('sandbox',$csv);
   $this->assertSame($before,DB::table('invoices')->get()->toJson());
+ }
+ public function test_billing_disposition_composes_rows_totals_csv_and_preserves_history(): void {
+  $this->admin();
+  foreach(['pos_transactions'=>['pos_transactions','pra',2],'fbr_pos_transactions'=>['fbrpos_transactions','fbr',3]] as $table=>[$metric,$prefix,$company]) {
+   DB::table($table)->delete();
+   $cases=[
+    ['reported','local','failed','FISCAL-123'],
+    ['local_final',$prefix,null,null], ['local_final',null,null,null],
+    ['pending_decision','local','local',null],
+    ['reporting_pending',$prefix,'pending',null],
+    ['reporting_pending',$prefix,'submitted',null],
+    ['reporting_pending',$prefix,'verification_pending',null],
+    ['reporting_failed',$prefix,'failed',null],
+    ['reporting_failed',$prefix,'config_error',null],
+    ['unclassified',$prefix,'legacy_custom',null],
+   ];
+   foreach($cases as $i=>[$state,$mode,$fiscal,$number]) DB::table($table)->insert([
+    'company_id'=>$company,'invoice_number'=>'BILL-'.$i,'status'=>'completed','total_amount'=>100,
+    'invoice_mode'=>$mode,$prefix.'_status'=>$fiscal,$prefix.'_invoice_number'=>$number,
+    'branch_id'=>10,'payment_method'=>'card','business_date'=>'2026-10-01','created_at'=>'2026-10-02 01:00:00']);
+   $before=DB::table($table)->get()->toJson();
+   $base='/admin/dashboard/details/'.$metric.'?company_id='.$company.'&branch_id=10&payment_method=card&business_from=2026-10-01&business_to=2026-10-01';
+   foreach(array_count_values(array_column($cases,0)) as $state=>$count) {
+    $r=$this->get($base.'&billing_state='.$state)->assertOk()->assertViewHas('count',$count)->assertViewHas('revenue',(float)$count*100);
+    $rows=$r->viewData('rows');
+    $this->assertSame([\App\Services\AdminPosBillDisposition::LABELS[$state]],$rows->pluck('billing_state')->unique()->values()->all());
+    $csv=$this->get($base.'&billing_state='.$state.'&export=csv')->streamedContent();
+    $this->assertCount($count+1,array_filter(explode("\n",trim($csv))));
+   }
+   $this->get($base.'&billing_state=local_unreported')->assertViewHas('count',9)->assertViewHas('revenue',900.0);
+   $this->get(str_replace('branch_id=10','branch_id=11',$base))->assertViewHas('count',0);
+   $this->get(str_replace('payment_method=card','payment_method=cash',$base))->assertViewHas('count',0);
+   $this->get(str_replace('company_id='.$company,'company_id=99',$base))->assertViewHas('count',0);
+   $this->assertSame($before,DB::table($table)->get()->toJson());
+  }
  }
  private function admin(): void {$this->actingAs((new AdminUser)->forceFill(['id'=>50,'role'=>'super_admin','name'=>'Synthetic admin']),'admin');}
  public function test_all_thirteen_screens_render_and_csv_is_safe(): void {

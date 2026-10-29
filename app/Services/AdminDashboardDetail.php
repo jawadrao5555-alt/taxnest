@@ -44,6 +44,15 @@ class AdminDashboardDetail {
    if(!empty($filters['mode'])) $q->where('invoice_mode',$filters['mode']);
    $fiscal=$d['metric']==='pos_transactions'?'pra_status':'fbr_status';
    if(!empty($filters['fiscal_status'])) $q->where($fiscal,$filters['fiscal_status']);
+   if(!empty($filters['billing_state'])) {
+    $state=AdminPosBillDisposition::sql($d['fixed_product']);
+    if($filters['billing_state']==='local_unreported') $q->whereRaw("($state) <> ?",['reported']);
+    else $q->whereRaw("($state) = ?",[$filters['billing_state']]);
+   }
+   if(!empty($filters['branch_id'])) $q->where($table.'.branch_id',$filters['branch_id']);
+   if(!empty($filters['payment_method'])) $q->where($table.'.payment_method',$filters['payment_method']);
+   foreach(['business_from'=>'>=','business_to'=>'<='] as $key=>$op) if(!empty($filters[$key])) $q->whereDate($table.'.business_date',$op,$filters[$key]);
+
   }
   if($d['metric']==='di_invoices' && !empty($filters['environment'])) $q->where('fbr_status',$filters['environment']);
   return $q;
@@ -73,6 +82,7 @@ class AdminDashboardDetail {
    'mode'=>$record->invoice_mode ?? '', 'subscription_start'=>$record->start_date?->format('Y-m-d'), 'subscription_end'=>$record->end_date?->format('Y-m-d')];
   if($d['metric']!=='active_subscriptions') unset($row['subscription_start'],$row['subscription_end']);
   if(!$d['is_invoice']) unset($row['fiscal_number'],$row['fiscal_status'],$row['mode']);
+  if(in_array($d['metric'],['pos_transactions','fbrpos_transactions'])) $row['billing_state']=AdminPosBillDisposition::LABELS[AdminPosBillDisposition::state($record,$d['fixed_product'])];
   if($d['metric']==='di_invoices') $row['environment']=in_array($record->fbr_status,['production','sandbox'],true)?$record->fbr_status:'Not recorded / other';
   return $row;
  }

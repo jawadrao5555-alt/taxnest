@@ -704,7 +704,8 @@ foreach (['pos' => '/pos', 'fbrpos' => '/fbr-pos'] as $archiveProduct => $archiv
         'name'=>'optional-support-copies-'.$archiveProduct, 'login'=>$archiveCases[1366]['login'],
         'password'=>$password, 'loginPath'=>$archivePrefix.'/login',
         'paths'=>[$archivePrefix.'/local-support-copies'], 'markers'=>['Optional local bill support copies','Retention OFF'],
-        'optionalArchive'=>['prefix'=>$archivePrefix, 'cases'=>$archiveCases, 'validUntil'=>now()->addDays(7)->toDateString()],
+        'optionalArchive'=>['prefix'=>$archivePrefix, 'cases'=>$archiveCases, 'validUntil'=>now()->addDays(7)->toDateString(),
+            'admin'=>['login'=>$admin->email, 'password'=>$password, 'loginPath'=>'/admin/login']],
     ];
 }
 

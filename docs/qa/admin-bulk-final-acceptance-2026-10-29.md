@@ -79,3 +79,9 @@ GLOB_BRACE (unrelated health test); the archive tamper test used an obsolete
 in-memory-only mutation while the service had switched to authoritative DB reads.
 Final test corrupts the actual stored ciphertext and passes; do not count the
 initial full run as current-head green. Official full CI is still required.
+
+Final affected group133tests1033assertions PASS. Browser journeys also sign in as
+an independent synthetic super-admin at each viewport, verify no consent form,
+read the exact company-scoped list, download and compare the exact owner export,
+and require clean page/console/request/HTTP diagnostics. Owner session/settings
+are unchanged; stop/purge testing then continues in its original context.

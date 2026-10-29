@@ -2610,6 +2610,41 @@ async function optionalArchiveWorkflow(page,t,v) {
   if(JSON.stringify(document).includes('customer_phone')||JSON.stringify(document).includes('private_note'))
     throw new Error('Optional support export includes excluded personal/free-form fields');
   await saveEvidenceScreenshot(page,`rc-optional-copy-${prefix.slice(1)}-${v.width}`);
+  // A separate signed-in platform session must expose a company-scoped,
+  // read-only archive screen and a real download, without changing owner consent.
+  const adminContext=await page.context().browser().newContext({viewport:v});
+  await adminContext.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
+  const adminPage=await adminContext.newPage(),adminDiagnostics=attachDiagnostics(adminPage);
+  try {
+    const adminCase={name:t.name+'-admin',...t.optionalArchive.admin};
+    valid(adminCase);await login(adminPage,adminCase);await waitForOperationalSurface(adminPage);await dismiss(adminPage);
+    const adminPath=`/admin/companies/${sample.companyId}/local-support-copies`;
+    const response=await adminPage.goto(baseUrl+adminPath,{waitUntil:'domcontentloaded'});
+    if(!response?.ok())throw new Error('Privileged archive read-only screen unavailable');
+    await waitForOperationalSurface(adminPage);await dismiss(adminPage);
+    const adminSurface=adminPage.locator('[data-optional-support-copies]');
+    if(!await adminSurface.getByText('Platform read-only view.',{exact:true}).isVisible()
+      ||await adminSurface.locator('form').count()
+      ||await adminSurface.getByRole('button',{name:'Save archive choice',exact:true}).count())
+      throw new Error('Platform archive screen exposed an owner consent mutation');
+    const adminRow=adminSurface.locator('tr').filter({hasText:sample.reference});
+    if(await adminRow.count()!==1)throw new Error('Platform archive list lost the selected company copy');
+    const [adminDownload]=await Promise.all([adminPage.waitForEvent('download'),
+      adminRow.getByRole('link',{name:'Download support copy',exact:true}).click()]);
+    const exported=JSON.parse(readFileSync(await adminDownload.path(),'utf8'));
+    if(exported.header?.invoice_number!==sample.reference||Number(exported.header?.total_amount)!==100
+      ||Number(exported.company_id)!==Number(sample.companyId)||JSON.stringify(exported)!==JSON.stringify(document))
+      throw new Error('Platform support export changed or crossed the selected company identity/amount');
+    await checkUsability(adminPage,adminCase,adminPath,v);
+    const consoleErrors=adminDiagnostics.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));
+    const failedRequests=adminDiagnostics.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));
+    if(adminDiagnostics.pageErrors.length||consoleErrors.length||failedRequests.length||adminDiagnostics.httpErrors.length)
+      throw new Error('Platform archive browser diagnostics failed: '+adminDiagnostics.summary());
+    pass(`${t.name}/${v.width}: platform read-only company list and exact JSON download`);
+  } finally {
+    await saveEvidenceScreenshot(adminPage,`rc-optional-copy-admin-${prefix.slice(1)}-${v.width}`).catch(()=>{});
+    await adminContext.close();
+  }
   await save('stop');
   if(!await page.locator('.tn-copy-state').filter({hasText:'Retention OFF'}).isVisible()
     ||await page.getByRole('link',{name:'Download support copy',exact:true}).count()!==1)

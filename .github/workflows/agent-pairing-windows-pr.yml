@@ -52,6 +52,13 @@ jobs:
           if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { throw 'Delivered ZIP has no app.asar' }
           node test/native-pairing-launcher.js $archive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual packaged POS foreground and native report Save As/Cancel
+        working-directory: pra-agent
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node test/native-pairing-launcher.js dist/native-acceptance/TaxNest-PRA-Agent/resources/app.asar downloads
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve fictional native-window evidence
         if: always()
         uses: actions/upload-artifact@v4

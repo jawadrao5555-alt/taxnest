@@ -1,8 +1,10 @@
 'use strict';
 
+const { recoveryRegistration, assertRecoveryPaths } = require('./update-recovery');
+
 // The updater replaces only this installation. Never terminate every process
 // sharing the Agent executable name: a different shop/profile may use one.
-function buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir, logPath, resultPath, sourcePid }) {
+function buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir, logPath, resultPath, sourcePid, recoveryPath, readyPath }) {
   const quote = (value) => {
     const s = String(value);
     if (!s || /["\r\n%]/.test(s)) throw new Error('invalid updater path');
@@ -16,8 +18,11 @@ function buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir, logPath
   const result = resultPath ? quote(resultPath) : 'nul';
   const pid = Number(sourcePid);
   if (sourcePid != null && (!Number.isSafeInteger(pid) || pid <= 0)) throw new Error('invalid updater PID');
+  if (!!recoveryPath !== !!readyPath) throw new Error('recovery and ready paths must be paired');
+  if (recoveryPath) assertRecoveryPaths({exePath,destDir,backupDir,recoveryPath,readyPath,resultPath,logPath});
+  const recovery = recoveryPath ? recoveryRegistration(exePath, recoveryPath) : null;
   return [
-    '@echo off',
+    '@echo off', 'setlocal DisableDelayedExpansion',
     // Detached cmd.exe has no console input; Windows timeout can fail instantly
     // in that environment. Wait for exactly the Agent instance that handed off
     // instead of racing its open app.asar / executable file locks.
@@ -31,6 +36,18 @@ function buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir, logPath
     // Locked files keep the existing copy/restore recovery path intact.
     `robocopy ${destination} ${backup} /E /R:2 /W:2 >${log} 2>&1`,
     'if errorlevel 8 goto backup_failed',
+    ...(recovery ? [
+      // Register recovery BEFORE the first write to the installation. Denied
+      // HKCU registration aborts safely, leaving the old installation intact.
+      `${recovery.register} >>${log} 2>&1`,
+      'if errorlevel 1 goto recovery_unavailable',
+      `fc /b ${quote(pathJoin(destDir, 'resources', 'app.asar'))} ${quote(pathJoin(backupDir, 'resources', 'app.asar'))} >nul 2>&1`,
+      'if errorlevel 1 goto backup_failed',
+      `echo ready>${quote(readyPath)}`,
+      // Never start an in-place copy without a durable, verified backup marker.
+      `if not exist ${quote(readyPath)} goto backup_failed`,
+      `echo copying>${result}`,
+    ] : []),
     'set RETRIES=0',
     ':copyloop',
     `robocopy ${source} ${destination} /E /R:5 /W:2 >>${log} 2>&1`,
@@ -43,12 +60,14 @@ function buildUpdateHandoffScript({ exePath, srcDir, destDir, backupDir, logPath
     `fc /b ${quote(pathJoin(srcDir, 'resources', 'app.asar'))} ${quote(pathJoin(destDir, 'resources', 'app.asar'))} >nul 2>&1`,
     'if errorlevel 1 goto restore',
     `echo installed>${result}`,
+    ...(recovery ? [`${recovery.unregister} >>${log} 2>&1`] : []),
     'goto launch',
     ':restore',
     `echo failed_copy_or_verify>${result}`,
     `robocopy ${backup} ${destination} /E /R:5 /W:2 >>${log} 2>&1`,
     `if errorlevel 8 echo failed_restore>${result}`,
     'goto launch',
+    ...(recovery ? [':recovery_unavailable', `echo failed_recovery_registration>${result}`, 'goto launch'] : []),
     ':source_missing',
     `echo failed_source_missing>${result}`,
     'goto launch',

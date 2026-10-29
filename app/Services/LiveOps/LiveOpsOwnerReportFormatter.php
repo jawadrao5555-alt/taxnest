@@ -18,6 +18,7 @@ class LiveOpsOwnerReportFormatter
         $data = is_array($envelope['data'] ?? null) ? $envelope['data'] : [];
 
         $formatted = match ($operation) {
+            'AGENT_HEALTH' => $this->formatAgentHealth($data),
             'DAILY_OPS' => $this->formatDaily($envelope, $data, $context),
             'COMPANY_DIAGNOSTIC', 'COMPANY_HEALTH', 'PRINTER_HEALTH' => $this->formatCompany($envelope, $data, $context),
             'BILLING_BY_COMPANY', 'BILLING_SUMMARY' => $this->formatBilling($envelope, $data),
@@ -197,6 +198,65 @@ class LiveOpsOwnerReportFormatter
             'unresolved' => array_slice($lines, 1),
             'actions_taken' => [],
         ];
+    }
+
+    /** Owner-readable heartbeat observations; absence is not a physical diagnosis. */
+    private function formatAgentHealth(array $data): array
+    {
+        $scoped = isset($data['company']) && is_array($data['company']);
+        $counts = $data['counts'] ?? null;
+        $coverage = $data['coverage'] ?? null;
+        $rows = $scoped ? [[
+            'company_id' => $data['company']['id'] ?? null,
+            'name' => $data['company']['name'] ?? 'Company',
+            'online' => $data['company']['agent_online'] ?? null,
+            'enabled' => $data['company']['agent_enabled'] ?? null,
+            'last_seen' => $data['company']['agent_last_seen'] ?? null,
+            'version' => $data['company']['agent_version'] ?? null,
+        ]] : ($data['agents'] ?? []);
+        $state = static fn ($online) => $online === true ? 'ONLINE' : ($online === false ? 'OFFLINE' : 'UNKNOWN');
+        $overall = 'UNKNOWN';
+        $lines = ['Desktop Agent heartbeat observations'];
+        if (is_array($counts) && isset($counts['enabled'], $counts['online'], $counts['long_offline'])) {
+            $lines[] = sprintf('Enabled: %d; online: %d; long offline: %d', $counts['enabled'], $counts['online'], $counts['long_offline']);
+            if ((int) $counts['enabled'] > 0) {
+                $overall = ((int) $counts['long_offline'] > 0 || (int) $counts['online'] < (int) $counts['enabled']) ? 'ATTENTION' : 'GREEN';
+            }
+        }
+        if (!$scoped) {
+            $lines[] = is_array($coverage) && isset($coverage['returned'], $coverage['total'], $coverage['truncated'])
+                ? sprintf('Detail rows: %d of %d%s', $coverage['returned'], $coverage['total'], $coverage['truncated'] ? ' (truncated; use a company-scoped diagnostic for omitted rows)' : '')
+                : 'Fleet coverage unverified; reported detail rows: '.count($rows);
+        }
+        $cards = [];
+        foreach ($rows as $row) {
+            $label = ($row['enabled'] ?? null) === false ? 'DISABLED' : $state($row['online'] ?? null);
+            if ($label === 'OFFLINE') {
+                $overall = 'ATTENTION';
+            } elseif ($scoped && $label === 'ONLINE') {
+                $overall = 'GREEN';
+            }
+            $lastSeen = $row['last_seen'] ?? 'not recorded';
+            $version = ($row['version'] ?? null) ?: 'not reported';
+            $lines[] = ($row['name'] ?? 'Company').': '.$label.'; last heartbeat: '.$lastSeen.'; version: '.$version;
+            $cards[] = ['company_id' => $row['company_id'] ?? null, 'name' => $row['name'] ?? 'Company',
+                'agent' => $label, 'last_seen' => $row['last_seen'] ?? null, 'version' => $row['version'] ?? null];
+        }
+        if ($scoped) {
+            foreach (array_values($data['devices'] ?? []) as $i => $device) {
+                $lines[] = 'Counter '.($i + 1).': '.$state($device['online'] ?? null)
+                    .'; last heartbeat: '.($device['last_seen_at'] ?? 'not recorded')
+                    .'; version: '.($device['agent_version'] ?? 'not reported');
+                if (($device['online'] ?? null) === false) {
+                    $overall = 'ATTENTION';
+                }
+            }
+        }
+        $unknown = 'Cause: UNKNOWN. Heartbeat age alone cannot distinguish PC power, Windows service, internet or rejected requests. Compare company and per-counter observations before recovery.';
+        $lines[] = $unknown;
+        return ['title' => 'Desktop Agent Health', 'overall' => $overall,
+            'text' => implode("\n", $lines), 'companies' => $cards, 'platform' => [],
+            'unresolved' => $overall === 'GREEN' ? [] : [$unknown], 'actions_taken' => []];
     }
 
     /**

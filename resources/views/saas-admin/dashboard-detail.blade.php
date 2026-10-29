@@ -1,6 +1,9 @@
 <x-admin-layout><div class="tn-admin-main tn-dashboard-detail space-y-5">
 <a class="text-indigo-400" href="{{ route('saas.admin.dashboard') }}">← Admin Dashboard</a>
 <h1 class="text-2xl font-bold" data-dashboard-detail="{{ $d['metric'] }}">{{ $d['title'] }} details</h1>
+@if(in_array($d['metric'], ['pos_transactions','fbrpos_transactions']) && !empty($filters['company_id']) && auth('admin')->user()?->isSuperAdmin())
+<p><a class="tn-detail-secondary" href="{{ route('saas.admin.local-support-copies', ['companyId'=>$filters['company_id']]) }}">Optional local bill support copies (read-only)</a></p>
+@endif
 <p class="tn-detail-explanation">{{ $d['explanation'] }}</p>
 @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
 <form class="tn-dashboard-detail-filters grid gap-3 sm:grid-cols-3 lg:grid-cols-5" method="GET">
@@ -12,7 +15,7 @@
 @if(in_array($d['metric'],['pos_transactions','fbrpos_transactions']))
 <label>Billing disposition<select name="billing_state" aria-label="Billing disposition" class="block w-full bg-gray-900 rounded"><option value="">All dispositions</option><option value="local_unreported" @selected(($filters['billing_state']??'')==='local_unreported')>Local / unreported (all substates)</option>@foreach(\App\Services\AdminPosBillDisposition::LABELS as $key=>$label)<option value="{{ $key }}" @selected(($filters['billing_state']??'')===$key)>{{ $label }}</option>@endforeach</select></label>
 <label>Branch ID<input class="block w-full bg-gray-900 rounded" type="number" min="1" name="branch_id" value="{{ $filters['branch_id']??'' }}"></label>
-<label>Payment method<select class="block w-full bg-gray-900 rounded" name="payment_method"><option value="">All</option>@foreach(['cash','card','split','credit','bank_transfer'] as $payment)<option @selected(($filters['payment_method']??'')===$payment)>{{ $payment }}</option>@endforeach</select></label>
+<label>Payment method<select class="block w-full bg-gray-900 rounded" name="payment_method"><option value="">All</option>@foreach($filterOptions['payment_method'] as $payment)<option value="{{ $payment }}" @selected(($filters['payment_method']??'')===$payment)>{{ $payment }}</option>@endforeach</select></label>
 @foreach(['business_from'=>'Business date from','business_to'=>'Business date to'] as $key=>$label)<label>{{ $label }}<input class="block w-full bg-gray-900 rounded" type="date" name="{{ $key }}" value="{{ $filters[$key]??'' }}"></label>@endforeach
 <p>Disposition is read-only. Local/unreported includes pending and failed bills and never authorizes deletion.</p>
 @foreach(['mode'=>'Saved invoice mode','fiscal_status'=>($d['metric']==='pos_transactions'?'Saved PRA status':'Saved FBR status')] as $key=>$label)

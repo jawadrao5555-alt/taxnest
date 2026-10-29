@@ -533,6 +533,22 @@ class FbrDealStockAndAllocationTest extends TestCase
         $this->assertSame($stock, [$this->stockQty($this->burgerId), $this->stockQty($this->friesId), $this->stockQty($this->drinkId)]);
     }
 
+    public function test_return_credit_note_cannot_be_deleted_or_promoted_even_with_stale_local_columns(): void
+    {
+        $response = $this->callStore($this->dealPayload(1, ['save_as_provisional' => 1]));
+        $id = (int) $response->getData(true)['transaction_id'];
+        DB::table('fbr_pos_transactions')->where('id', $id)->update(['transaction_type' => 'return']);
+        $before = DB::table('fbr_pos_transactions')->where('id', $id)->first();
+        $stock = [$this->stockQty($this->burgerId), $this->stockQty($this->friesId), $this->stockQty($this->drinkId)];
+        $controller = new FbrPosController();
+        $request = Request::create('/fictional/provisional', 'POST');
+        $request->headers->set('Accept', 'application/json');
+        $this->assertFalse($controller->apiDeleteProvisional($request, $id)->getData(true)['success']);
+        $this->assertFalse($controller->apiPromoteProvisional($request, $id)->getData(true)['success']);
+        $this->assertEquals($before, DB::table('fbr_pos_transactions')->where('id', $id)->first());
+        $this->assertSame($stock, [$this->stockQty($this->burgerId), $this->stockQty($this->friesId), $this->stockQty($this->drinkId)]);
+    }
+
     public function test_provisional_delete_restores_frozen_fixed_and_repeated_choice_components(): void
     {
         // The drink is already a fixed 2x component. Add a choice group which

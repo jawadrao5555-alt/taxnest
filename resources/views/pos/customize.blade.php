@@ -1,4 +1,7 @@
 <x-pos-layout>
+    @if(auth('pos')->user()?->role === 'company_admin' && !auth('admin')->check() && !session()->has('impersonation'))
+        <div class="m-4"><a class="inline-block rounded bg-white text-slate-900 border border-slate-500 px-4 py-3 underline" href="{{ route('pos.local-support-copies') }}">Optional local bill support copies</a></div>
+    @endif
     @php
         $densityKey = in_array($company->pos_ui_density, ['simple', 'standard', 'premium'], true) ? $company->pos_ui_density : 'standard';
         $density = __('pos.density_' . $densityKey);

@@ -4767,6 +4767,7 @@ class PosController extends Controller
                         : __('pos.return_bill_immutable'));
             }
             $transaction = $locked->load('items');
+            app(\App\Services\OptionalLocalBillArchive::class)->capture($transaction, 'pos', $transaction->items);
 
             // QUOTA LEDGER (Task 1372) — write it BEFORE the row disappears.
             // A deleted bill that already consumed this month's quota must keep
@@ -5855,6 +5856,7 @@ class PosController extends Controller
                     'message' => __('pos.only_provisional_deleted_endpoint')], 422);
             }
             $tx->load('items');
+            app(\App\Services\OptionalLocalBillArchive::class)->capture($tx, 'pos', $tx->items);
             $restoreItems = ($company && $company->inventory_enabled && $company->pos_restock_on_void)
                 ? $this->expandDealComponentsForStock($tx->items->map(fn ($i) => [
                     'type' => $i->item_type ?? 'product', 'item_id' => $i->item_id,
@@ -9046,6 +9048,9 @@ class PosController extends Controller
             $rows = $this->archivedLocalSeriesRows($companyId, ['*'], true);
             if ($rows->isEmpty()) {
                 return;
+            }
+            foreach ($rows as $archiveRow) {
+                app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
             }
             $ids = $rows->pluck('id')->all();
             $dates = $rows->map(fn ($t) => $t->business_date ?: $t->created_at?->toDateString())->filter()->sort()->values();
@@ -16334,6 +16339,9 @@ class PosController extends Controller
                         if (!empty($snapshots)) {
                             \App\Models\PosCustomerSpendSnapshot::insert($snapshots);
                         }
+                    }
+                    foreach ($deleteRows as $archiveRow) {
+                        app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
                     }
                     $ids = $deleteRows->pluck('id')->all();
                     \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)->delete();

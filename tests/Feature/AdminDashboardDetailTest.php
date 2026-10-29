@@ -34,6 +34,17 @@ class AdminDashboardDetailTest extends TestCase {
   $this->get('/admin/dashboard/details/total_users')->assertOk()->assertSee('Role');
   $this->get('/admin/dashboard/details/active_subscriptions')->assertOk()->assertSee('Subscription dates');
  }
+ public function test_actual_stored_payment_methods_filter_rows_and_csv_without_rewriting_history(): void {
+  $this->admin();
+  foreach(['debit_card','credit_card','qr_payment'] as $i=>$method) DB::table('pos_transactions')->where('id',$i+1)->update(['payment_method'=>$method,'status'=>'completed']);
+  $before=DB::table('pos_transactions')->get()->toJson();
+  foreach(['debit_card','credit_card','qr_payment'] as $method) {
+   $this->get('/admin/dashboard/details/pos_transactions?company_id=2&payment_method='.$method)->assertOk()->assertViewHas('count',1)->assertSee('value="'.$method.'"',false);
+   $csv=$this->get('/admin/dashboard/details/pos_transactions?company_id=2&payment_method='.$method.'&export=csv')->streamedContent();
+   $this->assertSame(2,count(array_filter(explode("\n",trim($csv)))));
+  }
+  $this->assertSame($before,DB::table('pos_transactions')->get()->toJson());
+ }
  public function test_unknown_saved_modes_remain_selectable_and_company_scope_matches_csv(): void {
   $this->admin();
   DB::table('pos_transactions')->where('status','completed')->update(['invoice_mode'=>'legacy_custom','pra_status'=>'legacy_waiting']);

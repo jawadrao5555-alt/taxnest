@@ -97,6 +97,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
     clean_php php "$ROOT/tests/native/rc_admin_bill_disposition.php"
+    clean_php php "$ROOT/tests/native/rc_optional_local_bill_archive.php"
 }
 di(){
     reset "$DI_DB"

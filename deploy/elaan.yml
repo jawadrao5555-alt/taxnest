@@ -1,8 +1,8 @@
-title: "Agent mein POS aur report save karne ki behtari"
-audience: pos
+title: "Reports aur local bill support copies"
+audience: all
 type: improvement
 points:
-  - "POS na khulne par wazeh paigham aur apni marzi se browser mein kholne ka button milega."
-  - "Reports save karte waqt folder poochne ki sahulat Settings se khud ON kar sakte hain; purana download tareeqa pehle ki tarah rahega."
-  - "Agent Health mein tamam shamil companies ki ginti aur aakhri rabtay ki maloomat zyada wazeh hogi."
-  - "Naye updater mein adhoori update ke liye backup aur recovery ki tayyari shamil hai; saved company aur printer settings barqarar rahengi."
+  - "Admin reports mein company aur product ke mutabiq filters aur bill ki reporting ki halat zyada wazeh hai."
+  - "PRA aur FBR POS mein company owner Customize se deleted local bills ki optional support copy khud ON kar sakta hai; pehle se koi company ON nahi hogi."
+  - "Owner copy rakhne ki muddat aur ijazat ki aakhri tareekh khud chunta hai; future copies rokne aur purani optional copies purge karne ke alag options hain."
+  - "Saved company settings, invoice design aur asal billing records pehle ki tarah rahenge."

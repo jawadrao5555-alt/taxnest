@@ -1109,6 +1109,36 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     // contract as the day-close DELETE policy.
     // ════════════════════════════════════════════════════════════════════════
 
+    public function test_optional_copy_is_atomic_with_real_deletion_and_does_not_change_quota(): void
+    {
+        (require database_path('migrations/2026_12_20_090000_create_optional_local_bill_archive.php'))->up();
+        config(['app.key'=>'base64:'.base64_encode(str_repeat('q',32))]);
+        $root=sys_get_temp_dir().'/taxnest-archive-quota-'.bin2hex(random_bytes(8));
+        config(['local_bill_archive.key_root'=>$root]);
+        $company=$this->makeCompany(['invoice_limit_override'=>1]);
+        $owner=$this->makeUser($company);
+        $archive=app(\App\Services\OptionalLocalBillArchive::class);
+        try {
+            $archive->grant($company,$owner,7,now()->addDays(2));
+            $bill=$this->makeProvisional($company,'L-COPY-001');
+            $this->actingAs($owner,'pos')->postJson("/pos/api/provisional-bills/{$bill}/delete")->assertOk();
+            $this->assertDatabaseMissing('pos_transactions',['id'=>$bill]);
+            $this->assertDatabaseHas('support_bill_archives',['company_id'=>$company,'source_id'=>$bill]);
+            $this->assertSame(0,DB::table('pos_bill_deletions')->count());
+            $copy=$archive->available($company)->first();
+            $this->assertSame('L-COPY-001',$archive->readPayload($copy)['header']['invoice_number']);
+            $final=$this->makeFinal($company,'L-COPY-002');
+            foreach(glob($root.'/*.key') as $key) unlink($key);
+            $this->actingAs($owner,'pos')->from("/pos/transaction/{$final}")->delete("/pos/transaction/{$final}")->assertSessionHas('error');
+            $this->assertDatabaseHas('pos_transactions',['id'=>$final]);
+            $this->assertSame(0,DB::table('pos_bill_deletions')->count());
+            $this->assertFalse(PlanLimitService::canCreatePosBill($company)['allowed']);
+            $this->assertSame(1,DB::table('support_bill_archives')->count());
+        } finally {
+            if(is_dir($root)) \Illuminate\Support\Facades\File::deleteDirectory($root);
+        }
+    }
+
     public function test_deleting_a_final_bill_does_not_give_back_monthly_quota(): void
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);

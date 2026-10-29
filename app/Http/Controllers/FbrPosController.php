@@ -332,6 +332,9 @@ class FbrPosController extends Controller
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
                     ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
             ->first();
         if (!$bill) {
             return response()->json(['success' => false, 'message' => __('pos.provisional_bill_not_found')], 404);
@@ -343,10 +346,14 @@ class FbrPosController extends Controller
                     ->where('invoice_mode', 'local')
                     ->where('fbr_status', 'local')
                     ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
                     ->lockForUpdate()
                     ->firstOrFail();
                 $items = \App\Models\FbrPosTransactionItem::where('transaction_id', $locked->id)
                     ->lockForUpdate()->get();
+                app(\App\Services\OptionalLocalBillArchive::class)->capture($locked, 'fbrpos', $items);
                 \App\Services\InventoryService::restoreFbrTransaction(
                     (int) $companyId,
                     $items,
@@ -403,6 +410,9 @@ class FbrPosController extends Controller
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
                     ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
             ->update([
                 'invoice_mode' => 'fbr',
                 'fbr_status' => $reportingOn ? 'pending' : null,
@@ -1110,12 +1120,16 @@ class FbrPosController extends Controller
                         ->where('invoice_mode', 'local')
                         ->where('fbr_status', 'local')
                     ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
                         ->orderBy('id')
                         ->lockForUpdate()
                         ->get();
                     foreach ($deleteRows as $deleteRow) {
                         $items = FbrPosTransactionItem::where('transaction_id', $deleteRow->id)
                             ->lockForUpdate()->get();
+                        app(\App\Services\OptionalLocalBillArchive::class)->capture($deleteRow, 'fbrpos', $items);
                         \App\Services\InventoryService::restoreFbrTransaction(
                             (int) $companyId,
                             $items,
@@ -1133,6 +1147,9 @@ class FbrPosController extends Controller
                         ->where('invoice_mode', 'local')
                         ->where('fbr_status', 'local')
                     ->whereNull('fbr_invoice_number')
+                    ->where('status', 'completed')
+                    ->when(\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type'),
+                        fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', 'sale')))
                         ->delete();
                 });
             }

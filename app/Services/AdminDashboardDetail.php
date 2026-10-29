@@ -61,7 +61,7 @@ class AdminDashboardDetail {
  public function filterOptions(array $d): array {
   if(!in_array($d['metric'],['pos_transactions','fbrpos_transactions'])) return [];
   $options=[];
-  foreach(['mode'=>'invoice_mode','fiscal_status'=>$d['metric']==='pos_transactions'?'pra_status':'fbr_status'] as $key=>$column) {
+  foreach(['mode'=>'invoice_mode','payment_method'=>'payment_method','fiscal_status'=>$d['metric']==='pos_transactions'?'pra_status':'fbr_status'] as $key=>$column) {
    $options[$key]=(clone $d['q'])->whereNotNull($column)->where($column,'!=','')->distinct()->orderBy($column)->pluck($column)->all();
   }
   return $options;

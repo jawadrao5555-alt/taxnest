@@ -11,6 +11,9 @@ use App\Jobs\CheckTrialExpiryJob;
 
 Schedule::command('pos:whatsapp-drain --limit=5')->everyMinute()->withoutOverlapping(5);
 
+// Optional support copies: expiry reads deny immediately; cleanup uses bounded idempotent batches.
+Schedule::command('local-support-copies:cleanup --limit=100')->everyFiveMinutes()->withoutOverlapping(5);
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

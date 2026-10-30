@@ -558,6 +558,11 @@ foreach ([['AMOUNT-QR-316', 'qr_payment', 14, 316], ['AMOUNT-CASH-330', 'cash', 
     ]);
     $amountCases[] = ['id' => $amountBill->id, 'invoice' => $number, 'payable' => $payable];
 }
+$diagnosticJob = \App\Models\PosPrintJob::create(['company_id'=>$amountCompany->id,
+    'transaction_id'=>$amountBill->id, 'type'=>'proof', 'status'=>'pending', 'target_printer'=>'Fictional diagnostic printer']);
+\App\Services\PrintJobEvidence::record($amountCompany->id, 'result_received', $diagnosticJob->id, 1,
+    ['outcome'=>'spool_accepted', 'claim_token'=>'FICTIONAL_DIAGNOSTIC_SECRET', 'target_printer'=>'FICTIONAL_DIAGNOSTIC_SECRET']);
+DB::table('pos_print_jobs')->where('id', $diagnosticJob->id)->delete();
 
 $admin = AdminUser::create([
     'name' => 'Synthetic RC Platform Administrator', 'email' => 'hotel-admin-manage-as@rc-browser.invalid',
@@ -733,7 +738,7 @@ $fixture = [
         ['name'=>'fbr-identity-settings','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/settings/identities'],'markers'=>['Branch / terminal FBR identity']],
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
-            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
+            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString(), 'diagnosticBillId'=>$amountBill->id, 'diagnosticJobId'=>$diagnosticJob->id]],
         ['name'=>'whatsapp-optional-autosend','login'=>$waOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/settings/whatsapp-delivery'],'markers'=>['WhatsApp auto-send'], 'whatsappAutoSend'=>true],
         ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',

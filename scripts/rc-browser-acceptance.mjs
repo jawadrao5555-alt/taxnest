@@ -1255,15 +1255,20 @@ async function reportingConnectorWorkflow(page,t,v) {
   if(own.result?.isError||Number(own.result?.structuredContent?.totals?.net_billing)!==f.billing)throw new Error('Native billing mismatch: '+JSON.stringify({status:ownResponse.status(),rpcError:own.error,toolError:own.result?.isError,content:own.result?.isError?own.result?.content:undefined,totals:own.result?.structuredContent?.totals,period:own.result?.structuredContent?.period}));
   const foreign=await (await report(f.foreignCompanyName)).json();
   if(!foreign.result?.isError)throw new Error('Connection company scope leaked a foreign company report');
+  const incident=async(companyName)=>request.post(baseUrl+'/api/reporting/mcp',{headers:{Authorization:'Bearer '+tokens.access_token},data:{jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'get_pra_incident_timeline',arguments:{company_name:companyName,date_from:f.date,bill_id:f.diagnosticBillId}}}});
+  const timeline=await (await incident(f.companyName)).json(), evidence=timeline.result?.structuredContent;
+  if(timeline.result?.isError||evidence?.events?.length!==2||evidence.events[1].job_id!==f.diagnosticJobId||evidence.events[1].details.outcome!=='spool_accepted'||evidence.physical_print!=='unknown'||evidence.coverage.complete!==false||JSON.stringify(evidence).includes('FICTIONAL_DIAGNOSTIC_SECRET'))throw new Error('Correlated diagnostic evidence/redaction/gaps failed');
+  if(!(await (await incident(f.foreignCompanyName)).json()).result?.isError)throw new Error('Foreign diagnostic scope leaked');
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
   await page.locator('[data-reporting-onboarding]').waitFor();
   const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
-  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 1.'))throw new Error('Successful read evidence missing or failed foreign read counted');
+  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 2.'))throw new Error('Successful read evidence missing or failed foreign read counted');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-read-evidence');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
   if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
   if((await report(f.companyName)).status()!==401)throw new Error('Revoked token retained billing access');
-  pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
+  if((await incident(f.companyName)).status()!==401)throw new Error('Revoked token retained diagnostic access');
+  pass(t.name+'/'+v.width+': real consent, PKCE, native billing and job-purge-resistant redacted print timeline, foreign-company denial and immediate revoke');
 }
 
 async function liveOpsReadability(page,t,v) {

@@ -84,6 +84,7 @@ final class McpController extends Controller
                 'get_company_tax_items' => $this->reports->taxItems($args, $allowed),
                 'get_company_operational_summary' => $this->reports->operations($args, $allowed),
                 'get_company_payment_summary' => $this->reports->payments($args, $allowed),
+                'get_pra_incident_timeline' => app(\App\Services\Reporting\PraIncidentTimeline::class)->read($args, $allowed),
                 default => null,
             };
             if ($result === null) {
@@ -120,6 +121,10 @@ final class McpController extends Controller
         $period += ['company_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional ID from find_companies to disambiguate duplicate names; company_name must match the exact name.'], 'branch_id' => ['type' => 'integer', 'minimum' => 1], 'terminal_id' => ['type' => 'integer', 'minimum' => 1], 'payment_method' => ['type' => 'string']];
         $cursor = ['after_id' => ['type' => 'integer', 'minimum' => 0], 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 50]];
         $defs = [
+            ['get_pra_incident_timeline', 'PRA server print-attempt timeline, immutable bill/order correlation, retention policy and explicit collection gaps. Maximum seven calendar days; physical paper and full SaaS coverage are unknown. JSON pages can be saved as evidence; no writes or retries.',
+                array_intersect_key($period, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
+                    'branch_id' => ['type' => 'integer', 'minimum' => 1], 'bill_id' => ['type' => 'integer', 'minimum' => 1],
+                    'order_id' => ['type' => 'integer', 'minimum' => 1], 'job_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name']],
             ['find_companies', 'Find permitted companies by name; never guess among ambiguous matches.', ['name' => ['type' => 'string', 'minLength' => 2]], ['name']],
             ['get_company_billing_summary', 'Sales, returns, net billing/tax, reported/unreported counts and amounts, fiscal states, payment-method invoice values and exempt/taxable/zero-rate item counts.', $period, ['company_name']],
             ['list_company_bills', 'Paginated bills, status, fiscal number and amounts; filter reported/unreported, sale/return, draft/cancelled/completed.', $period + $cursor + ['reported' => ['type' => 'string', 'enum' => ['reported', 'unreported', 'any']], 'kind' => ['type' => 'string', 'enum' => ['sale', 'return', 'any']], 'status' => ['type' => 'string'], 'fiscal_status' => ['type' => 'string']], ['company_name']],

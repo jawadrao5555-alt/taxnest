@@ -3,8 +3,10 @@ export async function b02DealWorkflow(page,t,v,helpers) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
+  // Match the tile's own title, never the component names shown inside a deal.
+  const catalogTile=name=>root.locator('.prod-card').filter({has:page.getByText(name,{exact:true}).and(page.locator('p[x-text="item.name"]'))});
   await root.locator('[x-ref="searchInput"]:visible').fill(t.b02Deal.name);
-  const tile=root.locator('.prod-card').filter({hasText:t.b02Deal.name}).first();
+  const tile=catalogTile(t.b02Deal.name);
   await tile.waitFor({state:'visible'});await tile.click();
   if(v.width<768) {
     const cart=root.locator('[data-cart-menu-open]:visible');
@@ -49,7 +51,8 @@ export async function b02DealWorkflow(page,t,v,helpers) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
   await root.locator('[x-ref="searchInput"]:visible').fill(t.b02Deal.product);
-  await root.locator('.prod-card').filter({hasText:t.b02Deal.product}).first().click();
+  await catalogTile(t.b02Deal.product).click();
+  await page.waitForFunction(name=>{const cart=window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).cart;return cart.length===1&&cart[0].item_type==='product'&&cart[0].item_name===name;},t.b02Deal.product);
   if(v.width<768) { const cart=root.locator('[data-cart-menu-open]:visible');if(await cart.count())await cart.click(); }
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).roundedTotal===835).catch(async error=>{
     const state=await page.evaluate(()=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return {total:d.roundedTotal,tax:d.taxAmount,discount:d.discountAmount,items:d.cart.map(i=>({name:i.item_name,price:i.unit_price,qty:i.quantity,offer:i.promotion_quote?.title||null}))};});

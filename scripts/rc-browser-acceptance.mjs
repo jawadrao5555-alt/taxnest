@@ -27,7 +27,10 @@ regular.push({name:'sale-toast-header',login:toastCashier.login,password:toastCa
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
 // Exercise transactional table, settings and Hotel desk regressions first; retain every journey.
 const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>x.tableOrderWorkflow), ...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>x.hotelWorkflow), ...regular.filter(x=>!x.mixedFulfillment&&!x.hotelSettingsWorkflow&&!x.tableOrderWorkflow&&!x.hotelWorkflow)];
-const cases = requested.length ? ordered.filter(x => requested.includes(x.name)) : ordered;
+// Exercise the new B02 payment contract before the broad screen sweep so a
+// checkout regression produces evidence promptly. Every original case remains.
+const cases = requested.length ? ordered.filter(x => requested.includes(x.name))
+  : [...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.b02Deal)];
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
 if (unknown.length) throw new Error(`unknown requested journey: ${unknown.join(', ')}`);

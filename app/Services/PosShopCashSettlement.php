@@ -60,6 +60,11 @@ class PosShopCashSettlement
             Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
             $prior = PosRiderSettlement::where('company_id', $companyId)->where('receipt_key', $key)->first();
             if ($prior) {
+                $visible = PosRiderSettlement::where('company_id', $companyId)->whereKey($prior->id);
+                app(BranchContextService::class)->applyToQuery($visible);
+                abort_unless($visible->exists(), 403);
+                $scope = $actor->posBillingScopeExplicit();
+                abort_if($scope !== 'both' && collect($prior->allocation ?? [])->contains(fn ($row) => ($row['billing_scope'] ?? null) !== $scope), 403);
                 $priorIds = array_column($prior->allocation ?? [], 'bill_id');
                 sort($priorIds);
                 if ($prior->receipt_kind !== 'shop' || (int) $prior->settled_by !== (int) $actor->id
@@ -87,6 +92,7 @@ class PosShopCashSettlement
                     'bill_id' => (int) $bill->id, 'invoice_number' => $bill->invoice_number,
                     'amount' => PosRider::remainingAmount($bill), 'business_date' => $bill->business_date,
                     'branch_id' => $bill->branch_id, 'created_by' => $bill->created_by,
+                    'billing_scope' => $bill->pra_status !== null || $bill->pra_invoice_number !== null ? 'pra' : 'local',
                 ])->all(),
             ]);
             PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)->whereIn('id', $ids)

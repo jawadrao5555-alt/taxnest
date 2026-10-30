@@ -120,7 +120,7 @@ class PosInventoryController extends Controller
             ->value('value');
 
         $lowStockItems = $this->scopeBranch(InventoryStock::where('company_id', $companyId), $companyId)
-            ->lowStock()
+            ->lowStock()->where('quantity', '>', 0)
             ->with('posProduct')
             ->get();
 
@@ -130,7 +130,7 @@ class PosInventoryController extends Controller
 
         $totalTracked = $this->scopeBranch(InventoryStock::where('company_id', $companyId), $companyId)->count();
         $healthyCount = $this->scopeBranch(InventoryStock::where('company_id', $companyId), $companyId)
-            ->whereRaw('quantity > min_stock_level')->count();
+            ->where('quantity', '>', 0)->whereRaw('quantity > COALESCE(min_stock_level, 0)')->count();
 
         $recentMovements = $this->scopeBranch(InventoryMovement::where('company_id', $companyId), $companyId)
             ->with(['posProduct', 'creator'])
@@ -214,6 +214,13 @@ class PosInventoryController extends Controller
     {
         [$companyId, $company] = $this->ensureInventoryEnabled();
         $branchView = $this->branchView($companyId);
+
+        $request->validate([
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => array_filter(['nullable', 'date_format:Y-m-d', $request->filled('date_from') ? 'after_or_equal:date_from' : null]),
+            'product_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('pos_products', 'id')->where('company_id', $companyId)],
+            'type' => ['nullable', 'in:purchase,sale,adjustment_in,adjustment_out,return_in,return_out,transfer_in,transfer_out,opening,recipe_sale,recipe_return'],
+        ]);
 
         $query = $this->scopeBranch(
             InventoryMovement::where('company_id', $companyId)->with(['posProduct', 'creator', 'branch']),

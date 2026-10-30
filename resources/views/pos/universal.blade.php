@@ -5592,9 +5592,11 @@ function restaurantPos() {
         get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (this._safeQty(i.quantity) * i.unit_price), 0)); },
         get effectiveSubtotal() { return Math.max(0, this.r2(this.subtotal - this.itemDiscountsTotal)); },
         dealTaxableSubtotal(item) {
+            if (!window.PosDealAllocation) return item.is_tax_exempt ? 0 : this.getItemTotal(item);
             return window.PosDealAllocation.taxable(item.deal_snapshot, this.getItemTotal(item), !!item.is_tax_exempt);
         },
         allocatedDealBill(rate = this.taxRate) {
+            if (!window.PosDealAllocation) return null;
             return window.PosDealAllocation.bill(this.cart.map(item => ({snapshot:item.deal_snapshot,
                 subtotal:this.getItemTotal(item),exempt:!!item.is_tax_exempt})), this.discountAmount, rate,
                 this.taxInclusive, this.cardSaveMode() ? this.taxMenuRate : null);
@@ -11152,6 +11154,8 @@ function restaurantPos() {
                 fulfillment: i.fulfillment || null, line_uid: i.line_uid || null, kot_printed_at: i.kot_printed_at || null, special_notes: i.special_notes || '',
                 skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen,
                 is_tax_exempt: !!i.is_tax_exempt,
+                deal_snapshot: i.deal_snapshot || [], deal_choices: i.deal_choices || [],
+                _dealChoiceKey: (i.deal_choices || []).map(c => c.group_id + ':' + c.product_id).join('|'),
                 item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
             }));
             this.orderType = eb.order_type || 'takeaway';
@@ -11474,6 +11478,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            if (!window.PosDealAllocation && this.cart.some(i => i.item_type === 'deal')) { this.showToast('Deal calculation could not load. Reload the sale screen before payment.', 'error'); return; }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).

@@ -37,8 +37,8 @@ class IngredientController extends Controller
     public function kitchenReport(Request $request)
     {
         $request->validate([
-            'from' => 'nullable|date',
-            'to' => 'nullable|date|after_or_equal:from',
+            'from' => 'nullable|date_format:Y-m-d',
+            'to' => 'nullable|date_format:Y-m-d|after_or_equal:from',
         ]);
         $companyId = (int) app('currentCompanyId');
         $from = $request->input('from');
@@ -180,13 +180,16 @@ class IngredientController extends Controller
             && Ingredient::where('company_id', $companyId)->whereRaw('LOWER(code) = ?', [strtolower($code)])->exists()) {
             return back()->withInput()->with('error', 'Yeh ingredient code pehle se mojood hai.');
         }
+        $factor = \App\Services\IngredientUnitConversion::configuredFactor(
+            $request->input('base_unit') ?: $request->unit, $request->unit, $request->input('conversion_factor')
+        );
         $ingredient = Ingredient::create([
             'company_id' => $companyId,
             'code' => $code !== '' && Schema::hasColumn('ingredients', 'code') ? $code : null,
             'name' => $request->name,
             'unit' => $request->unit,
             'base_unit' => $request->input('base_unit') ?: $request->unit,
-            'conversion_factor' => (float) ($request->input('conversion_factor') ?: 1),
+            'conversion_factor' => $factor,
             'cost_per_unit' => $request->cost_per_unit,
             // Opening stock is posted through the same locked adjustment
             // ledger below; do not seed it here and count it twice.
@@ -231,7 +234,7 @@ class IngredientController extends Controller
         // conversion workflow.
         $newUnit = (string) $request->input('unit');
         $newBaseUnit = (string) ($request->input('base_unit') ?: $newUnit);
-        $newFactor = (float) ($request->input('conversion_factor') ?: 1);
+        $newFactor = \App\Services\IngredientUnitConversion::configuredFactor($newBaseUnit, $newUnit, $request->input('conversion_factor'), $ingredient);
         $unitMeaningChanged = $newUnit !== (string) $ingredient->unit
             || $newBaseUnit !== (string) ($ingredient->base_unit ?: $ingredient->unit)
             || abs($newFactor - (float) ($ingredient->conversion_factor ?: 1)) > 0.000001;
@@ -265,7 +268,7 @@ class IngredientController extends Controller
             'name' => $request->name,
             'unit' => $request->unit,
             'base_unit' => $request->input('base_unit') ?: $request->unit,
-            'conversion_factor' => (float) ($request->input('conversion_factor') ?: 1),
+            'conversion_factor' => $newFactor,
             'cost_per_unit' => $request->cost_per_unit,
             'min_stock_level' => $request->min_stock_level,
             'is_active' => $request->boolean('is_active', true),

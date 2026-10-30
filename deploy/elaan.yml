@@ -1,4 +1,4 @@
-title: "PRA bill record, shop cash aur mixed deal tax"
+title: "PRA history milaan, shop cash aur stock units"
 audience: pos
 type: improvement
 points:
@@ -7,3 +7,5 @@ points:
   - "Stock-In mein compatible ingredient units aur rate convert hote hain; posting se pehle conversion preview check karein."
   - "Recipe reports mein waste samait cost aur available servings dikhte hain; returns asal sale ki ingredient quantity aur cost istemal karte hain."
   - "Taxable aur exempt items wali deal ka tax alag hisab se lagta hai; return aur purane bill ki cost asal sale ke mutabiq rehti hai."
+  - "Reports mein business-day milaan aur CSV se final gross, returns aur net dekhein; purani missing detail zero sales nahin dikhai jati. Souday ki provisional raqam alag hai."
+  - "Product/size report mein standalone aur deal-component raqam alag hai; stock health mein khali stock dobara count nahin hota aur valuation ki bunyaad wazeh hai."

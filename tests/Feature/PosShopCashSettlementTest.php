@@ -114,4 +114,32 @@ class PosShopCashSettlementTest extends TestCase
             $this->fail('A second receipt must fail.');
         } catch (ValidationException $e) { $this->assertSame(1, PosRiderSettlement::count()); }
     }
+    public function test_read_only_and_foreign_actors_cannot_receive_cash(): void
+    {
+        $bill = $this->bill();
+        foreach (['pos_waiter', 'pos_kitchen', 'archive_viewer', 'local_viewer'] as $role) {
+            $this->actor->pos_role = $role;
+            try { PosShopCashSettlement::receive($this->companyId, $this->actor, [$bill], 125.5, (string) Str::uuid()); $this->fail('Read-only role received cash.'); }
+            catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
+        }
+        $this->actor->pos_role = 'pos_admin'; $this->actor->company_id = 999;
+        try { PosShopCashSettlement::receive($this->companyId, $this->actor, [$bill], 125.5, (string) Str::uuid()); $this->fail('Foreign company received cash.'); }
+        catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
+        $this->assertSame(0, PosRiderSettlement::count());
+    }
+
+    public function test_impersonation_and_revoked_billing_scope_cannot_replay_receipt(): void
+    {
+        $bill = $this->bill(); $key = (string) Str::uuid();
+        PosShopCashSettlement::receive($this->companyId, $this->actor, [$bill], 125.5, $key);
+        session(['impersonation' => ['company_id' => $this->companyId]]);
+        try { PosShopCashSettlement::receive($this->companyId, $this->actor, [$bill], 125.5, $key); $this->fail('Impersonation replayed receipt.'); }
+        catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
+        session()->forget('impersonation');
+        $this->actor->pos_billing_scope = 'pra';
+        try { PosShopCashSettlement::receive($this->companyId, $this->actor, [$bill], 125.5, $key); $this->fail('Revoked stream replayed receipt.'); }
+        catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
+        $this->assertSame(1, PosRiderSettlement::count());
+    }
+
 }

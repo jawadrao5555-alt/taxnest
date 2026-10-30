@@ -12,7 +12,7 @@ class PosTransactionItem extends Model
         // Kitchen ki parchi par na chhapne wali line (Delivery Charges) — dekho
         // RestaurantOrderItem par isi naam ka field.
         'skip_kitchen',
-        'special_notes', 'deal_snapshot',
+        'special_notes', 'deal_snapshot', 'reporting_snapshot',
         'quantity', 'unit_price', 'cost_price', 'subtotal',
         'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount', 'taxable_base', 'exempt_base', 'third_schedule_base', 'allocated_discount',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
@@ -23,7 +23,7 @@ class PosTransactionItem extends Model
 
     protected $casts = [
         'hotel_folio_entry_id' => 'integer',
-        'deal_snapshot' => 'array',
+        'deal_snapshot' => 'array', 'reporting_snapshot' => 'array',
         'quantity' => 'decimal:3',
         'returned_quantity' => 'decimal:3',
         'return_disposition' => 'string',

@@ -19,15 +19,38 @@ class IngredientUnitConversion
         if ($from === '' || $from === $to) return 1.0;
         $source = self::SCALES[$from] ?? null;
         $target = self::SCALES[$to] ?? null;
-        if ($source && $target) {
-            if ($source[0] !== $target[0]) self::invalid($from, $to);
-            return $source[1] / $target[1];
-        }
-        // A pack/cup has no universal size. Only an explicitly saved purchase mapping applies.
+        if ($source && $target && $source[0] !== $target[0]) self::invalid($from, $to);
+        // Existing saved mappings are contractual. Never replace a shop's factor
+        // when merely receiving stock; the preview exposes the factor being used.
         if ($from === strtolower((string) $ingredient->base_unit) && (float) $ingredient->conversion_factor > 0) {
             return (float) $ingredient->conversion_factor;
         }
+        if ($source && $target) return $source[1] / $target[1];
         self::invalid($from, $to);
+    }
+
+    public static function defaultFactor(string $from, string $to): ?float
+    {
+        $from = strtolower(trim($from)); $to = strtolower(trim($to));
+        if ($from === '' || $from === $to) return 1.0;
+        $source = self::SCALES[$from] ?? null; $target = self::SCALES[$to] ?? null;
+        return $source && $target && $source[0] === $target[0] ? $source[1] / $target[1] : null;
+    }
+
+    public static function configuredFactor(string $from, string $to, mixed $requested, ?Ingredient $existing = null): float
+    {
+        $from = strtolower(trim($from)); $to = strtolower(trim($to));
+        if ($requested === null || $requested === '') {
+            $unchanged = $existing && strtolower((string) ($existing->base_unit ?: $existing->unit)) === $from
+                && strtolower((string) $existing->unit) === $to;
+            $requested = $unchanged && (float) $existing->conversion_factor > 0
+                ? (float) $existing->conversion_factor : self::defaultFactor($from, $to);
+        }
+        if (!is_numeric($requested) || !is_finite((float) $requested) || (float) $requested <= 0) self::invalid($from, $to);
+        $probe = new Ingredient(['unit' => $to, 'base_unit' => $from, 'conversion_factor' => $requested]);
+        // Reject physically incompatible dimensions even when a client supplies a factor.
+        self::factor($probe, $from);
+        return (float) $requested;
     }
 
     private static function invalid(string $from, string $to): never

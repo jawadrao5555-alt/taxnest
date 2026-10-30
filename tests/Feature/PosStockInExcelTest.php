@@ -319,6 +319,27 @@ class PosStockInExcelTest extends TestCase
         $this->assertEquals(.3, $movement->snapshot['rate']);
     }
 
+    public function test_receiving_revalidates_saved_conversion_after_preview_and_posts_only_once(): void
+    {
+        $ingredient = $this->ingredient(['unit' => 'g', 'base_unit' => 'kg', 'conversion_factor' => 1000]);
+        $batch = $this->stage([['INGREDIENT', 'RICE-25', '', 'Basmati Rice', 2, 'kg', 300, '', 'INV-88', '', '']], updateCost: true);
+        $ingredient->update(['conversion_factor' => 900]);
+        try {
+            $this->service()->post($batch, $this->company(), 1);
+            $this->fail('Changed conversion must require a new preview.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('unit', $e->errors());
+        }
+        $this->assertEquals(10, $ingredient->fresh()->current_stock);
+        $this->assertSame(0, IngredientMovement::count());
+        $this->service()->rematch($batch, $this->company());
+        $this->service()->post($batch, $this->company(), 1);
+        $this->assertEquals(1810, $ingredient->fresh()->current_stock);
+        try { $this->service()->post($batch, $this->company(), 1); } catch (ValidationException $e) {}
+        $this->assertEquals(1810, $ingredient->fresh()->current_stock);
+        $this->assertSame(1, IngredientMovement::count());
+    }
+
     public function test_item_barcode_sku_matching(): void
     {
         $p = $this->product();

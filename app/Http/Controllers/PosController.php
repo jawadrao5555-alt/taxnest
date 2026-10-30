@@ -2944,6 +2944,9 @@ class PosController extends Controller
                         'skip_kitchen' => (bool) $i->skip_kitchen,
                         'special_notes' => $i->special_notes,
                         'is_tax_exempt' => (bool) $i->is_tax_exempt,
+                        'deal_snapshot' => $i->deal_snapshot,
+                        'deal_choices' => collect($i->deal_snapshot ?? [])->filter(fn ($c) => !empty($c['choice_group_id']))
+                            ->map(fn ($c) => ['group_id' => (int) $c['choice_group_id'], 'product_id' => (int) $c['product_id']])->values()->all(),
                     ])->values()->all(),
                 ];
             }
@@ -4067,7 +4070,7 @@ class PosController extends Controller
             $storeCostMap = ($hasCostPriceCol && $storeCostProductIds->isNotEmpty())
                 ? \App\Models\PosProduct::where('company_id', $companyId)
                     ->whereIn('id', $storeCostProductIds)
-                    ->get(['id', 'cost_price'])
+                    ->get()
                     ->keyBy('id')
                 : collect();
 
@@ -4114,7 +4117,10 @@ class PosController extends Controller
                     'tax_amount' => $itemTaxAmount,
                 ], $thirdSchemaExists ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
                    $skipKitchenExists ? ['skip_kitchen' => $ri['skipKitchen'] ?? false] : [],
-                   $hasCostPriceCol ? ['cost_price' => $frozenCost] : [], $allocationFields));
+                   $hasCostPriceCol ? ['cost_price' => $frozenCost] : [], $allocationFields, \Schema::hasColumn('pos_transaction_items', 'reporting_snapshot') ? ['reporting_snapshot' => [
+                       'category' => $storeCostMap[$ri['item_id']]->category ?? null, 'size' => $storeCostMap[$ri['item_id']]->size ?? null,
+                       'uom' => $storeCostMap[$ri['item_id']]->uom ?? null,
+                   ]] : []));
             }
 
             \App\Support\PosFulfillment::applyCollection($transaction, $request, $subtotal > 0 ? max(0, 1 - $discountAmount / $subtotal) : 1, (float) $taxRate, $taxInclusive);
@@ -4620,7 +4626,7 @@ class PosController extends Controller
             $editCostMap = ($hasCostPriceColEdit && $editCostProductIds->isNotEmpty())
                 ? \App\Models\PosProduct::where('company_id', $companyId)
                     ->whereIn('id', $editCostProductIds)
-                    ->get(['id', 'cost_price'])
+                    ->get()
                     ->keyBy('id')
                 : collect();
 
@@ -4664,7 +4670,10 @@ class PosController extends Controller
                     'tax_amount' => $itemTaxAmount,
                 ], $thirdSchemaExistsEdit ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
                    $skipKitchenExistsEdit ? ['skip_kitchen' => $ri['skipKitchen'] ?? false] : [],
-                   $hasCostPriceColEdit ? ['cost_price' => $frozenCostEdit] : [], $allocationFields));
+                   $hasCostPriceColEdit ? ['cost_price' => $frozenCostEdit] : [], $allocationFields, \Schema::hasColumn('pos_transaction_items', 'reporting_snapshot') ? ['reporting_snapshot' => [
+                       'category' => $editCostMap[$ri['item_id']]->category ?? null, 'size' => $editCostMap[$ri['item_id']]->size ?? null,
+                       'uom' => $editCostMap[$ri['item_id']]->uom ?? null,
+                   ]] : []));
             }
 
             $transaction->unsetRelation('items');
@@ -7125,7 +7134,8 @@ class PosController extends Controller
         //                 never sees them by design (Task 647). Excluded from the
         //                 PRA tab; own tab, visible to both billing scopes.
         // SINGLE predicate — PosTransaction::applyStreamTab is the only truth.
-        PosTransaction::applyStreamTab($query, $tab);
+        if ($tab === 'combined') $query->withoutGlobalScope('hide_archived');
+        else PosTransaction::applyStreamTab($query, $tab);
 
         if ($cashierFilter && $cashierFilter !== 'all') {
             $query->where('created_by', $cashierFilter);
@@ -7166,6 +7176,16 @@ class PosController extends Controller
             ->all();
     }
 
+    private function salesReportTab(Request $request, $user): string
+    {
+        if ($request->get('tab') === 'exempt') return 'exempt';
+        $scope = $user?->posBillingScope() ?? 'both';
+        if ($scope !== 'both') return $scope === 'local' ? 'local' : 'pra';
+        $canLocal = $user?->isPosAdmin() && !$user->posHidesLocalStream();
+        if ($canLocal && in_array($request->get('tab'), ['local', 'combined'], true)) return $request->get('tab');
+        return 'pra';
+    }
+
     public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -7174,22 +7194,7 @@ class PosController extends Controller
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
-        // Exempt tab (Task 647): every role + both scopes may view it.
-        if ($request->get('tab') === 'exempt') {
-            $tab = 'exempt';
-        }
-        // Billing Scope (07 Aug 2026): scope-locked staff report ONLY their own
-        // stream — mirrors the Transactions tab forcing.
-        $reportScope = $user?->posBillingScope() ?? 'both';
-        if ($reportScope !== 'both' && $tab !== 'exempt') {
-            $tab = $reportScope === 'local' ? 'local' : 'pra';
-        }
-        // Task 705: manager default PRA-only (khufia local-check mode OFF).
-        if ($tab === 'local' && ($user?->posHidesLocalStream() ?? false)) {
-            $tab = 'pra';
-        }
+        $tab = $this->salesReportTab($request, $user);
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
@@ -7330,7 +7335,11 @@ class PosController extends Controller
             $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
         }
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
+        [$historyFrom, $historyTo] = $this->resolveReportRange($request);
+        $financialHistory = \App\Services\PosFinancialHistory::report($companyId, $historyFrom->toDateString(), $historyTo->toDateString(), $tab, $cashierFilter, $user,
+            fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user));
+
+        return view('pos.reports', compact('financialHistory', 'dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
     }
 
     /**
@@ -7347,11 +7356,7 @@ class PosController extends Controller
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin() && !$user->posHidesLocalStream()) ? 'local' : 'pra';
-        if ($request->get('tab') === 'exempt') {
-            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
-        }
+        $tab = $this->salesReportTab($request, $user);
         $cashierFilter = $request->get('cashier', 'all');
         // Owner rule (5 Aug 2026): cashier reports are locked to OWN sales.
         if ($isCashier) {
@@ -7378,12 +7383,7 @@ class PosController extends Controller
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        // Local export is ADMIN-ONLY — cashiers always export PRA data.
-        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin() && !$user->posHidesLocalStream()) ? 'local' : 'pra';
-        if ($request->get('tab') === 'exempt') {
-            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
-        }
+        $tab = $this->salesReportTab($request, $user);
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
@@ -7395,6 +7395,12 @@ class PosController extends Controller
         // Custom date range (analytics block) wins; default stays last 30 days.
         $hasRange = $request->filled('from') || $request->filled('to');
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
+
+        if ($request->boolean('reconciliation')) {
+            $history = \App\Services\PosFinancialHistory::report($companyId, $rangeFrom->toDateString(), $rangeTo->toDateString(), $tab, $cashierFilter, $user,
+                fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user));
+            return $this->financialHistoryCsv($history, PosFeatureService::planAllows($company, 'analytics_enabled'));
+        }
 
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
@@ -7431,21 +7437,22 @@ class PosController extends Controller
             fputcsv($file, ['Date', 'Invoice #', 'Customer', 'Payment Method', 'Subtotal', 'Tax', 'Total', 'Staff']);
 
             foreach ($transactions as $t) {
+                $sign = $t->transaction_type === 'return' ? -1 : 1;
                 fputcsv($file, [
                     $t->created_at->format('d M Y H:i'),
                     $t->invoice_number,
                     $t->customer_name ?: 'Walk-in',
                     \App\Support\PosPaymentLabels::label($t->payment_method),
-                    $n($t->subtotal),
-                    $n($t->tax_amount),
-                    $n($t->total_amount),
+                    $n($sign * $t->subtotal),
+                    $n($sign * $t->tax_amount),
+                    $n($sign * $t->total_amount),
                     $t->creator?->name ?? '-',
                 ]);
             }
 
-            $totalSubtotal = $transactions->sum('subtotal');
-            $totalRevenue = $transactions->sum('total_amount');
-            $totalTax = $transactions->sum('tax_amount');
+            $totalSubtotal = $transactions->sum(fn ($t) => ($t->transaction_type === 'return' ? -1 : 1) * (float) $t->subtotal);
+            $totalRevenue = $transactions->sum(fn ($t) => ($t->transaction_type === 'return' ? -1 : 1) * (float) $t->total_amount);
+            $totalTax = $transactions->sum(fn ($t) => ($t->transaction_type === 'return' ? -1 : 1) * (float) $t->tax_amount);
             fputcsv($file, []);
             fputcsv($file, ['', '', '', 'TOTALS', $n($totalSubtotal), $n($totalTax), $n($totalRevenue), '']);
             fputcsv($file, ['Total Transactions: ' . $transactions->count()]);
@@ -7453,6 +7460,31 @@ class PosController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    private function financialHistoryCsv(array $history, bool $includeProducts)
+    {
+        return response()->streamDownload(function () use ($history, $includeProducts) {
+            $out = fopen('php://output', 'w');
+            $write = function (array $row) use ($out) {
+                fputcsv($out, array_map(fn ($v) => is_string($v) && preg_match('/^[=+@\t\r-]/u', $v) ? "'" . $v : $v, $row));
+            };
+            $write(['Business-day reconciliation', $history['from'], $history['to'], $history['tab'], $history['complete'] ? 'Known totals reconciled' : 'PARTIAL: older deleted breakdown unavailable']);
+            $write(['Basis', 'Surviving/archived rows + retained deletion aggregates; provisional amounts separate. Refund/credit note is not proof of cash payout.']);
+            $write(['Metric', 'Value']);
+            foreach ($history['summary'] as $key => $value) $write([$key, $value]);
+            $write(['Provisional amount (excluded from final net)', $history['provisional']['net']]);
+            foreach (['daily' => 'Business date', 'payments' => 'Payment method', 'cashiers' => 'Cashier ID'] as $field => $label) {
+                $write([]); $write([$label, 'Sales', 'Returns', 'Gross', 'Returned', 'Net', 'Tax', 'Discount', 'Base']);
+                foreach ($history[$field] as $key => $totals) $write(array_merge([$key], array_values($totals)));
+            }
+            if ($includeProducts) {
+                $write([]); $write(['Product ID', 'Product', 'Category', 'Size', 'Channel', 'Label basis', 'Net quantity', 'Base', 'Tax', 'Net']);
+                foreach ($history['products'] as $row) $write(array_values($row));
+            }
+            foreach ($history['gaps'] as $gap) $write(['DETAIL UNAVAILABLE', $gap['date'], $gap['number'], $gap['reason']]);
+            fclose($out);
+        }, 'POS-Reconciliation-' . $history['from'] . '-to-' . $history['to'] . '.csv', ['Content-Type' => 'text/csv']);
     }
 
     protected function buildTaxReportQuery(Request $request, $tab = 'pra', $skipTaxRateFilter = false)
@@ -9153,6 +9185,7 @@ class PosController extends Controller
             if ($rows->isEmpty()) {
                 return;
             }
+            \App\Services\PosFinancialHistory::captureDeleted($rows, null, 'archive-clear');
             foreach ($rows as $archiveRow) {
                 app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
             }
@@ -12722,7 +12755,7 @@ class PosController extends Controller
                     ->whereIn('id', $recipeRows->pluck('ingredient_id'))->get()->keyBy('id') : collect();
             $recipe = $recipeRows->map(fn ($row) => [
                 'stock_id' => 'ingredient-' . (int) $row->ingredient_id,
-                'quantity' => round((float) $row->quantity_needed * (1 + (float) ($row->waste_percent ?? 0) / 100), 4),
+                'quantity' => round((float) $row->quantity_needed * (1 + max(0, min(100, (float) ($row->waste_percent ?? 0))) / 100), 4),
                 'unit_cost' => ($ingredientCosts[$row->ingredient_id]->cost_per_unit ?? null) === null
                     ? null : (float) $ingredientCosts[$row->ingredient_id]->cost_per_unit,
                 'company_id' => $companyId,
@@ -15429,6 +15462,7 @@ class PosController extends Controller
         $prevTo = $from->copy()->subDay()->endOfDay();
         $prevRow = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
+            ->when(\Schema::hasColumn('pos_transactions', 'transaction_type'), fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return')))
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user))
             ->whereBetween('business_date', [$prevFrom->toDateString(), $prevTo->toDateString()])
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
@@ -15568,6 +15602,7 @@ class PosController extends Controller
      */
     private function resolveReportRange(Request $request): array
     {
+        $request->validate(['from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d']]);
         $defaultDate = now()->toDateString();
         // Fresh analytics follows the shop's active day, including the hours
         // after midnight. Explicit/partial ranges keep their previous meaning.
@@ -16041,6 +16076,14 @@ class PosController extends Controller
      */
     public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null, ?int $branchId = null): array
     {
+        return DB::transaction(function () use ($companyId, $date, $closedBy, $notes, $cashRecon, $allowEmpty, $actionOverride, $branchId) {
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            return $this->performLockedDayClose($companyId, $date, $closedBy, $notes, $cashRecon, $allowEmpty, $actionOverride, $branchId);
+        });
+    }
+
+    private function performLockedDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes, ?array $cashRecon, bool $allowEmpty, ?array $actionOverride, ?int $branchId): array
+    {
         $existing = PosDayCloseReport::where('company_id', $companyId)
             ->forBranch($branchId)
             ->whereDate('report_date', $date)
@@ -16479,6 +16522,7 @@ class PosController extends Controller
                             \App\Models\PosCustomerSpendSnapshot::insert($snapshots);
                         }
                     }
+                    \App\Services\PosFinancialHistory::captureDeleted($deleteRows, (int) $report->id, 'day-close');
                     foreach ($deleteRows as $archiveRow) {
                         app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
                     }

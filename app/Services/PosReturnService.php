@@ -252,6 +252,7 @@ class PosReturnService
                     'item_id' => $orig->item_id,
                     'item_name' => $orig->item_name,
                     ...(Schema::hasColumn('pos_transaction_items', 'deal_snapshot') ? ['deal_snapshot' => $returnSnapshot ?? $orig->deal_snapshot] : []),
+                    ...(Schema::hasColumn('pos_transaction_items', 'reporting_snapshot') ? ['reporting_snapshot' => $orig->reporting_snapshot] : []),
                     ...($returnSnapshot && Schema::hasColumn('pos_transaction_items', 'taxable_base') ? [
                         'taxable_base' => PosDealAllocation::sum($returnSnapshot, 'taxable_base'),
                         'exempt_base' => PosDealAllocation::sum($returnSnapshot, 'exempt_base'),

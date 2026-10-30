@@ -2547,12 +2547,15 @@ window.addEventListener('popstate', function() {
                         <div class="space-y-1">
                             {{-- Task #643: noTicks — claimed-cart cancel has no real item ids
                                  (Made/Not-Made marking = Task #645); KOT alert still shows. --}}
-                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length && !boardCancelAsk.noTicks" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.cancel_mark_made_hint') }}</p>
+                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length && !boardCancelAsk.noTicks" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">Prepared quantity: leave blank if unknown; enter 0 only if none was prepared.</p>
                             <template x-for="it in boardCancelAsk.items" :key="it.id">
                                 <div class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
                                     <span class="flex-1" x-text="it.quantity + ' × ' + it.item_name"></span>
                                     <span class="text-gray-400" x-text="Math.round(it.subtotal).toLocaleString()"></span>
-                                    <button x-show="boardCancelAsk.order.kot_sent_at && !boardCancelAsk.noTicks" type="button" @click="boardCancelMade[it.id] = !boardCancelMade[it.id]" class="px-2 py-1 rounded-lg text-[10px] font-bold border transition" :class="boardCancelMade[it.id] ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 text-orange-700 dark:text-orange-300' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400'" x-text="boardCancelMade[it.id] ? '{{ __('pos.item_made_yes') }}' : '{{ __('pos.item_made_no') }}'"></button>
+                                    <input x-show="!boardCancelAsk.noTicks" type="number" min="0" :max="it.quantity" step="0.001"
+                                           x-model="boardCancelMade[it.id]" aria-label="Prepared quantity" placeholder="Unknown"
+                                           class="w-24 px-2 py-1 rounded border border-gray-300 bg-white dark:bg-gray-800 text-xs">
+
                                 </div>
                             </template>
                         </div>
@@ -2561,6 +2564,11 @@ window.addEventListener('popstate', function() {
                         <p class="text-[11px] font-bold text-orange-700 dark:text-orange-300">&#9888;&#65039; {{ __('pos.cancel_kot_warning') }}</p>
                     </div>
                     <p x-show="!boardCancelAsk.order.kot_sent_at" class="mt-3 text-[11px] text-gray-400 text-center">{{ __('pos.cancel_no_kot_note') }}</p>
+                </div>
+                <div class="px-5 pt-2">
+                    <label class="block text-xs font-bold text-gray-600 dark:text-gray-300" for="cancel-order-reason">Cancellation reason</label>
+                    <textarea id="cancel-order-reason" x-model="boardCancelAsk.reason" maxlength="500" rows="2" class="w-full mt-1 rounded border border-gray-300 bg-white dark:bg-gray-800 text-sm" placeholder="Why is this order being cancelled?"></textarea>
+                    <p class="text-[10px] text-gray-500">Records preparation only; no sale, refund or stock adjustment is posted.</p>
                 </div>
                 <div class="p-4 grid grid-cols-1 gap-2">
                     <button @click="boardCancelAsk = null" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_keep_order') }}</button>
@@ -8326,7 +8334,8 @@ function restaurantPos() {
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); const _hkR = _hkList[this.activeHeldIndex]; if (_hkR) this.recallOrder(_hkR); }
                 else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); const _hkP = _hkList[this.activeHeldIndex]; if (_hkP) this.payHeldOrder(_hkP.id); }
-                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const _hkO = _hkList[this.activeHeldIndex]; if (_hkO) { this.boardCancelAsk = this.buildOrderCancelAsk(_hkO); this.boardCancelMade = {}; } }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const _hkO = _hkList[this.activeHeldIndex]; if (_hkO) { this.boardCancelAsk = this.buildOrderCancelAsk(_hkO); this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = ''; } }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
                 return;
             }
@@ -9265,6 +9274,7 @@ function restaurantPos() {
             if (this._claimBusy || !o) return;
             this.boardCancelAsk = this.buildOrderCancelAsk(o);
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
         },
         // Shared builder (bell panel + claimed cart): normalizes an orderJson-style
         // snapshot into the modal's { table, order, items, noTicks } shape. noTicks
@@ -9305,6 +9315,7 @@ function restaurantPos() {
                 total_amount: (o && o.total_amount) || this.totalAmount || 0,
             }));
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
         },
         // Picker ka HAR "bina table chune" band hone wala raasta yahan se guzarta
         // hai (X, backdrop, Esc, F2). ZFC (owner video, 23 Aug 2026): DINE IN pill
@@ -9890,6 +9901,7 @@ function restaurantPos() {
             // not just the KOT path.
             this.boardCancelAsk = this.buildOrderCancelAsk(o);
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
         },
         // Free table: reserved-only → release; any open order (cashier OR waiter,
         // Task #409) → confirm + soft-cancel via the same deleteOrder endpoint.
@@ -9902,6 +9914,7 @@ function restaurantPos() {
                 // khana anjane mein cancel na ho.
                 this.boardCancelAsk = { table: t, order: t.order, items: null };
                 this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
                 try {
                     const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
                     const list = res.ok ? await res.json().catch(() => null) : null;
@@ -9921,18 +9934,21 @@ function restaurantPos() {
         async boardCancelConfirm() {
             const ask = this.boardCancelAsk;
             if (!ask || this.boardBusy) return;
+            if (!String(ask.reason || '').trim()) { this.showToast('Enter a cancellation reason.', 'error'); return; }
             const t = ask.table;
             this.boardBusy = true;
             try {
-                const madeIds = Object.keys(this.boardCancelMade).filter(k => this.boardCancelMade[k]).map(Number);
+                const prepared = Object.fromEntries(Object.entries(this.boardCancelMade)
+                    .filter(([id, qty]) => qty !== '' && qty !== null && Number.isInteger(Number(id)))
+                    .map(([id, qty]) => [id, Number(qty)]));
                 const res = await fetch('/pos/restaurant/orders/' + ask.order.id + '/delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     // made_item_ids sirf tab bhejo jab KOT gayi thi (warna sawal hi nahi banta)
-                    body: JSON.stringify((ask.order.kot_sent_at && !ask.noTicks) ? { made_item_ids: madeIds } : {}),
+                    body: JSON.stringify({ cancellation_reason: ask.reason.trim(), ...(!ask.noTicks ? { prepared_quantities: prepared } : {}) }),
                 });
-                const data = res.ok ? await res.json().catch(() => null) : null;
-                if (data && data.success) {
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
                     // Task 928: signal any open KDS tab on this device to refresh immediately.
                     try { localStorage.setItem('pos_kds_void_signal', Date.now()); } catch(e) {}
                     this.heldOrders = this.heldOrders.filter(o => o.id !== ask.order.id);
@@ -9964,9 +9980,11 @@ function restaurantPos() {
                     }
                 } else {
                     this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
+                    return;
                 }
             } catch (e) {
                 this.showToast(window.TXT.cancel_failed_conn, 'error');
+                return;
             } finally { this.boardBusy = false; }
             this.boardCancelAsk = null;
             this.boardMenuTable = null;
@@ -10122,6 +10140,7 @@ function restaurantPos() {
                 items: null,
             };
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
             try {
                 const res = ti ? await fetch('/pos/restaurant/orders/by-table/' + ti.id, { headers: { 'Accept': 'application/json' } }) : null;
                 const list = (res && res.ok) ? await res.json().catch(() => null) : null;

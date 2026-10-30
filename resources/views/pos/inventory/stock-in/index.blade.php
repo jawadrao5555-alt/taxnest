@@ -79,7 +79,7 @@
                 </form>
             </div>
         </div>
-        <p class="mt-4 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.stock_in_columns_note') }}</p>
+        <p class="mt-4 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.stock_in_columns_note') }} Ingredient receiving converts compatible kg/g and ltr/ml units. Pack/cup conversions require a saved size. Check the usage quantity and rate in the preview before posting.</p>
     </div>
     @endif
 

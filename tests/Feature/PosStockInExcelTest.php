@@ -89,6 +89,8 @@ class PosStockInExcelTest extends TestCase
             $table->string('code')->nullable();
             $table->string('name');
             $table->string('unit', 20);
+            $table->string('base_unit')->nullable();
+            $table->decimal('conversion_factor', 15, 4)->nullable();
             $table->decimal('cost_per_unit', 15, 2)->default(0);
             $table->decimal('current_stock', 15, 4)->default(0);
             $table->decimal('min_stock_level', 15, 4)->default(0);
@@ -175,6 +177,7 @@ class PosStockInExcelTest extends TestCase
             $table->string('nestpos_code_raw')->nullable();
             $table->decimal('qty', 15, 4)->default(0);
             $table->string('unit', 30)->nullable();
+            $table->json('unit_snapshot')->nullable();
             $table->decimal('rate', 15, 4)->nullable();
             $table->unsignedBigInteger('branch_id')->nullable();
             $table->string('reference_override')->nullable();
@@ -289,7 +292,7 @@ class PosStockInExcelTest extends TestCase
     {
         $this->ingredient();
         $batch = $this->stage([
-            ['INGREDIENT', 'RICE-25', 'RICE-25', 'Basmati Rice', 5, 'g', 300, '', 'INV-88', '', ''],
+            ['INGREDIENT', 'RICE-25', 'RICE-25', 'Basmati Rice', 5, 'ml', 300, '', 'INV-88', '', ''],
         ]);
         $this->assertSame(PosStockInLine::INVALID, $batch->lines->first()->match_status);
         try {
@@ -299,6 +302,21 @@ class PosStockInExcelTest extends TestCase
             $this->assertNotEmpty($e->errors());
         }
         $this->assertEquals(10.0, (float) Ingredient::first()->current_stock);
+    }
+
+    public function test_purchase_kilograms_convert_quantity_and_rate_to_usage_grams(): void
+    {
+        $ingredient = $this->ingredient(['unit' => 'g', 'base_unit' => 'kg', 'conversion_factor' => 1000]);
+        $batch = $this->stage([
+            ['INGREDIENT', 'RICE-25', '', 'Basmati Rice', 2, 'kg', 300, '', 'INV-88', '', ''],
+        ], updateCost: true);
+        $this->assertSame(PosStockInLine::MATCHED, $batch->lines->first()->match_status);
+        $this->service()->post($batch, $this->company(), 1);
+        $this->assertEquals(2010, (float) $ingredient->fresh()->current_stock);
+        $this->assertEquals(.3, (float) $ingredient->fresh()->cost_per_unit);
+        $movement = IngredientMovement::first();
+        $this->assertEquals(2000, (float) $movement->quantity);
+        $this->assertEquals(.3, $movement->snapshot['rate']);
     }
 
     public function test_item_barcode_sku_matching(): void
@@ -384,6 +402,25 @@ class PosStockInExcelTest extends TestCase
         $this->assertSame(1, $result['already']);
         $this->assertEquals(15.0, (float) $ing->fresh()->current_stock);
         $this->assertSame(1, IngredientMovement::count());
+    }
+
+    public function test_stale_open_batch_cannot_post_after_another_request_cancels_it(): void
+    {
+        $ing = $this->ingredient();
+        $batch = $this->stage([
+            ['INGREDIENT', 'RICE-25', 'RICE-25', 'Basmati Rice', 5, 'kg', 300, '', 'INV-88', '', ''],
+        ]);
+        $this->service()->cancelBatch($batch->fresh(), $this->company());
+
+        try {
+            $this->service()->post($batch, $this->company(), 1);
+            $this->fail('A stale open model must not post a cancelled batch.');
+        } catch (ValidationException $e) {
+            $this->assertNotEmpty($e->errors());
+        }
+        $this->assertEquals(10.0, (float) $ing->fresh()->current_stock);
+        $this->assertSame(0, IngredientMovement::count());
+        $this->assertSame(PosStockInBatch::STATUS_CANCELLED, $batch->fresh()->status);
     }
 
     public function test_transaction_rollback_leaves_no_partial_stock(): void

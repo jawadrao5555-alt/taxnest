@@ -32,6 +32,7 @@ class RestaurantOrderItem extends Model
         'item_discount_amount' => 'decimal:2',
         'kot_printed_at' => 'datetime',
         'was_made' => 'boolean',
+        'prepared_quantity' => 'decimal:3',
         'deal_snapshot' => 'array',
     ];
 
@@ -46,10 +47,24 @@ class RestaurantOrderItem extends Model
      */
     public function madeStateLabel(): string
     {
+        if ($this->prepared_quantity !== null) {
+            return 'Prepared ' . rtrim(rtrim(number_format((float) $this->prepared_quantity, 3, '.', ''), '0'), '.')
+                . ' / ' . rtrim(rtrim(number_format((float) $this->quantity, 3, '.', ''), '0'), '.');
+        }
         if ($this->was_made === true) {
             return 'Made';
         }
 
         return $this->was_made === false ? 'Not made' : 'Not recorded';
+    }
+
+    public function preparedSaleValue(): ?float
+    {
+        if ($this->prepared_quantity === null && $this->was_made === null) return null;
+        $prepared = $this->prepared_quantity !== null ? (float) $this->prepared_quantity
+            : ($this->was_made ? (float) $this->quantity : 0.0);
+
+        return (float) $this->quantity > 0
+            ? round((float) $this->subtotal * $prepared / (float) $this->quantity, 2) : 0.0;
     }
 }

@@ -1,8 +1,8 @@
-title: "Reports aur local bill support copies"
-audience: all
+title: "PRA cancellation evidence aur shop cash receipts"
+audience: pos
 type: improvement
 points:
-  - "Admin reports mein company aur product ke mutabiq filters aur bill ki reporting ki halat zyada wazeh hai."
-  - "PRA aur FBR POS mein company owner Customize se deleted local bills ki optional support copy khud ON kar sakta hai; pehle se koi company ON nahi hogi."
-  - "Owner copy rakhne ki muddat aur ijazat ki aakhri tareekh khud chunta hai; future copies rokne aur purani optional copies purge karne ke alag options hain."
-  - "Saved company settings, invoice design aur asal billing records pehle ki tarah rahenge."
+  - "Order cancel karte waqt wajah aur tayyar quantity record karein; khali quantity unknown rahegi."
+  - "Deliveries se selected unassigned final cash bills ki shop receipt banayein; cash receive karna delivery complete karne se alag hai."
+  - "Stock-In mein compatible ingredient units aur rate convert hote hain; posting se pehle conversion preview check karein."
+  - "Recipe reports mein waste samait cost aur available servings dikhte hain; returns asal sale ki ingredient quantity aur cost istemal karte hain."

@@ -458,3 +458,10 @@ Agar aik workbook mein wohi Product Code/naam, Ingredient Code/naam-unit, ya woh
 
 ## Receipt ki optional details aur layout
 Receipt Settings mein **Fiscal receipt: optional details and layout** aur **Local receipt: optional details and layout** khol kar terminal, cashier/waiter, table/floor, item columns, notes, logo aur likhai ke controls alag chun sakte hain. **Keep current** mojooda design ko follow karta hai. Preview se setting save ya receipt print nahi hoti; tabdeeli sirf **Save** par lagti hai. Extra contact note plain text hota hai. Bill ki calculation, fiscal number aur fiscal verification QR nahi badalte. Paper width, alignment aur left margin ke purane printer controls isi safhay par hain. KOT design aur printer routing barqarar hain.
+
+## PRA bill evidence aur shop cash (B02)
+- Cancelled Orders mein current ya previous business day ki range select karein. Cancelled open order sale ya refund nahin hota; order ID, cancel karne wala, waqt, wajah aur preparation evidence alag hain.
+- Cancel karte waqt har item ki prepared quantity likh sakte hain. Khali = maloom nahin; 0 = kuch tayyar nahin hua. Report ka recorded prepared sale value inventory cost ya cash refund nahin hai.
+- Deliveries → Receive unassigned delivery cash at shop: aik branch ke final cash bills select karein, count aur amount check karein, phir receive confirm karein. Card, provisional/draft, returned, rider-assigned aur pehle received bills shamil nahin hote. Delivery status is action se nahin badalta.
+- Stock-In receiving mein kg/g aur ltr/ml ki quantity aur cost usage unit mein convert hoti hai. Pack/cup ki size sirf saved conversion se li jati hai. Preview ke baad ingredient unit badle to pehle Rematch karein. Same reference ki receipt dobara stock nahin barhati.
+- Recipe cost aur available servings mein saved waste percentage shamil hai. Historical frozen cost na ho to unknown dikhaya jata hai; aaj ka ingredient rate purani sale par nahin lagaya jata.

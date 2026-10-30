@@ -33,4 +33,9 @@ class ProductRecipe extends Model
     {
         return $this->belongsTo(Ingredient::class);
     }
+
+    public function effectiveQuantity(): float
+    {
+        return round((float) $this->quantity_needed * (1 + max(0, min(100, (float) $this->waste_percent)) / 100), 4);
+    }
 }

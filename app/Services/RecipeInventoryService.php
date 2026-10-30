@@ -220,6 +220,7 @@ class RecipeInventoryService
                     continue;
                 }
 
+                $requirement['cost_per_unit'] = (float) $ingredient->cost_per_unit;
                 $qty = (float) $requirement['quantity'];
                 $before = (float) $ingredient->current_stock;
                 $after = round($before - $qty, 4);
@@ -359,6 +360,8 @@ class RecipeInventoryService
             }
 
             $restore = [];
+            $restoreCost = [];
+            $unknownCost = [];
             foreach ($rows as $row) {
                 $components = json_decode((string) ($row->components ?? '{}'), true);
                 if (!is_array($components)) {
@@ -376,6 +379,16 @@ class RecipeInventoryService
                 if ($factor > 0) {
                     $id = (int) $row->ingredient_id;
                     $restore[$id] = round(($restore[$id] ?? 0) + $factor, 4);
+                    $cost = $row->unit_cost ?? null;
+                    if ($cost === null && Schema::hasTable('ingredient_movements')) {
+                        $frozen = DB::table('ingredient_movements')->where('company_id', $companyId)
+                            ->where('ingredient_id', $id)->where('reference_id', $parentTransactionId)
+                            ->where('reference_type', 'pos_transaction')->where('type', self::MOVEMENT_SALE)
+                            ->orderBy('id')->value('snapshot');
+                        $cost = (json_decode((string) $frozen, true) ?: [])['cost_per_unit'] ?? null;
+                    }
+                    if ($cost === null) $unknownCost[$id] = true;
+                    $restoreCost[$id] = ($restoreCost[$id] ?? 0) + $factor * (float) $cost;
                 }
             }
 
@@ -413,6 +426,7 @@ class RecipeInventoryService
                 if (!$ingredient) {
                     continue;
                 }
+                $unitCost = !isset($unknownCost[$ingredientId]) && isset($restoreCost[$ingredientId]) ? $restoreCost[$ingredientId] / $qty : null;
                 $after = round((float) $ingredient->current_stock + $qty, 4);
                 $ingredient->update(['current_stock' => $after]);
                 self::changeIngredientBranchStock($companyId, (int) $ingredient->id, $resolvedBranch, $qty, (float) $after - $qty);
@@ -422,8 +436,8 @@ class RecipeInventoryService
                     'branch_id' => $resolvedBranch,
                     'type' => self::MOVEMENT_RETURN,
                     'quantity' => $qty,
-                    'unit_price' => (float) ($ingredient->cost_per_unit ?? 0),
-                    'total_price' => round($qty * (float) ($ingredient->cost_per_unit ?? 0), 2),
+                    'unit_price' => $unitCost ?? 0,
+                    'total_price' => round($qty * ($unitCost ?? 0), 2),
                     'balance_after' => $after,
                     'reference_type' => 'pos_return',
                     'reference_id' => $returnTransactionId,
@@ -433,7 +447,7 @@ class RecipeInventoryService
                 ]);
                 self::writeIngredientLedger(
                     $companyId, $ingredientId, $resolvedBranch, self::MOVEMENT_RETURN,
-                    $qty, $after, $returnTransactionId, $returnNumber, null, $userId
+                    $qty, $after, $returnTransactionId, $returnNumber, ['cost_per_unit' => $unitCost, 'cost_basis' => $unitCost === null ? 'unknown' : 'sale_snapshot'], $userId
                 );
                 $out[] = ['ingredient_id' => $ingredientId, 'quantity' => $qty, 'movement_id' => $movement->id];
             }
@@ -779,6 +793,9 @@ class RecipeInventoryService
         if (Schema::hasColumn('recipe_consumptions', 'reversed_at')) {
             $data['reversed_at'] = null;
         }
+        if (Schema::hasColumn('recipe_consumptions', 'unit_cost')) {
+            $data['unit_cost'] = $requirement['cost_per_unit'] ?? null;
+        }
         DB::table('recipe_consumptions')->insert($data);
     }
 
@@ -844,7 +861,7 @@ class RecipeInventoryService
             $saleQty = (float) ($component['sale_quantity'] ?? 0);
             if ($saleQty > 0) {
                 $soldUnits += $saleQty;
-                $consumedUnits += (float) ($component['quantity_needed'] ?? 0) * $saleQty;
+                $consumedUnits += (float) ($component['effective_quantity_needed'] ?? $component['quantity_needed'] ?? 0) * $saleQty;
             }
         }
         if ($soldUnits > 0) {

@@ -22,12 +22,13 @@
         <span>Total cancelled: {{ number_format($summary['count']) }}</span>
         <span>Cancelled value: Rs {{ number_format($summary['value']) }}</span>
         <span>
-            Wasted (made) value: Rs {{ number_format($summary['waste'] ?? 0) }}
+            Recorded prepared sale value: Rs {{ number_format($summary['waste'] ?? 0) }}
             @if(($summary['made_item_count'] ?? 0) === 0)
-                — No items were marked made
+                — No prepared quantities recorded as positive
             @endif
         </span>
     </div>
+    <p>Unknown preparation: {{ $summary['unknown_item_count'] ?? 0 }} lines. Prepared sale value is not inventory cost or cash refunded. Cancellation creates no sale or stock movement.</p>
     <table>
         <thead>
             <tr>
@@ -37,7 +38,7 @@
         <tbody>
             @forelse ($orders as $o)
             <tr>
-                <td>{{ $o->order_number }}</td>
+                <td>{{ $o->order_number }}<span class="block text-xs font-normal">ID {{ $o->id }} · Cancelled open order</span><span class="block text-xs font-normal">Reason: {{ $o->cancellation_reason ?: 'Not recorded' }}</span></td>
                 {{-- the ORDER's own day (the sale it belongs to), not the cancel moment --}}
                 <td>{{ optional($o->created_at)->format('d M Y, h:i A') }}</td>
                 <td>{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '-' }}</td>

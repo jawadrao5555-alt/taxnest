@@ -84,10 +84,11 @@
                     </div>
                 </div>
                 @php
-                    $totalCost = $productRecipes->sum(fn($r) => $r->quantity_needed * ($r->ingredient->cost_per_unit ?? 0));
+                    $availableServings = $productRecipes->count() ? (int) floor($productRecipes->min(fn($r) => $r->effectiveQuantity() > 0 ? max(0, (float) ($r->ingredient->current_stock ?? 0)) / $r->effectiveQuantity() : 0)) : 0;
+                    $totalCost = $productRecipes->sum(fn($r) => $r->effectiveQuantity() * ($r->ingredient->cost_per_unit ?? 0));
                 @endphp
                 <div class="flex items-center gap-3">
-                    <span class="text-sm font-semibold text-purple-600 dark:text-purple-400">{{ __('pos.cost_rs_prefix') }}{{ number_format($totalCost, 2) }}</span>
+                    <span class="text-sm font-semibold text-purple-600 dark:text-purple-400">{{ __('pos.cost_rs_prefix') }}{{ number_format($totalCost, 2) }} · {{ $availableServings }} available servings (including waste)</span>
                     <button @click="openAdd('{{ $productId }}')" class="px-3 py-1.5 text-xs rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-semibold">{{ __('pos.add_ingredient_btn') }}</button>
                 </div>
             </div>
@@ -114,8 +115,8 @@
                                     <button class="text-xs font-semibold text-purple-600 hover:text-purple-800 dark:text-purple-400">{{ __('pos.save_btn') }}</button>
                                 </form>
                             </td>
-                            <td class="px-5 py-3 text-gray-500">{{ $recipe->ingredient->unit ?? '' }}</td>
-                            <td class="px-5 py-3">Rs. {{ number_format($recipe->quantity_needed * ($recipe->ingredient->cost_per_unit ?? 0), 2) }}</td>
+                            <td class="px-5 py-3 text-gray-500">{{ $recipe->ingredient->unit ?? '' }}<span class="block text-xs">Waste: {{ (float) $recipe->waste_percent }}% · Use: {{ $recipe->effectiveQuantity() }}</span></td>
+                            <td class="px-5 py-3">Rs. {{ number_format($recipe->effectiveQuantity() * ($recipe->ingredient->cost_per_unit ?? 0), 2) }}</td>
                             <td class="px-5 py-3">
                                 @if($recipe->ingredient && $recipe->ingredient->isLowStock())
                                 <span class="text-red-600 dark:text-red-400 font-medium">{{ number_format($recipe->ingredient->current_stock, 2) }}</span>

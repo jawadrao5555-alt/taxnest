@@ -926,39 +926,43 @@ class RestaurantPosController extends Controller
         if (!\App\Services\PosAccessService::orderCancelAllowed(Auth::guard('pos')->user())) {
             return response()->json(['success' => false, 'message' => __('pos.order_cancel_not_allowed')], 403);
         }
-        $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
-        if (!$order) {
-            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
-        }
-        if ($order->status === 'completed') {
-            return response()->json(['success' => false, 'message' => 'Cannot delete a completed order'], 400);
-        }
-
-        // Task 840 — WHOLE-ORDER VOID SLIP: collect every printed item BEFORE
-        // the cancel so we can tell the kitchen to stop ALL dishes. Only items
-        // with a kot_printed_at stamp are counted — a fresh hold cancelled
-        // before any KOT got out stays silent (nothing printed = nothing to void).
-        $company = Company::find($companyId);
-        $printedItems = $order->items()->whereNotNull('kot_printed_at')->get();
-        $voidItems = [];
-        foreach ($printedItems as $oi) {
-            $voidItems[] = [
-                'item_type' => $oi->item_type ?? 'product',
-                'item_id'   => $oi->item_id,
-                'item_name' => $oi->item_name ?? '',
-                'notes'     => trim(\App\Support\PosFulfillment::label($oi->fulfillment) . ' ' . ($oi->special_notes ?? '')),
-                'qty'       => (float) $oi->quantity,
-            ];
-        }
-
         DB::beginTransaction();
         try {
+            $order = RestaurantOrder::where('company_id', $companyId)->whereKey($orderId)->lockForUpdate()->first();
+            if (!$order) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+            }
+            if ($order->status === 'completed') {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Cannot delete a completed order'], 400);
+            }
+            if ($order->status === 'cancelled') {
+                DB::commit();
+                return response()->json(['success' => true, 'message' => 'Order already cancelled',
+                    'kot_void_queued' => false, 'kot_void_url' => null]);
+            }
+
+            $company = Company::find($companyId);
+            $printedItems = $order->items()->whereNotNull('kot_printed_at')->get();
+            $voidItems = [];
+            foreach ($printedItems as $oi) {
+                $voidItems[] = [
+                    'item_type' => $oi->item_type ?? 'product',
+                    'item_id' => $oi->item_id,
+                    'item_name' => $oi->item_name ?? '',
+                    'notes' => trim(\App\Support\PosFulfillment::label($oi->fulfillment) . ' ' . ($oi->special_notes ?? '')),
+                    'qty' => (float) $oi->quantity,
+                ];
+            }
+
             $orderData = ['order_number' => $order->order_number, 'total_amount' => $order->total_amount, 'status' => $order->status];
             $tableId = $order->table_id;
             // ZFC (2 Aug 2026): cancel = SOFT cancel. Order + items mehfooz rehte
             // hain (status='cancelled') taake Cancelled Orders report ban sake.
             // Har active-order query pehle se held/preparing/ready ya completed
             // par filter karti hai, is liye cancelled kahin leak nahi hota.
+            \App\Services\PosCancellationEvidence::record($order, $request);
             $order->status = 'cancelled';
             if (Schema::hasColumn('restaurant_orders', 'cancelled_at')) {
                 $order->cancelled_at = now();
@@ -967,16 +971,6 @@ class RestaurantPosController extends Controller
                 $order->cancelled_by = Auth::guard('pos')->id();
             }
             $order->save();
-            // Item-wise made/unmade (ZFC, 2 Aug 2026): modal se aaye ids jin par
-            // cashier ne "ban gaya tha" tick kiya. Sirf tab likho jab client ne
-            // bheja ho (warna NULL = poochha nahi gaya).
-            if ($request->has('made_item_ids') && Schema::hasColumn('restaurant_order_items', 'was_made')) {
-                $madeIds = array_filter(array_map('intval', (array) $request->input('made_item_ids', [])));
-                $order->items()->update(['was_made' => false]);
-                if ($madeIds) {
-                    $order->items()->whereIn('id', $madeIds)->update(['was_made' => true]);
-                }
-            }
             // F3 (Jul 2026): deleting a held order frees its table — unless another
             // active order is still parked on the same table.
             if ($tableId) {
@@ -991,7 +985,7 @@ class RestaurantPosController extends Controller
             }
             try {
                 if (class_exists(\App\Services\AuditLogService::class)) {
-                    \App\Services\AuditLogService::log('order_deleted', 'restaurant_order', $orderId, $orderData, null, $companyId, Auth::guard('pos')->id());
+                    \App\Services\AuditLogService::log('order_deleted', 'restaurant_order', $orderId, $orderData, ['status' => 'cancelled', 'reason' => $order->cancellation_reason, 'prepared_quantities' => $request->input('prepared_quantities'), 'made_item_ids' => $request->input('made_item_ids')], $companyId, Auth::guard('pos')->id());
                 }
             } catch (\Exception $auditEx) {
             }
@@ -1022,6 +1016,9 @@ class RestaurantPosController extends Controller
                 'kot_void_queued'  => $kotVoidQueued,
                 'kot_void_url'     => $kotVoidUrl,
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => 'Failed to delete order: ' . $e->getMessage()], 500);
@@ -3626,8 +3623,8 @@ class RestaurantPosController extends Controller
         $from = $request->query('from') ?: $todayBiz;
         $to = $request->query('to') ?: $todayBiz;
         // Guard: swapped/garbage dates → sane defaults
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = $todayBiz;
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = $todayBiz;
+        if (!is_string($from) || !\Illuminate\Support\Carbon::canBeCreatedFromFormat($from, 'Y-m-d') || !\Illuminate\Support\Carbon::hasFormat($from, 'Y-m-d')) $from = $todayBiz;
+        if (!is_string($to) || !\Illuminate\Support\Carbon::canBeCreatedFromFormat($to, 'Y-m-d') || !\Illuminate\Support\Carbon::hasFormat($to, 'Y-m-d')) $to = $todayBiz;
         if ($from > $to) { [$from, $to] = [$to, $from]; }
 
         // Owner (1 Sep 2026): a cancelled order belongs to the business day it
@@ -3669,23 +3666,7 @@ class RestaurantPosController extends Controller
         if ($gate = $this->cancelledOrdersGate()) return $gate;
         $company = Company::find(app('currentCompanyId'));
         $orders = $this->cancelledOrdersQuery($request, $from, $to)->paginate(50)->withQueryString();
-        $summary = [
-            'count' => $orders->total(),
-            'value' => (float) $this->cancelledOrdersQuery($request)->sum('total_amount'),
-            // Waste = cancel ke waqt "ban gaya tha" tick hue items ki maliyat
-            'waste' => Schema::hasColumn('restaurant_order_items', 'was_made')
-                ? (float) RestaurantOrderItem::where('was_made', true)
-                    ->whereIn('order_id', $this->cancelledOrdersQuery($request)->select('id'))
-                    ->sum('subtotal')
-                : 0.0,
-            // NULL deliberately remains "Not recorded"; only an explicit true
-            // is waste.  A sent KOT is not evidence that an item was made.
-            'made_item_count' => Schema::hasColumn('restaurant_order_items', 'was_made')
-                ? RestaurantOrderItem::where('was_made', true)
-                    ->whereIn('order_id', $this->cancelledOrdersQuery($request)->select('id'))
-                    ->count()
-                : 0,
-        ];
+        $summary = \App\Services\PosCancellationEvidence::summary($this->cancelledOrdersQuery($request));
         // The quick-range links must be anchored on the current BUSINESS day too,
         // or before the cutoff the "Today" button asks for a different day than
         // the one the page just opened on.
@@ -3701,22 +3682,26 @@ class RestaurantPosController extends Controller
         return response()->streamDownload(function () use ($orders) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel)
-            fputcsv($out, ['Order #', 'Order Date/Time', 'Table', 'Order Type', 'Items (made state)', 'Wasted value (Rs)', 'Amount (Rs)', 'KOT Sent', 'Punched By', 'Cancelled By', 'Cancelled At']);
+            fputcsv($out, ['Order #', 'Order Date/Time', 'Table', 'Order Type', 'Items (made state)', 'Recorded prepared sale value (Rs)', 'Amount (Rs)', 'KOT Sent', 'Punched By', 'Cancelled By', 'Cancelled At', 'Cancellation reason', 'Unknown preparation lines', 'Stage', 'Order ID']);
             foreach ($orders as $o) {
                 $items = $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name . ' [' . $i->madeStateLabel() . ']')->implode('; ');
-                $waste = $o->items->filter(fn ($i) => $i->was_made === true)->sum('subtotal');
+                $waste = $o->items->sum(fn ($i) => $i->preparedSaleValue() ?? 0);
                 fputcsv($out, [
                     $o->order_number,
                     optional($o->created_at)->format('Y-m-d H:i'),
                     $o->table?->table_number ? 'T-' . $o->table->table_number : '-',
                     $o->order_type,
                     $items,
-                    (int) round($waste),
+                    number_format($waste, 2, '.', ''),
                     (int) round($o->total_amount),
                     $o->kot_sent_at ? 'YES' : 'no',
                     $o->creator?->name ?? '-',
                     $o->canceller?->name ?? 'System',
                     optional($o->cancelled_at ?? $o->updated_at)->format('Y-m-d H:i'),
+                    $o->cancellation_reason ?? 'Not recorded',
+                    $o->items->filter(fn ($i) => $i->preparedSaleValue() === null)->count(),
+                    'Cancelled open order (no sale or refund)',
+                    $o->id,
                 ]);
             }
             fclose($out);
@@ -3728,14 +3713,7 @@ class RestaurantPosController extends Controller
         if ($gate = $this->cancelledOrdersGate()) return $gate;
         $company = Company::find(app('currentCompanyId'));
         $orders = $this->cancelledOrdersQuery($request, $from, $to)->limit(2000)->get();
-        $summary = [
-            'count' => $orders->count(),
-            'value' => (float) $orders->sum('total_amount'),
-            // Strict true is intentional: NULL is legacy/not-recorded, not
-            // made; KOT sent must never be promoted to made automatically.
-            'waste' => (float) $orders->flatMap->items->filter(fn ($i) => $i->was_made === true)->sum('subtotal'),
-            'made_item_count' => $orders->flatMap->items->filter(fn ($i) => $i->was_made === true)->count(),
-        ];
+        $summary = \App\Services\PosCancellationEvidence::summary($this->cancelledOrdersQuery($request));
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.cancelled-orders-pdf', compact('company', 'orders', 'from', 'to', 'summary'));
         return $pdf->download("cancelled-orders-{$from}-to-{$to}.pdf");
     }

@@ -85,6 +85,7 @@ class IngredientController extends Controller
         }
 
         if (Schema::hasTable('recipe_consumptions') && Schema::hasTable('ingredients')) {
+            $frozenCost = Schema::hasColumn('recipe_consumptions', 'unit_cost') ? 'rc.unit_cost' : 'NULL';
             $query = DB::table('recipe_consumptions as rc')
                 ->join('ingredients as i', function ($join) {
                     $join->on('i.id', '=', 'rc.ingredient_id')
@@ -94,7 +95,8 @@ class IngredientController extends Controller
                 ->where('rc.ingredient_id', '>', 0)
                 ->select('i.name as ingredient_name', 'i.unit', 'i.cost_per_unit',
                     DB::raw('SUM(rc.quantity) as quantity'),
-                    DB::raw('SUM(rc.quantity * i.cost_per_unit) as cost'))
+                    DB::raw("SUM(rc.quantity * {$frozenCost}) as cost"),
+                    DB::raw("SUM(CASE WHEN {$frozenCost} IS NULL THEN 1 ELSE 0 END) AS unknown_cost_count"))
                 ->groupBy('i.id', 'i.name', 'i.unit', 'i.cost_per_unit')
                 ->orderByDesc('cost');
             if ($from) $query->whereDate('rc.created_at', '>=', $from);

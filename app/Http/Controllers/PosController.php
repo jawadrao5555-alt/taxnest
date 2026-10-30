@@ -15519,28 +15519,22 @@ class PosController extends Controller
             $dayBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('business_date', $date)
-                ->where(function ($q) { $q->whereNotNull('rider_id'); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_collection_amount')) $q->orWhere('rider_collection_amount', '>', 0); })
+                ->where(function ($q) { $q->whereNotNull('rider_id'); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_collection_amount')) $q->orWhere('rider_collection_amount', '>', 0); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'order_type')) $q->orWhere('order_type', 'delivery'); })
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 // Task 1360: rider cash reconciles against ONE branch's drawer.
                 ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
                 ->get();
 
-            // rider_settled_at stays on the REAL calendar date (settlement
-            // timestamps carry no business date) — known v1 limitation: a 1 AM
-            // settlement counts toward the calendar day, not the open trading day.
-            // Partial settlements (Task 525): new settlement rows carry an
-            // 'allocation' breakdown — for those, cash-in comes from the
-            // allocation entries (exact rupees received today against older
-            // bills, partial or full). The legacy bill-based query stays for
-            // pre-feature settlements (no allocation) so the transition day
-            // never double-counts.
+            // Older receipts have only a calendar timestamp; apply the same cutoff
+            // window as sales. New shop receipts carry a frozen business date.
+            [$receiptStart, $receiptEnd] = \App\Services\PosBusinessDay::windowFor($companyId, $date, $date);
             $hasAllocation = \Illuminate\Support\Facades\Schema::hasColumn('pos_rider_settlements', 'allocation');
             $legacyCashInQ = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
                 ->where('payment_method', PosPaymentBuckets::CASH)
                 ->whereNotNull('rider_settlement_id')
-                ->whereDate('rider_settled_at', $date)
+                ->where('rider_settled_at', '>=', $receiptStart)->where('rider_settled_at', '<', $receiptEnd)
                 ->where('business_date', '<', $date)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
@@ -15560,24 +15554,34 @@ class PosController extends Controller
                 $allocSettlements = \App\Models\PosRiderSettlement::where('company_id', $companyId)
                     ->where('panel', 'pra')
                     ->whereNotNull('allocation')
-                    ->whereDate('created_at', $date)
+                    ->where(function ($q) use ($date, $receiptStart, $receiptEnd) {
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_rider_settlements', 'business_date')) {
+                            $q->where('business_date', $date)->orWhere(fn ($legacy) => $legacy->whereNull('business_date')->where('created_at', '>=', $receiptStart)->where('created_at', '<', $receiptEnd));
+                        } else {
+                            $q->where('created_at', '>=', $receiptStart)->where('created_at', '<', $receiptEnd);
+                        }
+                    })
                     ->get();
                 // Task 1197: allocation entries carry bill_id — the isolated
                 // preview counts only rupees applied to the viewer's OWN bills.
                 $ownBillIds = null;
-                if ($onlyCreatedBy && $allocSettlements->isNotEmpty()) {
+                if (($onlyCreatedBy || $branchId) && $allocSettlements->isNotEmpty()) {
                     $allocIds = $allocSettlements->flatMap(fn ($s) => collect((array) $s->allocation)->pluck('bill_id'))->filter()->unique()->values();
                     $ownBillIds = $allocIds->isEmpty() ? collect() : PosTransaction::withoutGlobalScope('hide_archived')
                         ->where('company_id', $companyId)
                         ->whereIn('id', $allocIds)
-                        ->where('created_by', $onlyCreatedBy)
+                        ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
+                        ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
                         ->pluck('id')
                         ->flip();
                 }
-                $allocSettlements->each(function ($s) use (&$allocCashIn, $date, $ownBillIds) {
+                $allocSettlements->each(function ($s) use (&$allocCashIn, $date, $ownBillIds, $onlyCreatedBy, $branchId) {
                     foreach ((array) $s->allocation as $entry) {
                         if ($ownBillIds !== null && !isset($ownBillIds[(int) ($entry['bill_id'] ?? 0)])) {
-                            continue;
+                            // Shop receipt allocations survive deletion; use their frozen scope.
+                            if (!array_key_exists('branch_id', $entry)
+                                || ($branchId && $entry['branch_id'] !== null && (int) $entry['branch_id'] !== $branchId)
+                                || ($onlyCreatedBy && (int) ($entry['created_by'] ?? 0) !== $onlyCreatedBy)) continue;
                         }
                         if (!empty($entry['business_date']) && $entry['business_date'] < $date) {
                             $allocCashIn += (float) ($entry['amount'] ?? 0);
@@ -15610,7 +15614,7 @@ class PosController extends Controller
             $riders = [];
             foreach ($dayBills->groupBy('rider_id') as $rid => $rows) {
                 $riders[] = [
-                    'name' => $riderNames[$rid] ?? ('Rider #' . $rid),
+                    'name' => $rid ? ($riderNames[$rid] ?? ('Rider #' . $rid)) : 'Unassigned / shop cash',
                     'deliveries' => $rows->count(),
                     'delivered' => $rows->where('delivery_status', 'delivered')->count(),
                     'returned' => $rows->where('delivery_status', 'returned')->count(),
@@ -16185,12 +16189,21 @@ class PosController extends Controller
         $deletedCount = 0;
         $report = null;
         $localSummary = [];
-        \DB::transaction(function () use ($data, $companyId, $date, $branchId, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
+        $concurrentExisting = false;
+        \DB::transaction(function () use (&$concurrentExisting, $data, $companyId, $date, $branchId, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
             // Preserve every existing L-reference before the wash can archive or
             // permanently delete its row. This is a no-op on old schemas during
             // the migration window; the migration backfills the same high-water.
             \App\Services\PosLocalSeries::preserveHighWaterMark($companyId);
 
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $winner = PosDayCloseReport::where('company_id', $companyId)->forBranch($branchId)
+                ->whereDate('report_date', $date)->lockForUpdate()->first();
+            if ($winner) {
+                $report = $winner;
+                $concurrentExisting = true;
+                return;
+            }
             $report = PosDayCloseReport::create($data);
 
             // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND
@@ -16303,7 +16316,7 @@ class PosController extends Controller
                 // picks exactly like the whole-set policy. Settled / returned /
                 // non-cash rider bills wash normally.
                 if ($deleteRows->isNotEmpty() && $riderGuardReady) {
-                    $riderGuarded = $deleteRows->filter(fn ($t) => $t->rider_id
+                    $riderGuarded = $deleteRows->filter(fn ($t) => ($t->rider_id || $t->order_type === 'delivery' || $t->has_delivery_items)
                         && $t->payment_method === 'cash'
                         && !$t->rider_settlement_id
                         && $t->delivery_status !== 'returned');
@@ -16430,6 +16443,10 @@ class PosController extends Controller
                 }
             }
         });
+
+        if ($concurrentExisting) {
+            return ['status' => 'exists', 'report' => $report, 'archived' => 0, 'deleted' => 0, 'report_number' => $report->report_number];
+        }
 
         // Owner/manager phone push with the day's totals (Task #1142) — queued
         // only AFTER the report transaction committed; fire-and-forget (can

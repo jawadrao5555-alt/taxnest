@@ -60,7 +60,7 @@ class PosFinancialHistory
             self::add($groups[$key]['totals'], ['sales' => $sign > 0 ? 1 : 0, 'returns' => $sign < 0 ? 1 : 0,
                 'gross' => $sign > 0 ? $amount : 0, 'returned' => $sign < 0 ? $amount : 0,
                 'net' => $sign * $amount, 'tax' => $sign * (float) $bill->tax_amount,
-                'base' => $sign * ($amount - (float) $bill->tax_amount), 'discount' => $sign * (float) $bill->discount_amount]);
+                'base' => $sign * ($amount - (float) $bill->tax_amount), 'discount' => $sign * ((float) $bill->discount_amount + (float) $bill->items->sum('item_discount_amount') + (float) $bill->items->sum('promotion_discount'))]);
             $weights = $bill->items->map(fn ($i) => max(0, self::money($i->subtotal)))->all();
             $discounts = PosDealAllocation::cents(self::money($bill->discount_amount), $weights);
             $lineTotal = 0; $lineTax = 0;

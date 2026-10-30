@@ -435,6 +435,8 @@ class RestaurantPosController extends Controller
             }
         }
 
+        $resolvedItems = \App\Services\PosPromotions::heldRows($resolvedItems, $company, $request);
+
         foreach ($resolvedItems as $idx => &$resolvedLine) {
             $resolvedLine += \App\Support\PosFulfillment::fields($request->items[$idx]);
             if (!empty($resolvedLine['skip_kitchen']) && isset($resolvedLine['fulfillment'])) $resolvedLine['fulfillment'] = 'delivery';
@@ -485,6 +487,8 @@ class RestaurantPosController extends Controller
 
         DB::beginTransaction();
         try {
+            $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            \App\Services\PosPromotions::assertRowsCurrent(array_map(fn ($r) => ['type'=>$r['item_type'], 'item_id'=>$r['item_id'], 'promotion_snapshot'=>$r['promotion_snapshot'] ?? null], $resolvedItems), $lockedPromotionCompany);
             // Phase 5 — KOT tracking. If this is a re-send (recalled order)
             // carry the prior print count forward so the new ticket prints "UPDATED".
             $carriedKotCount = 0;
@@ -699,7 +703,7 @@ class RestaurantPosController extends Controller
                 $lineDiscAmt = (float) ($item['item_discount_amount'] ?? 0);
                 $lineDiscVal = (float) ($item['item_discount_value'] ?? 0);
                 $discType = $item['item_discount_type'] ?? null;
-                $accSub = 0.0; $accDisc = 0.0; $accVal = 0.0;
+                $accSub = 0.0; $accDisc = 0.0; $accVal = 0.0; $accPromo = 0.0;
                 foreach ($chunks as $ci => $chunk) {
                     $row = $item;
                     $row['quantity'] = $chunk['qty'];
@@ -725,6 +729,11 @@ class RestaurantPosController extends Controller
                         $accSub += $row['subtotal'];
                         $accDisc += $row['item_discount_amount'];
                         $accVal += $discType === 'amount' ? $row['item_discount_value'] : 0;
+                    }
+                    if (isset($item['promotion_snapshot'])) {
+                        $row['promotion_discount'] = $ci === $n - 1 ? round($item['promotion_discount'] - $accPromo, 2) : round($item['promotion_discount'] * $chunk['qty'] / $lineQty, 2);
+                        $accPromo += $row['promotion_discount'];
+                        $row['promotion_snapshot'] = array_replace($item['promotion_snapshot'], ['gross'=>round($row['subtotal']+$row['promotion_discount'],2),'discount'=>$row['promotion_discount'],'net'=>$row['subtotal']]);
                     }
                     RestaurantOrderItem::create(array_merge($row, ['order_id' => $order->id]));
                 }
@@ -1153,6 +1162,7 @@ class RestaurantPosController extends Controller
             ->with('items')
             ->findOrFail((int) $orderId);
 
+        \App\Services\PosPromotions::assertHeldCurrent($order, $company);
         $quote = RestaurantOrderPaymentCalculator::calculate($order, $company, $validated['payment_method']);
 
         return response()->json([
@@ -1297,6 +1307,7 @@ class RestaurantPosController extends Controller
         // Normalize aliases → canonical stored buckets (mirrors storeInvoice):
         // 'card'/'online' front-end aliases become 'debit_card' so PosTaxRule,
         // PRA PaymentMode mapping, and cash/card aggregations all see one bucket.
+        \App\Services\PosPromotions::assertHeldCurrent($order, $company);
         $payment = RestaurantOrderPaymentCalculator::calculate($order, $company, $paymentMethod);
         $paymentMethod = $payment['payment_method'];
         $taxRate = $payment['tax_rate'];
@@ -1372,6 +1383,7 @@ class RestaurantPosController extends Controller
 
         DB::beginTransaction();
         try {
+            $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
             // ── Single-winner guard (Table Board, Jul 2026) ──────────────────
             // Cross-terminal pays are first-class now (sale-screen Table Board):
             // re-fetch the order under a ROW LOCK and re-check status INSIDE the
@@ -1423,6 +1435,7 @@ class RestaurantPosController extends Controller
                     'message' => 'Order was just updated (new items) — refresh and try again.',
                 ], 409);
             }
+            \App\Services\PosPromotions::assertHeldCurrent($freshOrder, $lockedPromotionCompany);
             $order = $freshOrder;
 
             $stockErrors = $this->validateStockForOrder($companyId, $order, true);
@@ -1551,6 +1564,9 @@ class RestaurantPosController extends Controller
             // stamped + delta rows (kitchen bookkeeping only). The customer bill
             // must show ONE line per dish — consolidate identical rows before
             // creating transaction items. Sums are exact by construction.
+            $costIds = $order->items->where('item_type', 'product')->pluck('item_id')->filter();
+            $costProducts = $costIds->isEmpty() ? collect() : PosProduct::where('company_id', $companyId)->whereIn('id', $costIds)->get()->keyBy('id');
+            $productCosts = \App\Services\PosProductCost::map($companyId, $costProducts);
             foreach ($this->consolidateBillLines($order->items) as $item) {
                 $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;
                 $lineTax = $item->is_tax_exempt ? 0 : ($taxInclusive
@@ -1570,6 +1586,8 @@ class RestaurantPosController extends Controller
                     ...(Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $item->fulfillment, 'line_uid' => $item->line_uid] : []),
                     ...(Schema::hasColumn('pos_transaction_items', 'skip_kitchen') ? ['skip_kitchen' => (bool) $item->skip_kitchen] : []),
                     'special_notes' => $item->special_notes ?: null,
+                    ...(Schema::hasColumn('pos_transaction_items', 'cost_price') ? ['cost_price'=>$item->item_type === 'product' ? ($productCosts[$item->item_id] ?? null) : null] : []),
+                    ...(Schema::hasColumn('pos_transaction_items', 'reporting_snapshot') ? ['reporting_snapshot'=>['category'=>$costProducts[$item->item_id]->category ?? null,'size'=>$costProducts[$item->item_id]->size ?? null,'uom'=>$costProducts[$item->item_id]->uom ?? null]] : []),
                     'quantity' => $itemQty,
                     'unit_price' => (float) $item->unit_price,
                     'subtotal' => (float) $item->subtotal,
@@ -1579,6 +1597,7 @@ class RestaurantPosController extends Controller
                     'item_discount_type' => $item->item_discount_type ?? 'percentage',
                     'item_discount_value' => (float) ($item->item_discount_value ?? 0),
                     'item_discount_amount' => (float) ($item->item_discount_amount ?? 0),
+                    ...(Schema::hasColumn('pos_transaction_items', 'promotion_snapshot') ? ['promotion_snapshot'=>$item->promotion_snapshot, 'promotion_discount'=>$item->promotion_discount] : []),
                 ]);
             }
 
@@ -1722,6 +1741,7 @@ class RestaurantPosController extends Controller
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
+            if ($e instanceof \Illuminate\Validation\ValidationException) throw $e;
             // Task 994 review fix: DUPLICATE-KEY RECOVERY. Two same-uuid pays can
             // both pass the pre-create checks when they target DIFFERENT order
             // rows (original + a ghost re-hold — the row lock can't serialize

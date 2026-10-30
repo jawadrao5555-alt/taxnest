@@ -165,7 +165,7 @@ class PosReturnService
             }
 
             $taxInclusive = (bool) ($original->tax_inclusive ?? false);
-            $allocatedBill = $original->items->contains(fn ($line) => PosDealAllocation::supported($line->deal_snapshot));
+            $allocatedBill = $original->items->contains(fn ($line) => PosDealAllocation::supported($line->deal_snapshot) || !empty($line->promotion_snapshot));
             $originalLineSum = (float) $original->items->sum('subtotal');
             $allocatedNet = $allocatedDiscount = $allocatedExempt = $allocatedBase = 0.0;
 
@@ -206,6 +206,10 @@ class PosReturnService
                     $itemDisc = $finalLine ? $discRemaining : min($itemDisc, $discRemaining);
                 }
 
+                $soldQty = (float) $orig->quantity;
+                $beforeQty = (float) ($orig->returned_quantity ?? 0);
+                $promoDisc = (round((float) $orig->promotion_discount * 100 * min(1, ($beforeQty + $qty) / $soldQty))
+                    - round((float) $orig->promotion_discount * 100 * min(1, $beforeQty / $soldQty))) / 100;
                 $returnSnapshot = null;
                 if ($allocatedBill) {
                     $soldQty = (float) $orig->quantity;
@@ -214,6 +218,7 @@ class PosReturnService
                         - round($amount * 100 * min(1, $beforeQty / $soldQty))) / 100;
                     $sub = $slice((float) $orig->subtotal);
                     $tax = $slice((float) $orig->tax_amount);
+                    $itemDisc = $slice((float) ($orig->item_discount_amount ?? 0));
                     if (PosDealAllocation::supported($orig->deal_snapshot)) {
                         $returnSnapshot = PosDealAllocation::returnSlice($orig->deal_snapshot, $soldQty, $beforeQty, $qty);
                         $sub = PosDealAllocation::sum($returnSnapshot, 'subtotal');
@@ -276,6 +281,8 @@ class PosReturnService
                     'tax_amount' => $tax,
                     // Informational — the sold line's own item-discount share.
                     'item_discount_amount' => $itemDisc,
+                    ...($allocatedBill && !$returnSnapshot && Schema::hasColumn('pos_transaction_items', 'taxable_base') ? ['taxable_base'=>$orig->is_tax_exempt ? 0 : round($ownNet-$tax,2), 'exempt_base'=>$ownExempt, 'allocated_discount'=>$ownDiscount] : []),
+                    ...(Schema::hasColumn('pos_transaction_items', 'promotion_snapshot') ? ['promotion_discount'=>$promoDisc,'promotion_snapshot'=>$orig->promotion_snapshot ? array_replace($orig->promotion_snapshot,['discount'=>$promoDisc,'net'=>$sub,'gross'=>round($sub+$promoDisc,2)]) : null] : []),
                     'return_disposition' => $disposition,
                     'disposition' => $disposition,
                 ];

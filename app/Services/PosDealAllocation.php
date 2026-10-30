@@ -86,6 +86,7 @@ class PosDealAllocation
                 : ($cardSave ? round($net * 100 / (100 + $menuRate), 2) : round($net - $tax, 2));
             $component['allocation'] = [
                 'subtotal' => $gross[$index] / 100, 'discount' => $discounts[$index] / 100,
+                'item_discount' => (float) ($component['allocation']['item_discount'] ?? 0),
                 'taxable_base' => $exempt ? 0.0 : $base, 'exempt_base' => $exempt ? $base : 0.0,
                 'tax_rate' => $ownRate, 'tax' => $tax, 'total' => round($base + $tax, 2),
                 'tax_inclusive' => $inclusive, 'menu_rate' => $menuRate,
@@ -168,14 +169,25 @@ class PosDealAllocation
         }, $snapshot);
     }
 
+    /** Informational item reduction is separate from the invoice discount already allocated by capture(). */
+    public static function withItemDiscount(array $snapshot, float $discount): array
+    {
+        $shares = self::cents((int) round($discount * 100), self::weights($snapshot));
+        foreach ($snapshot as $index => &$component) {
+            if (isset($component['allocation'])) $component['allocation']['item_discount'] = $shares[$index] / 100;
+        }
+        unset($component);
+        return $snapshot;
+    }
+
     /** Cumulative proration leaves the last partial return the exact original remainder. */
     public static function returnSlice(array $snapshot, float $sold, float $returned, float $quantity): array
     {
         if ($sold <= 0) return $snapshot;
         foreach ($snapshot as &$component) {
             if (!is_array($component['allocation'] ?? null)) continue;
-            foreach (['subtotal', 'discount', 'taxable_base', 'exempt_base', 'tax', 'total'] as $key) {
-                $cents = (int) round((float) $component['allocation'][$key] * 100);
+            foreach (['subtotal', 'discount', 'item_discount', 'taxable_base', 'exempt_base', 'tax', 'total'] as $key) {
+                $cents = (int) round((float) ($component['allocation'][$key] ?? 0) * 100);
                 $component['allocation'][$key] = (round($cents * min(1, ($returned + $quantity) / $sold))
                     - round($cents * min(1, $returned / $sold))) / 100;
             }

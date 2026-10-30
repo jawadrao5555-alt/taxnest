@@ -244,13 +244,16 @@ class PosProfitFreezeTest extends TestCase
     {
         return [
             'exclusive' => ['exclusive', 'cash', 812, 92, 576, 92.16],
+            'exclusive item discount' => ['exclusive', 'cash', 812, 92, 576, 92.16, true],
+            'inclusive item discount' => ['inclusive', 'cash', 720, 79.45, 496.55, 79.45, true],
+            'card saving item discount' => ['inclusive_card_save', 'debit_card', 665, 24.83, 496.55, 24.83, true],
             'inclusive cash' => ['inclusive', 'cash', 720, 79.45, 496.55, 79.45],
             'inclusive card saving' => ['inclusive_card_save', 'debit_card', 665, 24.83, 496.55, 24.83],
         ];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('mixedDealModes')]
-    public function test_mixed_deal_freezes_component_tax_discount_cost_and_payload(string $mode, string $method, float $total, float $headerTax, float $taxable, float $lineTax): void
+    public function test_mixed_deal_freezes_component_tax_discount_cost_and_payload(string $mode, string $method, float $total, float $headerTax, float $taxable, float $lineTax, bool $itemDiscount = false): void
     {
         (require database_path('migrations/2026_07_14_200000_add_pos_deals.php'))->up();
         (require database_path('migrations/2026_12_21_000003_add_pos_deal_allocated_bases.php'))->up();
@@ -268,8 +271,9 @@ class PosProfitFreezeTest extends TestCase
         }
         $response = $this->actingAs($this->posAdmin, 'pos')->postJson('/pos/invoice/store', [
             'items' => [['type' => 'deal', 'item_id' => $deal->id, 'name' => $deal->name,
-                'quantity' => 1, 'unit_price' => 800, 'is_tax_exempt' => true]],
-            'payment_method' => $method, 'discount_type' => 'percentage', 'discount_value' => 10,
+                'quantity' => 1, 'unit_price' => 800, 'is_tax_exempt' => true,
+                'item_discount_type' => 'percentage', 'item_discount_value' => $itemDiscount ? 10 : 0]],
+            'payment_method' => $method, 'discount_type' => 'percentage', 'discount_value' => $itemDiscount ? 0 : 10,
         ]);
         $this->assertSame(200, $response->status(), $response->getContent());
         $response->assertJson(['success' => true]);
@@ -281,6 +285,8 @@ class PosProfitFreezeTest extends TestCase
         $this->assertEquals($taxable, $line->taxable_base);
         $this->assertEquals(144, $line->exempt_base);
         $this->assertEquals(330, $line->cost_price);
+        $this->assertEquals($itemDiscount ? 80 : 0, $line->item_discount_amount ?? 0);
+        $this->assertEquals($itemDiscount ? 80 : 0, \App\Services\PosDealAllocation::sum($line->deal_snapshot, 'item_discount'));
         $this->assertEquals($lineTax, $line->tax_amount);
         $this->assertFalse($line->is_tax_exempt, 'Client parent toggle cannot erase taxable component tax.');
         $summary = new \ReflectionMethod(\App\Http\Controllers\PosController::class, 'buildItemLevelSummary');
@@ -308,6 +314,11 @@ class PosProfitFreezeTest extends TestCase
         $deal->update(['price' => 9999]);
         $this->company->update(['pos_tax_rate_cash' => 30]);
         $this->assertSame($before, $service->generatePayload($tx->fresh()->load('items')));
+        $analytics = $this->runRangeAnalytics(false, 'local');
+        $this->assertEquals(330, $analytics->profit->cost);
+        $this->assertEquals(round($taxable + 144 - 330, 2), round($analytics->profit->profit, 2));
+        $this->assertEquals(100, $analytics->profit->coverage_pct);
+
     }
 
     /** storeInvoice() must freeze pos_products.cost_price onto the item row. */
@@ -450,6 +461,119 @@ class PosProfitFreezeTest extends TestCase
     // Helpers
     // ═════════════════════════════════════════════════════════════════════════
 
+    private function preparePromotion(array $attributes = []): \App\Models\PosPromotion
+    {
+        (require database_path('migrations/2026_12_21_000005_add_pos_scheduled_promotions.php'))->up();
+        DB::table('pricing_plans')->update(['deals_enabled'=>true]);
+        PosFeatureService::flushGateCaches();
+        return \App\Models\PosPromotion::create(array_replace(['company_id'=>$this->companyId,'title'=>'Lunch offer','percent'=>10,
+            'applies_to'=>'all','product_ids'=>[],'priority'=>1,'timezone'=>'Asia/Karachi','starts_at'=>now('UTC')->subHour()->format('Y-m-d H:i:s'),
+            'ends_at'=>now('UTC')->addHour()->format('Y-m-d H:i:s'),'is_active'=>true], $attributes));
+    }
+
+    public static function promotionModes(): array
+    {
+        return [['exclusive','cash',209],['inclusive','cash',180],['inclusive_card_save','debit_card',163]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('promotionModes')]
+    public function test_promotion_posting_freezes_offer_and_tax_without_repricing_paid_history(string $mode, string $method, int $total): void
+    {
+        $offer=$this->preparePromotion(); $product=$this->makeProduct(50);
+        Schema::table('pos_transactions', fn(Blueprint $t)=>$t->decimal('tax_menu_rate',8,2)->nullable());
+        $this->company->update(['pos_tax_rate_cash'=>16,'pos_tax_rate_card'=>5,'pos_tax_pricing_mode'=>$mode,'pos_tax_inclusive'=>$mode!=='exclusive']);
+        $quote=\App\Services\PosPromotions::quotes($this->company,[$product])[$product->id];
+        $response=$this->actingAs($this->posAdmin,'pos')->postJson('/pos/invoice/store',[
+            'items'=>[['type'=>'product','item_id'=>$product->id,'name'=>$product->name,'quantity'=>1,'unit_price'=>200,'promotion_quote'=>$quote]],
+            'payment_method'=>$method,'discount_type'=>'percentage','discount_value'=>0]);
+        $this->assertSame(200,$response->status(),$response->getContent());
+        $tx=PosTransaction::findOrFail($response->json('transaction_id'));$line=$tx->items->sole();
+        $this->assertEquals($total,$tx->total_amount);$this->assertEquals(20,$line->promotion_discount);$this->assertEquals(180,$line->subtotal);
+        $this->assertSame('Lunch offer',$line->promotion_snapshot['title']);$this->assertEquals(50,$line->cost_price);
+        $service=new \App\Services\PraIntegrationService($this->company);$payload=$service->generatePayload($tx);
+        $offer->update(['title'=>'Changed','percent'=>50,'is_active'=>false]);$product->update(['price'=>999,'cost_price'=>900]);
+        $this->assertSame($payload,$service->generatePayload($tx->fresh()->load('items')));
+        $this->assertSame('Lunch offer',$line->fresh()->promotion_snapshot['title']);
+    }
+
+    public static function invalidPromotionCarts(): array
+    {
+        return [['missing'],['expired'],['changed'],['forged_percent'],['forged_price'],['foreign'],['manual_item'],['manual_bill'],['offline']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidPromotionCarts')]
+    public function test_promotion_rejects_invalid_cart_without_writing_a_bill(string $case): void
+    {
+        $offer=$this->preparePromotion();$product=$this->makeProduct(50);
+        $quote=\App\Services\PosPromotions::quotes($this->company,[$product])[$product->id];
+        $item=['type'=>'product','item_id'=>$product->id,'name'=>$product->name,'quantity'=>1,'unit_price'=>200,'promotion_quote'=>$quote];
+        $payload=['items'=>[$item],'payment_method'=>'cash','discount_type'=>'percentage','discount_value'=>0];
+        if($case==='missing') unset($payload['items'][0]['promotion_quote']);
+        if($case==='expired') $offer->update(['ends_at'=>now('UTC')->format('Y-m-d H:i:s')]);
+        if($case==='changed') $offer->update(['percent'=>50]);
+        if($case==='forged_percent') $payload['items'][0]['promotion_quote']['percent']=99;
+        if($case==='forged_price') $payload['items'][0]['unit_price']=1;
+        if($case==='foreign') $offer->update(['company_id'=>$this->companyId+999]);
+        if($case==='manual_item') $payload['items'][0]['item_discount_value']=5;
+        if($case==='manual_bill') $payload['discount_value']=5;
+        if($case==='offline') $payload['offline_queued_at']=now()->toIso8601String();
+        $response=$this->actingAs($this->posAdmin,'pos')->postJson('/pos/invoice/store',$payload);
+        $this->assertSame(422,$response->status(),$response->getContent());$response->assertJsonValidationErrors($case === 'manual_bill' ? 'discount_value' : 'items');$this->assertSame(0,PosTransaction::count());
+    }
+
+    public function test_promotion_schedule_overlap_selection_and_plan_revocation(): void
+    {
+        $product=$this->makeProduct(50);$other=$this->makeProduct(30);$foreign=$this->makeProduct(10);$foreign->update(['company_id'=>$this->companyId+999]);
+        $first=$this->preparePromotion(['starts_at'=>'2026-10-30 07:00:00','ends_at'=>'2026-10-30 08:00:00']);
+        $at=\Carbon\CarbonImmutable::parse('2026-10-30 12:00:00','Asia/Karachi');
+        $quotes=fn($time)=>\App\Services\PosPromotions::quotes($this->company,[$product,$other,$foreign],$time);
+        $this->assertSame([],$quotes($at->subSecond()));$this->assertCount(2,$quotes($at));$this->assertSame([],$quotes($at->addHour()));
+        $second=$first->replicate();$second->percent=20;$second->applies_to='selected';$second->product_ids=[$product->id];$second->save();
+        $this->assertSame($second->id,$quotes($at)[$product->id]['id']);$this->assertSame($first->id,$quotes($at)[$other->id]['id']);
+        $third=$second->replicate();$third->save();$this->assertSame($second->id,$quotes($at)[$product->id]['id']);
+        $first->update(['priority'=>2]);$this->assertSame($first->id,$quotes($at)[$product->id]['id']);
+        DB::table('pricing_plans')->update(['deals_enabled'=>false]);PosFeatureService::flushGateCaches();
+        $this->assertSame([],$quotes($at));
+    }
+
+    public function test_promotion_crud_validates_local_times_tenant_ids_and_admin_permission(): void
+    {
+        $offer=$this->preparePromotion();$product=$this->makeProduct(10);
+        $input=['title'=>'Evening','percent'=>15,'priority'=>3,'timezone'=>'Asia/Karachi','starts_at'=>'2026-11-01T18:00','ends_at'=>'2026-11-01T20:00','applies_to'=>'selected','product_ids'=>[$product->id],'is_active'=>1];
+        $this->actingAs($this->posAdmin,'pos')->post('/pos/promotions',$input)->assertRedirect();
+        $saved=\App\Models\PosPromotion::where('title','Evening')->sole();$this->assertSame('2026-11-01 13:00:00',$saved->starts_at);
+        $this->putJson('/pos/promotions/'.$saved->id,array_replace($input,['ends_at'=>$input['starts_at']]))->assertUnprocessable();
+        $this->postJson('/pos/promotions',array_replace($input,['product_ids'=>[999999]]))->assertUnprocessable();
+        $offer->update(['company_id'=>$this->companyId+999]);$this->putJson('/pos/promotions/'.$offer->id,$input)->assertNotFound();
+        $this->postJson('/pos/api/promotion-quotes',['product_ids'=>[$product->id,999999]])->assertOk();
+        auth('admin')->setUser(new \App\Models\AdminUser(['id'=>999,'name'=>'Synthetic admin']));
+        $this->withSession(['impersonation'=>['company_id'=>$this->companyId,'guard'=>'pos','read_only'=>true]])->putJson('/pos/promotions/'.$saved->id,array_replace($input,['percent'=>99]))->assertForbidden();
+        $this->assertEquals(15,$saved->fresh()->percent);
+        auth('admin')->forgetUser();
+        $this->flushSession();$this->posAdmin->update(['role'=>'pos_user','pos_role'=>'pos_cashier']);
+        $count=\App\Models\PosPromotion::count();
+        $this->actingAs($this->posAdmin->fresh(),'pos')->postJson('/pos/promotions',$input)->assertRedirect(route('pos.dashboard'));
+        $this->assertSame($count,\App\Models\PosPromotion::count());
+    }
+
+    public function test_recipe_sale_freezes_base_unit_cost_with_waste_and_keeps_unconfigured_cost_unknown(): void
+    {
+        Schema::create('ingredients',function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->string('name');$t->boolean('is_active');$t->decimal('cost_per_unit',18,6)->nullable();$t->decimal('current_stock',18,4)->default(10000);$t->string('unit')->default('g');$t->timestamps();});
+        Schema::create('product_recipes',function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->unsignedBigInteger('product_id');$t->unsignedBigInteger('ingredient_id');$t->decimal('quantity_needed',18,4);$t->decimal('waste_percent',8,2);$t->boolean('is_active')->default(true);});
+        $product=$this->makeProduct(99);
+        $ingredient=\App\Models\Ingredient::create(['company_id'=>$this->companyId,'name'=>'Flour','is_active'=>true,'cost_per_unit'=>.125]);
+        DB::table('product_recipes')->insert(['company_id'=>$this->companyId,'product_id'=>$product->id,'ingredient_id'=>$ingredient->id,'quantity_needed'=>100,'waste_percent'=>10]);
+        $payload=['items'=>[['type'=>'product','item_id'=>$product->id,'name'=>$product->name,'quantity'=>2,'unit_price'=>200]],'payment_method'=>'cash','discount_type'=>'amount','discount_value'=>0];
+        $response=$this->actingAs($this->posAdmin,'pos')->postJson('/pos/invoice/store',$payload);$this->assertSame(200,$response->status(),$response->getContent());
+        $line=PosTransaction::findOrFail($response->json('transaction_id'))->items->sole();$this->assertEquals(13.75,$line->cost_price);
+        $ingredient->update(['cost_per_unit'=>0]);
+        $this->assertEquals(13.75,$line->fresh()->cost_price);
+        $response=$this->postJson('/pos/invoice/store',$payload);$response->assertOk();
+        $this->assertNull(PosTransaction::findOrFail($response->json('transaction_id'))->items->sole()->cost_price);
+        $ingredient->update(['company_id'=>$this->companyId+999,'cost_per_unit'=>1]);
+        $this->assertNull(\App\Services\PosProductCost::map($this->companyId,[$product])[$product->id]);
+    }
+
     private function makeProduct(float $cost): PosProduct
     {
         return PosProduct::create([
@@ -495,7 +619,7 @@ class PosProfitFreezeTest extends TestCase
         ]);
     }
 
-    private function runRangeAnalytics(bool $menuOrder = false): object
+    private function runRangeAnalytics(bool $menuOrder = false, string $tab = 'pra'): object
     {
         $user = new class { public function isPosAdmin(): bool { return true; } };
         $ctrl = new \App\Http\Controllers\PosController();
@@ -503,7 +627,7 @@ class PosProfitFreezeTest extends TestCase
         $ref->setAccessible(true);
         return $ref->invoke($ctrl, $this->companyId,
             Carbon::today()->startOfDay(), Carbon::today()->endOfDay(),
-            'pra', 'all', $this->company, $user, $menuOrder);
+            $tab, 'all', $this->company, $user, $menuOrder);
     }
 
     /**

@@ -8,15 +8,10 @@
         @endif
     </div>
     <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('pos_history.basis') }}</p>
-    <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-wrap gap-2 items-end">
-        <input type="hidden" name="tab" value="{{ $tab }}"><input type="hidden" name="cashier" value="{{ $selectedCashier }}">
-        <label class="text-sm">{{ __('pos.from_label') }}<input class="block border rounded-lg bg-transparent p-2" type="date" name="from" value="{{ $fh['from'] }}" required></label>
-        <label class="text-sm">{{ __('pos.to_label') }}<input class="block border rounded-lg bg-transparent p-2" type="date" name="to" value="{{ $fh['to'] }}" required></label>
-        <button class="px-4 py-2 bg-purple-700 text-white rounded-lg">{{ __('pos.filter_btn') }}</button>
         @if($user?->isPosAdmin() && !$user->posHidesLocalStream() && $user->posBillingScope() === 'both')
         <a class="px-4 py-2 text-purple-700 underline" href="{{ route('pos.reports', ['tab' => 'combined', 'cashier' => $selectedCashier, 'from' => $fh['from'], 'to' => $fh['to']]) }}">{{ __('pos_history.combined') }}</a>
         @endif
-    </form>
+
     @if(!$fh['complete'])
     <div role="status" class="p-3 bg-amber-50 text-amber-900 rounded-lg"><strong>{{ __('pos_history.partial') }}</strong>
         <p>{{ __('pos_history.gap_explanation') }}</p>

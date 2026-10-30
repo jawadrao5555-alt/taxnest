@@ -992,6 +992,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'returnForm'])->name('pos.transaction.return-form');
     Route::post('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'processReturn'])->name('pos.transaction.return');
     Route::post('/transactions/bulk-retry-pra', [PosController::class, 'bulkRetryPra'])->name('pos.transactions.bulk-retry-pra');
+    Route::post('/api/promotion-quotes', [\App\Http\Controllers\PosPromotionController::class, 'quotes'])->name('pos.promotions.quotes');
     Route::get('/api/provisional-bills', [PosController::class, 'apiProvisionalBills'])->name('pos.api.provisional-bills');
     Route::post('/api/provisional-bills/{id}/delete', [PosController::class, 'apiDeleteProvisional'])->name('pos.api.provisional.delete');
     Route::post('/api/provisional-bills/{id}/promote', [PosController::class, 'apiPromoteProvisional'])->name('pos.api.provisional.promote');
@@ -1223,6 +1224,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
             Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
             Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
         });
+        Route::get('/promotions', [\App\Http\Controllers\PosPromotionController::class, 'index'])->name('pos.promotions');
+        Route::post('/promotions', [\App\Http\Controllers\PosPromotionController::class, 'store'])->name('pos.promotions.store');
+        Route::put('/promotions/{id}', [\App\Http\Controllers\PosPromotionController::class, 'update'])->name('pos.promotions.update');
         Route::get('/deals', [PosController::class, 'deals'])->name('pos.deals');
         Route::post('/deals', [PosController::class, 'storeDeal'])->name('pos.deals.store');
         Route::put('/deals/{id}', [PosController::class, 'updateDeal'])->name('pos.deals.update');

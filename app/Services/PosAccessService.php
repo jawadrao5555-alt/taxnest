@@ -129,6 +129,7 @@ class PosAccessService
         '#^pos/api/enable-pra-integration#' => 'customize',
         '#^pos/services#' => 'customize',
         '#^pos/deals#' => 'customize',
+        '#^pos/promotions#' => 'customize',
         '#^pos/terminals#' => 'customize',
         '#^pos/pra-settings#' => 'customize',
         '#^pos/billing#' => 'customize',

@@ -299,7 +299,45 @@ class PosPraReturnFlowTest extends TestCase
             ->where('transaction_type', 'return')->get();
     }
 
-    public function test_mixed_deal_partial_returns_keep_original_component_split_and_money(): void
+
+    public static function promotionReturnModes(): array
+    {
+        return [[false,null,16,626,86,540],[true,null,16,540,74.48,465.52],[true,16,5,489,23.28,465.52]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('promotionReturnModes')]
+    public function test_promotion_partial_returns_preserve_discount_and_conserve_original_money(bool $inclusive, ?float $menuRate, float $rate, float $total, float $tax, float $base): void
+    {
+        (require database_path('migrations/2026_12_21_000003_add_pos_deal_allocated_bases.php'))->up();
+        (require database_path('migrations/2026_12_21_000005_add_pos_scheduled_promotions.php'))->up();
+        $this->actAs('pos_admin');
+        $parent=$this->seedParent(['subtotal'=>$base,'discount_amount'=>0,'tax_rate'=>$rate,'tax_amount'=>$tax,'exempt_amount'=>0,
+            'total_amount'=>$total,'tax_inclusive'=>$inclusive,'tax_menu_rate'=>$menuRate]);
+        $parent->items()->delete();
+        $line=$parent->items()->create(['item_type'=>'product','item_id'=>501,'item_name'=>'Offer product','quantity'=>3,'unit_price'=>200,
+            'subtotal'=>540,'cost_price'=>50,'tax_rate'=>$rate,'tax_amount'=>$inclusive ? $tax : 86.4,'is_tax_exempt'=>false,
+            'taxable_base'=>$base,'exempt_base'=>0,'allocated_discount'=>0,'promotion_discount'=>60,
+            'promotion_snapshot'=>['id'=>10,'title'=>'Original offer','percent'=>10,'discount'=>60,'net'=>540,'gross'=>600]]);
+        for($i=0;$i<3;$i++) $this->postReturn($parent,[['item_id'=>$line->id,'return_qty'=>1]]);
+        $returns=$this->returnRows($parent);$this->assertCount(3,$returns);
+        foreach(['total_amount'=>$total,'tax_amount'=>$tax,'subtotal'=>$base] as $field=>$expected) $this->assertSame((int)round($expected*100),(int)round($returns->sum($field)*100));
+        $this->assertEquals(60,$returns->flatMap->items->sum('promotion_discount'));
+        foreach($returns as $return) { $item=$return->items->sole();$this->assertSame('Original offer',$item->promotion_snapshot['title']);$this->assertEquals(20,$item->promotion_snapshot['discount']);$this->assertEquals(50,$item->cost_price); }
+        $this->postReturn($parent,[['item_id'=>$line->id,'return_qty'=>1]]);$this->assertCount(3,$this->returnRows($parent));
+    }
+
+    public static function allocatedReturnModes(): array
+    {
+        return [
+            'exclusive' => [false,null,16,2436,276,1728,false],
+            'inclusive' => [true,null,16,2160,238.34,1489.66,false],
+            'card-save' => [true,16,5,1996,74.48,1489.66,false],
+            'item discount' => [false,null,16,2436,276,1728,true],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('allocatedReturnModes')]
+    public function test_mixed_deal_partial_returns_keep_original_component_split_and_money(bool $inclusive, ?float $menuRate, float $rate, float $total, float $tax, float $base, bool $itemDiscount): void
     {
         Schema::table('pos_transaction_items', function (Blueprint $table) {
             $table->json('deal_snapshot')->nullable();
@@ -307,33 +345,36 @@ class PosPraReturnFlowTest extends TestCase
             $table->decimal('exempt_base', 18, 2)->nullable();
         });
         $this->actAs('pos_admin');
-        $parent = $this->seedParent(['subtotal' => 2400, 'discount_amount' => 240, 'tax_rate' => 16,
-            'tax_amount' => 276, 'exempt_amount' => 432, 'total_amount' => 2436]);
+        $billDiscount = $itemDiscount ? 0 : 240;
+        $lineSubtotal = $itemDiscount ? 2160 : 2400;
+        $parent = $this->seedParent(['subtotal' => $base + 432 + $billDiscount, 'discount_amount' => $billDiscount, 'tax_rate' => $rate,
+            'tax_amount' => $tax, 'exempt_amount' => 432, 'total_amount' => $total, 'tax_inclusive' => $inclusive, 'tax_menu_rate' => $menuRate]);
         $parent->items()->delete();
         $snapshot = \App\Services\PosDealAllocation::capture([
             ['allocation_version' => 1, 'allocation_weight' => 800, 'product_id' => 501, 'name' => 'Food', 'qty' => 1, 'unit_cost' => 300, 'tax_facts' => ['is_tax_exempt' => false]],
             ['allocation_version' => 1, 'allocation_weight' => 200, 'product_id' => 502, 'name' => 'Drink', 'qty' => 1, 'unit_cost' => 30, 'tax_facts' => ['is_tax_exempt' => true]],
-        ], 2400, 240, 16, false);
+        ], $lineSubtotal, $billDiscount, $rate, $inclusive, $menuRate);
+        $snapshot = \App\Services\PosDealAllocation::withItemDiscount($snapshot,$itemDiscount ? 240 : 0);
         $line = $parent->items()->create(['item_type' => 'deal', 'item_id' => 90, 'item_name' => 'Frozen combo',
-            'quantity' => 3, 'unit_price' => 800, 'subtotal' => 2400, 'cost_price' => 330,
-            'tax_rate' => 16, 'tax_amount' => 276.48, 'is_tax_exempt' => false, 'deal_snapshot' => $snapshot,
-            'taxable_base' => 1728, 'exempt_base' => 432]);
-        for ($i = 0; $i < 3; $i++) {
-            $this->postReturn($parent, [['item_id' => $line->id, 'return_qty' => 1]]);
-        }
+            'quantity' => 3, 'unit_price' => 800, 'subtotal' => $lineSubtotal, 'cost_price' => 330,
+            'tax_rate' => $rate, 'tax_amount' => \App\Services\PosDealAllocation::sum($snapshot,'tax'), 'is_tax_exempt' => false, 'deal_snapshot' => $snapshot,
+            'taxable_base' => $base, 'exempt_base' => 432, 'item_discount_amount'=>$itemDiscount ? 240 : 0]);
+        for ($i = 0; $i < 3; $i++) $this->postReturn($parent, [['item_id' => $line->id, 'return_qty' => 1]]);
         $returns = $this->returnRows($parent);
         $this->assertCount(3, $returns);
-        $this->assertEquals(2436, $returns->sum('total_amount'));
-        $this->assertEquals(240, $returns->sum('discount_amount'));
+        $this->assertEquals($total, $returns->sum('total_amount'));
+        $this->assertEquals($billDiscount, $returns->sum('discount_amount'));
         $this->assertEquals(432, $returns->sum('exempt_amount'));
-        $this->assertEquals(276, $returns->sum('tax_amount'));
+        $this->assertSame((int) round($tax * 100), (int) round($returns->sum('tax_amount') * 100));
+        $this->assertSame((int) round($base * 100),(int) round($returns->flatMap->items->sum('taxable_base') * 100));
         foreach ($returns as $return) {
             $item = $return->items->sole();
             $this->assertEquals(144, $item->exempt_base);
-            $this->assertEquals(576, $item->taxable_base);
             $this->assertEquals(330, $item->cost_price);
+            $this->assertEquals($itemDiscount ? 80 : 0,$item->item_discount_amount);
+            $this->assertEquals($itemDiscount ? 80 : 0,\App\Services\PosDealAllocation::sum($item->deal_snapshot,'item_discount'));
             $payload = (new PraIntegrationService(\App\Models\Company::find($this->companyId)))->generatePayload($return);
-            $this->assertEquals(812, $payload['TotalBillAmount']);
+            $this->assertEquals($return->total_amount, $payload['TotalBillAmount']);
             $this->assertEquals(0, $payload['Items'][1]['TaxRate']);
             $this->assertEquals(144, $payload['Items'][1]['SaleValue']);
         }

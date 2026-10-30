@@ -220,7 +220,7 @@ class RecipeInventoryService
                     continue;
                 }
 
-                $requirement['cost_per_unit'] = (float) $ingredient->cost_per_unit;
+                $requirement['cost_per_unit'] = (float) $ingredient->cost_per_unit > 0 ? (float) $ingredient->cost_per_unit : null;
                 $qty = (float) $requirement['quantity'];
                 $before = (float) $ingredient->current_stock;
                 $after = round($before - $qty, 4);

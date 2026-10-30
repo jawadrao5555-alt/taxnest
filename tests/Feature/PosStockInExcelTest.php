@@ -37,6 +37,7 @@ class PosStockInExcelTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Tests\Support\B02NativeDatabase::configure();
 
         Schema::dropAllTables();
         PosFeatureService::flushGateCaches();
@@ -706,4 +707,16 @@ class PosStockInExcelTest extends TestCase
         $this->assertFalse($parsed['ok']);
         $this->assertNotEmpty($parsed['fatal']);
     }
+    public function test_native_simultaneous_receiving_posts_one_movement_and_one_stock_increment(): void
+    {
+        if(\Illuminate\Support\Facades\DB::getDriverName()!=='mysql')$this->markTestSkipped('Covered by the required isolated B02 native MariaDB lane.');
+        $product=$this->product();
+        $batch=$this->stage([['ITEM','628100000001','','Coke 500ml',24,'NOS',55,'','INV-RACE','','']]);
+        $command=['kind'=>'stock','company'=>$this->companyId,'batch'=>$batch->id];
+        $results=\Tests\Support\B02NativeDatabase::race($this->companyId,[$command,$command]);
+        $out=array_column($results,'result');sort($out);$this->assertSame(['posted','rejected'],$out);
+        $this->assertEquals(24,InventoryStock::sum('quantity'));$this->assertSame(1,InventoryMovement::count());
+        $this->assertEquals(24,$product->fresh()->stock_quantity);
+    }
+
 }

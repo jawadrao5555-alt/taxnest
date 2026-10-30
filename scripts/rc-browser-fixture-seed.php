@@ -788,7 +788,7 @@ $fixture = [
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
         ['name' => 'pra-b02-deal', 'login' => $b02Owner->email, 'password' => $password, 'loginPath' => '/pos/login',
-            'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'b02Deal' => ['name' => $b02Deal->name]],
+            'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'b02Deal' => ['name' => $b02Deal->name, 'product' => $b02Food->name]],
         ['name' => 'fbr-owner-reconciliation', 'login' => $fiscalUser->email, 'password' => $password,
             'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/fail-queue'],
             'markers' => ['FBR Fail Queue'], 'fbrReconciliation' => $reconcileCases],

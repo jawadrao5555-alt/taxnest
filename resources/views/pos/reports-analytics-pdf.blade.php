@@ -65,6 +65,17 @@
         <p>{{ __('pos.dcp_generated') }} {{ now()->format('d M Y h:i A') }}</p>
     </div>
 
+    @if(isset($financialHistory))
+    <div class="section-title">{{ __('pos_history.title') }}</div>
+    <p>{{ __('pos_history.basis') }}</p>
+    @if(!$financialHistory['complete'])<p><strong>{{ __('pos_history.partial') }}</strong> {{ __('pos_history.gap_explanation') }}</p>@endif
+    <table><thead><tr>@foreach(['gross','returned','net','tax'] as $metric)<th>{{ __('pos_history.'.$metric) }}</th>@endforeach</tr></thead><tbody><tr>@foreach(['gross','returned','net','tax'] as $metric)<td>{{ number_format($financialHistory['summary'][$metric],2) }}</td>@endforeach</tr></tbody></table>
+    <p>{{ __('pos_history.provisional', ['amount'=>number_format($financialHistory['provisional']['net'],2)]) }}</p>
+    <table><thead><tr><th>{{ __('pos_history.business_dates') }}</th><th>{{ __('pos_history.net') }}</th><th>{{ __('pos_history.tax') }}</th></tr></thead><tbody>@foreach($financialHistory['daily'] as $date=>$row)<tr><td>{{ $date }}</td><td>{{ number_format($row['net'],2) }}</td><td>{{ number_format($row['tax'],2) }}</td></tr>@endforeach</tbody></table>
+    <div class="section-title">{{ __('pos_history.products') }}</div><p>{{ __('pos_history.product_basis') }}</p>
+    <table><thead><tr><th>{{ __('pos.product_col') }}</th><th>{{ __('pos_history.category_size') }}</th><th>{{ __('pos_history.channel') }}</th><th>{{ __('pos.receipt_qty') }}</th><th>{{ __('pos_history.net') }}</th></tr></thead><tbody>@foreach($financialHistory['products'] as $row)<tr><td>{{ $row['name'] }}</td><td>{{ $row['category'] }} · {{ $row['size'] ?: '—' }}</td><td>{{ $row['channel'] }}</td><td>{{ $row['qty'] }}</td><td>{{ number_format($row['net'],2) }}</td></tr>@endforeach</tbody></table>
+    <p>{{ __('pos_history.detail_note') }}</p>
+    @endif
     <div class="section-title">{{ __('pos.ra_summary_comparison') }}</div>
     <div class="info-box">
         <div class="info-row">

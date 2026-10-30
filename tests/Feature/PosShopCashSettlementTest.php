@@ -21,6 +21,8 @@ class PosShopCashSettlementTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Tests\Support\B02NativeDatabase::configure();
+        User::flushScopeColumnCache();
         Schema::dropAllTables();
         Schema::create('companies', function (Blueprint $t) { $t->id(); $t->string('name'); $t->softDeletes(); $t->timestamps(); });
         Schema::create('users', function (Blueprint $t) {
@@ -140,6 +142,21 @@ class PosShopCashSettlementTest extends TestCase
         try { PosShopCashSettlement::receive($this->companyId, $this->actor, [$bill], 125.5, $key); $this->fail('Revoked stream replayed receipt.'); }
         catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
         $this->assertSame(1, PosRiderSettlement::count());
+    }
+
+    public function test_native_simultaneous_shop_receipts_receive_selected_cash_once(): void
+    {
+        if(DB::getDriverName()!=='mysql')$this->markTestSkipped('Covered by the required isolated B02 native MariaDB lane.');
+        $bill=$this->bill();$key=(string)Str::uuid();
+        $command=['kind'=>'cash','company'=>$this->companyId,'actor'=>$this->actor->id,'bill'=>$bill,'key'=>$key];
+        $results=\Tests\Support\B02NativeDatabase::race($this->companyId,[$command,$command]);
+        $this->assertSame(['received','received'],array_column($results,'result'));
+        $this->assertSame($results[0]['id'],$results[1]['id']);$this->assertSame(1,PosRiderSettlement::count());
+        $this->assertEquals(125.5,PosRiderSettlement::sum('total_amount'));
+        $second=$this->bill();$command['bill']=$second;$command['key']=(string)Str::uuid();$other=$command;$other['key']=(string)Str::uuid();
+        $results=\Tests\Support\B02NativeDatabase::race($this->companyId,[$command,$other]);
+        $out=array_column($results,'result');sort($out);$this->assertSame(['received','rejected'],$out);
+        $this->assertSame(2,PosRiderSettlement::count());$this->assertEquals(251,PosRiderSettlement::sum('total_amount'));
     }
 
 }

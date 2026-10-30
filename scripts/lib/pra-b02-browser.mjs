@@ -1,5 +1,11 @@
 export async function b02DealWorkflow(page,t,v,helpers) {
   const {baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass}=helpers;
+  const mutations=[];
+  page.on('response',response=>{if(response.request().method()==='POST')mutations.push({path:new URL(response.request().url()).pathname,status:response.status()});});
+  const responseFor=(predicate,label)=>page.waitForResponse(predicate).catch(async error=>{
+    const state=await page.evaluate(()=>{const root=document.querySelector('[data-tn-sale-root]');if(!root)return {page:location.pathname};const d=window.Alpine.$data(root);return {page:location.pathname,restaurant:d.isRestaurantMode,total:d.roundedTotal,submitting:d.submitting,paymentOpen:d.showPayModal,toast:d.toast?.message};});
+    throw Error(label+': '+error.message+'; '+JSON.stringify({state,mutations:mutations.slice(-12)}));
+  });
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
@@ -61,16 +67,26 @@ export async function b02DealWorkflow(page,t,v,helpers) {
   await saveEvidenceScreenshot(page,'pra-b02-promotion-'+v.width+'.png');
   await root.locator('[data-video="open-payment"]').click();
   await page.evaluate(()=>{window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).payPrintReceipt=false;});
-  const [offerPaid]=await Promise.all([page.waitForResponse(r=>r.url()===baseUrl+'/pos/invoice/store'&&r.request().method()==='POST'),page.locator('[data-video="cash-payment"]:visible').click()]);
+  // This fictional restaurant uses the normal hold-then-pay path for products;
+  // deals above intentionally bypass hold and use invoice/store. Assert both
+  // actual requests, without switching the company or forcing a client mode.
+  const [offerHeld,offerPaid]=await Promise.all([
+    responseFor(r=>r.url()===baseUrl+'/pos/restaurant/orders/hold'&&r.request().method()==='POST','Promotion hold'),
+    responseFor(r=>/^\/pos\/restaurant\/orders\/\d+\/pay$/.test(new URL(r.url()).pathname)&&r.request().method()==='POST','Promotion payment'),
+    page.locator('[data-video="cash-payment"]:visible').click(),
+  ]);
+  const heldOffer=await offerHeld.json();
+  if(!offerHeld.ok()||!heldOffer.success||!heldOffer.order?.id||new URL(offerPaid.url()).pathname!=='/pos/restaurant/orders/'+heldOffer.order.id+'/pay')throw Error('Promotion did not settle its actual held order');
   const offerBill=await offerPaid.json();
   if(!offerPaid.ok()||!offerBill.success||Number(offerBill.total_amount)!==835)throw Error('Promotion preview/post mismatch: '+JSON.stringify(offerBill));
   const offerReceipt=await page.request.get(baseUrl+'/pos/transaction/'+offerBill.transaction_id+'/receipt');
   if(!offerReceipt.ok()||!(await offerReceipt.text()).includes(offerName))throw Error('Frozen promotion missing from receipt');
+  pass(t.name+'/'+v.width+': standalone promoted product, real restaurant hold/pay and stored receipt agree at Rs 835');
   await page.goto(baseUrl+'/pos/promotions',{waitUntil:'domcontentloaded'});
   const saved=page.locator('details').filter({has:page.locator('summary').filter({hasText:offerName})});
   await saved.locator('summary').click();
   await saved.locator('input[type="checkbox"][name="is_active"]').uncheck();
-  await Promise.all([page.waitForResponse(r=>r.url().includes('/pos/promotions/')&&r.request().method()==='POST'),saved.locator('button[type="submit"]').click()]);
+  await Promise.all([responseFor(r=>r.request().url().includes('/pos/promotions/')&&r.request().method()==='POST','Disable promotion'),saved.locator('button[type="submit"]').click()]);
   const historical=await page.request.get(baseUrl+'/pos/transaction/'+offerBill.transaction_id+'/receipt');
   if(!(await historical.text()).includes(offerName))throw Error('Disabling campaign changed historical receipt');
   pass(t.name+'/'+v.width+': real promotion creation, automatic preview, paid receipt and disable preserve Rs 835');

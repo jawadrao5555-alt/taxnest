@@ -1565,7 +1565,7 @@ class RestaurantPosController extends Controller
             // must show ONE line per dish — consolidate identical rows before
             // creating transaction items. Sums are exact by construction.
             $costIds = $order->items->where('item_type', 'product')->pluck('item_id')->filter();
-            $costProducts = $costIds->isEmpty() ? collect() : PosProduct::where('company_id', $companyId)->whereIn('id', $costIds)->get()->keyBy('id');
+            $costProducts = $costIds->isEmpty() || !Schema::hasTable('pos_products') ? collect() : PosProduct::where('company_id', $companyId)->whereIn('id', $costIds)->get()->keyBy('id');
             $productCosts = \App\Services\PosProductCost::map($companyId, $costProducts);
             foreach ($this->consolidateBillLines($order->items) as $item) {
                 $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;

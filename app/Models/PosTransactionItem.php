@@ -29,7 +29,7 @@ class PosTransactionItem extends Model
         'return_disposition' => 'string',
         'prepared_return_id' => 'integer',
         'unit_price' => 'decimal:2',
-        'cost_price' => 'decimal:4',
+        'cost_price' => 'decimal:6',
         'subtotal' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
         'skip_kitchen' => 'boolean',

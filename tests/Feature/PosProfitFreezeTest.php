@@ -348,7 +348,7 @@ class PosProfitFreezeTest extends TestCase
 
         $this->assertNotNull($item, 'Item row must exist after store');
         $this->assertNotNull($item->cost_price, 'cost_price must be frozen at sale time');
-        $this->assertEquals('45.0000', $item->cost_price, 'Frozen cost must match product cost at sale time');
+        $this->assertEquals('45.000000', $item->cost_price, 'Frozen cost must match product cost at sale time');
     }
 
     /** storeInvoice() must leave cost_price NULL when product has no cost set. */
@@ -421,7 +421,7 @@ class PosProfitFreezeTest extends TestCase
 
         $item = PosTransactionItem::where('transaction_id', $txId)->first();
         $this->assertNotNull($item->cost_price);
-        $this->assertEquals('70.0000', $item->cost_price, 'Edit must re-freeze cost at current product rate');
+        $this->assertEquals('70.000000', $item->cost_price, 'Edit must re-freeze cost at current product rate');
     }
 
     /** Editing the product rate after a sale must not change the stored snapshot. */
@@ -570,6 +570,9 @@ class PosProfitFreezeTest extends TestCase
         $this->assertEquals(13.75,$line->fresh()->cost_price);
         $response=$this->postJson('/pos/invoice/store',$payload);$response->assertOk();
         $this->assertNull(PosTransaction::findOrFail($response->json('transaction_id'))->items->sole()->cost_price);
+        $ingredient->update(['cost_per_unit'=>.000001]);
+        $response=$this->postJson('/pos/invoice/store',$payload);$response->assertOk();
+        $this->assertEquals(.000110,(float)PosTransaction::findOrFail($response->json('transaction_id'))->items->sole()->cost_price, 'Sub-rupee base-unit recipe cost must not lose precision.');
         $ingredient->update(['company_id'=>$this->companyId+999,'cost_per_unit'=>1]);
         $this->assertNull(\App\Services\PosProductCost::map($this->companyId,[$product])[$product->id]);
     }

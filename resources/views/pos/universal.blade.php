@@ -5586,6 +5586,7 @@ function restaurantPos() {
 
         r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },
         _safeQty(q) { const n = Number(q); return Number.isFinite(n) && n > 0 ? n : 1; },
+        promotionOnlineMessage: @json(__('pos_promotions.online_only')),
         refreshingOffers: false,
         async refreshOffers() {
             if (this.refreshingOffers || this.submitting) return;
@@ -6466,7 +6467,7 @@ function restaurantPos() {
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
         async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
-            if ((payload.items || []).some(item => item.promotion_quote)) { this.showToast(@json(__('pos_promotions.online_only')), 'error'); return false; }
+            if ((payload.items || []).some(item => item.promotion_quote)) { this.showToast(this.promotionOnlineMessage, 'error'); return false; }
             if ((payload.items || []).some(item => item.type === 'deal')) { this.showToast(window.TXT.deal_offline_block, 'error'); return false; }
             if (this.hasMixedService()) { this.showToast(window.TXT.fulfill_online_required, 'error'); return false; }
             // REUSE the uuid already attached by processPaymentManual (it rode on
@@ -6541,7 +6542,7 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
         },
         async acceptLocalCoreSale(payload, method, savedTotal, skipReceipt = false) {
-            if ((payload.items || []).some(item => item.promotion_quote)) { this.showToast(@json(__('pos_promotions.online_only')), 'error'); return false; }
+            if ((payload.items || []).some(item => item.promotion_quote)) { this.showToast(this.promotionOnlineMessage, 'error'); return false; }
             if ((payload.items || []).some(item => item.type === 'deal')) return false;
             const bridge = window.nestposDesktop;
             if (!bridge || typeof bridge.acceptImmediateSale !== 'function') return false;
@@ -10825,7 +10826,7 @@ function restaurantPos() {
         },
 
         async _localCoreHold() {
-            if (this.cart.some(item => item.promotion_quote)) return { success: false, message: @json(__('pos_promotions.online_only')) };
+            if (this.cart.some(item => item.promotion_quote)) return { success: false, message: this.promotionOnlineMessage };
             if (this.hasMixedService()) return { success: false, message: window.TXT.fulfill_online_required };
             if (!window.NestPosLocal) return null;
             const orderId = String(this.recalledOrderId ||

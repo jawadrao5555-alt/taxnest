@@ -86,11 +86,22 @@ export async function b02DealWorkflow(page,t,v,helpers) {
   const saved=page.locator('details').filter({has:page.locator('summary').filter({hasText:offerName})});
   await saved.locator('summary').click();
   await saved.locator('input[type="checkbox"][name="is_active"]').uncheck();
-  await Promise.all([responseFor(r=>r.request().url().includes('/pos/promotions/')&&r.request().method()==='POST','Disable promotion'),saved.locator('button[type="submit"]').click()]);
+  // The service worker can own native form redirects, so a page-level POST
+  // response is not a reliable completion signal (creation above uses the UI).
+  // Require the server-rendered state, then reload to prove persistence rather
+  // than mistaking the locally unchecked checkbox for a saved change.
+  await saved.locator('button[type="submit"]').click();
+  await saved.locator('summary').filter({hasText:/\bDisabled\s*$/}).waitFor();
+  await page.reload({waitUntil:'domcontentloaded'});
+  await saved.locator('summary').filter({hasText:/\bDisabled\s*$/}).waitFor();
+  if(await saved.locator('input[type="checkbox"][name="is_active"]').isChecked())throw Error('Disabled promotion was not persisted');
   const historical=await page.request.get(baseUrl+'/pos/transaction/'+offerBill.transaction_id+'/receipt');
-  if(!(await historical.text()).includes(offerName))throw Error('Disabling campaign changed historical receipt');
-  pass(t.name+'/'+v.width+': real promotion creation, automatic preview, paid receipt and disable preserve Rs 835');
+  if(!historical.ok()||!(await historical.text()).includes(offerName))throw Error('Disabling campaign changed historical receipt');
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page);await dismiss(page);
+  await root.locator('[x-ref="searchInput"]:visible').fill(t.b02Deal.product);
+  await catalogTile(t.b02Deal.product).click();
+  await page.waitForFunction(name=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return d.cart.length===1&&d.cart[0].item_type==='product'&&d.cart[0].item_name===name&&!d.cart[0].promotion_quote&&d.roundedTotal===928;},t.b02Deal.product);
+  pass(t.name+'/'+v.width+': persisted disable restores new-sale Rs 928 while the paid receipt retains its Rs 835 offer');
 
 }

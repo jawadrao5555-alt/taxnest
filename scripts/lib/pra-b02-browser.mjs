@@ -51,7 +51,10 @@ export async function b02DealWorkflow(page,t,v,helpers) {
   await root.locator('[x-ref="searchInput"]:visible').fill(t.b02Deal.product);
   await root.locator('.prod-card').filter({hasText:t.b02Deal.product}).first().click();
   if(v.width<768) { const cart=root.locator('[data-cart-menu-open]:visible');if(await cart.count())await cart.click(); }
-  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).roundedTotal===835);
+  await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).roundedTotal===835).catch(async error=>{
+    const state=await page.evaluate(()=>{const d=window.Alpine.$data(document.querySelector('[data-tn-sale-root]'));return {total:d.roundedTotal,tax:d.taxAmount,discount:d.discountAmount,items:d.cart.map(i=>({name:i.item_name,price:i.unit_price,qty:i.quantity,offer:i.promotion_quote?.title||null}))};});
+    throw Error('Promotion preview did not reach Rs 835: '+JSON.stringify(state)+'; '+error.message);
+  });
   await saveEvidenceScreenshot(page,'pra-b02-promotion-'+v.width+'.png');
   await root.locator('[data-video="open-payment"]').click();
   await page.evaluate(()=>{window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).payPrintReceipt=false;});

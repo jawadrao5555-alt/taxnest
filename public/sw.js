@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-pra-b02-promotions-cost-20261030'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-pra-b02-promotion-cache-20261030'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -222,6 +222,25 @@ self.addEventListener('fetch', e => {
     // Pairing nonces/credentials and mutable Agent download redirects must
     // never enter any offline runtime cache, even when opened as navigation.
     if (url.pathname.includes('/desktop/agent-') || url.pathname === '/download/agent') return;
+
+    // Offer quotes are baked into the cache-first PRA sale document. A successful
+    // create/update must evict that document before returning control to the
+    // editor; otherwise a quick New Sale can add an obsolete quote before the
+    // delayed boot check, whose busy-cart guard correctly refuses to reload it.
+    // No cart is repriced, failed saves keep their fallback, and FBR is untouched.
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && /^\/pos\/promotions(?:\/\d+)?$/.test(url.pathname)) {
+        e.respondWith((async () => {
+            const response = await fetch(req);
+            if (response.ok || response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+                try {
+                    const sale = await caches.open(SALE_CACHE);
+                    await sale.delete(new URL('/pos/invoice/create', location.origin).href);
+                } catch (_) {} // Disabled cache must never turn a successful save into a retry.
+            }
+            return response;
+        })());
+        return;
+    }
 
     if (req.method !== 'GET') return;
 

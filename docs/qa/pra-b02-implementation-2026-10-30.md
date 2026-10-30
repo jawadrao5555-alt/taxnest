@@ -65,3 +65,39 @@ reproduction, test runs and remaining gaps are recorded below as they occur.
   branch/concurrency/browser acceptance, complete stock unit UX and final-head
   required CI. No whole B02 completion, ready-for-review, merge, deployment or
   live verification is claimed.
+
+### Exact first checkpoint validation
+
+- Commit `300f9ab26813a2f2b0fe117b6255b7eff2b2ad65`: an isolated, unchanged
+  checkout passed the guarded full suite: **5,703 tests, 45,600 assertions**,
+  with 7 skips and 28 PHPUnit deprecations. The earlier exploratory receiving
+  error did not reproduce on this fixed commit. Test output is not silently
+  counted as clean of skips/deprecations.
+- Actions run `41053038458` passed full PHPUnit, native MariaDB migration and
+  concurrency, dependency/build, workflow safety, release chain and Node/Agent
+  jobs. Browser and aggregate validate were still pending when recorded here.
+
+### Mixed-deal implementation checkpoint (bulk still incomplete)
+
+- Reproduced wrong exclusive and inclusive/card-save billing on checkpoint
+  code using the new HTTP regression: all three modes failed before the fix.
+- New component snapshots freeze allocation weights, exemption/Third Schedule,
+  known cost, category/size/unit and effective recipe quantity. Deterministic
+  paisa shares preserve discounts across components and bill lines. Existing
+  non-versioned historical snapshots retain their legacy calculation.
+- Browser preview, store/edit/promotion, PRA payload and item tax-report/export
+  values use the component split. PRA whole-rupee header conventions remain.
+  Partial returns consume cumulative frozen shares and cap final remainders;
+  later catalogue/rate/cost changes do not rewrite original payloads.
+- New online deals cannot be shown as successfully queued offline when the
+  existing server would reject their replay. Retry preserves the payment key.
+  This does not migrate or reprice older signed Local Core history.
+- Focused guarded PHP tests: **69 tests, 414 assertions PASS**. Pure browser
+  calculation test passed three pricing modes and 250 penny-allocation cases.
+  Blade compilation passed. A new isolated synthetic tenant/journey exercises
+  real deal selection, discount and payment at desktop and 390px; its browser
+  execution and new-head CI are pending, not claimed as passed.
+- Still open: historical availability/reconciliation and grouping, scheduled
+  promotions, remaining stock UX, specific cash/receiving concurrency and
+  negative-scope acceptance, remaining deal lifecycle edge acceptance, and the
+  final exact-head whole-bulk readiness gate. PR stays draft.

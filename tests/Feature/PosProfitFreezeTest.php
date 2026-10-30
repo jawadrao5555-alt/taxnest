@@ -240,6 +240,76 @@ class PosProfitFreezeTest extends TestCase
     // REQUEST-LEVEL (HTTP) TESTS
     // ─────────────────────────────────────────────────────────────────────────
 
+    public static function mixedDealModes(): array
+    {
+        return [
+            'exclusive' => ['exclusive', 'cash', 812, 92, 576, 92.16],
+            'inclusive cash' => ['inclusive', 'cash', 720, 79.45, 496.55, 79.45],
+            'inclusive card saving' => ['inclusive_card_save', 'debit_card', 665, 24.83, 496.55, 24.83],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('mixedDealModes')]
+    public function test_mixed_deal_freezes_component_tax_discount_cost_and_payload(string $mode, string $method, float $total, float $headerTax, float $taxable, float $lineTax): void
+    {
+        (require database_path('migrations/2026_07_14_200000_add_pos_deals.php'))->up();
+        (require database_path('migrations/2026_12_21_000003_add_pos_deal_allocated_bases.php'))->up();
+        DB::table('pricing_plans')->update(['deals_enabled' => true]);
+        PosFeatureService::flushGateCaches();
+        Schema::table('pos_transactions', fn (Blueprint $t) => $t->decimal('tax_menu_rate', 8, 2)->nullable());
+        $this->company->update(['pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 5, 'pos_tax_pricing_mode' => $mode, 'pos_tax_inclusive' => $mode !== 'exclusive']);
+        $food = $this->makeProduct(cost: 300);
+        $food->update(['price' => 800, 'category' => 'Food']);
+        $drink = $this->makeProduct(cost: 30);
+        $drink->update(['price' => 200, 'category' => 'Drinks', 'is_tax_exempt' => true, 'is_third_schedule' => true]);
+        $deal = \App\Models\PosDeal::create(['company_id' => $this->companyId, 'name' => 'Mixed meal', 'price' => 800, 'is_active' => true]);
+        foreach ([$food, $drink] as $product) {
+            DB::table('pos_deal_items')->insert(['deal_id' => $deal->id, 'pos_product_id' => $product->id, 'quantity' => 1]);
+        }
+        $response = $this->actingAs($this->posAdmin, 'pos')->postJson('/pos/invoice/store', [
+            'items' => [['type' => 'deal', 'item_id' => $deal->id, 'name' => $deal->name,
+                'quantity' => 1, 'unit_price' => 800, 'is_tax_exempt' => true]],
+            'payment_method' => $method, 'discount_type' => 'percentage', 'discount_value' => 10,
+        ]);
+        $this->assertSame(200, $response->status(), $response->getContent());
+        $response->assertJson(['success' => true]);
+        $tx = PosTransaction::findOrFail($response->json('transaction_id'));
+        $line = $tx->items->sole();
+        $this->assertEquals($total, $tx->total_amount);
+        $this->assertEquals($headerTax, $tx->tax_amount);
+        $this->assertEquals(144, $tx->exempt_amount);
+        $this->assertEquals($taxable, $line->taxable_base);
+        $this->assertEquals(144, $line->exempt_base);
+        $this->assertEquals(330, $line->cost_price);
+        $this->assertEquals($lineTax, $line->tax_amount);
+        $this->assertFalse($line->is_tax_exempt, 'Client parent toggle cannot erase taxable component tax.');
+        $summary = new \ReflectionMethod(\App\Http\Controllers\PosController::class, 'buildItemLevelSummary');
+        $controller = new \App\Http\Controllers\PosController();
+        $exemptSummary = $summary->invoke($controller, [$tx->id], 'exempt');
+        $taxSummary = $summary->invoke($controller, [$tx->id], $method === 'cash' ? '16' : '5');
+        $this->assertEquals(144, $exemptSummary->total_sales);
+        $this->assertEquals(144, $exemptSummary->total_third_schedule);
+        $this->assertEquals(0, $exemptSummary->total_tax);
+        $this->assertEquals($taxable, $taxSummary->total_sales);
+        $this->assertEquals($lineTax, $taxSummary->total_tax);
+        $valuesMethod = new \ReflectionMethod($controller, 'getItemLevelValuesForTransactions');
+        $exportValues = $valuesMethod->invoke($controller, collect([$tx]), 'exempt');
+        $this->assertEquals($exemptSummary->total_sales, $exportValues[$tx->id]['item_subtotal']);
+        $this->assertEquals(0, $exportValues[$tx->id]['item_tax']);
+
+        $service = new \App\Services\PraIntegrationService($this->company);
+        $before = $service->generatePayload($tx);
+        $this->assertCount(2, $before['Items']);
+        $this->assertEquals(0, $before['Items'][1]['TaxRate']);
+        $this->assertEquals(144, $before['Items'][1]['SaleValue']);
+        $this->assertEquals($total, $before['TotalBillAmount']);
+        $food->update(['price' => 5000, 'cost_price' => 4000, 'is_tax_exempt' => true]);
+        $drink->update(['is_tax_exempt' => false]);
+        $deal->update(['price' => 9999]);
+        $this->company->update(['pos_tax_rate_cash' => 30]);
+        $this->assertSame($before, $service->generatePayload($tx->fresh()->load('items')));
+    }
+
     /** storeInvoice() must freeze pos_products.cost_price onto the item row. */
     public function test_store_invoice_freezes_cost_price_on_item(): void
     {

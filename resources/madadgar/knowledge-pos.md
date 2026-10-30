@@ -465,3 +465,6 @@ Receipt Settings mein **Fiscal receipt: optional details and layout** aur **Loca
 - Deliveries → Receive unassigned delivery cash at shop: aik branch ke final cash bills select karein, count aur amount check karein, phir receive confirm karein. Card, provisional/draft, returned, rider-assigned aur pehle received bills shamil nahin hote. Delivery status is action se nahin badalta.
 - Stock-In receiving mein kg/g aur ltr/ml ki quantity aur cost usage unit mein convert hoti hai. Pack/cup ki size sirf saved conversion se li jati hai. Preview ke baad ingredient unit badle to pehle Rematch karein. Same reference ki receipt dobara stock nahin barhati.
 - Recipe cost aur available servings mein saved waste percentage shamil hai. Historical frozen cost na ho to unknown dikhaya jata hai; aaj ka ingredient rate purani sale par nahin lagaya jata.
+
+### Mixed taxable / exempt deals
+New deals retain each component’s taxable or exempt share, discount and known sale-time cost. The bill uses the selected payment method’s PRA rate and its saved pricing mode. Returns and tax reports read the original component split, even after catalogue or rate edits. Deal bills require an online connection; an outage keeps the cart for retry instead of showing an unpostable offline bill as complete. Existing older bill snapshots retain their original semantics.

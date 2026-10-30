@@ -4794,6 +4794,7 @@ $jsEnc = function ($value, $fallback = '[]') {
 };
 @endphp
 <script src="/js/pos-print-attempt.js?v=20260909"></script>
+<script src="/js/pos-deal-allocation.js?v=20261030-b02"></script>
 <script>
 // OFFLINE-FIRST BOOT (Jul 2026): server-side fingerprint of everything baked
 // into this page (user, company, screen file, catalog, settings). The SW may
@@ -4957,6 +4958,8 @@ function restaurantPos() {
         // Total for a given rate under card-save: base derived at the MENU (cash)
         // rate, chosen method's rate applied on top. Exempt items pass through.
         cardSaveTotalForRate(rate) {
+            const allocated = this.allocatedDealBill(rate);
+            if (allocated) return allocated.total_amount;
             const after = Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
             if (Math.abs(this.taxMenuRate - rate) < 0.005) return Math.round(after);
             const tia = this.taxableSubtotal;
@@ -5588,12 +5591,22 @@ function restaurantPos() {
         get itemDiscountsTotal() { return this.r2(this.cart.reduce((s, i) => s + this.getItemDiscount(i), 0)); },
         get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (this._safeQty(i.quantity) * i.unit_price), 0)); },
         get effectiveSubtotal() { return Math.max(0, this.r2(this.subtotal - this.itemDiscountsTotal)); },
+        dealTaxableSubtotal(item) {
+            return window.PosDealAllocation.taxable(item.deal_snapshot, this.getItemTotal(item), !!item.is_tax_exempt);
+        },
+        allocatedDealBill(rate = this.taxRate) {
+            return window.PosDealAllocation.bill(this.cart.map(item => ({snapshot:item.deal_snapshot,
+                subtotal:this.getItemTotal(item),exempt:!!item.is_tax_exempt})), this.discountAmount, rate,
+                this.taxInclusive, this.cardSaveMode() ? this.taxMenuRate : null);
+        },
         get taxableSubtotal() {
-            const taxable = this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0);
+            const taxable = this.cart.reduce((s, i) => s + this.dealTaxableSubtotal(i), 0);
             const discountRatio = this.effectiveSubtotal > 0 ? (this.effectiveSubtotal - this.discountAmount) / this.effectiveSubtotal : 1;
             return Math.max(0, this.r2(taxable * Math.max(0, discountRatio)));
         },
         get taxAmount() {
+            const allocated = this.allocatedDealBill();
+            if (allocated) return allocated.tax_amount;
             // Inclusive mode: included portion of the taxable menu money (r/(100+r)).
             // Card-save: base always derives from the MENU (cash) rate, the bill's
             // own rate applies on top — mirrors PosTaxMath backend math.
@@ -5606,6 +5619,8 @@ function restaurantPos() {
             return this.r2(this.taxableSubtotal * this.taxRate / 100);
         },
         get totalAmount() {
+            const allocated = this.allocatedDealBill();
+            if (allocated) return allocated.total_amount;
             // Inclusive mode: menu prices already contain tax — never add it on top.
             // Card-save with a DIFFERENT rate than the menu rate: cheaper total.
             if (this.taxInclusive) {
@@ -5620,7 +5635,7 @@ function restaurantPos() {
         },
         get roundedTotal() { return Math.round(this.totalAmount); },
         get roundOff() { return this.r2(this.roundedTotal - this.totalAmount); },
-        get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0); },
+        get exemptAmount() { return this.r2(this.cart.reduce((s, i) => s + this.getItemTotal(i) - this.dealTaxableSubtotal(i), 0)); },
         // ─── Jul 2026 redesign: method-aware CART totals (estimate only — the
         // backend recomputes tax per method on submit; PRA gets tax in full).
         // Mirrors heldOrderEstimate()/payModalTotal math for the LIVE cart.
@@ -5629,6 +5644,8 @@ function restaurantPos() {
             const rate = method === 'card'
                 ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
                 : (this.taxRules['cash'] ?? this.taxRate);
+            const allocated = this.allocatedDealBill(rate);
+            if (allocated) return allocated.total_amount;
             if (this.taxInclusive) {
                 if (this.cardSaveMode() && Math.abs(this.taxMenuRate - rate) >= 0.005) return this.cardSaveTotalForRate(rate);
                 // Plain inclusive: menu total is method-independent.
@@ -6413,6 +6430,7 @@ function restaurantPos() {
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
         async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
+            if ((payload.items || []).some(item => item.type === 'deal')) { this.showToast(window.TXT.deal_offline_block, 'error'); return false; }
             if (this.hasMixedService()) { this.showToast(window.TXT.fulfill_online_required, 'error'); return false; }
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
@@ -6486,6 +6504,7 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
         },
         async acceptLocalCoreSale(payload, method, savedTotal, skipReceipt = false) {
+            if ((payload.items || []).some(item => item.type === 'deal')) return false;
             const bridge = window.nestposDesktop;
             if (!bridge || typeof bridge.acceptImmediateSale !== 'function') return false;
             // Deliberately narrow: immediate final universal sale only. Every
@@ -11465,6 +11484,7 @@ function restaurantPos() {
             this.lastPayTime = now;
             this.submitting = true; this.stockError = '';
             const savedTotal = this.totalAmount;
+            if (!this.payAttemptUuid) this.payAttemptUuid = this._newOfflineUuid();
             try {
                 // storeInvoice expects: items[].{name, quantity, unit_price, type?, item_id?, is_tax_exempt?, _manual?}
                 // and discount_type/value/payment_method at top level.
@@ -11539,7 +11559,7 @@ function restaurantPos() {
                     // the bill but the reply never arrived), the queued replay
                     // carries the SAME uuid → server's replay guard returns the
                     // existing bill instead of creating a duplicate.
-                    offline_uuid: this._newOfflineUuid(),
+                    offline_uuid: this.payAttemptUuid,
                     // Task 1349: COUNTER attribution — the device's remembered
                     // counter. Inside the payload on purpose: an offline-queued
                     // bill then replays with its ORIGINAL counter. Server
@@ -11557,7 +11577,9 @@ function restaurantPos() {
                     return;
                 }
                 if (!navigator.onLine) {
-                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
+                    if (await this.queueOfflineBill(payload, method, savedTotal, skipReceipt) === false) {
+                        this.submitting = false; this.showPayModal = true; return;
+                    }
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;
@@ -11598,7 +11620,9 @@ function restaurantPos() {
                         this.saveAsProvisional = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
+                    if (await this.queueOfflineBill(payload, method, savedTotal, skipReceipt) === false) {
+                        this.submitting = false; this.showPayModal = true; return;
+                    }
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;

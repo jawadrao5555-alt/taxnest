@@ -299,6 +299,48 @@ class PosPraReturnFlowTest extends TestCase
             ->where('transaction_type', 'return')->get();
     }
 
+    public function test_mixed_deal_partial_returns_keep_original_component_split_and_money(): void
+    {
+        Schema::table('pos_transaction_items', function (Blueprint $table) {
+            $table->json('deal_snapshot')->nullable();
+            $table->decimal('taxable_base', 18, 2)->nullable();
+            $table->decimal('exempt_base', 18, 2)->nullable();
+        });
+        $this->actAs('pos_admin');
+        $parent = $this->seedParent(['subtotal' => 2400, 'discount_amount' => 240, 'tax_rate' => 16,
+            'tax_amount' => 276, 'exempt_amount' => 432, 'total_amount' => 2436]);
+        $parent->items()->delete();
+        $snapshot = \App\Services\PosDealAllocation::capture([
+            ['allocation_version' => 1, 'allocation_weight' => 800, 'product_id' => 501, 'name' => 'Food', 'qty' => 1, 'unit_cost' => 300, 'tax_facts' => ['is_tax_exempt' => false]],
+            ['allocation_version' => 1, 'allocation_weight' => 200, 'product_id' => 502, 'name' => 'Drink', 'qty' => 1, 'unit_cost' => 30, 'tax_facts' => ['is_tax_exempt' => true]],
+        ], 2400, 240, 16, false);
+        $line = $parent->items()->create(['item_type' => 'deal', 'item_id' => 90, 'item_name' => 'Frozen combo',
+            'quantity' => 3, 'unit_price' => 800, 'subtotal' => 2400, 'cost_price' => 330,
+            'tax_rate' => 16, 'tax_amount' => 276.48, 'is_tax_exempt' => false, 'deal_snapshot' => $snapshot,
+            'taxable_base' => 1728, 'exempt_base' => 432]);
+        for ($i = 0; $i < 3; $i++) {
+            $this->postReturn($parent, [['item_id' => $line->id, 'return_qty' => 1]]);
+        }
+        $returns = $this->returnRows($parent);
+        $this->assertCount(3, $returns);
+        $this->assertEquals(2436, $returns->sum('total_amount'));
+        $this->assertEquals(240, $returns->sum('discount_amount'));
+        $this->assertEquals(432, $returns->sum('exempt_amount'));
+        $this->assertEquals(276, $returns->sum('tax_amount'));
+        foreach ($returns as $return) {
+            $item = $return->items->sole();
+            $this->assertEquals(144, $item->exempt_base);
+            $this->assertEquals(576, $item->taxable_base);
+            $this->assertEquals(330, $item->cost_price);
+            $payload = (new PraIntegrationService(\App\Models\Company::find($this->companyId)))->generatePayload($return);
+            $this->assertEquals(812, $payload['TotalBillAmount']);
+            $this->assertEquals(0, $payload['Items'][1]['TaxRate']);
+            $this->assertEquals(144, $payload['Items'][1]['SaleValue']);
+        }
+        $this->postReturn($parent, [['item_id' => $line->id, 'return_qty' => 1]]);
+        $this->assertCount(3, $this->returnRows($parent));
+    }
+
     // ── 1. access gates ──────────────────────────────────────────────────────
 
     public function test_plain_cashier_reaches_return_form(): void

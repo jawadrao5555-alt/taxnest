@@ -165,6 +165,9 @@ class PosReturnService
             }
 
             $taxInclusive = (bool) ($original->tax_inclusive ?? false);
+            $allocatedBill = $original->items->contains(fn ($line) => PosDealAllocation::supported($line->deal_snapshot));
+            $originalLineSum = (float) $original->items->sum('subtotal');
+            $allocatedNet = $allocatedDiscount = $allocatedExempt = $allocatedBase = 0.0;
 
             $lineSum = 0.0;   // Σ prorated item subtotals (menu money on inclusive bills)
             $taxSum = 0.0;    // Σ prorated item tax
@@ -203,6 +206,36 @@ class PosReturnService
                     $itemDisc = $finalLine ? $discRemaining : min($itemDisc, $discRemaining);
                 }
 
+                $returnSnapshot = null;
+                if ($allocatedBill) {
+                    $soldQty = (float) $orig->quantity;
+                    $beforeQty = (float) ($orig->returned_quantity ?? 0);
+                    $slice = static fn (float $amount) => (round($amount * 100 * min(1, ($beforeQty + $qty) / $soldQty))
+                        - round($amount * 100 * min(1, $beforeQty / $soldQty))) / 100;
+                    $sub = $slice((float) $orig->subtotal);
+                    $tax = $slice((float) $orig->tax_amount);
+                    if (PosDealAllocation::supported($orig->deal_snapshot)) {
+                        $returnSnapshot = PosDealAllocation::returnSlice($orig->deal_snapshot, $soldQty, $beforeQty, $qty);
+                        $sub = PosDealAllocation::sum($returnSnapshot, 'subtotal');
+                        $tax = PosDealAllocation::sum($returnSnapshot, 'tax');
+                        $ownDiscount = PosDealAllocation::sum($returnSnapshot, 'discount');
+                        $ownExempt = PosDealAllocation::sum($returnSnapshot, 'exempt_base');
+                        $ownNet = PosDealAllocation::sum($returnSnapshot, 'total');
+                    } else {
+                        $fullDiscount = $orig->allocated_discount ?? ($originalLineSum > 0 ? round((float) $original->discount_amount * (float) $orig->subtotal / $originalLineSum, 2) : 0);
+                        $ownDiscount = $slice($fullDiscount);
+                        $ownExempt = $orig->is_tax_exempt ? $sub - $ownDiscount : 0;
+                        $ownNet = $sub - $ownDiscount + ($taxInclusive ? 0 : $tax);
+                        if ($taxInclusive && !$orig->is_tax_exempt && (float) $original->tax_menu_rate > 0) {
+                            $ownNet = round(($sub - $ownDiscount) * 100 / (100 + (float) $original->tax_menu_rate), 2) + $tax;
+                        }
+                    }
+                    $allocatedNet += $ownNet;
+                    $allocatedDiscount += $ownDiscount;
+                    $allocatedExempt += $ownExempt;
+                    $allocatedBase += $ownNet - $tax + $ownDiscount;
+                }
+
                 $lineSum += $sub;
                 $taxSum += $tax;
                 if ($orig->is_tax_exempt) {
@@ -218,7 +251,20 @@ class PosReturnService
                     'item_type' => $orig->item_type,
                     'item_id' => $orig->item_id,
                     'item_name' => $orig->item_name,
+                    ...(Schema::hasColumn('pos_transaction_items', 'deal_snapshot') ? ['deal_snapshot' => $returnSnapshot ?? $orig->deal_snapshot] : []),
+                    ...($returnSnapshot && Schema::hasColumn('pos_transaction_items', 'taxable_base') ? [
+                        'taxable_base' => PosDealAllocation::sum($returnSnapshot, 'taxable_base'),
+                        'exempt_base' => PosDealAllocation::sum($returnSnapshot, 'exempt_base'),
+                    ] : []),
                     ...(Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $orig->fulfillment, 'line_uid' => $orig->line_uid] : []),
+                    ...($returnSnapshot && Schema::hasColumn('pos_transaction_items', 'third_schedule_base') ? [
+                        'third_schedule_base' => PosDealAllocation::thirdScheduleBase($returnSnapshot),
+                    ] : []),
+                    ...($allocatedBill && Schema::hasColumn('pos_transaction_items', 'allocated_discount') ? [
+                        'allocated_discount' => $ownDiscount,
+                        'exempt_base' => $ownExempt,
+                        'taxable_base' => round($ownNet - $tax - $ownExempt, 2),
+                    ] : []),
                     'quantity' => $qty,
                     'unit_price' => $orig->unit_price,
                     'cost_price' => $orig->cost_price,
@@ -299,6 +345,24 @@ class PosReturnService
             $refundTotal = round($returnValue - $billDiscShare);
             if ($refundTotal < 0) {
                 $refundTotal = 0.0;
+            }
+
+            if ($allocatedBill) {
+                $billDiscShare = round($allocatedDiscount, 2);
+                $exemptSum = round($allocatedExempt, 2);
+                $headerSubtotal = round($allocatedBase, 2);
+                $headerTax = $taxInclusive ? round($taxSum, 2) : round($taxSum);
+                $refundTotal = round($headerSubtotal - $billDiscShare + $headerTax);
+                $prior = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id', $companyId)
+                    ->where('parent_transaction_id', $original->id)->where('transaction_type', 'return')->get();
+                $allReturned = !$original->items()->whereRaw('quantity > COALESCE(returned_quantity, 0)')->exists();
+                foreach (['total_amount' => &$refundTotal, 'tax_amount' => &$headerTax,
+                    'subtotal' => &$headerSubtotal, 'discount_amount' => &$billDiscShare,
+                    'exempt_amount' => &$exemptSum] as $column => &$value) {
+                    $left = max(0, round((float) $original->$column - (float) $prior->sum($column), 2));
+                    $value = $allReturned ? $left : min($value, $left);
+                }
+                unset($value);
             }
 
             if ($hotelCredit) {

@@ -14,7 +14,7 @@ class PosTransactionItem extends Model
         'skip_kitchen',
         'special_notes', 'deal_snapshot',
         'quantity', 'unit_price', 'cost_price', 'subtotal',
-        'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount',
+        'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount', 'taxable_base', 'exempt_base', 'third_schedule_base', 'allocated_discount',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
         // Return / credit-note flow (Task 570): link to the original sold line +
         // running returned quantity ON the parent's line (over-return guard).
@@ -36,6 +36,10 @@ class PosTransactionItem extends Model
         'is_third_schedule' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'taxable_base' => 'decimal:2',
+        'exempt_base' => 'decimal:2',
+        'third_schedule_base' => 'decimal:2',
+        'allocated_discount' => 'decimal:2',
         'item_discount_value' => 'decimal:2',
         'item_discount_amount' => 'decimal:2',
     ];

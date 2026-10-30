@@ -1,4 +1,4 @@
-title: "PRA cancellation evidence aur shop cash receipts"
+title: "PRA bill record, shop cash aur mixed deal tax"
 audience: pos
 type: improvement
 points:
@@ -6,3 +6,4 @@ points:
   - "Deliveries se selected unassigned final cash bills ki shop receipt banayein; cash receive karna delivery complete karne se alag hai."
   - "Stock-In mein compatible ingredient units aur rate convert hote hain; posting se pehle conversion preview check karein."
   - "Recipe reports mein waste samait cost aur available servings dikhte hain; returns asal sale ki ingredient quantity aur cost istemal karte hain."
+  - "Taxable aur exempt items wali deal ka tax alag hisab se lagta hai; return aur purane bill ki cost asal sale ke mutabiq rehti hai."

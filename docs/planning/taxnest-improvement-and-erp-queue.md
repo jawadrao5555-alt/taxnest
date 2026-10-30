@@ -118,3 +118,62 @@ Append one entry per material status change:
 | 29 Oct 2026 | Q4/Q5 | #312 | `e0993a4ff2702fbcf8946b3231958822df1fc3c5` | Reports/notifications group107 tests/689 assertions and financial guard/stock/day-close group121 tests/726 assertions pass locally; exact-head CI40840527646 pending. Parent91fdd016 all eight in40835527970 are historical. | None for this head | Owner-consent/archive and complete decision/concurrency acceptance pending; no whole-outcome completion | Implementing / verification pending |
 
 Do not fill unknown cells with invented evidence. Keep observed facts, inference, readiness and live verification distinct.
+
+
+---
+
+# B09 — Future ERP queue and shared-platform readiness
+
+**Primary source records:** Existing #314 Q1-Q6 and E1-E9, #301 programme, #310 adapter contract.
+
+**Dependencies:** Shared financial/stock/report/control/onboarding foundations Q1-Q6 must be accepted for each selected pilot. Future expansion does not preempt existing-product defects.
+
+## Delivery contract
+
+This is an owner-requested bulk scope/acceptance record, dated 30 October 2026 (Asia/Karachi), under master #301. **Documentation/planning only: no runtime fix, test execution, readiness, deployment or completion is claimed by this update.** The owner explicitly requested related bulk PRs; preserve that grouped delivery while keeping separable internal checkpoints and dependencies.
+
+- Reconcile current code, merged sources and deployed-version evidence before implementing; a missing control in a read-only role is not automatically a missing feature.
+- Reported media/UI evidence is an investigation input. Reproduce with fictional local tenants before claiming root cause. Preserve earlier evidence classification and unresolved ambiguity.
+- Universal fix for compatible tenants; preserve saved settings, permissions, paid terms, immutable financial/fiscal history and supported legacy Agents. Missing values receive safe defaults only; existing values are not silently reset.
+- Reuse canonical services/policies. Optional changes require the established explicit selection/consent; ordinary bug fixes do not need a new switch for every symptom.
+- Validate the original failure, a previously working configuration, a second tenant and relevant one/many branch/device/printer topology. Use real local Chrome/MariaDB when affected, plus meaningful negative/concurrency/rollback tests.
+- Ready means reviewed exact implementation head, relevant acceptance, clean mergeability and latest required CI including validate. Documentation CI is not feature acceptance.
+- Deployed and Live verified are separate states. Owner release approval remains required; physical Windows/printer, central fiscal and connected-client outcomes require actual evidence beyond generic CI.
+- No production credentials/customer datasets, raw media or private amounts in this public repository. No customer communications, settings changes, merge, deployment, fiscal retry, reprint or grant change is authorized by this document.
+- #237 remains HOLD. Source PRs remain traceable; this plan does not automatically close or merge them. Unrelated earlier holds remain intact.
+
+## Evidence ledger
+
+| Checkpoint | Implementation PR / exact head | Reproduction and retest | Required CI / UI / DB / device | Owner release / deployed SHA / live proof | Remaining gaps / state |
+|---|---|---|---|---|---|
+| Scope captured 30 Oct 2026 | This planning record | Not executed here | Document coverage review only | None | Queued; original whole-outcome checks remain open |
+
+For each implementation stage, add actual evidence and its date. Do not overwrite historical rows or mark the whole bulk complete after one partial slice.
+
+## Required scope
+
+- [ ] B09-R01 — Preserve the full existing Q1-Q6 outcome and E1-E9 industry checklists, scope decisions, incoming-reference process and evidence ledger; route platform implementation to the primary bulk instead of duplicating it.
+- [ ] B09-R02 — Retain E1 distributor/wholesale including optional returnable-container ledger; E2 manufacturing/textile/BOM/WIP/cost/yield; E3 hotel reservation/rooms/housekeeping/deposits and guest ledger.
+- [ ] B09-R03 — Retain E4 fertilizer/pesticide trade; E5 field/crop/season farm costing; E6 installment price/down-payment/due/recovery/reschedule rules without invented financing terms.
+- [ ] B09-R04 — Retain E7 asset/workshop/job cards/parts/warranty/depreciation policy; E8 consignment/trip/carrier/vehicle accounts; E9 approved-device attendance/roster/leave/payroll/advance/deduction/payment.
+- [ ] B09-R05 — Audit deployed Healthcare/current hotel/stock/accounts modules and gaps before creating duplicates. Use Nest ERPS registry with separate vertical scope/guards/permissions and no new product discriminator per industry.
+- [ ] B09-R06 — Each pilot has agreed workflow/data model/module/role/branch/billing/reporting/diagnostic scope, migration/rollback and acceptance; competitor marketing is only discovery input, not functional evidence or copied code.
+- [ ] B09-R07 — Every new module registers versioned B06 diagnostics/retention/permissions and B07 privacy/isolation; no promise future modules automatically have complete coverage.
+- [ ] B09-R08 — Append later owner references in the same #314 register with exact requirement/uncertainty, deduplicate against Q/E/bulk IDs, preserve prior scope and mark complete only with functional/release acceptance.
+
+## Bulk acceptance
+
+- [ ] B09-A01 — All original Q1-Q6 and E1-E9 remain tracked and unchecked until their entire promised outcome passes.
+- [ ] B09-A02 — Each real ERP requires an approved pilot scope, actual end-to-end acceptance and independent financial/stock/isolation/recovery/device evidence where applicable.
+- [ ] B09-A03 — Existing Healthcare vertical and older company links/settings remain compatible.
+- [ ] B09-A04 — New adapter/schema test exposes missing/unknown coverage honestly; no unrelated HOLD advanced.
+
+## Audit coverage — primary owner
+
+No new S/P/M finding is assigned here: this bulk preserves the previously agreed Q1-Q6 and E1-E9 future expansion scope.
+
+## Named acceptance scenarios — planned, not passed
+
+Use the original Q/E acceptance and the pilot's explicit source/financial/isolation/device test matrix.
+
+Cross-bulk cases remain coordinated: MT12 spans receipt preservation (B03) and unread updates (B08); T29/T33/T34 also inform B04/B05; B07's denial/revocation controls apply to every product. These references do not create duplicate implementation ownership.

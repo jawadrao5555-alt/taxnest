@@ -1,13 +1,13 @@
-title: "PRA scheduled offers, frozen cost aur mukammal history milaan"
+title: "Bill, cash aur stock ke hisaab mein behtari"
 audience: pos
 type: improvement
 points:
-  - "Order cancel karte waqt wajah aur tayyar quantity record karein; khali quantity unknown rahegi."
-  - "Deliveries se selected unassigned final cash bills ki shop receipt banayein; cash receive karna delivery complete karne se alag hai."
-  - "Stock-In mein compatible ingredient units aur rate convert hote hain; posting se pehle conversion preview check karein."
-  - "Recipe reports mein waste samait cost aur available servings dikhte hain; returns asal sale ki ingredient quantity aur cost istemal karte hain."
-  - "Taxable aur exempt items wali deal ka tax alag hisab se lagta hai; return aur purane bill ki cost asal sale ke mutabiq rehti hai."
-  - "Reports mein business-day milaan aur CSV se final gross, returns aur net dekhein; purani missing detail zero sales nahin dikhai jati. Souday ki provisional raqam alag hai."
-  - "Product/size report mein standalone aur deal-component raqam alag hai; stock health mein khali stock dobara count nahin hota aur valuation ki bunyaad wazeh hai."
-  - "Deals page se waqt ke mutabiq all ya selected product offers set karein. Offer aur manual discount jama nahin hote; expired cart mein Offers refresh karein aur total dobara dekhein."
-  - "Offer ki payment online hoti hai. Receipt, partial return aur purani history mein asal offer aur sale-time cost mehfooz rehti hai."
+  - "Order cancel karte waqt wajah aur tayyar ki gayi quantity likh sakte hain. Quantity maloom na ho to usay khali chhor dein."
+  - "Delivery ki raqam dukaan par milne par, bills select karke cash receive ki receipt banayein. Delivery complete karna aur cash receive karna alag kaam hain."
+  - "Stock-In mein khareedi gayi quantity aur rate, istemal wali unit mein badal kar dikhaye jate hain. Save karne se pehle hisaab check kar lein."
+  - "Recipe ki cost mein waste bhi shamil hota hai. Report mein dekhein ke mojooda stock se kitni servings ban sakti hain."
+  - "Deal mein tax wale aur tax se chhoot wale items ka hisaab alag hota hai. Return karte waqt asal bill ka tax aur cost li jati hai."
+  - "Din band karne par bills ki detail delete ki jaye, to bhi unki total sale report mein mehfooz rahegi. Pehle se missing bill detail wapas nahi aayegi."
+  - "Product aur size ke mutabiq sale report dekhein. Deal ke andar bikne wale items alag dikhte hain, taake sale do baar count na ho."
+  - "Deals page par offer ka naam, discount aur shuru aur khatam hone ka waqt set karein. Offer sab products ya sirf chune hue products par laga sakte hain. Offer ke saath mazeed manual discount nahi lagta."
+  - "Offer wali payment ke liye internet zaroori hai. Offer khatam ho jaye to Offers refresh dabayein aur total dobara dekhein. Baad mein offer badalne se purane paid bill aur uske return ka hisaab nahi badlega."

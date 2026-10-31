@@ -92,3 +92,5 @@ metadata, packaging, SHA, CI, callback or workflow. Keep implementation details
 in PR/QA documentation. Do not promise a release, rollout or fix without its
 actual acceptance evidence. Preserve notification targeting and read state when
 correcting wording.
+
+Use [customer announcement language](docs/ops/customer-announcement-language.md) when writing or revising release notices.

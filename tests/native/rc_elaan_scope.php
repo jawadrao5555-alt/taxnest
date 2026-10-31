@@ -17,6 +17,9 @@ $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use App\Models\AppUpdate;
 use Illuminate\Support\Facades\DB;
 
+define('ELAAN_RECEIPT_FUNCTIONS_ONLY', true);
+require dirname(__DIR__, 2).'/scripts/lib/elaan-receipt.php';
+
 DB::beginTransaction();
 try {
     foreach (['pos' => 'restaurant', 'fbr_pos' => 'pharmacy', 'di' => 'di_services', 'all' => 'salon'] as $audience => $category) {
@@ -43,6 +46,11 @@ try {
             if (array_map(fn ($row) => (int) $row->id, $rows) !== [$wanted->id]) {
                 throw new RuntimeException('Exact audience/categories/receipt scope mismatch');
             }
+            if (elaanReceiptCount($scope, $sha, null) !== 1
+                || elaanReceiptCount($scope, $sha, '2000-01-01 00:00:00') !== 1
+                || elaanReceiptCount($scope, $sha, '2099-01-01 00:00:00') !== 0) {
+                throw new RuntimeException('Laravel configured-connection receipt count mismatch');
+            }
             // deployment_key is unique: mutate the one fictional receipt,
             // restoring it between cases, rather than fabricating duplicates.
             $originalReceipt = (array) DB::table('app_updates')->where('id', $wanted->id)->first();
@@ -55,7 +63,7 @@ try {
             ] as $change) {
                 $original = array_intersect_key($originalReceipt, $change);
                 DB::table('app_updates')->where('id', $wanted->id)->update($change);
-                if (DB::select('SELECT id FROM app_updates WHERE '.$scope.' AND deployment_key=? AND archived_at IS NULL', [$sha])) {
+                if (elaanReceiptCount($scope, $sha, null) !== 0 || DB::select('SELECT id FROM app_updates WHERE '.$scope.' AND deployment_key=? AND archived_at IS NULL', [$sha])) {
                     throw new RuntimeException('Ineligible receipt passed scope');
                 }
                 DB::table('app_updates')->where('id', $wanted->id)->update($original);
@@ -64,7 +72,7 @@ try {
                 }
             }
             DB::table('app_updates')->where('id', $wanted->id)->delete();
-            if (DB::select('SELECT id FROM app_updates WHERE '.$scope.' AND deployment_key=? AND archived_at IS NULL', [$sha])) {
+            if (elaanReceiptCount($scope, $sha, null) !== 0 || DB::select('SELECT id FROM app_updates WHERE '.$scope.' AND deployment_key=? AND archived_at IS NULL', [$sha])) {
                 throw new RuntimeException('Deleted receipt passed scope');
             }
         }

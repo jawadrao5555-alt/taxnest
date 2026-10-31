@@ -171,8 +171,8 @@ grep -q 'new_sha_missing_fresh' "$EVAL" \
   || bad "evaluator missing new_sha_missing_fresh"
 
 # Shared check queries exact internal deployment key (not any old row).
-grep -q 'ELAAN_TITLE_COUNT' "$CHECK" \
-  && grep -q "deployment_key = '\$TARGET_SHA'" "$CHECK" \
+grep -q 'RECEIPT_COUNT' "$CHECK" \
+  && grep -q "where('deployment_key', \$sha)" "$ROOT/scripts/lib/elaan-receipt.php" \
   && ok "same-SHA path counts exact deployment-key match" \
   || bad "same-SHA deployment-key query missing"
 

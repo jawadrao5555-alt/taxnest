@@ -114,7 +114,7 @@ jobs:
           command -v mysqld
           mysqld --no-defaults --version
       - name: Check native MySQL 8 receipt scopes without a database listener
-        run: bash scripts/rc-safe-run -- python3 scripts/tests/elaan-mysql8-check.py
+        run: bash scripts/rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence
@@ -168,6 +168,8 @@ jobs:
       - name: Install MariaDB 10.6 and locked PHP dependencies
         run: |
           composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Check native MariaDB receipt collation compatibility without a listener
+        run: bash scripts/rc-safe-run -- python3 scripts/tests/elaan-native-sql-check.py --mariadb
       - name: Run disposable data-bearing migration and DI proof
         env:
           RC_MARIADB_PORT: '33116'

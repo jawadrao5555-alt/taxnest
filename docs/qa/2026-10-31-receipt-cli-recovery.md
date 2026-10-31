@@ -17,6 +17,13 @@ A second native MySQL difference rejects an eligible empty JSON array when
 comparing the JSON column directly with SQL text `'[]'`. MariaDB's JSON-as-text
 coverage did not expose these MySQL-specific differences.
 
+The same original 1267 also reproduces on actual MariaDB 10.11.14 with the
+server's general_ci default and an existing unicode_ci audience column, including
+a connection explicitly configured with SET NAMES unicode_ci. The earlier native
+lab used unicode_ci for both server and columns, hiding this mismatch. A separate
+MariaDB bootstrap regression now exercises the differing defaults on the pinned
+10.6 CI lane as well; its 32 combinations / 472 assertions pass locally on 10.11.
+
 ## Change and compatibility matrix
 
 The generated literals now specify the shared `utf8mb4_unicode_ci` collation.
@@ -33,8 +40,9 @@ restoration and deletion. NULL, empty text and empty arrays retain their
 existing broadcast meaning. It runs SQL during initialization, without opening
 a listener, reading host configuration or using an existing database.
 
-The existing mandatory full-PHP CI lane now runs this native MySQL test;
-MariaDB and browser lanes remain required. Active and proposed workflow contracts
+The existing mandatory full-PHP CI lane runs the native MySQL test, and the
+mandatory pinned MariaDB lane runs the independent MariaDB bootstrap regression.
+Browser lanes remain required. Active and proposed workflow contracts
 require the new regression. No skip_elaan bypass or weakened deployment gate.
 
 Receipt failures now expose only an allowlisted stage, SQLSTATE and numeric
@@ -46,6 +54,7 @@ failure and verifies the sanitized failure protocol.
 ## Validation
 
 - Actual MySQL 8.0.46: original 1267 reproduced; corrected 48 cases / 708 assertions pass.
+- Actual MariaDB 10.11.14: original 1267 reproduced; corrected 32 cases / 472 assertions pass.
 - Receipt bootstrap/real CLI/sanitization: 5 tests / 23 assertions pass.
 - Existing audience targeting plus initial receipt tests: 34 tests / 155 assertions pass.
 - Strict announcement scope and same-SHA freshness regression scripts pass.

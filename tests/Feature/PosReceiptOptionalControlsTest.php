@@ -351,6 +351,7 @@ class PosReceiptOptionalControlsTest extends TestCase
     {
         $before = Company::findOrFail($this->companyId)->getAttributes();
         $this->actingAs(\App\Models\User::findOrFail($this->adminUserId), 'pos')->get('/pos/receipt-settings')
+            ->assertSee('/js/pos-print-design-preview.js?v=20261031-b03', false)
             ->assertOk()->assertSee('receipt_options_local[show_terminal]', false)->assertSee('receipt_options_pra[show_waiter]', false);
         $this->assertSame($before, Company::findOrFail($this->companyId)->getAttributes());
     }

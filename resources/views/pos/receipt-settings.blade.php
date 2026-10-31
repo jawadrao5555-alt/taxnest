@@ -603,8 +603,5 @@
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">{{ __('pos.direct_print_note') }}</p>
     </div>
 </div>
-</x-pos-layout>
-
-@push('scripts')
 <script src="/js/pos-print-design-preview.js?v=20261031-b03" defer></script>
-@endpush
+</x-pos-layout>

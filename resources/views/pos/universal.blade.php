@@ -14746,7 +14746,7 @@ function restaurantPos() {
      nav + back button (see pos/deliveries.blade.php) — so tab/filter/POST
      navigation INSIDE the iframe keeps the embedded look. All gating stays
      server-side on the route (PosAuth + plan/feature gates + stream scope). --}}
-<div id="tn-delivery-board" style="display:none; position:fixed; inset:0; z-index:95;">
+<div id="tn-delivery-board" style="display:none; position:fixed; inset:0; z-index:150;">
     <div onclick="tnCloseDeliveryBoard()" style="position:absolute; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(4px);"></div>
     <div style="position:absolute; inset:16px; display:flex; flex-direction:column; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,.35);" class="dark:bg-gray-900">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 16px; background:#064e3b; color:#fff; flex-shrink:0;">
@@ -14780,6 +14780,8 @@ function tnOpenDeliveryBoard() {
     var wrap = document.getElementById('tn-delivery-board');
     var frame = document.getElementById('tn-delivery-board-frame');
     if (!wrap || !frame) return;
+    // Escape sale zoom/scroll containment and the 140-layer top navigation.
+    if (wrap.parentElement !== document.body) document.body.appendChild(wrap);
     wrap.style.display = 'block';
     tnDeliveryBoardError(false);
     if (!frame.getAttribute('src')) {

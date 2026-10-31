@@ -84,6 +84,7 @@ export async function b03DeliveryNavigationWorkflow(originalPage,t,v,{baseUrl,wa
     await page.route('**/pos/deliveries',failure);
     await page.locator('button[onclick="tnOpenDeliveryBoard()"]:visible').first().click();
     const board=page.locator('#tn-delivery-board');
+    if(!await board.evaluate(el=>el.parentElement===document.body))throw Error('Delivery overlay did not escape the sale stacking context');
     await board.locator('#tn-delivery-board-error').waitFor({state:'visible'});
     if(!injected)throw Error('Embedded document fault was not injected');
     if(await root.evaluate(el=>Alpine.$data(el).cart[0]?.cart_uid)!=='b03-navigation-draft')throw Error('Failed frame changed parent draft');

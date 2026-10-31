@@ -284,6 +284,7 @@ class PosRiderDayCloseFiguresTest extends TestCase
     public function test_legacy_receipt_after_midnight_belongs_to_the_previous_cutoff_window(): void
     {
         $this->travelTo(\Carbon\Carbon::parse('2026-10-16 01:00:00', 'Asia/Karachi'));
+        \App\Services\PosBusinessDay::forgetCutoff(self::COMPANY);
         $riderId = $this->makeRider();
         $billId = $this->makeBill($riderId, '2026-10-14', ['total_amount'=>900]);
         $this->makeSettlement($riderId, 700, [

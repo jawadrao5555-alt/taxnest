@@ -61,4 +61,49 @@ class ElaanReceiptBootstrapTest extends TestCase
         $this->expectExceptionMessage('ELAAN_SCHEMA_KEY_MISSING');
         \elaanReceiptCount('is_published=1',str_repeat('a',40),null);
     }
+    public function test_failure_diagnostics_expose_only_allowlisted_stage_and_numeric_database_codes(): void
+    {
+        $error = new \PDOException('secret-password SQL bindings customer data');
+        $error->errorInfo = ['HY000', 1267, 'secret-password host and query'];
+        $wrapped = new \RuntimeException('private path and credentials', 0, $error);
+        $this->assertSame('ELAAN_DB_ERROR stage=fresh_query sqlstate=HY000 driver=1267', \elaanReceiptFailure($wrapped, 'fresh_query'));
+        $this->assertSame('ELAAN_DB_ERROR stage=marker', \elaanReceiptFailure(new \RuntimeException('ELAAN_SECRET_PASSWORD'), 'marker'));
+        $this->assertSame('ELAAN_DB_ERROR stage=unknown', \elaanReceiptFailure(new \Exception('secret'), 'secret'));
+        $error->errorInfo = ['secret', 'private', 'secret'];
+        $this->assertSame('ELAAN_DB_ERROR stage=bootstrap', \elaanReceiptFailure($error, 'bootstrap'));
+        $this->assertSame('ELAAN_SCHEMA_KEY_MISSING', \elaanReceiptFailure(new \RuntimeException('ELAAN_SCHEMA_KEY_MISSING'), 'fresh_query'));
+    }
+
+    public function test_real_cli_bootstrap_returns_a_receipt_and_sanitizes_query_failures(): void
+    {
+        $database = tempnam(sys_get_temp_dir(), 'elaan-cli-db-');
+        $marker = tempnam(sys_get_temp_dir(), 'elaan-cli-marker-');
+        try {
+            $sha = str_repeat('a', 40);
+            $pdo = new \PDO('sqlite:'.$database);
+            $pdo->exec('CREATE TABLE app_updates (audience TEXT,is_published INTEGER,deployment_key TEXT,created_at TEXT)');
+            $pdo->prepare('INSERT INTO app_updates VALUES (?,?,?,?)')->execute(['pos', 1, $sha, '2026-10-31 12:00:00']);
+            file_put_contents($marker, '1|'.$sha);
+            $run = function (string $scope) use ($database, $marker, $sha) {
+                $process = new \Symfony\Component\Process\Process(
+                    [PHP_BINARY, '-c', php_ini_loaded_file(), base_path('scripts/lib/elaan-receipt.php')],
+                    base_path(), ['LIVE_DIR'=>base_path(), 'DB_CONNECTION'=>'sqlite', 'DB_DATABASE'=>$database,
+                        'MARKER_FILE'=>$marker, 'TARGET_SHA'=>$sha, 'SCOPE_B64'=>base64_encode($scope)]
+                );
+                $process->run();
+                return $process;
+            };
+            $ok = $run("is_published=1 AND audience='pos'");
+            $this->assertSame(0, $ok->getExitCode(), $ok->getOutput().$ok->getErrorOutput());
+            $this->assertSame("ELAAN_COUNT=1 MARKER_COMMIT=$sha RECEIPT_COUNT=1\n", $ok->getOutput());
+            $bad = $run('private_customer_field=1');
+            $this->assertSame(1, $bad->getExitCode());
+            $this->assertSame("ELAAN_DB_ERROR stage=fresh_query sqlstate=HY000 driver=1\n", $bad->getOutput());
+            $this->assertSame('', $bad->getErrorOutput());
+        } finally {
+            unlink($database);
+            unlink($marker);
+        }
+    }
+
 }

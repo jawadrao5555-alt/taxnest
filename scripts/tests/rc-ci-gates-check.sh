@@ -18,7 +18,7 @@ const expected=['workflow-safety','dependency-audit-build','fullphpunit','native
 const mandatoryCommands={
   'workflow-safety':['rc-ci-gates-check.sh','npm-lock-portability-test.sh','ci-sanitize-evidence-check.sh','rc-failure-observability-check.sh'],
   'dependency-audit-build':['rc-recertify.sh --all-locks'],
-  fullphpunit:['rc-safe-run -- vendor/bin/phpunit'],
+  fullphpunit:['rc-safe-run -- vendor/bin/phpunit','rc-safe-run -- python3 scripts/tests/elaan-mysql8-check.py'],
   'native-mariadb-di':['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-mariadb-migration-lab.sh --all'],
   browserdesktopmobile:['ci-mariadb-provision.sh install','ci-mariadb-provision.sh verify','rc-browser-fixture.sh run','rc-playwright-install.sh','local-browser-discovery-check.mjs'],
   jsagentrealtime:['rc-safe-run -- node --test'],

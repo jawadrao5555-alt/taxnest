@@ -109,6 +109,12 @@ jobs:
           php-version: '8.4'
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Install MySQL 8 core for isolated receipt SQL regression
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mysql-server-core-8.0
+      - name: Check native MySQL 8 receipt scopes without a database listener
+        run: bash scripts/rc-safe-run -- python3 scripts/tests/elaan-mysql8-check.py
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence

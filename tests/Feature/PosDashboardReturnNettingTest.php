@@ -35,6 +35,8 @@ class PosDashboardReturnNettingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // These fixtures describe a daytime trading day, independent of runner time.
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-15 12:00:00', 'Asia/Karachi'));
 
         Schema::dropAllTables();
         User::flushScopeColumnCache();
@@ -178,6 +180,7 @@ class PosDashboardReturnNettingTest extends TestCase
     protected function tearDown(): void
     {
         Auth::guard('pos')->logout();
+        $this->travelBack();
         parent::tearDown();
     }
 

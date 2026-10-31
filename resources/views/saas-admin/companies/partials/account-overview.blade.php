@@ -21,7 +21,7 @@
         </dl>
         <p class="text-sm mt-3">These are account-level checks, not a guarantee that every action is enabled. Each product still enforces its roles, features, quotas, login rules and system restrictions.</p>
         @if(($account['active_count'] ?? 0) > 1)
-        <p role="alert" class="mt-3 font-semibold">{{ $account['active_count'] }} active subscription rows need review. The newest active row below is the one used by SubscriptionAccessService. No rows were changed.</p>
+        <p role="alert" class="mt-3 font-semibold">{{ $account['active_count'] }} active subscription rows need review. The newest active row below is the one used by the current subscription rules. No rows were changed.</p>
         @endif
         @if($sub)
         <dl data-current-subscription="{{ $sub->id }}" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 text-sm">

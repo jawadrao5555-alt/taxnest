@@ -45,3 +45,21 @@ Payment allocation/reconciliation, trial/grace policy, versioned entitlements/pr
 Elaan retains the existing POS audience and uses plain language about admin review; it does not claim new customer renewal rules.
 
 Owner merge/deploy and Actions live verification are separate. A green PR is not LIVE VERIFIED.
+
+## First exact-head CI findings and correction
+
+Run 41236241326 passed native MariaDB concurrency, dependency/build, workflow safety,
+release-chain and agent/Android checks. Its full PHP run found:
+- A reconstructed foreign subscription fixture omitted required start_date. The
+  fixture now supplies its stored period, without weakening the schema.
+- Admin DI review primes AiPageCreditService's per-process ledgerReady probe.
+  Later AI Reader tests rebuild a legacy schema without that ledger. The common
+  test setup now calls the existing forgetLedgerProbe() reset alongside other
+  schema-cache resets; production AI behavior is unchanged.
+- Three older POS fixture classes used wall-clock now() while assuming daytime
+  and mid-month. The CI ran after midnight PKT, inside the real 06:00 business-day
+  cutoff. They now freeze an explicit mid-month noon and restore time at teardown.
+  A new actual rider-receipt regression explicitly tests 01:00 against both
+  previous-business-day and calendar-day windows, preserving cutoff coverage.
+
+All tests and required lanes must run again on the corrected exact head.

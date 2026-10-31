@@ -112,7 +112,7 @@ class AdminCompanyAccountOverviewTest extends TestCase
     {
         [$admin,$company,$sub] = $this->fixture();
         $other = Company::create(['name'=>'Foreign B01 company','email'=>uniqid().'@b01.invalid','ntn'=>uniqid(),'product_type'=>'pos','status'=>'approved','company_status'=>'active']);
-        $foreignSub = Subscription::create(['company_id'=>$other->id,'active'=>true,'final_price'=>54321]);
+        $foreignSub = Subscription::create(['company_id'=>$other->id,'active'=>true,'start_date'=>'2025-01-01','end_date'=>'2025-12-31','final_price'=>54321]);
         foreach ([[$company,$sub,'OWN-B01'],[$other,$foreignSub,'FOREIGN-B01']] as [$c,$s,$marker]) {
             $invoice = SubscriptionInvoice::create(['company_id'=>$c->id,'subscription_id'=>$s->id,'amount'=>123,'status'=>'pending','due_date'=>now()]);
             SubscriptionPayment::create(['subscription_invoice_id'=>$invoice->id,'amount'=>50,'payment_method'=>'bank','transaction_ref'=>$marker.'-PAY','paid_at'=>now()]);

@@ -37,6 +37,8 @@ class PosPaymentBucketsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // These fixtures describe a daytime trading day, independent of runner time.
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-15 12:00:00', 'Asia/Karachi'));
 
         Schema::dropAllTables();
 
@@ -669,4 +671,11 @@ class PosPaymentBucketsTest extends TestCase
         // cash_pending = unsettled, not-returned cash only (the 300).
         $this->assertSame(300.0, (float) $ali['cash_pending']);
     }
+
+    protected function tearDown(): void
+    {
+        $this->travelBack();
+        parent::tearDown();
+    }
+
 }

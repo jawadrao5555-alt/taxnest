@@ -55,11 +55,14 @@ class PosPhoneSearchContinuityTest extends TestCase
     {
         [$company,$owner]=$this->shop();
         $day=\App\Services\PosBusinessDay::current($company->id);
-        $wanted=PosTransaction::create(['company_id'=>$company->id,'invoice_number'=>'B03-OLDER-MATCH','invoice_mode'=>'pra','pra_status'=>null,'customer_name'=>'Synthetic Older Buyer','customer_phone'=>'0300-1234567','total_amount'=>100,'payment_method'=>'cash','order_type'=>'delivery','status'=>'completed','business_date'=>$day,'created_by'=>$owner->id]);
+        $wanted=PosTransaction::create(['company_id'=>$company->id,'invoice_number'=>'B03-OLDER-MATCH','invoice_mode'=>'pra','pra_status'=>null,'customer_name'=>'Synthetic Older Buyer','customer_phone'=>'0300-1234567','total_amount'=>11100,'payment_method'=>'cash','order_type'=>'delivery','status'=>'completed','business_date'=>$day,'created_by'=>$owner->id]);
+        $wanted->forceFill(['bill_token'=>21100])->saveQuietly();
         $attrs=$wanted->getAttributes();unset($attrs['id']);$rows=[];
-        for($i=0;$i<305;$i++)$rows[]=array_replace($attrs,['invoice_number'=>'B03-NEWER-'.$i,'customer_phone'=>'03111234567']);
+        for($i=0;$i<305;$i++)$rows[]=array_replace($attrs,['invoice_number'=>'B03-NEWER-'.$i,'customer_phone'=>'03111234567','total_amount'=>200,'bill_token'=>$i+1]);
         DB::table('pos_transactions')->insert($rows);
         $this->actingAs($owner,'pos')->getJson('/pos/api/todays-bills?'.http_build_query(['date'=>$day,'search'=>'+92 300 1234567']))->assertOk()->assertJsonCount(1,'bills')->assertJsonPath('bills.0.id',$wanted->id)->assertJsonPath('bills.0.customer_phone','0300-1234567')->assertJsonPath('has_more',false);
+        $this->getJson('/pos/api/todays-bills?'.http_build_query(['date'=>$day,'search'=>'1100']))->assertOk()->assertJsonCount(1,'bills')->assertJsonPath('bills.0.id',$wanted->id);
+        $this->getJson('/pos/api/todays-bills?'.http_build_query(['date'=>$day,'search'=>'2110']))->assertOk()->assertJsonCount(1,'bills')->assertJsonPath('bills.0.id',$wanted->id);
         $this->getJson('/pos/api/todays-bills?date='.$day)->assertOk()->assertJsonCount(300,'bills')->assertJsonPath('has_more',true);
     }
 

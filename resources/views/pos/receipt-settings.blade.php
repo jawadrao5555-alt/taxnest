@@ -21,6 +21,8 @@
     </div>
     @endif
 
+    @include('pos.partials.saved-print-summary')
+
     {{-- Owner (Jul 2026): PRA and Local receipts each get a FULL independent display
          set. PRA set = legacy invoice_display_prefs['pos'] + pos_receipt_show_tax
          column; Local set = invoice_display_prefs['pos_local'] (mirrors PRA until
@@ -601,4 +603,5 @@
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">{{ __('pos.direct_print_note') }}</p>
     </div>
 </div>
+<script src="/js/pos-print-design-preview.js?v=20261031-b03" defer></script>
 </x-pos-layout>

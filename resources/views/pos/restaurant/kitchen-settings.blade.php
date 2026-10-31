@@ -23,6 +23,7 @@
     </div>
     @endif
 
+    @include('pos.partials.saved-print-summary')
     <form method="POST" action="{{ route('pos.restaurant.kitchen-settings.update') }}" class="space-y-6">
         @csrf
         {{-- Task 1393 marker: proves this form was FRESHLY rendered, so the handler may

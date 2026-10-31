@@ -2551,13 +2551,13 @@ window.addEventListener('popstate', function() {
                         <div class="space-y-1">
                             {{-- Task #643: noTicks — claimed-cart cancel has no real item ids
                                  (Made/Not-Made marking = Task #645); KOT alert still shows. --}}
-                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length && !boardCancelAsk.noTicks" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">Prepared quantity: leave blank if unknown; enter 0 only if none was prepared.</p>
+                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length && !boardCancelAsk.noTicks" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.prepared_quantity_help') }}</p>
                             <template x-for="it in boardCancelAsk.items" :key="it.id">
                                 <div class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
                                     <span class="flex-1" x-text="it.quantity + ' × ' + it.item_name"></span>
                                     <span class="text-gray-400" x-text="Math.round(it.subtotal).toLocaleString()"></span>
                                     <input x-show="!boardCancelAsk.noTicks" type="number" min="0" :max="it.quantity" step="0.001"
-                                           x-model="boardCancelMade[it.id]" aria-label="Prepared quantity" placeholder="Unknown"
+                                           x-model="boardCancelMade[it.id]" aria-label="{{ __('pos.prepared_quantity_label') }}" placeholder="Unknown"
                                            class="w-24 px-2 py-1 rounded border border-gray-300 bg-white dark:bg-gray-800 text-xs">
 
                                 </div>
@@ -2570,9 +2570,9 @@ window.addEventListener('popstate', function() {
                     <p x-show="!boardCancelAsk.order.kot_sent_at" class="mt-3 text-[11px] text-gray-400 text-center">{{ __('pos.cancel_no_kot_note') }}</p>
                 </div>
                 <div class="px-5 pt-2">
-                    <label class="block text-xs font-bold text-gray-600 dark:text-gray-300" for="cancel-order-reason">Cancellation reason</label>
+                    <label class="block text-xs font-bold text-gray-600 dark:text-gray-300" for="cancel-order-reason">{{ __('pos.cancellation_reason_label') }}</label>
                     <textarea id="cancel-order-reason" x-model="boardCancelAsk.reason" maxlength="500" rows="2" class="w-full mt-1 rounded border border-gray-300 bg-white dark:bg-gray-800 text-sm" placeholder="Why is this order being cancelled?"></textarea>
-                    <p class="text-[10px] text-gray-500">Records preparation only; no sale, refund or stock adjustment is posted.</p>
+                    <p class="text-[10px] text-gray-500">{{ __('pos.cancellation_evidence_only_help') }}</p>
                 </div>
                 <div class="p-4 grid grid-cols-1 gap-2">
                     <button @click="boardCancelAsk = null" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_keep_order') }}</button>
@@ -3371,13 +3371,14 @@ window.addEventListener('popstate', function() {
                     <input type="date" x-model="reprintDate" @change="activeReprintIndex = 0; reprintPreviewBill = null; loadReprintBills()"
                            :disabled="reprintBusyId !== null" class="rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm">
                 </label>
+                <p x-show="reprintLimited" x-cloak class="mt-2 text-sm font-semibold text-amber-800 dark:text-amber-300">{{ __('pos.reprint_search_limit') }}</p>
                 <p x-show="reprintLoadError" x-cloak role="alert" class="mt-2 text-sm font-semibold text-red-700 dark:text-red-300" x-text="window.TXT.network_error"></p>
                 <div class="mt-3 relative">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     {{-- Element-level keydown handlers REQUIRED: handleKey's global input-field
                          gate swallows window-level keys while this input has focus (which is the
                          default — openReprint auto-focuses it). Do NOT rely on the window branch. --}}
-                    <input type="text" x-model="reprintSearch" @input="activeReprintIndex = 0" x-ref="reprintSearchInput"
+                    <input type="text" x-model="reprintSearch" @input="activeReprintIndex = 0; reprintPreviewBill = null; scheduleReprintLoad()" maxlength="100" x-ref="reprintSearchInput"
                            @keydown.down.prevent="if (!reprintPreviewBill) activeReprintIndex = Math.min(activeReprintIndex + 1, Math.max(0, filteredReprintBills().length - 1))"
                            @keydown.up.prevent="if (!reprintPreviewBill) activeReprintIndex = Math.max(activeReprintIndex - 1, 0)"
                            @keydown.enter.prevent="if (reprintPreviewBill) { const b = reprintPreviewBill; reprintPreviewBill = null; reprintBill(b); } else if (filteredReprintBills()[activeReprintIndex]) { reprintBill(filteredReprintBills()[activeReprintIndex]) }"
@@ -3389,7 +3390,7 @@ window.addEventListener('popstate', function() {
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <label class="text-xs font-semibold text-gray-800 dark:text-gray-200">
                         {{ __('pos.order_type') }}
-                        <select x-model="reprintOrderType" @change="activeReprintIndex = 0; reprintPreviewBill = null" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <select x-model="reprintOrderType" @change="activeReprintIndex = 0; reprintPreviewBill = null; loadReprintBills()" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                             <option value="">{{ __('pos.all_types') }}</option>
                             <option value="dine_in">{{ __('pos.dine_in') }}</option>
                             <option value="takeaway">{{ __('pos.takeaway') }}</option>
@@ -3398,7 +3399,7 @@ window.addEventListener('popstate', function() {
                     </label>
                     <label class="text-xs font-semibold text-gray-800 dark:text-gray-200">
                         {{ __('pos.payment_method') }}
-                        <select x-model="reprintPayment" @change="activeReprintIndex = 0; reprintPreviewBill = null" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <select x-model="reprintPayment" @change="activeReprintIndex = 0; reprintPreviewBill = null; loadReprintBills()" class="mt-1 w-full rounded-lg text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                             <option value="">{{ __('pos.all_types') }}</option>
                             <option value="cash">{{ __('pos.pm_cash') }}</option>
                             <option value="card">{{ __('pos.pm_card') }}</option>
@@ -4799,6 +4800,7 @@ $jsEnc = function ($value, $fallback = '[]') {
     return $json === false ? $fallback : $json;
 };
 @endphp
+<script src="/js/pos-phone-identity.js?v=20261031-b03"></script>
 <script src="/js/pos-print-attempt.js?v=20260909"></script>
 <script src="/js/pos-deal-allocation.js?v=20261030-b02"></script>
 <script>
@@ -5350,6 +5352,7 @@ function restaurantPos() {
         activeReprintIndex: 0,
         reprintLoading: false,
         reprintSearch: '',
+        reprintLimited: false,
         reprintDate: '',
         reprintLoadError: false,
         _reprintLoadVersion: 0,
@@ -8561,8 +8564,12 @@ function restaurantPos() {
 
         clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.deliveryCollectionMode = null; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
-            if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
-            this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
+            if (this.submitting || this._tableSelectionBusy) { this.showToast(window.TXT.order_action_in_progress, 'info'); return false; }
+            if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return false; }
+            if (this.editingBillId) { this.cancelEditMode(); return true; } // Leave the existing bill through its established no-write exit.
+            this.clearCart(); this.showPendingDeliveries = false; this.showToast(window.TXT.new_sale_started, 'success');
+            this.$nextTick(() => this.$refs.searchInput?.focus());
+            return true;
         },
         voidOrder() {
             if (this.cart.length === 0) return;
@@ -9132,6 +9139,9 @@ function restaurantPos() {
             this.printKitchenTicket(id, null, true);
         },
         async selectTable(table, opts) {
+            if (this._tableSelectionBusy) return;
+            this._tableSelectionBusy = true;
+            try {
             // Table-se-Bill (Jul 2026) + ZFC (5 Aug 2026): occupied table WITH a
             // waiting waiter order ab bhi WAHI options menu kholta hai jo desktop
             // wale table ko milta hai (Open/Edit, Proof Bill, Make FINAL, Shift) —
@@ -9255,13 +9265,16 @@ function restaurantPos() {
             // waiter order is loaded, or with manual/deal lines (billing-only —
             // hold would 422). On failure fall through to the normal flow so the
             // cashier keeps the cart and can press Hold/F5 manually.
-            if (this.kitchenSettings.dine_in_auto_kot && this.cart.length > 0 && !this.editingBillId && !this.incomingOrderId && !this.holdBlockedByManual() && !this.hasDealItems()) {
-                const held = await this.holdOrder({ forcePrintKot: true, successMessage: 'T-' + table.table_number + ' — KOT sent, bill saved in Recall' });
-                if (held) return;
+            if (this.kitchenSettings.dine_in_auto_kot && this.cart.length > 0 && !this.editingBillId && !this.recalledOrderId && !this.incomingOrderId && !this.holdBlockedByManual() && !this.hasDealItems()) {
+                if (confirm(window.TXT.auto_kot_table_confirm)) {
+                    const held = await this.holdOrder({ forcePrintKot: true, successMessage: 'T-' + table.table_number + ' — KOT sent, bill saved in Recall' });
+                    if (held) return;
+                } else { this.showToast(window.TXT.auto_kot_draft_kept, 'info'); }
             }
             // Guided keyboard flow paused at the type step waiting for a table —
             // resume the chain into cart mode now that the table is locked in.
             if (this.guidedFlow && this.flowStep === 'cart' && !this.cartMode) this.enterCartMode('last');
+            } finally { this._tableSelectionBusy = false; }
         },
         // Table-se-Bill (Jul 2026): atomic claim then cart-load. The claim response
         // carries a FRESH order snapshot (waiter may have appended items after our
@@ -9847,9 +9860,10 @@ function restaurantPos() {
                     (o.items || []).map(it => it.name || it.item_name || '').join(' ')
                 ].filter(Boolean).join(' ').toLowerCase();
                 if (hay.indexOf(q) !== -1) return true;
+                if (typeof window !== 'undefined' && window.TNPosPhone && window.TNPosPhone.matches(o.customer_phone, q)) return true;
                 if (digits.length >= 3) {
                     const phone = String(o.customer_phone || '').replace(/\D/g, '');
-                    if (phone && phone.indexOf(digits) !== -1) return true;
+                    if (!(typeof window !== 'undefined' && window.TNPosPhone) && phone && phone.indexOf(digits) !== -1) return true;
                     const num = String(o.order_number || '').replace(/\D/g, '');
                     if (num && num.indexOf(digits) !== -1) return true;
                 }
@@ -9992,7 +10006,7 @@ function restaurantPos() {
         async boardCancelConfirm() {
             const ask = this.boardCancelAsk;
             if (!ask || this.boardBusy) return;
-            if (!String(ask.reason || '').trim()) { this.showToast('Enter a cancellation reason.', 'error'); return; }
+            if (!String(ask.reason || '').trim()) { this.showToast(window.TXT.cancellation_reason_required, 'error'); return; }
             const t = ask.table;
             this.boardBusy = true;
             try {
@@ -11517,7 +11531,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
-            if (!window.PosDealAllocation && this.cart.some(i => i.item_type === 'deal')) { this.showToast('Deal calculation could not load. Reload the sale screen before payment.', 'error'); return; }
+            if (!window.PosDealAllocation && this.cart.some(i => i.item_type === 'deal')) { this.showToast(window.TXT.deal_calculation_unavailable, 'error'); return; }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).
@@ -12841,7 +12855,7 @@ function restaurantPos() {
                 b.display_number, b.bill_token, b.invoice_number, b.customer_name, b.customer_phone,
                 b.delivery_address, b.rider_name, b.delivery_status,
             ].some(v => v && String(v).toLowerCase().includes(q)) ||
-                (digits.length >= 3 && String(b.customer_phone || '').replace(/\D/g, '').includes(digits)));
+                ((typeof window !== 'undefined' && window.TNPosPhone) ? window.TNPosPhone.matches(b.customer_phone, q) : (digits.length >= 3 && String(b.customer_phone || '').replace(/\D/g, '').includes(digits))));
         },
         // Prepaid ⇄ Back to Cash from the popup — reuses the SAME endpoints as
         // the Deliveries board (pos.deliveries.mark-prepaid / unmark-prepaid);
@@ -13044,7 +13058,7 @@ function restaurantPos() {
                 (b.bill_token || '').toString().toLowerCase().includes(q) ||
                 (b.invoice_number || '').toLowerCase().includes(q) ||
                 (b.customer_name || '').toLowerCase().includes(q) ||
-                (b.customer_phone || '').toLowerCase().includes(q) ||
+                ((typeof window !== 'undefined' && window.TNPosPhone) ? window.TNPosPhone.matches(b.customer_phone, q) : (b.customer_phone || '').toLowerCase().includes(q)) ||
                 (b.delivery_address || '').toLowerCase().includes(q)
             );
         },
@@ -13096,20 +13110,27 @@ function restaurantPos() {
             this.loadReprintBills();
             this.$nextTick(() => { const el = this.$refs.reprintSearchInput; if (el) el.focus(); });
         },
+        scheduleReprintLoad() {
+            clearTimeout(this._reprintSearchTimer);
+            this._reprintSearchTimer=setTimeout(() => this.loadReprintBills(), 250);
+        },
         async loadReprintBills() {
             const version = ++this._reprintLoadVersion;
             this.reprintLoading = true;
             this.reprintLoadError = false;
+            this.reprintLimited = false;
             this.reprintBills = [];
             this.reprintPreviewBill = null;
             try {
-                const query = this.reprintDate ? '?date=' + encodeURIComponent(this.reprintDate) : '';
+                const filters=[['date',this.reprintDate],['search',this.reprintSearch],['order_type',this.reprintOrderType],['payment_method',this.reprintPayment]].filter(([,value]) => value).map(([key,value]) => key+'='+encodeURIComponent(value));
+                const query=filters.length ? '?'+filters.join('&') : '';
                 const res = await fetch('{{ url('/pos/api/todays-bills') }}' + query, { headers: { 'Accept': 'application/json' } });
                 if (!res.ok) throw new Error('Bill list unavailable');
                 const data = await res.json();
                 if (!data || !data.success) throw new Error('Bill list unavailable');
                 if (version !== this._reprintLoadVersion) return;
                 this.reprintBills = data.bills || [];
+                this.reprintLimited = !!data.has_more;
                 this.reprintDate = data.business_date || this.reprintDate;
                 this.activeReprintIndex = 0;
             } catch (e) {
@@ -13125,7 +13146,8 @@ function restaurantPos() {
                 const payment = String(b.payment_method || '').trim().toLowerCase();
                 if (this.reprintPayment === 'cash' && payment !== 'cash') return false;
                 if (this.reprintPayment === 'card' && !['card', 'debit_card', 'credit_card'].includes(payment)) return false;
-                return !q || (b.display_number || '').toLowerCase().includes(q)
+                return !q || (typeof window !== 'undefined' && window.TNPosPhone && window.TNPosPhone.matches(b.customer_phone, q))
+                    || (b.display_number || '').toLowerCase().includes(q)
                     || (b.bill_token || '').toString().toLowerCase().includes(q)
                     || (b.invoice_number || '').toLowerCase().includes(q)
                     || (b.pra_invoice_number || '').toLowerCase().includes(q)
@@ -14724,7 +14746,7 @@ function restaurantPos() {
      nav + back button (see pos/deliveries.blade.php) — so tab/filter/POST
      navigation INSIDE the iframe keeps the embedded look. All gating stays
      server-side on the route (PosAuth + plan/feature gates + stream scope). --}}
-<div id="tn-delivery-board" style="display:none; position:fixed; inset:0; z-index:95;">
+<div id="tn-delivery-board" style="display:none; position:fixed; inset:0; z-index:150;">
     <div onclick="tnCloseDeliveryBoard()" style="position:absolute; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(4px);"></div>
     <div style="position:absolute; inset:16px; display:flex; flex-direction:column; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,.35);" class="dark:bg-gray-900">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 16px; background:#064e3b; color:#fff; flex-shrink:0;">
@@ -14732,31 +14754,84 @@ function restaurantPos() {
                 <svg style="width:18px;height:18px;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                 <span style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ __('pos.deliveries') }}</span>
             </div>
+            <button type="button" onclick="tnDeliveryNewSale()" data-b03-delivery-new-sale style="padding:8px 12px;border-radius:8px;border:1px solid #fff;color:#fff;background:transparent;font-weight:bold;">{{ __('pos.new_sale') }}</button>
             <button type="button" onclick="tnCloseDeliveryBoard()" style="display:flex; align-items:center; gap:6px; padding:6px 14px; border-radius:10px; background:rgba(255,255,255,.14); color:#fff; font-weight:800; font-size:12px; border:1px solid rgba(255,255,255,.25); cursor:pointer;">
                 {{ __('pos.close') }}
                 <svg style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
+        <div id="tn-delivery-board-error" hidden role="alert" style="padding:12px;background:#fff7ed;color:#7c2d12;">
+            {{ __('pos.delivery_board_load_failed') }}
+            <button type="button" onclick="tnRetryDeliveryBoard()" style="padding:8px;text-decoration:underline;font-weight:bold;">{{ __('pos.delivery_board_retry') }}</button>
+        </div>
         <iframe id="tn-delivery-board-frame" title="{{ __('pos.deliveries') }}" style="flex:1 1 0%; width:100%; border:0; background:#f9fafb;"></iframe>
     </div>
 </div>
 <script>
+function tnDeliverySaleState() {
+    var root = document.querySelector('[data-tn-sale-root]');
+    return root && window.Alpine ? window.Alpine.$data(root) : null;
+}
+function tnDeliveryBoardError(failed) {
+    var hint = document.getElementById('tn-delivery-board-error');
+    if (hint) hint.hidden = !failed;
+}
 function tnOpenDeliveryBoard() {
     var wrap = document.getElementById('tn-delivery-board');
     var frame = document.getElementById('tn-delivery-board-frame');
     if (!wrap || !frame) return;
+    // Escape sale zoom/scroll containment and the 140-layer top navigation.
+    if (wrap.parentElement !== document.body) document.body.appendChild(wrap);
+    wrap.style.display = 'block';
+    tnDeliveryBoardError(false);
     if (!frame.getAttribute('src')) {
+        clearTimeout(window._tnDeliveryBoardTimer);
+        window._tnDeliveryBoardTimer = setTimeout(function () { tnDeliveryBoardError(true); }, 15000);
         frame.setAttribute('src', '{{ route('pos.deliveries', [], false) }}');
     }
-    wrap.style.display = 'block';
 }
 function tnCloseDeliveryBoard() {
     var wrap = document.getElementById('tn-delivery-board');
     if (wrap) wrap.style.display = 'none';
-    // Reload the board next open so rider/status changes are always fresh.
+    clearTimeout(window._tnDeliveryBoardTimer);
     var frame = document.getElementById('tn-delivery-board-frame');
     if (frame) frame.removeAttribute('src');
+    var state = tnDeliverySaleState();
+    if (state) state.$nextTick(function () { state.$refs.searchInput?.focus(); });
 }
+function tnDeliveryNewSale() {
+    var state = tnDeliverySaleState();
+    if (state && state.newSale() === true) tnCloseDeliveryBoard();
+}
+function tnRetryDeliveryBoard() {
+    var frame = document.getElementById('tn-delivery-board-frame');
+    if (frame) frame.removeAttribute('src');
+    tnOpenDeliveryBoard();
+}
+(function () {
+    var frame = document.getElementById('tn-delivery-board-frame');
+    if (!frame) return;
+    frame.addEventListener('error', function () { clearTimeout(window._tnDeliveryBoardTimer); tnDeliveryBoardError(true); });
+    frame.addEventListener('load', function () {
+        if (!frame.getAttribute('src')) return;
+        clearTimeout(window._tnDeliveryBoardTimer);
+        try {
+            var doc = frame.contentDocument;
+            if (!doc || !doc.querySelector('[data-tn-delivery-page]')) { tnDeliveryBoardError(true); return; }
+            tnDeliveryBoardError(false);
+            doc.addEventListener('click', function (event) {
+                if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                var link = event.target.closest ? event.target.closest('a[href]') : null;
+                if (!link || link.hasAttribute('download') || link.target) return;
+                var next = new URL(link.href, window.location.origin);
+                var sale = new URL('{{ route('pos.invoice.create') }}', window.location.origin);
+                if (next.origin === sale.origin && next.pathname.replace(/\/$/,'') === sale.pathname.replace(/\/$/,'') && !next.search && !next.hash) {
+                    event.preventDefault(); event.stopImmediatePropagation(); tnDeliveryNewSale();
+                }
+            }, true);
+        } catch (_) { tnDeliveryBoardError(true); }
+    });
+})();
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         var wrap = document.getElementById('tn-delivery-board');

@@ -37,8 +37,8 @@ class PosCustomerSpend
                     $query->where('customer_id', $customer->id);
                     if (!empty($customer->phone)) {
                         $query->orWhere(function ($byPhone) use ($customer) {
-                            $byPhone->whereNull('customer_id')
-                                ->where('customer_phone', $customer->phone);
+                            $byPhone->whereNull('customer_id');
+                            PosCustomerPhoneIdentity::constrain($byPhone, 'customer_phone', $customer->phone, false);
                         });
                     }
                 })

@@ -113,10 +113,10 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosRestaurantDashboardCountsTest.php
       - name: Check notification read state and product targeting
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/FeaturedWhatsNewTest.php tests/Feature/WhatsNewAudienceTargetingTest.php
-      - name: Install MySQL 8 core for isolated receipt SQL regression
+      - name: Verify runner MySQL 8 core for isolated receipt SQL regression
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends mysql-server-core-8.0
+          command -v mysqld
+          mysqld --no-defaults --version
       - name: Check native MySQL 8 receipt scopes without a database listener
         run: bash scripts/rc-safe-run -- python3 scripts/tests/elaan-mysql8-check.py
       - name: Check strict announcement publication and exact receipt scope

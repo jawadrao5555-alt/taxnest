@@ -12,6 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 31 Oct 2026: follow-redirects 1.16.2 and minimatch upstream 11.0.1
+// close GHSA-mrwp-f3q8-3g9p / GHSA-g3hv-75wg-m249. The hash-pinned
+// facade preserves old callable packaging APIs without an older matching engine.
 // Reviewed 31 Oct 2026: Agent 1.13.25 avoids replacing the released 1.13.24 tag.
 // Only the two root version fields change; dependency versions/integrities/edges stay pinned.
 // Reviewed 27 Oct 2026: owner-requested Agent bulk uses source identity 1.13.24.
@@ -49,7 +52,7 @@ const LOCKS = [
     lock: 'package-lock.json',
     packages: 249,
     resolved: 242,
-    graph: 'dc2565379f0b5a493bf0148ad8b04edb8d1cfb39faedefa4bd0f0af1e7891e96',
+    graph: '12cbb9422d7c8aea18b891e515284094599ef3633ccf31a0656ff5fceee107ac',
   },
   {
     lock: 'agent-realtime-gateway/package-lock.json',
@@ -65,9 +68,9 @@ const LOCKS = [
   },
   {
     lock: 'pra-agent/package-lock.json',
-    packages: 308,
-    resolved: 307,
-    graph: '3e1ac11036ee2f751dfebfbb7aeb5475a1e4f8f5d287841de5b7164c3938829e',
+    packages: 294,
+    resolved: 293,
+    graph: 'e1ebea69f9d263af1bfdebaf53563921046b201fdcb2a658ffd7316fbeb27f1b',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',
@@ -87,7 +90,7 @@ const root = path.resolve(
 const errors = [];
 
 
-// A single explicitly reviewed local security fork is allowed. Every file is
+// Only explicitly reviewed local security/compatibility packages are allowed. Every file is
 // hash-pinned below; local packages are not silently exempt from validation.
 const FORK_FILES = {
   "LICENSE": "35bdd8a44339719441900fb50fbefc5e2dca1ca662cbaed7a687de842c8b70f2",
@@ -103,7 +106,17 @@ const FORK_FILES = {
   "lib/utils.js": "b5a7596aa67730412b3c029ef09e84e6b67b8e445cffd35d1d295549c89066c7",
   "package.json": "41ae524edddcd03b8289de9cfb73051115fc6830cb1042c69ee7e204caf9e542"
 };
+const MINIMATCH_FILES = {
+  "PATCH.md": "8529440e52ee351a989ffddf25d51866d2939a3741450ce1c4560f753972ab76",
+  "index.cjs": "be7f390d0dc24f63701967225c9ac87d025882ea7dc07750f1f34547fab58545",
+  "package.json": "1efe89fb40dbc98a597241594aeacb7f07102259caaa06cc482fd705fd73a580"
+};
 function reviewedFork(lockPath, entryPath, pkg) {
+  if (lockPath === 'pra-agent/package-lock.json' && entryPath === 'node_modules/minimatch') {
+    return pkg.resolved === 'file:vendor/minimatch-compat' &&
+      pkg.name === '@taxnest/minimatch-compat' && pkg.version === '11.0.1-taxnest.1';
+  }
+
   const expected = lockPath === 'package-lock.json'
     ? 'file:tools/npm-patches/braces'
     : lockPath === 'artifacts/mockup-sandbox/package-lock.json'
@@ -132,6 +145,17 @@ for (const [file, expected] of Object.entries(FORK_FILES)) {
     if (actual !== expected) errors.push(`reviewed fork source hash mismatch: ${file}`);
   } catch { errors.push(`reviewed fork source missing: ${file}`); }
 }
+
+const minimatchRoot = path.join(root, 'pra-agent/vendor/minimatch-compat');
+try {
+  if (JSON.stringify(forkInventory(minimatchRoot).sort()) !== JSON.stringify(Object.keys(MINIMATCH_FILES).sort())) {
+    errors.push('reviewed minimatch facade source inventory differs');
+  }
+  for (const [file, expected] of Object.entries(MINIMATCH_FILES)) {
+    const actual = crypto.createHash('sha256').update(fs.readFileSync(path.join(minimatchRoot, file))).digest('hex');
+    if (actual !== expected) errors.push(`reviewed minimatch facade source hash mismatch: ${file}`);
+  }
+} catch { errors.push('reviewed minimatch facade source unreadable'); }
 
 function withoutResolved(value) {
   if (Array.isArray(value)) return value.map(withoutResolved);

@@ -1,13 +1,12 @@
-title: "Bill, cash aur stock ke hisaab mein behtari"
+title: "Bill ki talash, kitchen order aur print design mein behtari"
 audience: pos
 type: improvement
 points:
-  - "Order cancel karte waqt wajah aur tayyar ki gayi quantity likh sakte hain. Quantity maloom na ho to usay khali chhor dein."
-  - "Delivery ki raqam dukaan par milne par, bills select karke cash receive ki receipt banayein. Delivery complete karna aur cash receive karna alag kaam hain."
-  - "Stock-In mein khareedi gayi quantity aur rate, istemal wali unit mein badal kar dikhaye jate hain. Save karne se pehle hisaab check kar lein."
-  - "Recipe ki cost mein waste bhi shamil hota hai. Report mein dekhein ke mojooda stock se kitni servings ban sakti hain."
-  - "Deal mein tax wale aur tax se chhoot wale items ka hisaab alag hota hai. Return karte waqt asal bill ka tax aur cost li jati hai."
-  - "Din band karne par bills ki detail delete ki jaye, to bhi unki total sale report mein mehfooz rahegi. Pehle se missing bill detail wapas nahi aayegi."
-  - "Product aur size ke mutabiq sale report dekhein. Deal ke andar bikne wale items alag dikhte hain, taake sale do baar count na ho."
-  - "Deals page par offer ka naam, discount aur shuru aur khatam hone ka waqt set karein. Offer sab products ya sirf chune hue products par laga sakte hain. Offer ke saath mazeed manual discount nahi lagta."
-  - "Offer wali payment ke liye internet zaroori hai. Offer khatam ho jaye to Offers refresh dabayein aur total dobara dekhein. Baad mein offer badalne se purane paid bill aur uske return ka hisaab nahi badlega."
+  - "Phone number 03، +92 ya 0092 se likha ho, bill aur customer ki talash mein aik hi number pehchana jata hai. Purane customer profiles merge nahi honge."
+  - "Reprint mein tareekh, order ki qisam aur cash/card filter saath laga sakte hain. Purana bill dhoondne ke liye phone ya bill number likhein. Zyada results hon to talash mazeed wazeh karein."
+  - "Table select karne par automatic kitchen order ki setting on ho to pehle tasdeeq poochi jayegi. Cancel se cart aur table mehfooz rahenge; kitchen ko order nahi jayega."
+  - "Deliveries se New Sale khol sakte hain. Cart mein items hon to pehle poocha jayega. Cancel se cart mehfooz rahega. Deliveries load na hon to dobara load karne ka button istemal karein."
+  - "Receipt aur kitchen ticket ke liye mojooda design samait 9 pasand hain. Local aur fiscal bill ki pasand alag save hoti hai. Preview se na sale banti hai, na print nikalta hai, na setting save hoti hai."
+  - "Save this design only se sirf us design ki pasand save hoti hai. Form ki doosri tabdeeliyan save nahi hotin. Purana design rakhne ke liye Existing select karein."
+  - "Print settings mein mehfooz printer aur print ka tareeqa dekhein. PC ka print qabool karna paper nikalne ki tasdeeq nahi. Parchi na nikle to dobara print se pehle printer aur tray check karein."
+categories: []

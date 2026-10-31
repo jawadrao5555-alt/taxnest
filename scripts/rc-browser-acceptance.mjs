@@ -1,3 +1,4 @@
+import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow } from './lib/pra-b03-browser.mjs';
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
 import { createHash } from 'node:crypto';
@@ -1397,7 +1398,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   if(!/phone/i.test(await search.getAttribute('placeholder')))throw new Error('Phone search hint missing');
   const current=page.locator('tr[data-delrow]'),old=page.locator('tr[data-oldrow]');
   if(await current.count()!==2||await old.count()!==1)throw new Error('Current/old delivery groups changed');
-  for(const query of ['03001234567','0300 123-4567','1234567']) {
+  for(const query of ['03001234567','0300 123-4567','1234567','+92 300 1234567','0092 300 1234567']) {
     await search.fill(query);
     await page.waitForFunction(()=>document.querySelector('#del-count')?.textContent==='1');
     // The board input updates the count synchronously, but its existing
@@ -1432,7 +1433,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   const input=popup.locator('[name="pdsearch_nofill"]');
   await input.waitFor({state:'visible'});
   await popup.locator('xpath=.//button[@*[name()="@click"]="showOldDeliveries = !showOldDeliveries"]').click();
-  for(const query of ['03001234567','0300-123-4567','1234567']) {
+  for(const query of ['03001234567','0300-123-4567','1234567','+92 300 1234567','0092 300 1234567']) {
     await input.fill(query);
     await page.waitForFunction(()=>{
       const popup=document.querySelector('[x-show="showPendingDeliveries"]');
@@ -1449,10 +1450,13 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   await page.waitForFunction(()=>document.querySelector('[x-show="showPendingDeliveries"]').innerText.includes('Synthetic Contact A'));
   if((await popup.innerText()).includes('Synthetic Foreign Contact Bill')||await snapshot()!==before)
     throw new Error('Search changed saved bill values or leaked a foreign contact');
+  await b03DeliveryNavigationWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
+  if(await snapshot()!==before)throw Error('B03 navigation changed stored delivery bills');
   pass(t.name+'/'+v.width+': actual board/popup formatted/full/partial phone, current/old counts, name/clear, scoped API and unchanged bill values');
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.b03AutoKot)return b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});
   if(t.optionalArchive)return optionalArchiveWorkflow(page,t,v);
   if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
@@ -1657,6 +1661,7 @@ async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
     await login(page,t.settingsOwner);
   await page.goto(baseUrl+'/pos/receipt-settings',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  await b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   await page.locator('[name="rp_font_family"]').selectOption('sans');
   await page.locator('[name="rp_item_text"]').selectOption('compact');
   await page.locator('[name="rp_wide_names"]').check();

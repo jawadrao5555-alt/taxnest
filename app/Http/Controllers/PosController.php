@@ -396,6 +396,18 @@ class PosController extends Controller
             // hidden marker (fresh form) or any of that set's own fields (scripted
             // and legacy POSTs keep working). Otherwise the stored set is left
             // exactly as it is; wiping is never the safe default.
+            // A scoped optional-layout save must not materialize legacy global defaults.
+            // This also makes an empty/stale settings POST a true no-op.
+            $scopedKeys=['receipt_options_local','receipt_options_pra'];
+            if (array_diff(array_keys($request->except('_token')), $scopedKeys) === []) {
+                if ($request->hasAny($scopedKeys)) {
+                    $company->mergeJsonColumn('invoice_display_prefs', fn ($prefs) => \App\Support\PosReceiptOptions::merge($prefs, $request));
+                }
+                return $request->wantsJson()
+                    ? response()->json(['success'=>true,'message'=>__('pos.receipt_style_saved')])
+                    : back()->with('success', __('pos.receipt_style_saved'));
+            }
+
             $rpPresent = $request->has('rp_present') || $request->hasAny([
                 'rp_footer_text', 'rp_show_address', 'rp_show_ntn', 'rp_show_email',
                 'rp_show_mobile', 'rp_show_cashier', 'rp_show_footer',
@@ -5803,7 +5815,7 @@ class PosController extends Controller
     public function apiTodaysBills(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $validated = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']]);
+        $validated = $request->validate(['date' => ['nullable', 'date_format:Y-m-d'], 'search'=>['nullable','string','max:100'], 'order_type'=>['nullable','in:dine_in,takeaway,delivery'], 'payment_method'=>['nullable','in:cash,card,debit_card,credit_card,qr_payment,bank_transfer']]);
         $businessDate = $validated['date'] ?? \App\Services\PosBusinessDay::current($companyId);
 
         // Visibility MUST mirror receipt(): archived bills are listed ONLY when
@@ -5841,10 +5853,28 @@ class PosController extends Controller
             // Task 1197: isolated cashier's Reprint list = OWN bills only.
             // ANDs with the scope closure above (compose, never replace).
             ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
+            ->when(!empty($validated['search']), function ($q) use ($validated) {
+                $term = trim($validated['search']);
+                $q->where(function ($match) use ($term) {
+                    foreach (['invoice_number','pra_invoice_number','customer_name'] as $field) $match->orWhere($field, \App\Helpers\DbCompat::like(), '%'.$term.'%');
+                    if (strlen(\App\Services\PosCustomerPhoneIdentity::searchDigits($term)) >= 3) $match->orWhere(fn ($phoneQuery) => \App\Services\PosCustomerPhoneIdentity::constrain($phoneQuery, 'customer_phone', $term));
+                    if (is_numeric($term)) $match->orWhere('total_amount', (float) $term);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions','bill_token') && preg_match('/^(?:[LPE]-?)?0*(\d+)$/iD', $term, $token)) $match->orWhere('bill_token',(int)$token[1]);
+                });
+            })
+            ->when(!empty($validated['order_type']), fn ($q) => $q->where('order_type', $validated['order_type']))
+            ->when(!empty($validated['payment_method']), function ($q) use ($validated) {
+                $method = $validated['payment_method'];
+                in_array($method, \App\Support\PosPaymentLabels::CARD_ALIASES, true)
+                    ? $q->whereIn('payment_method', \App\Support\PosPaymentLabels::CARD_ALIASES) : $q->where('payment_method', $method);
+            })
             ->orderBy('id', 'desc')
-            ->limit(300)
+            ->limit(301)
             ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'customer_phone', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at',
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') ? ['bill_token'] : [])]);
+
+        $hasMore=$bills->count()>300;
+        $bills=$bills->take(300);
 
         // Task 1036: WhatsApp Bill from the Reprint list — per-bill routable
         // number (null when feature off / unroutable → client hides the action).
@@ -5893,6 +5923,7 @@ class PosController extends Controller
                 'bill_token'         => \App\Support\PosBillNumberStyle::bigNumber($company, $b),
                 'pra_invoice_number' => $b->pra_invoice_number,
                 'customer_name'      => $b->customer_name,
+                'customer_phone'     => $b->customer_phone,
                 'total_amount'       => (float) $b->total_amount,
                 'payment_method'     => $b->payment_method,
                 'payment_label'      => \App\Support\PosPaymentLabels::label($b->payment_method),
@@ -5913,6 +5944,7 @@ class PosController extends Controller
             'success' => true,
             'count'   => $data->count(),
             'business_date' => $businessDate,
+            'has_more' => $hasMore,
             'bills'   => $data,
         ]);
     }
@@ -6731,6 +6763,9 @@ class PosController extends Controller
                 $like = \App\Helpers\DbCompat::like();
                 $q->where('invoice_number', $like, "%{$search}%")
                     ->orWhere('customer_name', $like, "%{$search}%");
+                if (strlen(\App\Services\PosCustomerPhoneIdentity::searchDigits($search)) >= 3) {
+                    $q->orWhere(fn ($phoneQuery) => \App\Services\PosCustomerPhoneIdentity::constrain($phoneQuery, 'customer_phone', $search));
+                }
             });
         }
 
@@ -10431,7 +10466,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $input = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:30', 'regex:/^[0-9+() \-]+$/'],
+            'phone' => ['required', 'string', 'max:30', 'regex:/^[0-9+().\s-]+$/u'],
             'expected_phone' => ['present', 'nullable', 'string', 'max:30'],
         ]);
         $name = trim($input['name']);
@@ -12243,7 +12278,7 @@ class PosController extends Controller
             ->where(function ($q) use ($customer) {
                 $q->where('customer_id', $customer->id);
                 if (!empty($customer->phone)) {
-                    $q->orWhere('customer_phone', $customer->phone);
+                    $q->orWhere(fn ($phoneQuery) => \App\Services\PosCustomerPhoneIdentity::constrain($phoneQuery, 'customer_phone', $customer->phone, false));
                 }
             })
             ->orderByDesc('created_at');

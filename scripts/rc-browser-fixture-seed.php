@@ -247,6 +247,18 @@ $riderLive->update(['app_token' => hash('sha256', $riderLiveToken)]);
 $tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
 // Separate fictional companies keep read-only phone-search proof independent of
 // transactional table/rider journeys and exercise the real company-scoped routes.
+// Independent opt-in auto-KOT fixture: selection cancellation must never post an order.
+$b03Shop=$company('Synthetic B03 auto KOT','b03-auto-company@rc-browser.invalid','RCBROWSERB03','pos',[
+    'business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,
+    'feature_flags'=>PosFeatureService::defaultsForCategory('restaurant'),'pos_integration_mode'=>'pra',
+    'pos_setup_completed'=>true,'pos_guided_flow_enabled'=>false,'dine_in_auto_kot'=>true,
+    'pos_tax_rate_cash'=>0,'pos_tax_rate_card'=>0,
+]);
+$b03Owner=$user($b03Shop,'Synthetic B03 owner','b03-owner@rc-browser.invalid','company_admin','pos_admin');
+$b03Product=\App\Models\PosProduct::forceCreate(['company_id'=>$b03Shop->id,'name'=>'Synthetic B03 draft meal','price'=>100,'is_active'=>true,'is_tax_exempt'=>false]);
+$b03Floor=RestaurantFloor::create(['company_id'=>$b03Shop->id,'name'=>'Synthetic B03 floor','is_active'=>true]);
+$b03Table=RestaurantTable::create(['company_id'=>$b03Shop->id,'floor_id'=>$b03Floor->id,'table_number'=>'B03-1','seats'=>4,'status'=>'available','is_active'=>true]);
+
 $contactShop = $company('Synthetic Contact Search', 'contact-company@rc-browser.invalid', 'RCBROWSERCONTACT', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
@@ -787,6 +799,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'b03-auto-kot','login'=>$b03Owner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],
+            'b03AutoKot'=>['product'=>$b03Product->name,'tableId'=>$b03Table->id,'tableNumber'=>$b03Table->table_number]],
         ['name' => 'pra-b02-deal', 'login' => $b02Owner->email, 'password' => $password, 'loginPath' => '/pos/login',
             'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'b02Deal' => ['name' => $b02Deal->name, 'product' => $b02Food->name]],
         ['name' => 'fbr-owner-reconciliation', 'login' => $fiscalUser->email, 'password' => $password,

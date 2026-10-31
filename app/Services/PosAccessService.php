@@ -135,6 +135,7 @@ class PosAccessService
         '#^pos/billing#' => 'customize',
         '#^pos/business-profile#' => 'customize',
         '#^pos/receipt-settings#' => 'customize',
+        '#^pos/receipt-design-preview$#' => 'customize',
         '#^pos/printer-settings#' => 'customize',
         '#^pos/public-profile#' => 'customize',
         '#^pos/agent#' => 'customize',

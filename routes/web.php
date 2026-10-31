@@ -1250,6 +1250,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/public-profile/regenerate', [\App\Http\Controllers\PublicProfileController::class, 'regenerateSlug'])->name('pos.public-profile.regenerate');
         Route::post('/public-profile/menu', [\App\Http\Controllers\PublicProfileController::class, 'saveMenu'])->name('pos.public-profile.menu');
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
+        Route::get('/receipt-design-preview', [\App\Http\Controllers\PosPrintDesignController::class, 'preview'])->name('pos.receipt-design-preview');
         Route::post('/rider-bill-preview/settings', [\App\Http\Controllers\RiderBillPreviewController::class, 'update'])->name('rider.preview.settings');
         Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
         Route::post('/hotel/rooms', [HotelController::class, 'storeRoom'])->name('pos.hotel.rooms.store')->middleware('feature:rooms');

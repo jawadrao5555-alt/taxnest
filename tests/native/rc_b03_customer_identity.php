@@ -45,7 +45,7 @@ try {
         $companies[]=$company->id;
     }
     $foreign=PosCustomer::create(['company_id'=>$companies[1],'name'=>'Synthetic foreign unchanged','phone'=>'+92 300 1234567','is_active'=>true]);
-    $foreignBefore=$foreign->getAttributes();
+    $foreignBefore=$foreign->fresh()->getAttributes();
     $phones=['0300-1234567','+92 300 1234567','00923001234567','3001234567','0300 123 4567','+9203001234567'];
     foreach ($phones as $phone) {
         $process=new Process([PHP_BINARY,'-c',php_ini_loaded_file(),__FILE__,'worker',(string)$companies[0],$phone,$barrier]);

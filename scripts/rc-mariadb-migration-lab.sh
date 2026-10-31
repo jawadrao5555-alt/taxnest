@@ -96,7 +96,8 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_mariadb_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
-    clean_php php "$ROOT/tests/native/rc_b03_customer_identity.php"
+    clean_php php "$ROOT/tests/native/rc_b03_customer_identity.php" | tee "$EVIDENCE_DIR/b03-customer-identity.log"
+    grep -Fqx "PASS: six simultaneous actual customer-store controller workers share one canonical identity; native SQL phone variants, foreign country and second tenant preserved" "$EVIDENCE_DIR/b03-customer-identity.log" || fail b03-customer-identity-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_admin_bill_disposition.php"
     clean_php php "$ROOT/tests/native/rc_optional_local_bill_archive.php"
 }

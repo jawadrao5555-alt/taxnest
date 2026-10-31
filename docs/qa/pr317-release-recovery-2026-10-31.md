@@ -31,3 +31,9 @@ Native MariaDB scope probes now also execute the actual configured-connection re
 ## Release boundary
 
 A green fix PR still needs owner approval for its new commit and the normal merge/deploy/live-verification chain. Do not retry the old approved SHA or mark the release live from unit tests alone.
+
+## Follow-up verification checkpoint
+
+The first CI safety/build lanes correctly rejected the changed root Agent version because its reviewed lock graph fingerprint still described v1.13.24. The fingerprint now records only the reviewed root-identity change; all 307 resolved dependencies, integrity values and dependency edges remain unchanged. The portability and tampered-source negative probes passed locally.
+
+The full suite also reproduced two pre-existing month-end fixture errors on 31 October: subtracting a month from 31 October overflowed to 1 October. Their intended prior-month dates now subtract from the first day of the month. Assertions and production billing/period logic remain intact; the isolated regression passed 59 tests / 587 assertions. Earlier failed runs are not counted as passes.

@@ -12,6 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 31 Oct 2026: Agent 1.13.25 avoids replacing the released 1.13.24 tag.
+// Only the two root version fields change; dependency versions/integrities/edges stay pinned.
 // Reviewed 27 Oct 2026: owner-requested Agent bulk uses source identity 1.13.24.
 // Preserve the current patched dependency graph; only root version identity changes.
 // Reviewed 24 Oct 2026 (PR #275): Agent identity 1.13.23 packages IMS
@@ -65,7 +67,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 308,
     resolved: 307,
-    graph: '90de4e526b499322af5c47c685ac31aeea3feff808b24333318282893b07072b',
+    graph: '3e1ac11036ee2f751dfebfbb7aeb5475a1e4f8f5d287841de5b7164c3938829e',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

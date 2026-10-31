@@ -27,7 +27,7 @@
                 const data=await response.json();
                 if(!response.ok||!data.success)throw Error('The design could not be saved. Your other settings have not changed.');
                 status.textContent='Design saved. Other edits have not been saved.';close.textContent='Close preview';
-            }catch(error){status.textContent=error.message||'The design could not be saved. Try again.';save.disabled=false;}
+            }catch(error){status.textContent='Could not save the design. Your other settings have not changed. Try again.';save.disabled=false;}
         });
         dialog.append(close,save,status,frame);document.body.append(dialog);dialog.showModal();
     });

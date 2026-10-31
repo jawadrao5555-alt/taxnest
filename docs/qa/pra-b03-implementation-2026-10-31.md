@@ -26,7 +26,8 @@ live, physical paper or installed-Windows acceptance is established by this ledg
   Reprint applies business-day/type/payment/search before the 300-result cap.
 - Auto-KOT table selection requires confirmation; Cancel retains draft/table.
   Concurrent table selection is suppressed. Deliveries has local Retry and
-  explicit New Sale with draft confirmation and focus restoration.
+  explicit New Sale with draft confirmation and focus restoration. Existing
+  provisional editing exits through its established no-write navigation.
 - Nine choices (Existing plus eight optional designs) for receipts and KOTs,
   independent Local/Fiscal settings. Actual-renderer previews are synthetic,
   sandboxed and script-free. Explicit scoped Save changes only that design;
@@ -41,7 +42,7 @@ Before-fix HTTP failures established formatted-phone lookup and ignored Reprint
 filters. Behavior tests established unconfirmed auto-KOT and duplicate table
 reserve requests. These cases pass after the implementation.
 
-- New JavaScript behavior tests: 13 passing; related JavaScript regression set:
+- New JavaScript behavior tests: 14 passing; related JavaScript regression set:
   53 passing. Frontend build passes; generated assets are not part of this PR.
 - KOT/routing/print regression: 101 tests, 937 assertions passing.
 - Scoped receipt-save and theme regression: 53 tests, 705 assertions passing.

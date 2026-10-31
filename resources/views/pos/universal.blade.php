@@ -8566,6 +8566,7 @@ function restaurantPos() {
         newSale() {
             if (this.submitting || this._tableSelectionBusy) { this.showToast(window.TXT.order_action_in_progress, 'info'); return false; }
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return false; }
+            if (this.editingBillId) { this.cancelEditMode(); return true; } // Leave the existing bill through its established no-write exit.
             this.clearCart(); this.showPendingDeliveries = false; this.showToast(window.TXT.new_sale_started, 'success');
             this.$nextTick(() => this.$refs.searchInput?.focus());
             return true;

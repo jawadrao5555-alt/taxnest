@@ -63,7 +63,15 @@ export async function b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSur
   } finally {page.off('request',watch);}
 }
 
-export async function b03DeliveryNavigationWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass}) {
+export async function b03DeliveryNavigationWorkflow(originalPage,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,loopback,login}) {
+  // Route faults must reach the frame: a controlling service worker owns its
+  // network fetches and bypasses Playwright page.route. Other PWA journeys keep
+  // their service workers enabled and run unchanged in the original context.
+  const context=await originalPage.context().browser().newContext({viewport:v,serviceWorkers:'block'});
+  await context.route('**/*',route=>loopback(new URL(route.request().url()).hostname)?route.continue():route.abort('blockedbyclient'));
+  const page=await context.newPage();
+  try {
+  await login(page,t);
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
   const financial=[];
@@ -71,11 +79,13 @@ export async function b03DeliveryNavigationWorkflow(page,t,v,{baseUrl,waitForOpe
   page.on('request',watch);
   try {
     await root.evaluate(el=>{const d=Alpine.$data(el);d.cart=[{cart_uid:'b03-navigation-draft',item_id:null,item_type:'manual',item_name:'Synthetic B03 draft',quantity:1,unit_price:100,special_notes:'',is_tax_exempt:true}];});
-    const failure=route=>route.fulfill({status:200,contentType:'text/html',body:'<html><body>Synthetic unavailable frame</body></html>'});
+    let injected=false;
+    const failure=route=>{injected=true;return route.fulfill({status:200,contentType:'text/html',body:'<html><body>Synthetic unavailable frame</body></html>'});};
     await page.route('**/pos/deliveries',failure);
     await page.locator('button[onclick="tnOpenDeliveryBoard()"]:visible').first().click();
     const board=page.locator('#tn-delivery-board');
     await board.locator('#tn-delivery-board-error').waitFor({state:'visible'});
+    if(!injected)throw Error('Embedded document fault was not injected');
     if(await root.evaluate(el=>Alpine.$data(el).cart[0]?.cart_uid)!=='b03-navigation-draft')throw Error('Failed frame changed parent draft');
     await page.unroute('**/pos/deliveries',failure);
     await board.locator('button[onclick="tnRetryDeliveryBoard()"]:visible').click();
@@ -94,6 +104,7 @@ export async function b03DeliveryNavigationWorkflow(page,t,v,{baseUrl,waitForOpe
     await saveEvidenceScreenshot(page,'b03-delivery-new-sale-'+v.width+'.png');
     pass(t.name+'/'+v.width+': unexpected embedded document stays locally recoverable; Retry succeeds; cancel preserves draft, confirmed New Sale dismisses frame and restores focus; no sale/KOT/print POST');
   } finally {page.off('request',watch);}
+  } finally {await context.close();}
 }
 
 export async function b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart}) {

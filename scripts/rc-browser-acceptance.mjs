@@ -1450,7 +1450,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   await page.waitForFunction(()=>document.querySelector('[x-show="showPendingDeliveries"]').innerText.includes('Synthetic Contact A'));
   if((await popup.innerText()).includes('Synthetic Foreign Contact Bill')||await snapshot()!==before)
     throw new Error('Search changed saved bill values or leaked a foreign contact');
-  await b03DeliveryNavigationWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
+  await b03DeliveryNavigationWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,loopback,login});
   if(await snapshot()!==before)throw Error('B03 navigation changed stored delivery bills');
   pass(t.name+'/'+v.width+': actual board/popup formatted/full/partial phone, current/old counts, name/clear, scoped API and unchanged bill values');
 }

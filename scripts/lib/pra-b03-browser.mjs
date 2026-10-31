@@ -1,6 +1,7 @@
 export async function b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass}) {
   const option=(stream,key)=>page.locator('[name="receipt_options_'+stream+'['+key+']"]');
   const open=async stream=>{const panel=page.locator('[data-receipt-options="'+stream+'"]');if(!await panel.evaluate(el=>el.open))await panel.locator('summary').click();};
+  const savedPaper=await page.locator('[name="rp_printer_size"]').inputValue();
   const writes=[];
   const watch=req=>{if(req.method()==='POST')writes.push(new URL(req.url()).pathname);};
   page.on('request',watch);
@@ -12,6 +13,8 @@ export async function b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSur
         const select=option(stream,key);
         const values=await select.locator('option').evaluateAll(options=>options.map(o=>o.value));
         if(values.length!==9||values[0]!=='inherit')throw Error('Nine opt-in styles including Existing required for '+kind);
+        for(const paper of kind==='receipt'?['80mm','58mm']:['80mm']) {
+        if(kind==='receipt')await page.locator('[name="rp_printer_size"]').selectOption(paper);
         for(const design of values) {
           await select.selectOption(design);
           await page.locator('[data-print-design-preview="'+kind+'"][data-stream="'+stream+'"]').click();
@@ -29,14 +32,16 @@ export async function b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSur
           if(kind==='kot'&&body.includes('580.00'))throw Error('KOT exposed money');
           if(await preview.locator('script').count())throw Error('Read-only preview contains executable scripts');
           if(await preview.locator('body').evaluate(el=>el.scrollWidth)>await modal.locator('iframe').evaluate(el=>el.clientWidth)+2)throw Error('Print preview clips at '+v.width);
-          if(design==='boxed'||design==='checklist')await saveEvidenceScreenshot(page,'b03-'+stream+'-'+kind+'-'+v.width+'.png');
+          if(design==='boxed'||design==='checklist')await saveEvidenceScreenshot(page,'b03-'+stream+'-'+kind+'-'+paper+'-'+v.width+'.png');
           await modal.getByRole('button',{name:'Close preview — nothing saved',exact:true}).click();
+        }
         }
       }
     }
     if(writes.length)throw Error('Preview created a POST: '+writes.join(','));
     await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
     for(const stream of ['local','pra'])for(const key of ['design','kot_design'])if(await option(stream,key).inputValue()!=='inherit')throw Error('Preview/cancel changed saved design');
+    if(await page.locator('[name="rp_printer_size"]').inputValue()!==savedPaper)throw Error('Preview changed the saved paper width');
     // Real scoped Save touches only the design shown in the preview, not the form's other fields.
     const scoped=async value=>{
       await open('local');await option('local','design').selectOption(value);
@@ -59,7 +64,7 @@ export async function b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSur
     for(const stream of ['local','pra']){await open(stream);for(const key of ['design','kot_design'])await option(stream,key).selectOption('inherit');}
     await save();
     for(const stream of ['local','pra'])for(const key of ['design','kot_design'])if(await option(stream,key).inputValue()!=='inherit')throw Error('Existing design restore failed');
-    pass(t.name+'/'+v.width+': 36 real sandboxed Local/Fiscal receipt/KOT previews, all nine designs, no preview POST/script/print; explicit independent Save and legacy restore');
+    pass(t.name+'/'+v.width+': 54 real sandboxed Local/Fiscal previews: all nine receipt designs at 58/80mm and KOT at its existing 80mm width, no preview POST/script/print; explicit independent Save and legacy restore');
   } finally {page.off('request',watch);}
 }
 

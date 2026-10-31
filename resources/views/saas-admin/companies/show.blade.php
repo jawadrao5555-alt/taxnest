@@ -39,6 +39,11 @@
         @endif
     </div>
 
+    @if($errors->any())
+    <div role="alert" class="mb-4 rounded-lg bg-red-100 text-red-900 p-4">{{ $errors->first() }}</div>
+    @endif
+    @include('saas-admin.companies.partials.account-overview')
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Company Details</h3>
@@ -489,7 +494,7 @@
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
-        <h3 class="text-sm font-semibold text-white mb-3">Quick Actions</h3>
+        <h3 id="company-access-actions" class="text-sm font-semibold text-white mb-3">Quick Actions</h3>
         {{-- Package picked before signing up — approval activates exactly this
              plan, on the period that product sells (Task 1484). --}}
         @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
@@ -504,9 +509,9 @@
                 <form method="POST" action="{{ route('saas.admin.companies.approve', $company->id) }}">@csrf<button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition font-medium">Approve</button></form>
                 <form method="POST" action="{{ route('saas.admin.companies.reject', $company->id) }}">@csrf<button class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition font-medium">Reject</button></form>
                 @elseif($company->status === 'approved' || $company->status === 'active')
-                <form method="POST" action="{{ route('saas.admin.companies.suspend', $company->id) }}">@csrf<button class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg transition font-medium">Suspend</button></form>
+                @include('saas-admin.companies.partials.state-action', ['activate' => false])
                 @elseif($company->status === 'suspended' || $company->status === 'rejected')
-                <form method="POST" action="{{ route('saas.admin.companies.activate', $company->id) }}">@csrf<button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition font-medium">Activate</button></form>
+                @include('saas-admin.companies.partials.state-action', ['activate' => true])
                 @endif
 
                 <button @click="showDeleteModal = true" class="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-sm rounded-lg transition font-medium border border-red-800">Move to Bin</button>

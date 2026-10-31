@@ -29,9 +29,10 @@ class AdminPaymentProofController extends Controller
             ]);
         }
 
+        $companyId = $request->validate(['company_id' => ['nullable', 'integer', 'min:1']])['company_id'] ?? null;
         $status = $request->get('status', 'pending');
 
-        $query = PaymentProof::with(['company', 'pricingPlan'])->orderByDesc('created_at');
+        $query = PaymentProof::with(['company', 'pricingPlan'])->when($companyId, fn ($q) => $q->where('company_id', $companyId))->orderByDesc('created_at');
         if (in_array($status, ['pending', 'verified', 'rejected'], true)) {
             $query->where('status', $status);
         }
@@ -45,6 +46,7 @@ class AdminPaymentProofController extends Controller
             'proofs' => $proofs,
             'plans' => $plans,
             'status' => $status,
+            'companyId' => $companyId,
             'tableMissing' => false,
         ]);
     }

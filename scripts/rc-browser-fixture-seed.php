@@ -758,6 +758,25 @@ foreach ([$b02Food, $b02Drink] as $component) DB::table('pos_deal_items')->inser
     'deal_id' => $b02Deal->id, 'pos_product_id' => $component->id, 'quantity' => 1, 'created_at' => $now, 'updated_at' => $now,
 ]);
 
+// B01 isolates each viewport's company; account review never changes a real paid term.
+$b01Cases = [];
+$b01Plan = \App\Models\PricingPlan::create(['name'=>'Synthetic B01 catalogue', 'product_type'=>'pos',
+    'price'=>9999, 'invoice_limit'=>100, 'user_limit'=>2, 'branch_limit'=>1, 'is_active'=>true, 'is_trial'=>false]);
+foreach ([1366, 390] as $b01Width) {
+    $b01Company = $company('Synthetic B01 '.$b01Width, 'b01-'.$b01Width.'@rc-browser.invalid', 'RCB01-'.$b01Width, 'pos', ['is_internal_account'=>false]);
+    $b01Sub = \App\Models\Subscription::create(['company_id'=>$b01Company->id, 'pricing_plan_id'=>$b01Plan->id,
+        'billing_cycle'=>'annual', 'start_date'=>'2025-01-01', 'end_date'=>'2025-12-31', 'final_price'=>12499, 'active'=>true]);
+    $b01Charge = \App\Models\SubscriptionInvoice::create(['company_id'=>$b01Company->id, 'subscription_id'=>$b01Sub->id,
+        'amount'=>12499, 'status'=>'pending', 'due_date'=>'2025-01-01']);
+    \App\Models\SubscriptionPayment::create(['subscription_invoice_id'=>$b01Charge->id, 'amount'=>200,
+        'payment_method'=>'bank_transfer', 'transaction_ref'=>'RC-B01-PAY-'.$b01Width, 'paid_at'=>$now]);
+    \App\Models\PaymentProof::create(['company_id'=>$b01Company->id, 'amount'=>200, 'payment_method'=>'bank_transfer',
+        'reference'=>'RC-B01-PROOF-'.$b01Width, 'payment_date'=>$now, 'status'=>'pending',
+        'proof_path'=>'synthetic/pruned-b01.png', 'file_pruned_at'=>$now]);
+    $b01Cases[$b01Width] = ['companyId'=>$b01Company->id, 'subId'=>$b01Sub->id, 'paymentRef'=>'RC-B01-PAY-'.$b01Width,
+        'proofRef'=>'RC-B01-PROOF-'.$b01Width, 'foreignRef'=>'RC-B01-PROOF-'.($b01Width===1366?390:1366)];
+}
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -799,6 +818,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',
+            'paths'=>[], 'b01Account'=>$b01Cases],
         ['name'=>'b03-auto-kot','login'=>$b03Owner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],
             'b03AutoKot'=>['product'=>$b03Product->name,'tableId'=>$b03Table->id,'tableNumber'=>$b03Table->table_number]],
         ['name' => 'pra-b02-deal', 'login' => $b02Owner->email, 'password' => $password, 'loginPath' => '/pos/login',

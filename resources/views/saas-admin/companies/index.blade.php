@@ -120,9 +120,9 @@
                                 <form method="POST" action="{{ route('saas.admin.companies.approve', $company->id) }}" class="inline">@csrf<button class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-xs rounded hover:bg-emerald-600/40 transition">Approve</button></form>
                                 <form method="POST" action="{{ route('saas.admin.companies.reject', $company->id) }}" class="inline">@csrf<button class="px-2 py-1 bg-red-600/20 text-red-400 text-xs rounded hover:bg-red-600/40 transition">Reject</button></form>
                                 @elseif($company->status === 'approved' || $company->status === 'active')
-                                <form method="POST" action="{{ route('saas.admin.companies.suspend', $company->id) }}" class="inline">@csrf<button class="px-2 py-1 bg-amber-600/20 text-amber-400 text-xs rounded hover:bg-amber-600/40 transition">Suspend</button></form>
+                                <a href="{{ route('saas.admin.companies.show', $company->id) }}#company-access-actions" class="px-2 py-1 bg-amber-600/20 text-amber-400 text-xs rounded hover:bg-amber-600/40 transition">Suspend</a>
                                 @elseif($company->status === 'suspended' || $company->status === 'rejected')
-                                <form method="POST" action="{{ route('saas.admin.companies.activate', $company->id) }}" class="inline">@csrf<button class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-xs rounded hover:bg-emerald-600/40 transition">Activate</button></form>
+                                <a href="{{ route('saas.admin.companies.show', $company->id) }}#company-access-actions" class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-xs rounded hover:bg-emerald-600/40 transition">Activate</a>
                                 @endif
                                 <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="px-2 py-1 bg-indigo-600/20 text-indigo-400 text-xs rounded hover:bg-indigo-600/40 transition">View</a>
                             </div>

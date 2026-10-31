@@ -21,6 +21,7 @@ class PosRiderSettlement extends Model
     protected $fillable = [
         'company_id', 'rider_id', 'settled_by', 'total_amount', 'bill_count', 'notes',
         'outstanding_after', 'allocation', 'panel',
+        'receipt_kind', 'receipt_key', 'branch_id', 'business_date',
     ];
 
     protected $casts = [
@@ -28,6 +29,16 @@ class PosRiderSettlement extends Model
         'outstanding_after' => 'decimal:2',
         'allocation' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function ($receipt) {
+            if ($receipt->getOriginal('receipt_kind') === 'shop') throw new \LogicException('Shop cash receipts are immutable.');
+        });
+        static::deleting(function ($receipt) {
+            if ($receipt->receipt_kind === 'shop') throw new \LogicException('Shop cash receipts are immutable.');
+        });
+    }
 
     /** True when this event left part of a bill unpaid (allocation has one
      *  more entry than fully-settled bill_count → last entry was partial). */

@@ -361,4 +361,32 @@ sandbox.caches.open = openCache;
 sandbox.caches.match = matchCache;
 assert(src.includes("searchParams.set('__tn_sale_recover','1')"), 'recovery retry must bypass the failed cached navigation');
 
+// A successful offer edit must invalidate the baked PRA prices before the
+// operator returns to New Sale. Keep FBR and failed-save offline copies intact.
+for (const path of ['/pos/promotions', '/pos/promotions/41']) {
+  cacheStores.clear();
+  const store = getStore(saleName);
+  await store.put('/pos/invoice/create', htmlResponse(validHtml('pra', 'before-offer'), {variant:'pra'}));
+  await store.put('/fbr-pos/create', htmlResponse(validHtml('fbr', 'unchanged-fbr'), {variant:'fbr'}));
+  networkHandler = async input => {
+    const path = new URL(input.url || input, ORIGIN).pathname;
+    if (path.startsWith('/pos/promotions')) return htmlResponse('saved', {url:ORIGIN+'/pos/promotions'});
+    return path.startsWith('/build/') ? assetResponse() : htmlResponse(validHtml('pra', 'after-offer'), {variant:'pra',url:ORIGIN+path});
+  };
+  const mutation = request(path, {method:'POST'});
+  await (await dispatchFetch(mutation) || await networkHandler(mutation));
+  served = await dispatchFetch(request('/pos/invoice/create'));
+  assert((await served.text()).includes('after-offer'), 'successful offer save replayed the stale sale catalogue');
+  assert((await store.match('/fbr-pos/create')).body.includes('unchanged-fbr'), 'PRA offer save removed FBR offline copy');
+}
+for (const status of [403, 422, 500]) {
+  cacheStores.clear();
+  const store = getStore(saleName);
+  await store.put('/pos/invoice/create', htmlResponse(validHtml('pra', 'before-offer'), {variant:'pra'}));
+  networkHandler = async () => htmlResponse('rejected', {status});
+  const mutation=request('/pos/promotions/41',{method:'PUT'});
+  await (await dispatchFetch(mutation) || await networkHandler(mutation));
+  assert(await store.match('/pos/invoice/create'), 'rejected offer save removed the working offline copy');
+}
+
 console.log('SW SMOKE OK: validated PRA/FBR sale documents and their Vite assets, stale-hash replacement, waiter offline cold-start, hard-refresh network preference, offline fallback, invalid-cache eviction, auth cleanup, recovery UI, prime-cache and ordinary events.');

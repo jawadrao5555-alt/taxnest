@@ -1107,6 +1107,9 @@ window.addEventListener('popstate', function() {
              it is ALWAYS visible (even when the grid is hidden). NOTE (22 Jul 2026): category scopes
              the browsable GRID only — search is always GLOBAL (whole catalog), per customer request.
              Hidden automatically when the company has no categories/services/deals to pick. --}}
+        @if(\App\Services\PosPromotions::enabled($company))
+        <button type="button" @click="refreshOffers()" :disabled="refreshingOffers || submitting" class="px-3 py-2 text-xs rounded-lg border border-purple-300 text-purple-700 dark:text-purple-300">{{ __('pos_promotions.refresh') }}</button>
+        @endif
         <div class="relative flex-shrink-0" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
             <select x-model="activeCategory" title="{{ __('pos.ti_category_pra') }}"
                     class="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-bold border-2 cursor-pointer max-w-[150px] shadow-sm transition focus:ring-2 focus:ring-purple-500 focus:border-purple-400"
@@ -1649,6 +1652,7 @@ window.addEventListener('popstate', function() {
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
                                     <span class="truncate" x-text="item.item_name"></span>
+                                    <span x-show="item.promotion_quote" class="text-[10px] text-purple-700 dark:text-purple-300" x-text="item.promotion_quote ? item.promotion_quote.title + ' −' + item.promotion_quote.percent + '%' : ''"></span>
                                     <span x-show="item.fulfillment && !item.skip_kitchen" class="text-[10px] font-semibold" x-text="fulfillmentLabel(item.fulfillment)"></span>
                                     <template x-if="item._isQuickCreated">
                                         <span class="flex-shrink-0 whitespace-nowrap text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
@@ -1850,8 +1854,8 @@ window.addEventListener('popstate', function() {
                     <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-white/50 pt-1">
                         <span>{{ __('pos.est_cost') }}</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
                     </div>
-                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
-                        <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - getCartCost()).toLocaleString()"></span>
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - taxAmount - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
+                        <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - taxAmount - getCartCost()).toLocaleString()"></span>
                     </div>
                 </div>
                 <div class="tn-payment-actions px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
@@ -2547,12 +2551,15 @@ window.addEventListener('popstate', function() {
                         <div class="space-y-1">
                             {{-- Task #643: noTicks — claimed-cart cancel has no real item ids
                                  (Made/Not-Made marking = Task #645); KOT alert still shows. --}}
-                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length && !boardCancelAsk.noTicks" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.cancel_mark_made_hint') }}</p>
+                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length && !boardCancelAsk.noTicks" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">Prepared quantity: leave blank if unknown; enter 0 only if none was prepared.</p>
                             <template x-for="it in boardCancelAsk.items" :key="it.id">
                                 <div class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
                                     <span class="flex-1" x-text="it.quantity + ' × ' + it.item_name"></span>
                                     <span class="text-gray-400" x-text="Math.round(it.subtotal).toLocaleString()"></span>
-                                    <button x-show="boardCancelAsk.order.kot_sent_at && !boardCancelAsk.noTicks" type="button" @click="boardCancelMade[it.id] = !boardCancelMade[it.id]" class="px-2 py-1 rounded-lg text-[10px] font-bold border transition" :class="boardCancelMade[it.id] ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 text-orange-700 dark:text-orange-300' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400'" x-text="boardCancelMade[it.id] ? '{{ __('pos.item_made_yes') }}' : '{{ __('pos.item_made_no') }}'"></button>
+                                    <input x-show="!boardCancelAsk.noTicks" type="number" min="0" :max="it.quantity" step="0.001"
+                                           x-model="boardCancelMade[it.id]" aria-label="Prepared quantity" placeholder="Unknown"
+                                           class="w-24 px-2 py-1 rounded border border-gray-300 bg-white dark:bg-gray-800 text-xs">
+
                                 </div>
                             </template>
                         </div>
@@ -2561,6 +2568,11 @@ window.addEventListener('popstate', function() {
                         <p class="text-[11px] font-bold text-orange-700 dark:text-orange-300">&#9888;&#65039; {{ __('pos.cancel_kot_warning') }}</p>
                     </div>
                     <p x-show="!boardCancelAsk.order.kot_sent_at" class="mt-3 text-[11px] text-gray-400 text-center">{{ __('pos.cancel_no_kot_note') }}</p>
+                </div>
+                <div class="px-5 pt-2">
+                    <label class="block text-xs font-bold text-gray-600 dark:text-gray-300" for="cancel-order-reason">Cancellation reason</label>
+                    <textarea id="cancel-order-reason" x-model="boardCancelAsk.reason" maxlength="500" rows="2" class="w-full mt-1 rounded border border-gray-300 bg-white dark:bg-gray-800 text-sm" placeholder="Why is this order being cancelled?"></textarea>
+                    <p class="text-[10px] text-gray-500">Records preparation only; no sale, refund or stock adjustment is posted.</p>
                 </div>
                 <div class="p-4 grid grid-cols-1 gap-2">
                     <button @click="boardCancelAsk = null" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_keep_order') }}</button>
@@ -4660,10 +4672,11 @@ window.addEventListener('popstate', function() {
 </div>
 
 @php
-$productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus, $recipes) {
+$promotionQuotes = \App\Services\PosPromotions::quotes($company, $products);
+$productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus, $recipes, $promotionQuotes) {
     return [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
-        'price' => $p->price ?? 0, 'category' => $p->category,
+        'price' => $p->price ?? 0, 'category' => $p->category, 'promotion_quote' => $promotionQuotes[$p->id] ?? null,
         'barcode' => $p->barcode ?: null, 'sku' => $p->sku ?: null,
         'show_on_sale' => (bool)($p->show_on_sale ?? true),
         'cost_price' => (float) ($p->cost_price ?? 0),
@@ -4672,7 +4685,7 @@ $productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus, $r
         'hasRecipe' => in_array($p->id, $recipeLookup ?? []),
         'recipe_snapshot' => $recipes->get($p->id, collect())->map(fn ($r) => [
             'stock_id' => 'ingredient-' . (int) $r->ingredient_id,
-            'quantity' => (float) $r->quantity_needed,
+            'quantity' => $r->effectiveQuantity(),
         ])->values(),
         'image' => $p->image ? asset('storage/products/' . $p->image) : null,
         'stockStatus' => $stockStatus[$p->id] ?? null,
@@ -4737,6 +4750,7 @@ $heldOrdersJson = $heldOrders->map(function ($o) use ($recipes) {
             'fulfillment' => $i->fulfillment, 'line_uid' => $i->line_uid, 'kot_printed_at' => $i->kot_printed_at,
             'special_notes' => $i->special_notes,
             'is_tax_exempt' => (bool) ($i->is_tax_exempt ?? false),
+            'promotion_snapshot' => $i->promotion_snapshot,
             'item_discount_type' => $i->item_discount_type,
             'item_discount_value' => (float) ($i->item_discount_value ?? 0),
             // Tenant-scoped deal components are frozen in the server boot payload.
@@ -4748,7 +4762,7 @@ $heldOrdersJson = $heldOrders->map(function ($o) use ($recipes) {
             'recipe_snapshot' => $i->item_type === 'product'
                 ? $recipes->get($i->item_id, collect())->map(fn ($r) => [
                     'stock_id' => (string) $r->ingredient_id,
-                    'quantity' => (float) $r->quantity_needed,
+                    'quantity' => $r->effectiveQuantity(),
                 ])->values()
                 : [],
         ])->values(),
@@ -4786,6 +4800,7 @@ $jsEnc = function ($value, $fallback = '[]') {
 };
 @endphp
 <script src="/js/pos-print-attempt.js?v=20260909"></script>
+<script src="/js/pos-deal-allocation.js?v=20261030-b02"></script>
 <script>
 // OFFLINE-FIRST BOOT (Jul 2026): server-side fingerprint of everything baked
 // into this page (user, company, screen file, catalog, settings). The SW may
@@ -4949,6 +4964,8 @@ function restaurantPos() {
         // Total for a given rate under card-save: base derived at the MENU (cash)
         // rate, chosen method's rate applied on top. Exempt items pass through.
         cardSaveTotalForRate(rate) {
+            const allocated = this.allocatedDealBill(rate);
+            if (allocated) return allocated.total_amount;
             const after = Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
             if (Math.abs(this.taxMenuRate - rate) < 0.005) return Math.round(after);
             const tia = this.taxableSubtotal;
@@ -5569,8 +5586,37 @@ function restaurantPos() {
 
         r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },
         _safeQty(q) { const n = Number(q); return Number.isFinite(n) && n > 0 ? n : 1; },
+        promotionOnlineMessage: @json(__('pos_promotions.online_only')),
+        refreshingOffers: false,
+        async refreshOffers() {
+            if (this.refreshingOffers || this.submitting) return;
+            this.refreshingOffers = true;
+            try {
+                const ids = [...new Set([...this.allProducts.map(p => Number(p.id)), ...this.cart.filter(i => i.item_type === 'product').map(i => Number(i.item_id))])];
+                const quotes = {}, prices = {};
+                for (let start = 0; start < ids.length; start += 200) {
+                    const res = await fetch(@json(route('pos.promotions.quotes')), {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':@json(csrf_token())}, body:JSON.stringify({product_ids:ids.slice(start,start+200)})});
+                    const data = await res.json();
+                    if (!res.ok || !data.success) throw new Error(data.message || @json(__('pos_promotions.refresh_failed')));
+                    Object.assign(quotes, data.quotes || {}); Object.assign(prices, data.prices || {});
+                }
+                for (const p of this.allProducts) { p.promotion_quote = quotes[p.id] || null; if (prices[p.id] != null) p.price = Number(prices[p.id]); }
+                for (const item of this.cart) {
+                    if (item.item_type !== 'product') continue;
+                    item.promotion_quote = quotes[item.item_id] || null;
+                    const master = this.allProducts.find(p => Number(p.id) === Number(item.item_id));
+                    if (item.promotion_quote) item.unit_price = Number(item.promotion_quote.unit_price);
+                    else if (master) item.unit_price = Number(master.price);
+                    if (item.promotion_quote) item.item_discount_value = 0;
+                }
+                if (this.cart.some(i => i.promotion_quote)) { this.discountValue = 0; this.discountAmount = 0; }
+                this.showToast(@json(__('pos_promotions.refreshed')), 'info');
+            } catch (e) { this.showToast(e.message || @json(__('pos_promotions.refresh_failed')), 'error'); }
+            finally { this.refreshingOffers = false; }
+        },
         getItemDiscount(item) {
             const lineTotal = this.r2(this._safeQty(item.quantity) * item.unit_price);
+            if (item.promotion_quote) return this.r2(lineTotal * Math.min(100, Number(item.promotion_quote.percent) || 0) / 100);
             const dv = parseFloat(item.item_discount_value) || 0;
             if (dv <= 0) return 0;
             if ((item.item_discount_type || 'percentage') === 'percentage') return this.r2(lineTotal * Math.min(100, dv) / 100);
@@ -5580,12 +5626,24 @@ function restaurantPos() {
         get itemDiscountsTotal() { return this.r2(this.cart.reduce((s, i) => s + this.getItemDiscount(i), 0)); },
         get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (this._safeQty(i.quantity) * i.unit_price), 0)); },
         get effectiveSubtotal() { return Math.max(0, this.r2(this.subtotal - this.itemDiscountsTotal)); },
+        dealTaxableSubtotal(item) {
+            if (!window.PosDealAllocation) return item.is_tax_exempt ? 0 : this.getItemTotal(item);
+            return window.PosDealAllocation.taxable(item.deal_snapshot, this.getItemTotal(item), !!item.is_tax_exempt);
+        },
+        allocatedDealBill(rate = this.taxRate) {
+            if (!window.PosDealAllocation) return null;
+            return window.PosDealAllocation.bill(this.cart.map(item => ({snapshot:item.deal_snapshot,
+                subtotal:this.getItemTotal(item),exempt:!!item.is_tax_exempt})), this.discountAmount, rate,
+                this.taxInclusive, this.cardSaveMode() ? this.taxMenuRate : null);
+        },
         get taxableSubtotal() {
-            const taxable = this.cart.filter(i => !i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0);
+            const taxable = this.cart.reduce((s, i) => s + this.dealTaxableSubtotal(i), 0);
             const discountRatio = this.effectiveSubtotal > 0 ? (this.effectiveSubtotal - this.discountAmount) / this.effectiveSubtotal : 1;
             return Math.max(0, this.r2(taxable * Math.max(0, discountRatio)));
         },
         get taxAmount() {
+            const allocated = this.allocatedDealBill();
+            if (allocated) return allocated.tax_amount;
             // Inclusive mode: included portion of the taxable menu money (r/(100+r)).
             // Card-save: base always derives from the MENU (cash) rate, the bill's
             // own rate applies on top — mirrors PosTaxMath backend math.
@@ -5598,6 +5656,8 @@ function restaurantPos() {
             return this.r2(this.taxableSubtotal * this.taxRate / 100);
         },
         get totalAmount() {
+            const allocated = this.allocatedDealBill();
+            if (allocated) return allocated.total_amount;
             // Inclusive mode: menu prices already contain tax — never add it on top.
             // Card-save with a DIFFERENT rate than the menu rate: cheaper total.
             if (this.taxInclusive) {
@@ -5612,7 +5672,7 @@ function restaurantPos() {
         },
         get roundedTotal() { return Math.round(this.totalAmount); },
         get roundOff() { return this.r2(this.roundedTotal - this.totalAmount); },
-        get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0); },
+        get exemptAmount() { return this.r2(this.cart.reduce((s, i) => s + this.getItemTotal(i) - this.dealTaxableSubtotal(i), 0)); },
         // ─── Jul 2026 redesign: method-aware CART totals (estimate only — the
         // backend recomputes tax per method on submit; PRA gets tax in full).
         // Mirrors heldOrderEstimate()/payModalTotal math for the LIVE cart.
@@ -5621,6 +5681,8 @@ function restaurantPos() {
             const rate = method === 'card'
                 ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
                 : (this.taxRules['cash'] ?? this.taxRate);
+            const allocated = this.allocatedDealBill(rate);
+            if (allocated) return allocated.total_amount;
             if (this.taxInclusive) {
                 if (this.cardSaveMode() && Math.abs(this.taxMenuRate - rate) >= 0.005) return this.cardSaveTotalForRate(rate);
                 // Plain inclusive: menu total is method-independent.
@@ -6405,6 +6467,8 @@ function restaurantPos() {
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
         async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
+            if ((payload.items || []).some(item => item.promotion_quote)) { this.showToast(this.promotionOnlineMessage, 'error'); return false; }
+            if ((payload.items || []).some(item => item.type === 'deal')) { this.showToast(window.TXT.deal_offline_block, 'error'); return false; }
             if (this.hasMixedService()) { this.showToast(window.TXT.fulfill_online_required, 'error'); return false; }
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
@@ -6478,6 +6542,8 @@ function restaurantPos() {
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
         },
         async acceptLocalCoreSale(payload, method, savedTotal, skipReceipt = false) {
+            if ((payload.items || []).some(item => item.promotion_quote)) { this.showToast(this.promotionOnlineMessage, 'error'); return false; }
+            if ((payload.items || []).some(item => item.type === 'deal')) return false;
             const bridge = window.nestposDesktop;
             if (!bridge || typeof bridge.acceptImmediateSale !== 'function') return false;
             // Deliberately narrow: immediate final universal sale only. Every
@@ -7328,7 +7394,7 @@ function restaurantPos() {
             } else {
                 const fixedComponents = item.type === 'deal' ? (item.component_rows || []) : [];
                 const selectedComponents = (selectedDealChoices || []).map(choice => ({ name: choice.name, quantity: choice.quantity }));
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, fulfillment: serviceMode, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey, deal_components: [...fixedComponents, ...selectedComponents],
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, fulfillment: serviceMode, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), promotion_quote: item.promotion_quote || null, special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey, deal_components: [...fixedComponents, ...selectedComponents],
                     has_recipe: !!item.hasRecipe,
                     recipe_snapshot: Array.isArray(item.recipe_snapshot) ? item.recipe_snapshot.map(part => ({ ...part })) : [],
                     deal_snapshot: item.type === 'deal'
@@ -8326,7 +8392,8 @@ function restaurantPos() {
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); const _hkR = _hkList[this.activeHeldIndex]; if (_hkR) this.recallOrder(_hkR); }
                 else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); const _hkP = _hkList[this.activeHeldIndex]; if (_hkP) this.payHeldOrder(_hkP.id); }
-                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const _hkO = _hkList[this.activeHeldIndex]; if (_hkO) { this.boardCancelAsk = this.buildOrderCancelAsk(_hkO); this.boardCancelMade = {}; } }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const _hkO = _hkList[this.activeHeldIndex]; if (_hkO) { this.boardCancelAsk = this.buildOrderCancelAsk(_hkO); this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = ''; } }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
                 return;
             }
@@ -9265,6 +9332,7 @@ function restaurantPos() {
             if (this._claimBusy || !o) return;
             this.boardCancelAsk = this.buildOrderCancelAsk(o);
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
         },
         // Shared builder (bell panel + claimed cart): normalizes an orderJson-style
         // snapshot into the modal's { table, order, items, noTicks } shape. noTicks
@@ -9305,6 +9373,7 @@ function restaurantPos() {
                 total_amount: (o && o.total_amount) || this.totalAmount || 0,
             }));
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
         },
         // Picker ka HAR "bina table chune" band hone wala raasta yahan se guzarta
         // hai (X, backdrop, Esc, F2). ZFC (owner video, 23 Aug 2026): DINE IN pill
@@ -9890,6 +9959,7 @@ function restaurantPos() {
             // not just the KOT path.
             this.boardCancelAsk = this.buildOrderCancelAsk(o);
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
         },
         // Free table: reserved-only → release; any open order (cashier OR waiter,
         // Task #409) → confirm + soft-cancel via the same deleteOrder endpoint.
@@ -9902,6 +9972,7 @@ function restaurantPos() {
                 // khana anjane mein cancel na ho.
                 this.boardCancelAsk = { table: t, order: t.order, items: null };
                 this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
                 try {
                     const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
                     const list = res.ok ? await res.json().catch(() => null) : null;
@@ -9921,18 +9992,21 @@ function restaurantPos() {
         async boardCancelConfirm() {
             const ask = this.boardCancelAsk;
             if (!ask || this.boardBusy) return;
+            if (!String(ask.reason || '').trim()) { this.showToast('Enter a cancellation reason.', 'error'); return; }
             const t = ask.table;
             this.boardBusy = true;
             try {
-                const madeIds = Object.keys(this.boardCancelMade).filter(k => this.boardCancelMade[k]).map(Number);
+                const prepared = Object.fromEntries(Object.entries(this.boardCancelMade)
+                    .filter(([id, qty]) => qty !== '' && qty !== null && Number.isInteger(Number(id)))
+                    .map(([id, qty]) => [id, Number(qty)]));
                 const res = await fetch('/pos/restaurant/orders/' + ask.order.id + '/delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     // made_item_ids sirf tab bhejo jab KOT gayi thi (warna sawal hi nahi banta)
-                    body: JSON.stringify((ask.order.kot_sent_at && !ask.noTicks) ? { made_item_ids: madeIds } : {}),
+                    body: JSON.stringify({ cancellation_reason: ask.reason.trim(), ...(!ask.noTicks ? { prepared_quantities: prepared } : {}) }),
                 });
-                const data = res.ok ? await res.json().catch(() => null) : null;
-                if (data && data.success) {
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
                     // Task 928: signal any open KDS tab on this device to refresh immediately.
                     try { localStorage.setItem('pos_kds_void_signal', Date.now()); } catch(e) {}
                     this.heldOrders = this.heldOrders.filter(o => o.id !== ask.order.id);
@@ -9964,9 +10038,11 @@ function restaurantPos() {
                     }
                 } else {
                     this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
+                    return;
                 }
             } catch (e) {
                 this.showToast(window.TXT.cancel_failed_conn, 'error');
+                return;
             } finally { this.boardBusy = false; }
             this.boardCancelAsk = null;
             this.boardMenuTable = null;
@@ -10122,6 +10198,7 @@ function restaurantPos() {
                 items: null,
             };
             this.boardCancelMade = {};
+            if (this.boardCancelAsk) this.boardCancelAsk.reason = '';
             try {
                 const res = ti ? await fetch('/pos/restaurant/orders/by-table/' + ti.id, { headers: { 'Accept': 'application/json' } }) : null;
                 const list = (res && res.ok) ? await res.json().catch(() => null) : null;
@@ -10749,6 +10826,7 @@ function restaurantPos() {
         },
 
         async _localCoreHold() {
+            if (this.cart.some(item => item.promotion_quote)) return { success: false, message: this.promotionOnlineMessage };
             if (this.hasMixedService()) return { success: false, message: window.TXT.fulfill_online_required };
             if (!window.NestPosLocal) return null;
             const orderId = String(this.recalledOrderId ||
@@ -11114,7 +11192,9 @@ function restaurantPos() {
                 fulfillment: i.fulfillment || null, line_uid: i.line_uid || null, kot_printed_at: i.kot_printed_at || null, special_notes: i.special_notes || '',
                 skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen,
                 is_tax_exempt: !!i.is_tax_exempt,
-                item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
+                deal_snapshot: i.deal_snapshot || [], deal_choices: i.deal_choices || [],
+                _dealChoiceKey: (i.deal_choices || []).map(c => c.group_id + ':' + c.product_id).join('|'),
+                promotion_quote: i.promotion_quote || i.promotion_snapshot || null, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: false,
             }));
             this.orderType = eb.order_type || 'takeaway';
             if (eb.customer_name || eb.customer_phone) {
@@ -11141,7 +11221,8 @@ function restaurantPos() {
                     items: this.cart.map(c => ({
                         name: c.item_name,
                         quantity: c.quantity,
-                        unit_price: c.unit_price,
+                        unit_price: c.unit_price, promotion_quote: c.promotion_quote || null,
+                        item_discount_type: c.item_discount_type || 'percentage', item_discount_value: parseFloat(c.item_discount_value) || 0,
                         type: c.item_type === 'service' ? 'service' : (c.item_type === 'deal' ? 'deal' : 'product'),
                         item_id: c.item_id || null,
                         is_tax_exempt: !!c.is_tax_exempt,
@@ -11436,6 +11517,7 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            if (!window.PosDealAllocation && this.cart.some(i => i.item_type === 'deal')) { this.showToast('Deal calculation could not load. Reload the sale screen before payment.', 'error'); return; }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             // Task 994: hard double-submit guard (mirrors processPayment).
@@ -11446,6 +11528,7 @@ function restaurantPos() {
             this.lastPayTime = now;
             this.submitting = true; this.stockError = '';
             const savedTotal = this.totalAmount;
+            if (!this.payAttemptUuid) this.payAttemptUuid = this._newOfflineUuid();
             try {
                 // storeInvoice expects: items[].{name, quantity, unit_price, type?, item_id?, is_tax_exempt?, _manual?}
                 // and discount_type/value/payment_method at top level.
@@ -11453,7 +11536,8 @@ function restaurantPos() {
                     items: this.cart.map(c => ({
                         name: c.item_name,
                         quantity: c.quantity,
-                        unit_price: c.unit_price,
+                        unit_price: c.unit_price, promotion_quote: c.promotion_quote || null,
+                        item_discount_type: c.item_discount_type || 'percentage', item_discount_value: parseFloat(c.item_discount_value) || 0,
                         type: c.item_type === 'service' ? 'service' : (c.item_type === 'deal' ? 'deal' : 'product'),
                         item_id: c.item_id || null,
                         is_tax_exempt: !!c.is_tax_exempt,
@@ -11520,7 +11604,7 @@ function restaurantPos() {
                     // the bill but the reply never arrived), the queued replay
                     // carries the SAME uuid → server's replay guard returns the
                     // existing bill instead of creating a duplicate.
-                    offline_uuid: this._newOfflineUuid(),
+                    offline_uuid: this.payAttemptUuid,
                     // Task 1349: COUNTER attribution — the device's remembered
                     // counter. Inside the payload on purpose: an offline-queued
                     // bill then replays with its ORIGINAL counter. Server
@@ -11538,7 +11622,9 @@ function restaurantPos() {
                     return;
                 }
                 if (!navigator.onLine) {
-                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
+                    if (await this.queueOfflineBill(payload, method, savedTotal, skipReceipt) === false) {
+                        this.submitting = false; this.showPayModal = true; return;
+                    }
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;
@@ -11579,7 +11665,9 @@ function restaurantPos() {
                         this.saveAsProvisional = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
+                    if (await this.queueOfflineBill(payload, method, savedTotal, skipReceipt) === false) {
+                        this.submitting = false; this.showPayModal = true; return;
+                    }
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;
@@ -13493,6 +13581,7 @@ function restaurantPos() {
             return { has_recipe: recipe.length > 0, recipe_snapshot: recipe };
         },
         localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, payUuid, payOrderType) {
+            if (heldOrd?.items?.some(i => i.promotion_snapshot || i.promotion_quote)) return null;
             if (!['cash', 'card'].includes(method)) return null;
             if (!heldOrd || !Array.isArray(heldOrd.items) || !heldOrd.items.length) return null;
             // Shop-PC held order (Offline Mode): lines + totals come VERBATIM from
@@ -13521,6 +13610,7 @@ function restaurantPos() {
                     is_tax_exempt: !!item.is_tax_exempt,
                     _manual: item.item_id == null,
                     fulfillment: item.fulfillment || null, line_uid: item.line_uid || item.cart_uid, special_notes: item.special_notes || null,
+                    promotion_quote: item.promotion_quote || null,
                     item_discount_type: item.item_discount_type || 'percentage',
                     item_discount_value: Number(item.item_discount_value || 0),
                     deal_snapshot: item.item_type === 'deal' && Array.isArray(item.deal_snapshot)
@@ -13853,7 +13943,7 @@ function restaurantPos() {
             // skip_kitchen wapas cart par: yehi nishan Delivery Charges line ko
             // dobara "_delivery" banata hai, warna recall ke baad woh aam manual
             // line ban kar re-hold rok deti aur KOT par chhap jati.
-            this.cart = this.restoreFulfillmentCart(order.items).map(i => ({ cart_uid: i.cart_uid, kot_sent_quantity: i.kot_sent_quantity, item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), fulfillment: i.fulfillment || null, line_uid: i.line_uid || null, kot_printed_at: i.kot_printed_at || null, special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0, skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen }));
+            this.cart = this.restoreFulfillmentCart(order.items).map(i => ({ cart_uid: i.cart_uid, kot_sent_quantity: i.kot_sent_quantity, item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), fulfillment: i.fulfillment || null, line_uid: i.line_uid || null, kot_printed_at: i.kot_printed_at || null, special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, promotion_quote: i.promotion_quote || i.promotion_snapshot || null, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0, skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen }));
             // Delivery-fee input bhi bhar do, warna cashier ko lagta hai fee gayab
             // hai aur dobara type karne par doosri line ban jati.
             const recalledFee = this.cart.find(c => c && c._delivery);
@@ -13995,17 +14085,23 @@ function restaurantPos() {
             this.showCustomerHistory = false; this.showToast(window.TXT.items_added_to_cart, 'success');
         },
         getCartCost() {
-            // Profit engine: prefer recipe-based ingredient cost (most accurate for kitchens),
-            // fall back to product.cost_price for simple/retail items. Services have no cost.
-            return this.cart.reduce((s, i) => {
-                if (i.item_type === 'service') return s;
-                let cost = this.ingredientCosts[i.item_id] || 0;
-                if (cost === 0) {
-                    const p = (this.allProducts || []).find(x => x.id === i.item_id);
-                    if (p && Number(p.cost_price) > 0) cost = Number(p.cost_price);
+            let total = 0;
+            for (const item of this.cart) {
+                if (item.item_type === 'service') continue;
+                if (item.item_type === 'deal') {
+                    const parts = item.deal_snapshot || [];
+                    if (!parts.length || parts.some(p => p.unit_cost == null)) return null;
+                    total += parts.reduce((sum,p) => sum + Number(p.unit_cost) * Number(p.qty || 1),0) * item.quantity;
+                    continue;
                 }
-                return s + (cost * i.quantity);
-            }, 0);
+                if (item.item_type !== 'product') return null;
+                let cost;
+                if (Object.prototype.hasOwnProperty.call(this.ingredientCosts, item.item_id)) cost = this.ingredientCosts[item.item_id];
+                else { const product = (this.allProducts || []).find(p => Number(p.id) === Number(item.item_id)); cost = Number(product?.cost_price) > 0 ? Number(product.cost_price) : null; }
+                if (cost == null) return null;
+                total += Number(cost) * item.quantity;
+            }
+            return this.r2(total);
         },
         // ─── Caller ID popup (Task 1039) ───────────────────────────────────
         // Non-blocking: silent while payment / receipt / manager-PIN / table-

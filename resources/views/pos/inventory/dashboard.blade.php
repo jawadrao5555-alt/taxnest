@@ -88,7 +88,7 @@
                 </div>
             </div>
             <p class="text-3xl font-black text-gray-900 dark:text-white">{{ number_format($totalProducts) }}</p>
-            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">{{ __('pos.total_products') }}</p>
+            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">{{ __('pos_stock_chain.active_catalogue') }}</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
@@ -98,7 +98,8 @@
                 </div>
             </div>
             <p class="text-2xl font-black text-emerald-600">PKR {{ number_format($totalStockValue, 0) }}</p>
-            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">{{ __('pos.stock_value') }}</p>
+            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">{{ __('pos_stock_chain.stock_value') }}</p>
+            <p class="text-xs text-gray-500 mt-2">{{ __('pos_stock_chain.valuation_basis') }}</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border {{ $lowStockItems->count() > 0 ? 'border-amber-200 dark:border-amber-800/50' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500 {{ $lowStockItems->count() > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
@@ -157,8 +158,9 @@
             </div>
             <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.stock_health_overview') }}</h3>
         </div>
+        <p class="text-xs text-gray-500 mb-3">{{ $totalTracked ? __('pos_stock_chain.health_basis') : __('pos_stock_chain.no_balances') }}</p>
         @php
-            $healthPct = $totalTracked > 0 ? round(($healthyCount / $totalTracked) * 100) : 100;
+            $healthPct = $totalTracked > 0 ? round(($healthyCount / $totalTracked) * 100) : 0;
             $lowPct = $totalTracked > 0 ? round(($lowStockItems->count() / $totalTracked) * 100) : 0;
             $outPct = $totalTracked > 0 ? round(($outOfStockCount / $totalTracked) * 100) : 0;
         @endphp
@@ -181,7 +183,7 @@
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
                             <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.in_stock') }}</span>
-                            <span class="text-xs font-bold text-emerald-600">{{ __('pos.n_products', ['count' => $healthyCount]) }}</span>
+                            <span class="text-xs font-bold text-emerald-600">{{ __('pos_stock_chain.n_rows', ['count' => $healthyCount]) }}</span>
                         </div>
                         <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                             <div class="h-2 rounded-full bg-emerald-500 transition-all duration-700" style="width: {{ $healthPct }}%"></div>
@@ -193,7 +195,7 @@
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
                             <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.low_stock') }}</span>
-                            <span class="text-xs font-bold text-amber-600">{{ __('pos.n_products', ['count' => $lowStockItems->count()]) }}</span>
+                            <span class="text-xs font-bold text-amber-600">{{ __('pos_stock_chain.n_rows', ['count' => $lowStockItems->count()]) }}</span>
                         </div>
                         <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                             <div class="h-2 rounded-full bg-amber-500 transition-all duration-700" style="width: {{ $lowPct }}%"></div>
@@ -205,7 +207,7 @@
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
                             <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.out_of_stock') }}</span>
-                            <span class="text-xs font-bold text-red-600">{{ __('pos.n_products', ['count' => $outOfStockCount]) }}</span>
+                            <span class="text-xs font-bold text-red-600">{{ __('pos_stock_chain.n_rows', ['count' => $outOfStockCount]) }}</span>
                         </div>
                         <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                             <div class="h-2 rounded-full bg-red-500 transition-all duration-700" style="width: {{ $outPct }}%"></div>

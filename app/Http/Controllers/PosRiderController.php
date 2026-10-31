@@ -1536,6 +1536,30 @@ class PosRiderController extends Controller
      *  cash actually handed over. Applies oldest-first: fully covered bills
      *  settle, the remainder lands on the next bill's rider_partial_paid and the
      *  rest of the khata stays outstanding. Omitted = full settle (unchanged). */
+    public function shopCash(Request $request)
+    {
+        $companyId = (int) app('currentCompanyId');
+        $actor = auth('pos')->user();
+        \App\Services\PosShopCashSettlement::authorize($companyId, $actor);
+        if ($request->isMethod('post')) {
+            $data = $request->validate([
+                'bill_ids' => 'required|array|min:1|max:200', 'bill_ids.*' => 'required|integer|min:1|distinct',
+                'expected_amount' => 'required|numeric|gt:0', 'receipt_key' => 'required|uuid',
+            ]);
+            $receipt = \App\Services\PosShopCashSettlement::receive($companyId, $actor, $data['bill_ids'], (float) $data['expected_amount'], $data['receipt_key']);
+            if ($request->expectsJson()) return response()->json(['success' => true, 'receipt_id' => $receipt->id, 'amount' => $receipt->total_amount, 'bill_count' => $receipt->bill_count]);
+            return redirect()->route('pos.deliveries.shop-cash')->with('success', 'Cash receipt #' . $receipt->id . ': Rs. ' . number_format((float) $receipt->total_amount, 2) . ' received for ' . $receipt->bill_count . ' bills.');
+        }
+        $data = $request->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d|after_or_equal:from', 'reference' => 'nullable|string|max:100']);
+        $query = \App\Services\PosShopCashSettlement::eligible($companyId, $actor);
+        if (!empty($data['from'])) $query->where('business_date', '>=', $data['from']);
+        if (!empty($data['to'])) $query->where('business_date', '<=', $data['to']);
+        if (!empty($data['reference'])) $query->where('invoice_number', 'like', '%' . $data['reference'] . '%');
+        $bills = $query->orderBy('business_date')->orderBy('id')->paginate(50)->withQueryString();
+
+        return view('pos.shop-cash', ['bills' => $bills, 'receiptKey' => (string) Str::uuid()]);
+    }
+
     public function settle(Request $request, $riderId)
     {
         $companyId = app('currentCompanyId');

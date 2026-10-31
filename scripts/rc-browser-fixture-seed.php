@@ -724,6 +724,28 @@ try {
 }
 if (!$adminPreviewCsp) throw new RuntimeException('Production CSP missing from preview fixture');
 
+// B02 has its own fictional tenant; existing journeys and their counts stay isolated.
+$b02Company = $company('Synthetic B02 shop', 'b02-company@rc-browser.invalid', 'RCB02-001', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant',
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
+    'restaurant_mode' => true, 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
+    'pos_guided_flow_enabled' => false, 'inventory_enabled' => false, 'pra_reporting_enabled' => false,
+    'pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 5, 'pos_tax_pricing_mode' => 'exclusive',
+]);
+$b02Owner = $user($b02Company, 'Synthetic B02 owner', 'b02-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$b02Plan = \App\Models\PricingPlan::create(['name' => 'Synthetic B02 package', 'product_type' => 'pos',
+    'invoice_limit' => 100, 'price' => 100, 'is_trial' => false, 'deals_enabled' => true]);
+\App\Models\Subscription::create(['company_id' => $b02Company->id, 'pricing_plan_id' => $b02Plan->id,
+    'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(), 'active' => true]);
+$b02Food = \App\Models\PosProduct::create(['company_id' => $b02Company->id, 'name' => 'Synthetic B02 food',
+    'price' => 800, 'cost_price' => 300, 'category' => 'Food', 'is_active' => true, 'show_on_sale' => true]);
+$b02Drink = \App\Models\PosProduct::create(['company_id' => $b02Company->id, 'name' => 'Synthetic B02 drink',
+    'price' => 200, 'cost_price' => 30, 'category' => 'Drinks', 'is_tax_exempt' => true, 'is_active' => true, 'show_on_sale' => true]);
+$b02Deal = \App\Models\PosDeal::create(['company_id' => $b02Company->id, 'name' => 'Synthetic B02 mixed meal', 'price' => 800, 'is_active' => true]);
+foreach ([$b02Food, $b02Drink] as $component) DB::table('pos_deal_items')->insert([
+    'deal_id' => $b02Deal->id, 'pos_product_id' => $component->id, 'quantity' => 1, 'created_at' => $now, 'updated_at' => $now,
+]);
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -765,6 +787,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name' => 'pra-b02-deal', 'login' => $b02Owner->email, 'password' => $password, 'loginPath' => '/pos/login',
+            'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'b02Deal' => ['name' => $b02Deal->name, 'product' => $b02Food->name]],
         ['name' => 'fbr-owner-reconciliation', 'login' => $fiscalUser->email, 'password' => $password,
             'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/fail-queue'],
             'markers' => ['FBR Fail Queue'], 'fbrReconciliation' => $reconcileCases],

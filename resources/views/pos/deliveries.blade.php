@@ -1,4 +1,7 @@
 <x-pos-layout>
+@if(\Illuminate\Support\Facades\Schema::hasColumn('pos_rider_settlements', 'receipt_key'))
+<div class="max-w-7xl mx-auto px-4 pt-4"><a href="{{ route('pos.deliveries.shop-cash') }}" class="inline-block rounded bg-indigo-600 text-white px-4 py-2 text-sm font-semibold">Receive unassigned delivery cash at shop</a></div>
+@endif
 {{-- Deliveries board (Jul 2026) — open to admins, managers AND cashiers
      (the cashier is who receives the rider's cash). Rider CRUD lives on
      /pos/riders (admin-only). --}}

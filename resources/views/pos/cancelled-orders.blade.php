@@ -43,14 +43,15 @@
             <p class="text-2xl font-black text-gray-900 dark:text-white mt-1">Rs {{ number_format($summary['value']) }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">{{ __('pos.waste_value') }}</p>
+            <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">Recorded prepared sale value</p>
             <p class="text-2xl font-black text-orange-600 mt-1">Rs {{ number_format($summary['waste'] ?? 0) }}</p>
             @if(($summary['made_item_count'] ?? 0) === 0)
-                <p class="text-[10px] text-gray-400 mt-1">No items were marked made</p>
+                <p class="text-[10px] text-gray-400 mt-1">No prepared quantities recorded as positive</p>
             @endif
         </div>
     </div>
 
+    <p class="text-xs text-gray-500 mb-3">{{ $summary['unknown_item_count'] ?? 0 }} item lines have unknown preparation. Recorded prepared sale value is not inventory cost or a cash refund. No sale or stock movement is created by cancellation.</p>
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
@@ -58,7 +59,7 @@
                     <th class="px-4 py-3">{{ __('pos.order_number') }}</th>
                     <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.business_date_calendar_time') }}</th>
                     <th class="px-4 py-3">Table</th>
-                    <th class="px-4 py-3 hidden lg:table-cell">Items</th>
+                    <th class="px-4 py-3 ">Items</th>
                     <th class="px-4 py-3 text-right">Rs</th>
                     <th class="px-4 py-3 hidden sm:table-cell">KOT</th>
                     <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.punched_by') }}</th>
@@ -68,7 +69,7 @@
             <tbody>
                 @forelse ($orders as $o)
                 <tr class="border-b border-gray-100 dark:border-gray-800 {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}">
-                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ $o->order_number }}</td>
+                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ $o->order_number }}<span class="block text-xs font-normal">ID {{ $o->id }} · Cancelled open order</span><span class="block text-xs font-normal">Reason: {{ $o->cancellation_reason ?: 'Not recorded' }}</span></td>
                     {{-- The filter uses the POS business-day window (cutoff to
                          cutoff), while created_at remains an honest calendar
                          timestamp. Show BOTH so a 02-Sep business-day order
@@ -87,7 +88,7 @@
                         <span class="block text-[11px]">{{ __('pos.calendar_time_label') }}: {{ $calendarAt?->format('d M Y, h:i A') ?? '—' }}</span>
                     </td>
                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '—' }}</td>
-                    <td class="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell max-w-xs">
+                    <td class="px-4 py-3 text-xs text-gray-500  max-w-xs">
                         @foreach($o->items as $i)
                             <span class="block truncate">{{ $i->quantity }}× {{ $i->item_name }} — <span class="font-semibold {{ $i->was_made === true ? 'text-orange-600' : ($i->was_made === false ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400') }}">{{ $i->madeStateLabel() }}</span></span>
                         @endforeach

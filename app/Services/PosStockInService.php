@@ -81,7 +81,7 @@ class PosStockInService
 
             foreach ($parsed['rows'] as $row) {
                 $match = $this->excel->matchRow($row, (int) $company->id, $inventoryOn, $recipesOn);
-                PosStockInLine::query()->create([
+                $line = PosStockInLine::query()->create([
                     'batch_id' => $batch->id,
                     'source_row_no' => (int) $row['source_row_no'],
                     'line_type' => (string) ($row['line_type'] ?? PosStockInLine::TYPE_ITEM),
@@ -100,6 +100,7 @@ class PosStockInService
                     'invalid_reason' => $match['invalid_reason'],
                     'selected' => (bool) $match['selected'],
                 ]);
+                $this->stampUnitSnapshot($line, $company);
             }
 
             $batch->line_count = $batch->lines()->count();
@@ -110,6 +111,51 @@ class PosStockInService
     }
 
     public function rematch(PosStockInBatch $batch, Company $company): PosStockInBatch
+    {
+        return $this->withOpenBatch($batch, $company, fn ($locked, $freshCompany) => $this->rematchLocked($locked, $freshCompany));
+    }
+
+    public function mapClearance(PosStockInBatch $batch, Company $company, int $lineId, ?int $ingredientId, ?int $productId): PosStockInLine
+    {
+        return $this->withOpenBatch($batch, $company, fn ($locked, $freshCompany) => $this->mapClearanceLocked($locked, $freshCompany, $lineId, $ingredientId, $productId));
+    }
+
+    public function setSelected(PosStockInBatch $batch, Company $company, array $selectedIds): void
+    {
+        $this->withOpenBatch($batch, $company, fn ($locked, $freshCompany) => $this->setSelectedLocked($locked, $freshCompany, $selectedIds));
+    }
+
+    public function cancelBatch(PosStockInBatch $batch, Company $company): PosStockInBatch
+    {
+        return $this->withOpenBatch($batch, $company, fn ($locked, $freshCompany) => $this->cancelBatchLocked($locked, $freshCompany));
+    }
+
+    public function post(PosStockInBatch $batch, Company $company, int $userId): array
+    {
+        return $this->withOpenBatch($batch, $company, fn ($locked, $freshCompany) => $this->postLocked($locked, $freshCompany, $userId));
+    }
+
+    /** Serialize all staging changes with posting, including duplicate references in other batches. */
+    private function withOpenBatch(PosStockInBatch $batch, Company $company, callable $action): mixed
+    {
+        if ((int) $batch->company_id !== (int) $company->id) {
+            abort(404);
+        }
+
+        return DB::transaction(function () use ($batch, $company, $action) {
+            // The tenant lock also protects reference deduplication across different batches.
+            $company = Company::query()->whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $batch = PosStockInBatch::query()->where('company_id', $company->id)
+                ->whereKey($batch->id)->lockForUpdate()->firstOrFail();
+            $this->assertSingleShop($company);
+            $this->assertBatchOpen($batch, $company);
+            $batch->setRelation('lines', $batch->lines()->orderBy('id')->lockForUpdate()->get());
+
+            return $action($batch, $company);
+        });
+    }
+
+    private function rematchLocked(PosStockInBatch $batch, Company $company): PosStockInBatch
     {
         $this->assertSingleShop($company);
         $this->assertBatchOpen($batch, $company);
@@ -122,6 +168,7 @@ class PosStockInService
                 continue;
             }
             if ($this->keepHumanClearance($line, $company)) {
+                $this->stampUnitSnapshot($line, $company);
                 continue;
             }
 
@@ -133,12 +180,13 @@ class PosStockInService
             $line->invalid_reason = $match['invalid_reason'];
             $line->selected = (bool) $match['selected'];
             $line->save();
+            $this->stampUnitSnapshot($line, $company);
         }
 
         return $batch->fresh(['lines']);
     }
 
-    public function mapClearance(
+    private function mapClearanceLocked(
         PosStockInBatch $batch,
         Company $company,
         int $lineId,
@@ -186,13 +234,15 @@ class PosStockInService
         $line->selected = true;
         $line->save();
 
+        $this->stampUnitSnapshot($line, $company);
+
         return $line;
     }
 
     /**
      * @param  list<int>  $selectedIds
      */
-    public function setSelected(PosStockInBatch $batch, Company $company, array $selectedIds): void
+    private function setSelectedLocked(PosStockInBatch $batch, Company $company, array $selectedIds): void
     {
         $this->assertBatchOpen($batch, $company);
         $want = array_map('intval', $selectedIds);
@@ -207,7 +257,7 @@ class PosStockInService
         }
     }
 
-    public function cancelBatch(PosStockInBatch $batch, Company $company): PosStockInBatch
+    private function cancelBatchLocked(PosStockInBatch $batch, Company $company): PosStockInBatch
     {
         $this->assertSingleShop($company);
         $this->assertBatchOpen($batch, $company);
@@ -223,7 +273,7 @@ class PosStockInService
      *
      * @return array{posted:int,skipped:int,already:int}
      */
-    public function post(PosStockInBatch $batch, Company $company, int $userId): array
+    private function postLocked(PosStockInBatch $batch, Company $company, int $userId): array
     {
         $this->assertSingleShop($company);
         $this->assertBatchOpen($batch, $company);
@@ -242,6 +292,10 @@ class PosStockInService
 
         DB::transaction(function () use ($batch, $company, $userId, $groups, &$posted, &$already) {
             foreach ($groups as $group) {
+                if (($group['kind'] === PosStockInLine::TYPE_INGREDIENT && !$this->recipesOn($company))
+                    || ($group['kind'] === PosStockInLine::TYPE_ITEM && !$this->inventoryOn($company))) {
+                    throw ValidationException::withMessages(['stock_in' => 'The required inventory module is no longer available.']);
+                }
                 if ($this->alreadyPosted($company, $group)) {
                     $this->markAlreadyReceived($group);
                     $already += count($group['line_ids']);
@@ -341,6 +395,25 @@ class PosStockInService
             if (! $line->isPostable() || ! $line->selected) {
                 continue;
             }
+            $factor = 1.0;
+            if ($line->line_type === PosStockInLine::TYPE_INGREDIENT) {
+                $ingredient = Ingredient::where('company_id', $batch->company_id)->whereKey($line->matched_ingredient_id)->lockForUpdate()->firstOrFail();
+                $factor = IngredientUnitConversion::factor($ingredient, $line->unit);
+                $snapshot = $line->unit_snapshot;
+                if ($snapshot && ((int) ($snapshot['ingredient_id'] ?? 0) !== (int) $ingredient->id
+                    || ($snapshot['usage_unit'] ?? '') !== $ingredient->unit
+                    || abs((float) ($snapshot['factor'] ?? 0) - $factor) > .000001)) {
+                    throw ValidationException::withMessages(['unit' => 'Ingredient units changed since preview. Rematch and review this batch before posting.']);
+                }
+                if (!$snapshot && abs($factor - 1) > .000001) {
+                    throw ValidationException::withMessages(['unit' => 'Rematch this batch to record and preview the unit conversion before posting.']);
+                }
+            } else {
+                $product = PosProduct::where('company_id', $batch->company_id)->whereKey($line->matched_product_id)->lockForUpdate()->firstOrFail();
+                if ($line->unit && strcasecmp((string) $line->unit, (string) $product->uom) !== 0) {
+                    throw ValidationException::withMessages(['unit' => 'The item receiving unit no longer matches its stock unit.']);
+                }
+            }
             $ref = $this->effectiveReference($batch, $line);
             $matchedId = $line->line_type === PosStockInLine::TYPE_INGREDIENT
                 ? (int) $line->matched_ingredient_id
@@ -365,12 +438,14 @@ class PosStockInService
                     'source_row_nos' => [],
                     'line_ids' => [],
                     'keeper_id' => (int) $line->id,
+                    'unit_conversions' => [],
                 ];
             }
-            $groups[$key]['quantity'] += (float) $line->qty;
+            $groups[$key]['quantity'] += round((float) $line->qty * $factor, 4);
+            $groups[$key]['unit_conversions'][] = ['source_row' => $line->source_row_no, 'source_qty' => (float) $line->qty, 'source_unit' => $line->unit, 'factor' => $factor, 'usage_qty' => round((float) $line->qty * $factor, 4)];
             if ($line->rate !== null) {
                 $groups[$key]['rate_num'] += (float) $line->rate * (float) $line->qty;
-                $groups[$key]['rate_den'] += (float) $line->qty;
+                $groups[$key]['rate_den'] += (float) $line->qty * $factor;
             }
             if ($line->notes) {
                 $groups[$key]['notes'][] = $line->notes;
@@ -387,6 +462,19 @@ class PosStockInService
         unset($group);
 
         return array_values($groups);
+    }
+
+    private function stampUnitSnapshot(PosStockInLine $line, Company $company): void
+    {
+        if (!Schema::hasColumn('pos_stock_in_lines', 'unit_snapshot') || $line->line_type !== PosStockInLine::TYPE_INGREDIENT
+            || $line->match_status !== PosStockInLine::MATCHED) return;
+        $ingredient = Ingredient::where('company_id', $company->id)->whereKey($line->matched_ingredient_id)->firstOrFail();
+        $factor = IngredientUnitConversion::factor($ingredient, $line->unit);
+        $line->unit_snapshot = ['ingredient_id' => (int) $ingredient->id, 'source_unit' => $line->unit ?: $ingredient->unit,
+            'usage_unit' => $ingredient->unit, 'factor' => $factor,
+            'usage_quantity' => round((float) $line->qty * $factor, 4),
+            'usage_rate' => $line->rate === null ? null : round((float) $line->rate / $factor, 6)];
+        $line->save();
     }
 
     protected function effectiveReference(PosStockInBatch $batch, PosStockInLine $line): string
@@ -441,6 +529,7 @@ class PosStockInService
             'supplier_item_code' => $group['supplier_item_code'],
             'source_row_nos' => $group['source_row_nos'],
             'collapsed_qty' => $qty,
+            'unit_conversions' => $group['unit_conversions'],
         ];
 
         RecipeInventoryService::adjustIngredientStock(

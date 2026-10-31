@@ -2722,12 +2722,12 @@ class PosController extends Controller
                 foreach ($productRecipes as $recipe) {
                     $ing = $recipe->ingredient;
                     if (!$ing || !$ing->is_active) continue;
-                    if ((float)$ing->current_stock < (float)$recipe->quantity_needed) { $status = 'out'; }
+                    if ((float)$ing->current_stock < $recipe->effectiveQuantity()) { $status = 'out'; }
                     elseif (method_exists($ing, 'isLowStock') && $ing->isLowStock()) { $status = 'low'; }
-                    $cost += (float)$recipe->quantity_needed * (float)($ing->cost_per_unit ?? 0);
+                    $cost += $recipe->effectiveQuantity() * (float)($ing->cost_per_unit ?? 0);
                 }
                 $stockStatus[$productId] = $status;
-                $ingredientCosts[$productId] = round($cost, 2);
+                $ingredientCosts[$productId] = $productRecipes->contains(fn ($r) => !$r->ingredient || (float) $r->ingredient->cost_per_unit <= 0) ? null : round($cost, 6);
             }
             if ($inventoryOn) {
                 $lowStockAlerts = Ingredient::where('company_id', $companyId)
@@ -2944,6 +2944,11 @@ class PosController extends Controller
                         'skip_kitchen' => (bool) $i->skip_kitchen,
                         'special_notes' => $i->special_notes,
                         'is_tax_exempt' => (bool) $i->is_tax_exempt,
+                        'item_discount_type' => $i->item_discount_type, 'item_discount_value' => (float) $i->item_discount_value,
+                        'deal_snapshot' => $i->deal_snapshot,
+                        'promotion_quote' => $i->promotion_snapshot,
+                        'deal_choices' => collect($i->deal_snapshot ?? [])->filter(fn ($c) => !empty($c['choice_group_id']))
+                            ->map(fn ($c) => ['group_id' => (int) $c['choice_group_id'], 'product_id' => (int) $c['product_id']])->values()->all(),
                     ])->values()->all(),
                 ];
             }
@@ -3063,6 +3068,7 @@ class PosController extends Controller
             $choiceGroupsAgg,
             $choiceOptionsAgg,
             $dealUsageAgg,
+            \Schema::hasTable('pos_promotions') ? $agg(\App\Models\PosPromotion::where('company_id', $companyId)) : '0:',
             // Deals carry weekday/date windows — a day change must refresh the
             // screen, but ONLY for companies that actually have deals (ZFC,
             // 28 Jul 2026: the date-flip forced EVERY shop into a morning reload
@@ -3442,6 +3448,8 @@ class PosController extends Controller
             // tampered / malformed payload. POS line-item prices in Pakistan
             // never legitimately exceed this.
             'items.*.unit_price' => 'required|numeric|min:0|max:10000000',
+            'items.*.item_discount_type' => 'nullable|in:percentage,amount',
+            'items.*.item_discount_value' => 'nullable|numeric|min:0|max:10000000',
             'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
@@ -3567,6 +3575,7 @@ class PosController extends Controller
             $request->input('order_type'),
             (bool) $agentCoreInventorySale
         );
+        $companyItems = \App\Services\PosPromotions::apply($companyItems, $request->items, $company, $request, false, (bool) $agentCoreInventorySale);
         // Deals are billing-only: component stock and the live deal row cannot
         // be authoritatively checked while a bill is offline. Keep this server
         // guard alongside the client guard so a stale/crafted offline replay
@@ -3600,7 +3609,7 @@ class PosController extends Controller
             ], 400);
         }
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
-        $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));
+        $taxableSubtotal = array_sum(array_map(fn($i) => \App\Services\PosDealAllocation::taxableSubtotal($i['deal_snapshot'] ?? null, (float) $i['lineTotal'], (bool) $i['isExempt']), $companyItems));
         $exemptSubtotal = $subtotal - $taxableSubtotal;
 
         $discountValue = (float) ($request->discount_value ?? 0);
@@ -3653,6 +3662,17 @@ class PosController extends Controller
             $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
             $totalAmount = (float) round($afterDiscount + $taxAmount);
             $headerSubtotal = $subtotal;
+        }
+        $dealBill = \App\Services\PosDealAllocation::bill(array_map(fn ($line) => [
+            'snapshot' => $line['deal_snapshot'] ?? null, 'subtotal' => (float) $line['lineTotal'], 'exempt' => (bool) $line['isExempt'],
+        ], $companyItems), (float) $discountAmount, (float) $taxRate, $taxInclusive, $menuRate);
+        if ($dealBill) {
+            $taxAmount = $dealBill['tax_amount'];
+            $totalAmount = $dealBill['total_amount'];
+            $exemptAfterDiscount = $dealBill['exempt_amount'];
+            $headerSubtotal = $dealBill['subtotal_col'];
+            foreach ($companyItems as $index => &$line) $line['allocated_discount'] = $dealBill['lines'][$index]['discount'];
+            unset($line);
         }
         if ($agentCoreInventorySale) {
             // The signed Local Core snapshot is the accepted fiscal history.
@@ -3911,6 +3931,8 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
+            $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            if (!$agentCoreInventorySale && !$request->filled('offline_queued_at')) \App\Services\PosPromotions::assertRowsCurrent($companyItems, $lockedPromotionCompany);
             $draftId = $request->input('draft_id');
             $transaction = null;
 
@@ -4056,13 +4078,15 @@ class PosController extends Controller
             $storeCostMap = ($hasCostPriceCol && $storeCostProductIds->isNotEmpty())
                 ? \App\Models\PosProduct::where('company_id', $companyId)
                     ->whereIn('id', $storeCostProductIds)
-                    ->get(['id', 'cost_price'])
+                    ->get()
                     ->keyBy('id')
                 : collect();
 
+            $storeRecipeCosts = \App\Services\PosProductCost::map($companyId, $storeCostMap);
+
             foreach ($companyItems as $ri) {
                 $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
-                $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
+                $itemDiscountShare = $ri['allocated_discount'] ?? ($subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0);
                 $itemTaxableAmount = $ri['lineTotal'] - $itemDiscountShare;
                 // Inclusive mode: line prices are menu (tax-in) — tax_amount holds the
                 // INCLUDED portion, unit_price/subtotal keep the as-entered menu values.
@@ -4075,8 +4099,19 @@ class PosController extends Controller
                 // Freeze cost snapshot: only product-type items with a known cost.
                 $frozenCost = null;
                 if ($hasCostPriceCol && $ri['type'] === 'product' && !empty($ri['item_id'])) {
-                    $cp = (float) ($storeCostMap[$ri['item_id']]?->cost_price ?? 0);
-                    $frozenCost = $cp > 0 ? $cp : null;
+                    $frozenCost = $storeRecipeCosts[$ri['item_id']] ?? null;
+                }
+                $allocationFields = \App\Services\PosDealAllocation::lineFields(
+                    $ri['deal_snapshot'] ?? null, (float) $ri['lineTotal'], (float) $itemDiscountShare,
+                    (float) $taxRate, $taxInclusive, $menuRate, (bool) $ri['isExempt'], isset($ri['allocated_discount']) || isset($ri['promotion_snapshot'])
+                );
+                if (isset($allocationFields['deal_snapshot'])) {
+                    $allocationFields['deal_snapshot'] = \App\Services\PosDealAllocation::withItemDiscount($allocationFields['deal_snapshot'], (float) ($ri['item_discount_amount'] ?? 0));
+                }
+                if ($allocationFields) {
+                    $itemTaxAmount = $allocationFields['tax_amount'];
+                    $itemTaxRate = $allocationFields['tax_rate'];
+                    if ($ri['type'] === 'deal') $frozenCost = \App\Services\PosDealAllocation::unitCost($ri['deal_snapshot']);
                 }
                 PosTransactionItem::create(array_merge([
                     'transaction_id' => $transaction->id,
@@ -4086,15 +4121,23 @@ class PosController extends Controller
                     ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $ri['fulfillment'] ?? null, 'line_uid' => $ri['line_uid'] ?? null] : []),
                     'special_notes' => $ri['notes'] ?? null,
                     'deal_snapshot' => $ri['deal_snapshot'] ?? null,
+                    ...(\Schema::hasColumn('pos_transaction_items', 'promotion_snapshot') ? ['promotion_snapshot' => $ri['promotion_snapshot'] ?? null, 'promotion_discount' => $ri['promotion_discount'] ?? null] : []),
                     'quantity' => $ri['quantity'],
                     'unit_price' => $ri['price'],
                     'subtotal' => $ri['lineTotal'],
+                    ...(\Schema::hasColumn('pos_transaction_items', 'item_discount_amount') ? [
+                        'item_discount_type' => $ri['item_discount_type'] ?? null, 'item_discount_value' => $ri['item_discount_value'] ?? 0,
+                        'item_discount_amount' => $ri['item_discount_amount'] ?? 0,
+                    ] : []),
                     'is_tax_exempt' => $ri['isExempt'],
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
                 ], $thirdSchemaExists ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
                    $skipKitchenExists ? ['skip_kitchen' => $ri['skipKitchen'] ?? false] : [],
-                   $hasCostPriceCol ? ['cost_price' => $frozenCost] : []));
+                   $hasCostPriceCol ? ['cost_price' => $frozenCost] : [], $allocationFields, \Schema::hasColumn('pos_transaction_items', 'reporting_snapshot') ? ['reporting_snapshot' => [
+                       'category' => $storeCostMap[$ri['item_id']]->category ?? null, 'size' => $storeCostMap[$ri['item_id']]->size ?? null,
+                       'uom' => $storeCostMap[$ri['item_id']]->uom ?? null,
+                   ]] : []));
             }
 
             \App\Support\PosFulfillment::applyCollection($transaction, $request, $subtotal > 0 ? max(0, 1 - $discountAmount / $subtotal) : 1, (float) $taxRate, $taxInclusive);
@@ -4434,6 +4477,8 @@ class PosController extends Controller
             'items.*.name' => 'required|string|max:255',
             'items.*.quantity' => 'required|integer|min:1|max:9999',
             'items.*.unit_price' => 'required|numeric|min:0|max:10000000',
+            'items.*.item_discount_type' => 'nullable|in:percentage,amount',
+            'items.*.item_discount_value' => 'nullable|numeric|min:0|max:10000000',
             'payment_method' => 'required|in:cash,card,debit_card,credit_card,qr_payment',
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
@@ -4461,8 +4506,9 @@ class PosController extends Controller
 
         \App\Support\PosFulfillment::validate($request, $company, $transaction);
         $companyItems = $this->resolveItemExemptions($request->items, $companyId, $request->input('order_type'));
+        $companyItems = \App\Services\PosPromotions::apply($companyItems, $request->items, $company, $request);
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
-        $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));
+        $taxableSubtotal = array_sum(array_map(fn($i) => \App\Services\PosDealAllocation::taxableSubtotal($i['deal_snapshot'] ?? null, (float) $i['lineTotal'], (bool) $i['isExempt']), $companyItems));
 
         $discountValue = (float) ($request->discount_value ?? 0);
         $discountType = $request->discount_type;
@@ -4509,6 +4555,17 @@ class PosController extends Controller
             $headerSubtotal = $subtotal;
         }
 
+        $dealBill = \App\Services\PosDealAllocation::bill(array_map(fn ($line) => [
+            'snapshot' => $line['deal_snapshot'] ?? null, 'subtotal' => (float) $line['lineTotal'], 'exempt' => (bool) $line['isExempt'],
+        ], $companyItems), (float) $discountAmount, (float) $taxRate, $editTaxInclusive, $editMenuRate);
+        if ($dealBill) {
+            $taxAmount = $dealBill['tax_amount'];
+            $totalAmount = $dealBill['total_amount'];
+            $exemptAfterDiscount = $dealBill['exempt_amount'];
+            $headerSubtotal = $dealBill['subtotal_col'];
+            foreach ($companyItems as $index => &$line) $line['allocated_discount'] = $dealBill['lines'][$index]['discount'];
+            unset($line);
+        }
         // Owner rule (Jul 2026 update): an EDIT must NEVER silently change a bill's
         // reporting fate. The bill keeps whatever it was:
         //   provisional stays provisional; a LOCAL final (NULL pra_status, no fiscal)
@@ -4546,6 +4603,8 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
+            $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            if (!$request->filled('offline_queued_at')) \App\Services\PosPromotions::assertRowsCurrent($companyItems, $lockedPromotionCompany);
             // Allocate INSIDE the transaction: PosFinalSeries serializes callers on
             // a row lock, and outside a transaction MySQL drops that lock as soon as
             // the statement ends — two cashiers promoting bills at the same moment
@@ -4589,13 +4648,15 @@ class PosController extends Controller
             $editCostMap = ($hasCostPriceColEdit && $editCostProductIds->isNotEmpty())
                 ? \App\Models\PosProduct::where('company_id', $companyId)
                     ->whereIn('id', $editCostProductIds)
-                    ->get(['id', 'cost_price'])
+                    ->get()
                     ->keyBy('id')
                 : collect();
 
+            $editRecipeCosts = \App\Services\PosProductCost::map($companyId, $editCostMap);
+
             foreach ($companyItems as $ri) {
                 $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
-                $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
+                $itemDiscountShare = $ri['allocated_discount'] ?? ($subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0);
                 $itemTaxableAmount = $ri['lineTotal'] - $itemDiscountShare;
                 $itemTaxAmount = $editTaxInclusive
                     ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate, $editMenuRate)
@@ -4605,8 +4666,19 @@ class PosController extends Controller
                 $skipKitchenExistsEdit = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'skip_kitchen');
                 $frozenCostEdit = null;
                 if ($hasCostPriceColEdit && $ri['type'] === 'product' && !empty($ri['item_id'])) {
-                    $cpEdit = (float) ($editCostMap[$ri['item_id']]?->cost_price ?? 0);
-                    $frozenCostEdit = $cpEdit > 0 ? $cpEdit : null;
+                    $frozenCostEdit = $editRecipeCosts[$ri['item_id']] ?? null;
+                }
+                $allocationFields = \App\Services\PosDealAllocation::lineFields(
+                    $ri['deal_snapshot'] ?? null, (float) $ri['lineTotal'], (float) $itemDiscountShare,
+                    (float) $taxRate, $editTaxInclusive, $editMenuRate, (bool) $ri['isExempt'], isset($ri['allocated_discount']) || isset($ri['promotion_snapshot'])
+                );
+                if (isset($allocationFields['deal_snapshot'])) {
+                    $allocationFields['deal_snapshot'] = \App\Services\PosDealAllocation::withItemDiscount($allocationFields['deal_snapshot'], (float) ($ri['item_discount_amount'] ?? 0));
+                }
+                if ($allocationFields) {
+                    $itemTaxAmount = $allocationFields['tax_amount'];
+                    $itemTaxRate = $allocationFields['tax_rate'];
+                    if ($ri['type'] === 'deal') $frozenCostEdit = \App\Services\PosDealAllocation::unitCost($ri['deal_snapshot']);
                 }
                 PosTransactionItem::create(array_merge([
                     'transaction_id' => $transaction->id,
@@ -4616,15 +4688,23 @@ class PosController extends Controller
                     ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'fulfillment') ? ['fulfillment' => $ri['fulfillment'] ?? null, 'line_uid' => $ri['line_uid'] ?? null] : []),
                     'special_notes' => $ri['notes'] ?? null,
                     'deal_snapshot' => $ri['deal_snapshot'] ?? null,
+                    ...(\Schema::hasColumn('pos_transaction_items', 'promotion_snapshot') ? ['promotion_snapshot' => $ri['promotion_snapshot'] ?? null, 'promotion_discount' => $ri['promotion_discount'] ?? null] : []),
                     'quantity' => $ri['quantity'],
                     'unit_price' => $ri['price'],
                     'subtotal' => $ri['lineTotal'],
+                    ...(\Schema::hasColumn('pos_transaction_items', 'item_discount_amount') ? [
+                        'item_discount_type' => $ri['item_discount_type'] ?? null, 'item_discount_value' => $ri['item_discount_value'] ?? 0,
+                        'item_discount_amount' => $ri['item_discount_amount'] ?? 0,
+                    ] : []),
                     'is_tax_exempt' => $ri['isExempt'],
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
                 ], $thirdSchemaExistsEdit ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
                    $skipKitchenExistsEdit ? ['skip_kitchen' => $ri['skipKitchen'] ?? false] : [],
-                   $hasCostPriceColEdit ? ['cost_price' => $frozenCostEdit] : []));
+                   $hasCostPriceColEdit ? ['cost_price' => $frozenCostEdit] : [], $allocationFields, \Schema::hasColumn('pos_transaction_items', 'reporting_snapshot') ? ['reporting_snapshot' => [
+                       'category' => $editCostMap[$ri['item_id']]->category ?? null, 'size' => $editCostMap[$ri['item_id']]->size ?? null,
+                       'uom' => $editCostMap[$ri['item_id']]->uom ?? null,
+                   ]] : []));
             }
 
             $transaction->unsetRelation('items');
@@ -4652,6 +4732,7 @@ class PosController extends Controller
                     'quantity' => (float) $ri['quantity'],
                     'unit_price' => (float) $ri['price'],
                     'deal_snapshot' => $ri['deal_snapshot'] ?? null,
+                    ...(\Schema::hasColumn('pos_transaction_items', 'promotion_snapshot') ? ['promotion_snapshot' => $ri['promotion_snapshot'] ?? null, 'promotion_discount' => $ri['promotion_discount'] ?? null] : []),
                 ], $companyItems));
                 PosInventoryController::deductStockForInvoice(
                     $companyId, $newStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), $transaction->branch_id ?? null
@@ -4659,6 +4740,8 @@ class PosController extends Controller
             }
 
             DB::commit();
+         } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack(); throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             if ($request->wantsJson()) {
@@ -5948,7 +6031,7 @@ class PosController extends Controller
                 $subtotal = (float) $tx->subtotal;
                 $discountAmount = (float) $tx->discount_amount;
                 $afterDiscount = $subtotal - $discountAmount;
-                $taxableSubtotal = (float) $items->reject(fn($it) => (bool) $it->is_tax_exempt)->sum('subtotal');
+                $taxableSubtotal = (float) $items->sum(fn($it) => \App\Services\PosDealAllocation::taxableSubtotal($it->deal_snapshot, (float) $it->subtotal, (bool) $it->is_tax_exempt));
                 $taxableAfterDiscount = $subtotal > 0 ? round($taxableSubtotal / $subtotal * $afterDiscount, 2) : 0;
                 $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
@@ -5981,6 +6064,14 @@ class PosController extends Controller
                     $totalAmount = (float) round($afterDiscount + $taxAmount);
                     $headerSubtotal = $subtotal;
                     $shareBase = $subtotal;
+                }
+
+                $dealBill = \App\Services\PosDealAllocation::bill($items->map(fn ($line) => [
+                    'snapshot' => $line->deal_snapshot, 'subtotal' => (float) $line->subtotal, 'exempt' => (bool) $line->is_tax_exempt,
+                ])->all(), (float) $discountAmount, (float) $taxRate, $promoteTaxInclusive, $promoteMenuRate);
+                if ($dealBill) {
+                    $taxAmount = $dealBill['tax_amount']; $totalAmount = $dealBill['total_amount'];
+                    $exemptAfterDiscount = $dealBill['exempt_amount']; $headerSubtotal = $dealBill['subtotal_col'];
                 }
 
                 // Serial split (owner rule Jul 2026): a real POS fiscal serial replaces
@@ -6016,17 +6107,20 @@ class PosController extends Controller
                 ] + ($reportingOn ? $this->praStreamBillTokenFields($companyId) : []));
 
                 // Re-tax each line for the new rate — the PRA payload reads per-item tax_rate.
-                foreach ($items as $it) {
+                foreach ($items as $index => $it) {
                     $itemTaxRate = (bool) $it->is_tax_exempt ? 0 : $taxRate;
-                    $itemDiscountShare = $shareBase > 0 ? round($discountAmount * ((float) $it->subtotal / $shareBase), 2) : 0;
+                    $itemDiscountShare = $dealBill['lines'][$index]['discount'] ?? ($shareBase > 0 ? round($discountAmount * ((float) $it->subtotal / $shareBase), 2) : 0);
                     $itemTaxableAmount = (float) $it->subtotal - $itemDiscountShare;
                     $itemTaxAmount = $promoteTaxInclusive
                         ? \App\Services\PosTaxMath::inclusiveLineTax($itemTaxableAmount, (float) $itemTaxRate, $promoteMenuRate)
                         : round($itemTaxableAmount * $itemTaxRate / 100, 2);
-                    $it->update([
+                    $it->update(array_merge([
                         'tax_rate'   => $itemTaxRate,
                         'tax_amount' => $itemTaxAmount,
-                    ]);
+                    ], \App\Services\PosDealAllocation::lineFields($it->deal_snapshot,
+                        (float) $it->subtotal, (float) $itemDiscountShare, (float) $taxRate,
+                        $promoteTaxInclusive, $promoteMenuRate, (bool) $it->is_tax_exempt, $dealBill !== null)));
+
                 }
 
                 // Sync the payment record — restaurant-origin provisionals may have none,
@@ -7074,7 +7168,8 @@ class PosController extends Controller
         //                 never sees them by design (Task 647). Excluded from the
         //                 PRA tab; own tab, visible to both billing scopes.
         // SINGLE predicate — PosTransaction::applyStreamTab is the only truth.
-        PosTransaction::applyStreamTab($query, $tab);
+        if ($tab === 'combined') $query->withoutGlobalScope('hide_archived');
+        else PosTransaction::applyStreamTab($query, $tab);
 
         if ($cashierFilter && $cashierFilter !== 'all') {
             $query->where('created_by', $cashierFilter);
@@ -7115,6 +7210,16 @@ class PosController extends Controller
             ->all();
     }
 
+    private function salesReportTab(Request $request, $user): string
+    {
+        if ($request->get('tab') === 'exempt') return 'exempt';
+        $scope = $user?->posBillingScope() ?? 'both';
+        if ($scope !== 'both') return $scope === 'local' ? 'local' : 'pra';
+        $canLocal = $user?->isPosAdmin() && !$user->posHidesLocalStream();
+        if ($canLocal && in_array($request->get('tab'), ['local', 'combined'], true)) return $request->get('tab');
+        return 'pra';
+    }
+
     public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -7123,22 +7228,7 @@ class PosController extends Controller
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
-        // Exempt tab (Task 647): every role + both scopes may view it.
-        if ($request->get('tab') === 'exempt') {
-            $tab = 'exempt';
-        }
-        // Billing Scope (07 Aug 2026): scope-locked staff report ONLY their own
-        // stream — mirrors the Transactions tab forcing.
-        $reportScope = $user?->posBillingScope() ?? 'both';
-        if ($reportScope !== 'both' && $tab !== 'exempt') {
-            $tab = $reportScope === 'local' ? 'local' : 'pra';
-        }
-        // Task 705: manager default PRA-only (khufia local-check mode OFF).
-        if ($tab === 'local' && ($user?->posHidesLocalStream() ?? false)) {
-            $tab = 'pra';
-        }
+        $tab = $this->salesReportTab($request, $user);
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
@@ -7279,7 +7369,11 @@ class PosController extends Controller
             $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
         }
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
+        [$historyFrom, $historyTo] = $this->resolveReportRange($request);
+        $financialHistory = \App\Services\PosFinancialHistory::report($companyId, $historyFrom->toDateString(), $historyTo->toDateString(), $tab, $cashierFilter, $user,
+            fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user));
+
+        return view('pos.reports', compact('financialHistory', 'dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics', 'reportBusinessDate'));
     }
 
     /**
@@ -7296,11 +7390,7 @@ class PosController extends Controller
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin() && !$user->posHidesLocalStream()) ? 'local' : 'pra';
-        if ($request->get('tab') === 'exempt') {
-            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
-        }
+        $tab = $this->salesReportTab($request, $user);
         $cashierFilter = $request->get('cashier', 'all');
         // Owner rule (5 Aug 2026): cashier reports are locked to OWN sales.
         if ($isCashier) {
@@ -7310,9 +7400,12 @@ class PosController extends Controller
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
         $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user, true);
 
+        $financialHistory = \App\Services\PosFinancialHistory::report($companyId, $rangeFrom->toDateString(), $rangeTo->toDateString(), $tab, $cashierFilter, $user,
+            fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user));
+
          return $this->renderReportPdf(
             'pos.reports-analytics-pdf',
-            compact('company', 'analytics', 'tab'),
+            compact('company', 'analytics', 'tab', 'financialHistory'),
             'Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf'
         );
     }
@@ -7327,12 +7420,7 @@ class PosController extends Controller
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        // Local export is ADMIN-ONLY — cashiers always export PRA data.
-        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin() && !$user->posHidesLocalStream()) ? 'local' : 'pra';
-        if ($request->get('tab') === 'exempt') {
-            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
-        }
+        $tab = $this->salesReportTab($request, $user);
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
@@ -7344,6 +7432,12 @@ class PosController extends Controller
         // Custom date range (analytics block) wins; default stays last 30 days.
         $hasRange = $request->filled('from') || $request->filled('to');
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
+
+        if ($request->boolean('reconciliation')) {
+            $history = \App\Services\PosFinancialHistory::report($companyId, $rangeFrom->toDateString(), $rangeTo->toDateString(), $tab, $cashierFilter, $user,
+                fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user));
+            return $this->financialHistoryCsv($history, PosFeatureService::planAllows($company, 'analytics_enabled'));
+        }
 
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
@@ -7380,21 +7474,22 @@ class PosController extends Controller
             fputcsv($file, ['Date', 'Invoice #', 'Customer', 'Payment Method', 'Subtotal', 'Tax', 'Total', 'Staff']);
 
             foreach ($transactions as $t) {
+                $sign = $t->transaction_type === 'return' ? -1 : 1;
                 fputcsv($file, [
                     $t->created_at->format('d M Y H:i'),
                     $t->invoice_number,
                     $t->customer_name ?: 'Walk-in',
                     \App\Support\PosPaymentLabels::label($t->payment_method),
-                    $n($t->subtotal),
-                    $n($t->tax_amount),
-                    $n($t->total_amount),
+                    $n($sign * $t->subtotal),
+                    $n($sign * $t->tax_amount),
+                    $n($sign * $t->total_amount),
                     $t->creator?->name ?? '-',
                 ]);
             }
 
-            $totalSubtotal = $transactions->sum('subtotal');
-            $totalRevenue = $transactions->sum('total_amount');
-            $totalTax = $transactions->sum('tax_amount');
+            $totalSubtotal = $transactions->sum(fn ($t) => ($t->transaction_type === 'return' ? -1 : 1) * (float) $t->subtotal);
+            $totalRevenue = $transactions->sum(fn ($t) => ($t->transaction_type === 'return' ? -1 : 1) * (float) $t->total_amount);
+            $totalTax = $transactions->sum(fn ($t) => ($t->transaction_type === 'return' ? -1 : 1) * (float) $t->tax_amount);
             fputcsv($file, []);
             fputcsv($file, ['', '', '', 'TOTALS', $n($totalSubtotal), $n($totalTax), $n($totalRevenue), '']);
             fputcsv($file, ['Total Transactions: ' . $transactions->count()]);
@@ -7402,6 +7497,31 @@ class PosController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    private function financialHistoryCsv(array $history, bool $includeProducts)
+    {
+        return response()->streamDownload(function () use ($history, $includeProducts) {
+            $out = fopen('php://output', 'w');
+            $write = function (array $row) use ($out) {
+                fputcsv($out, array_map(fn ($v) => is_string($v) && preg_match('/^[=+@\t\r-]/u', $v) ? "'" . $v : $v, $row));
+            };
+            $write(['Business-day reconciliation', $history['from'], $history['to'], $history['tab'], $history['complete'] ? 'Known totals reconciled' : 'PARTIAL: older deleted breakdown unavailable']);
+            $write(['Basis', 'Surviving/archived rows + retained deletion aggregates; provisional amounts separate. Refund/credit note is not proof of cash payout.']);
+            $write(['Metric', 'Value']);
+            foreach ($history['summary'] as $key => $value) $write([$key, $value]);
+            $write(['Provisional amount (excluded from final net)', $history['provisional']['net']]);
+            foreach (['daily' => 'Business date', 'payments' => 'Payment method', 'cashiers' => 'Cashier ID'] as $field => $label) {
+                $write([]); $write([$label, 'Sales', 'Returns', 'Gross', 'Returned', 'Net', 'Tax', 'Discount', 'Base']);
+                foreach ($history[$field] as $key => $totals) $write(array_merge([$key], array_values($totals)));
+            }
+            if ($includeProducts) {
+                $write([]); $write(['Product ID', 'Product', 'Category', 'Size', 'Channel', 'Label basis', 'Net quantity', 'Base', 'Tax', 'Net']);
+                foreach ($history['products'] as $row) $write(array_values($row));
+            }
+            foreach ($history['gaps'] as $gap) $write(['DETAIL UNAVAILABLE', $gap['date'], $gap['number'], $gap['reason']]);
+            fclose($out);
+        }, 'POS-Reconciliation-' . $history['from'] . '-to-' . $history['to'] . '.csv', ['Content-Type' => 'text/csv']);
     }
 
     protected function buildTaxReportQuery(Request $request, $tab = 'pra', $skipTaxRateFilter = false)
@@ -7440,7 +7560,7 @@ class PosController extends Controller
         if ($skipTaxRateFilter && $request->filled('tax_rate')) {
             if ($request->tax_rate === 'exempt') {
                 $query->whereHas('items', function ($q) {
-                    $q->where('is_tax_exempt', true);
+                    $this->filterExemptItemRows($q);
                 });
             } else {
                 $rate = (float) $request->tax_rate;
@@ -7568,6 +7688,41 @@ class PosController extends Controller
      */
     private function itemBaseSqlExpr(): string
     {
+        $legacy = $this->legacyItemBaseSqlExpr();
+        return \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'taxable_base')
+            ? "COALESCE(pos_transaction_items.taxable_base + pos_transaction_items.exempt_base, ({$legacy}))" : $legacy;
+    }
+
+    private function itemSplitSqlExpr(bool $exempt): string
+    {
+        $base = $this->legacyItemBaseSqlExpr();
+        $flag = $exempt ? 1 : 0;
+        $legacy = "CASE WHEN pos_transaction_items.is_tax_exempt = {$flag} THEN ({$base}) ELSE 0 END";
+        $column = $exempt ? 'exempt_base' : 'taxable_base';
+        return \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', $column)
+            ? "COALESCE(pos_transaction_items.{$column}, ({$legacy}))" : $legacy;
+    }
+
+    private function thirdScheduleBaseSqlExpr(): string
+    {
+        $base = $this->legacyItemBaseSqlExpr();
+        $legacy = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')
+            ? "CASE WHEN pos_transaction_items.is_third_schedule = 1 THEN ({$base}) ELSE 0 END" : '0';
+        return \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'third_schedule_base')
+            ? "COALESCE(pos_transaction_items.third_schedule_base, ({$legacy}))" : $legacy;
+    }
+
+    private function filterExemptItemRows($query): void
+    {
+        $ready = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'exempt_base');
+        $query->where(function ($q) use ($ready) {
+            $q->where('pos_transaction_items.is_tax_exempt', true);
+            if ($ready) $q->orWhere('pos_transaction_items.exempt_base', '>', 0);
+        });
+    }
+
+    private function legacyItemBaseSqlExpr(): string
+    {
         if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive')) {
             return 'pos_transaction_items.subtotal';
         }
@@ -7630,8 +7785,10 @@ class PosController extends Controller
             ->whereIn('pos_transaction_items.transaction_id', $transactionIds);
 
         if ($taxRateFilter === 'exempt') {
-            $itemQuery->where('pos_transaction_items.is_tax_exempt', true);
+            $this->filterExemptItemRows($itemQuery);
+            $base = $this->itemSplitSqlExpr(true);
         } elseif ($taxRateFilter !== null && $taxRateFilter !== '') {
+            $base = $this->itemSplitSqlExpr(false);
             $rate = (float) $taxRateFilter;
             $itemQuery->where('pos_transaction_items.is_tax_exempt', false)
                 ->where('pos_transaction_items.tax_rate', $rate);
@@ -7648,21 +7805,24 @@ class PosController extends Controller
             ? "COUNT(DISTINCT CASE WHEN COALESCE(pos_transactions.transaction_type, 'sale') != 'return' THEN pos_transaction_items.transaction_id END)"
             : "COUNT(DISTINCT pos_transaction_items.transaction_id)";
 
-        $hasThirdCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
-        $thirdExpr = $hasThirdCol
-            ? "COALESCE(SUM(CASE WHEN pos_transaction_items.is_third_schedule = 1 OR pos_transaction_items.is_third_schedule = true THEN ({$sign}) * ({$base}) ELSE 0 END), 0) as total_third_schedule,"
-            : "0 as total_third_schedule,";
+        $third = $taxRateFilter !== null && $taxRateFilter !== '' && $taxRateFilter !== 'exempt'
+            ? '0' : $this->thirdScheduleBaseSqlExpr();
+        $thirdExpr = "COALESCE(SUM(({$sign}) * ({$third})), 0) as total_third_schedule,";
 
+        $taxable = $taxRateFilter === 'exempt' ? '0' : $this->itemSplitSqlExpr(false);
+        $exempt = $taxRateFilter !== null && $taxRateFilter !== '' && $taxRateFilter !== 'exempt'
+            ? '0' : $this->itemSplitSqlExpr(true);
+        $tax = $taxRateFilter === 'exempt' ? '0' : 'pos_transaction_items.tax_amount';
         return $itemQuery->selectRaw("
             {$invoiceExpr} as total_invoices,
             COALESCE(SUM(({$sign}) * ({$base})), 0) as total_sales,
-            COALESCE(SUM(({$sign}) * pos_transaction_items.tax_amount), 0) as total_tax,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 1 OR pos_transaction_items.is_tax_exempt = true THEN ({$sign}) * ({$base}) ELSE 0 END), 0) as total_exempt,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 0 OR pos_transaction_items.is_tax_exempt = false THEN ({$sign}) * ({$base}) ELSE 0 END), 0) as total_taxable,
+            COALESCE(SUM(({$sign}) * ({$tax})), 0) as total_tax,
+            COALESCE(SUM(({$sign}) * ({$exempt})), 0) as total_exempt,
+            COALESCE(SUM(({$sign}) * ({$taxable})), 0) as total_taxable,
             {$thirdExpr}
             COUNT(DISTINCT CASE WHEN ({$isReturn}) = 1 THEN pos_transaction_items.transaction_id END) as return_count,
-            COALESCE(SUM(({$isReturn}) * (({$base}) + pos_transaction_items.tax_amount)), 0) as return_amount,
-            COALESCE(SUM(({$isReturn}) * pos_transaction_items.tax_amount), 0) as return_tax
+            COALESCE(SUM(({$isReturn}) * (({$base}) + ({$tax}))), 0) as return_amount,
+            COALESCE(SUM(({$isReturn}) * ({$tax})), 0) as return_tax
         ")->first();
     }
 
@@ -7677,8 +7837,10 @@ class PosController extends Controller
             ->whereIn('pos_transaction_items.transaction_id', $transactionIds);
 
         if ($taxRateFilter === 'exempt') {
-            $itemQuery->where('pos_transaction_items.is_tax_exempt', true);
+            $this->filterExemptItemRows($itemQuery);
+            $base = $this->itemSplitSqlExpr(true);
         } elseif ($taxRateFilter !== null && $taxRateFilter !== '') {
+            $base = $this->itemSplitSqlExpr(false);
             $rate = (float) $taxRateFilter;
             $itemQuery->where('pos_transaction_items.is_tax_exempt', false)
                 ->where('pos_transaction_items.tax_rate', $rate);
@@ -7686,12 +7848,16 @@ class PosController extends Controller
             return [];
         }
 
+        $taxable = $taxRateFilter === 'exempt' ? '0' : $this->itemSplitSqlExpr(false);
+        $exempt = $taxRateFilter !== null && $taxRateFilter !== '' && $taxRateFilter !== 'exempt'
+            ? '0' : $this->itemSplitSqlExpr(true);
+        $tax = $taxRateFilter === 'exempt' ? '0' : 'pos_transaction_items.tax_amount';
         return $itemQuery->selectRaw("
             pos_transaction_items.transaction_id,
             COALESCE(SUM({$base}), 0) as item_subtotal,
-            COALESCE(SUM(pos_transaction_items.tax_amount), 0) as item_tax,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = true THEN {$base} ELSE 0 END), 0) as item_exempt,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = false THEN {$base} ELSE 0 END), 0) as item_taxable
+            COALESCE(SUM({$tax}), 0) as item_tax,
+            COALESCE(SUM({$exempt}), 0) as item_exempt,
+            COALESCE(SUM({$taxable}), 0) as item_taxable
         ")->groupBy('pos_transaction_items.transaction_id')->get()->keyBy('transaction_id')->toArray();
     }
 
@@ -7750,12 +7916,11 @@ class PosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
                 $allIds = $this->buildTaxReportQuery($request, $tab, true)->pluck('id')->toArray();
                 if (!empty($allIds)) {
-                    $base = $this->itemBaseSqlExpr();
+                    $base = $this->thirdScheduleBaseSqlExpr();
                     $thirdScheduleTotal = (float) (\App\Models\PosTransactionItem::query()
                         ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
                         ->whereIn('pos_transaction_items.transaction_id', $allIds)
-                        ->where('pos_transaction_items.is_third_schedule', true)
-                        ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base})), 0) as ts_total")
+                                                ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base})), 0) as ts_total")
                         ->value('ts_total') ?? 0);
                 }
             }
@@ -7949,12 +8114,11 @@ class PosController extends Controller
                 if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
                     $csvAllIds = $transactions->pluck('id')->toArray();
                     if (!empty($csvAllIds)) {
-                        $base2 = $this->itemBaseSqlExpr();
+                        $base2 = $this->thirdScheduleBaseSqlExpr();
                         $csvThirdTotal = (float) (\App\Models\PosTransactionItem::query()
                             ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
                             ->whereIn('pos_transaction_items.transaction_id', $csvAllIds)
-                            ->where('pos_transaction_items.is_third_schedule', true)
-                            ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base2})), 0) as ts_total")
+                                                        ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base2})), 0) as ts_total")
                             ->value('ts_total') ?? 0);
                     }
                 }
@@ -8045,12 +8209,11 @@ class PosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
                 $pdfAllIds = $transactions->pluck('id')->toArray();
                 if (!empty($pdfAllIds)) {
-                    $base3 = $this->itemBaseSqlExpr();
+                    $base3 = $this->thirdScheduleBaseSqlExpr();
                     $pdfThirdTotal = (float) (\App\Models\PosTransactionItem::query()
                         ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
                         ->whereIn('pos_transaction_items.transaction_id', $pdfAllIds)
-                        ->where('pos_transaction_items.is_third_schedule', true)
-                        ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base3})), 0) as ts_total")
+                                                ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base3})), 0) as ts_total")
                         ->value('ts_total') ?? 0);
                 }
             }
@@ -9059,6 +9222,7 @@ class PosController extends Controller
             if ($rows->isEmpty()) {
                 return;
             }
+            \App\Services\PosFinancialHistory::captureDeleted($rows, null, 'archive-clear');
             foreach ($rows as $archiveRow) {
                 app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
             }
@@ -12622,16 +12786,31 @@ class PosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('product_recipes', 'is_active')) {
                 $recipeQuery->where('is_active', true);
             }
-            $recipe = $recipeQuery->get()
-                ->map(fn ($row) => [
-                    'stock_id' => 'ingredient-' . (int) $row->ingredient_id,
-                    'quantity' => (float) $row->quantity_needed,
-                    'company_id' => $companyId,
-                    'recipe_version' => (int) ($row->recipe_version ?? 1),
-                ])->values()->all();
+            $recipeRows = $recipeQuery->get();
+            $ingredientCosts = \Illuminate\Support\Facades\Schema::hasTable('ingredients')
+                ? \App\Models\Ingredient::where('company_id', $companyId)
+                    ->whereIn('id', $recipeRows->pluck('ingredient_id'))->get()->keyBy('id') : collect();
+            $recipe = $recipeRows->map(fn ($row) => [
+                'stock_id' => 'ingredient-' . (int) $row->ingredient_id,
+                'quantity' => round((float) $row->quantity_needed * (1 + max(0, min(100, (float) ($row->waste_percent ?? 0))) / 100), 4),
+                'unit_cost' => (float) ($ingredientCosts[$row->ingredient_id]->cost_per_unit ?? 0) <= 0
+                    ? null : (float) $ingredientCosts[$row->ingredient_id]->cost_per_unit,
+                'company_id' => $companyId,
+                'recipe_version' => (int) ($row->recipe_version ?? 1),
+            ])->values()->all();
         }
 
+        $cost = $recipe
+            ? (collect($recipe)->contains(fn ($part) => $part['unit_cost'] === null) ? null
+                : round(collect($recipe)->sum(fn ($part) => $part['quantity'] * $part['unit_cost']), 6))
+            : (($product->cost_price ?? null) !== null && (float) $product->cost_price > 0 ? (float) $product->cost_price : null);
         return [
+            'allocation_version' => 1,
+            'allocation_weight' => (int) round((float) $product->price * 100) * $quantity,
+            'unit_cost' => $cost,
+            'category' => $product->category,
+            'size' => $product->size,
+            'uom' => $product->uom,
             'deal_id' => (int) $deal->id,
             'deal_version' => optional($deal->updated_at)->toJSON() ?: 'legacy',
             'deal_name' => (string) $deal->name,
@@ -12652,9 +12831,9 @@ class PosController extends Controller
         ];
     }
 
-    private function dealSnapshotComparable(array $snapshot): array
+    private function dealSnapshotComparable(array $snapshot, bool $allocation = false): array
     {
-        return collect($snapshot)->map(function ($component) {
+        return collect($snapshot)->map(function ($component) use ($allocation) {
             $recipe = collect(is_array($component['recipe_snapshot'] ?? null) ? $component['recipe_snapshot'] : [])
                 ->map(fn ($part) => [
                     'stock_id' => (string) ($part['stock_id'] ?? ''),
@@ -12664,6 +12843,13 @@ class PosController extends Controller
                 ])->values()->all();
             $tax = is_array($component['tax_facts'] ?? null) ? $component['tax_facts'] : [];
             return [
+                ...($allocation ? [
+                    'allocation_version' => (int) ($component['allocation_version'] ?? 0),
+                    'allocation_weight' => (float) ($component['allocation_weight'] ?? -1),
+                    'unit_cost' => isset($component['unit_cost']) ? round((float) $component['unit_cost'], 6) : null,
+                    'category' => $component['category'] ?? null, 'size' => $component['size'] ?? null,
+                    'uom' => $component['uom'] ?? null,
+                ] : []),
                 'deal_id' => (int) ($component['deal_id'] ?? 0),
                 'deal_version' => (string) ($component['deal_version'] ?? ''),
                 'deal_name' => (string) ($component['deal_name'] ?? ''),
@@ -12744,8 +12930,8 @@ class PosController extends Controller
             )->values()->all();
             [$choiceSnapshot] = $this->resolveDealChoiceSnapshot($deal, $item['deal_choices'] ?? [], $companyId);
             $expectedSnapshot = array_merge($fixedSnapshot, $choiceSnapshot);
-            $postedSnapshot = $this->dealSnapshotComparable($item['deal_snapshot'] ?? []);
-            $expectedComparable = $this->dealSnapshotComparable($expectedSnapshot);
+            $postedSnapshot = $this->dealSnapshotComparable($item['deal_snapshot'] ?? [], \App\Services\PosDealAllocation::supported($item['deal_snapshot'] ?? null));
+            $expectedComparable = $this->dealSnapshotComparable($expectedSnapshot, \App\Services\PosDealAllocation::supported($item['deal_snapshot'] ?? null));
             if ($postedSnapshot !== $expectedComparable) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
@@ -12792,6 +12978,7 @@ class PosController extends Controller
         array $requestItems, int $companyId, ?string $orderType = null, bool $authoritativeSnapshot = false
     ): array
     {
+        $discountCompany = Company::find($companyId);
         $resolved = [];
         $skipUsed = false; // ek bill mein sirf EK line kitchen se chhup sakti hai
         foreach ($requestItems as $item) {
@@ -12938,8 +13125,8 @@ class PosController extends Controller
                                 )
                             );
                         if ($postedIsRich
-                            && $this->dealSnapshotComparable($postedDealSnapshot)
-                                !== $this->dealSnapshotComparable($dealSnapshot)) {
+                            && $this->dealSnapshotComparable($postedDealSnapshot, \App\Services\PosDealAllocation::supported($postedDealSnapshot))
+                                !== $this->dealSnapshotComparable($dealSnapshot, \App\Services\PosDealAllocation::supported($postedDealSnapshot))) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
                                 'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
                             ]);
@@ -13015,6 +13202,10 @@ class PosController extends Controller
             // No client-payload fallback: for any product-backed line, DB wins.
             // For manual lines (itemId null), $isThirdSchedule stays false.
 
+            if ($itemType === 'deal' && \App\Services\PosDealAllocation::supported($dealSnapshot)) {
+                $isExempt = \App\Services\PosDealAllocation::taxableSubtotal($dealSnapshot, 10000) === 0.0;
+            }
+
             // Third Schedule implies exempt (belt-and-suspenders at billing time)
             if ($isThirdSchedule) { $isExempt = true; }
 
@@ -13033,13 +13224,18 @@ class PosController extends Controller
                 $isExempt = true;
             }
 
+            $lineDiscount = $authoritativeSnapshot
+                ? ['lineTotal' => round($qty * $itemPrice, 2), 'item_discount_type' => null, 'item_discount_value' => 0, 'item_discount_amount' => 0]
+                : \App\Services\PosLineDiscount::calculate(round($qty * $itemPrice, 2), $item['item_discount_type'] ?? null,
+                    (float) ($item['item_discount_value'] ?? 0), $discountCompany, auth('pos')->user());
+
             $resolved[] = [
                 'type' => $itemType,
                 'item_id' => $itemId,
                 'name' => $itemName,
                 'price' => $itemPrice,
                 'quantity' => $qty,
-                'lineTotal' => round($qty * $itemPrice, 2),
+                ...$lineDiscount,
                 'isExempt' => $isExempt,
                 'isThirdSchedule' => $isThirdSchedule,
                 // Kitchen ki parchi par na chhapne wali line (abhi sirf Delivery
@@ -15083,6 +15279,9 @@ class PosController extends Controller
         if ($hasFrozenCost) {
             $itemCols[] = 'cost_price';
         }
+        foreach (['reporting_snapshot', 'taxable_base', 'exempt_base'] as $column) {
+            if (\Schema::hasColumn('pos_transaction_items', $column)) $itemCols[] = $column;
+        }
         $items = empty($ids) ? collect() : \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)
             ->get($itemCols);
 
@@ -15097,9 +15296,14 @@ class PosController extends Controller
 
         $items->each(function ($it) use ($productMap, $isAdminView, $hasFrozenCost) {
             $cost = null;
+            // New allocation snapshots carry the actual discounted, ex-tax base.
+            // Legacy rows keep their established basis rather than inventing a split.
+            if ($it->taxable_base !== null && $it->exempt_base !== null) {
+                $it->subtotal = (float) $it->taxable_base + (float) $it->exempt_base;
+            }
             if ($it->item_type === 'product') {
                 $p = $productMap[$it->item_id] ?? null;
-                $cat = trim((string) ($p->category ?? ''));
+                $cat = trim((string) ($it->reporting_snapshot['category'] ?? $p->category ?? ''));
                 $it->resolved_category = $cat !== '' ? $cat : 'Uncategorized';
                 if ($isAdminView) {
                     if ($hasFrozenCost) {
@@ -15115,6 +15319,9 @@ class PosController extends Controller
                         }
                     }
                 }
+            } elseif ($it->item_type === 'deal') {
+                $it->resolved_category = 'Deals';
+                if ($isAdminView && $hasFrozenCost && $it->cost_price !== null) $cost = (float) $it->cost_price * (float) $it->quantity;
             } elseif ($it->item_type === 'service') {
                 $it->resolved_category = 'Services';
             } else {
@@ -15151,12 +15358,12 @@ class PosController extends Controller
             $withCost = $items->filter(fn ($it) => $it->resolved_cost !== null);
             $cost = (float) $withCost->sum('resolved_cost');
             $costedRevenue = (float) $withCost->sum('subtotal');
-            $productQty = (float) $items->where('item_type', 'product')->sum('quantity');
+            $productQty = (float) $items->whereIn('item_type', ['product', 'deal'])->sum('quantity');
             $costedQty = (float) $withCost->sum('quantity');
             // Task 448 (mirrors FBR munafa Task 426): surface WHY lines are missing
             // from profit — product lines without a frozen cost snapshot are excluded,
             // never estimated. unknown_* feed the setup/partial-exclusion banners.
-            $unknownItems = $items->filter(fn ($it) => $it->item_type === 'product' && $it->resolved_cost === null);
+            $unknownItems = $items->filter(fn ($it) => in_array($it->item_type, ['product', 'deal'], true) && $it->resolved_cost === null);
             $profit = (object) [
                 'cost' => $cost,
                 'revenue' => $costedRevenue,
@@ -15165,7 +15372,7 @@ class PosController extends Controller
                 'coverage_pct' => $productQty > 0 ? (int) round($costedQty / $productQty * 100) : 0,
                 'unknown_lines' => $unknownItems->count(),
                 'unknown_sale_value' => (float) $unknownItems->sum('subtotal'),
-                'product_revenue' => (float) $items->where('item_type', 'product')->sum('subtotal'),
+                'product_revenue' => (float) $items->whereIn('item_type', ['product', 'deal'])->sum('subtotal'),
             ];
         }
 
@@ -15309,6 +15516,7 @@ class PosController extends Controller
         $prevTo = $from->copy()->subDay()->endOfDay();
         $prevRow = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
+            ->when(\Schema::hasColumn('pos_transactions', 'transaction_type'), fn ($q) => $q->where(fn ($w) => $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return')))
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user))
             ->whereBetween('business_date', [$prevFrom->toDateString(), $prevTo->toDateString()])
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
@@ -15448,6 +15656,7 @@ class PosController extends Controller
      */
     private function resolveReportRange(Request $request): array
     {
+        $request->validate(['from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d']]);
         $defaultDate = now()->toDateString();
         // Fresh analytics follows the shop's active day, including the hours
         // after midnight. Explicit/partial ranges keep their previous meaning.
@@ -15519,28 +15728,22 @@ class PosController extends Controller
             $dayBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('business_date', $date)
-                ->where(function ($q) { $q->whereNotNull('rider_id'); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_collection_amount')) $q->orWhere('rider_collection_amount', '>', 0); })
+                ->where(function ($q) { $q->whereNotNull('rider_id'); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_collection_amount')) $q->orWhere('rider_collection_amount', '>', 0); if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'order_type')) $q->orWhere('order_type', 'delivery'); })
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 // Task 1360: rider cash reconciles against ONE branch's drawer.
                 ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
                 ->get();
 
-            // rider_settled_at stays on the REAL calendar date (settlement
-            // timestamps carry no business date) — known v1 limitation: a 1 AM
-            // settlement counts toward the calendar day, not the open trading day.
-            // Partial settlements (Task 525): new settlement rows carry an
-            // 'allocation' breakdown — for those, cash-in comes from the
-            // allocation entries (exact rupees received today against older
-            // bills, partial or full). The legacy bill-based query stays for
-            // pre-feature settlements (no allocation) so the transition day
-            // never double-counts.
+            // Older receipts have only a calendar timestamp; apply the same cutoff
+            // window as sales. New shop receipts carry a frozen business date.
+            [$receiptStart, $receiptEnd] = \App\Services\PosBusinessDay::windowFor($companyId, $date, $date);
             $hasAllocation = \Illuminate\Support\Facades\Schema::hasColumn('pos_rider_settlements', 'allocation');
             $legacyCashInQ = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
                 ->where('payment_method', PosPaymentBuckets::CASH)
                 ->whereNotNull('rider_settlement_id')
-                ->whereDate('rider_settled_at', $date)
+                ->where('rider_settled_at', '>=', $receiptStart)->where('rider_settled_at', '<', $receiptEnd)
                 ->where('business_date', '<', $date)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
@@ -15560,24 +15763,34 @@ class PosController extends Controller
                 $allocSettlements = \App\Models\PosRiderSettlement::where('company_id', $companyId)
                     ->where('panel', 'pra')
                     ->whereNotNull('allocation')
-                    ->whereDate('created_at', $date)
+                    ->where(function ($q) use ($date, $receiptStart, $receiptEnd) {
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_rider_settlements', 'business_date')) {
+                            $q->where('business_date', $date)->orWhere(fn ($legacy) => $legacy->whereNull('business_date')->where('created_at', '>=', $receiptStart)->where('created_at', '<', $receiptEnd));
+                        } else {
+                            $q->where('created_at', '>=', $receiptStart)->where('created_at', '<', $receiptEnd);
+                        }
+                    })
                     ->get();
                 // Task 1197: allocation entries carry bill_id — the isolated
                 // preview counts only rupees applied to the viewer's OWN bills.
                 $ownBillIds = null;
-                if ($onlyCreatedBy && $allocSettlements->isNotEmpty()) {
+                if (($onlyCreatedBy || $branchId) && $allocSettlements->isNotEmpty()) {
                     $allocIds = $allocSettlements->flatMap(fn ($s) => collect((array) $s->allocation)->pluck('bill_id'))->filter()->unique()->values();
                     $ownBillIds = $allocIds->isEmpty() ? collect() : PosTransaction::withoutGlobalScope('hide_archived')
                         ->where('company_id', $companyId)
                         ->whereIn('id', $allocIds)
-                        ->where('created_by', $onlyCreatedBy)
+                        ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
+                        ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
                         ->pluck('id')
                         ->flip();
                 }
-                $allocSettlements->each(function ($s) use (&$allocCashIn, $date, $ownBillIds) {
+                $allocSettlements->each(function ($s) use (&$allocCashIn, $date, $ownBillIds, $onlyCreatedBy, $branchId) {
                     foreach ((array) $s->allocation as $entry) {
                         if ($ownBillIds !== null && !isset($ownBillIds[(int) ($entry['bill_id'] ?? 0)])) {
-                            continue;
+                            // Shop receipt allocations survive deletion; use their frozen scope.
+                            if (!array_key_exists('branch_id', $entry)
+                                || ($branchId && $entry['branch_id'] !== null && (int) $entry['branch_id'] !== $branchId)
+                                || ($onlyCreatedBy && (int) ($entry['created_by'] ?? 0) !== $onlyCreatedBy)) continue;
                         }
                         if (!empty($entry['business_date']) && $entry['business_date'] < $date) {
                             $allocCashIn += (float) ($entry['amount'] ?? 0);
@@ -15610,7 +15823,7 @@ class PosController extends Controller
             $riders = [];
             foreach ($dayBills->groupBy('rider_id') as $rid => $rows) {
                 $riders[] = [
-                    'name' => $riderNames[$rid] ?? ('Rider #' . $rid),
+                    'name' => $rid ? ($riderNames[$rid] ?? ('Rider #' . $rid)) : 'Unassigned / shop cash',
                     'deliveries' => $rows->count(),
                     'delivered' => $rows->where('delivery_status', 'delivered')->count(),
                     'returned' => $rows->where('delivery_status', 'returned')->count(),
@@ -15917,6 +16130,14 @@ class PosController extends Controller
      */
     public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null, ?int $branchId = null): array
     {
+        return DB::transaction(function () use ($companyId, $date, $closedBy, $notes, $cashRecon, $allowEmpty, $actionOverride, $branchId) {
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            return $this->performLockedDayClose($companyId, $date, $closedBy, $notes, $cashRecon, $allowEmpty, $actionOverride, $branchId);
+        });
+    }
+
+    private function performLockedDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes, ?array $cashRecon, bool $allowEmpty, ?array $actionOverride, ?int $branchId): array
+    {
         $existing = PosDayCloseReport::where('company_id', $companyId)
             ->forBranch($branchId)
             ->whereDate('report_date', $date)
@@ -16185,12 +16406,21 @@ class PosController extends Controller
         $deletedCount = 0;
         $report = null;
         $localSummary = [];
-        \DB::transaction(function () use ($data, $companyId, $date, $branchId, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
+        $concurrentExisting = false;
+        \DB::transaction(function () use (&$concurrentExisting, $data, $companyId, $date, $branchId, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
             // Preserve every existing L-reference before the wash can archive or
             // permanently delete its row. This is a no-op on old schemas during
             // the migration window; the migration backfills the same high-water.
             \App\Services\PosLocalSeries::preserveHighWaterMark($companyId);
 
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $winner = PosDayCloseReport::where('company_id', $companyId)->forBranch($branchId)
+                ->whereDate('report_date', $date)->lockForUpdate()->first();
+            if ($winner) {
+                $report = $winner;
+                $concurrentExisting = true;
+                return;
+            }
             $report = PosDayCloseReport::create($data);
 
             // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND
@@ -16303,7 +16533,7 @@ class PosController extends Controller
                 // picks exactly like the whole-set policy. Settled / returned /
                 // non-cash rider bills wash normally.
                 if ($deleteRows->isNotEmpty() && $riderGuardReady) {
-                    $riderGuarded = $deleteRows->filter(fn ($t) => $t->rider_id
+                    $riderGuarded = $deleteRows->filter(fn ($t) => ($t->rider_id || $t->order_type === 'delivery' || $t->has_delivery_items)
                         && $t->payment_method === 'cash'
                         && !$t->rider_settlement_id
                         && $t->delivery_status !== 'returned');
@@ -16346,6 +16576,7 @@ class PosController extends Controller
                             \App\Models\PosCustomerSpendSnapshot::insert($snapshots);
                         }
                     }
+                    \App\Services\PosFinancialHistory::captureDeleted($deleteRows, (int) $report->id, 'day-close');
                     foreach ($deleteRows as $archiveRow) {
                         app(\App\Services\OptionalLocalBillArchive::class)->capture($archiveRow, 'pos');
                     }
@@ -16430,6 +16661,10 @@ class PosController extends Controller
                 }
             }
         });
+
+        if ($concurrentExisting) {
+            return ['status' => 'exists', 'report' => $report, 'archived' => 0, 'deleted' => 0, 'report_number' => $report->report_number];
+        }
 
         // Owner/manager phone push with the day's totals (Task #1142) — queued
         // only AFTER the report transaction committed; fire-and-forget (can

@@ -12,9 +12,9 @@ class PosTransactionItem extends Model
         // Kitchen ki parchi par na chhapne wali line (Delivery Charges) — dekho
         // RestaurantOrderItem par isi naam ka field.
         'skip_kitchen',
-        'special_notes', 'deal_snapshot',
+        'special_notes', 'deal_snapshot', 'promotion_snapshot', 'promotion_discount', 'reporting_snapshot',
         'quantity', 'unit_price', 'cost_price', 'subtotal',
-        'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount',
+        'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount', 'taxable_base', 'exempt_base', 'third_schedule_base', 'allocated_discount',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
         // Return / credit-note flow (Task 570): link to the original sold line +
         // running returned quantity ON the parent's line (over-return guard).
@@ -23,19 +23,23 @@ class PosTransactionItem extends Model
 
     protected $casts = [
         'hotel_folio_entry_id' => 'integer',
-        'deal_snapshot' => 'array',
+        'deal_snapshot' => 'array', 'promotion_snapshot' => 'array', 'promotion_discount' => 'decimal:2', 'reporting_snapshot' => 'array',
         'quantity' => 'decimal:3',
         'returned_quantity' => 'decimal:3',
         'return_disposition' => 'string',
         'prepared_return_id' => 'integer',
         'unit_price' => 'decimal:2',
-        'cost_price' => 'decimal:4',
+        'cost_price' => 'decimal:6',
         'subtotal' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
         'skip_kitchen' => 'boolean',
         'is_third_schedule' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'taxable_base' => 'decimal:2',
+        'exempt_base' => 'decimal:2',
+        'third_schedule_base' => 'decimal:2',
+        'allocated_discount' => 'decimal:2',
         'item_discount_value' => 'decimal:2',
         'item_discount_amount' => 'decimal:2',
     ];

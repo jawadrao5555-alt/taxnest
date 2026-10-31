@@ -1,6 +1,7 @@
 <x-pos-layout>
 @include('pos.inventory.partials.family-styles')
 <div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, code: '', name: '', unit: '', base_unit: '', conversion_factor: 1, cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true }, q: '', ingredientNames: {{ json_encode($ingredients->map(fn($i) => mb_strtolower($i->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }" class="tn-inventory-family max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <p class="my-3 text-sm text-gray-600 dark:text-gray-300">Stock, recipe quantities and cost here use the Usage Unit. Base Unit is the purchase unit: 1 base unit = conversion factor usage units. Leave a new factor blank for kg/g or ltr/ml conversion; enter the size of a pack explicitly. Existing saved factors are preserved. Catalogue import does not receive stock.</p>
     <div class="tn-family-header flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.ingredients') }}</h1>
@@ -66,7 +67,7 @@
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400">{{ __('pos.cost_per_unit') }}</span>
-                        <span class="text-gray-700 dark:text-gray-300">Rs. {{ number_format($ingredient->cost_per_unit, 2) }}</span>
+                        <span class="text-gray-700 dark:text-gray-300">Rs. {{ rtrim(rtrim(number_format($ingredient->cost_per_unit, 6), '0'), '.') }}</span>
                     </div>
                     @if($ingredient->isLowStock())
                     <div class="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-2 py-1.5">
@@ -128,7 +129,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.cost_per_unit_rs') }}</label>
-                        <input type="number" name="cost_per_unit" step="0.01" min="0" value="0" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                        <input type="number" name="cost_per_unit" step="0.000001" min="0" value="0" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -140,7 +141,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.conversion_factor') }}</label>
-                        <input type="number" name="conversion_factor" step="0.0001" min="0.0001" value="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                        <input type="number" name="conversion_factor" step="0.0001" min="0.0001" placeholder="Auto for kg/g, ltr/ml; pack size required" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -183,7 +184,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.cost_per_unit_rs') }}</label>
-                        <input type="number" name="cost_per_unit" x-model="edit.cost" step="0.01" min="0" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                        <input type="number" name="cost_per_unit" x-model="edit.cost" step="0.000001" min="0" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                     </div>
                 </div>
                 <div>

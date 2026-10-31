@@ -30,6 +30,14 @@ class PosReportsActiveBusinessDayTest extends TestCase
         foreach($this->range($night) as $date)$this->assertSame('2026-10-22',$date->toDateString());
         $this->assertSame('06:00',$night->fresh()->pos_business_day_cutoff);
     }
+    public function test_exact_midnight_and_cutoff_boundaries_keep_the_same_reporting_business_date(): void {
+        config(['app.timezone'=>'Asia/Karachi']);$company=$this->company('06:00');
+        foreach(['2026-10-21 23:59:00'=>'2026-10-21','2026-10-22 00:01:00'=>'2026-10-21','2026-10-22 05:59:00'=>'2026-10-21','2026-10-22 06:00:00'=>'2026-10-22'] as $stamp=>$expected) {
+            Carbon::setTestNow(Carbon::parse($stamp,'Asia/Karachi'));
+            foreach($this->range($company) as $date)$this->assertSame($expected,$date->toDateString(),$stamp);
+        }
+        $this->assertSame('06:00',$company->fresh()->pos_business_day_cutoff);
+    }
     public function test_already_closed_day_advances_without_changing_saved_cutoff(): void {
         config(['app.timezone'=>'Asia/Karachi']);Carbon::setTestNow(Carbon::parse('2026-10-22 00:30:00','Asia/Karachi'));$c=$this->company('06:00');
         DB::table('pos_day_close_reports')->insert(['company_id'=>$c->id,'report_date'=>'2026-10-21','report_number'=>'SYNTHETIC-DAY-1']);

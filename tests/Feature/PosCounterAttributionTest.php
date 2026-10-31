@@ -271,7 +271,7 @@ class PosCounterAttributionTest extends TestCase
         // object literal that is built once and then either POSTed or handed to
         // queueOfflineBill — a counter attached only on the online branch would
         // vanish from every offline-queued bill.
-        $start = strpos($src, 'offline_uuid: this._newOfflineUuid(),');
+        $start = strpos($src, 'offline_uuid: this.payAttemptUuid,');
         $this->assertNotFalse($start, 'sale payload builder not found — update this guard');
         $end = strpos($src, 'navigator.onLine', $start);
         $this->assertNotFalse($end);

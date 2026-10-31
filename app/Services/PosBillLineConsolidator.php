@@ -39,6 +39,7 @@ class PosBillLineConsolidator
                 trim((string) ($item->special_notes ?? '')),
                 number_format((float) $item->unit_price, 2, '.', ''),
                 (int) (bool) $item->is_tax_exempt,
+                (string) ($item->promotion_snapshot['version'] ?? ''),
                 $discType ?? 'none',
                 $discType === 'percentage' ? number_format((float) ($item->item_discount_value ?? 0), 2, '.', '') : '',
             ]);
@@ -50,6 +51,10 @@ class PosBillLineConsolidator
                 $g->quantity = (float) $g->quantity + (float) $item->quantity;
                 $g->subtotal = round((float) $g->subtotal + (float) $item->subtotal, 2);
                 $g->item_discount_amount = round((float) ($g->item_discount_amount ?? 0) + (float) ($item->item_discount_amount ?? 0), 2);
+                if ($g->promotion_snapshot) {
+                    $g->promotion_discount = round((float) $g->promotion_discount + (float) $item->promotion_discount, 2);
+                    $g->promotion_snapshot = array_replace($g->promotion_snapshot, ['gross'=>round($g->subtotal+$g->promotion_discount,2),'net'=>$g->subtotal,'discount'=>$g->promotion_discount]);
+                }
                 if ($discType === 'amount') {
                     $g->item_discount_value = round((float) ($g->item_discount_value ?? 0) + (float) ($item->item_discount_value ?? 0), 2);
                 }

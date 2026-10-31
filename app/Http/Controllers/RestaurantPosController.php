@@ -1940,7 +1940,7 @@ class RestaurantPosController extends Controller
     public function customerSearch(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $q = $request->get('q', '');
+        $q = $request->validate(['q'=>['nullable','string','max:100']])['q'] ?? '';
 
         if (strlen($q) < 2) {
             return response()->json(['customers' => []]);
@@ -1956,7 +1956,7 @@ class RestaurantPosController extends Controller
                 $query->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($q) . '%'])
                     ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($q) . '%']);
                 if (strlen($digits) >= 4) {
-                    $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(phone,''),'-',''),' ',''),'(',''),')',''),'+','') LIKE ?", ['%' . $digits . '%']);
+                    $query->orWhere(fn ($phoneQuery) => \App\Services\PosCustomerPhoneIdentity::constrain($phoneQuery, 'phone', $q));
                 }
             })
             ->limit(8)
@@ -2001,7 +2001,7 @@ class RestaurantPosController extends Controller
         // and receipts/ledgers expect a printable name).
         $request->validate([
             'name' => 'nullable|string|max:255',
-            'phone' => 'required|string|max:30',
+            'phone' => ['required','string','max:30','regex:/^[0-9+().\s-]+$/u'],
             'address' => 'nullable|string|max:500',
         ]);
 
@@ -2013,71 +2013,52 @@ class RestaurantPosController extends Controller
         // both insert. pos_customers has no unique (company_id, phone) index —
         // adding one would fail on shards that already carry duplicates — so
         // the check-and-create is serialised per company+number instead.
-        $digits = preg_replace('/\D+/', '', (string) $request->phone);
-        $lock = Cache::lock('poscust:' . $companyId . ':' . $digits, 10);
-
+        if (strlen(preg_replace('/\D+/', '', (string) $request->phone)) < 3) return response()->json(['success'=>false,'message'=>__('pos.customer_contact_invalid')],422);
+        $digits = \App\Services\PosCustomerPhoneIdentity::canonical((string) $request->phone);
+        $lock = null;
         try {
+            $lock = Cache::lock('poscust:' . $companyId . ':' . $digits, 10);
             $lock->block(5);
         } catch (\Throwable $e) {
-            $lock = null; // lock store unavailable — still better to proceed than to fail the cashier
+            $lock = null; // database company-row lock below remains authoritative when cache is unavailable
         }
 
         try {
-            $existing = $this->findPosCustomerByPhone($companyId, (string) $request->phone);
+            return DB::transaction(function () use ($request, $companyId) {
+                Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+                $existing = $this->findPosCustomerByPhone($companyId, (string) $request->phone);
 
-            if ($existing) {
-                if ($request->address && ! $existing->address) {
-                    $existing->update(['address' => $request->address]);
+                if ($existing) {
+                    if ($request->address && ! $existing->address) {
+                        $existing->update(['address' => $request->address]);
+                    }
+
+                    return response()->json(['success' => true, 'customer' => $existing, 'existing' => true]);
                 }
 
-                return response()->json(['success' => true, 'customer' => $existing, 'existing' => true]);
-            }
-
-            $customer = PosCustomer::create([
-                'company_id' => $companyId,
-                'name' => trim((string) $request->name) !== '' ? trim($request->name) : $request->phone,
-                'phone' => $request->phone,
-                'email' => $request->email,
-                'address' => $request->address,
-                'type' => 'unregistered',
-            ]);
+                $customer = PosCustomer::create([
+                    'company_id' => $companyId,
+                    'name' => trim((string) $request->name) !== '' ? trim($request->name) : $request->phone,
+                    'phone' => $request->phone,
+                    'email' => $request->email,
+                    'address' => $request->address,
+                    'type' => 'unregistered',
+                ]);
+                return response()->json(['success' => true, 'customer' => $customer]);
+            }, 3);
         } finally {
             optional($lock)->release();
         }
-
-        return response()->json(['success' => true, 'customer' => $customer]);
     }
 
-    /**
-     * Find a company's customer by phone, comparing DIGITS ONLY.
-     *
-     * Narrowed in SQL by the last 7 digits (so the scan stays indexed-ish and
-     * tiny) and then confirmed in PHP on the full normalized number, which is
-     * the only comparison that is actually correct across the formats shops
-     * type. Returns null for a number with too few digits to be meaningful.
-     */
+    /** Same canonical phone identity for local/international spellings; company scoped. */
     private function findPosCustomerByPhone(int|string|null $companyId, string $phone): ?PosCustomer
     {
-        $digits = preg_replace('/\D+/', '', $phone);
-        if ($digits === '') {
-            return null;
-        }
-
         $exact = PosCustomer::where('company_id', $companyId)->where('phone', $phone)->first();
-        if ($exact) {
-            return $exact;
-        }
-
-        $tail = substr($digits, -7);
-        if (strlen($tail) < 7) {
-            return null;
-        }
-
-        return PosCustomer::where('company_id', $companyId)
-            ->where('phone', 'like', '%' . $tail)
-            ->orderBy('id')
-            ->get(['id', 'company_id', 'name', 'phone', 'email', 'address', 'type'])
-            ->first(fn ($c) => preg_replace('/\D+/', '', (string) $c->phone) === $digits);
+        if ($exact) return $exact; // Preserve existing duplicate-row selection; never silently merge profiles.
+        $query = PosCustomer::where('company_id', $companyId);
+        \App\Services\PosCustomerPhoneIdentity::constrain($query, 'phone', $phone, false);
+        return $query->orderBy('id')->first();
     }
 
     /**
@@ -2875,6 +2856,7 @@ class RestaurantPosController extends Controller
             'kotBatchNo' => null,
             'newItemIds' => collect(),
             'shimBillToken' => $shimBillToken,
+            'designBill' => $transaction,
         ])->render();
     }
 
@@ -3003,19 +2985,17 @@ class RestaurantPosController extends Controller
     public function customerLookup(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $phone = $request->get('phone', '');
+        $phone = $request->validate(['phone'=>['nullable','string','max:30']])['phone'] ?? '';
 
         if (strlen($phone) < 4) {
             return response()->json(['found' => false]);
         }
 
-        $customer = PosCustomer::where('company_id', $companyId)
-            ->where('phone', $phone)
-            ->first();
+        $customer = $this->findPosCustomerByPhone($companyId, $phone);
 
         if (!$customer) {
             $partials = PosCustomer::where('company_id', $companyId)
-                ->whereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($phone) . '%'])
+                ->where(fn ($q) => \App\Services\PosCustomerPhoneIdentity::constrain($q, 'phone', $phone))
                 ->limit(5)
                 ->get(['id', 'name', 'phone', 'address']);
 
@@ -3519,7 +3499,7 @@ class RestaurantPosController extends Controller
         $match = function ($q) use ($customer) {
             $q->where('customer_id', $customer->id);
             if (!empty($customer->phone)) {
-                $q->orWhere('customer_phone', $customer->phone);
+                $q->orWhere(fn ($phoneQuery) => \App\Services\PosCustomerPhoneIdentity::constrain($phoneQuery, 'customer_phone', $customer->phone, false));
             }
         };
 

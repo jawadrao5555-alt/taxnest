@@ -10,6 +10,7 @@
      param — so tab links / date filter / POST-redirects inside the iframe keep
      the embedded look with zero param plumbing. Hides the app top-nav and the
      history-back button (back inside a frame would strand the modal). --}}
+<script src="/js/pos-phone-identity.js?v=20261031-b03"></script>
 <script>if (window.self !== window.top) { document.documentElement.classList.add('tn-embedded'); }</script>
 <style>
     .tn-embedded .topnav-bar { display: none !important; }
@@ -34,7 +35,7 @@
 <script src="{{ asset('vendor/leaflet/leaflet.js') }}?v=1"></script>
 @endif
 <script src="{{ asset('js/rider-settlement-selection.js') }}?v=1"></script>
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+<div data-tn-delivery-page class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
      x-data="{ settleSelectionVersion: 0, settleSelection(form) { this.settleSelectionVersion; return window.TnRiderSettlement.selection(form); }, selectSettlementBills(form, checked) { window.TnRiderSettlement.selectAll(form, checked); this.recalcSettle(form); }, confirmSettlement(form) { return window.TnRiderSettlement.confirmSelection(form, this.settleAmount, this.settleTotal, this.settlePrepaidPending(), message => window.confirm(message), {{ Js::from(__('pos.settle_selection_confirm')) }}); }, settleRider: null, settleTotal: 0, settleAmount: '', settlePrepaid: {}, settlePrepaidBusy: {}, retBill: null, retBulk: null, retCount: 0, recalcSettle(form) {
          let t = 0;
          form.querySelectorAll('input[name=\'bill_ids[]\']:checked').forEach(cb => t += parseFloat(cb.dataset.amount || 0));
@@ -911,7 +912,7 @@
         var digits = /^[+\d\s().-]+$/.test(q) ? q.replace(/\D/g, '') : '';
         function matches(tr) {
             return !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1 ||
-                (digits.length >= 3 && (tr.getAttribute('data-phone') || '').replace(/\D/g, '').indexOf(digits) !== -1);
+                (window.TNPosPhone ? window.TNPosPhone.matches(tr.getAttribute('data-phone'), q) : (digits.length >= 3 && (tr.getAttribute('data-phone') || '').replace(/\D/g, '').indexOf(digits) !== -1));
         }
         document.querySelectorAll('tr[data-delrow]').forEach(function (tr) {
             var hit = matches(tr);

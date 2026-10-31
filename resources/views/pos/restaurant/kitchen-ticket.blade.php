@@ -10,6 +10,7 @@
         // paper-saving toggles + print position, read from the COMPANY row so
         // BOTH render paths (kitchen-ticket route + Agent print-job content)
         // honor them. Null-coalesced defaults = prod schema-drift safe.
+        $b03KotMixed = \App\Support\PosFulfillment::isMixed($order->relationLoaded('items') ? $order->items : ($ticketItems ?? collect()), $order->order_type);
         $kotCompact           = (bool) ($company->kot_compact ?? false);
         $kotShowCustomer      = (bool) ($company->kot_show_customer ?? true);
         $kotShowOrderby       = (bool) ($company->kot_show_orderby ?? true);
@@ -233,6 +234,9 @@
     @if($kotShowBarcode)
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     @endif
+    @php $b03KotOptions = \App\Support\PosPrintDesigns::kotOptions($company, $order, $designBill ?? null); @endphp
+    <style>{!! \App\Support\PosPrintDesigns::kotCss($b03KotOptions) !!}
+    </style>
 </head>
 <body>
     @php
@@ -243,7 +247,7 @@
         $void = $void ?? false;
         $voidItems = $voidItems ?? collect();
     @endphp
-    <div class="text-center">
+    <div class="text-center b03-kot-header">
         @if(!$void)
         @if(($order->kot_print_count ?? 0) > 1 && empty($delta))
             {{-- Phase 5 — re-send marker so kitchen knows items changed.
@@ -500,7 +504,7 @@
                 <tr>
                     <td class="name">
                         <span class="bold">{{ $item->item_name }}</span>@if(($newItemIds ?? collect())->contains($item->id)) <span class="kot-new-tag">{{ __('pos.kot_new_tag') }}</span>@endif
-                        @if(!empty($item->fulfillment))<br><strong>{{ \App\Support\PosFulfillment::label($item->fulfillment) }}</strong>@endif
+                        @if(!empty($item->fulfillment) && ($b03KotMixed || $item->fulfillment !== $order->order_type))<br><strong>{{ \App\Support\PosFulfillment::label($item->fulfillment) }}</strong>@endif
                         @if($item->special_notes)
                             <br><span class="note"><span class="note-label">&raquo; {{ __('pos.kot_note') }}</span><span class="note-text">{{ $item->special_notes }}</span></span>
                         @endif

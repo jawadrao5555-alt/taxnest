@@ -286,6 +286,8 @@ jobs:
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
       - name: Run realtime gateway tests with egress blocked
         run: bash scripts/rc-safe-run -- node --test --test-concurrency=1 agent-realtime-gateway/test/gateway.test.js agent-realtime-gateway/test/wake-secret.test.js
+      - name: Check PRA B03 phone continuity and explicit table commit
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/b03-phone-search.test.mjs scripts/tests/b03-table-commit.test.mjs scripts/tests/b03-delivery-navigation.test.mjs
       - name: Sanitize CI evidence
         id: sanitize_evidence
         if: always()

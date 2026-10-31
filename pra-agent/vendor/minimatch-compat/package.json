@@ -1,0 +1,8 @@
+{
+  "name": "@taxnest/minimatch-compat",
+  "version": "11.0.1-taxnest.1",
+  "description": "Legacy callable CommonJS facade over the unmodified patched upstream minimatch 11.0.1",
+  "main": "index.cjs",
+  "license": "UNLICENSED",
+  "dependencies": { "minimatch-upstream": "npm:minimatch@11.0.1" }
+}

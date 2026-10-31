@@ -58,145 +58,25 @@ elaan_freshness_check() {
     || fail "elaan check: invalid committed announcement scope or SHA"
   SCOPE_B64=$(printf '%s' "$SCOPE_SQL" | base64 | tr -d '\n')
 
-  local ELAAN_OUT ELAAN_RC
+  local ELAAN_OUT ELAAN_RC PAYLOAD
+  PAYLOAD=$(base64 < "$ROOT/scripts/lib/elaan-receipt.php" | tr -d '\n')
   ELAAN_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "LIVE_DIR='$LIVE_DIR' MARKER_FILE='$LIVE_DEPLOY_MARKER' TARGET_SHA='$TARGET_SHA' SCOPE_B64='$SCOPE_B64' bash -s" 2>&1 <<'EOFELAAN'
-if [ ! -f "$MARKER_FILE" ]; then
-  echo "ELAAN_NO_MARKER"
-  exit 0
-fi
-MARKER=$(head -1 "$MARKER_FILE" 2>/dev/null || echo "")
-MARKER_TS=$(echo "$MARKER" | cut -d'|' -f1)
-MARKER_COMMIT=$(echo "$MARKER" | cut -d'|' -f2)
-if ! echo "$MARKER_TS" | grep -qE '^[0-9]+$'; then
-  echo "ELAAN_MARKER_PARSE_ERROR"
-  exit 0
-fi
-SINCE=$(date -d "@$MARKER_TS" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
-  || date -r "$MARKER_TS" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
-  || echo "")
-if [ -z "$SINCE" ]; then
-  echo "ELAAN_MARKER_PARSE_ERROR"
-  exit 0
-fi
-cd "$LIVE_DIR" || { echo "ELAAN_DB_ERROR"; exit 0; }
-DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
-[ -z "$DB_HOST" ] && DB_HOST=127.0.0.1
-DB_USER=$(grep '^DB_USERNAME=' .env | head -1 | sed 's/^DB_USERNAME=//' | tr -d "\"'")
-DB_PASS=$(grep '^DB_PASSWORD=' .env | head -1 | sed 's/^DB_PASSWORD=//' | tr -d "\"'")
-DB_NAME=$(grep '^DB_DATABASE=' .env | head -1 | sed 's/^DB_DATABASE=//' | tr -d "\"'")
-if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
-  echo "ELAAN_DB_CREDS_MISSING"
-  exit 0
-fi
-SCOPE_SQL=$(printf '%s' "$SCOPE_B64" | base64 -d) || { echo "ELAAN_DB_ERROR"; exit 0; }
-HAS_KEY=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='deployment_key'" 2>/dev/null) || { echo "ELAAN_DB_ERROR"; exit 0; }
-# A pre-key legacy schema cannot prove a new receipt. Fail closed; owner must
-# complete the approved schema transition before claiming exact-SHA evidence.
-if [ "$HAS_KEY" != "1" ]; then echo "ELAAN_DB_ERROR"; exit 0; fi
-HAS_ARCHIVE=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='archived_at'" 2>/dev/null) || { echo "ELAAN_DB_ERROR"; exit 0; }
-[ "$HAS_ARCHIVE" = "0" ] || [ "$HAS_ARCHIVE" = "1" ] || { echo "ELAAN_DB_ERROR"; exit 0; }
-[ "$HAS_ARCHIVE" = "0" ] || SCOPE_SQL="$SCOPE_SQL AND archived_at IS NULL"
-COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM app_updates WHERE $SCOPE_SQL AND deployment_key = '$TARGET_SHA' AND created_at > '$SINCE'" 2>&1)
-MYSQL_RC=$?
-if [ $MYSQL_RC -ne 0 ] || ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
-  echo "ELAAN_DB_ERROR"
-  exit 0
-fi
-echo "ELAAN_COUNT=$COUNT MARKER_COMMIT=$MARKER_COMMIT SINCE=$SINCE"
+    "LIVE_DIR='$LIVE_DIR' LIVE_PHP='${LIVE_PHP:-/usr/bin/php}' MARKER_FILE='$LIVE_DEPLOY_MARKER' TARGET_SHA='$TARGET_SHA' SCOPE_B64='$SCOPE_B64' PAYLOAD='$PAYLOAD' bash -s" 2>&1 <<'EOFELAAN'
+set -eu
+SCRIPT=$(mktemp /tmp/taxnest-elaan-receipt.XXXXXX.php)
+trap 'rm -f "$SCRIPT"' EXIT
+printf '%s' "$PAYLOAD" | base64 -d > "$SCRIPT"
+"$LIVE_PHP" "$SCRIPT"
 EOFELAAN
   )
   ELAAN_RC=$?
-  if [ $ELAAN_RC -ne 0 ] || [ -z "$ELAAN_OUT" ]; then
-    fail "elaan check: SSH failed (rc=$ELAAN_RC) — create announcement or use skip_elaan/--no-elaan for emergencies only"
-  fi
-
-  case "$ELAAN_OUT" in
-    ELAAN_NO_MARKER*|ELAAN_MARKER_PARSE_ERROR*|ELAAN_DB_CREDS_MISSING*|ELAAN_DB_ERROR*)
-      fail "elaan check blocked deploy ($ELAAN_OUT) — create elaan or use skip_elaan/--no-elaan for emergencies"
-      ;;
-    *ELAAN_COUNT=*) ;;
-    *)
-      fail "elaan check: unexpected remote output: $ELAAN_OUT"
-      ;;
-  esac
-
-  local COUNT MARKER_COMMIT
-  COUNT=$(echo "$ELAAN_OUT" | grep -oE 'ELAAN_COUNT=[0-9]+' | cut -d= -f2)
-  MARKER_COMMIT=$(echo "$ELAAN_OUT" | grep -oE 'MARKER_COMMIT=[^ ]+' | cut -d= -f2)
-  COUNT="${COUNT:-0}"
-
-  local TITLE="" TITLE_MATCH=0
-  # Same-SHA evidence path only when time-fresh count is zero.
-  if [ "$COUNT" -lt 1 ] 2>/dev/null \
-    && [ -n "$LIVE_HEAD" ] && [ -n "$TARGET_SHA" ] \
-    && [ "$LIVE_HEAD" = "$TARGET_SHA" ] && [ "$MARKER_COMMIT" = "$TARGET_SHA" ]; then
-    TITLE=$(elaan_published_title "$TARGET_SHA") \
-      || fail "elaan same-SHA title check: could not qualify deploy/elaan.yml title with TARGET_SHA"
-    TITLE="${TITLE%"${TITLE##*[![:space:]]}"}"
-    if [ -n "$TITLE" ]; then
-      local TITLE_B64 TITLE_OUT TITLE_RC
-      TITLE_B64=$(printf '%s' "$TITLE" | base64 -w0 2>/dev/null || printf '%s' "$TITLE" | base64)
-      TITLE_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-        "LIVE_DIR='$LIVE_DIR' TITLE_B64='$TITLE_B64' TARGET_SHA='$TARGET_SHA' SCOPE_B64='$SCOPE_B64' bash -s" 2>&1 <<'EOFTITLE'
-cd "$LIVE_DIR" || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
-DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
-[ -z "$DB_HOST" ] && DB_HOST=127.0.0.1
-DB_USER=$(grep '^DB_USERNAME=' .env | head -1 | sed 's/^DB_USERNAME=//' | tr -d "\"'")
-DB_PASS=$(grep '^DB_PASSWORD=' .env | head -1 | sed 's/^DB_PASSWORD=//' | tr -d "\"'")
-DB_NAME=$(grep '^DB_DATABASE=' .env | head -1 | sed 's/^DB_DATABASE=//' | tr -d "\"'")
-if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
-  echo "ELAAN_TITLE_DB_ERROR"
-  exit 0
-fi
-TITLE=$(printf '%s' "$TITLE_B64" | base64 -d 2>/dev/null || printf '%s' "$TITLE_B64" | base64 --decode 2>/dev/null || true)
-if [ -z "$TITLE" ]; then
-  echo "ELAAN_TITLE_DB_ERROR"
-  exit 0
-fi
-HAS_KEY=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='deployment_key'" 2>/dev/null || echo 0)
-SCOPE_SQL=$(printf '%s' "$SCOPE_B64" | base64 -d) || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
-HAS_ARCHIVE=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-  -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='app_updates' AND column_name='archived_at'" 2>/dev/null) || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
-[ "$HAS_ARCHIVE" = "0" ] || [ "$HAS_ARCHIVE" = "1" ] || { echo "ELAAN_TITLE_DB_ERROR"; exit 0; }
-[ "$HAS_ARCHIVE" = "0" ] || SCOPE_SQL="$SCOPE_SQL AND archived_at IS NULL"
-if [ "$HAS_KEY" = "1" ]; then
-  COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
-    -e "SELECT COUNT(*) FROM app_updates WHERE $SCOPE_SQL AND deployment_key = '$TARGET_SHA'" 2>&1)
-else
-  echo "ELAAN_TITLE_DB_ERROR"
-  exit 0
-fi
-MYSQL_RC=$?
-if [ $MYSQL_RC -ne 0 ] || ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
-  echo "ELAAN_TITLE_DB_ERROR"
-  exit 0
-fi
-echo "ELAAN_TITLE_COUNT=$COUNT"
-EOFTITLE
-      )
-      TITLE_RC=$?
-      if [ $TITLE_RC -ne 0 ] || [ -z "$TITLE_OUT" ]; then
-        fail "elaan same-SHA title check: SSH failed (rc=$TITLE_RC)"
-      fi
-      case "$TITLE_OUT" in
-        ELAAN_TITLE_DB_ERROR*)
-          fail "elaan same-SHA title check blocked deploy ($TITLE_OUT)"
-          ;;
-        *ELAAN_TITLE_COUNT=*)
-          TITLE_MATCH=$(echo "$TITLE_OUT" | grep -oE 'ELAAN_TITLE_COUNT=[0-9]+' | cut -d= -f2)
-          TITLE_MATCH="${TITLE_MATCH:-0}"
-          ;;
-        *)
-          fail "elaan same-SHA title check: unexpected remote output: $TITLE_OUT"
-          ;;
-      esac
-    fi
-  fi
+  [ "$ELAAN_RC" -eq 0 ] && [ -n "$ELAAN_OUT" ] || fail "elaan receipt check failed (rc=$ELAAN_RC): $ELAAN_OUT"
+  # Accept exactly one protocol line; PHP warnings/transport noise never count.
+  [[ "$ELAAN_OUT" =~ ^ELAAN_COUNT=([0-9]+)\ MARKER_COMMIT=([0-9a-f]{40})\ RECEIPT_COUNT=([0-9]+)$ ]] \
+    || fail "elaan receipt check blocked deploy: $ELAAN_OUT"
+  local COUNT="${BASH_REMATCH[1]}" MARKER_COMMIT="${BASH_REMATCH[2]}"
+  local TITLE_MATCH="${BASH_REMATCH[3]}" TITLE
+  TITLE=$(elaan_published_title)
 
   local EVAL_JSON EVAL_OUT EVAL_RC
   EVAL_JSON=$(python3 -c 'import json,sys; print(json.dumps({

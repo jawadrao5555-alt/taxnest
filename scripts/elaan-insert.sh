@@ -157,6 +157,7 @@ DEPLOY_SHA_ESCAPED=$(printf '%s' "$DEPLOY_SHA" | tr 'A-F' 'a-f')
 # Runs identically on live (hardcoded LIVE_DIR paths) or dev (relative paths from CWD).
 # GOTCHA: on live the script runs from /tmp so __DIR__ is wrong — we hardcode the path.
 # In dev mode the workspace root is passed as $argv[1] so the script finds vendor/.
+RECEIPT_HELPER=$(python3 -c 'import pathlib; print(pathlib.Path("scripts/lib/elaan-receipt.php").read_text().split("// Include functions")[0].removeprefix("<?php\n"))')
 read -r -d '' PHP_SCRIPT <<PHPEOF || true
 <?php
 // Elaan insert helper — Task 999
@@ -174,6 +175,14 @@ require \$base . '/vendor/autoload.php';
 // request and throws a TypeError in CLI context.
 \$kernel = \$app->make(Illuminate\Contracts\Console\Kernel::class);
 \$kernel->bootstrap();
+
+// Prepare only additive announcement receipt columns before publication. The
+// normal migrations remain pending and idempotently observe these columns later.
+if ('$DEPLOY_SHA_ESCAPED' !== '') {
+$RECEIPT_HELPER
+    try { elaanReceiptPrepare(); }
+    catch (Throwable \$error) { fwrite(STDERR, "ELAAN_SCHEMA_PREPARE_ERROR\\n"); exit(1); }
+}
 
 \$points = $PHP_POINTS_ARRAY;
 // Validate: must be a non-empty array of non-blank strings (model rule).
@@ -225,14 +234,14 @@ if (\$existing->isNotEmpty()) {
     exit(0);
 }
 
-\$row = App\Models\AppUpdate::create([
+\$row = App\Models\AppUpdate::unguarded(fn() => App\Models\AppUpdate::create([
     'title'        => '$TITLE_ESCAPED',
     'points'       => \$points,   // PHP array — model setter handles JSON encode
     'audience'     => '$AUDIENCE_ESCAPED',
     'is_published' => true,
     'created_by'   => null,
 ] + \$extra + ((\$hasDeploymentKey && '$DEPLOY_SHA_ESCAPED' !== '')
-    ? ['deployment_key' => '$DEPLOY_SHA_ESCAPED'] : []));
+    ? ['deployment_key' => '$DEPLOY_SHA_ESCAPED'] : [])));
 
 echo "ELAAN_INSERTED id=" . \$row->id . " title=" . json_encode(\$row->title) . "\n";
 exit(0);

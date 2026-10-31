@@ -28,6 +28,9 @@ done
 mkdir -p "$tmp/tools/npm-patches"
 cp -R "$ROOT/tools/npm-patches/braces" "$tmp/tools/npm-patches/braces"
 
+mkdir -p "$tmp/pra-agent/vendor"
+cp -R "$ROOT/pra-agent/vendor/minimatch-compat" "$tmp/pra-agent/vendor/minimatch-compat"
+
 "$NODE_BIN" "$GUARD" --root "$tmp"
 
 "$NODE_BIN" - "$tmp/package-lock.json" <<'NODE'
@@ -56,3 +59,11 @@ if "$NODE_BIN" "$GUARD" --root "$tmp" >/dev/null 2>&1; then
   exit 1
 fi
 echo "REVIEWED LOCAL FORK SOURCE-INTEGRITY REGRESSION PASSED"
+
+cp "$ROOT/tools/npm-patches/braces/lib/parse.js" "$tmp/tools/npm-patches/braces/lib/parse.js"
+printf '\n// unauthorized facade change\n' >> "$tmp/pra-agent/vendor/minimatch-compat/index.cjs"
+if "$NODE_BIN" "$GUARD" --root "$tmp" >/dev/null 2>&1; then
+  echo "NPM LOCK GUARD FAILED to reject modified minimatch facade" >&2
+  exit 1
+fi
+echo "REVIEWED MINIMATCH FACADE SOURCE-INTEGRITY REGRESSION PASSED"

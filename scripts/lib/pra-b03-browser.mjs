@@ -113,21 +113,24 @@ export async function b03DeliveryNavigationWorkflow(originalPage,t,v,{baseUrl,wa
   } finally {await context.close();}
 }
 
-export async function b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart}) {
+export async function b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass}) {
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
   const root=page.locator('[data-tn-sale-root]');
   if(!await root.evaluate(el=>Alpine.$data(el).kitchenSettings.dine_in_auto_kot))throw Error('Persisted auto-KOT fixture is not ON');
   const posts=[];const watch=req=>{if(req.method()==='POST')posts.push(new URL(req.url()).pathname);};page.on('request',watch);
   const reserve='/pos/restaurant/tables/'+t.b03AutoKot.tableId+'/reserve';
   const delay=async route=>{await new Promise(resolve=>setTimeout(resolve,500));await route.continue();};
+  const menu=async()=>{
+    if(v.width<768&&await root.evaluate(el=>Alpine.$data(el).mobileView)==='cart'){
+      await root.locator('[data-cart-menu-back]:visible').click();
+      await page.waitForFunction(()=>Alpine.$data(document.querySelector('[data-tn-sale-root]')).mobileView==='menu');
+    }
+  };
   try {
     await root.locator('[x-ref="searchInput"]:visible').fill(t.b03AutoKot.product);
     const tile=root.locator('.prod-card').filter({has:page.getByText(t.b03AutoKot.product,{exact:true}).and(page.locator('p[x-text="item.name"]'))});
     await tile.waitFor({state:'visible'});await tile.click();
-    if(v.width<768){
-      await root.locator('[data-cart-menu-open]:visible').click();
-      await page.waitForFunction(()=>Alpine.$data(document.querySelector('[data-tn-sale-root]')).mobileView==='cart');
-    }
+    await menu();
     await page.locator('[data-video="counter-dine-in"]:visible').click();
     await page.route('**'+reserve,delay);
     const target=page.locator('button[data-video="counter-table"]').filter({hasText:t.b03AutoKot.tableNumber});
@@ -138,10 +141,7 @@ export async function b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSur
     if(state.cart.length!==1||state.cart[0][0]!==t.b03AutoKot.product||state.recall||state.incoming)throw Error('Cancelled auto-KOT lost or committed the draft');
     if(posts.filter(p=>p===reserve).length!==1||posts.some(p=>/\/restaurant\/(?:hold|orders)|\/api\/print-jobs|\/invoice(?:\/|$)/.test(p)))throw Error('Table double-click duplicated reserve or posted an order/KOT');
     await saveEvidenceScreenshot(page,'b03-table-explicit-commit-'+v.width+'.png');
-    if(v.width<768){
-      await root.locator('[data-cart-menu-back]:visible').click();
-      await page.waitForFunction(()=>Alpine.$data(document.querySelector('[data-tn-sale-root]')).mobileView==='menu');
-    }
+    await menu();
     page.once('dialog',dialog=>dialog.accept());
     await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname==='/pos/restaurant/tables/'+t.b03AutoKot.tableId+'/release'&&response.request().method()==='POST'),page.locator('[data-nav-new-sale="action"]:visible').first().click()]);
     pass(t.name+'/'+v.width+': persisted auto-KOT ON, actual table double-click reserves once; Cancel keeps draft and posts no order/print; explicit New Sale releases reservation');

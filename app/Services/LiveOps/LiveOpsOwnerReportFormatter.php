@@ -113,6 +113,14 @@ class LiveOpsOwnerReportFormatter
     private function formatCompany(array $envelope, array $data, array $context): array
     {
         $card = $this->cardFromCompanyDiagnostic($data);
+        $operationalOverall = $card['severity'] === 'none' ? 'GREEN' : strtoupper((string) $card['severity']);
+        $card['coverage'] = $data['coverage'] ?? ['status' => 'UNAVAILABLE', 'complete' => false];
+        if (($data['day_close']['coverage']['arithmetic_issues_in_returned_page'] ?? 0) > 0) {
+            $card['issues'][] = 'Saved Day Close or counter cash calculation differs; cash movement cause is not yet established';
+            $card['issues_line'] = implode('; ', $card['issues']);
+            $card['unresolved'] = $card['issues'];
+            $card['severity'] = 'attention';
+        }
         $actions = $context['actions_taken'] ?? [];
         $card['actions_taken'] = $actions;
         if (!empty($context['status'])) {
@@ -135,7 +143,6 @@ class LiveOpsOwnerReportFormatter
 
         $coverage = $data['coverage'] ?? ['status' => 'UNAVAILABLE', 'complete' => false];
         $overall = $card['severity'] === 'none' ? 'GREEN' : strtoupper((string) $card['severity']);
-        $operationalOverall = $overall;
         $unresolved = $card['unresolved'] ?? [];
         if (($coverage['complete'] ?? false) !== true) {
             if ($overall === 'GREEN') $overall = 'PARTIAL';

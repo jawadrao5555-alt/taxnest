@@ -79,9 +79,9 @@ Release and remediation authorization boundaries are unchanged.
 
 - Baseline reproduction at main `0aecc18`: the new connector regression failed
   because `get_pra_day_close_evidence` was not an available tool.
-- Local PHP 8.4.23: 119 reporting/Live Ops tests, 714 assertions passed. Two
-  subsequent cash-stream/range cases also passed (cash suite: 10 tests,
-  49 assertions).
+- Local PHP 8.4.23: final focused reporting/Live Ops suite passed with 123 tests
+  and 735 assertions, including counter-only inconsistencies and agreement
+  between the company card and report aggregate.
 - Synthetic tests cover a seven-date range, cross-midnight saved close,
   multiple counters, no live bill table, unknown vs zero opening, rider gaps,
   arithmetic mismatch, branch-zero pagination, malformed/oversized snapshots,
@@ -92,6 +92,10 @@ Release and remediation authorization boundaries are unchanged.
   foreign company denial, coverage gaps, read evidence and revocation. These
   must pass in PR CI before handoff; no production browser/DB was used.
 - Full-suite and exact-head CI results belong in the PR verification record.
+  A local full-suite attempt was blocked by automatic approval review after
+  an existing test attempted external PRA egress. It is not a passing run and
+  is not retried outside isolation; full acceptance uses the existing
+  loopback-only CI runner with external egress blocked.
   Code completion is not a claim that this is deployed or the cash complaint
   is resolved. After owner deployment, rerun the approved seven-day incident
   diagnostic and investigate its actual cash evidence.

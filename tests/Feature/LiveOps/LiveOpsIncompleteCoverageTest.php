@@ -28,6 +28,19 @@ class LiveOpsIncompleteCoverageTest extends LiveOpsTestCase
         $this->assertSame('UNAVAILABLE', $report['coverage']['status']);
     }
 
+    public function test_cash_issue_reaches_company_card_as_well_as_report_aggregate(): void
+    {
+        $report = app(LiveOpsOwnerReportFormatter::class)->format(['operation' => 'COMPANY_DIAGNOSTIC', 'data' => [
+            'company' => ['name' => 'Synthetic'], 'coverage' => ['status' => 'PARTIAL', 'complete' => false],
+            'day_close' => ['coverage' => ['status' => 'ISSUE', 'arithmetic_issues_in_returned_page' => 1], 'records' => []],
+        ]]);
+        $this->assertSame('ATTENTION', $report['overall']);
+        $this->assertSame('GREEN', $report['operational_overall']);
+        $this->assertSame('attention', $report['companies'][0]['severity']);
+        $this->assertStringContainsString('cash calculation differs', $report['companies'][0]['issues_line']);
+        $this->assertFalse($report['companies'][0]['coverage']['complete']);
+    }
+
     public function test_no_operational_fault_does_not_resolve_an_unmeasured_cash_complaint(): void
     {
         // Verify both resolution gates independent of the owner's natural-language classifier.

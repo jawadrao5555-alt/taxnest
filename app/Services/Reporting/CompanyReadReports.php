@@ -10,6 +10,17 @@ use Illuminate\Validation\ValidationException;
 /** Explicit SELECT-only reports. No fiscal API, job dispatch, raw query input or customer/device credentials. */
 final class CompanyReadReports
 {
+    public function dayClose(array $args, ?array $allowed): array
+    {
+        if (array_diff(array_keys($args), ['company_name', 'company_id', 'date_from', 'date_to', 'stream', 'branch_id', 'terminal_id', 'after_id', 'limit'])) {
+            throw ValidationException::withMessages(['arguments' => 'Unsupported filter. Day Close uses saved business dates only.']);
+        }
+        $v = validator($args, ['company_name' => 'required|string|min:2|max:150', 'company_id' => 'nullable|integer|min:1'])->validate();
+        $company = $this->company($v['company_name'], $allowed, isset($v['company_id']) ? (int) $v['company_id'] : null);
+
+        return app(DayCloseEvidence::class)->read((int) $company->id, $args);
+    }
+
     public function companies(string $name, ?array $allowed): array
     {
         $q = DB::table('companies')->whereIn('product_type', ['pos', 'fbrpos', 'di']);

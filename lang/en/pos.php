@@ -4,6 +4,10 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
+    'dc_report_title' => 'Day Close Report',
+    'dc_report_pdf' => 'Day Close Report — PDF',
+    'dc_report_thermal' => 'Day Close Report — Thermal',
+    'dc_report_open' => 'Day open — report so far',
     'restaurant_top_selling_scope' => 'Completed restaurant orders for the selected business dates, ranked by quantity. Amounts are item subtotals before bill-level discounts and tax. Select an item to see its orders.',
     'orders_count_label' => 'Orders',
     'notification_read_failed' => 'Could not save read status. This notification remains unread.',

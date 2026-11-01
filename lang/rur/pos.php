@@ -4,6 +4,10 @@
 // Purity locked by tests/Unit/LangPurityTest.php — no Arabic-script characters here.
 
 return [
+    'dc_report_title' => 'Day Close Report',
+    'dc_report_pdf' => 'Day Close Report — PDF',
+    'dc_report_thermal' => 'Day Close Report — Thermal',
+    'dc_report_open' => 'Din abhi khula hai — ab tak ki report',
     'restaurant_top_selling_scope' => 'Selected business dates ke tamam completed restaurant orders, quantity ke hisab se. Amount item subtotal hai; bill discount aur tax se pehle. Order details ke liye item kholain.',
     'orders_count_label' => 'Orders',
     'notification_read_failed' => 'Read status save nahi hua. Yeh notification abhi unread hai.',

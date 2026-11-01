@@ -41,6 +41,9 @@ class LiveOpsOwnerReportFormatter
     private function formatDaily(array $envelope, array $data, array $context): array
     {
         $overall = $data['overall']['status'] ?? 'UNKNOWN';
+        if ($overall === 'GREEN' && ($data['coverage']['complete'] ?? false) !== true) {
+            $overall = 'PARTIAL';
+        }
         $cards = $data['owner_company_cards'] ?? $this->cardsFromDaily($data);
         $platform = [
             'server' => $this->passFail($data['server_health'] ?? []),
@@ -98,6 +101,7 @@ class LiveOpsOwnerReportFormatter
             'platform' => $platform,
             'unresolved' => $unresolved,
             'actions_taken' => $actions,
+            'coverage' => $data['coverage'] ?? ['status' => 'UNAVAILABLE', 'complete' => false],
         ];
     }
 
@@ -129,13 +133,41 @@ class LiveOpsOwnerReportFormatter
             $text .= "\nStatus: ".$card['status'];
         }
 
+        $coverage = $data['coverage'] ?? ['status' => 'UNAVAILABLE', 'complete' => false];
+        $overall = $card['severity'] === 'none' ? 'GREEN' : strtoupper((string) $card['severity']);
+        $operationalOverall = $overall;
+        $unresolved = $card['unresolved'] ?? [];
+        if (($coverage['complete'] ?? false) !== true) {
+            if ($overall === 'GREEN') $overall = 'PARTIAL';
+            $gap = 'Check abhi adhoora hai. Tamam features aur cash ka poora hisaab verify nahi hua; is report se complaint hal shuda nahi samjhi ja sakti.';
+            $text .= "\nCoverage: ".$gap;
+            $unresolved[] = $gap;
+        }
+        if (isset($data['day_close'])) {
+            $cash = $data['day_close'];
+            $text .= "\nDay Close: ".($cash['coverage']['status'] ?? 'UNAVAILABLE').'; '.count($cash['records'] ?? []).' saved records shown.';
+            foreach ($cash['records'] ?? [] as $row) {
+                $money = fn ($key) => isset($row[$key]) ? $this->money($row[$key]) : 'unknown';
+                $text .= "\n".$row['business_date'].' / record '.$row['id'].': opening '.$money('opening_float').', expected '.$money('expected_cash').', counted '.$money('counted_cash').', difference '.$money('cash_variance').'.';
+                if (in_array('ISSUE', [$row['arithmetic']['expected_check'] ?? null, $row['arithmetic']['variance_check'] ?? null], true)) {
+                    $overall = $overall === 'CRITICAL' ? $overall : 'ATTENTION';
+                    $unresolved[] = 'Stored cash arithmetic differs in Day Close record '.$row['id'].'. This does not establish the underlying cash movement cause.';
+                }
+            }
+            if ($cash['pagination']['has_more'] ?? false) $text .= "\nMazeed records baqi hain. Next page parhna zaroori hai.";
+            $text .= "\nSaved figures ka hisaab asal cash, refunds aur rider payments ki mukammal tasdeeq nahi hai.";
+        }
+
         return [
             'title' => ($card['name'] ?? 'Company').' report',
-            'overall' => $card['severity'] === 'none' ? 'GREEN' : strtoupper((string) $card['severity']),
+            'overall' => $overall,
+            'operational_overall' => $operationalOverall,
+            'coverage' => $coverage,
+            'day_close' => $data['day_close'] ?? null,
             'text' => $text,
             'companies' => [$card],
             'platform' => [],
-            'unresolved' => $card['unresolved'] ?? [],
+            'unresolved' => $unresolved,
             'actions_taken' => $actions,
         ];
     }

@@ -739,6 +739,13 @@ class LiveOpsDiagnosticsService
 
         $likely = $this->inferRootCause($company, $pra, $agent, $printer, $errors);
         $recommend = $this->recommendFix($likely);
+        try {
+            $dayClose = app(\App\Services\Reporting\DayCloseEvidence::class)->read($companyId, ['date_from' => $from->toDateString(), 'date_to' => $to->toDateString()]);
+        } catch (\Throwable $e) {
+            // Legacy schemas/ranges must not erase the other diagnostic signals or leak SQL.
+            $dayClose = ['coverage' => ['status' => 'UNAVAILABLE', 'complete' => false, 'reason' => 'Saved cash evidence could not be read. No balance conclusion is available.'], 'records' => []];
+        }
+        $coverage = app(\App\Services\Reporting\DiagnosticCoverage::class)->assessment($dayClose);
 
         return [
             'company' => $company['company'],
@@ -756,6 +763,8 @@ class LiveOpsDiagnosticsService
             'errors' => $errors['errors'],
             'likely_root_cause' => $likely,
             'recommended_fix' => $recommend,
+            'day_close' => $dayClose,
+            'coverage' => $coverage,
             'remediation_note' => 'Diagnosis never executes fixes. Owner must explicitly approve a low/medium allow-listed remediation.',
         ];
     }
@@ -1147,9 +1156,17 @@ class LiveOpsDiagnosticsService
 
         $overall = $this->composeOverallStatus($sections);
         $cards = $this->ownerCompanyCards($from, $to, $billing, $activity, $pra);
+        $operationalOverall = $overall;
+        $coverage = app(\App\Services\Reporting\DiagnosticCoverage::class)->assessment();
+        if ($overall['status'] === 'GREEN') {
+            $overall['status'] = 'PARTIAL';
+        }
+        $overall['unknown'][] = $coverage['reason'];
 
         return $sections + [
             'overall' => $overall,
+            'operational_overall' => $operationalOverall,
+            'coverage' => $coverage,
             'owner_company_cards' => $cards,
             'unknown_observability_gaps' => $overall['unknown'],
             'recommended_owner_actions' => $overall['recommended_owner_actions'],

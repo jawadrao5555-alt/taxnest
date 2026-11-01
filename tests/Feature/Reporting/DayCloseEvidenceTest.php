@@ -108,6 +108,19 @@ class DayCloseEvidenceTest extends TestCase
         $this->assertSame(150.0, $r[2]['arithmetic']['stored_minus_calculated']);
     }
 
+    public function test_counter_only_arithmetic_issue_is_not_hidden_by_consistent_shop_totals(): void
+    {
+        $this->row(['counter_summary' => json_encode([
+            ['opening' => 0, 'cash_sales' => 10, 'rider_out' => 0, 'rider_in' => 0, 'expected' => 20, 'counted' => 20, 'variance' => 0],
+            'malformed-counter',
+        ])]);
+        $r = $this->read();
+        $this->assertSame('PASS', $r['records'][0]['arithmetic']['expected_check']);
+        $this->assertSame('ISSUE', $r['coverage']['status']);
+        $this->assertSame(1, $r['coverage']['arithmetic_issues_in_returned_page']);
+        $this->assertSame('PARTIAL', $r['records'][0]['counter_snapshot_coverage']['status']);
+    }
+
     public function test_pagination_keeps_total_and_branch_zero_and_cannot_hide_counter_truncation(): void
     {
         $first = $this->row(['counter_summary' => json_encode(array_fill(0, 26, ['terminal_id' => 5]))]);

@@ -123,7 +123,7 @@ final class DayCloseEvidence
                     $clean['arithmetic'] = $this->arithmetic($clean['opening'], $clean['cash_sales'], $clean['rider_out'], $clean['rider_in'], $clean['expected'], $clean['counted'], $clean['variance']);
                     $r['counter_snapshot'][] = $clean;
                 }
-                $r['counter_snapshot_coverage'] = ['status' => $counters === null ? 'UNAVAILABLE' : (count($counters) > 25 ? 'PARTIAL' : 'STORED_EVIDENCE'), 'returned' => count($r['counter_snapshot']), 'total' => $counters === null ? null : count($counters)];
+                $r['counter_snapshot_coverage'] = ['status' => $counters === null ? 'UNAVAILABLE' : (count($counters) > count($r['counter_snapshot']) ? 'PARTIAL' : 'STORED_EVIDENCE'), 'returned' => count($r['counter_snapshot']), 'total' => $counters === null ? null : count($counters)];
             } elseif ($stream === 'counter_closes') {
                 // Separate counter-close rows do not store rider in/out. Never invent those inputs.
                 $r['arithmetic'] = $this->arithmetic($r['opening_float'], $r['cash_sales'], null, null, $r['expected_cash'], $r['counted_cash'], $r['cash_variance']);
@@ -132,6 +132,20 @@ final class DayCloseEvidence
         }
         $result['coverage'] += ['total_matching' => (int) $counts->sum(), 'missing_columns' => array_values(array_diff($fields, $columns)), 'scope_note' => 'Branch 0 means stored no-branch/legacy/company-wide scope; it is not a current branch attribution.'];
         $result['coverage']['status'] = $counts->sum() ? 'PARTIAL' : 'NO_ACTIVITY';
+        $issues = 0;
+        foreach ($result['records'] as $record) {
+            foreach (array_merge([$record], $record['counter_snapshot'] ?? []) as $snapshot) {
+                foreach (['expected_check', 'variance_check'] as $check) {
+                    if (($snapshot['arithmetic'][$check] ?? null) === 'ISSUE') {
+                        $issues++;
+                    }
+                }
+            }
+        }
+        $result['coverage']['arithmetic_issues_in_returned_page'] = $issues;
+        if ($issues > 0) {
+            $result['coverage']['status'] = 'ISSUE';
+        }
         $result['pagination'] = ['limit' => $limit, 'has_more' => $hasMore, 'next_after_id' => $hasMore ? (int) $rows->last()->id : null];
 
         return $result;

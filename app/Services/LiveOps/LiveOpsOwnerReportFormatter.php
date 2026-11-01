@@ -145,6 +145,10 @@ class LiveOpsOwnerReportFormatter
         }
         if (isset($data['day_close'])) {
             $cash = $data['day_close'];
+            if (($cash['coverage']['arithmetic_issues_in_returned_page'] ?? 0) > 0) {
+                $overall = $overall === 'CRITICAL' ? $overall : 'ATTENTION';
+                $unresolved[] = 'A saved shop/counter cash calculation differs. The underlying cash movement cause still requires investigation.';
+            }
             $text .= "\nDay Close: ".($cash['coverage']['status'] ?? 'UNAVAILABLE').'; '.count($cash['records'] ?? []).' saved records shown.';
             foreach ($cash['records'] ?? [] as $row) {
                 $money = fn ($key) => isset($row[$key]) ? $this->money($row[$key]) : 'unknown';

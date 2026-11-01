@@ -4,6 +4,10 @@
 // Purity locked by tests/Unit/LangPurityTest.php — Latin words only from the whitelist.
 
 return [
+    'dc_report_title' => 'دن بند کرنے کی رپورٹ',
+    'dc_report_pdf' => 'دن بند کرنے کی رپورٹ — PDF',
+    'dc_report_thermal' => 'دن بند کرنے کی رپورٹ — تھرمل',
+    'dc_report_open' => 'دن ابھی کھلا ہے — اب تک کی رپورٹ',
     'restaurant_top_selling_scope' => 'منتخب کاروباری تاریخوں کے مکمل ریسٹورنٹ آرڈر، مقدار کے لحاظ سے۔ رقم بل کی رعایت اور ٹیکس سے پہلے آئٹم کا سب ٹوٹل ہے۔ تفصیل کے لیے آئٹم کھولیں۔',
     'orders_count_label' => 'آرڈرز',
     'notification_read_failed' => 'پڑھے جانے کی حالت محفوظ نہیں ہوئی۔ یہ اطلاع ابھی غیر پڑھی ہے۔',

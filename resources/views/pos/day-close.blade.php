@@ -3,7 +3,7 @@
     @include('pos.partials.back-link')
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.day_close_report_z') }}</h1>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.dc_report_title') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.pra_compliance_eod') }}</p>
         </div>
         <form method="GET" action="{{ route('pos.day-close') }}" class="flex items-center gap-2">
@@ -86,27 +86,7 @@
             {{-- Task 1197: Z prints are COMPANY-WIDE documents — isolated
                  cashiers get no links (the routes redirect them anyway). --}}
             @if(!($dcIso ?? false))
-            <div class="flex items-center gap-2">
-                <a href="{{ route('pos.day-close-thermal', $existingReport->id) }}" target="_blank" class="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-900 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    {{ __('pos.thermal_z_report') }}
-                </a>
-                <a href="{{ route('pos.day-close-pdf', $existingReport->id) }}" target="_blank" class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    {{ __('pos.view_btn') }}
-                </a>
-                <a href="{{ route('pos.day-close-pdf-download', $existingReport->id) }}" class="px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-lg hover:bg-emerald-800 transition">{{ __('pos.download_pdf') }}</a>
-                <a href="{{ route('pos.day-close-summary', ['date' => $existingReport->report_date->format('Y-m-d')]) }}" class="px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition">
-                    {{ __('pos.dc_summary_zreport') }}
-                </a>
-                <a href="{{ route('pos.day-close-summary-thermal', $existingReport->id) }}" target="_blank" class="px-4 py-2 bg-slate-700 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition flex items-center gap-2">
-                    {{ __('pos.dc_summary_z_thermal') }}
-                </a>
-                <a href="{{ route('pos.day-close-summary-pdf', $existingReport->id) }}" target="_blank" class="px-4 py-2 bg-violet-600 text-white text-sm font-semibold rounded-lg hover:bg-violet-700 transition flex items-center gap-2">
-                    {{ __('pos.dc_summary_z_pdf') }}
-                </a>
-                <a href="{{ route('pos.day-close-summary-pdf-download', $existingReport->id) }}" class="px-4 py-2 bg-violet-700 text-white text-sm font-semibold rounded-lg hover:bg-violet-800 transition">{{ __('pos.download_pdf') }}</a>
-            </div>
+            @include('pos.partials.day-close-report-actions')
             @endif
         </div>
     </div>
@@ -121,30 +101,10 @@
     <div class="mb-6 p-4 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-                <p class="font-bold text-sky-800 dark:text-sky-300">{{ __('pos.dc_xreport_title') }}</p>
+                <p class="font-bold text-sky-800 dark:text-sky-300">{{ __('pos.dc_report_open') }}</p>
                 <p class="text-xs text-sky-600 dark:text-sky-400">{{ __('pos.dc_xreport_hint') }}</p>
             </div>
-            <div class="flex items-center gap-2">
-                <a href="{{ route('pos.day-close-x-thermal', ['date' => $date]) }}" target="_blank" class="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-900 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    {{ __('pos.dc_xreport_thermal') }}
-                </a>
-                <a href="{{ route('pos.day-close-x-pdf', ['date' => $date]) }}" target="_blank" class="px-4 py-2 bg-sky-600 text-white text-sm font-semibold rounded-lg hover:bg-sky-700 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    {{ __('pos.dc_xreport_pdf') }}
-                </a>
-                <a href="{{ route('pos.day-close-x-pdf-download', ['date' => $date]) }}" class="px-4 py-2 bg-sky-700 text-white text-sm font-semibold rounded-lg hover:bg-sky-800 transition">{{ __('pos.download_pdf') }}</a>
-                <a href="{{ route('pos.day-close-summary', ['date' => $date]) }}" class="px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition">
-                    {{ __('pos.dc_summary_xreport') }}
-                </a>
-                <a href="{{ route('pos.day-close-x-summary-thermal', ['date' => $date]) }}" target="_blank" class="px-4 py-2 bg-slate-700 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition flex items-center gap-2">
-                    {{ __('pos.dc_summary_x_thermal') }}
-                </a>
-                <a href="{{ route('pos.day-close-x-summary-pdf', ['date' => $date]) }}" target="_blank" class="px-4 py-2 bg-violet-600 text-white text-sm font-semibold rounded-lg hover:bg-violet-700 transition flex items-center gap-2">
-                    {{ __('pos.dc_summary_x_pdf') }}
-                </a>
-                <a href="{{ route('pos.day-close-x-summary-pdf-download', ['date' => $date]) }}" class="px-4 py-2 bg-violet-700 text-white text-sm font-semibold rounded-lg hover:bg-violet-800 transition">{{ __('pos.download_pdf') }}</a>
-            </div>
+            @include('pos.partials.day-close-report-actions')
         </div>
     </div>
     @endif

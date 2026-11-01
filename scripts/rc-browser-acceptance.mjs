@@ -1,3 +1,4 @@
+import { b01CompanyAccountWorkflow } from './lib/b01-company-account-browser.mjs';
 import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow } from './lib/pra-b03-browser.mjs';
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
@@ -31,7 +32,7 @@ const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>
 // Exercise the new B02 payment contract before the broad screen sweep so a
 // checkout regression produces evidence promptly. Every original case remains.
 const cases = requested.length ? ordered.filter(x => requested.includes(x.name))
-  : [...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.b02Deal)];
+  : [...ordered.filter(x=>x.b01Account), ...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.b01Account&&!x.b02Deal)];
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
 if (unknown.length) throw new Error(`unknown requested journey: ${unknown.join(', ')}`);
@@ -1456,6 +1457,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.b01Account)return b01CompanyAccountWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b03AutoKot)return b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});
   if(t.optionalArchive)return optionalArchiveWorkflow(page,t,v);
   if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);
@@ -2239,7 +2241,7 @@ async function one(browser,label,v,t) {
   }
 }
 const {browser}=await launchLocalBrowser();
-try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.mixedFulfillment||t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow||t.deliveryContactSearch||t.b03AutoKot)&&failures)throw new Error("Settings/table-order/Hotel/B03 preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.b01Account||t.mixedFulfillment||t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow||t.deliveryContactSearch||t.b03AutoKot)&&failures)throw new Error("Settings/table-order/Hotel/B03 preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);}
 if(videoDirectory) {
   if(recorded.length !== cases.length * views.length)throw new Error('Incomplete tutorial recordings');

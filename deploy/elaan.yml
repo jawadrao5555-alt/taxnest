@@ -1,11 +1,7 @@
-title: "Bill ki talash, kitchen order aur print design mein behtari"
+title: "Account ki miyaad aur suspension ka record"
 audience: pos
 type: improvement
 points:
-  - "Phone number 03، +92 ya 0092 se likha ho, bill aur customer ki talash mein aik hi number pehchana jata hai. Purane customer profiles merge nahi honge."
-  - "Reprint mein tareekh, order ki qisam aur cash/card filter saath laga sakte hain. Purana bill dhoondne ke liye phone ya bill number likhein. Zyada results hon to talash mazeed wazeh karein."
-  - "Table select karne par automatic kitchen order ki setting on ho to pehle tasdeeq poochi jayegi. Cancel se cart aur table mehfooz rahenge; kitchen ko order nahi jayega."
-  - "Deliveries se New Sale khol sakte hain. Cart mein items hon to pehle poocha jayega. Cancel se cart mehfooz rahega. Deliveries load na hon to dobara load karne ka button istemal karein."
-  - "Receipt aur kitchen ticket ke liye mojooda design samait 9 pasand hain. Local aur fiscal bill ki pasand alag save hoti hai. Preview se na sale banti hai, na print nikalta hai, na setting save hoti hai."
-  - "Save this design only se sirf us design ki pasand save hoti hai. Form ki doosri tabdeeliyan save nahi hotin. Purana design rakhne ke liye Existing select karein."
-  - "Print settings mein mehfooz printer aur print ka tareeqa dekhein. PC ka print qabool karna paper nikalne ki tasdeeq nahi. Parchi na nikle to dobara print se pehle printer aur tray check karein."
+  - "Account ki package dates aur company ka status ab admin ko aik jagah nazar aata hai. Account ka masla ho to support se rabta karein."
+  - "Company suspend karte waqt admin wajah aur dobara kholne ki shart likh sakta hai. Naye record mein yeh detail, waqt aur admin ka naam mehfooz rehta hai."
+  - "Company dobara active karne se package ki tareekh nahi barhti. Package renew karna alag qadam hai."

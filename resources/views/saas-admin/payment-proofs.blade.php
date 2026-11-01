@@ -14,9 +14,17 @@
             $activeTab = in_array($status ?? 'pending', array_keys($tabs), true) ? ($status ?? 'pending') : 'pending';
         @endphp
 
+        <form method="GET" action="{{ route('saas.admin.payment-proofs') }}" class="mb-4 flex flex-wrap gap-3 items-end">
+            <input type="hidden" name="status" value="{{ $status }}">
+            <label class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Company ID
+                <input type="number" name="company_id" min="1" value="{{ $companyId ?? '' }}" class="block mt-1 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-400">
+            </label>
+            <button type="submit" class="px-3 py-2 rounded-lg bg-indigo-700 text-white font-semibold">Filter company</button>
+            <a class="underline text-sm text-gray-900 dark:text-gray-100" href="{{ route('saas.admin.payment-proofs', ['status' => $status]) }}">All companies</a>
+        </form>
         <div class="flex flex-wrap gap-2 mb-5">
             @foreach($tabs as $key => $label)
-                <a href="{{ route('saas.admin.payment-proofs', ['status' => $key]) }}"
+                <a href="{{ route('saas.admin.payment-proofs', array_filter(['status' => $key, 'company_id' => $companyId ?? null])) }}"
                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {{ $activeTab === $key ? 'admin-btn text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200' }}">
                     {{ $label }}
                 </a>

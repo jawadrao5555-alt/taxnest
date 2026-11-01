@@ -32,6 +32,8 @@ class PosRiderDayCloseFiguresTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // These fixtures describe a daytime trading day, independent of runner time.
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-15 12:00:00', 'Asia/Karachi'));
 
         Schema::dropAllTables();
 
@@ -272,4 +274,27 @@ class PosRiderDayCloseFiguresTest extends TestCase
         $this->assertSame(0.0, $f['cash_in'], "panel='fbr' settlements excluded");
         $this->assertSame(0.0, $f['cash_out'], 'local provisionals excluded from PRA recon');
     }
+
+    protected function tearDown(): void
+    {
+        $this->travelBack();
+        parent::tearDown();
+    }
+
+    public function test_legacy_receipt_after_midnight_belongs_to_the_previous_cutoff_window(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-16 01:00:00', 'Asia/Karachi'));
+        \App\Services\PosBusinessDay::forgetCutoff(self::COMPANY);
+        $riderId = $this->makeRider();
+        $billId = $this->makeBill($riderId, '2026-10-14', ['total_amount'=>900]);
+        $this->makeSettlement($riderId, 700, [
+            ['bill_id'=>$billId,'amount'=>700,'business_date'=>'2026-10-14'],
+        ]);
+        $previous = $this->figures('2026-10-15');
+        $calendar = $this->figures('2026-10-16');
+        $this->assertTrue($previous['active']);
+        $this->assertSame(700.0, $previous['cash_in']);
+        $this->assertSame(0.0, $calendar['cash_in']);
+    }
+
 }

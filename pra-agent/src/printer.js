@@ -20,6 +20,10 @@ const WebSocket = require('ws');
 const { printerLaneKey, processPrintSchedule } = require('./printer-queue');
 const { nextPollDelay } = require('./printer-poll-policy');
 const { processCloudPrintJob } = require('./printer-job');
+const { normalizePaperProfiles, prepareThermalPaper } = require('./thermal-paper');
+let paperProfiles = {};
+function setPaperProfiles(value) { paperProfiles = normalizePaperProfiles(value); }
+
 const agentVersion = require('../package.json').version;
 const { RealtimeWakeClient, realtimeUrl } = require('./realtime-wake');
 
@@ -108,7 +112,9 @@ const printChains = new Map();
 function printHtml(html, deviceName, jobType = 'bill') {
   const laneKey = printerLaneKey(deviceName);
   const previous = printChains.get(laneKey) || Promise.resolve();
-  const run = () => printHtmlUnlocked(html, deviceName, jobType, laneKey);
+  // Snapshot this job's explicitly selected mode; later settings changes affect new jobs.
+  const width = Object.hasOwn(paperProfiles, deviceName) ? paperProfiles[deviceName] : null;
+  const run = () => printHtmlUnlocked(html, deviceName, jobType, laneKey, width);
   const p = previous.then(run, run);
   const tail = p.catch(() => {});
   printChains.set(laneKey, tail);
@@ -120,20 +126,29 @@ function printHtml(html, deviceName, jobType = 'bill') {
 
 // Load HTML into the hidden window and print silently on `deviceName`.
 // Resolves { success, error }. Never rejects.
-function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printerLaneKey(deviceName)) {
+function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printerLaneKey(deviceName), paperWidth = null) {
   return new Promise((resolve) => {
     let settled = false;
     let win;
     let tmpFile = null;
+    let timer;
+    let settleTimer;
+    const onClosed = () => done(false, 'print window closed');
     const done = (success, error) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
+      clearTimeout(settleTimer);
       // CRITICAL: drop any pending load listener — a stale listener firing on
       // the NEXT job's load would print the same content twice.
       try { if (win && !win.isDestroyed()) win.webContents.removeAllListeners('did-finish-load'); } catch (e) {}
       try { if (win) win.removeListener('closed', onClosed); } catch (e) {}
       // Best-effort temp file cleanup — content is already rasterized by now.
       try { if (tmpFile) fs.unlinkSync(tmpFile); } catch (e) {}
+      // A thermal window has print-media emulation/CSS; discard it so no
+      // later default-mode job inherits those overrides. Also destroy on
+      // failure so a late load/driver callback cannot reuse the next job's DOM.
+      if (win && (paperWidth || !success)) { try { win.destroy(); } catch (e) {} }
       resolve({ success, error: error || null });
     };
 
@@ -142,11 +157,10 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
     } catch (e) {
       return done(false, `window: ${e.message}`);
     }
-    const onClosed = () => done(false, 'print window closed');
     win.once('closed', onClosed);
 
     // Hard timeout — a wedged load/driver must never jam the queue.
-    const timer = setTimeout(() => done(false, 'print timeout (30s)'), 30000);
+    timer = setTimeout(() => done(false, 'print timeout (30s)'), 30000);
 
     win.webContents.once('did-finish-load', () => {
       // Give layout/fonts/images a moment to settle before rasterizing.
@@ -166,8 +180,13 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
           true
         )
         .catch(() => 'fonts-wait-error');
-      fontsWait.then(() => setTimeout(() => {
+      fontsWait.then(() => {
+        if (settled) return;
+        settleTimer = setTimeout(async () => {
         try {
+          if (settled) return;
+          const pageSize = paperWidth ? await prepareThermalPaper(win.webContents, paperWidth) : null;
+          if (settled) return;
           win.webContents.print(
             {
               silent: true,
@@ -177,7 +196,7 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
               // Omitting pageSize alone makes Electron 42 fall back to A4.
               // Explicitly query this queue's driver defaults, including
               // 58/80mm rolls, instead of imposing one size on every printer.
-              usePrinterDefaultPageSize: true,
+              ...(pageSize ? { pageSize } : { usePrinterDefaultPageSize: true }),
             },
             (ok, failureReason) => {
               clearTimeout(timer);
@@ -188,7 +207,8 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
           clearTimeout(timer);
           done(false, `print: ${e.message}`);
         }
-      }, settleMs));
+      }, settleMs);
+      });
     });
 
     // Temp file + loadFile — a data: URL over ~2 MB fails with ERR_INVALID_URL
@@ -414,4 +434,4 @@ function nudgePrintPoll() {
   return false;
 }
 
-module.exports = { startPrinting, stopPrinting, getPrintStatus, printHtml, getLocalPrinters, reportPrinters, nudgePrintPoll };
+module.exports = { setPaperProfiles, startPrinting, stopPrinting, getPrintStatus, printHtml, getLocalPrinters, reportPrinters, nudgePrintPoll };

@@ -2544,7 +2544,9 @@ async function recentBillPreviewWorkflow(page,t,v,id,address) {
     });
     if(current!==before)throw new Error('Opening recent bill changed the current sale');
     await saveEvidenceScreenshot(page,'bill-preview-'+entry+'-'+v.width+'-'+silent);
-    await popup.locator('button').last().click();
+    const printButton=popup.locator('button').last();
+    if(silent)await printButton.click();
+    else {await printButton.focus();await printButton.press('Enter');}
     await page.waitForFunction(()=>window.__recentBillPrints.length===1);
     const output=await page.evaluate(()=>window.__recentBillPrints[0]);
     if(silent?(output.kind!=='silent'||output.transaction_id!==id):(output.kind!=='iframe'||!output.url.includes('auto_print=1')))throw new Error('Explicit preview Print did not retain its selected route');

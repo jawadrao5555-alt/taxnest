@@ -15,12 +15,34 @@ test('Reprint row and both Enter handlers only open preview, which has explicit 
   assert.ok(!source.includes('this.reprintBill(rlist[this.activeReprintIndex])'));
   assert.ok(source.includes('@click="reprintBill(reprintPreviewBill); reprintPreviewBill = null"'));
   const ui = vm.runInNewContext('({' + method('openReprintPreview') + method('receiptViewUrl') + '})');
+  let focused = 0;
+  Object.assign(ui, {$nextTick: fn=>fn(), $refs:{reprintPreviewDialog:{focus:()=>focused++}}});
   for (const restaurant of [false, true]) {
     ui.isRestaurantMode = restaurant;
     ui.openReprintPreview({id: 91});
     assert.equal(ui.reprintPreviewBill.id, 91);
     assert.ok(!ui.receiptViewUrl(ui.reprintPreviewBill).includes('auto_print'));
   }
+  assert.equal(focused,2);
+});
+test('preview owns checkout shortcuts without blocking native activation of its explicit Print button', () => {
+  const ui=vm.runInNewContext('({'+method('reprintPreviewOwnsKey')+'})');
+  ui.reprintPreviewBill={id:91};
+  for(const listOpen of [false,true]) {
+    ui.showReprint=listOpen;
+    let prevented=0;
+    const event={key:'Enter',target:{closest:()=>null},preventDefault:()=>prevented++,stopPropagation:()=>{}};
+    assert.equal(ui.reprintPreviewOwnsKey(event),true);
+    assert.equal(prevented,1);
+    event.target.closest=()=>({tagName:'BUTTON'});
+    assert.equal(ui.reprintPreviewOwnsKey(event),true);
+    assert.equal(prevented,1,'focused preview Print keeps native Enter');
+    event.key='F1';assert.equal(ui.reprintPreviewOwnsKey(event),true);
+  }
+  let stopped=false;
+  ui.reprintPreviewOwnsKey({key:'Escape',preventDefault:()=>{},stopPropagation:()=>stopped=true});
+  assert.equal(stopped,true);assert.equal(ui.reprintPreviewBill,null);
+  assert.equal(ui.reprintPreviewOwnsKey({key:'Enter'}),false);
 });
 for (const methodName of ['boardProofBill', 'panelProofBill']) {
   test(`${methodName} carries fresh cash/card choice through silent and browser printing`, async () => {

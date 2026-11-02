@@ -3514,10 +3514,10 @@ window.addEventListener('popstate', function() {
     {{-- via inline z-index — NO arbitrary Tailwind class (Vite build trap).      --}}
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     <div x-show="reprintPreviewBill" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style="z-index:60" @click.self="reprintPreviewBill = null" @keydown.escape.window="reprintPreviewBill = null">
-        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        <div data-reprint-preview x-ref="reprintPreviewDialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="reprint-preview-title" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
             <div class="px-4 py-3 bg-teal-600 flex items-center justify-between flex-shrink-0">
                 <div class="min-w-0">
-                    <h3 class="text-white font-bold text-sm truncate" x-text="reprintPreviewBill ? (window.TXT.bill_preview_prefix + billDisplayNumber(reprintPreviewBill)) : ''"></h3>
+                    <h3 id="reprint-preview-title" class="text-white font-bold text-sm truncate" x-text="reprintPreviewBill ? (window.TXT.bill_preview_prefix + billDisplayNumber(reprintPreviewBill)) : ''"></h3>
                     <p class="text-teal-100 text-[11px]" x-text="reprintPreviewBill ? [orderTypeLabel(reprintPreviewBill), reprintPreviewBill.customer_name, 'Rs. ' + Number(reprintPreviewBill.total_amount).toLocaleString()].filter(Boolean).join(' • ') : ''"></p>
                 </div>
                 <button @click="reprintPreviewBill = null" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition flex-shrink-0" title="{{ __('pos.ti_close') }}">
@@ -7910,6 +7910,7 @@ function restaurantPos() {
         },
 
         handleKey(e) {
+            if (this.reprintPreviewOwnsKey(e)) return;
             // ═══════════════════════════════════════════════════════════════
             // Task 565: PRINT-CONFIRM YES/NO DIALOG — sab se TOPMOST; khula ho
             // to keyboard SIRF isi ka hai. Enter = highlighted choice (Yes
@@ -8445,14 +8446,8 @@ function restaurantPos() {
             }
             // REPRINT modal — keyboard nav. Typed characters fall through to the
             // search input (no preventDefault on unhandled keys); ↑↓ move the
-            // highlight over the FILTERED list, Enter prints it, Esc closes.
+            // highlight over the FILTERED list, Enter previews it, Esc closes.
             if (this.showReprint) {
-                // Preview open (ZFC 30 Jul 2026): Esc = sirf preview band; Enter = print.
-                if (this.reprintPreviewBill) {
-                    if (e.key === 'Escape') { e.preventDefault(); this.reprintPreviewBill = null; }
-                    else if (e.key === 'Enter') { e.preventDefault(); } // Printing requires the preview Print button.
-                    return;
-                }
                 const rlist = this.filteredReprintBills();
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeReprintIndex = Math.min(this.activeReprintIndex + 1, Math.max(0, rlist.length - 1)); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeReprintIndex = Math.max(this.activeReprintIndex - 1, 0); }
@@ -13184,6 +13179,21 @@ function restaurantPos() {
         openReprintPreview(bill) {
             if (!bill) return;
             this.reprintPreviewBill = bill;
+            this.$nextTick(() => this.$refs.reprintPreviewDialog?.focus());
+        },
+        reprintPreviewOwnsKey(e) {
+            if (!this.reprintPreviewBill) return false;
+            // Recent-bill previews can open without the Reprint list. They
+            // still own the keyboard, so checkout shortcuts cannot reach the
+            // sale underneath. A focused preview button keeps native Enter.
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                this.reprintPreviewBill = null;
+            } else if (e.key === 'Enter' && !e.target?.closest?.('[data-reprint-preview] button')) {
+                e.preventDefault();
+            }
+            return true;
         },
         reprintBill(bill) {
             if (!bill || this.reprintBusyId) return;

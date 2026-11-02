@@ -378,6 +378,26 @@ class PosBranchStockTest extends TestCase
         $this->assertTrue($data['allBranches']);
     }
 
+    public function test_health_counts_do_not_count_empty_stock_as_both_low_and_out(): void
+    {
+        $this->actAs($this->makeUser('pos_admin'), 'all');
+        $empty = $this->seedStock($this->mainBranchId, 0);
+        $low = $this->seedStock($this->cityBranchId, 2);
+        DB::table('inventory_stocks')->whereIn('id', [$empty, $low])->update(['min_stock_level' => 5]);
+        $data = (new PosInventoryController())->dashboard()->getData();
+        $this->assertEquals(1, $data['outOfStockCount']);
+        $this->assertCount(1, $data['lowStockItems']);
+        $this->assertEquals($data['totalTracked'], $data['outOfStockCount'] + count($data['lowStockItems']) + $data['healthyCount']);
+        $this->assertEquals(1, $data['totalProducts']);
+    }
+
+    public function test_invalid_calendar_movement_date_is_rejected_before_query(): void
+    {
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        (new PosInventoryController())->movements(Request::create('/pos/inventory/movements', 'GET', ['date_from'=>'2026-02-31']));
+    }
+
     public function test_dashboard_breaks_the_total_down_per_branch_for_the_owner(): void
     {
         $this->seedStock($this->mainBranchId, 60);

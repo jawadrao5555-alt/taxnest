@@ -47,7 +47,7 @@ class RestaurantOrderPaymentCalculator
         $subtotal = (float) $order->items->sum('subtotal');
         $discountAmount = (float) ($order->discount_amount ?? 0);
         $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
-        $taxableSubtotal = (float) $order->items->where('is_tax_exempt', false)->sum('subtotal');
+        $taxableSubtotal = (float) $order->items->sum(fn ($item) => PosDealAllocation::taxableSubtotal($item->deal_snapshot, (float) $item->subtotal, (bool) $item->is_tax_exempt));
         $adjustedTaxable = round($taxableSubtotal * max(0, $discountRatio), 2);
 
         $taxInclusiveColumnExists = Schema::hasColumn('pos_transactions', 'tax_inclusive');

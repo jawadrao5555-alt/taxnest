@@ -95,6 +95,7 @@ class PosRestaurantOrderCancelTest extends TestCase
             $table->timestamp('kot_sent_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->string('cancellation_reason', 500)->nullable();
             $table->timestamps();
         });
 
@@ -110,6 +111,7 @@ class PosRestaurantOrderCancelTest extends TestCase
             $table->string('special_notes')->nullable();
             $table->boolean('is_tax_exempt')->default(false);
             $table->boolean('was_made')->nullable();
+            $table->decimal('prepared_quantity', 12, 3)->nullable();
             $table->timestamp('kot_printed_at')->nullable();
             $table->timestamps();
         });
@@ -209,6 +211,55 @@ class PosRestaurantOrderCancelTest extends TestCase
     }
 
     // ── soft cancel + table freeing ──────────────────────────────────────────
+
+    public function test_partial_preparation_and_reason_survive_without_converting_unknown_to_zero(): void
+    {
+        $this->actAs($this->makeUser('pos_manager'));
+        $orderId = $this->order();
+        $partial = RestaurantOrderItem::create(['order_id' => $orderId, 'quantity' => 4, 'subtotal' => 200]);
+        $unknown = RestaurantOrderItem::create(['order_id' => $orderId, 'quantity' => 2, 'subtotal' => 100]);
+        $response = $this->cancel($orderId, ['cancellation_reason' => 'Customer changed order',
+            'prepared_quantities' => [$partial->id => 1.5]]);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('Customer changed order', DB::table('restaurant_orders')->find($orderId)->cancellation_reason);
+        $this->assertEquals(1.5, $partial->fresh()->prepared_quantity);
+        $this->assertNull($unknown->fresh()->was_made);
+        $this->assertNull($unknown->fresh()->prepared_quantity);
+        $this->assertEquals(75, $partial->fresh()->preparedSaleValue());
+        $this->assertNull($unknown->fresh()->preparedSaleValue());
+    }
+
+    public function test_foreign_or_excess_preparation_is_rejected_without_cancelling(): void
+    {
+        $this->actAs($this->makeUser('pos_manager'));
+        $orderId = $this->order();
+        $item = RestaurantOrderItem::create(['order_id' => $orderId, 'quantity' => 2, 'subtotal' => 100]);
+        $foreign = RestaurantOrderItem::create(['order_id' => $this->order(['company_id' => 999]), 'quantity' => 1]);
+        foreach ([[$item->id => 3], [$foreign->id => 1], [$item->id => -1]] as $quantities) {
+            $response = $this->cancel($orderId, ['prepared_quantities' => $quantities]);
+            $this->assertSame(422, $response->getStatusCode());
+            $this->assertSame('held', DB::table('restaurant_orders')->find($orderId)->status);
+        }
+    }
+
+    public function test_repeated_cancel_does_not_replace_original_actor_or_preparation_evidence(): void
+    {
+        $first = $this->actAs($this->makeUser('pos_manager', 'First QA Manager'));
+        $orderId = $this->order();
+        $itemId = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'QA dish', 'quantity' => 2,
+            'unit_price' => 50, 'subtotal' => 100, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->assertSame(200, $this->cancel($orderId, ['made_item_ids' => [$itemId]])->getStatusCode());
+        $original = DB::table('restaurant_orders')->find($orderId);
+        $this->actAs($this->makeUser('pos_manager', 'Second QA Manager'));
+        $this->travel(1)->minutes();
+        $this->assertSame(200, $this->cancel($orderId, ['made_item_ids' => []])->getStatusCode());
+        $after = DB::table('restaurant_orders')->find($orderId);
+        $this->assertEquals($first->id, $after->cancelled_by);
+        $this->assertSame($original->cancelled_at, $after->cancelled_at);
+        $this->assertEquals(1, DB::table('restaurant_order_items')->find($itemId)->was_made);
+    }
 
     public function test_cancel_waiter_held_order_soft_cancels_and_frees_table(): void
     {

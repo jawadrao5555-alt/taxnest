@@ -327,6 +327,35 @@ class PosKotDeltaQtyCarryTest extends TestCase
         });
     }
 
+    public function test_scheduled_offer_survives_kot_split_and_requires_refresh_after_expiry(): void
+    {
+        Schema::create('pos_products', function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->string('name');$t->decimal('price',12,2);$t->decimal('cost_price',12,4)->nullable();$t->boolean('is_active')->default(true);$t->boolean('is_tax_exempt')->default(false);$t->timestamps();});
+        (require database_path('migrations/2026_12_21_000005_add_pos_scheduled_promotions.php'))->up();
+        $company=$this->makeCompany();$this->subscribe($company);$this->makeCashier($company);$table=$this->makeTable($company);
+        $product=\App\Models\PosProduct::create(['company_id'=>$company->id,'name'=>'Offer bottle','price'=>100,'cost_price'=>30,'is_active'=>true]);
+        $offer=\App\Models\PosPromotion::create(['company_id'=>$company->id,'title'=>'Kitchen offer','percent'=>10,'priority'=>1,'timezone'=>'Asia/Karachi','starts_at'=>now('UTC')->subHour()->format('Y-m-d H:i:s'),'ends_at'=>now('UTC')->addHour()->format('Y-m-d H:i:s'),'applies_to'=>'all','is_active'=>true]);
+        $item=['item_type'=>'product','item_id'=>$product->id,'quantity'=>1,'unit_price'=>100];
+        $first=$this->hold(['items'=>[$item],'order_type'=>'dine_in','table_id'=>$table]);$this->assertSame(200,$first->getStatusCode(),$first->getContent());
+        $id=json_decode($first->getContent(),true)['order']['id'];$this->stampPrinted($id);
+        $item['quantity']=3;
+        $again=$this->hold(['items'=>[$item],'order_type'=>'dine_in','table_id'=>$table,'recalled_order_id'=>$id]);$this->assertSame(200,$again->getStatusCode(),$again->getContent());
+        $id=json_decode($again->getContent(),true)['order']['id'];$order=RestaurantOrder::findOrFail($id)->load('items');
+        $this->assertCount(2,$order->items);$this->assertEquals(270,$order->items->sum('subtotal'));$this->assertEquals(30,$order->items->sum('promotion_discount'));
+        $offer->update(['ends_at'=>now('UTC')->format('Y-m-d H:i:s')]);
+        try { app(RestaurantPosController::class)->payOrder(Request::create('/pay','POST',['payment_method'=>'cash']),$id);$this->fail('Expired offer paid without refresh.'); }
+        catch(\Illuminate\Validation\ValidationException $e){$this->assertArrayHasKey('items',$e->errors());}
+        $this->assertNull($order->fresh()->pos_transaction_id);
+        $offer->update(['ends_at'=>now('UTC')->addHour()->format('Y-m-d H:i:s')]);
+        // Explicit refresh/resave obtains the newly versioned quote and keeps printed quantities intact.
+        $refreshed=$this->hold(['items'=>[$item],'order_type'=>'dine_in','table_id'=>$table,'recalled_order_id'=>$id]);
+        $this->assertSame(200,$refreshed->getStatusCode(),$refreshed->getContent());$id=json_decode($refreshed->getContent(),true)['order']['id'];
+        $paid=app(RestaurantPosController::class)->payOrder(Request::create('/pay','POST',['payment_method'=>'cash']),$id);
+        $this->assertSame(200,$paid->getStatusCode(),$paid->getContent());
+        $tx=\App\Models\PosTransaction::findOrFail(RestaurantOrder::find($id)->pos_transaction_id);$line=$tx->items->sole();
+        $this->assertEquals(270,$tx->total_amount);$this->assertEquals(30,$line->promotion_discount);$this->assertSame('Kitchen offer',$line->promotion_snapshot['title']);
+        $this->assertEquals(30,$line->promotion_snapshot['discount']);$this->assertEquals(270,$line->promotion_snapshot['net']);
+    }
+
     // ── Seed helpers ─────────────────────────────────────────────────────
 
     private function makeCompany(): Company

@@ -29,6 +29,7 @@ class PosStockInLine extends Model
         'qty',
         'unit',
         'rate',
+        'unit_snapshot',
         'branch_id',
         'reference_override',
         'notes',
@@ -46,6 +47,7 @@ class PosStockInLine extends Model
     protected $casts = [
         'qty' => 'float',
         'rate' => 'float',
+        'unit_snapshot' => 'array',
         'selected' => 'boolean',
         'posted_at' => 'datetime',
     ];

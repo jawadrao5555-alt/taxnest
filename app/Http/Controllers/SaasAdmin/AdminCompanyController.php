@@ -365,6 +365,8 @@ class AdminCompanyController extends Controller
     {
         $company = Company::withTrashed()->with(['franchise', 'activeSubscription', 'requestedPlan'])->findOrFail($id);
         $usageStats = CompanyUsageStat::refreshForCompany($id);
+        $accountOverview = \App\Services\CompanyAccountOverview::for($company);
+        $company->setRelation('activeSubscription', $accountOverview['current']);
 
         $extraStats = [];
         if ($company->product_type === 'di') {
@@ -407,7 +409,7 @@ class AdminCompanyController extends Controller
         }
 
         $extraStats['total_users'] = User::where('company_id', $id)->count();
-        $extraStats['active_subscription'] = Subscription::where('company_id', $id)->where('active', true)->with('pricingPlan')->first();
+        $extraStats['active_subscription'] = $accountOverview['current'];
 
         // Archive Viewer accounts (only meaningful for POS companies).
         $archiveViewers = User::where('company_id', $id)
@@ -463,7 +465,7 @@ class AdminCompanyController extends Controller
             ->filter(fn ($p) => !\App\Services\PlanSellabilityService::isRetired($p))
             ->values();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings'));
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans', 'groupMember', 'groupSiblings', 'accountOverview'));
     }
 
     /**
@@ -1027,20 +1029,29 @@ class AdminCompanyController extends Controller
         return back()->with('success', "Company '{$company->name}' has been rejected.");
     }
 
-    public function suspend($id)
+    public function suspend(Request $request, $id)
     {
-        $company = Company::findOrFail($id);
-        $company->update(['status' => 'suspended', 'company_status' => 'suspended', 'suspended_at' => now()]);
-        AdminAuditLog::log(auth('admin')->id(), 'Company suspended', 'Company', $id, ['name' => $company->name]);
-        return back()->with('success', "Company '{$company->name}' has been suspended.");
+        return $this->changeCompanyState($request, (int) $id, false);
     }
 
-    public function activate($id)
+    public function activate(Request $request, $id)
     {
-        $company = Company::findOrFail($id);
-        $company->update(['status' => 'approved', 'company_status' => 'active', 'suspended_at' => null]);
-        AdminAuditLog::log(auth('admin')->id(), 'Company activated', 'Company', $id, ['name' => $company->name]);
-        return back()->with('success', "Company '{$company->name}' has been activated.");
+        return $this->changeCompanyState($request, (int) $id, true);
+    }
+
+    private function changeCompanyState(Request $request, int $id, bool $activate)
+    {
+        $data = $request->validate([
+            // Versioned forms require a reason; existing unversioned clients remain compatible.
+            'reason' => [$request->filled('state_token') ? 'required' : 'nullable', 'string', 'max:1000'],
+            'restoration_condition' => ['nullable', 'string', 'max:1000'],
+            'state_token' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/D'],
+        ]);
+        $result = \App\Services\CompanyAccountStateService::change($id, $activate, (int) auth('admin')->id(), $data);
+        if ($request->wantsJson()) {
+            return response()->json(['success' => !$result['conflict']] + $result, $result['conflict'] ? 409 : 200);
+        }
+        return back()->with($result['conflict'] ? 'error' : 'success', $result['message']);
     }
 
     public function updateLimits(Request $request, $id)
@@ -1215,6 +1226,7 @@ class AdminCompanyController extends Controller
         // that blocks re-registration), hs_* logs (global HS intelligence).
         // Schema guards keep this safe during the deploy-before-migrate window.
         $orphanTables = [
+            'pos_promotions', 'pos_deleted_history_totals',
             'pos_whatsapp_status_events', 'pos_whatsapp_outbox',
             'pos_riders', 'pos_rider_settlements', 'pos_day_close_reports',
             'pos_deals', 'pos_deal_usages', 'pos_stations', 'pos_menu_items', 'pos_print_jobs',

@@ -37,8 +37,8 @@ class IngredientController extends Controller
     public function kitchenReport(Request $request)
     {
         $request->validate([
-            'from' => 'nullable|date',
-            'to' => 'nullable|date|after_or_equal:from',
+            'from' => 'nullable|date_format:Y-m-d',
+            'to' => 'nullable|date_format:Y-m-d|after_or_equal:from',
         ]);
         $companyId = (int) app('currentCompanyId');
         $from = $request->input('from');
@@ -85,6 +85,7 @@ class IngredientController extends Controller
         }
 
         if (Schema::hasTable('recipe_consumptions') && Schema::hasTable('ingredients')) {
+            $frozenCost = Schema::hasColumn('recipe_consumptions', 'unit_cost') ? 'rc.unit_cost' : 'NULL';
             $query = DB::table('recipe_consumptions as rc')
                 ->join('ingredients as i', function ($join) {
                     $join->on('i.id', '=', 'rc.ingredient_id')
@@ -94,7 +95,8 @@ class IngredientController extends Controller
                 ->where('rc.ingredient_id', '>', 0)
                 ->select('i.name as ingredient_name', 'i.unit', 'i.cost_per_unit',
                     DB::raw('SUM(rc.quantity) as quantity'),
-                    DB::raw('SUM(rc.quantity * i.cost_per_unit) as cost'))
+                    DB::raw("SUM(rc.quantity * {$frozenCost}) as cost"),
+                    DB::raw("SUM(CASE WHEN {$frozenCost} IS NULL THEN 1 ELSE 0 END) AS unknown_cost_count"))
                 ->groupBy('i.id', 'i.name', 'i.unit', 'i.cost_per_unit')
                 ->orderByDesc('cost');
             if ($from) $query->whereDate('rc.created_at', '>=', $from);
@@ -178,13 +180,16 @@ class IngredientController extends Controller
             && Ingredient::where('company_id', $companyId)->whereRaw('LOWER(code) = ?', [strtolower($code)])->exists()) {
             return back()->withInput()->with('error', 'Yeh ingredient code pehle se mojood hai.');
         }
+        $factor = \App\Services\IngredientUnitConversion::configuredFactor(
+            $request->input('base_unit') ?: $request->unit, $request->unit, $request->input('conversion_factor')
+        );
         $ingredient = Ingredient::create([
             'company_id' => $companyId,
             'code' => $code !== '' && Schema::hasColumn('ingredients', 'code') ? $code : null,
             'name' => $request->name,
             'unit' => $request->unit,
             'base_unit' => $request->input('base_unit') ?: $request->unit,
-            'conversion_factor' => (float) ($request->input('conversion_factor') ?: 1),
+            'conversion_factor' => $factor,
             'cost_per_unit' => $request->cost_per_unit,
             // Opening stock is posted through the same locked adjustment
             // ledger below; do not seed it here and count it twice.
@@ -229,7 +234,7 @@ class IngredientController extends Controller
         // conversion workflow.
         $newUnit = (string) $request->input('unit');
         $newBaseUnit = (string) ($request->input('base_unit') ?: $newUnit);
-        $newFactor = (float) ($request->input('conversion_factor') ?: 1);
+        $newFactor = \App\Services\IngredientUnitConversion::configuredFactor($newBaseUnit, $newUnit, $request->input('conversion_factor'), $ingredient);
         $unitMeaningChanged = $newUnit !== (string) $ingredient->unit
             || $newBaseUnit !== (string) ($ingredient->base_unit ?: $ingredient->unit)
             || abs($newFactor - (float) ($ingredient->conversion_factor ?: 1)) > 0.000001;
@@ -263,7 +268,7 @@ class IngredientController extends Controller
             'name' => $request->name,
             'unit' => $request->unit,
             'base_unit' => $request->input('base_unit') ?: $request->unit,
-            'conversion_factor' => (float) ($request->input('conversion_factor') ?: 1),
+            'conversion_factor' => $newFactor,
             'cost_per_unit' => $request->cost_per_unit,
             'min_stock_level' => $request->min_stock_level,
             'is_active' => $request->boolean('is_active', true),

@@ -175,7 +175,11 @@ class PraIntegrationService
                 return (float) $item->unit_price > 0 && (float) $item->quantity > 0;
             })
             ->values()
-            ->map(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive, $menuRate, $hotelCredit) {
+            ->flatMap(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive, $menuRate, $hotelCredit) {
+                if (PosDealAllocation::supported($item->deal_snapshot)
+                    && isset($item->deal_snapshot[0]['allocation'])) {
+                    return PosDealAllocation::payloadItems($item->deal_snapshot, (float) $item->quantity);
+                }
                 $qty = (float) $item->quantity;
                 $unitPrice = (float) $item->unit_price;
                 $lineSubtotal = (float) $item->subtotal;
@@ -183,7 +187,7 @@ class PraIntegrationService
                     // Hotel line subtotal already includes its original item discount.
                     $unitPrice = round($lineSubtotal / $qty, 2);
                 }
-                $itemDiscount = $shareBase > 0 ? round($totalDiscount * ($lineSubtotal / $shareBase), 2) : 0;
+                $itemDiscount = $item->allocated_discount ?? ($shareBase > 0 ? round($totalDiscount * ($lineSubtotal / $shareBase), 2) : 0);
                 $perUnitDiscount = $qty > 0 ? round($itemDiscount / $qty, 2) : 0;
                 $saleValuePerUnit = round($unitPrice - $perUnitDiscount, 2);
                 if ($saleValuePerUnit <= 0) {
@@ -215,7 +219,13 @@ class PraIntegrationService
                     $totalAmount = round($lineSaleValue + $taxCharged, 2);
                 }
 
-                return [
+                if ($item->taxable_base !== null && $item->exempt_base !== null) {
+                    $lineSaleValue = round((float) $item->taxable_base + (float) $item->exempt_base, 2);
+                    $taxCharged = (float) $item->tax_amount;
+                    $totalAmount = round($lineSaleValue + $taxCharged, 2);
+                }
+
+                return [[
                     'ItemCode' => $item->item_id ? sprintf('%04d', $item->item_id) : sprintf('IT_%04d', $index + 1),
                     'ItemName' => preg_replace('/[^a-zA-Z0-9\s]/', '', $item->item_name),
                     'Quantity' => $qty,
@@ -232,7 +242,7 @@ class PraIntegrationService
                     'FurtherTax' => 0.0,
                     'InvoiceType' => 1,
                     'RefUSIN' => null,
-                ];
+                ]];
             })->toArray();
 
         $paymentMode = self::PAYMENT_MODE_MAP[$transaction->payment_method] ?? 1;

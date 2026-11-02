@@ -84,7 +84,8 @@ complete history is **not proven** and absent past events cannot be recovered.
 ## Release and operator boundary
 
 Owner Admin approval is required. Do not bypass the exact receipt/announcement
-gate. The preceding #312 deployment failed its Elaan preflight; that is a separate
-known release blocker, not fixed or waived by this diagnostic implementation.
+gate. The historical #312 Elaan failure was followed by release corrections #322/#323
+and successful subsequent deployments. This refreshed PR integrates #327
+without replacing its Day Close tools or claiming complete diagnostic coverage.
 Only successful exact-SHA Actions deployment/live verification/callback can
 establish live status. No production access or dispatch is performed by this PR.

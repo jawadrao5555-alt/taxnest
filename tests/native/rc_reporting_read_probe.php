@@ -44,6 +44,19 @@ try {
     $reports->taxItems($args, $scope);
     $reports->operations($args, $scope);
     $reports->payments($args, $scope);
+    $cashArgs = ['company_name' => $case['companyName'], 'date_from' => $case['dayCloseDate']];
+    $before = \Illuminate\Support\Facades\DB::table('pos_day_close_reports')->where('company_id', $case['companyId'])->orderBy('id')->get()->toJson();
+    $cash = $reports->dayClose($cashArgs, $scope);
+    if (count($cash['records']) !== 1 || $cash['records'][0]['arithmetic']['calculated_expected'] !== 750.0
+        || $cash['records'][0]['arithmetic']['expected_check'] !== 'PASS' || $cash['coverage']['complete'] !== false
+        || str_contains(json_encode($cash), 'SYNTHETIC-PRIVATE-RIDER')) {
+        throw new RuntimeException('Native frozen cash evidence mismatch.');
+    }
+    foreach (['openings', 'counter_closes'] as $stream) $reports->dayClose($cashArgs + ['stream' => $stream], $scope);
+    if ($before !== \Illuminate\Support\Facades\DB::table('pos_day_close_reports')->where('company_id', $case['companyId'])->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native read changed frozen cash evidence.');
+    }
+    echo "NATIVE CASH EVIDENCE PASS: literal date, numeric snapshot arithmetic, redaction and unchanged business rows.\n";
     echo "NATIVE READONLY REPORTS PASS: known source totals, bill/item evidence, stock/print/agent and payment snapshots.\n";
 
 } catch (Throwable $e) {

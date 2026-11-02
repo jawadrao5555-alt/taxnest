@@ -42,15 +42,16 @@
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
         <section class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h2 class="font-semibold text-gray-900 dark:text-white">Food cost by ingredient</h2>
+                <h2 class="font-semibold text-gray-900 dark:text-white">Recorded food cost by ingredient</h2>
                 <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Rs. {{ number_format((float) $foodCostTotal, 2) }}</span>
             </div>
+            <p class="px-4 py-2 text-xs text-gray-500">Recorded costs use sale snapshots. Older movements without a snapshot are unknown; current ingredient prices are not substituted.</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-500 dark:text-gray-400"><tr><th class="text-left px-4 py-3">Ingredient</th><th class="text-right px-4 py-3">Consumed</th><th class="text-right px-4 py-3">Cost</th></tr></thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                     @forelse($foodCost as $row)
-                        <tr><td class="px-4 py-3 text-gray-900 dark:text-white">{{ $row->ingredient_name }} <span class="text-xs text-gray-400">{{ $row->unit }}</span></td><td class="px-4 py-3 text-right">{{ number_format((float) $row->quantity, 4) }}</td><td class="px-4 py-3 text-right">Rs. {{ number_format((float) $row->cost, 2) }}</td></tr>
+                        <tr><td class="px-4 py-3 text-gray-900 dark:text-white">{{ $row->ingredient_name }} <span class="text-xs text-gray-400">{{ $row->unit }}</span></td><td class="px-4 py-3 text-right">{{ number_format((float) $row->quantity, 4) }}</td><td class="px-4 py-3 text-right">{{ $row->cost === null ? 'Unknown' : 'Rs. ' . number_format((float) $row->cost, 2) }}<span class="block text-xs">{{ $row->unknown_cost_count ?? 0 }} movements without frozen cost</span></td></tr>
                     @empty
                         <tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">No recipe cost recorded in this period.</td></tr>
                     @endforelse

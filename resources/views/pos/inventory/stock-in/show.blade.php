@@ -92,6 +92,10 @@
                     <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full font-semibold {{ $badge }}">{{ $line->match_status }}</span></td>
                     <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
                         {{ $line->invalid_reason }}
+                        @if($line->unit_snapshot)
+                            <span class="block text-xs">Receive {{ $line->unit_snapshot['usage_quantity'] }} {{ $line->unit_snapshot['usage_unit'] }} (× {{ $line->unit_snapshot['factor'] }})
+                            @if($line->unit_snapshot['usage_rate'] !== null) · Rs. {{ number_format($line->unit_snapshot['usage_rate'], 6) }} / {{ $line->unit_snapshot['usage_unit'] }} @endif</span>
+                        @endif
                         @if($line->posted_at)
                             <span class="block text-emerald-700">{{ __('pos.stock_in_line_posted') }}</span>
                         @endif

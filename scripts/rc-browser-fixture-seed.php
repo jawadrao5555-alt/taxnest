@@ -247,6 +247,18 @@ $riderLive->update(['app_token' => hash('sha256', $riderLiveToken)]);
 $tableManager = $user($tableShop, 'Synthetic Transfer Manager', 'table-manager@rc-browser.invalid', 'user', 'pos_manager');
 // Separate fictional companies keep read-only phone-search proof independent of
 // transactional table/rider journeys and exercise the real company-scoped routes.
+// Independent opt-in auto-KOT fixture: selection cancellation must never post an order.
+$b03Shop=$company('Synthetic B03 auto KOT','b03-auto-company@rc-browser.invalid','RCBROWSERB03','pos',[
+    'business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,
+    'feature_flags'=>PosFeatureService::defaultsForCategory('restaurant'),'pos_integration_mode'=>'pra',
+    'pos_setup_completed'=>true,'pos_guided_flow_enabled'=>false,'dine_in_auto_kot'=>true,
+    'pos_tax_rate_cash'=>0,'pos_tax_rate_card'=>0,
+]);
+$b03Owner=$user($b03Shop,'Synthetic B03 owner','b03-owner@rc-browser.invalid','company_admin','pos_admin');
+$b03Product=\App\Models\PosProduct::forceCreate(['company_id'=>$b03Shop->id,'name'=>'Synthetic B03 draft meal','price'=>100,'is_active'=>true,'is_tax_exempt'=>false]);
+$b03Floor=RestaurantFloor::create(['company_id'=>$b03Shop->id,'name'=>'Synthetic B03 floor','is_active'=>true]);
+$b03Table=RestaurantTable::create(['company_id'=>$b03Shop->id,'floor_id'=>$b03Floor->id,'table_number'=>'B03-1','seats'=>4,'status'=>'available','is_active'=>true]);
+
 $contactShop = $company('Synthetic Contact Search', 'contact-company@rc-browser.invalid', 'RCBROWSERCONTACT', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
@@ -539,6 +551,14 @@ $amountCompany = $company('Synthetic Customer Amount Audit', 'amount-company@rc-
     'pra_reporting_enabled' => false, 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
 ]);
 $amountOwner = $user($amountCompany, 'Synthetic Amount Owner', 'amount-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+// Historical frozen cash evidence for the read-only connector; no close action or fiscal call.
+$diagnosticDate = $now->copy()->subDays(7)->toDateString();
+\App\Models\PosDayCloseReport::forceCreate([
+    'company_id' => $amountCompany->id, 'branch_id' => 0, 'report_date' => $diagnosticDate, 'report_number' => 'RC-DIAGNOSTIC-CASH',
+    'opening_float' => 0, 'cash_amount' => 800, 'card_amount' => 200, 'expected_cash' => 750, 'counted_cash' => 760, 'cash_variance' => 10,
+    'rider_summary' => ['cash_out' => 100, 'cash_in' => 50, 'notes' => 'SYNTHETIC-PRIVATE-RIDER'],
+    'counter_summary' => [['terminal_id' => 0, 'opening' => 0, 'cash_sales' => 800, 'rider_out' => 100, 'rider_in' => 50, 'expected' => 750, 'counted' => 760, 'variance' => 10]],
+]);
 $amountCustomer = \App\Models\PosCustomer::create([
     'company_id' => $amountCompany->id, 'name' => 'Synthetic Amount Customer', 'phone' => '00000000111',
 ]);
@@ -729,6 +749,47 @@ try {
 }
 if (!$adminPreviewCsp) throw new RuntimeException('Production CSP missing from preview fixture');
 
+// B02 has its own fictional tenant; existing journeys and their counts stay isolated.
+$b02Company = $company('Synthetic B02 shop', 'b02-company@rc-browser.invalid', 'RCB02-001', 'pos', [
+    'business_category' => 'restaurant', 'pos_type' => 'restaurant',
+    'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
+    'restaurant_mode' => true, 'pos_integration_mode' => 'pra', 'pos_setup_completed' => true,
+    'pos_guided_flow_enabled' => false, 'inventory_enabled' => false, 'pra_reporting_enabled' => false,
+    'pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 5, 'pos_tax_pricing_mode' => 'exclusive',
+]);
+$b02Owner = $user($b02Company, 'Synthetic B02 owner', 'b02-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+$b02Plan = \App\Models\PricingPlan::create(['name' => 'Synthetic B02 package', 'product_type' => 'pos',
+    'invoice_limit' => 100, 'price' => 100, 'is_trial' => false, 'deals_enabled' => true]);
+\App\Models\Subscription::create(['company_id' => $b02Company->id, 'pricing_plan_id' => $b02Plan->id,
+    'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addDays(30)->toDateString(), 'active' => true]);
+$b02Food = \App\Models\PosProduct::create(['company_id' => $b02Company->id, 'name' => 'Synthetic B02 food',
+    'price' => 800, 'cost_price' => 300, 'category' => 'Food', 'is_active' => true, 'show_on_sale' => true]);
+$b02Drink = \App\Models\PosProduct::create(['company_id' => $b02Company->id, 'name' => 'Synthetic B02 drink',
+    'price' => 200, 'cost_price' => 30, 'category' => 'Drinks', 'is_tax_exempt' => true, 'is_active' => true, 'show_on_sale' => true]);
+$b02Deal = \App\Models\PosDeal::create(['company_id' => $b02Company->id, 'name' => 'Synthetic B02 mixed meal', 'price' => 800, 'is_active' => true]);
+foreach ([$b02Food, $b02Drink] as $component) DB::table('pos_deal_items')->insert([
+    'deal_id' => $b02Deal->id, 'pos_product_id' => $component->id, 'quantity' => 1, 'created_at' => $now, 'updated_at' => $now,
+]);
+
+// B01 isolates each viewport's company; account review never changes a real paid term.
+$b01Cases = [];
+$b01Plan = \App\Models\PricingPlan::create(['name'=>'Synthetic B01 catalogue', 'product_type'=>'pos',
+    'price'=>9999, 'invoice_limit'=>100, 'user_limit'=>2, 'branch_limit'=>1, 'is_active'=>true, 'is_trial'=>false]);
+foreach ([1366, 390] as $b01Width) {
+    $b01Company = $company('Synthetic B01 '.$b01Width, 'b01-'.$b01Width.'@rc-browser.invalid', 'RCB01-'.$b01Width, 'pos', ['is_internal_account'=>false]);
+    $b01Sub = \App\Models\Subscription::create(['company_id'=>$b01Company->id, 'pricing_plan_id'=>$b01Plan->id,
+        'billing_cycle'=>'annual', 'start_date'=>'2025-01-01', 'end_date'=>'2025-12-31', 'final_price'=>12499, 'active'=>true]);
+    $b01Charge = \App\Models\SubscriptionInvoice::create(['company_id'=>$b01Company->id, 'subscription_id'=>$b01Sub->id,
+        'amount'=>12499, 'status'=>'pending', 'due_date'=>'2025-01-01']);
+    \App\Models\SubscriptionPayment::create(['subscription_invoice_id'=>$b01Charge->id, 'amount'=>200,
+        'payment_method'=>'bank_transfer', 'transaction_ref'=>'RC-B01-PAY-'.$b01Width, 'paid_at'=>$now]);
+    \App\Models\PaymentProof::create(['company_id'=>$b01Company->id, 'amount'=>200, 'payment_method'=>'bank_transfer',
+        'reference'=>'RC-B01-PROOF-'.$b01Width, 'payment_date'=>$now, 'status'=>'pending',
+        'proof_path'=>'synthetic/pruned-b01.png', 'file_pruned_at'=>$now]);
+    $b01Cases[$b01Width] = ['companyId'=>$b01Company->id, 'subId'=>$b01Sub->id, 'paymentRef'=>'RC-B01-PAY-'.$b01Width,
+        'proofRef'=>'RC-B01-PROOF-'.$b01Width, 'foreignRef'=>'RC-B01-PROOF-'.($b01Width===1366?390:1366)];
+}
+
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -738,7 +799,7 @@ $fixture = [
         ['name'=>'fbr-identity-settings','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/settings/identities'],'markers'=>['Branch / terminal FBR identity']],
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
-            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString(), 'diagnosticBillId'=>$amountBill->id, 'diagnosticJobId'=>$diagnosticJob->id]],
+            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString(), 'dayCloseDate'=>$diagnosticDate, 'diagnosticBillId'=>$amountBill->id, 'diagnosticJobId'=>$diagnosticJob->id]],
         ['name'=>'whatsapp-optional-autosend','login'=>$waOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/settings/whatsapp-delivery'],'markers'=>['WhatsApp auto-send'], 'whatsappAutoSend'=>true],
         ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
@@ -770,6 +831,12 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',
+            'paths'=>[], 'b01Account'=>$b01Cases],
+        ['name'=>'b03-auto-kot','login'=>$b03Owner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],
+            'b03AutoKot'=>['product'=>$b03Product->name,'tableId'=>$b03Table->id,'tableNumber'=>$b03Table->table_number]],
+        ['name' => 'pra-b02-deal', 'login' => $b02Owner->email, 'password' => $password, 'loginPath' => '/pos/login',
+            'paths' => ['/pos/invoice/create'], 'markers' => ['Current Order'], 'b02Deal' => ['name' => $b02Deal->name, 'product' => $b02Food->name]],
         ['name' => 'fbr-owner-reconciliation', 'login' => $fiscalUser->email, 'password' => $password,
             'loginPath' => '/fbr-pos/login', 'paths' => ['/fbr-pos/fail-queue'],
             'markers' => ['FBR Fail Queue'], 'fbrReconciliation' => $reconcileCases],

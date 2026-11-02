@@ -984,7 +984,7 @@ class HealthAccountsSettlementsTest extends TestCase
 
     public function test_a_period_cannot_be_closed_while_an_earlier_one_is_open(): void
     {
-        $earlier = Periods::ensureFor($this->companyId(), now()->subMonth()->startOfMonth()->toDateString());
+        $earlier = Periods::ensureFor($this->companyId(), now()->startOfMonth()->subMonth()->toDateString());
         $later = Periods::ensureFor($this->companyId(), now()->startOfMonth()->toDateString());
 
         $this->assertNotNull($earlier);

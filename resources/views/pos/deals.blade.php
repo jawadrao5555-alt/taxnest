@@ -36,6 +36,7 @@
     </div>
     @endif
 
+    <a class="inline-block mb-5 px-4 py-2 rounded-lg bg-purple-700 text-white" href="{{ route('pos.promotions') }}">{{ __('pos_promotions.title') }}</a>
     {{-- Add New Deal --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
          x-data="Object.assign(dealComposer({{ json_encode($restoringCreateDeal ? old('items', []) : [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}, {{ json_encode($restoringCreateDeal ? old('choice_groups', []) : [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}), { dealType: @js($restoringCreateDeal ? old('deal_type', 'regular') : 'regular') })">

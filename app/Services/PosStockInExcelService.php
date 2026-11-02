@@ -206,10 +206,10 @@ class PosStockInExcelService
                 ->get();
             if ($hits->count() === 1) {
                 $ing = $hits->first();
-                if ($unit !== '' && strtolower((string) $ing->unit) !== $unit) {
-                    return $this->status(PosStockInLine::INVALID, __('pos.stock_in_unit_mismatch', [
-                        'file' => $unit, 'master' => $ing->unit,
-                    ]));
+                try {
+                    IngredientUnitConversion::factor($ing, $unit);
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    return $this->status(PosStockInLine::INVALID, $e->getMessage());
                 }
                 return $this->status(PosStockInLine::MATCHED, null, ingredientId: (int) $ing->id);
             }
@@ -230,8 +230,10 @@ class PosStockInExcelService
 
         $hits = Ingredient::where('company_id', $companyId)
             ->whereRaw('LOWER(name) = ?', [$name])
-            ->whereRaw('LOWER(unit) = ?', [$unit])
-            ->get();
+            ->get()->filter(function ($ingredient) use ($unit) {
+                try { IngredientUnitConversion::factor($ingredient, $unit); return true; }
+                catch (\Illuminate\Validation\ValidationException $e) { return false; }
+            });
         if ($hits->count() === 1) {
             return $this->status(PosStockInLine::MATCHED, null, ingredientId: (int) $hits->first()->id);
         }

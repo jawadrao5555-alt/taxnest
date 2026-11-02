@@ -1,3 +1,6 @@
+import { b01CompanyAccountWorkflow } from './lib/b01-company-account-browser.mjs';
+import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow } from './lib/pra-b03-browser.mjs';
+import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -26,7 +29,10 @@ regular.push({name:'sale-toast-header',login:toastCashier.login,password:toastCa
 const di = Object.entries(fixture.diUiRoleCases || {}).map(([name, item]) => ({ name, ...item }));
 // Exercise transactional table, settings and Hotel desk regressions first; retain every journey.
 const ordered = [...regular.filter(x=>x.mixedFulfillment), ...regular.filter(x=>x.tableOrderWorkflow), ...regular.filter(x=>x.hotelSettingsWorkflow), ...regular.filter(x=>x.hotelWorkflow), ...regular.filter(x=>!x.mixedFulfillment&&!x.hotelSettingsWorkflow&&!x.tableOrderWorkflow&&!x.hotelWorkflow)];
-const cases = requested.length ? ordered.filter(x => requested.includes(x.name)) : ordered;
+// Exercise the new B02 payment contract before the broad screen sweep so a
+// checkout regression produces evidence promptly. Every original case remains.
+const cases = requested.length ? ordered.filter(x => requested.includes(x.name))
+  : [...ordered.filter(x=>x.b01Account), ...ordered.filter(x=>x.b02Deal), ...ordered.filter(x=>!x.b01Account&&!x.b02Deal)];
 const requestedIsolation = requested.includes('health-isolation');
 const unknown = requested.filter(name => name !== 'health-isolation' && ![...regular, ...di].some(x => x.name === name));
 if (unknown.length) throw new Error(`unknown requested journey: ${unknown.join(', ')}`);
@@ -1259,16 +1265,26 @@ async function reportingConnectorWorkflow(page,t,v) {
   const timeline=await (await incident(f.companyName)).json(), evidence=timeline.result?.structuredContent;
   if(timeline.result?.isError||evidence?.events?.length!==2||evidence.events[1].job_id!==f.diagnosticJobId||evidence.events[1].details.outcome!=='spool_accepted'||evidence.physical_print!=='unknown'||evidence.coverage.complete!==false||JSON.stringify(evidence).includes('FICTIONAL_DIAGNOSTIC_SECRET'))throw new Error('Correlated diagnostic evidence/redaction/gaps failed');
   if(!(await (await incident(f.foreignCompanyName)).json()).result?.isError)throw new Error('Foreign diagnostic scope leaked');
+  const diagnostic=async(name,args)=>request.post(baseUrl+'/api/reporting/mcp',{headers:{Authorization:'Bearer '+tokens.access_token},data:{jsonrpc:'2.0',id:2,method:'tools/call',params:{name,arguments:args}}});
+  const cashArgs={company_name:f.companyName,date_from:f.dayCloseDate};
+  const cash=await(await diagnostic('get_pra_day_close_evidence',cashArgs)).json();
+  if(cash.result?.isError||cash.result?.structuredContent?.records?.[0]?.arithmetic?.calculated_expected!==750||cash.result?.structuredContent?.coverage?.complete!==false)throw new Error('Scoped native cash snapshot was not returned as partial evidence');
+  const cashForeign=await(await diagnostic('get_pra_day_close_evidence',{...cashArgs,company_name:f.foreignCompanyName})).json();
+  if(!cashForeign.result?.isError)throw new Error('Foreign cash evidence leaked');
+  const coverage=await(await diagnostic('get_diagnostic_coverage',{product:'pos',limit:1})).json();
+  if(coverage.result?.structuredContent?.complete!==false||coverage.result?.structuredContent?.tenant_checks_run!==0)throw new Error('Capability inventory claimed complete tenant health');
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
   await page.locator('[data-reporting-onboarding]').waitFor();
   const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
-  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 2.'))throw new Error('Successful read evidence missing or failed foreign read counted');
+  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 4.'))throw new Error('Successful read evidence missing or failed foreign read counted');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-read-evidence');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
   if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
   if((await report(f.companyName)).status()!==401)throw new Error('Revoked token retained billing access');
   if((await incident(f.companyName)).status()!==401)throw new Error('Revoked token retained diagnostic access');
-  pass(t.name+'/'+v.width+': real consent, PKCE, native billing and job-purge-resistant redacted print timeline, foreign-company denial and immediate revoke');
+  if((await diagnostic('get_pra_day_close_evidence',cashArgs)).status()!==401)throw new Error('Revoked token retained cash evidence access');
+  if((await diagnostic('get_diagnostic_coverage',{})).status()!==401)throw new Error('Revoked token retained diagnostic catalog access');
+  pass(t.name+'/'+v.width+': real consent, PKCE, native billing/cash, retained print timeline, coverage gaps, foreign-company denial and immediate revoke');
 }
 
 async function liveOpsReadability(page,t,v) {
@@ -1398,7 +1414,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   if(!/phone/i.test(await search.getAttribute('placeholder')))throw new Error('Phone search hint missing');
   const current=page.locator('tr[data-delrow]'),old=page.locator('tr[data-oldrow]');
   if(await current.count()!==2||await old.count()!==1)throw new Error('Current/old delivery groups changed');
-  for(const query of ['03001234567','0300 123-4567','1234567']) {
+  for(const query of ['03001234567','0300 123-4567','1234567','+92 300 1234567','0092 300 1234567']) {
     await search.fill(query);
     await page.waitForFunction(()=>document.querySelector('#del-count')?.textContent==='1');
     // The board input updates the count synchronously, but its existing
@@ -1433,7 +1449,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   const input=popup.locator('[name="pdsearch_nofill"]');
   await input.waitFor({state:'visible'});
   await popup.locator('xpath=.//button[@*[name()="@click"]="showOldDeliveries = !showOldDeliveries"]').click();
-  for(const query of ['03001234567','0300-123-4567','1234567']) {
+  for(const query of ['03001234567','0300-123-4567','1234567','+92 300 1234567','0092 300 1234567']) {
     await input.fill(query);
     await page.waitForFunction(()=>{
       const popup=document.querySelector('[x-show="showPendingDeliveries"]');
@@ -1450,10 +1466,14 @@ async function deliveryContactSearchWorkflow(page,t,v) {
   await page.waitForFunction(()=>document.querySelector('[x-show="showPendingDeliveries"]').innerText.includes('Synthetic Contact A'));
   if((await popup.innerText()).includes('Synthetic Foreign Contact Bill')||await snapshot()!==before)
     throw new Error('Search changed saved bill values or leaked a foreign contact');
+  await b03DeliveryNavigationWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,loopback,login});
+  if(await snapshot()!==before)throw Error('B03 navigation changed stored delivery bills');
   pass(t.name+'/'+v.width+': actual board/popup formatted/full/partial phone, current/old counts, name/clear, scoped API and unchanged bill values');
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.b01Account)return b01CompanyAccountWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
+  if(t.b03AutoKot)return b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});
   if(t.optionalArchive)return optionalArchiveWorkflow(page,t,v);
   if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);
   if(t.whatsappAutoSend)return whatsappAutoSendWorkflow(page,t,v);
@@ -1588,6 +1608,7 @@ async function workflow(page,t,v,diagnostics) {
     pass(`${t.name}/${v.width}: all 13 cards opened, returned, filtered, exported and isolated invoice PDFs previewed/downloaded`);
     return;
   }
+  if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
@@ -1657,6 +1678,7 @@ async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
     await login(page,t.settingsOwner);
   await page.goto(baseUrl+'/pos/receipt-settings',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  await b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   await page.locator('[name="rp_font_family"]').selectOption('sans');
   await page.locator('[name="rp_item_text"]').selectOption('compact');
   await page.locator('[name="rp_wide_names"]').check();
@@ -2234,7 +2256,7 @@ async function one(browser,label,v,t) {
   }
 }
 const {browser}=await launchLocalBrowser();
-try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.mixedFulfillment||t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow)&&failures)throw new Error("Settings/table-order/Hotel preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
+try { if(!requested.length) { const fiscal=cases.find(t=>t.name==='fiscal'), mobile=views.find(([,v])=>v.width===390); if(fiscal&&mobile) { await one(browser,'mobile-fiscal-preflight',mobile[1],fiscal); if(failures)throw new Error('FBR mobile fiscal preflight failed; pointer-access acceptance remains required'); } } for(const [label,v]of views)for(const t of cases){await one(browser,label,v,t);if((t.b01Account||t.mixedFulfillment||t.hotelSettingsWorkflow||t.tableOrderWorkflow||t.hotelWorkflow||t.deliveryContactSearch||t.b03AutoKot)&&failures)throw new Error("Settings/table-order/Hotel/B03 preflight failed; required browser acceptance remains failed");} for(const [label,v]of views)if(!requested.length||requestedIsolation)await healthIsolation(browser,label,v,fixture.isolation); if(!requested.length&&!di.length)throw new Error('DI pending role fixture missing'); for(const [label,v]of views)for(const t of di)if(!requested.length||requested.includes(t.name))await one(browser,label,v,t); } finally {await browser.close();}
 if(failures){console.error(`RC BROWSER ACCEPTANCE FAIL: ${failures} assertion(s) failed.`);process.exit(1);}
 if(videoDirectory) {
   if(recorded.length !== cases.length * views.length)throw new Error('Incomplete tutorial recordings');

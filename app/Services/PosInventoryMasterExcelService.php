@@ -1913,7 +1913,12 @@ class PosInventoryMasterExcelService
                 if ($ambiguous) { $errors[]=$this->cellError($item,'Code/Ingredient Name','Ambiguous tenant-scoped ingredient identity.'); continue; }
                 $purchaseUnit=trim((string)($v[2]??'')); $usageUnit=trim((string)($v[3]??''));
                 $factor=$this->cleanImportNumber($v[4]??null);
-                if ($purchaseUnit===$usageUnit && $factor===null) $factor=1;
+                try {
+                    $factor = IngredientUnitConversion::configuredFactor($purchaseUnit, $usageUnit, $factor, $match);
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    $errors[] = $this->cellError($item, 'Conversion Factor', 'Use compatible units; pack/cup sizes require an explicit positive factor.');
+                    continue;
+                }
                 $purchaseCost=$this->cleanImportNumber($v[5]??null);
                 $fields=['name'=>trim((string)($v[0]??'')),'unit'=>$usageUnit,
                     'base_unit'=>$purchaseUnit,'conversion_factor'=>$factor,

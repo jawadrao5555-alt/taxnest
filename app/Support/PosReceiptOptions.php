@@ -30,6 +30,8 @@ final class PosReceiptOptions
     ];
 
     public const CHOICES = [
+        'design' => PosPrintDesigns::RECEIPTS,
+        'kot_design' => PosPrintDesigns::KOTS,
         'logo_position' => ['inherit' => 'Keep current', 'center' => 'Centre', 'side' => 'Beside business name'],
         'logo_size' => ['inherit' => 'Keep current', 'small' => 'Small', 'medium' => 'Medium', 'large' => 'Large'],
         'extra_qr_size' => ['inherit' => 'Keep current', 'small' => 'Small', 'medium' => 'Medium', 'large' => 'Large'],
@@ -45,6 +47,7 @@ final class PosReceiptOptions
     ];
 
     public const LABELS = [
+        'design' => 'Receipt design', 'kot_design' => 'Kitchen ticket design',
         'logo_position' => 'Logo position', 'logo_size' => 'Logo size', 'extra_qr_size' => 'Extra QR size',
         'font_family' => 'Font', 'item_text' => 'Item text size', 'item_bold' => 'Item text weight',
         'heading_size' => 'Heading size', 'heading_bold' => 'Heading weight',
@@ -136,7 +139,7 @@ final class PosReceiptOptions
                 $typography[$key] = $options[$key];
             }
         }
-        $css = PosReceiptTypography::css($typography, $paper);
+        $css = PosPrintDesigns::receiptCss($options, $paper).PosReceiptTypography::css($typography, $paper);
         foreach (['item_bold' => '.items-table td,.items-table td *', 'heading_bold' => '.header h1,.invoice-numbers>strong', 'total_bold' => '.grand-total td'] as $key => $selector) {
             if (in_array($options[$key] ?? '', ['normal', 'bold'], true)) {
                 $css .= $selector.'{font-weight:'.($options[$key] === 'bold' ? '700' : '400').' !important;}';

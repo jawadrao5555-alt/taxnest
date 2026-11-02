@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source=fs.readFileSync(new URL('../../resources/views/pos/universal.blade.php',import.meta.url),'utf8');
+function fixture(method){const start=source.indexOf('        '+method+'() {');assert.ok(start>0);const window={};const helper=new URL('../../public/js/pos-phone-identity.js',import.meta.url);if(fs.existsSync(helper))vm.runInNewContext(fs.readFileSync(helper,'utf8'),{window});return vm.runInNewContext('({'+source.slice(start,source.indexOf('\n        },',start)+11)+'})',{window});}
+for(const query of ['03001234567','+92 300 1234567','0092-300-1234567','3001234567'])test('Reprint matches equivalent '+query+' alongside type/payment filters',()=>{const u=fixture('filteredReprintBills');Object.assign(u,{reprintSearch:query,reprintOrderType:'delivery',reprintPayment:'cash',reprintBills:[{id:1,customer_phone:'0300-1234567',order_type:'delivery',payment_method:'cash'},{id:2,customer_phone:'03001234567',order_type:'takeaway',payment_method:'cash'},{id:3,customer_phone:'03001234567',order_type:'delivery',payment_method:'card'},{id:4,customer_phone:'+44 3001234567',order_type:'delivery',payment_method:'cash'}]});assert.deepEqual(Array.from(u.filteredReprintBills(),b=>b.id),[1]);});
+for(const method of ['heldWindowList','filteredLocalBills'])test(method+' uses the same local/international identity',()=>{const u=fixture(method);Object.assign(u,{tableBoardEnabled:false,heldOrders:[{id:1,customer_phone:'0300-1234567'}],heldSearch:'+92 300 1234567',localBills:[{id:1,customer_phone:'0300-1234567'}],localSearch:'+92 300 1234567'});assert.deepEqual(Array.from(u[method](),b=>b.id),[1]);});

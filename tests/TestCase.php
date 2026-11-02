@@ -40,6 +40,9 @@ abstract class TestCase extends BaseTestCase
         // reuses company id 1). Never let an earlier test's entitlement answer
         // leak into the next isolated fixture.
         \App\Services\PosFeatureService::flushGateCaches();
+        // Admin DI review reads the full ledger schema; later tests build
+        // legacy schemas without it. Do not reuse that per-process answer.
+        \App\Services\AiPageCreditService::forgetLedgerProbe();
         // Campaign pricing is memoized for one request. A long PHPUnit process
         // must not carry another test's active sale into a fresh database.
         \App\Models\SaleCampaign::clearActiveCache();

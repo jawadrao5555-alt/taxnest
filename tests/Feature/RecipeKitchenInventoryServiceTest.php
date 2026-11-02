@@ -51,6 +51,7 @@ class RecipeKitchenInventoryServiceTest extends TestCase
             $t->unsignedBigInteger('product_id');
             $t->unsignedBigInteger('ingredient_id');
             $t->decimal('quantity_needed', 10, 4);
+            $t->decimal('waste_percent', 5, 2)->default(0);
             $t->unsignedInteger('recipe_version')->default(1);
             $t->boolean('is_active')->default(true);
             $t->timestamps();
@@ -95,6 +96,7 @@ class RecipeKitchenInventoryServiceTest extends TestCase
             $t->unsignedBigInteger('branch_id')->nullable();
             $t->decimal('quantity', 15, 4);
             $t->json('components')->nullable();
+            $t->decimal('unit_cost', 18, 6)->nullable();
             $t->json('snapshot')->nullable();
             $t->string('invoice_number')->nullable();
             $t->timestamp('reversed_at')->nullable();
@@ -206,22 +208,24 @@ class RecipeKitchenInventoryServiceTest extends TestCase
         $product = PosProduct::create(['company_id' => $company->id, 'name' => 'Burger']);
         $recipe = ProductRecipe::create([
             'company_id' => $company->id, 'product_id' => $product->id,
-            'ingredient_id' => $ingredient->id, 'quantity_needed' => .25, 'recipe_version' => 1,
+            'ingredient_id' => $ingredient->id, 'quantity_needed' => .25, 'waste_percent' => 20, 'recipe_version' => 1,
         ]);
         RecipeInventoryService::consumeForInvoice($company->id, [
             ['type' => 'product', 'item_id' => $product->id, 'quantity' => 2],
         ], 102, 'P102');
         $recipe->update(['quantity_needed' => .75, 'recipe_version' => 2]);
+        $ingredient->update(['cost_per_unit' => 500]);
 
         RecipeInventoryService::restoreForReturn(
             $company->id, 102, 202,
             [['item_id' => $product->id, 'quantity' => 1, 'disposition' => 'normal_restock']]
         );
-        $this->assertSame('9.7500', Ingredient::find($ingredient->id)->current_stock);
+        $this->assertSame('9.7000', Ingredient::find($ingredient->id)->current_stock);
+        $this->assertEquals(5, \DB::table('inventory_movements')->where('type', 'recipe_return')->value('unit_price'));
         RecipeInventoryService::consumeForInvoice($company->id, [
             ['type' => 'product', 'item_id' => $product->id, 'quantity' => 1],
         ], 103, 'P103');
-        $this->assertSame('9.0000', Ingredient::find($ingredient->id)->current_stock);
+        $this->assertSame('8.8000', Ingredient::find($ingredient->id)->current_stock);
     }
 
     public function test_prepared_cooked_return_is_consumed_once_before_fresh_recipe_stock(): void

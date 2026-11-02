@@ -12,6 +12,11 @@
 
     @include('pos.inventory.partials.branch-bar')
 
+    @if($errors->any())
+    <div role="alert" class="p-3 mb-4 rounded-xl bg-red-50 text-red-800">{{ $errors->first() }}</div>
+    @endif
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">{{ __('pos_stock_chain.movement_count', ['count' => $movements->total()]) }}</p>
+    <p class="text-xs text-gray-500 mb-4">{{ __('pos_stock_chain.movement_dates', ['timezone' => config('app.timezone')]) }}</p>
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 mb-6">
         <form method="GET" action="{{ route('pos.inventory.movements') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <select name="type" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition">
@@ -21,6 +26,9 @@
                 <option value="adjustment_in" {{ request('type') === 'adjustment_in' ? 'selected' : '' }}>{{ __('pos.type_adjustment_in') }}</option>
                 <option value="adjustment_out" {{ request('type') === 'adjustment_out' ? 'selected' : '' }}>{{ __('pos.type_adjustment_out') }}</option>
                 <option value="opening" {{ request('type') === 'opening' ? 'selected' : '' }}>{{ __('pos.type_opening') }}</option>
+                @foreach(['return_in', 'return_out', 'recipe_sale', 'recipe_return'] as $movementType)
+                <option value="{{ $movementType }}" {{ request('type') === $movementType ? 'selected' : '' }}>{{ __('pos_stock_chain.' . $movementType) }}</option>
+                @endforeach
                 @if($multiBranch ?? false)
                 <option value="transfer_in" {{ request('type') === 'transfer_in' ? 'selected' : '' }}>{{ __('pos.type_transfer_in') }}</option>
                 <option value="transfer_out" {{ request('type') === 'transfer_out' ? 'selected' : '' }}>{{ __('pos.type_transfer_out') }}</option>
@@ -62,7 +70,7 @@
                 <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
                     @forelse($movements as $m)
                     @php
-                        $isOut = in_array($m->type, ['sale', 'adjustment_out', 'return_out', 'transfer_out']);
+                        $isOut = in_array($m->type, ['sale', 'recipe_sale', 'adjustment_out', 'return_out', 'transfer_out']);
                         $typeColors = [
                             'sale' => 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
                             'purchase' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -86,8 +94,8 @@
                                 {{ ucwords(str_replace('_', ' ', $m->type)) }}
                             </span>
                         </td>
-                        <td class="px-5 py-3.5 text-right font-bold {{ $isOut ? 'text-red-500' : 'text-emerald-600' }}">{{ $isOut ? '-' : '+' }}{{ number_format($m->quantity, 0) }}</td>
-                        <td class="px-5 py-3.5 text-right font-medium text-gray-900 dark:text-white">{{ number_format($m->balance_after, 0) }}</td>
+                        <td class="px-5 py-3.5 text-right font-bold {{ $isOut ? 'text-red-500' : 'text-emerald-600' }}">{{ $isOut ? '-' : '+' }}{{ rtrim(rtrim(number_format($m->quantity, 3), '0'), '.') }}</td>
+                        <td class="px-5 py-3.5 text-right font-medium text-gray-900 dark:text-white">{{ rtrim(rtrim(number_format($m->balance_after, 3), '0'), '.') }}</td>
                         <td class="px-5 py-3.5 text-gray-500 dark:text-gray-400 text-xs hidden md:table-cell">{{ $m->reference_number ?? ($m->reference_type ? ucwords(str_replace('_', ' ', $m->reference_type)) : '—') }}</td>
                         <td class="px-5 py-3.5 text-gray-600 dark:text-gray-400 hidden lg:table-cell">{{ $m->creator->name ?? '—' }}</td>
                         <td class="px-5 py-3.5 text-gray-500 dark:text-gray-500 text-xs max-w-[200px] truncate hidden lg:table-cell">{{ $m->notes ?? '—' }}</td>

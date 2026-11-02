@@ -206,11 +206,16 @@ class PosReceiptOptionalControlsTest extends TestCase
         $other = Company::create(['name' => 'Other tenant', 'product_type' => 'pos', 'invoice_display_prefs' => ['sentinel' => 'other']]);
         $beforeOther = $other->fresh()->invoice_display_prefs;
         $this->actingAs(\App\Models\User::findOrFail($this->adminUserId), 'pos')
-            ->post('/pos/receipt-settings', ['receipt_options_pra' => ['show_terminal' => 'hide', 'total_size' => 'large'],
-                'receipt_options_local' => ['show_rate' => 'hide']])->assertRedirect();
+            ->post('/pos/receipt-settings', ['receipt_options_pra' => ['show_terminal' => 'hide', 'total_size' => 'large', 'design'=>'compact','kot_design'=>'checklist'],
+                'receipt_options_local' => ['show_rate' => 'hide','design'=>'boxed','kot_design'=>'quantity_first']])->assertRedirect();
         $prefs = $company->fresh()->invoice_display_prefs;
         $this->assertSame('hide', $prefs['receipt_options']['pra']['show_terminal']);
         $this->assertSame('large', $prefs['receipt_options']['pra']['total_size']);
+        $this->assertSame('compact',$prefs['receipt_options']['pra']['design']);
+        $this->assertSame('checklist',$prefs['receipt_options']['pra']['kot_design']);
+        $this->assertSame('boxed',$prefs['receipt_options']['local']['design']);
+        $this->assertSame('quantity_first',$prefs['receipt_options']['local']['kot_design']);
+        $this->assertSame(['bold'=>false],$prefs['pos_style'],'Scoped design Save preserves the exact legacy typography/logo representation');
         $this->assertSame('hide', $prefs['receipt_options']['local']['show_waiter']);
         $this->assertSame('keep', $prefs['receipt_options']['local']['future_option']);
         $this->assertSame(false, $prefs['pos']['show_mobile']);
@@ -346,7 +351,73 @@ class PosReceiptOptionalControlsTest extends TestCase
     {
         $before = Company::findOrFail($this->companyId)->getAttributes();
         $this->actingAs(\App\Models\User::findOrFail($this->adminUserId), 'pos')->get('/pos/receipt-settings')
+            ->assertSee('/js/pos-print-design-preview.js?v=20261031-b03', false)
             ->assertOk()->assertSee('receipt_options_local[show_terminal]', false)->assertSee('receipt_options_pra[show_waiter]', false);
         $this->assertSame($before, Company::findOrFail($this->companyId)->getAttributes());
     }
+    public function test_all_nine_designs_render_both_receipt_streams_and_widths_without_changing_financial_snapshots(): void
+    {
+        $company=Company::findOrFail($this->companyId);
+        foreach (array_keys(\App\Support\PosPrintDesigns::RECEIPTS) as $design) {
+            foreach ([null,'submitted'] as $status) {
+                $stream=$status ? 'pra':'local';
+                $company->invoice_display_prefs=['pos_style'=>['bold'=>false,'font_family'=>'mono','item_text'=>'compact'], 'receipt_options'=>[$stream=>['design'=>$design]]];
+                $prefs=$company->invoice_display_prefs;
+                foreach (['58mm','80mm'] as $paper) {
+                    $bill=$this->bill($company,$status);$before=$bill->getAttributes();
+                    $html=view('pos.receipts.receipt_'.$paper,['company'=>$company,'transaction'=>$bill])->render();
+                    if ($design!=='inherit') $this->assertStringContainsString('b03-receipt-design:'.$design,$html);
+                    else $this->assertStringNotContainsString('b03-receipt-design:',$html);
+                    $this->assertStringContainsString('Synthetic full product name',$html);
+                    $this->assertStringContainsString('580.00',$html);
+                    if ($status) $this->assertStringContainsString('SYNTHETIC-FISCAL-2240',$html);
+                    else $this->assertStringNotContainsString('SYNTHETIC-FISCAL-2240',$html);
+                    $this->assertSame($before,$bill->getAttributes());
+                    $this->assertSame($prefs,$company->invoice_display_prefs);
+                }
+            }
+        }
+    }
+
+    public function test_design_previews_use_actual_renderers_without_saving_or_printing_and_reject_invalid_choices(): void
+    {
+        $company=Company::findOrFail($this->companyId);
+        $before=$company->invoice_display_prefs;
+        $this->actingAs(\App\Models\User::findOrFail($this->adminUserId),'pos');
+        foreach (['local','pra'] as $stream) foreach (['receipt','kot'] as $kind) {
+            $choices=$kind==='receipt'?\App\Support\PosPrintDesigns::RECEIPTS:\App\Support\PosPrintDesigns::KOTS;
+            foreach (array_keys($choices) as $design) {
+                $key=$kind==='receipt'?'design':'kot_design';
+                $url='/pos/receipt-design-preview?'.http_build_query(['kind'=>$kind,'stream'=>$stream,'receipt_options_'.$stream=>[$key=>$design]]);
+                $response=$this->get($url)->assertOk()->assertSee('DESIGN PREVIEW');
+                $this->assertStringContainsString('sandbox',$response->headers->get('Content-Security-Policy'));
+                $this->assertStringNotContainsString('<script',$response->getContent());
+                if ($design!=='inherit') $response->assertSee('b03-'.$kind.'-design:'.$design,false);
+                $this->assertSame($before,$company->fresh()->invoice_display_prefs);
+            }
+        }
+        $this->getJson('/pos/receipt-design-preview?'.http_build_query(['kind'=>'receipt','stream'=>'local','receipt_options_local'=>['design'=>'javascript:bad']]))->assertUnprocessable();
+        $this->actingAs(\App\Models\User::findOrFail($this->cashierUserId),'pos')->get('/pos/receipt-design-preview?kind=receipt&stream=local')->assertRedirect(route('pos.dashboard'));
+        $this->assertSame($before,$company->fresh()->invoice_display_prefs);
+    }
+
+    public function test_kot_omits_repeated_whole_order_pack_labels_but_keeps_all_real_mixed_portion_instructions(): void
+    {
+        $company=Company::findOrFail($this->companyId);
+        $order=new \App\Models\RestaurantOrder(['company_id'=>$company->id,'order_number'=>'SYNTHETIC-KOT','order_type'=>'takeaway','kot_print_count'=>1]);
+        $order->id=0;$order->created_at=now();$order->setRelation('table',null);$order->setRelation('creator',(object)['name'=>'Synthetic Cashier']);
+        $items=collect([new \App\Models\RestaurantOrderItem(['item_name'=>'Synthetic Meal','quantity'=>2,'fulfillment'=>'takeaway','special_notes'=>'Only this meal has this note'])]);
+        $render=function () use ($company,$order,$items) { $order->setRelation('items',$items);return view('pos.restaurant.kitchen-ticket',['company'=>$company,'order'=>$order,'ticketItems'=>$items,'grouped'=>collect(['ALL'=>$items]),'delta'=>false,'newItemIds'=>collect()])->render(); };
+        $html=$render();
+        $this->assertStringNotContainsString('PACK / TAKEAWAY',$html);
+        $this->assertSame(1,substr_count($html,'Only this meal has this note'));
+        $order->order_type='dine_in';
+        $items->push(new \App\Models\RestaurantOrderItem(['item_name'=>'Synthetic Here Portion','quantity'=>1,'fulfillment'=>'dine_in']));
+        $html=$render();
+        $this->assertStringContainsString('PACK / TAKEAWAY',$html);
+        $this->assertStringContainsString('SERVE HERE',$html);
+        $this->assertStringContainsString('Synthetic Here Portion',$html);
+        $this->assertSame(1,substr_count($html,'Only this meal has this note'));
+    }
+
 }

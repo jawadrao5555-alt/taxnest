@@ -42,20 +42,22 @@ class ScopeTest(unittest.TestCase):
             temp = Path(directory)
             (temp/'.env').write_text('DB_HOST=127.0.0.1\nDB_USERNAME=fictional\nDB_PASSWORD=fictional\nDB_DATABASE=fictional\n')
             (temp/'marker').write_text('1|' + SHA)
-            mysql = temp/'mysql'
+            mysql = temp/'php'
             mysql.write_text('''#!/usr/bin/env python3
-import os,sys
-q=sys.argv[-1]
-if os.environ['CASE']=='db_error': sys.exit(1)
-if 'information_schema.columns' in q:
- print('0' if os.environ['CASE']=='missing_key' and "column_name='deployment_key'" in q else '1'); sys.exit(0)
-# These are mandatory predicates in BOTH new- and same-SHA paths.
-assert "deployment_key = '" + 'a'*40 + "'" in q, q
-assert 'audience=CONVERT(0x' + os.environ['AUDIENCE'].encode().hex() + ' USING utf8mb4)' in q, q
-assert 'is_published=1' in q and 'archived_at IS NULL' in q, q
-assert 'target_categories IS NULL' in q, q
+import os,sys,base64
+# Exercise the actual SSH payload/transport without production access.
+source=open(sys.argv[-1]).read()
+assert 'elaanReceiptCount' in source
+q=base64.b64decode(os.environ['SCOPE_B64']).decode()
+assert 'audience=CONVERT(0x'+os.environ['AUDIENCE'].encode().hex()+' USING utf8mb4)' in q
+assert 'is_published=1' in q and 'target_categories IS NULL' in q
+case=os.environ['CASE']
+if case in {'db_error','missing_key'}: print('ELAAN_DB_ERROR');sys.exit(1)
+if case=='missing_marker': print('ELAAN_NO_MARKER');sys.exit(0)
 negative={'wrong_scope','wrong_sha','unpublished','archived','deleted','unrelated'}
-print(0 if os.environ['CASE'] in negative else (0 if os.environ['CASE']=='same_sha' and 'created_at >' in q else 1))
+fresh=0 if case in negative or case=='same_sha' else 1
+existing=0 if case in negative else 1
+print('ELAAN_COUNT=%d MARKER_COMMIT=%s RECEIPT_COUNT=%d' % (fresh,'a'*40,existing))
 ''')
             mysql.chmod(0o700)
             ssh = temp/'ssh'
@@ -71,7 +73,7 @@ print(0 if os.environ['CASE'] in negative else (0 if os.environ['CASE']=='same_s
                     if case == 'invalid_spec': spec.write_text('title: invalid\naudience: typo\npoints:\n  - Point\n')
                     else: spec.write_text(f'title: Fictional receipt\naudience: {audience}\npoints:\n  - Point\n')
                     script = '''set -uo pipefail
-ROOT="$1"; LIVE_DIR="$2"; LIVE_DEPLOY_MARKER="$2/marker"; HOST=fictional; SSH_OPTS=()
+ROOT="$1"; LIVE_DIR="$2"; LIVE_DEPLOY_MARKER="$2/marker"; HOST=fictional; SSH_OPTS=(); LIVE_PHP="$2/php"
 fail() { echo "$*" >&2; exit 1; }; step() { :; }
 ssh() { [ "$CASE" != ssh_error ] || return 1; bash -c "${@: -1}"; }
 export -f ssh

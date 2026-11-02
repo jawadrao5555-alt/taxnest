@@ -90,7 +90,7 @@ if "deploy_require_origin_main_tip" not in text:
 sys.exit(0)
 PY
 
-grep -q "deployment_key = '\$TARGET_SHA'" "$CHECK" \
+grep -q "where('deployment_key', \$sha)" "$ROOT/scripts/lib/elaan-receipt.php" \
   && ok "freshness same-SHA lookup uses internal deployment key" \
   || bad "freshness check must use internal deployment key"
 

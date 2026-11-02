@@ -707,6 +707,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
             {{-- Per-item comment (owner voice note, 23 Aug 2026): cart row ke pen se
                  likha note ab tak sirf KOT par chhapta tha — customer ke bill par
                  nazar hi nahi aata tha ("comments bill par print nahi hote"). --}}
+            @if($item->promotion_snapshot)<tr><td colspan="{{ $receiptItemCols }}" style="font-size:9px;">{{ __('pos_promotions.label') }}: {{ $item->promotion_snapshot['title'] }} · {{ $item->promotion_snapshot['percent'] }}% · −{{ number_format($item->promotion_discount, 2) }}</td></tr>@endif
             @if(!empty($item->fulfillment))<tr><td colspan="{{ $receiptItemCols }}" style="font-size:9px;">{{ \App\Support\PosFulfillment::label($item->fulfillment) }}</td></tr>@endif
             @if(!empty($item->special_notes) && $optionVisible('show_item_notes'))
             <tr>

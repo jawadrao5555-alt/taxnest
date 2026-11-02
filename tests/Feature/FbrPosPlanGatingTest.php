@@ -180,7 +180,7 @@ class FbrPosPlanGatingTest extends TestCase
         $this->addBill($companyId);
         $this->addBill($companyId, ['invoice_mode' => 'local', 'fbr_status' => 'local']);
         $this->addBill($companyId, ['transaction_type' => 'return']);
-        $this->addBill($companyId, ['created_at' => now()->subMonth()]);
+        $this->addBill($companyId, ['created_at' => now()->startOfMonth()->subMonth()]);
 
         $check = PlanLimitService::canCreateFbrPosBill($companyId);
         $this->assertTrue($check['allowed']);

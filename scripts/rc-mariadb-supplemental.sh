@@ -161,7 +161,19 @@ env -i PATH="$PATH" HOME="$EVIDENCE_DIR/phpunit-home" LANG=C LC_ALL=C TZ=UTC CI=
         "$ROOT/tests/Feature/OwnerDeploymentApprovalMigrationTest.php" \
         "$ROOT/tests/Feature/OwnerDeploymentApprovalMariaDbSchemaTest.php"
 
-for junit in "$FBR_JUNIT" "$OWNER_JUNIT"; do
+B02_JUNIT="$EVIDENCE_DIR/b02-money-stock.junit.xml"
+env -i PATH="$PATH" HOME="$EVIDENCE_DIR/phpunit-home" LANG=C LC_ALL=C TZ=UTC CI=1 \
+    NO_PROXY='*' no_proxy='*' LD_PRELOAD="$GUARD" \
+    VIEW_COMPILED_PATH="$EVIDENCE_DIR/compiled-views" TAXNEST_REQUIRE_B02_NATIVE=1 \
+    TAXNEST_RC_NO_EXTERNAL_FISCAL=1 FBR_TOKEN='' PRA_TOKEN='' \
+    TAXNEST_MARIADB_TEST_HOST=127.0.0.1 TAXNEST_MARIADB_TEST_PORT="$RC_MARIADB_PORT" \
+    TAXNEST_MARIADB_TEST_DATABASE="$PROBE_DB" TAXNEST_MARIADB_TEST_USERNAME="$PROBE_USER" \
+    TAXNEST_MARIADB_TEST_PASSWORD="$PROBE_PASSWORD" TAXNEST_MARIADB_TEST_SOCKET='' \
+    php "$ROOT/vendor/bin/phpunit" --testdox --filter test_native_simultaneous --log-junit "$B02_JUNIT" \
+        "$ROOT/tests/Feature/PosShopCashSettlementTest.php" "$ROOT/tests/Feature/PosStockInExcelTest.php"
+[[ "$(grep -o 'name="test_native_simultaneous' "$B02_JUNIT" | wc -l)" == 2 ]] || { printf 'FAIL: two B02 native races required\n' >&2; exit 1; }
+
+for junit in "$FBR_JUNIT" "$OWNER_JUNIT" "$B02_JUNIT"; do
     [[ -s "$junit" ]] || {
         printf 'rc-mariadb-supplemental: PHPUnit did not write JUnit evidence\n' >&2
         exit 1

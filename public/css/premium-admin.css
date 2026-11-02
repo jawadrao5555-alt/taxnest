@@ -628,3 +628,24 @@ body.admin-themed main :is(input, textarea):is(.bg-gray-900, .bg-gray-800):not(:
 }
 .tn-live-ops .grid > div { min-width: 0; }
 .tn-live-ops :is(li, code) { overflow-wrap: anywhere; }
+
+/* Company account evidence follows the native light/dark surface tokens,
+   independently of legacy dark cards and Tailwind's colour-scheme preference. */
+.tn-account-panel, .tn-account-action {
+    background-color: var(--tn-admin-surface);
+    color: var(--tn-admin-text);
+    border-color: var(--tn-admin-line);
+}
+.tn-account-panel :is(h2,h3,dt,dd,p,summary,th,td,a),
+.tn-account-action :is(summary,p,label) { color: inherit; }
+.tn-account-action textarea {
+    background-color: var(--tn-admin-surface);
+    color: var(--tn-admin-text);
+    border-color: var(--tn-admin-muted);
+}
+.tn-account-action textarea::placeholder { color: var(--tn-admin-text); opacity: .75; }
+.tn-account-panel :is(summary,a,[role="region"]):focus-visible,
+.tn-account-action :is(summary,textarea,button):focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}

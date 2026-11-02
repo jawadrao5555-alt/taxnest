@@ -1578,7 +1578,7 @@ async function workflow(page,t,v,diagnostics) {
       const link=page.locator(`[data-invoice-preview$="/${doc.product}/${doc.company}/${doc.record}/preview"]`);
       if(!await link.count())throw new Error('Typed invoice preview link missing: '+doc.product);
       const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith(`/${doc.product}/${doc.company}/${doc.record}/preview`)),link.click()]);
-      if(response.status()!==200 || !response.headers()['content-type']?.includes('application/pdf')) throw new Error('Actual '+doc.product+' document did not render as PDF');
+      if(response.status()!==200 || !response.headers()['content-type']?.includes('application/pdf')) throw new Error('Actual '+doc.product+' document did not render as PDF: status='+response.status()+' type='+response.headers()['content-type']);
       // Chrome's PDF response capture can expose an empty CDP body. Verify
       // binary bytes via the authenticated HTTP client; the UI separately
       // validates its fetched blob before showing any preview/download controls.

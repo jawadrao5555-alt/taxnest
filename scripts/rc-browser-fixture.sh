@@ -236,6 +236,7 @@ setup() {
   safe_browser php tests/native/rc_reporting_read_probe.php
   safe_browser php scripts/rc-di-browser-fixture.php
   ensure_fixture_storage_link
+  safe_browser php tests/native/rc_admin_invoice_render.php
   start_server
   assert_fixture
   write_state

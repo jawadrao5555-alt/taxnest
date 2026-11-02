@@ -1,7 +1,7 @@
 'use strict';
 // Run with the pinned Electron runtime, --no-sandbox --ozone-platform=headless.
 // No printer, live account, HTTP endpoint or physical spool submission is used.
-const {app, BrowserWindow} = require('electron');
+const {app, BrowserWindow, ipcMain} = require('electron');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -52,21 +52,24 @@ app.whenReady().then(async () => {
     }
   }
   // Real Agent settings DOM + real UI module, mocked IPC only (never starts Agent).
-  const ui=new BrowserWindow({show:true,width:900,height:1400,webPreferences:{sandbox:true,contextIsolation:true,backgroundThrottling:false}});
-  console.log('Settings fixture: window created');
+  let saved;
+  ipcMain.handle('thermal-fixture-save', (_event,config) => {saved=config;return {ok:true};});
+  const preload=path.join(out,'settings-preload.cjs');
+  fs.writeFileSync(preload, `
+    const {contextBridge,ipcRenderer}=require('electron');
+    const api={
+      getConfig:async()=>({serverUrl:'http://127.0.0.1:8000/api/agent',apiKey:'fixture-only',receiptPrinter:'Counter',printerPaperProfiles:{'Kitchen <one>':58,Unavailable:80}}),
+      getPrinters:async()=>({printers:[{name:'Kitchen <one>'},{name:'Counter'}]}),
+      saveConfig:config=>ipcRenderer.invoke('thermal-fixture-save',config)
+    };
+    for(const key of ['getVersion','getStatus','getLanSettings','getLanStatus','getPosSettings','lanListDevices','checkImsService']) api[key]=async()=>({});
+    for(const key of ['onConfigAutofilled','onStatusUpdate','onUpdateAvailable','onImsProgress']) api[key]=()=>{};
+    api.testConnection=async()=>({ok:false});
+    contextBridge.exposeInMainWorld('agentAPI',api);
+  `);
+  const ui=new BrowserWindow({show:true,width:900,height:1400,webPreferences:{preload,sandbox:true,contextIsolation:true,backgroundThrottling:false}});
   const errors=[];
   ui.webContents.on('console-message', (_event, level, message) => { if(level>=3) errors.push(message); });
-  ui.webContents.debugger.attach('1.3');
-  await ui.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', {source:`
-    window.agentAPI = new Proxy({}, {get(_,key){
-      if(String(key).startsWith('on')) return ()=>{};
-      if(key==='getConfig') return async()=>({serverUrl:'http://127.0.0.1:8000/api/agent',apiKey:'fixture-only',receiptPrinter:'Counter',printerPaperProfiles:{'Kitchen <one>':58,Unavailable:80}});
-      if(key==='getPrinters') return async()=>({printers:[{name:'Kitchen <one>'},{name:'Counter'}]});
-      if(key==='saveConfig') return async config=>{window.savedConfig=config;return {ok:true};};
-      return async()=>({});
-    }});
-  `});
-  console.log('Settings fixture: IPC installed');
   await ui.loadFile(path.join(__dirname,'../index.html'));
   console.log('Settings fixture: loaded');
   await new Promise(resolve=>setTimeout(resolve,100));
@@ -77,7 +80,6 @@ app.whenReady().then(async () => {
   assert.ok(state.html.includes('&lt;one&gt;'),'printer names are text, not injected markup');
   await ui.webContents.executeJavaScript(`document.getElementById('saveBtn').click()`);
   await new Promise(resolve=>setTimeout(resolve,100));
-  const saved=await ui.webContents.executeJavaScript('window.savedConfig');
   assert.equal(saved.printerExplicit,false);
   assert.deepEqual(saved.printerPaperProfiles,state.profiles);
   assert.deepEqual(errors,[], 'Agent settings must render without JavaScript errors');

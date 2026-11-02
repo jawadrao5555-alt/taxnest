@@ -174,8 +174,10 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printer
               deviceName: deviceName,
               printBackground: true,
               margins: { marginType: 'none' },
-              // NO pageSize — thermal drivers reject explicit sizes; the
-              // driver's own paper setting (80mm/58mm roll) must win.
+              // Omitting pageSize alone makes Electron 42 fall back to A4.
+              // Explicitly query this queue's driver defaults, including
+              // 58/80mm rolls, instead of imposing one size on every printer.
+              usePrinterDefaultPageSize: true,
             },
             (ok, failureReason) => {
               clearTimeout(timer);

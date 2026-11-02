@@ -88,7 +88,9 @@ class PraDiSandboxService
             abort_unless(in_array($record->state, ['draft', 'rejected'], true), 409, 'This outcome must be preserved; it cannot be edited or replayed.');
             $this->validatePayload($record, $payload);
             $record->payload = $payload;
-            $record->payload_hash = hash('sha256', json_encode($payload, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR));
+            // Hash the encrypted-cast round trip used for submission. Whole-number
+            // decimals (100.0) may normalize to integers (100) when stored as JSON.
+            $record->payload_hash = hash('sha256', json_encode($record->payload, JSON_THROW_ON_ERROR));
             $record->state = 'draft';
             $record->save();
             return $record;

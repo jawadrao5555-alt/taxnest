@@ -206,6 +206,22 @@ class PraDiSandboxTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_payload_hash_matches_the_stored_and_submitted_decimal_values(): void
+    {
+        $record = $this->record();
+        $p = $this->payload($record);
+        $p['items'][0]['quantity'] = 2.0;
+        $p['items'][0]['valueSalesExcludingST'] = 100.0;
+        $p['items'][0]['totalValues'] = 100.0;
+        $p['items'][0]['salesTaxApplicable'] = 0.0;
+        $saved = $this->service->prepare($this->company->id, $record->id, $p)->fresh();
+        $this->assertSame(hash('sha256', json_encode($saved->payload, JSON_THROW_ON_ERROR)), $saved->payload_hash);
+        Http::fake(['*' => Http::response($this->ack())]);
+        $submitted = $this->service->submit($this->company->id, $record->id, $this->owner->id);
+        Http::assertSent(fn ($request) => hash('sha256', json_encode($request->data(), JSON_THROW_ON_ERROR)) === $saved->payload_hash);
+        $this->assertSame($saved->payload_hash, $submitted->attempts[0]['hash']);
+    }
+
     public function test_blank_mapping_cannot_be_prepared_or_sent(): void
     {
         $record = $this->record();

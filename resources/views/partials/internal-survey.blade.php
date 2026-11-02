@@ -13,10 +13,11 @@ try {
 } catch(\Throwable $ignored) {}
 @endphp
 @if($panelSurvey)
-<details data-internal-survey="{{ $panelSurvey->id }}" class="fixed bottom-4 right-4 z-50 w-80 max-w-full rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-xl" @if(!$panelSeen?->updated_at?->isToday()) open @endif>
+<details data-internal-survey="{{ $panelSurvey->id }}" style="z-index:70" class="fixed bottom-4 right-4 w-80 max-w-full rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-xl" @if(!$panelSeen?->updated_at?->isToday()) open @endif>
  <summary class="cursor-pointer font-bold">{{ $panelSurvey->title }}</summary>
- <form data-survey-form class="space-y-3 mt-3" action="{{ route($surveyRoute.'.survey.respond',$panelSurvey->id) }}">
-  <p>{{ $panelSurvey->intro }}</p>
+ <form method="POST" data-survey-form class="space-y-3 mt-3" action="{{ route($surveyRoute.'.survey.respond',$panelSurvey->id) }}">
+  @csrf
+ <p>{{ $panelSurvey->intro }}</p>
   @foreach($panelSurvey->questions as $q)
   <label class="block text-sm">{{ $q['text'] }}
    @if(($q['type'] ?? 'choice')==='text')<textarea required maxlength="2000" name="answers[{{ $q['key'] }}]" class="w-full rounded border p-2" rows="3"></textarea>

@@ -97,3 +97,11 @@ Local current regression batch: 76 PHP tests / 427 assertions, plus 10 JavaScrip
 The initial occupied-order preflight reused a mutable contact fixture in the later full suite; setup is reset between those passes. No scenario or assertion is removed.
 
 Whole-batch release acceptance remains open: physical long-roll/cutter output, exact reported installed New Sale/Refresh/Copy controls (not identified in current Agent source), and actual rider background/lock/battery/GPS evidence cannot be established in this cloud workspace. Native app cosmetics and source tests do not establish installed-device acceptance. Keep this PR draft until fresh CI and material scope acceptance are complete. No merge or deployment performed.
+
+## Browser and full-suite checkpoint
+
+The full disposable PHPUnit lane passed on `0c3a8a0b508b1eae9e8bd562119b19462a25854b`: 5,827 tests / 47,906 assertions (existing deprecations and skips remain reported). PRA/DI/FBR Android debug builds and both Windows packaging/recovery jobs passed.
+
+The actual new browser journeys passed targeted rating/text submission and no-repeat checks for all four products on desktop, and PRA/DI/ERP on mobile. All metric detail routes and placement passed at both widths. The remaining mobile FBR failure exposed a real stacking issue: the support widget intercepted Send Answers. The survey now uses an explicit layer above the support widget; the strict real-click test remains unchanged and must pass on final HEAD. Reprint cancellation errors stopped after removing the list/preview fades. No page errors are filtered, and no force-click is used.
+
+Whole-batch release/device acceptance and exact-HEAD full CI remain required. Physical printer/cutter output, reported installed Agent controls and real background GPS remain unverified.

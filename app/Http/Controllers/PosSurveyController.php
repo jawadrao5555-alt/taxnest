@@ -87,6 +87,9 @@ class PosSurveyController extends Controller
             if (! $locked->eligibleFor($user)) {
                 return response()->json(['ok' => false], 404);
             }
+            if ($locked->questions !== $survey->questions) {
+                return response()->json(['ok' => false, 'message' => 'Survey badal gaya hai; page dobara kholain.'], 409);
+            }
             if ($locked->answeredBy($user)) {
                 return response()->json(['ok' => true, 'already' => true]);
             }

@@ -372,7 +372,9 @@
         @include('pos.partials.pending-bills-tile')
         @if($dashboardRidersRelevant) @include('pos.partials.rider-settlement-pending') @endif
         @include('pos.partials.inactive-customers')
-        @php($dashboardMetricsRelocated = true)
+        @php
+        $dashboardMetricsRelocated = true;
+        @endphp
         @include('pos.partials.dashboard-metrics')
         @if($dashboardKhataRelevant) @include('pos.partials.today-khata') @endif
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))

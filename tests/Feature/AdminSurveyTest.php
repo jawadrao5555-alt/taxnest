@@ -161,6 +161,12 @@ class AdminSurveyTest extends TestCase
         ], $overrides);
     }
 
+    public function test_survey_editor_renders_publication_and_targeting_for_existing_surveys(): void
+    {
+        $this->admin()->post('/admin/surveys', $this->validPayload(['is_published'=>'1','target_companies'=>'7','response_policy'=>'company']))->assertRedirect();
+        $this->get('/admin/surveys')->assertOk()->assertSee('Test Survey')->assertSee('target_companies')->assertSee('response_policy')->assertSee('expires_at');
+    }
+
     // ── Create ────────────────────────────────────────────────────────────
 
     public function test_admin_can_create_a_draft_survey(): void

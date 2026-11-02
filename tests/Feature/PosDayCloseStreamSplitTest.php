@@ -408,6 +408,23 @@ class PosDayCloseStreamSplitTest extends TestCase
         $this->assertSame((int) $row->pra_invoices, 2, 'stored count column unchanged');
     }
 
+    public function test_frozen_presentation_does_not_change_when_later_bills_arrive(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedMixedDay($companyId, $user->id);
+        $result = (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+        $frozen = $result['report']->fresh()->stream_summary['report_groups'];
+        $before = \App\Services\PosReportPresentation::fromFrozen($frozen, ['pra', 'local', 'exempt']);
+        $this->assertSame(2572.0, $before['total']);
+        $this->makeTxn($companyId, 'L-LATER-FROZEN', ['total_amount' => 999, 'created_by' => $user->id]);
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+        $data = (new PosController())->dayCloseThermal($result['report']->id)->getData();
+        $this->assertSame($frozen, $data['streamSplit']['report_groups']);
+        $this->assertSame($before, \App\Services\PosReportPresentation::fromFrozen($data['streamSplit']['report_groups'], ['pra', 'local', 'exempt']));
+    }
+
     // ── 2. X-Report: same figures, strictly read-only ────────────────────────
 
     public function test_x_report_is_read_only_and_matches_stream_split(): void
@@ -430,6 +447,7 @@ class PosDayCloseStreamSplitTest extends TestCase
 
         // Same stream figures as the Z path (shared builder).
         $split = $data['streamSplit'];
+        $this->assertSame(2572.0, \App\Services\PosReportPresentation::fromFrozen($split['report_groups'], ['pra','local','exempt'])['total']);
         $this->assertSame(1872.0, (float) $split['pra']['sales']);
         $this->assertSame(300.0, (float) $split['local']['sales']);
         $this->assertSame(400.0, (float) $split['exempt']['sales']);

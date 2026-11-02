@@ -17391,6 +17391,9 @@ class PosController extends Controller
         }
 
          $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId, false), $hotelRefunds);
+         $streamSplit['report_groups'] = \App\Services\PosFinancialHistory::groups(
+             $this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId, false)
+         )->all();
 
         // Task 705: X display mode-gating (same rule as the Z page/PDF).
         $showLocalStream = (bool) session('pos_local_check')

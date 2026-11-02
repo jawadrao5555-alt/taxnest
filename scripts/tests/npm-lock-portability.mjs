@@ -12,6 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Reviewed 2 Nov 2026: Agent 1.13.26 increments source identity only.
+// Root lock version fields change; all dependency entries/integrities/edges remain identical.
 // Reviewed 31 Oct 2026: follow-redirects 1.16.2 and minimatch upstream 11.0.1
 // close GHSA-mrwp-f3q8-3g9p / GHSA-g3hv-75wg-m249. The hash-pinned
 // facade preserves old callable packaging APIs without an older matching engine.
@@ -70,7 +72,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: 'e1ebea69f9d263af1bfdebaf53563921046b201fdcb2a658ffd7316fbeb27f1b',
+    graph: '0640d6c3c01bb719883afb474d27f10deea332217eadbdb26024faa7ad6e9daf',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

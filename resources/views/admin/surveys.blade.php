@@ -70,7 +70,10 @@
                                             <a href="{{ route('admin.surveys.show', $sv->id) }}" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700">Results</a>
 
                                             {{-- Edit: always show, but warn if has responses + published --}}
-                                            <button type="button"
+                                            @php
+                                                $surveyPublication = ['starts_at'=>$sv->starts_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'expires_at'=>$sv->expires_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'response_policy'=>$sv->response_policy ?? 'user','targeting'=>$sv->targeting ?? []];
+                                                @endphp
+                                                <button type="button"
                                                 onclick='openEditModal(
                                                     {{ $sv->id }},
                                                     @json($sv->title),
@@ -80,7 +83,7 @@
                                                     @json($sv->audience),
                                                     @json($sv->is_published),
                                                     {{ $sv->seen_count > 0 ? 'true' : 'false' }},
-                                                    @json(['starts_at'=>$sv->starts_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'expires_at'=>$sv->expires_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'response_policy'=>$sv->response_policy ?? 'user','targeting'=>$sv->targeting ?? []])
+                                                    @json($surveyPublication)
                                                 )'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
 

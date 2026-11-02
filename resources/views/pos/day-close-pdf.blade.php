@@ -58,6 +58,7 @@
         .report-title h2 { text-transform: none; letter-spacing: 0; }
     </style>
     @endif
+@include('pos.partials.report-print-style')
 </head>
 <body>
     <div class="header">

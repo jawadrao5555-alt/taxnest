@@ -49,6 +49,8 @@ class PosPrintJob extends Model
     protected static function booted(): void
     {
         static::created(function (self $job): void {
+            \App\Services\PrintJobEvidence::record((int) $job->company_id, 'enqueued', (int) $job->id, 0,
+                ['type' => $job->type, 'device_uid' => $job->device_uid]);
             try {
                 DB::afterCommit(function () use ($job): void {
                     try {

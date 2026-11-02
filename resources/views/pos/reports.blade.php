@@ -798,6 +798,7 @@
         </div>
     </div>
 </div>
+    @include('pos.partials.financial-history-products')
 @if($hasPinSet ?? false)
 @include('pos.partials.pin-modal')
 @endif

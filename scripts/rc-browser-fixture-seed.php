@@ -551,6 +551,14 @@ $amountCompany = $company('Synthetic Customer Amount Audit', 'amount-company@rc-
     'pra_reporting_enabled' => false, 'pos_tax_rate_cash' => 0, 'pos_tax_rate_card' => 0,
 ]);
 $amountOwner = $user($amountCompany, 'Synthetic Amount Owner', 'amount-owner@rc-browser.invalid', 'company_admin', 'pos_admin');
+// Historical frozen cash evidence for the read-only connector; no close action or fiscal call.
+$diagnosticDate = $now->copy()->subDays(7)->toDateString();
+\App\Models\PosDayCloseReport::forceCreate([
+    'company_id' => $amountCompany->id, 'branch_id' => 0, 'report_date' => $diagnosticDate, 'report_number' => 'RC-DIAGNOSTIC-CASH',
+    'opening_float' => 0, 'cash_amount' => 800, 'card_amount' => 200, 'expected_cash' => 750, 'counted_cash' => 760, 'cash_variance' => 10,
+    'rider_summary' => ['cash_out' => 100, 'cash_in' => 50, 'notes' => 'SYNTHETIC-PRIVATE-RIDER'],
+    'counter_summary' => [['terminal_id' => 0, 'opening' => 0, 'cash_sales' => 800, 'rider_out' => 100, 'rider_in' => 50, 'expected' => 750, 'counted' => 760, 'variance' => 10]],
+]);
 $amountCustomer = \App\Models\PosCustomer::create([
     'company_id' => $amountCompany->id, 'name' => 'Synthetic Amount Customer', 'phone' => '00000000111',
 ]);
@@ -570,6 +578,11 @@ foreach ([['AMOUNT-QR-316', 'qr_payment', 14, 316], ['AMOUNT-CASH-330', 'cash', 
     ]);
     $amountCases[] = ['id' => $amountBill->id, 'invoice' => $number, 'payable' => $payable];
 }
+$diagnosticJob = \App\Models\PosPrintJob::create(['company_id'=>$amountCompany->id,
+    'transaction_id'=>$amountBill->id, 'type'=>'proof', 'status'=>'pending', 'target_printer'=>'Fictional diagnostic printer']);
+\App\Services\PrintJobEvidence::record($amountCompany->id, 'result_received', $diagnosticJob->id, 1,
+    ['outcome'=>'spool_accepted', 'claim_token'=>'FICTIONAL_DIAGNOSTIC_SECRET', 'target_printer'=>'FICTIONAL_DIAGNOSTIC_SECRET']);
+DB::table('pos_print_jobs')->where('id', $diagnosticJob->id)->delete();
 
 $admin = AdminUser::create([
     'name' => 'Synthetic RC Platform Administrator', 'email' => 'hotel-admin-manage-as@rc-browser.invalid',
@@ -786,7 +799,7 @@ $fixture = [
         ['name'=>'fbr-identity-settings','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/settings/identities'],'markers'=>['Branch / terminal FBR identity']],
         ['name' => 'readonly-reporting-connection', 'login' => $admin->email, 'password' => $password, 'loginPath' => '/admin/login',
             'paths' => ['/admin/reporting/connections'], 'markers' => ['Read-only reporting connections'],
-            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString()]],
+            'reportingConnector' => ['companyId' => $amountCompany->id, 'companyName' => $amountCompany->name, 'foreignCompanyName' => $hotel->name, 'billing' => 646, 'date' => $now->toDateString(), 'dayCloseDate'=>$diagnosticDate, 'diagnosticBillId'=>$amountBill->id, 'diagnosticJobId'=>$diagnosticJob->id]],
         ['name'=>'whatsapp-optional-autosend','login'=>$waOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/settings/whatsapp-delivery'],'markers'=>['WhatsApp auto-send'], 'whatsappAutoSend'=>true],
         ['name'=>'rider-realtime-map','login'=>$tableOwner->email,'password'=>$password,'loginPath'=>'/pos/login',

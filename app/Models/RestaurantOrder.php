@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class RestaurantOrder extends Model
 {
+    protected static function booted(): void
+    {
+        static::updated(function (self $order): void {
+            if ($order->wasChanged('pos_transaction_id') && $order->pos_transaction_id) {
+                \App\Services\PrintJobEvidence::record((int) $order->company_id, 'order_bill_linked', null, null,
+                    ['order_id' => $order->id]);
+            }
+        });
+    }
+
     protected $fillable = [
         'delivery_collection_mode', 'company_id', 'order_number', 'table_id', 'order_type', 'status',
         'customer_id', 'customer_name', 'customer_phone', 'delivery_address',

@@ -23,6 +23,7 @@ The default exact callback is `https://chatgpt.com/connector_platform_oauth_redi
 | `get_company_tax_items` | Paginated taxable, exempt, zero-rate or unknown items; sale/return evidence, rates and quantities |
 | `get_company_payment_summary` | Stored POS cash fields and separate hotel payment/refund/deposit movements |
 | `get_company_operational_summary` | Safe current branch-stock/product-stock counts, print-job states and at most 100 agent heartbeat records |
+| `get_pra_incident_timeline` | PRA-only, paginated server print-attempt observations and retained bill/order links; seven calendar days maximum, explicit partial coverage and unknown physical paper. [Scope and gaps](pra-incident-timeline.md) |
 
 Company and dates are explicit in each result, with request-time `as_of`, currency and timezone. Default date is today in **Asia/Karachi**; maximum range 93 days. Calendar `created_at` is the default; stored POS `business_date` can be requested. Branch, terminal and payment-method filters require actual source columns. Agent/stock snapshots are current and company-wide; operational tools reject branch/counter/payment filters. Filtered POS cash evidence remains separate; hotel folio evidence is unavailable for branch/counter requests when universal attribution cannot be established. print-job dates use calendar `created_at` explicitly. Missing evidence is unavailable/null, not an invented zero.
 

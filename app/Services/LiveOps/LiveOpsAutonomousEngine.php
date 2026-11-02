@@ -207,8 +207,8 @@ class LiveOpsAutonomousEngine
         $cause = (string) ($primary['data']['likely_root_cause'] ?? '');
         if ($cause === '' || $cause === 'no_obvious_fault_from_available_signals') {
             return [
-                'actions_taken' => ['Investigated — no proven defect to fix.'],
-                'status' => 'RESOLVED',
+                'actions_taken' => ['No proven defect in the available signals. Incomplete diagnostic coverage does not resolve the reported complaint.'],
+                'status' => ($primary['data']['coverage']['complete'] ?? false) === true ? 'RESOLVED' : 'DIAGNOSED',
                 're_diagnose' => false,
             ];
         }
@@ -298,7 +298,7 @@ class LiveOpsAutonomousEngine
     {
         $cause = (string) ($primary['data']['likely_root_cause'] ?? '');
         $printFailed = (int) ($primary['data']['printer']['failed_job_count'] ?? 0);
-        if ($cause === 'no_obvious_fault_from_available_signals' && $printFailed === 0) {
+        if ($cause === 'no_obvious_fault_from_available_signals' && $printFailed === 0 && ($primary['data']['coverage']['complete'] ?? false) === true) {
             return 'RESOLVED';
         }
 

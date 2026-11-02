@@ -3347,10 +3347,10 @@ window.addEventListener('popstate', function() {
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     {{-- REPRINT MODAL — opens from header "Reprint" button (Alt+R).            --}}
     {{-- ALL of today's completed bills (PRA / queue / failed / provisional /    --}}
-    {{-- local) — click a row = instant print of the ORIGINAL receipt.          --}}
-    {{-- Keyboard: type to search, ↑↓ navigate, Enter=Print, Esc=Close.         --}}
+    {{-- local) — click a row opens the ORIGINAL receipt preview.              --}}
+    {{-- Keyboard: type to search, ↑↓ navigate, Enter=Preview, Esc=Close.       --}}
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
-    <div x-show="showReprint" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showReprint = false">
+    <div x-show="showReprint" x-cloak class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showReprint = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-teal-50 dark:bg-teal-900/20 flex-shrink-0">
                 <div class="flex items-center justify-between">
@@ -3513,7 +3513,7 @@ window.addEventListener('popstate', function() {
     {{-- button that reuses reprintBill(). Sits ABOVE the reprint modal (z-50)    --}}
     {{-- via inline z-index — NO arbitrary Tailwind class (Vite build trap).      --}}
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
-    <div x-show="reprintPreviewBill" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style="z-index:60" @click.self="reprintPreviewBill = null" @keydown.escape.window="reprintPreviewBill = null">
+    <div x-show="reprintPreviewBill" x-cloak class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style="z-index:60" @click.self="reprintPreviewBill = null" @keydown.escape.window="reprintPreviewBill = null">
         <div data-reprint-preview x-ref="reprintPreviewDialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="reprint-preview-title" class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
             <div class="px-4 py-3 bg-teal-600 flex items-center justify-between flex-shrink-0">
                 <div class="min-w-0">

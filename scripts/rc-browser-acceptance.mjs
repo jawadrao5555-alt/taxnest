@@ -2318,8 +2318,10 @@ console.log('RC BROWSER ACCEPTANCE PASS: all required desktop/mobile synthetic j
 
 
 async function whatsappAutoSendWorkflow(page,t,v) {
-  await page.goto(baseUrl+'/pos/settings/whatsapp-delivery',{waitUntil:'domcontentloaded'});
-  await page.locator('[data-whatsapp-readiness]').waitFor();
+  const settingsResponse=await page.goto(baseUrl+'/pos/settings/whatsapp-delivery',{waitUntil:'domcontentloaded'});
+  if(!settingsResponse?.ok()||new URL(page.url()).pathname!=='/pos/settings/whatsapp-delivery')throw new Error('WhatsApp settings response status='+settingsResponse?.status()+' url='+page.url());
+  try {await page.locator('[data-whatsapp-readiness]').waitFor({timeout:5000});}
+  catch(error){throw new Error(error.message+'; settings status='+settingsResponse.status()+' url='+page.url()+' title='+await page.title());}
   if(!await page.locator('[data-confirmed-delivery]').innerText())throw new Error('Missing company delivery evidence state');
   await waitForOperationalSurface(page); await dismiss(page);
   const toggle=page.locator('input[type=checkbox][name=auto_send]');

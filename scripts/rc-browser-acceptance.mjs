@@ -2255,9 +2255,16 @@ async function customerSurveyJourney(page,t,v) {
  if(pos){await root.getByRole('button',{name:'4',exact:true}).click();await root.locator('textarea[x-model="svAnswers[q.key]"]').fill('Synthetic keyboard-friendly feedback');}
  else {await root.locator('select[name="answers[rating]"]').selectOption('4');await root.locator('textarea[name="answers[text]"]').fill('Synthetic keyboard-friendly feedback');}
  await saveEvidenceScreenshot(page,'survey-'+f.route+'-'+v.width);
- const response=page.waitForResponse(r=>r.url().endsWith('/survey/'+f.id+'/respond')&&r.request().method()==='POST');
- await root.getByRole('button',{name:/Submit|Jawab|Answer/i}).first().click();
- const r=await response; if(!r.ok()||!(await r.json()).ok)throw new Error('Actual scoped survey response failed');
+ const submit=pos?root.getByRole('button',{name:/Submit|Jawab|Answer/i}).first():root.locator('[data-survey-form] button[type="submit"]');
+ let r;
+ try { [r]=await Promise.all([
+  page.waitForResponse(r=>r.url().endsWith('/survey/'+f.id+'/respond')&&r.request().method()==='POST'),
+  submit.click({timeout:15000}),
+ ]); } catch(error) {
+  const state=await root.evaluate(el=>{const form=el.querySelector('form'),b=form?.querySelector('button[type=submit]');const rect=b?.getBoundingClientRect();return {open:el.open,action:form?.action,valid:form?.checkValidity(),button:b?.textContent,atButton:rect?document.elementsFromPoint(rect.x+rect.width/2,rect.y+rect.height/2).slice(0,4).map(n=>n.tagName+':'+n.getAttribute('class')):[]};});
+  throw new Error(error.message+'; survey state='+JSON.stringify(state));
+ }
+ if(!r.ok()||!(await r.json()).ok)throw new Error('Actual scoped survey response failed');
  await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
  if(await page.locator('[data-pos-survey="'+f.id+'"], [data-internal-survey="'+f.id+'"]').count())throw new Error('Answered survey repeated after reload');
  pass(t.name+'/'+v.width+': real targeted rating/text response persists and does not repeat; native presentation keeps the same authenticated routes');

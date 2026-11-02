@@ -480,4 +480,27 @@ class PosDashboardTodayKhataTest extends TestCase
         $this->assertStringContainsString(__('pos.khata_pra_stream'), $html);
         $this->assertStringNotContainsString(__('pos.khata_exempt_bills'), $html);
     }
+
+    public function test_ledger_links_keep_business_date_cashier_filter_and_visible_streams(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->seedKhataDay($companyId);
+        foreach (['both' => ['pra', 'local'], 'pra' => ['pra'], 'local' => ['local']] as $scope => $streams) {
+            $user = $this->makeUser($companyId, $scope === 'both' ? 'pos_admin' : 'pos_cashier', $scope);
+            $khata = $this->dashboardKhata($companyId, $user);
+            // A previous business day must not silently become today's calendar date.
+            $khata['date'] = '2026-10-30';
+            $html = view('pos.partials.today-khata', ['todayKhata' => $khata, 'cashierFilter' => '42'])->render();
+            $doc = new \DOMDocument();
+            @$doc->loadHTML($html);
+            $links = iterator_to_array($doc->getElementsByTagName('a'));
+            $this->assertCount(count($streams), $links);
+            foreach ($links as $index => $link) {
+                $this->assertSame($streams[$index], $link->getAttribute('data-ledger-stream'));
+                $this->assertSame(route('pos.reports', [
+                    'tab' => $streams[$index], 'from' => '2026-10-30', 'to' => '2026-10-30', 'cashier' => '42',
+                ]), $link->getAttribute('href'));
+            }
+        }
+    }
 }

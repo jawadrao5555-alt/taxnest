@@ -42,8 +42,16 @@
 
     <div class="grid grid-cols-1 {{ count($tkStreams) > 1 ? 'lg:grid-cols-2' : '' }} gap-3">
         @foreach($tkStreams as $tkKey => $s)
-        @php $tkIsPra = ($tkKey === 'pra'); @endphp
-        <div class="rounded-xl border p-3 {{ $tkIsPra ? 'border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20' }}">
+        @php
+            $tkIsPra = ($tkKey === 'pra');
+            $tkReportUrl = route('pos.reports', array_filter([
+                'tab' => $tkKey,
+                'from' => $tk['date'],
+                'to' => $tk['date'],
+                'cashier' => $cashierFilter ?? null,
+            ], fn ($value) => $value !== null && $value !== ''));
+        @endphp
+        <a href="{{ $tkReportUrl }}" data-ledger-stream="{{ $tkKey }}" class="block rounded-xl border p-3 hover:shadow-md focus-visible:ring-2 focus-visible:ring-teal-600 transition {{ $tkIsPra ? 'border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20' }}">
             <div class="flex items-center justify-between gap-2 mb-2">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider {{ $tkIsPra ? 'bg-teal-600 text-white' : 'bg-amber-500 text-white' }}">
                     {{ $tkIsPra ? __('pos.khata_pra_stream') : __('pos.khata_local_stream') }}
@@ -86,7 +94,7 @@
                     <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['exempt_items'], 0) }}</span>
                 </div>
             </div>
-        </div>
+        </a>
         @endforeach
     </div>
 

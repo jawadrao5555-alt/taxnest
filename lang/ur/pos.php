@@ -3692,7 +3692,7 @@ return [
     'reports_card_desc' => 'سیلز کی معلومات اور بزنس انٹیلیجنس',
     'reports_word' => 'رپورٹس',
     'reprint' => 'دوبارہ پرنٹ کریں',
-    'reprint_click_hint' => 'بل پر کلک کریں — فوری پرنٹ • ↑↓ نیویگیٹ • Enter=Print • Esc=Close',
+    'reprint_click_hint' => 'بل پر کلک کرکے پیش نظارہ دیکھیں • ↑↓ نیویگیٹ • Enter=Preview • پیش نظارے میں Print دبائیں • Esc=Close',
     'reprint_tip' => '💡 صرف آج کے بل — رسید بالکل اصل جیسی پرنٹ ہوگی۔',
     'reprint_todays_bills' => 'دوبارہ پرنٹ — آج کے بل',
     'requeued_desktop_agent' => '🟡 ڈیسک ٹاپ ایجنٹ کے لیے دوبارہ قطار میں لگایا گیا — چند سیکنڈ میں سنک ہو جائے گا۔',

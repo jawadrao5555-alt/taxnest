@@ -3694,7 +3694,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'reports_card_desc' => 'Sales insights aur business intelligence',
     'reports_word' => 'Reports',
     'reprint' => 'Reprint',
-    'reprint_click_hint' => 'Bill par click karein — foran print • ↑↓ navigate • Enter=Print • Esc=Close',
+    'reprint_click_hint' => 'Bill par click karke preview dekhein • ↑↓ navigate • Enter=Preview • Preview mein Print dabayein • Esc=Close',
     'reprint_tip' => '💡 Sirf AAJ ke bills — receipt bilkul asal jaisi print hogi.',
     'reprint_todays_bills' => 'Reprint — Aaj ke Bills',
     'requeued_desktop_agent' => '🟡 Desktop agent ke liye re-queue kar diya hai — kuch seconds mein sync ho jayega.',

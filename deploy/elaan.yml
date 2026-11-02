@@ -1,7 +1,7 @@
-title: "Day Close ka masla samajhne mein support ke liye behtari"
+title: "PRA bill ke print attempts ki support report"
 audience: pos
 type: improvement
 points:
-  - "Day Close mein farq aaye to support ko company, branch aur tareekh batayein. Support saved opening cash, expected cash, gina hua cash aur farq dekh sakti hai."
-  - "Purane record mein koi detail na ho to report usay saaf batati hai. Missing detail ko zero nahi maana jata."
-  - "Yeh jaanch bills ya cash ka record nahi badalti. Report yeh bhi batati hai ke kaun si jaanch abhi baqi hai."
+  - "Ijazat yafta support report mein bill aur order ke print attempts ka waqt aur mojood natija dekha ja sakta hai."
+  - "Jo record mojood na ho usay report saaf batati hai; PC ka jawab physical paper nikalne ka saboot nahi samjha jata."
+  - "Yeh sirf record dekhne ki sahulat hai; bill, printer ki setting ya dobara print apne aap nahi badalta."

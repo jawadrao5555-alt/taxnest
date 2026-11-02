@@ -332,5 +332,6 @@
         };
     }
 </script>
+@include('partials.internal-survey', ['surveyGuard'=>'health', 'surveyRoute'=>'health'])
 </body>
 </html>

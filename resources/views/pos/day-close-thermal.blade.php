@@ -24,6 +24,8 @@
     td { padding: 1px 0; font-size: 11px; vertical-align: top; }
     td.r { text-align: right; white-space: nowrap; }
     td.ct { text-align: center; }
+    .section-title { font-size:13px; font-weight:bold; margin:8px 0 4px; }
+    .data td { overflow-wrap:anywhere; }
     .sec { font-weight: bold; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; margin-top: 4px; }
     .wrap { word-break: break-all; }
     @media print {
@@ -69,6 +71,11 @@
     @endif
     <div class="hr2"></div>
 
+    @php
+    $presentation=\App\Services\PosReportPresentation::forView(null,$streamSplit ?? null,auth('pos')->user(),(bool)($showLocalStream ?? false));
+    @endphp
+    @if($presentation) @include('pos.partials.report-summary-tables') @endif
+    @unless($presentation)
     <div class="sec">{{ __('pos.dc_sales_summary') }}</div>
     <table>
         <tr><td>{{ __('pos.dc_total_invoices') }}</td><td class="r b">{{ $report->total_invoices }}</td></tr>
@@ -164,6 +171,7 @@
     </table>
     <div class="hr"></div>
 
+    @endunless
     @if($report->counted_cash !== null || $report->opening_float !== null)
     <div class="sec">{{ __('pos.dc_cash_recon') }}</div>
     <table>
@@ -357,6 +365,7 @@
     <div class="hr"></div>
     <div class="c sm">{{ __('pos.dcp_sys_zreport_pra') }}</div>
     <div class="c sm b">{{ __('pos.dcp_powered_nestpos') }}</div>
+@if($presentation) @include('pos.partials.report-product-table') @endif
 </div>
 </body>
 </html>

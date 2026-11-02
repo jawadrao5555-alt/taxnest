@@ -4,7 +4,7 @@ Owner direction, 2 November 2026 (Pakistan): one bulk PR for the collected issue
 
 ## Duplicate review
 
-Reviewed all 25 currently open PRs and the 100 most recently updated closed PRs. Current main: `0aecc18e18fb52a1c7d4499181f27362ae8b7411`.
+Reviewed all 25 currently open PRs and the 100 most recently updated closed PRs. Main reconciled through `3afe6c3363945115b15b59097421ed8cdf4d6bcc` (#315).
 
 | Area | Existing source | Treatment |
 |---|---|---|
@@ -14,7 +14,7 @@ Reviewed all 25 currently open PRs and the 100 most recently updated closed PRs.
 | Notifications / support copies | #219/#312/#322 merged; #279/#273 retained sources | Inspect current targeting and consent before changing. No duplicate notification system. |
 | Agent launch / updates / downloads | #305 merged; #234/#250/#251/#256 retained sources; #274 download foundation | Reuse existing release and recovery mechanisms. Source PRs are not separate release candidates. |
 | Rider GPS | #217 merged; #224 mobile builds | Verify installed/device behavior; do not infer completion from server tests. |
-| Diagnostics | #315 open; #327 open, #319 parent planning | Independent work, not imported into this bulk. #327 latest head passes 8/8; #315 needs current-main reconciliation. |
+| Diagnostics | #315 and #327 merged and deployment verified; #319 parent planning | Already on main and inherited here; do not release their retained planning or source work again. |
 | Other programmes | #301 master, #313/#314/#316/#318/#320/#321, #261/#264/#266/#278 | Retain independent scope. This bulk does not claim to complete the nine-workstream programme. |
 | Explicit hold / separate pilot | #237 HOLD, #228 CCI evidence | Untouched; not release candidates for this request. |
 
@@ -85,3 +85,15 @@ Receipt settings now show basic branding/contact/footer/paper/font controls and 
 Order-type aggregates are now retained inside the existing accounting snapshot JSON for future cleaned bills; old snapshots remain explicitly Unknown rather than being misclassified. This is a report-data foundation, not completion of the shared report layout.
 
 Local PHP evidence: 86 focused archive/numbering/day-close/language/settings tests (460 assertions), followed by the updated real day-close + SaaS capture integration (9 tests / 59 assertions). Another 30 financial-history/design/preferences tests passed (228 assertions); updated language/design/preferences checks 31 / 206 passed. JS behavior 10/10, syntax/whitespace pass. A broad substring filter also selected 10 unrelated FBR tests that hit this local static PHP build's missing PDO sqliteCreateFunction API; explicit PRA paths passed. Full CI and native MariaDB must be rerun on this checkpoint. Whole-bulk readiness is still blocked by the unchecked report/dashboard/survey/release/app/device requirements.
+
+## Current implementation and acceptance checkpoint
+
+Main now includes deployed #327 and #315. This branch incorporates both and preserves #328 as separate parked work and #237 HOLD.
+
+New implementation covers shared summary/product presentation for Sales and Day Close, frozen report groups before cleanup, included delivery reconciliation, paginated PDF numbering with final footer, relocated dashboard metrics and scoped detail destinations, targeted rating/text surveys with publication windows and per-company response locking, filtered survey results/export, native app presentation and release version increments. Existing centralized retention, cleanup-series reset, receipt Advanced settings and public product names remain part of this batch.
+
+Local current regression batch: 76 PHP tests / 427 assertions, plus 10 JavaScript print-flow tests passed. Actual multipage PDF parsing confirms the last product, per-page numbering and one final footer. These counts overlap prior checkpoints and must not be added together. Fresh CI still required on the published HEAD. The native MariaDB company-response race and desktop/mobile cross-product survey journeys are wired into required CI.
+
+The initial occupied-order preflight reused a mutable contact fixture in the later full suite; setup is reset between those passes. No scenario or assertion is removed.
+
+Whole-batch release acceptance remains open: physical long-roll/cutter output, exact reported installed New Sale/Refresh/Copy controls (not identified in current Agent source), and actual rider background/lock/battery/GPS evidence cannot be established in this cloud workspace. Native app cosmetics and source tests do not establish installed-device acceptance. Keep this PR draft until fresh CI and material scope acceptance are complete. No merge or deployment performed.

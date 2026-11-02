@@ -79,7 +79,8 @@
                                                     @json($sv->allow_comment),
                                                     @json($sv->audience),
                                                     @json($sv->is_published),
-                                                    {{ $sv->seen_count > 0 ? 'true' : 'false' }}
+                                                    {{ $sv->seen_count > 0 ? 'true' : 'false' }},
+                                                    @json(['starts_at'=>$sv->starts_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'expires_at'=>$sv->expires_at?->copy()->setTimezone('Asia/Karachi')->format('Y-m-d\TH:i'),'response_policy'=>$sv->response_policy ?? 'user','targeting'=>$sv->targeting ?? []])
                                                 )'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
 
@@ -154,14 +155,15 @@
                                 </div>
 
                                 <div class="ml-8 space-y-2">
+                                    <select x-model="q.type" @change="if(q.type==='rating')q.options=[1,2,3,4,5].map(n=>({key:String(n),label:String(n)}));else if(q.type==='text')q.options=[];else if(q.options.length<2)q.options=[{key:'yes',label:'Yes'},{key:'no',label:'No'}]" class="w-full border rounded-lg my-2"><option value="choice">Choice</option><option value="rating">Rating 1–5</option><option value="text">Written answer</option></select>
                                     <template x-for="(opt, oi) in q.options" :key="opt.key">
                                         <div class="flex items-center gap-2">
                                             <span class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-500 shrink-0"></span>
                                             <input type="text" x-model="opt.label" maxlength="150" placeholder="Option..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm py-1.5">
-                                            <button type="button" @click="removeOption(qi, oi)" x-show="q.options.length > 2" class="text-red-400 hover:text-red-600 text-lg leading-none" title="Remove option">&times;</button>
+                                            <button type="button" @click="removeOption(qi, oi)" x-show="(q.type || 'choice') === 'choice' && q.options.length > 2" class="text-red-400 hover:text-red-600 text-lg leading-none" title="Remove option">&times;</button>
                                         </div>
                                     </template>
-                                    <button type="button" @click="addOption(qi)" class="text-xs text-gray-400 hover:text-emerald-600 mt-1">+ option</button>
+                                    <button type="button" @click="addOption(qi)" x-show="(q.type || 'choice') === 'choice'" class="text-xs text-gray-400 hover:text-emerald-600 mt-1">+ option</button>
                                 </div>
                             </div>
                         </template>
@@ -191,10 +193,18 @@
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience</label>
                     <select name="audience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         <option value="pos_all">All PRA POS (restaurants + retail)</option>
-                        <option value="pos_restaurant">Restaurant-mode companies only</option>
+                        <option value="pos_restaurant">Restaurant-mode companies only</option><option value="di">TaxNest Digital Invoice</option><option value="fbrpos">TaxNest FBR POS</option><option value="erps">TaxNest ERP</option>
                     </select>
                 </div>
 
+<div class="grid sm:grid-cols-2 gap-3">
+<label>Start (Pakistan time)<input type="datetime-local" name="starts_at" class="block w-full rounded-lg border" /></label>
+<label>End (blank: three days)<input type="datetime-local" name="expires_at" class="block w-full rounded-lg border" /></label>
+<label>Responses<select name="response_policy" class="block w-full rounded-lg border"><option value="user">One per user</option><option value="company">One per company</option></select></label>
+<label>Company IDs (blank: all)<input name="target_companies" class="block w-full rounded-lg border" placeholder="12, 34" /></label>
+<label>User IDs (blank: all eligible)<input name="target_users" class="block w-full rounded-lg border" /></label>
+<label>Roles (blank: owners/managers)<input name="target_roles" class="block w-full rounded-lg border" placeholder="pos_admin, pos_manager" /></label>
+</div>
                 <div class="flex items-center gap-2">
                     <input type="checkbox" name="is_published" value="1" id="createPublish" class="rounded border-gray-300 text-emerald-600">
                     <label for="createPublish" class="text-sm text-gray-700 dark:text-gray-300">Publish immediately (POS users will see popup)</label>
@@ -251,14 +261,15 @@
                                     <button type="button" @click="removeQuestion(qi)" x-show="questions.length > 1" class="mt-1.5 text-red-400 hover:text-red-600 text-lg leading-none" title="Remove question">&times;</button>
                                 </div>
                                 <div class="ml-8 space-y-2">
+                                    <select x-model="q.type" @change="if(q.type==='rating')q.options=[1,2,3,4,5].map(n=>({key:String(n),label:String(n)}));else if(q.type==='text')q.options=[];else if(q.options.length<2)q.options=[{key:'yes',label:'Yes'},{key:'no',label:'No'}]" class="w-full border rounded-lg my-2"><option value="choice">Choice</option><option value="rating">Rating 1–5</option><option value="text">Written answer</option></select>
                                     <template x-for="(opt, oi) in q.options" :key="opt.key">
                                         <div class="flex items-center gap-2">
                                             <span class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-500 shrink-0"></span>
                                             <input type="text" x-model="opt.label" maxlength="150" placeholder="Option..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm py-1.5">
-                                            <button type="button" @click="removeOption(qi, oi)" x-show="q.options.length > 2" class="text-red-400 hover:text-red-600 text-lg leading-none" title="Remove option">&times;</button>
+                                            <button type="button" @click="removeOption(qi, oi)" x-show="(q.type || 'choice') === 'choice' && q.options.length > 2" class="text-red-400 hover:text-red-600 text-lg leading-none" title="Remove option">&times;</button>
                                         </div>
                                     </template>
-                                    <button type="button" @click="addOption(qi)" class="text-xs text-gray-400 hover:text-emerald-600 mt-1">+ option</button>
+                                    <button type="button" @click="addOption(qi)" x-show="(q.type || 'choice') === 'choice'" class="text-xs text-gray-400 hover:text-emerald-600 mt-1">+ option</button>
                                 </div>
                             </div>
                         </template>
@@ -277,10 +288,18 @@
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience</label>
                     <select name="audience" id="editAudience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         <option value="pos_all">All PRA POS (restaurants + retail)</option>
-                        <option value="pos_restaurant">Restaurant-mode companies only</option>
+                        <option value="pos_restaurant">Restaurant-mode companies only</option><option value="di">TaxNest Digital Invoice</option><option value="fbrpos">TaxNest FBR POS</option><option value="erps">TaxNest ERP</option>
                     </select>
                 </div>
 
+<div class="grid sm:grid-cols-2 gap-3">
+<label>Start (Pakistan time)<input type="datetime-local" name="starts_at" class="block w-full rounded-lg border" /></label>
+<label>End (blank: three days)<input type="datetime-local" name="expires_at" class="block w-full rounded-lg border" /></label>
+<label>Responses<select name="response_policy" class="block w-full rounded-lg border"><option value="user">One per user</option><option value="company">One per company</option></select></label>
+<label>Company IDs (blank: all)<input name="target_companies" class="block w-full rounded-lg border" placeholder="12, 34" /></label>
+<label>User IDs (blank: all eligible)<input name="target_users" class="block w-full rounded-lg border" /></label>
+<label>Roles (blank: owners/managers)<input name="target_roles" class="block w-full rounded-lg border" placeholder="pos_admin, pos_manager" /></label>
+</div>
                 <div class="flex items-center gap-2">
                     <input type="checkbox" name="is_published" value="1" id="editPublish" class="rounded border-gray-300 text-emerald-600">
                     <label for="editPublish" class="text-sm text-gray-700 dark:text-gray-300">Published (POS users will see popup)</label>
@@ -306,7 +325,7 @@
         function makeOptKey() { return makeKey('o'); }
 
         function blankQuestion() {
-            return { key: makeQKey(), text: '', options: [{ key: makeOptKey(), label: '' }, { key: makeOptKey(), label: '' }] };
+            return { key: makeQKey(), text: '', type: 'choice', options: [{ key: makeOptKey(), label: '' }, { key: makeOptKey(), label: '' }] };
         }
 
         // ── Create-modal builder ─────────────────────────────────────────────
@@ -338,7 +357,7 @@
                     // Deep-clone and ensure every question/option has a key
                     this.questions = qs.map((q, qi) => ({
                         key: q.key || makeQKey(),
-                        text: q.text || '',
+                        text: q.text || '', type: q.type || 'choice',
                         options: (q.options || []).map((o, oi) => ({
                             key: o.key || makeOptKey(),
                             label: o.label || '',
@@ -360,11 +379,14 @@
         }
 
         // ── Open edit modal ──────────────────────────────────────────────────
-        function openEditModal(id, title, intro, questions, allowComment, audience, isPublished, hasResponses) {
+        function openEditModal(id, title, intro, questions, allowComment, audience, isPublished, hasResponses, publication = {}) {
+            const editForm = document.getElementById('editSurveyForm');
+            for (const name of ['starts_at','expires_at','response_policy']) editForm.elements[name].value = publication[name] || (name==='response_policy'?'user':'');
+            for (const key of ['companies','users','roles']) editForm.elements['target_'+key].value=(publication.targeting?.[key] || []).join(', ');
             document.getElementById('editSurveyForm').action = '/admin/surveys/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editIntro').value = intro || '';
-            document.getElementById('editAudience').value = ['pos_all','pos_restaurant'].includes(audience) ? audience : 'pos_all';
+            document.getElementById('editAudience').value = ['pos_all','pos_restaurant','di','fbrpos','erps'].includes(audience) ? audience : 'pos_all';
             document.getElementById('editPublish').checked = !!isPublished;
 
             // Warn + optionally block if published with responses

@@ -1,7 +1,7 @@
-title: "PRA bill ke print attempts ki support report"
+title: "PRA reports aur printing mein behtari"
 audience: pos
 type: improvement
 points:
-  - "Ijazat yafta support report mein bill aur order ke print attempts ka waqt aur mojood natija dekha ja sakta hai."
-  - "Jo record mojood na ho usay report saaf batati hai; PC ka jawab physical paper nikalne ka saboot nahi samjha jata."
-  - "Yeh sirf record dekhne ki sahulat hai; bill, printer ki setting ya dobara print apne aap nahi badalta."
+  - "Reprint pehle preview kholta hai; print ke liye Print dabayen."
+  - "Day Close report PDF ya Thermal mein kholain; Sales aur reports mein tafseel saaf groups mein dekhein."
+  - "Dashboard ki raqam aur orders se usi din ki tafseel khol sakte hain."

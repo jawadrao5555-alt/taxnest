@@ -790,6 +790,23 @@ foreach ([1366, 390] as $b01Width) {
         'proofRef'=>'RC-B01-PROOF-'.$b01Width, 'foreignRef'=>'RC-B01-PROOF-'.($b01Width===1366?390:1366)];
 }
 
+$surveyJourneys=[];
+foreach ([['pos','/pos/login','/pos/dashboard','pos'],['di','/login','/dashboard','di'],['fbrpos','/fbr-pos/login','/fbr-pos/dashboard','fbrpos'],['erps','/health/login','/health/dashboard','health']] as [$product,$loginPath,$path,$route]) {
+    $sc=$company('Synthetic survey '.$product,$product.'-survey-company@rc-browser.invalid','RCSV'.strtoupper($product),$product,['pos_setup_completed'=>true,'business_category'=>$product==='erps'?'health':'general','health_setup_completed'=>true,'health_org_type'=>'clinic','health_modules'=>HealthModuleService::MODULES]);
+    $logins=[]; $targetUsers=[];
+    foreach ([1366,390] as $width) {
+        $su=$user($sc,'Synthetic survey owner',$product.'-survey-'.$width.'@rc-browser.invalid','company_admin',in_array($product,['pos','fbrpos'])?'pos_admin':'',null,$product==='erps'?'health_owner':null);
+        $logins[$width]=$su->email;$targetUsers[]=$su->id;
+    }
+    $survey=\App\Models\Survey::create(['title'=>'Synthetic scoped survey '.$product,'intro'=>'Synthetic feedback only','questions'=>[
+        ['key'=>'rating','text'=>'Rate the screen','type'=>'rating','options'=>array_map(fn($n)=>['key'=>(string)$n,'label'=>(string)$n],range(1,5))],
+        ['key'=>'text','text'=>'Your suggestion','type'=>'text','options'=>[]]],
+        'audience'=>$product==='pos'?'pos_all':$product,'is_published'=>true,'starts_at'=>now()->subMinute(),'expires_at'=>now()->addDays(3),
+        'targeting'=>['users'=>$targetUsers],'response_policy'=>'user']);
+    $surveyJourneys[]=['name'=>'survey-'.$product,'login'=>$logins[1366],'password'=>$password,'loginPath'=>$loginPath,'paths'=>[$path],'markers'=>[],
+        'surveyJourney'=>['id'=>$survey->id,'title'=>$survey->title,'logins'=>$logins,'path'=>$path,'route'=>$route],
+        'nativeAgent'=>$product==='pos'?'TaxNestPOSApp/1.2.1':($product==='di'?'TaxNestDIApp/1.0.4':($product==='fbrpos'?'TaxNestFBRPosApp/1.2.0':null))];
+}
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -831,6 +848,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ...$surveyJourneys,
         ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',
             'paths'=>[], 'b01Account'=>$b01Cases],
         ['name'=>'b03-auto-kot','login'=>$b03Owner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],
@@ -857,6 +875,7 @@ $fixture = [
         ['name' => 'reports-business-day', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/reports'], 'reportsBusinessDay' => \App\Services\PosBusinessDay::current($topSellingCompany->id)],
         ['name' => 'rider-selected-settlement', 'login' => $bulkRiderOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/deliveries'], 'riderBulkSelection' => $bulkRiderCases],
         ['name' => 'menu-exempt-filter', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/products'], 'menuExemptFilter' => true],
+        ['name'=>'customer-bulk-navigation','login'=>$topSellingOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/restaurant/dashboard'],'markers'=>[$topSellingCompany->name],'bulkNavigation'=>true],
         ['name' => 'restaurant-top-selling', 'login' => $topSellingOwner->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/restaurant/top-selling'], 'restaurantTopSelling' => true, 'markers' => ['Synthetic complete item 16']],
         ['name' => 'notification-di', 'login' => $notificationUsers['di']['desktop'], 'mobileLogin' => $notificationUsers['di']['mobile'], 'preflightLogin' => $notificationUsers['di']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['di']['preflight-mobile'], 'password' => $password, 'loginPath' => '/login', 'paths' => ['/profile'], 'notificationWorkflow' => 'di'],
         ['name' => 'notification-pra', 'login' => $notificationUsers['pra']['desktop'], 'mobileLogin' => $notificationUsers['pra']['mobile'], 'preflightLogin' => $notificationUsers['pra']['preflight-desktop'], 'preflightMobileLogin' => $notificationUsers['pra']['preflight-mobile'], 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/my-profile'], 'notificationWorkflow' => 'pra'],

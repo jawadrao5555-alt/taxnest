@@ -61,6 +61,9 @@ class PosFinancialHistory
                 'gross' => $sign > 0 ? $amount : 0, 'returned' => $sign < 0 ? $amount : 0,
                 'net' => $sign * $amount, 'tax' => $sign * (float) $bill->tax_amount,
                 'base' => $sign * ($amount - (float) $bill->tax_amount), 'discount' => $sign * ((float) $bill->discount_amount + (float) $bill->items->sum('item_discount_amount') + (float) $bill->items->sum('promotion_discount'))]);
+            if (array_key_exists('delivery_charges',$bill->getAttributes())) {
+                $groups[$key]['totals']['delivery']=round(($groups[$key]['totals']['delivery'] ?? 0)+$sign*(float)$bill->delivery_charges,2);
+            }
             $orderType = in_array($bill->order_type, ['delivery', 'dine_in', 'takeaway', 'counter'], true)
                 ? $bill->order_type : 'counter';
             $groups[$key]['totals']['order_types'][$orderType] ??= self::zero();
@@ -103,10 +106,10 @@ class PosFinancialHistory
                 $lineTotal += self::money($base + $tax); $lineTax += self::money($tax);
             }
             // Header rounding, delivery charges and legacy unallocated differences stay explicit.
-            $gap = self::money($amount) - $lineTotal;
+            $gap = self::money($amount) - $lineTotal - self::money($bill->delivery_charges ?? 0);
             $taxGap = self::money($bill->tax_amount) - $lineTax;
             if ($gap || $taxGap) self::addProduct($groups[$key]['products'], [
-                'product_id' => null, 'name' => 'Charges / rounding / legacy difference', 'category' => 'Reconciliation', 'size' => '',
+                'product_id' => null, 'name' => 'Rounding / legacy difference', 'category' => 'Reconciliation', 'size' => '',
                 'channel' => 'adjustment', 'basis' => 'header difference', 'qty' => 0,
                 'base' => $sign * ($gap - $taxGap) / 100, 'tax' => $sign * $taxGap / 100, 'net' => $sign * $gap / 100,
             ]);
@@ -153,10 +156,14 @@ class PosFinancialHistory
                 $row = (array) $r; $row['totals'] = json_decode($r->totals, true); $row['products'] = json_decode($r->products, true); return $row;
             });
         }
-        $summary = self::zero(); $provisional = self::zero(); $daily = []; $payments = []; $cashiers = []; $products = []; $orderTypes = [];
+        $summary = self::zero(); $provisional = self::zero(); $daily = []; $payments = []; $cashiers = []; $products = []; $orderTypes = []; $streams = []; $delivery = 0; $deliveryKnown = true;
         foreach ($groups->concat($retained) as $g) {
             if ($g['stage'] !== 'final') { self::add($provisional, $g['totals']); continue; }
             self::add($summary, $g['totals']);
+            $streams[$g['stream']] ??= self::zero(); self::add($streams[$g['stream']],$g['totals']);
+            $deliveryKnown=$deliveryKnown && array_key_exists('delivery',$g['totals']);
+            $delivery+=$g['totals']['delivery'] ?? 0;
+
             $date = $g['business_date']; $payment = $g['payment_method']; $creator = $g['created_by'] ?? 0;
             $daily[$date] ??= self::zero(); $payments[$payment] ??= self::zero(); $cashiers[$creator] ??= self::zero();
             self::add($daily[$date], $g['totals']); self::add($payments[$payment], $g['totals']); self::add($cashiers[$creator], $g['totals']);
@@ -188,7 +195,7 @@ class PosFinancialHistory
             }
         }
         return ['from' => $from, 'to' => $to, 'tab' => $tab, 'summary' => $summary, 'provisional' => $provisional,
-            'daily' => $daily, 'payments' => $payments, 'cashiers' => $cashiers, 'products' => array_values($products), 'order_types' => $orderTypes,
+            'daily' => $daily, 'payments' => $payments, 'cashiers' => $cashiers, 'products' => array_values($products), 'order_types' => $orderTypes, 'streams'=>$streams, 'delivery'=>$deliveryKnown ? round($delivery,2):null,
             'retained_count' => (int) $retained->sum(fn ($r) => $r['totals']['sales']), 'live_count' => $live->count(),
             'gaps' => $gaps, 'complete' => !$gaps];
     }

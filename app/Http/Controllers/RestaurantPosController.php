@@ -3138,6 +3138,7 @@ class RestaurantPosController extends Controller
         $todayOrders = RestaurantOrder::where('company_id', $companyId)
             ->where('created_at', '>=', $today)
             ->where('status', '!=', 'cancelled')
+            ->tap(fn($q)=>app(\App\Services\BranchContextService::class)->applyToQuery($q,'branch_id'))
             ->count();
 
         $heldCount = RestaurantOrder::where('company_id', $companyId)

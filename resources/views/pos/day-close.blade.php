@@ -34,6 +34,10 @@
     </div>
     @endif
 
+    @php
+$presentation = \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
+@endphp
+    @if($presentation)<div class="rounded-xl border bg-white dark:bg-gray-900 p-4 mb-4 overflow-auto">@include('pos.partials.report-summary-tables')</div>@endif
     {{-- Stranded-day banner (Task 455): prior business day(s) never closed —
          auto-close skipped (open orders) or nobody closed manually. Surface
          them loudly before more bills pile onto today. --}}
@@ -1636,4 +1640,5 @@
     </div>
     @endif
 </div>
+    @if($presentation)<div class="rounded-xl border bg-white dark:bg-gray-900 p-4 mb-4 overflow-auto">@include('pos.partials.report-product-table')</div>@endif
 </x-pos-layout>

@@ -1072,7 +1072,7 @@ async function hotelSettingsWorkflow(page,t,v,diagnostics) {
   await waitForOperationalSurface(page);
   await dismiss(page);
   const root=page.locator('[data-hotel-settings="1"]');
-  await root.waitFor({state:'visible'});
+  await root.waitFor({state:'attached'});
   if(await root.locator('[data-hotel-settings-card]').count()!==6)throw new Error('Hotel settings must have exactly six primary groups');
   if(await root.locator('[data-hotel-settings-outlet]').count())throw new Error('Rooms-only settings exposed restaurant controls');
   if(await root.locator('[data-hotel-settings-advanced]').getAttribute('open')!==null)throw new Error('Advanced settings were expanded by default');
@@ -1290,7 +1290,7 @@ async function reportingConnectorWorkflow(page,t,v) {
 async function liveOpsReadability(page,t,v) {
   await page.goto(baseUrl+'/admin/live-ops',{waitUntil:'domcontentloaded'});
   const root=page.locator('.tn-live-ops');
-  await root.waitFor({state:'visible'});
+  await root.waitFor({state:'attached'});
   const saved=await page.evaluate(()=>({theme:getAdminTheme(),dark:document.documentElement.classList.contains('dark')}));
   try {
     for(const theme of ['indigo','emerald','cyan','rose','amber','purple'])for(const dark of [false,true]) {
@@ -2243,11 +2243,45 @@ async function healthIsolation(browser,label,v,iso) {
     if(d.pageErrors.length||consoleErrors.length||failedRequests.length)fail(`HEALTH ISOLATION: ${label}: ${d.summary()}`);
   } finally {await saveEvidenceScreenshot(p,`rc-${label}-health-isolation`).catch(()=>{});await c.close();}
 }
+async function customerSurveyJourney(page,t,v) {
+ const f=t.surveyJourney;
+ if(t.nativeAgent && !await page.evaluate(()=>document.documentElement.classList.contains('tn-native-app')))throw new Error('Native app styling marker missing');
+ const pos=f.route==='pos';
+ const root=page.locator(pos?'[data-pos-survey="'+f.id+'"]':'[data-internal-survey="'+f.id+'"]');
+ await root.waitFor({state:'attached'});
+ await dismiss(page);
+ if(pos && !await root.isVisible()) await page.locator('[data-open-pos-survey]:visible').first().click();
+
+ if(pos){await root.getByRole('button',{name:'4',exact:true}).click();await root.locator('textarea[x-model="svAnswers[q.key]"]').fill('Synthetic keyboard-friendly feedback');}
+ else {await root.locator('select[name="answers[rating]"]').selectOption('4');await root.locator('textarea[name="answers[text]"]').fill('Synthetic keyboard-friendly feedback');}
+ await saveEvidenceScreenshot(page,'survey-'+f.route+'-'+v.width);
+ const response=page.waitForResponse(r=>r.url().endsWith('/survey/'+f.id+'/respond')&&r.request().method()==='POST');
+ await root.getByRole('button',{name:/Submit|Jawab|Answer/i}).first().click();
+ const r=await response; if(!r.ok()||!(await r.json()).ok)throw new Error('Actual scoped survey response failed');
+ await page.reload({waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);
+ if(await page.locator('[data-pos-survey="'+f.id+'"], [data-internal-survey="'+f.id+'"]').count())throw new Error('Answered survey repeated after reload');
+ pass(t.name+'/'+v.width+': real targeted rating/text response persists and does not repeat; native presentation keeps the same authenticated routes');
+}
+async function customerBulkNavigation(page,t,v) {
+ const root=page.locator('[data-dashboard-metrics]');await root.waitFor();
+ const ledger=page.locator('#today-khata');
+ if(await ledger.count() && await root.evaluate(el=>el.getBoundingClientRect().bottom)>await ledger.evaluate(el=>el.getBoundingClientRect().top))throw new Error('Metrics were not moved above ledger');
+ for(const metric of ['revenue','orders','customers']) {
+  const link=page.locator('[data-dashboard-metric="'+metric+'"]');await link.waitFor();
+  const href=await link.getAttribute('href');if(!href)throw new Error('Metric detail link missing');
+  const r=await page.goto(href,{waitUntil:'domcontentloaded'});if(!r?.ok())throw new Error('Metric detail did not render');
+  if(metric==='revenue'&&!await page.locator('[data-report-summary]').count())throw new Error('Sales report shared summary missing');
+  await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
+ }
+ await saveEvidenceScreenshot(page,'customer-bulk-metrics-'+v.width);
+ pass(t.name+'/'+v.width+': metrics above ledger; real revenue/order/customer detail routes render without posting or printing');
+}
 async function one(browser,label,v,t) {
+  if(t.surveyJourney) t={...t,login:t.surveyJourney.logins[v.width]};
   if(t.optionalArchive) t={...t, login:t.optionalArchive.cases[v.width].login};
   valid(t); const failuresBefore = failures;
-  const c=await browser.newContext({viewport:v,serviceWorkers:'allow',...(videoDirectory?{recordVideo:{dir:join(videoDirectory,'raw'),size:v}}:{})}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
-  try { await login(p,t.notificationWorkflow?{...t,login:requested.length?(v.width<768?t.preflightMobileLogin:t.preflightLogin):(v.width<768?t.mobileLogin:t.login)}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}; console=${JSON.stringify(d.consoleErrors)}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
+  const c=await browser.newContext({viewport:v,serviceWorkers:'allow',...(t.nativeAgent?{userAgent:'Mozilla/5.0 (Linux; Android 14; Synthetic) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 '+t.nativeAgent}:{}),...(videoDirectory?{recordVideo:{dir:join(videoDirectory,'raw'),size:v}}:{})}); await c.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient')); const p=await c.newPage(), d=attachDiagnostics(p);
+  try { await login(p,t.notificationWorkflow?{...t,login:requested.length?(v.width<768?t.preflightMobileLogin:t.preflightLogin):(v.width<768?t.mobileLogin:t.login)}:t); await waitForOperationalSurface(p); if(!t.notificationWorkflow && !t.surveyJourney)await dismiss(p); if(t.submitSelector){await p.goto(baseUrl+t.submitPath,{waitUntil:'domcontentloaded'});await waitForOperationalSurface(p);await checkAdminContrast(p,t,v);p.once('dialog',x=>x.accept());await Promise.all([p.waitForURL(u=>!u.pathname.startsWith('/admin/companies/'),{timeout:30000}),p.locator(t.submitSelector).first().evaluate(n=>n.requestSubmit())]);} await workflow(p,t,v,d);if(t.surveyJourney)await customerSurveyJourney(p,t,v);if(t.bulkNavigation)await customerBulkNavigation(p,t,v);if(t.customerAmountAudit)await customerAmountAudit(p,t,v);for(const path of t.paths||[t.path])await surface(p,t,path,v);await sameProductCategorySurface(p,t,v);await categoryMismatch(p,t,v);if(d.pageErrors.length)fail(`${t.name}/${label}: page error ${d.pageErrors[0]}; console=${JSON.stringify(d.consoleErrors)}`);const expectedMismatch=t.categoryCoverage?.mismatchPath ? `${baseUrl}${t.categoryCoverage.mismatchPath}` : null;const hotelFallback=t.categoryCoverage?.category==='hotel';const intentionalMismatchFailure=x=>(expectedMismatch&&x.includes(expectedMismatch))||(hotelFallback&&(x.includes(`${baseUrl}/pos/hotel`)||x.includes(`${baseUrl}/pos/invoice/create`)));const consoleErrors=t.denied?[]:d.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));const failedRequests=t.denied?[]:d.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT')&&!intentionalMismatchFailure(x));if(consoleErrors.length)fail(`${t.name}/${label}: console error ${consoleErrors[0]}`);if(failedRequests.length)fail(`${t.name}/${label}: failed request ${failedRequests[0]}`);const unexpectedHttp=t.denied?[]:d.httpErrors;if(unexpectedHttp.length)fail(`${t.name}/${label}: HTTP ${unexpectedHttp[0].status} ${unexpectedHttp[0].url}`);console.log(`DIAGNOSTICS: ${t.name}/${label}: ${d.summary()}`); }
   catch(e){fail(`${t.name}/${label}: ${e.message}`);} finally {
     await saveEvidenceScreenshot(p,`rc-${label}-${t.name}`).catch(()=>{});
     const video=p.video(); await c.close();

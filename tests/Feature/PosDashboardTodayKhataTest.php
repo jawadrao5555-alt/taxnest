@@ -503,4 +503,32 @@ class PosDashboardTodayKhataTest extends TestCase
             }
         }
     }
+    public function test_metric_cards_link_to_details_with_the_same_business_date_and_cashier(): void
+    {
+        $companyId=$this->makeCompany();$user=$this->makeUser($companyId);
+        auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
+        $html=view('pos.partials.dashboard-metrics',[
+            'company'=>\App\Models\Company::find($companyId),'todayKhata'=>['business_date'=>'2026-10-30'],
+            'cashierFilter'=>'42','todayTotalSale'=>1234,'todayStats'=>(object)['count'=>2],
+        ])->render();
+        $document=new \DOMDocument();@$document->loadHTML($html);$xpath=new \DOMXPath($document);
+        $links=$xpath->query('//a[@data-dashboard-metric]');$this->assertGreaterThanOrEqual(3,$links->length);
+        foreach($links as $link)if($link->getAttribute('data-dashboard-metric')!=='tables') {
+            parse_str(parse_url(html_entity_decode($link->getAttribute('href')),PHP_URL_QUERY),$query);
+            $this->assertSame('42',$query['cashier']);
+            $this->assertSame('2026-10-30',$query['date'] ?? $query['from']);
+        }
+    }
+
+    public function test_metric_order_detail_cannot_escape_isolated_cashier_or_company(): void
+    {
+        $companyId=$this->makeCompany(['pos_cashier_own_sales_only'=>true]);$user=$this->makeUser($companyId,'pos_cashier','pra');
+        $own=$this->makeTxn($companyId,'OWN',['created_by'=>$user->id]);
+        $this->makeTxn($companyId,'OTHER',['created_by'=>$user->id+99]);
+        $foreign=$this->makeCompany();$this->makeTxn($foreign,'FOREIGN',['created_by'=>$user->id]);
+        auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
+        $view=(new PosController())->dashboardDetail(Request::create('/pos/dashboard/detail/orders','GET',['date'=>now()->toDateString(),'cashier'=>'all']),'orders');
+        $this->assertSame([$own],$view->getData()['rows']->pluck('id')->all());
+    }
+
 }

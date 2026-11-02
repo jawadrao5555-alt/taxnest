@@ -30,6 +30,16 @@
                 </div>
             </div>
 
+            <form method="GET" class="flex flex-wrap items-end gap-3 mb-4">
+             <label>Company ID<input name="company_id" type="number" min="1" value="{{ request('company_id') }}" class="block rounded border p-2"></label>
+             <label>Response<select name="answered" class="block rounded border p-2"><option value="">All</option><option value="yes" @selected(request('answered')==='yes')>Answered</option><option value="no" @selected(request('answered')==='no')>Pending (seen)</option></select></label>
+             <button class="rounded bg-emerald-700 text-white px-4 py-2">Apply</button>
+             <a class="underline" href="{{ route('admin.surveys.export', ['id'=>$survey->id]+request()->only('company_id','answered')) }}">Download filtered CSV</a>
+            </form>
+            <p class="mb-4 text-sm">Current eligible recipients: <strong>{{ $eligibleCount }}</strong> · Still unanswered: <strong>{{ $pendingCount }}</strong>. Policy: {{ $survey->response_policy ?? 'user' }}. Counts use the current eligible audience; the pending-row filter below shows recipients who have seen the survey.</p>
+            @foreach($stats as $question)
+             @if(!empty($question['texts']))<section class="rounded-xl border p-4 mb-4"><h3 class="font-bold">{{ $question['text'] }}</h3>@foreach($question['texts'] as $text)<p class="border-b py-2 whitespace-pre-wrap">{{ $text }}</p>@endforeach</section>@endif
+            @endforeach
             {{-- Reach summary --}}
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 @foreach([
@@ -62,7 +72,7 @@
                                 <div class="flex items-center justify-between text-sm mb-1">
                                     <span class="font-medium text-gray-700 dark:text-gray-200">{{ $opt['label'] }}</span>
                                     <span class="text-gray-500 dark:text-gray-400 text-xs">
-                                        <span class="font-bold text-gray-800 dark:text-gray-100">{{ $opt['count'] }}</span>
+                                        <span class="font-bold text-gray-800 dark:text-gray-100">{{ $opt['count'] }}</span> ({{ $opt['percent'] }}%)
                                         <span class="ml-1.5 px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-300 text-[10px] font-medium" title="Restaurant-mode companies">🍽 {{ $opt['restaurant'] }}</span>
                                     </span>
                                 </div>

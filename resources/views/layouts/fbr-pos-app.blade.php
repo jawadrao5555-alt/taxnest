@@ -147,9 +147,9 @@
         <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="Nest FBR Pos">
+        <meta name="apple-mobile-web-app-title" content="TaxNest FBR POS">
         <meta name="mobile-web-app-capable" content="yes">
-        <meta name="application-name" content="Nest FBR Pos">
+        <meta name="application-name" content="TaxNest FBR POS">
         <link rel="manifest" href="/manifest-fbrpos.json">
         <link rel="apple-touch-icon" href="/icons/nest-fbr/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-fbr/icon-192.png">
@@ -393,7 +393,9 @@
             }
         </script>
         @include('partials.premium-ui')
-    </head>
+    <script src="/js/native-app-presentation.js?v=1"></script>
+<link rel="stylesheet" href="/css/native-app-presentation.css?v=1">
+</head>
     <body class="tn-premium-shell h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
         <x-pwa-init />
         <script>
@@ -1188,7 +1190,7 @@
                 @endif
 
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-3">
-                    <x-pwa-banner color="blue" appName="Nest FBR Pos" />
+                    <x-pwa-banner color="blue" appName="TaxNest FBR POS" />
                 </div>
 
                 {{ $slot }}
@@ -1745,5 +1747,6 @@
         {{-- Task 1275: Madadgar support bubble (AI chat + WhatsApp) — FBR flavor --}}
         <x-madadgar-support product="fbrpos" />
         <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
-    </body>
+    @include('partials.internal-survey', ['surveyGuard'=>'fbrpos', 'surveyRoute'=>'fbrpos'])
+</body>
 </html>

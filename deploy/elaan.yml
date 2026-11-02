@@ -1,7 +1,7 @@
-title: "PRA bill ke print attempts ki support report"
+title: "Agent mein printer ke paper size ka istemal"
 audience: pos
 type: improvement
 points:
-  - "Ijazat yafta support report mein bill aur order ke print attempts ka waqt aur mojood natija dekha ja sakta hai."
-  - "Jo record mojood na ho usay report saaf batati hai; PC ka jawab physical paper nikalne ka saboot nahi samjha jata."
-  - "Yeh sirf record dekhne ki sahulat hai; bill, printer ki setting ya dobara print apne aap nahi badalta."
+  - "Naya Desktop Agent bina popup print ke liye chune hue printer ka Windows mein saved paper size istemal karta hai."
+  - "Yeh tabdeeli Agent update install hone par lagu hogi. Windows mein paper size apne printer ke roll ke mutabiq rakhein."
+  - "Update ke baad Printer Settings se ek test slip nikaal kar text aur poori width check karein."

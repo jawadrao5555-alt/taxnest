@@ -1,3 +1,10 @@
+## v1.13.27 (2026-11-02)
+**Use the selected printer's paper size for automatic printing**
+
+- Ask the selected Windows queue for its saved paper size when printing without a dialog. Omitting the size alone allowed Electron's A4 fallback, even when the printer was configured for a thermal roll.
+- Apply the correction through the shared print function used by cloud jobs, local KOTs and the Desktop print bridge. Preserve printer assignments, layouts, copies, job ordering and duplicate-print protection.
+- Version 1.13.26 belongs to the separate customer-bulk PR. This proposed version does not overwrite an existing release. Native Windows packaging and a physical printer retest remain required before claiming the reported blank-slip incident resolved.
+
 ## v1.13.23 (2026-10-24)
 **FBR IMS preparation remains visible after company pairing**
 

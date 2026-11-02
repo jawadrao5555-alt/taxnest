@@ -1871,7 +1871,8 @@ window.addEventListener('popstate', function() {
                             <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400" x-text="panelTableInfo() ? 'T-' + panelTableInfo().table_number : (panelOrderMeta().order_number || '')"></span>
                         </div>
                         <div class="grid grid-cols-2 gap-1.5">
-                            <button @click="panelProofBill()" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; {{ __('pos.panel_proof_bill') }}</button>
+                            <button @click="panelProofBill('cash')" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; {{ __('pos.panel_proof_bill') }} — Cash</button>
+                            <button @click="panelProofBill('card')" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; {{ __('pos.panel_proof_bill') }} — Card</button>
                             <button @click="panelAskFinal()" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(roundedTotal).toLocaleString()"></button>
                         </div>
                         {{-- Task 1379: kitchen-ticket reprint gate ($canKotReprint =
@@ -2339,7 +2340,8 @@ window.addEventListener('popstate', function() {
                             <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? window.TXT.loading_generic : window.TXT.open_edit_bill"></button>
                             {{-- Proof Bill (Pizza Master feedback, Jul 2026): customer ko bill
                                  dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
-                            <button @click="boardProofBill()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill Print (bina final)</button>
+                            <button @click="boardProofBill('cash')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill — Cash</button>
+                            <button @click="boardProofBill('card')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill — Card</button>
                             {{-- ONLINE ADAIGI (owner, 26 Aug 2026): dine-in table kehta hai
                                  "online bhej deta hoon" — nishan lagao, proof bill khud
                                  ONLINE likh dega aur bill tasdeeq ke baghair final nahi
@@ -3381,7 +3383,7 @@ window.addEventListener('popstate', function() {
                     <input type="text" x-model="reprintSearch" @input="activeReprintIndex = 0; reprintPreviewBill = null; scheduleReprintLoad()" maxlength="100" x-ref="reprintSearchInput"
                            @keydown.down.prevent="if (!reprintPreviewBill) activeReprintIndex = Math.min(activeReprintIndex + 1, Math.max(0, filteredReprintBills().length - 1))"
                            @keydown.up.prevent="if (!reprintPreviewBill) activeReprintIndex = Math.max(activeReprintIndex - 1, 0)"
-                           @keydown.enter.prevent="if (reprintPreviewBill) { const b = reprintPreviewBill; reprintPreviewBill = null; reprintBill(b); } else if (filteredReprintBills()[activeReprintIndex]) { reprintBill(filteredReprintBills()[activeReprintIndex]) }"
+                           @keydown.enter.prevent="if (!reprintPreviewBill && filteredReprintBills()[activeReprintIndex]) { openReprintPreview(filteredReprintBills()[activeReprintIndex]); }"
                            @keydown.escape.prevent="if (reprintPreviewBill) { reprintPreviewBill = null } else { showReprint = false }"
                            autocomplete="off" name="reprint_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            placeholder="{{ __('pos.ph_reprint_search') }}"
@@ -3422,7 +3424,7 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
                 <template x-for="(bill, bi) in filteredReprintBills()" :key="bill.id">
-                    <button type="button" @click="reprintBill(bill)" :disabled="reprintBusyId === bill.id"
+                    <button type="button" @click="openReprintPreview(bill)" :disabled="reprintBusyId === bill.id"
                             class="w-full text-left p-4 border-b border-gray-100 dark:border-gray-800 transition-all hover:bg-teal-50/60 dark:hover:bg-teal-900/10 disabled:opacity-60"
                             :class="activeReprintIndex === bi ? 'bg-teal-50 dark:bg-teal-900/15 ring-2 ring-teal-400 ring-inset' : ''">
                         <div class="flex items-center justify-between mb-1">
@@ -8448,13 +8450,13 @@ function restaurantPos() {
                 // Preview open (ZFC 30 Jul 2026): Esc = sirf preview band; Enter = print.
                 if (this.reprintPreviewBill) {
                     if (e.key === 'Escape') { e.preventDefault(); this.reprintPreviewBill = null; }
-                    else if (e.key === 'Enter') { e.preventDefault(); const b = this.reprintPreviewBill; this.reprintPreviewBill = null; this.reprintBill(b); }
+                    else if (e.key === 'Enter') { e.preventDefault(); } // Printing requires the preview Print button.
                     return;
                 }
                 const rlist = this.filteredReprintBills();
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeReprintIndex = Math.min(this.activeReprintIndex + 1, Math.max(0, rlist.length - 1)); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeReprintIndex = Math.max(this.activeReprintIndex - 1, 0); }
-                else if (e.key === 'Enter') { e.preventDefault(); if (rlist[this.activeReprintIndex]) this.reprintBill(rlist[this.activeReprintIndex]); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (rlist[this.activeReprintIndex]) this.openReprintPreview(rlist[this.activeReprintIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showReprint = false; }
                 return;
             }
@@ -9597,10 +9599,10 @@ function restaurantPos() {
         // Proof Bill (Pizza Master, Jul 2026): thermal pre-bill WITHOUT finalizing —
         // no invoice, no serial, order stays open. Print via the same hidden-iframe
         // pipeline as receipts (focus wapas milta hai, shortcuts zinda rehte hain).
-        boardProofBill() {
+        boardProofBill(method = 'cash') {
             const t = this.boardMenuTable;
             if (!t || !t.order) return;
-            const url = '/pos/restaurant/orders/' + t.order.id + '/proof-bill?auto_print=1';
+            const url = '/pos/restaurant/orders/' + t.order.id + '/proof-bill?auto_print=1&payment_method=' + encodeURIComponent(method);
             // Owner video (Aug 2026): proof ke baad menu WAHIN khula rehta tha —
             // baqi board actions ki tarah menu band karo, cashier table board par
             // wapas. Order khula rehta hai (proof final nahi); print trigger `t`
@@ -9612,7 +9614,7 @@ function restaurantPos() {
             // print dialog inside the desktop app — route through the agent
             // queue like receipts; iframe stays as the fallback.
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'proof', restaurant_order_id: t.order.id }).then(ok => {
+                this.trySilentPrint({ type: 'proof', restaurant_order_id: t.order.id, proof_payment_method: method }).then(ok => {
                     if (ok) this.showToast(window.TXT.proof_bill_sent_to_printer, 'success'); else fallback();
                 });
                 return;
@@ -10137,13 +10139,13 @@ function restaurantPos() {
         panelKotSent() { return !!(this.panelOrderMeta().kot_sent_at); },
         // Proof Bill — same silent-first / iframe-fallback chain as the popup;
         // prints the SERVER-side order state (same semantics as the popup).
-        panelProofBill() {
+        panelProofBill(method = 'cash') {
             const oid = this.panelOrderId();
             if (!oid) return;
-            const url = '/pos/restaurant/orders/' + oid + '/proof-bill?auto_print=1';
+            const url = '/pos/restaurant/orders/' + oid + '/proof-bill?auto_print=1&payment_method=' + encodeURIComponent(method);
             const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'proof', restaurant_order_id: oid }).then(ok => {
+                this.trySilentPrint({ type: 'proof', restaurant_order_id: oid, proof_payment_method: method }).then(ok => {
                     if (ok) this.showToast(window.TXT.proof_bill_sent_to_printer, 'success'); else fallback();
                 });
                 return;
@@ -12026,7 +12028,7 @@ function restaurantPos() {
             let ceilingTimerId = null; // Task 779: 30s hard-fallback timer id (cleared on success)
             const fireOnce = (() => {
                 let invoked = false;
-                return () => {
+                return (result = {accepted: false}) => {
                     if (invoked) return;
                     invoked = true;
                     removeHandler();
@@ -12049,13 +12051,14 @@ function restaurantPos() {
                         window.focus();
                     } catch (err) {}
                     if (isStale()) return;
-                    if (typeof onAfterPrint === 'function') onAfterPrint();
+                    if (typeof onAfterPrint === 'function') onAfterPrint(result);
                 };
             })();
             const messageHandler = (e) => {
                 if (!e.data || e.data.type !== 'pos_print_done' || e.data.signal !== signal) return;
+                if (e.source !== frame.contentWindow || e.origin !== window.location.origin) return;
                 if (isStale()) { removeHandler(); return; }
-                this.queuePrintTimer(fireOnce, 50);
+                this.queuePrintTimer(() => fireOnce({accepted: e.data.reason === 'afterprint'}), 50);
             };
             window.addEventListener('message', messageHandler);
             this.printMessageHandlers.push(messageHandler);
@@ -12233,7 +12236,11 @@ function restaurantPos() {
             // navigation us khali gap mein page badal kar print kaat sakti thi.
             this.printWorkInFlight++;
             try {
-                return await this._printReceiptInner(onAfterPrint, printAttemptUuid);
+                const printedTxnId = this.lastTransactionId;
+                return await this._printReceiptInner((result) => {
+                    if (typeof onAfterPrint === 'function') onAfterPrint(result);
+                    if (result?.accepted) this.closeReceiptAfterAcceptedPrint(printedTxnId);
+                }, printAttemptUuid);
             } finally {
                 this.printWorkInFlight--;
             }
@@ -12271,7 +12278,7 @@ function restaurantPos() {
                     // (double-press guard) — tell the cashier to wait, no 2nd copy.
                     if (ok.deduped) this.showToast(window.TXT.receipt_already_printing, 'info');
                     else this.showToast(window.TXT.receipt_sent_to_printer, 'success');
-                    if (typeof onAfterPrint === 'function') onAfterPrint();
+                    if (typeof onAfterPrint === 'function') onAfterPrint({accepted: true});
                 } else { fallback(); }
                 return;
             }
@@ -13844,6 +13851,22 @@ function restaurantPos() {
                     'Payment was not saved locally. The held order remains open.', 'error');
                 return false;
             }
+        },
+
+        closeReceiptAfterAcceptedPrint(transactionId) {
+            // Wait for the entire receipt/KOT chain; never cancel an active job.
+            // Timeout or a newer sale leaves the current dialog untouched.
+            const started = Date.now();
+            const finish = () => {
+                if (!this.showReceipt || this.lastTransactionId !== transactionId) return;
+                if (this.printChainBusy()) {
+                    if (Date.now() - started < 45000) setTimeout(finish, 100);
+                    return;
+                }
+                this.cancelReceiptAutoClose();
+                this.closeReceiptPopup();
+            };
+            setTimeout(finish, 100);
         },
 
         // Receipt popup auto-close countdown (owner, 23 Jul 2026). Rules:

@@ -44,10 +44,11 @@
     .sec { text-transform: none; letter-spacing: 0; }
     @endif
 </style>
+@include('pos.partials.day-close-roll')
 </head>
 <body>
 <div class="toolbar">
-    <button class="btn-print" onclick="window.print()">🖨 {{ __('pos.dc_print_zreport') }}</button>
+    <button class="btn-print" onclick="printDayCloseRoll()">🖨 {{ __('pos.dc_print_zreport') }}</button>
     <a class="btn-back" href="{{ route('pos.day-close', ['date' => $report->report_date->format('Y-m-d')]) }}">{{ __('pos.receipt_back') }}</a>
 </div>
 
@@ -254,7 +255,7 @@
     <div class="sec">{{ __('pos.dc_category_sales') }}</div>
     <table>
         @foreach($analytics->categories as $catName => $cat)
-        <tr><td>{{ \Illuminate\Support\Str::limit($catName, 18) }}</td><td class="ct">{{ rtrim(rtrim(number_format($cat->qty, 2), '0'), '.') }}</td><td class="r">{{ number_format($cat->revenue, 2) }}</td></tr>
+        <tr><td>{{ $catName }}</td><td class="ct">{{ rtrim(rtrim(number_format($cat->qty, 2), '0'), '.') }}</td><td class="r">{{ number_format($cat->revenue, 2) }}</td></tr>
         @endforeach
     </table>
     <div class="hr"></div>
@@ -264,7 +265,7 @@
     <div class="sec">{{ __('pos.dc_top_products') }}</div>
     <table>
         @foreach($analytics->top_products->take(5) as $pname => $p)
-        <tr><td>{{ \Illuminate\Support\Str::limit($pname, 18) }}</td><td class="ct">{{ rtrim(rtrim(number_format($p->qty, 2), '0'), '.') }}</td><td class="r">{{ number_format($p->revenue, 2) }}</td></tr>
+        <tr><td>{{ $pname }}</td><td class="ct">{{ rtrim(rtrim(number_format($p->qty, 2), '0'), '.') }}</td><td class="r">{{ number_format($p->revenue, 2) }}</td></tr>
         @endforeach
     </table>
     <div class="hr"></div>
@@ -284,7 +285,7 @@
     <div class="sec">{{ __('pos.dc_cashiers') }}</div>
     <table>
         @foreach($cashierBreakdown as $name => $data)
-        <tr><td>{{ \Illuminate\Support\Str::limit($name, 18) }}</td><td class="ct">{{ $data->count }}</td><td class="r">{{ number_format($data->revenue, 2) }}</td></tr>
+        <tr><td>{{ $name }}</td><td class="ct">{{ $data->count }}</td><td class="r">{{ number_format($data->revenue, 2) }}</td></tr>
         @endforeach
     </table>
     <div class="hr"></div>
@@ -295,7 +296,7 @@
     <div class="sec">{{ __('pos.counter_breakdown') }}</div>
     <table>
         @foreach($terminalBreakdown as $tName => $tData)
-        <tr><td>{{ \Illuminate\Support\Str::limit($tName, 18) }}</td><td class="ct">{{ $tData->count }}</td><td class="r">{{ number_format($tData->revenue, 2) }}</td></tr>
+        <tr><td>{{ $tName }}</td><td class="ct">{{ $tData->count }}</td><td class="r">{{ number_format($tData->revenue, 2) }}</td></tr>
         @endforeach
     </table>
     <div class="hr"></div>

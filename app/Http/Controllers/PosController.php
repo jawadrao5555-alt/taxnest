@@ -1103,6 +1103,7 @@ class PosController extends Controller
 
         $validated = $request->validate([
             'type' => 'required|in:bill,kot,proof',
+            'proof_payment_method' => 'nullable|string|in:cash,card,debit_card,credit_card,qr_payment,online,split',
             'transaction_id' => 'required_if:type,bill|nullable|integer',
             'print_attempt_uuid' => 'nullable|uuid',
             // kot: restaurant_order_id OR transaction_id (order-less delivery bills)
@@ -1271,18 +1272,24 @@ class PosController extends Controller
             if (!$deviceRoute && !$settings['receipt_printer']) {
                 return $this->rejectPrintJob($request, 'no_printer');
             }
-            $exists = \App\Models\RestaurantOrder::where('company_id', $companyId)
-                ->where('id', (int) $validated['restaurant_order_id'])
-                ->exists();
-            if (!$exists) {
+            $proofOrder = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->whereNotIn('status', ['cancelled'])
+                ->find((int) $validated['restaurant_order_id']);
+            if (!$proofOrder) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
             }
+            $proofMethod = $validated['proof_payment_method'] ?? null;
+            if ($proofMethod !== null) {
+                \App\Services\RestaurantProofBill::prepare($proofOrder, $company, $proofMethod);
+            }
+            $proofQuery = $proofMethod === null ? null : http_build_query(['payment_method' => $proofMethod]);
             // In-flight dedupe (30 Jul 2026): the client now RETRIES on network
             // blips — a first request that succeeded server-side must not print
             // a second physical copy. Mirrors the bill double-press guard.
             $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
                 ->where('type', 'proof')
                 ->where('restaurant_order_id', (int) $validated['restaurant_order_id'])
+                ->where(fn ($q) => $proofQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $proofQuery))
                 ->whereIn('status', ['pending', 'printing'])
                 ->where('created_at', '>=', now()->subMinutes(2))
                 ->orderByDesc('id')->first();
@@ -1292,6 +1299,7 @@ class PosController extends Controller
             $job = \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'proof',
+                'render_query' => $proofQuery,
                 'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
                 'device_uid' => $deviceRoute['device_uid'] ?? null,
                 'restaurant_order_id' => (int) $validated['restaurant_order_id'],

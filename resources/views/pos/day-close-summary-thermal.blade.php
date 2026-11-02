@@ -19,9 +19,10 @@ table{width:100%;border-collapse:collapse}td{padding:2px 0;font-size:11px;vertic
 html,body{font-family:'Jameel Noori Nastaleeq','Noto Naskh Arabic','Urdu Typesetting','Courier New',Courier,monospace}.receipt{line-height:1.9}.sec{text-transform:none;letter-spacing:0}
 @endif
 </style>
+@include('pos.partials.day-close-roll')
 </head>
 <body>
-<div class="toolbar"><button class="btn-print" onclick="window.print()">🖨 {{ __('pos.dc_summary_print') }}</button><a class="btn-back" href="{{ route('pos.day-close', ['date' => $report->report_date->format('Y-m-d')]) }}">{{ __('pos.receipt_back') }}</a></div>
+<div class="toolbar"><button class="btn-print" onclick="printDayCloseRoll()">🖨 {{ __('pos.dc_summary_print') }}</button><a class="btn-back" href="{{ route('pos.day-close', ['date' => $report->report_date->format('Y-m-d')]) }}">{{ __('pos.receipt_back') }}</a></div>
 <div class="receipt">
     <div class="c b lg">{{ $company->name }}</div>
     <div class="hr2"></div>

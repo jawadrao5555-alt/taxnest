@@ -2224,8 +2224,10 @@ class RestaurantPosController extends Controller
      * cashier can hand to the customer WITHOUT finalizing — no PosTransaction,
      * no serial, no PRA reporting; the restaurant order stays open on its table.
      */
-    public function proofBill($orderId)
+    public function proofBill($orderId, ?Request $request = null)
     {
+        $request = $request ?? request();
+        $validated = $request->validate(['payment_method' => 'nullable|string|in:cash,card,debit_card,credit_card,qr_payment,online,split']);
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
@@ -2236,9 +2238,10 @@ class RestaurantPosController extends Controller
 
         // Task 778: customer-facing pre-bill — merge KOT-split rows into one
         // line per dish (display-only; DB rows keep their print stamps).
-        $order->setRelation('items', $this->consolidateBillLines($order->items));
+        $order = \App\Services\RestaurantProofBill::prepare($order, $company, $validated['payment_method'] ?? null);
 
-        return view('pos.restaurant.proof-bill', compact('order', 'company'));
+        return response()->view('pos.restaurant.proof-bill', compact('order', 'company'))
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     }
 
     /**

@@ -12,6 +12,7 @@ const html = readFileSync(new URL('../pra-agent/index.html', import.meta.url), '
 const displayScript = readFileSync(new URL('../pra-agent/src/build-info-view.js', import.meta.url), 'utf8');
 const imsScript = readFileSync(new URL('../pra-agent/src/ims-visibility.js', import.meta.url), 'utf8');
 const launchScript = readFileSync(new URL('../pra-agent/src/pos-launch-ui.js', import.meta.url), 'utf8');
+const paperScript = readFileSync(new URL('../pra-agent/src/printer-paper-ui.js', import.meta.url), 'utf8');
 const server = createServer((request, response) => {
   const mode = new URL(request.url, 'http://127.0.0.1').searchParams.get('mode') || 'valid';
   if (request.url.split('?')[0] === '/src/build-info-view.js') {
@@ -22,6 +23,9 @@ const server = createServer((request, response) => {
   }
   if (request.url.split('?')[0] === '/src/pos-launch-ui.js') {
     response.writeHead(200, { 'Content-Type': 'text/javascript' }); response.end(launchScript); return;
+  }
+  if (request.url.split('?')[0] === '/src/printer-paper-ui.js') {
+    response.writeHead(200, { 'Content-Type': 'text/javascript' }); response.end(paperScript); return;
   }
   if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
   const info = mode === 'missing' ? { version, builtAt: null } : identity;

@@ -34,13 +34,15 @@ now prevent late submission. This is not proof of the photo's duplicate cause.
 
 - Prior implementation: opt-in regression fails (missing paper profile support).
 - Node 22.23.2 pinned dependencies installed; Electron remains 42.11.16.
-- Agent suite: 136 pass, 5 Windows-only skips before the final two added tests.
+- Final local Agent suite: 138 pass, 5 Windows-only skips.
 - Targeted final tests: printer concurrency/timeout 9 pass; thermal/config 3 pass.
 - All five lock portability guards pass. Whole lock compared: only the two
   root version fields changed to 1.13.28; dependency graph unchanged.
 - Native Electron launch attempted with both ordinary and single-process
   headless flags. This execution environment denies sockets/udev and exits139
   before BrowserWindow renders. This is a testing limitation, not a passing check.
+- Initial PR runner test passed (run 41465863420); the existing browser smoke
+  needed its loopback static-file allowlist extended for the new UI helper.
 - Mandatory PR runner test `thermal-paper-native.js` renders synthetic short and
   40-row tickets on 58/80mm, checks one-page PDF dimensions/footer, and exercises
   the real settings DOM/save with mocked IPC. No customer data or print jobs.

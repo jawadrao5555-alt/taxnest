@@ -387,6 +387,11 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
           gradle -p rider-app --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug
+      - name: Compile PRA, DI and FBR Android shells without release credentials
+        run: |
+          gradle -p pos-app --no-daemon --console=plain :app:assembleDebug
+          gradle -p di-app --no-daemon --console=plain :app:assembleDebug
+          gradle -p fbr-pos-app --no-daemon --console=plain :app:assembleDebug
       - name: Check sale cache recovery and offline trust boundaries
         run: bash scripts/rc-safe-run -- node scripts/sw-smoke-check.mjs
       - name: Check complete catalog search and exact scanner priority

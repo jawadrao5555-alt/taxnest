@@ -64,7 +64,28 @@ class HealthPilotReadinessTest extends TestCase
         'health/my/leave/{id}/cancel',
         'health/my/earnings',
         'health/hr/leave/{id}/cancel',
+        // Personal feedback only: controller enforces survey product/company/
+        // user/role eligibility and cannot expose patient or financial records.
+        'health/survey/{id}/respond',
+        'health/survey/{id}/dismiss',
     ];
+
+    public function test_personal_survey_routes_enforce_targeting_and_ignore_a_client_guard_override(): void
+    {
+        $company = $this->company();
+        $member = $this->owner($company);
+        $member->update(['role'=>'staff','health_role'=>'health_nurse']);
+        $survey = \App\Models\Survey::create(['title'=>'Synthetic personal feedback','audience'=>'erps','is_published'=>true,
+            'starts_at'=>now()->subMinute(),'expires_at'=>now()->addDays(3),'targeting'=>['companies'=>[$company->id],'roles'=>['health_nurse']],
+            'questions'=>[['key'=>'rating','options'=>[['key'=>'4','label'=>'4'],['key'=>'5','label'=>'5']]]]]);
+        $this->actingAs($member, HealthPanel::GUARD)->postJson('/health/survey/'.$survey->id.'/respond',
+            ['survey_guard'=>'pos','answers'=>['rating'=>'4']])->assertOk()->assertJson(['ok'=>true]);
+        $foreign = $this->owner($this->company());
+        $foreign->update(['role'=>'staff','health_role'=>'health_nurse']);
+        $this->actingAs($foreign, HealthPanel::GUARD)->postJson('/health/survey/'.$survey->id.'/respond',
+            ['answers'=>['rating'=>'5']])->assertNotFound();
+        $this->assertSame(1, $survey->responses()->whereNotNull('answered_at')->count());
+    }
 
     /* ─────────────────────── 1. No ungated door ───────────────────────────── */
 

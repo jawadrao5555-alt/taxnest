@@ -272,6 +272,7 @@ jobs:
           RC_BROWSER_ONLY=survey-pos,survey-di,survey-fbrpos,survey-erps,customer-bulk-navigation bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=occupied-table-orders bash scripts/rc-browser-fixture.sh run
           bash scripts/rc-browser-fixture.sh stop
+          bash scripts/rc-playwright-install.sh
           bash scripts/rc-browser-fixture.sh setup
           RC_TUTORIAL_RECORDING=1 RC_BROWSER_ONLY=restaurant-top-selling bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=notification-pra,notification-fbr,notification-di bash scripts/rc-browser-fixture.sh run

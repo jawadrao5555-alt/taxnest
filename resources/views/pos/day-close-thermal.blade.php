@@ -350,6 +350,7 @@
     </table>
     <div class="hr"></div>
 
+    @if($presentation) @include('pos.partials.report-product-table') @endif
     <table>
         <tr><td>{{ __('pos.dc_first_inv') }}</td><td class="r">{{ $report->first_invoice_number ?? '-' }}</td></tr>
         <tr><td>{{ __('pos.dc_last_inv') }}</td><td class="r">{{ $report->last_invoice_number ?? '-' }}</td></tr>
@@ -365,7 +366,6 @@
     <div class="hr"></div>
     <div class="c sm">{{ __('pos.dcp_sys_zreport_pra') }}</div>
     <div class="c sm b">{{ __('pos.dcp_powered_nestpos') }}</div>
-@if($presentation) @include('pos.partials.report-product-table') @endif
 </div>
 </body>
 </html>

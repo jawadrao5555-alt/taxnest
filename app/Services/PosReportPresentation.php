@@ -26,6 +26,7 @@ final class PosReportPresentation
     {
         return [
             'total' => $history['summary']['net'], 'tax' => $history['summary']['tax'],
+            'gross' => $history['summary']['gross'] ?? 0, 'discount' => $history['summary']['discount'] ?? 0, 'returns_count' => $history['summary']['returns'] ?? 0,
             'count' => $history['summary']['sales'], 'returns' => $history['summary']['returned'],
             'provisional' => $history['provisional']['net'], 'complete' => $history['complete'],
             'payments' => $history['payments'], 'order_types' => $history['order_types'],
@@ -36,7 +37,7 @@ final class PosReportPresentation
 
     public static function fromFrozen(array $groups, array $allowedStreams): array
     {
-        $out = ['total' => 0, 'tax' => 0, 'count' => 0, 'returns' => 0, 'provisional' => 0, 'complete' => true,
+        $out = ['total' => 0, 'tax' => 0, 'gross' => 0, 'discount' => 0, 'returns_count' => 0, 'count' => 0, 'returns' => 0, 'provisional' => 0, 'complete' => true,
             'payments' => [], 'order_types' => [], 'products' => [], 'streams' => [], 'delivery' => 0];
         $knownCharges = true;
         $products = [];
@@ -50,7 +51,7 @@ final class PosReportPresentation
 
                 continue;
             }
-            foreach (['total' => 'net', 'tax' => 'tax', 'count' => 'sales', 'returns' => 'returned'] as $key => $source) {
+            foreach (['total' => 'net', 'tax' => 'tax', 'gross' => 'gross', 'discount' => 'discount', 'returns_count' => 'returns', 'count' => 'sales', 'returns' => 'returned'] as $key => $source) {
                 $out[$key] += $totals[$source] ?? 0;
             }
             $knownCharges = $knownCharges && array_key_exists('delivery', $totals);
@@ -79,7 +80,7 @@ final class PosReportPresentation
                 }
             }
         }
-        foreach (['total', 'tax', 'returns', 'provisional', 'delivery'] as $key) {
+        foreach (['total', 'tax', 'gross', 'discount', 'returns', 'provisional', 'delivery'] as $key) {
             $out[$key] = round($out[$key], 2);
         }
         $out['products'] = array_values($products);

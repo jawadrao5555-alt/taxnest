@@ -2249,6 +2249,9 @@ async function customerSurveyJourney(page,t,v) {
  const pos=f.route==='pos';
  const root=page.locator(pos?'[data-pos-survey="'+f.id+'"]':'[data-internal-survey="'+f.id+'"]');
  await root.waitFor({state:'attached'});
+ // A server-rendered announcement can still have x-cloak while Alpine boots.
+ // Wait for its actual component before using the normal dismissal control.
+ await page.waitForFunction(()=>[...document.querySelectorAll('[x-show="wnOpen"]')].every(el=>el._x_dataStack?.length),null,{timeout:15000});
  await dismiss(page);
  if(pos && !await root.isVisible()) await page.locator('[data-open-pos-survey]:visible').first().click();
 

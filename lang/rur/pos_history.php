@@ -1,5 +1,6 @@
 <?php
 return [
+    'discount_included' => 'Net discounts (raqam mein pehle se shamil)',
     'title' => 'Business day ka milaan', 'business_dates' => 'Business dates', 'csv' => 'Milaan wali CSV download',
     'basis' => 'Final sales aur credit notes mein mojood/archived bills aur deleted bills ke mehfooz majmooi totals shamil hain. Provisional bills alag hain. Dono sources par yehi filters hain.',
     'combined' => 'Dono streams', 'partial' => 'Adhoori history — deleted tafseel dastiyab nahin',

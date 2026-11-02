@@ -441,6 +441,13 @@ class PosDayCloseStreamSplitTest extends TestCase
         $data = $view->getData();
 
         $this->assertTrue($data['isXReport']);
+        $html = $view->render();
+        $productsAt = strpos($html, e(__('pos_history.product_basis')));
+        $footerAt = strpos($html, e(__('pos.dcp_sys_zreport_pra')));
+        $this->assertNotFalse($productsAt);
+        $this->assertNotFalse($footerAt);
+        $this->assertLessThan($footerAt, $productsAt, 'Thermal products must precede the final audit/footer block');
+
         $report = $data['report'];
         $this->assertStringStartsWith('X-', $report->report_number);
         $this->assertNull($report->hash ?? null, 'X-Report must carry NO integrity hash');

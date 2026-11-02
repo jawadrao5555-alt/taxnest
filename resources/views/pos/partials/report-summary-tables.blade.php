@@ -2,9 +2,11 @@
  <div class="section-title">{{ __('pos.ra_summary_comparison') }}</div>
  <table class="data"><tbody>
   <tr><td>{{ __('pos.dc_total_invoices') }}</td><td class="r">{{ $presentation['count'] }}</td></tr>
-  <tr><td>{{ __('pos.dc_total_revenue') }}</td><td class="r">PKR {{ number_format($presentation['total'],2) }}</td></tr>
+  <tr><td>{{ __('pos_history.gross') }}</td><td class="r">PKR {{ number_format($presentation['gross'],2) }}</td></tr>
+  <tr><td>{{ __('pos_history.discount_included') }}</td><td class="r">PKR {{ number_format($presentation['discount'],2) }}</td></tr>
+  <tr><td>{{ __('pos.dc_returns_row',['count'=>$presentation['returns_count']]) }}</td><td class="r">PKR {{ number_format($presentation['returns'],2) }}</td></tr>
+  <tr><td><strong>{{ __('pos.dc_total_revenue') }}</strong></td><td class="r"><strong>PKR {{ number_format($presentation['total'],2) }}</strong></td></tr>
   <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">PKR {{ number_format($presentation['tax'],2) }}</td></tr>
-  <tr><td>{{ __('pos_history.returned') }}</td><td class="r">PKR {{ number_format($presentation['returns'],2) }}</td></tr>
   <tr><td>{{ __('pos_history.provisional',['amount'=>number_format($presentation['provisional'],2)]) }}</td><td></td></tr>
  </tbody></table>
  @if(!$presentation['complete'])<p role="status">{{ __('pos_history.partial') }} {{ __('pos_history.gap_explanation') }}</p>@endif

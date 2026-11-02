@@ -1,5 +1,6 @@
 <?php
 return [
+    'discount_included' => 'Net discounts (already included)',
     'title' => 'Business-day reconciliation', 'business_dates' => 'Business dates', 'csv' => 'Download reconciled CSV',
     'basis' => 'Final sales and credit notes include surviving/archived bills plus retained deletion aggregates. Provisional bills stay separate. Filters apply to both sources.',
     'combined' => 'Combined streams', 'partial' => 'Partial history — deleted breakdown unavailable',

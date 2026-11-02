@@ -30,6 +30,53 @@ class FbrService
      */
     private array $hsMappingCache = [];
 
+    /** Local PRA/DI rehearsal; shares DI response handling without creating a DI Invoice. */
+    public function submitPosSandboxPayload(array $payload, string $sandboxToken): array
+    {
+        \App\Support\PraDiSandboxGate::enforce();
+        $unknown = ['state' => 'verification_required', 'reference' => null, 'error_codes' => []];
+        try {
+            // Fixed sandbox endpoint; no company URL overrides, redirects or automatic retry.
+            $response = Http::withToken($sandboxToken)->acceptJson()->connectTimeout(10)->timeout(45)
+                ->withoutRedirecting()->post(self::SANDBOX_POST_URL, $payload);
+            if (!$response->successful() || !is_array($response->json())) return $unknown;
+            $data = $response->json();
+            $validation = $data['validationResponse'] ?? null;
+            if (!is_array($validation)) return $unknown;
+            $statuses = $validation['invoiceStatuses'] ?? [];
+            if (!is_array($statuses)) return $unknown;
+            foreach ($statuses as $item) {
+                if (!is_array($item)) return $unknown;
+            }
+            $parsed = $this->parseFbrResponse($data);
+            $allValid = count($statuses) === count($payload['items']);
+            $seen = [];
+            foreach ($statuses as $item) {
+                $serial = (string) ($item['itemSNo'] ?? '');
+                $serialNumber = (int) $serial;
+                $allValid = $allValid && ($item['statusCode'] ?? null) === '00'
+                    && strtolower((string) ($item['status'] ?? '')) === 'valid'
+                    && ctype_digit($serial) && $serialNumber >= 1 && $serialNumber <= count($payload['items'])
+                    && !isset($seen[$serialNumber]);
+                $seen[$serialNumber] = true;
+            }
+            // Header invoice number only: an item number is not a whole-invoice acknowledgement.
+            $reference = $data['invoiceNumber'] ?? $data['InvoiceNumber'] ?? null;
+            if ($parsed['valid'] && $allValid && is_string($reference) && trim($reference) !== '' && strlen($reference) <= 100) {
+                return ['state' => 'accepted', 'reference' => $reference, 'error_codes' => []];
+            }
+            if ($this->isExplicitFbrRejection($data)) {
+                $codes = array_merge([$validation['errorCode'] ?? ''], array_column($statuses, 'errorCode'));
+                return ['state' => 'rejected', 'reference' => null,
+                    'error_codes' => array_values(array_unique(array_filter($codes, fn ($code) => is_string($code) && preg_match('/^[0-9]{1,8}$/', $code))))];
+            }
+            return $unknown;
+        } catch (\Throwable $e) {
+            // Do not persist exception bodies, bearer tokens or untrusted response echoes.
+            return $unknown;
+        }
+    }
+
     private function sanitizeForFbr(?string $text): string
     {
         if (empty($text)) return "";

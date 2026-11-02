@@ -867,6 +867,15 @@ Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function
 });
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
+    // Local disposable-db rehearsal only; controller also enforces owner + CSRF.
+    Route::prefix('di-sandbox')->name('pos.di-sandbox.')->controller(\App\Http\Controllers\PraDiSandboxController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/capture', 'capture')->name('capture');
+        Route::get('/{id}', 'show')->whereNumber('id')->name('show');
+        Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('prepare');
+        Route::post('/{id}/submit', 'submit')->whereNumber('id')->middleware('throttle:6,1')->name('submit');
+        Route::get('/{id}/receipt', 'receipt')->whereNumber('id')->name('receipt');
+    });
     Route::post('/desktop/local-core-lease', [\App\Http\Controllers\Api\AgentCoreController::class, 'issueLease'])
         ->middleware('throttle:10,1')->name('pos.desktop.local-core-lease');
     Route::get('/desktop/local-core-scope', [PosController::class, 'desktopLocalCoreScope'])

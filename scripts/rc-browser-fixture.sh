@@ -214,12 +214,36 @@ ensure_fixture_storage_link() {
   fi
   [[ -r "$public_storage/app-updates/return-elaan-fbr.png" ]] || fail 'fixture announcement image is not browser-readable'
 }
+browser_port_is_free() {
+  python3 - "$BROWSER_PORT" <<'PYPORT'
+import socket, sys
+with socket.socket() as probe:
+    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        probe.bind(('127.0.0.1', int(sys.argv[1])))
+    except OSError:
+        sys.exit(1)
+PYPORT
+}
 start_server() {
   assert_state_tree
   assert_no_symlink "$SERVER_PID" 'PHP server PID target'
   rm -f "$SERVER_PID"
-  safe_browser env FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 FEATURE_SMART_DI_IMPORT_MAPPING=1 APP_URL="http://127.0.0.1:$BROWSER_PORT" REPORTING_OAUTH_REDIRECT_URIS="http://127.0.0.1:$BROWSER_PORT/admin/reporting/connections" php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
-  for _ in $(seq 1 30); do curl --fail --silent --max-time 1 "http://127.0.0.1:$BROWSER_PORT/" >/dev/null && return; sleep 1; done
+  browser_port_is_free || fail 'exact loopback browser port is already occupied'
+  # Explicit exec makes the recorded PID the guarded Artisan process, not a
+  # background shell-function wrapper. Its TERM handler stops the PHP child.
+  (
+    exec "$ROOT/scripts/rc-safe-run" --browser --runtime "$SAFE_RUNTIME" --mariadb-root "$LAB_ROOT" \
+      --playwright-browsers-path "$PLAYWRIGHT_BROWSERS_PATH" --browser-tmpdir "$BROWSER_TMPDIR" -- \
+      env FEATURE_SMART_DI_IMPORT_SAFEGUARDS=1 FEATURE_SMART_DI_IMPORT_MAPPING=1 APP_URL="http://127.0.0.1:$BROWSER_PORT" \
+      REPORTING_OAUTH_REDIRECT_URIS="http://127.0.0.1:$BROWSER_PORT/admin/reporting/connections" \
+      php artisan serve --host=127.0.0.1 --port="$BROWSER_PORT" --tries=1 --no-reload
+  ) </dev/null >"$SERVER_LOG" 2>&1 & echo "$!" >"$SERVER_PID"
+  for _ in $(seq 1 30); do
+    kill -0 "$(cat "$SERVER_PID")" 2>/dev/null || fail 'guarded PHP server exited before readiness'
+    curl --fail --silent --max-time 1 "http://127.0.0.1:$BROWSER_PORT/" >/dev/null && return
+    sleep 1
+  done
   fail 'loopback PHP server did not become ready'
 }
 setup() {
@@ -280,12 +304,15 @@ run() {
 serve() { resume; wait "$(cat "$SERVER_PID")"; }
 stop() {
   if [[ -f "$STATE_RECORD" && ! -L "$STATE_RECORD" ]]; then load_state; fi
-  cleanup_browser_tmpdir
   if [[ -s "$SERVER_PID" && ! -L "$SERVER_PID" ]]; then
     local server_pid
     server_pid="$(cat "$SERVER_PID")"
     [[ "$server_pid" =~ ^[0-9]+$ ]] && kill "$server_pid" 2>/dev/null || true
   fi
+  # Never remove the runtime/TMPDIR while its PHP listener can still use it.
+  for _ in $(seq 1 100); do browser_port_is_free && break; sleep 0.1; done
+  browser_port_is_free || fail 'PHP listener did not stop; disposable state preserved'
+  cleanup_browser_tmpdir
   rm -rf "$STATE_BASE"
   resolve_mariadbd
   lab stop || true

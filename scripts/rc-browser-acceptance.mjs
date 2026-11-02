@@ -2263,6 +2263,9 @@ async function customerSurveyJourney(page,t,v) {
  pass(t.name+'/'+v.width+': real targeted rating/text response persists and does not repeat; native presentation keeps the same authenticated routes');
 }
 async function customerBulkNavigation(page,t,v) {
+ const opened=await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});
+ if(!opened?.ok())throw new Error('Dashboard did not render for metric navigation');
+ await waitForOperationalSurface(page);await dismiss(page);
  const root=page.locator('[data-dashboard-metrics]');await root.waitFor();
  const ledger=page.locator('#today-khata');
  if(await ledger.count() && await root.evaluate(el=>el.getBoundingClientRect().bottom)>await ledger.evaluate(el=>el.getBoundingClientRect().top))throw new Error('Metrics were not moved above ledger');

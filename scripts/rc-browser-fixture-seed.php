@@ -792,7 +792,7 @@ foreach ([1366, 390] as $b01Width) {
 
 $surveyJourneys=[];
 foreach ([['pos','/pos/login','/pos/dashboard','pos'],['di','/login','/dashboard','di'],['fbrpos','/fbr-pos/login','/fbr-pos/dashboard','fbrpos'],['erps','/health/login','/health/dashboard','health']] as [$product,$loginPath,$path,$route]) {
-    $sc=$company('Synthetic survey '.$product,$product.'-survey-company@rc-browser.invalid','RCSV'.strtoupper($product),$product,['pos_setup_completed'=>true,'business_category'=>$product==='erps'?'health':'general','health_setup_completed'=>true,'health_org_type'=>'clinic','health_modules'=>HealthModuleService::MODULES]);
+    $sc=$company('Synthetic survey '.$product,$product.'-survey-company@rc-browser.invalid','RCSV'.strtoupper($product),$product,['fbr_pos_enabled'=>$product==='fbrpos','pos_setup_completed'=>true,'business_category'=>$product==='erps'?'health':'general','health_setup_completed'=>true,'health_org_type'=>'clinic','health_modules'=>HealthModuleService::MODULES]);
     $logins=[]; $targetUsers=[];
     foreach ([1366,390] as $width) {
         $su=$user($sc,'Synthetic survey owner',$product.'-survey-'.$width.'@rc-browser.invalid','company_admin',in_array($product,['pos','fbrpos'])?'pos_admin':'',null,$product==='erps'?'health_owner':null);

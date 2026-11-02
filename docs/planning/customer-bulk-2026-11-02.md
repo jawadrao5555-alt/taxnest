@@ -105,3 +105,36 @@ The full disposable PHPUnit lane passed on `0c3a8a0b508b1eae9e8bd562119b19462a25
 The actual new browser journeys passed targeted rating/text submission and no-repeat checks for all four products on desktop, and PRA/DI/ERP on mobile. All metric detail routes and placement passed at both widths. The remaining mobile FBR failure exposed a real stacking issue: the support widget intercepted Send Answers. The survey now uses an explicit layer above the support widget; the strict real-click test remains unchanged and must pass on final HEAD. Reprint cancellation errors stopped after removing the list/preview fades. No page errors are filtered, and no force-click is used.
 
 Whole-batch release/device acceptance and exact-HEAD full CI remain required. Physical printer/cutter output, reported installed Agent controls and real background GPS remain unverified.
+
+
+## Latest-main reconciliation (2 November 2026)
+
+Owner requested this existing bulk PR be prepared for review. Reconciled main
+`dc46253a3987ab7270410d1a0268452ade042bb4`, including merged #330 and #333.
+Preserved selected-printer Windows defaults, opt-in per-queue 58/80mm content
+sizing, print timeout handling, saved configuration and their native Electron
+acceptance lane. Agent identity advances to **1.13.29** rather than reverting
+main's 1.13.28 to the earlier bulk's 1.13.26. Only the two root lock-version
+fields change; all dependency entries, edges and integrity values remain pinned.
+The bulk's PRA customer notice remains separate from the already-merged thermal
+paper notice, preserving existing targeting and read history.
+
+Pre-reconciliation HEAD `fcd0414be2cb10299e7e725b130921ffa865ac5e` passed all
+eight required PR jobs, including full PHPUnit and desktop/390px browser
+acceptance, plus both Windows packaging/recovery workflows. That evidence does
+not replace fresh checks on the reconciled HEAD.
+
+Readiness labels must distinguish software review from field acceptance:
+
+| Area | Review status | Remaining acceptance |
+|---|---|---|
+| Reports, dashboard, Reprint/proof/dialog, retention/series, surveys and settings | Implemented; preceding exact-HEAD automated acceptance passed | Fresh reconciled-HEAD full checks |
+| Printer foundation | Latest #330/#333 retained; no rollback of defaults or optional profiles | Actual supported long roll/cutter/driver output remains unverified for this bulk |
+| Agent Open POS / reported New Sale, Refresh, Copy | Existing launch/recovery foundation retained | Exact reported installed controls and original failure still need identification/retest; no new fix claimed |
+| App presentation and rider tracking | Presentation changes and existing tracking foundation retained | Installed-device layout/offline/update and background/lock/battery/GPS acceptance remain open |
+| Udhaar | Separate parked #328 | No implementation or deployment claim in this bulk |
+
+The unchecked register remains authoritative for whole-issue acceptance. A
+Ready-for-review label is not a claim that these field/device requirements have
+passed, nor authorization to merge, deploy, publish binaries or reprint old jobs.
+No physical-device evidence is invented or inferred from a successful build.

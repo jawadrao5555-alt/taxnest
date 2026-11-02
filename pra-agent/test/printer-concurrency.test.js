@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const Module = require('node:module');
 const test = require('node:test');
+const { processCloudPrintJob } = require('../src/printer-job');
 
 const windows = [];
 const pendingPrints = [];
@@ -12,18 +13,22 @@ class FakeWebContents extends EventEmitter {
   constructor(owner) {
     super();
     this.owner = owner;
+    this.debugger = { attach() {}, async sendCommand() {} };
   }
 
   async getPrintersAsync() {
     return [];
   }
 
-  async executeJavaScript() {
+  async executeJavaScript(script) {
+    if (this.owner.fontsPending && !script.includes('measureReceipt')) return this.owner.fontsPending;
+    if (script.includes('measureReceipt')) return this.owner.heightPx ?? 96;
     return 'fonts-ok';
   }
+  async insertCSS() {}
 
   print(options, callback) {
-    pendingPrints.push({ owner: this.owner, deviceName: options.deviceName, callback });
+    pendingPrints.push({ owner: this.owner, deviceName: options.deviceName, options, callback });
   }
 }
 
@@ -68,7 +73,46 @@ async function waitForPending(count) {
 }
 
 test.afterEach(() => {
+  printer.setPaperProfiles({});
   while (pendingPrints.length) pendingPrints.shift().callback(true);
+});
+
+// This exercises the real cloud-job -> printHtml -> Electron boundary. The
+// Electron window is mocked; it does not claim a physical printer passed.
+test('cloud tickets and bills request the selected printer paper defaults', async () => {
+  const cases = [
+    ['kot', 'Kitchen 58mm'],
+    ['kot', 'Kitchen 80mm'],
+    ['kot_void', 'Kitchen 58mm'],
+    ['bill', 'Counter 80mm'],
+    ['proof', 'Counter 58mm'],
+    ['test', 'Kitchen 80mm'],
+  ];
+  for (const [type, deviceName] of cases) {
+    const reports = [];
+    const job = { id: 1, type, target_printer: deviceName };
+    const result = processCloudPrintJob(job, {
+      fetchContent: async () => ({ status: 200, data: '<html><body>Item 1</body></html>' }),
+      printHtml: printer.printHtml,
+      report: async (_, evidence) => reports.push(evidence),
+    });
+    await waitForPending(1);
+    const pending = pendingPrints.shift();
+    try {
+      assert.equal(pending.options.usePrinterDefaultPageSize, true, `${type}: use the selected queue's paper, not Electron's A4 fallback`);
+      assert.equal(pending.options.deviceName, deviceName);
+      assert.equal(pending.options.silent, true);
+      assert.equal(pending.options.printBackground, true);
+      assert.deepEqual(pending.options.margins, { marginType: 'none' });
+      assert.equal(Object.hasOwn(pending.options, 'pageSize'), false, 'do not force 58/80mm or override the saved driver paper');
+    } finally {
+      pending.callback(true);
+      await result;
+    }
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0].outcome, 'spool_accepted');
+    assert.equal(pendingPrints.length, 0, 'one cloud job must not produce a second print');
+  }
 });
 
 test('different printers use different windows and can spool concurrently', async () => {
@@ -106,10 +150,12 @@ test('default printer lane never shares the discovery window', async () => {
   await printer.getLocalPrinters();
   const discoveryWindow = windows[before];
 
-  const printing = printer.printHtml('<html>default</html>', undefined, 'kot');
+  // The Desktop IPC bridge also calls printHtml without a job type.
+  const printing = printer.printHtml('<html>default</html>', undefined);
   await waitForPending(1);
   assert.notEqual(pendingPrints[0].owner, discoveryWindow);
   assert.equal(pendingPrints[0].deviceName, undefined);
+  assert.equal(pendingPrints[0].options.usePrinterDefaultPageSize, true);
   pendingPrints.shift().callback(true);
   await printing;
 });
@@ -129,4 +175,64 @@ test('stop and restart does not clear an in-flight printer lane', async () => {
   assert.equal(pendingPrints[0].owner, firstWindow);
   pendingPrints.shift().callback(true);
   await Promise.all([first, second]);
+});
+
+
+test('opt-in roll measures content, isolates queues, and default mode recovers its original window state', async () => {
+  printer.setPaperProfiles({'Fit kitchen':58, 'Fit counter':80});
+  for (const [queue,width,type] of [['Fit kitchen',58,'kot'],['Fit kitchen',58,'kot_void'],['Fit counter',80,'bill'],['Fit counter',80,'proof'],['Fit kitchen',58,'test']]) {
+    const result = printer.printHtml('<html><body>One item</body></html>',queue,type);
+    await waitForPending(1);
+    const pending = pendingPrints.shift();
+    assert.deepEqual(pending.options.pageSize,{width:width*1000,height:29000});
+    assert.equal(pending.options.usePrinterDefaultPageSize,undefined);
+    pending.callback(true);
+    assert.equal((await result).success,true);
+    assert.equal(pending.owner.isDestroyed(),true,'print-media emulation must not leak');
+  }
+  printer.setPaperProfiles({});
+  const result = printer.printHtml('<html>Normal</html>','Fit kitchen','kot');
+  await waitForPending(1);
+  const pending = pendingPrints.shift();
+  assert.equal(pending.options.usePrinterDefaultPageSize,true);
+  assert.equal(pending.options.pageSize,undefined);
+  pending.callback(true);
+  await result;
+});
+
+test('measurement failure sends no print and never falls back to a duplicate copy', async () => {
+  printer.setPaperProfiles({'Oversize':58});
+  const result = printer.printHtml('<html>Too long</html>','Oversize','kot');
+  await new Promise(resolve => setImmediate(resolve));
+  windows[windows.length-1].heightPx = 100000;
+  assert.match((await result).error,/2000mm/);
+  assert.equal(pendingPrints.length,0);
+  assert.equal(windows[windows.length-1].isDestroyed(),true);
+});
+
+test('driver refusal reports one failure with no automatic fallback', async () => {
+  printer.setPaperProfiles({'Unsupported driver':80});
+  const result = printer.printHtml('<html>One item</html>','Unsupported driver','kot');
+  await waitForPending(1);
+  pendingPrints.shift().callback(false,'Unsupported paper size');
+  assert.deepEqual(await result,{success:false,error:'Unsupported paper size'});
+  assert.equal(pendingPrints.length,0);
+});
+
+
+test('timeout before fonts settle cannot submit a late print or contaminate the next job', async (t) => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  let release;
+  const result=printer.printHtml('<html>Delayed fonts</html>','Delayed','kot');
+  await Promise.resolve();
+  const win=windows[windows.length-1];
+  win.fontsPending=new Promise(resolve=>{release=resolve;});
+  await new Promise(resolve=>setImmediate(resolve));
+  t.mock.timers.tick(30000);
+  assert.match((await result).error,/timeout/);
+  release('fonts-ok');
+  await Promise.resolve();await Promise.resolve();
+  t.mock.timers.tick(1000);
+  assert.equal(pendingPrints.length,0);
+  assert.equal(win.isDestroyed(),true);
 });

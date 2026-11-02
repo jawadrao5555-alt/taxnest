@@ -61,6 +61,13 @@ class PosFinancialHistory
                 'gross' => $sign > 0 ? $amount : 0, 'returned' => $sign < 0 ? $amount : 0,
                 'net' => $sign * $amount, 'tax' => $sign * (float) $bill->tax_amount,
                 'base' => $sign * ($amount - (float) $bill->tax_amount), 'discount' => $sign * ((float) $bill->discount_amount + (float) $bill->items->sum('item_discount_amount') + (float) $bill->items->sum('promotion_discount'))]);
+            $orderType = in_array($bill->order_type, ['delivery', 'dine_in', 'takeaway', 'counter'], true)
+                ? $bill->order_type : 'counter';
+            $groups[$key]['totals']['order_types'][$orderType] ??= self::zero();
+            self::add($groups[$key]['totals']['order_types'][$orderType], [
+                'sales' => $sign > 0 ? 1 : 0, 'net' => $sign * $amount,
+                'tax' => $sign * (float) $bill->tax_amount,
+            ]);
             $weights = $bill->items->map(fn ($i) => max(0, self::money($i->subtotal)))->all();
             $discounts = PosDealAllocation::cents(self::money($bill->discount_amount), $weights);
             $lineTotal = 0; $lineTax = 0;
@@ -146,13 +153,19 @@ class PosFinancialHistory
                 $row = (array) $r; $row['totals'] = json_decode($r->totals, true); $row['products'] = json_decode($r->products, true); return $row;
             });
         }
-        $summary = self::zero(); $provisional = self::zero(); $daily = []; $payments = []; $cashiers = []; $products = [];
+        $summary = self::zero(); $provisional = self::zero(); $daily = []; $payments = []; $cashiers = []; $products = []; $orderTypes = [];
         foreach ($groups->concat($retained) as $g) {
             if ($g['stage'] !== 'final') { self::add($provisional, $g['totals']); continue; }
             self::add($summary, $g['totals']);
             $date = $g['business_date']; $payment = $g['payment_method']; $creator = $g['created_by'] ?? 0;
             $daily[$date] ??= self::zero(); $payments[$payment] ??= self::zero(); $cashiers[$creator] ??= self::zero();
             self::add($daily[$date], $g['totals']); self::add($payments[$payment], $g['totals']); self::add($cashiers[$creator], $g['totals']);
+            // Old snapshots cannot reveal the original order type. Keep their
+            // known amount explicit instead of assigning it to Delivery/Counter.
+            foreach (($g['totals']['order_types'] ?? ['unknown' => $g['totals']]) as $type => $totals) {
+                $orderTypes[$type] ??= self::zero();
+                self::add($orderTypes[$type], $totals);
+            }
             foreach ($g['products'] as $row) self::addProduct($products, $row);
         }
         ksort($daily);
@@ -175,7 +188,7 @@ class PosFinancialHistory
             }
         }
         return ['from' => $from, 'to' => $to, 'tab' => $tab, 'summary' => $summary, 'provisional' => $provisional,
-            'daily' => $daily, 'payments' => $payments, 'cashiers' => $cashiers, 'products' => array_values($products),
+            'daily' => $daily, 'payments' => $payments, 'cashiers' => $cashiers, 'products' => array_values($products), 'order_types' => $orderTypes,
             'retained_count' => (int) $retained->sum(fn ($r) => $r['totals']['sales']), 'live_count' => $live->count(),
             'gaps' => $gaps, 'complete' => !$gaps];
     }

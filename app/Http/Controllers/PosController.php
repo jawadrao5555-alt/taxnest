@@ -16651,6 +16651,14 @@ class PosController extends Controller
                 }
             }
 
+            // Owner's daily-delete rule (Nov 2026): restart only an empty company
+            // series. Saved/guarded bills and another branch's live bills reserve
+            // their references, so mixed retention continues without collisions.
+            // The company lock spans cleanup + reset; a retry returns above.
+            if ($deletedCount > 0 || $provAction === 'delete' || $finalAction === 'delete') {
+                \App\Services\PosLocalSeries::resetToStart($companyId);
+            }
+
             // Persist deleted counts on the report: deleted reporting-OFF finals must
             // still consume monthly quota (PlanLimitService adds these back in), and
             // the Z-report PDF states how many bills were removed per policy.

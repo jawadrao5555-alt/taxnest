@@ -1,6 +1,6 @@
 export async function b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass}) {
   const option=(stream,key)=>page.locator('[name="receipt_options_'+stream+'['+key+']"]');
-  const open=async stream=>{const panel=page.locator('[data-receipt-options="'+stream+'"]');if(!await panel.evaluate(el=>el.open))await panel.locator('summary').click();};
+  const open=async stream=>{const advanced=page.locator('[data-receipt-advanced]');if(await advanced.count()&&!await advanced.evaluate(el=>el.open))await advanced.locator(':scope > summary').click();const panel=page.locator('[data-receipt-options="'+stream+'"]');if(!await panel.evaluate(el=>el.open))await panel.locator('summary').click();};
   const savedPaper=await page.locator('[name="rp_printer_size"]').inputValue();
   const writes=[];
   const watch=req=>{if(req.method()==='POST')writes.push(new URL(req.url()).pathname);};

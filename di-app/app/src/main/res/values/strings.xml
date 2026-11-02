@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TaxNest DI</string>
+    <string name="app_name">TaxNest Digital Invoice</string>
     <!-- Blank-screen recovery (Task #1491) — keep these keys in sync across
          pos-app, fbr-pos-app, di-app and waiter-app. -->
     <string name="boot_loading">Khul rahi hai…</string>

@@ -154,7 +154,7 @@
         <link rel="apple-touch-icon" href="/icons/nest-fbr/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-fbr/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-fbr/icon-512.png">
-        <title>FBR POS — {{ config('app.name', 'TaxNest') }}</title>
+        <title>TaxNest FBR POS — {{ config('app.name', 'TaxNest') }}</title>
         {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
         @include('partials.font-css', ['fontFamilies' => 'inter:300,400,500,600,700,800,900'])
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -449,7 +449,7 @@
                                 <svg class="w-4 h-4 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                             </div>
                             <div class="hidden sm:flex items-center gap-1.5">
-                                <span class="text-sm font-extrabold text-white tracking-tight">FBR POS</span>
+                                <span class="text-sm font-extrabold text-white tracking-tight">TaxNest FBR POS</span>
                                 <span class="hidden lg:inline-flex items-center px-1.5 py-0.5 rounded-md text-[8.5px] font-black tracking-widest fbr-badge-premium">PREMIUM</span>
                                 <span class="text-[9px] text-white/60 ml-0.5 hidden xl:inline">by TaxNest</span>
                             </div>
@@ -498,7 +498,7 @@
                     <div class="tn-fbr-header-actions flex items-center gap-2 min-w-0 max-w-full">
                         <div data-tn-topnav-scroll-actions class="tn-topnav-scroll-actions flex items-center gap-2">
                         {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
-                        <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
+                        <x-pwa-install-menu-item color="blue" app-name="TaxNest FBR POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="blue" />
                         {{-- Personal display preference, intentionally visible at every
                              desktop width (including compact Desktop shell). The DOM is
@@ -829,7 +829,7 @@
                                         </form>
                                     </div>
                                     {{-- PWA install — always visible --}}
-                                    <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.install_app_device')" item-class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300" />
+                                    <x-pwa-install-menu-item color="blue" app-name="TaxNest FBR POS" :label="__('pos.install_app_device')" item-class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300" />
                                 </div>
                                 </div>{{-- /scrollable middle --}}
 
@@ -868,7 +868,7 @@
                         {{ __('pos.settings') }}<x-new-badge page="fbrpos.customize" panel="fbrpos" dot class="ml-1" />
                     </a>
                     @endif
-                    <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
+                    <x-pwa-install-menu-item color="blue" app-name="TaxNest FBR POS" :label="__('pos.download_app')" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>
 
@@ -901,7 +901,7 @@
                             <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         </div>
                         <div>
-                            <p class="text-sm font-extrabold tracking-tight leading-tight">FBR POS</p>
+                            <p class="text-sm font-extrabold tracking-tight leading-tight">TaxNest FBR POS</p>
                             <p class="text-[10px] text-white/60 leading-tight">{{ $companyName }}</p>
                         </div>
                     </div>
@@ -1119,7 +1119,7 @@
                         </a>
                         @endif
                         {{-- PWA install — always visible --}}
-                        <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.install_app_device')" :item-class="$sidebarBase . ' ' . $sidebarInactive" />
+                        <x-pwa-install-menu-item color="blue" app-name="TaxNest FBR POS" :label="__('pos.install_app_device')" :item-class="$sidebarBase . ' ' . $sidebarInactive" />
                     </div>
                 </nav>
 

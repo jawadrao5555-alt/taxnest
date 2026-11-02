@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#052730">
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>NestPOS — Keyboard-Fast POS with PRA Compliance</title>
-    <meta name="description" content="NestPOS is a keyboard-fast PRA-compliant POS system for Pakistani restaurants and service businesses — offline billing, automatic fiscal sync, and real-time sales reporting.">
+    <title>TaxNest PRA POS — Keyboard-Fast POS with PRA Compliance</title>
+    <meta name="description" content="TaxNest PRA POS is a keyboard-fast PRA-compliant POS system for Pakistani restaurants and service businesses — offline billing, automatic fiscal sync, and real-time sales reporting.">
     @include('partials.meta-og', [
-        'ogTitle'       => 'NestPOS — Keyboard-Fast POS with PRA Compliance',
+        'ogTitle'       => 'TaxNest PRA POS — Keyboard-Fast POS with PRA Compliance',
         'ogDescription' => 'A lightning-fast point-of-sale system built for Pakistani restaurants and service businesses. PRA-integrated billing, inventory, and daily reports — all in one keyboard-driven screen.',
         'ogUrl'         => 'https://taxnest.pk/pos',
     ])
@@ -99,10 +99,10 @@
         "@@context": "https://schema.org",
         "@@type": "SoftwareApplication",
         "@@id": "https://taxnest.pk/pos#software",
-        "name": "NestPOS",
+        "name": "TaxNest PRA POS",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
-        "description": "NestPOS is a keyboard-fast, PRA-compliant point-of-sale system for Pakistani retail and restaurant businesses, with automatic fiscal integration and offline billing support.",
+        "description": "TaxNest PRA POS is a keyboard-fast, PRA-compliant point-of-sale system for Pakistani retail and restaurant businesses, with automatic fiscal integration and offline billing support.",
         "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
         "url": "https://taxnest.pk/pos",
         "publisher": {
@@ -128,7 +128,7 @@
             },
             {
                 "@@type": "Question",
-                "name": "Does NestPOS work for restaurants?",
+                "name": "Does TaxNest PRA POS work for restaurants?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
                     "text": "Yes — a full restaurant module: dine-in / takeaway / delivery order types, table management, kitchen order tickets and held orders, all on the same keyboard-fast sale screen."
@@ -144,7 +144,7 @@
             },
             {
                 "@@type": "Question",
-                "name": "What do the NestPOS plans include?",
+                "name": "What do the TaxNest PRA POS plans include?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
                     "text": "The comparison table reads the current package limits and feature permissions directly from our package settings. Check its Restaurant / Kitchen, Attendance, QR Menu and WhatsApp rows for your chosen plan. Business can purchase eligible Rider Live Tracking and Caller ID add-ons; Unlimited includes them. Extra branches are priced separately. Your business category and enabled settings also determine which screens appear."
@@ -175,7 +175,7 @@
                     <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-6 w-auto">
                     <div class="h-4 w-px mx-2 bg-white/30"></div>
                     <div>
-                        <span class="text-lg font-serif font-bold tracking-tight block leading-none text-white">NestPOS</span>
+                        <span class="text-lg font-serif font-bold tracking-tight block leading-none text-white">TaxNest PRA POS</span>
                         <span class="text-[10px] font-semibold uppercase tracking-widest text-white/70 block leading-none mt-1">PRA POS</span>
                     </div>
                 </a>
@@ -368,7 +368,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">3</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Offline resilience</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Internet outages shouldn't stop your register. Bills print offline and synchronize automatically with the PRA the moment your connection returns — and the NestPOS Desktop app keeps the whole sale screen working with silent thermal printing even when the connection is down.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Internet outages shouldn't stop your register. Bills print offline and synchronize automatically with the PRA the moment your connection returns — and the TaxNest PRA POS Desktop app keeps the whole sale screen working with silent thermal printing even when the connection is down.</p>
                 </div>
 
                 <!-- Feature 4 -->
@@ -424,7 +424,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">11</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Madadgar — AI support</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">An in-panel support assistant that answers in Urdu, any hour of the day. It knows every NestPOS screen — and when it can't solve something, it hands you straight to a human.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">An in-panel support assistant that answers in Urdu, any hour of the day. It knows every TaxNest PRA POS screen — and when it can't solve something, it hands you straight to a human.</p>
                 </div>
 
                 <!-- Feature 12 -->
@@ -440,7 +440,7 @@
     <!-- Testimonial -->
     <section class="py-24 bg-[#052730] text-white border-y border-[#0A4D5C]">
         <div class="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-3xl sm:text-4xl lg:text-5xl font-serif leading-tight mb-10 text-white/90">"At 7 PM, my counter is packed. I cannot afford a system that freezes or requires five clicks per customer. NestPOS lets my cashier ring up items as fast as he can scan them. The PRA guys are happy, and my line keeps moving."</h2>
+            <h2 class="text-3xl sm:text-4xl lg:text-5xl font-serif leading-tight mb-10 text-white/90">"At 7 PM, my counter is packed. I cannot afford a system that freezes or requires five clicks per customer. TaxNest PRA POS lets my cashier ring up items as fast as he can scan them. The PRA guys are happy, and my line keeps moving."</h2>
             <div class="text-[#E7BF3B] font-mono text-sm tracking-widest uppercase">
                 — M. Tariq, Madina Super Mart, Faisalabad
             </div>

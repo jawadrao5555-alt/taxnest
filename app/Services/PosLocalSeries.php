@@ -54,8 +54,8 @@ class PosLocalSeries
     }
 
     /**
-     * Explicitly restart an empty local reference series. This is never used by
-     * automatic or manual day close / record clearing.
+     * Restart an empty local reference series, explicitly or after successful
+     * daily cleanup. Retained rows always prevent a reset.
      */
     public static function resetToStart(int $companyId): bool
     {

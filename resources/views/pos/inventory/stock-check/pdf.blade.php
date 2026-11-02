@@ -158,7 +158,7 @@
 
     <div class="footer">
         <p>{{ __('pos.dcp_generated') }} {{ now()->format('d M Y h:i A') }}</p>
-        <p class="brand">NestPOS</p>
+        <p class="brand">TaxNest PRA POS</p>
     </div>
 </body>
 </html>

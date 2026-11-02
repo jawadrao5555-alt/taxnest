@@ -105,7 +105,7 @@
         @endif
 
         <footer class="mt-10 text-center">
-            <p class="text-[11px] text-gray-400 font-medium">{{ __('pos.qr_powered_by') }} <span class="font-bold" style="color: var(--brand);">NestPOS</span></p>
+            <p class="text-[11px] text-gray-400 font-medium">{{ __('pos.qr_powered_by') }} <span class="font-bold" style="color: var(--brand);">TaxNest PRA POS</span></p>
         </footer>
     </main>
 </body>

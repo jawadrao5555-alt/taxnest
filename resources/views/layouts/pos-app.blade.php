@@ -293,7 +293,7 @@
         <link rel="apple-touch-icon" href="/icons/nest-pra/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-pra/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-pra/icon-512.png">
-        <title>NestPOS — {{ config('app.name', 'TaxNest') }}</title>
+        <title>TaxNest PRA POS — {{ config('app.name', 'TaxNest') }}</title>
         {{-- ONE font CDN only (perf, Jul 2026): Google Fonts duplicate removed — it
              loaded the SAME Inter family from 2 extra domains (2 extra DNS+TLS
              round-trips per fresh visit, render-blocking). Do not re-add. --}}
@@ -632,7 +632,7 @@
                                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
                             <div class="hidden sm:block">
-                                <span class="text-sm font-extrabold text-white tracking-tight">NestPOS</span>
+                                <span class="text-sm font-extrabold text-white tracking-tight">TaxNest PRA POS</span>
                                 <span class="text-[9px] text-white ml-1 hidden lg:inline font-medium">Enterprise</span>
                             </div>
                         </a>

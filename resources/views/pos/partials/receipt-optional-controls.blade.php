@@ -13,6 +13,7 @@
         </label>
     @endforeach
     @foreach(\App\Support\PosReceiptOptions::CHOICES as $key => $choices)
+        @continue(($separateDesigns ?? false) && in_array($key, ['design', 'kot_design'], true))
         <label class="block text-sm text-gray-900 dark:text-gray-100">{{ \App\Support\PosReceiptOptions::LABELS[$key] }}
             <select name="receipt_options_{{ $stream }}[{{ $key }}]" class="mt-1 w-full rounded-lg border-gray-400 bg-white text-gray-900 dark:bg-gray-800 dark:text-white">
                 @foreach($choices as $value => $text)
@@ -25,10 +26,12 @@
     <label class="block text-sm text-gray-900 dark:text-gray-100 mt-3">Extra footer / complaint contact (optional)
         <input name="receipt_options_{{ $stream }}[extra_note]" maxlength="150" value="{{ old('receipt_options_'.$stream.'.extra_note', $optional['extra_note'] ?? '') }}" class="mt-1 w-full rounded-lg border-gray-400 bg-white text-gray-900 dark:bg-gray-800 dark:text-white">
     </label>
+    @unless($separateDesigns ?? false)
     <div class="flex flex-wrap gap-2 mt-3">
         <button type="button" data-print-design-preview="receipt" data-stream="{{ $stream }}" class="rounded-lg border border-gray-400 px-3 py-2 font-semibold text-sm">Preview {{ $stream === 'pra' ? 'Fiscal' : 'Local' }} receipt</button>
         <button type="button" data-print-design-preview="kot" data-stream="{{ $stream }}" class="rounded-lg border border-gray-400 px-3 py-2 font-semibold text-sm">Preview {{ $stream === 'pra' ? 'Fiscal' : 'Local' }} kitchen ticket</button>
     </div>
     <p class="text-sm mt-2">Preview never saves or prints. Existing font, logo and QR choices apply to every receipt design. Only Save applies your selected design.</p>
+    @endunless
     <p class="text-sm text-gray-700 dark:text-gray-200 mt-3">Paper size, print alignment and left margin use the existing printer controls below. Extra QR size does not resize the fiscal verification QR. Floor is shown only with a table. Item row numbers are separate from invoice serials.</p>
 </details>

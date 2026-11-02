@@ -1556,6 +1556,11 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
+    Route::get('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'index'])->whereNumber('companyId')->name('saas.admin.local-bill-records');
+    Route::put('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'update'])->whereNumber('companyId')->name('saas.admin.local-bill-records.update');
+    Route::get('/companies/{companyId}/local-bill-records/{id}/download', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'download'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-bill-records.download');
+    Route::delete('/companies/{companyId}/local-bill-records/{id}', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'destroy'])->whereNumber(['companyId', 'id'])->name('saas.admin.local-bill-records.destroy');
+
     Route::get('/companies/{companyId}/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminIndex'])->whereNumber('companyId')->name('saas.admin.local-support-copies');
     Route::get('/companies/{companyId}/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminDownload'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-support-copies.download');
 

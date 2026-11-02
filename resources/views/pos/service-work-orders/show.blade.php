@@ -30,7 +30,7 @@
                     <option value="qr_payment">QR payment</option>
                 </select>
             </div>
-            <button class="w-full sm:w-auto px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold">Create NestPOS bill</button>
+            <button class="w-full sm:w-auto px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold">Create TaxNest PRA POS bill</button>
             <p class="w-full text-xs text-gray-500">Creates a fiscal sale with a P/L invoice number. Keeps {{ $order->job_number }} as the operational job reference.</p>
         </form>
         @endif

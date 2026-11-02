@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#052730">
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Video Tutorials — NestPOS aur FBR POS | TaxNest</title>
-    <meta name="description" content="Chhoti chhoti Urdu videos — account banane se le kar bill, customers, products aur reports tak, NestPOS ka har feature aaram se seekhein.">
+    <title>Video Tutorials — TaxNest PRA POS aur FBR POS | TaxNest</title>
+    <meta name="description" content="Chhoti chhoti Urdu videos — account banane se le kar bill, customers, products aur reports tak, TaxNest PRA POS ka har feature aaram se seekhein.">
     @include('partials.meta-og', [
-        'ogTitle'       => 'Video Tutorials — NestPOS aur FBR POS | TaxNest',
+        'ogTitle'       => 'Video Tutorials — TaxNest PRA POS aur FBR POS | TaxNest',
         'ogDescription' => 'Short Urdu video tutorials for TaxNest — from creating your first bill to managing products, customers, and reports. Learn every feature step by step.',
         'ogUrl'         => 'https://taxnest.pk/tutorials',
     ])
@@ -48,7 +48,7 @@
                 </a>
                 <div class="flex items-center gap-3 sm:gap-5">
                     <a href="/" class="text-sm font-medium text-gray-600 hover:text-gray-900">Home</a>
-                    <a href="/pos" class="hidden sm:inline text-sm font-medium text-gray-600 hover:text-gray-900">NestPOS</a>
+                    <a href="/pos" class="hidden sm:inline text-sm font-medium text-gray-600 hover:text-gray-900">TaxNest PRA POS</a>
                     <a href="/pos/login" class="text-sm font-medium text-gray-600 hover:text-gray-900">Log In</a>
                     <a href="/pos/register" class="text-sm font-semibold text-white px-4 py-2 rounded-lg" style="background: var(--teal-main);">{{ __('pos.tutorials_pub_cta') }}</a>
                 </div>

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#FDFBF7">
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Digital Invoice — FBR Invoicing by TaxNest</title>
+    <title>TaxNest Digital Invoice — FBR Invoicing by TaxNest</title>
     <meta name="description" content="Send FBR-compliant digital invoices in seconds. TaxNest Digital Invoice integrates with PRAL's API for automatic submission, real-time validation, and audit-ready records.">
     @include('partials.meta-og', [
         'ogTitle'       => 'Digital Invoice — FBR Invoicing by TaxNest',
@@ -260,7 +260,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     </div>
                     <div>
-                        <h3 class="text-base font-serif font-bold text-white">Digital Invoice</h3>
+                        <h3 class="text-base font-serif font-bold text-white">TaxNest Digital Invoice</h3>
                         <p class="text-xs text-white/60 tracking-wider uppercase">FBR Portal Access</p>
                     </div>
                 </div>
@@ -329,7 +329,7 @@
                     </a>
                     <div class="hidden md:flex items-center space-x-8">
                         <a href="/pos" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">PRA POS</a>
-                        <a href="/fbr-pos-landing" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">FBR POS</a>
+                        <a href="/fbr-pos-landing" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">TaxNest FBR POS</a>
                         <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">How it Works</a>
                         <a href="#pricing" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Pricing</a>
                     </div>
@@ -344,7 +344,7 @@
             </div>
             <div x-show="mobileOpen" x-cloak @click.away="mobileOpen = false" class="md:hidden py-4 space-y-1 bg-[var(--paper)] border-t border-gray-200 shadow-lg">
                 <a href="/pos" class="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">PRA POS</a>
-                <a href="/fbr-pos-landing" class="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">FBR POS</a>
+                <a href="/fbr-pos-landing" class="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest FBR POS</a>
                 <a href="#how-it-works" class="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">How it Works</a>
                 <a href="#pricing" class="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Pricing</a>
                 <button @click="showLoginModal = true; mobileOpen = false" class="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Log In</button>

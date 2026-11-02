@@ -39,9 +39,9 @@
             <div>
                 <h4 class="text-xs font-semibold uppercase tracking-widest text-white/40 mb-4">Products</h4>
                 <ul class="space-y-3 text-sm text-white/60">
-                    <li><a href="/digital-invoice" class="hover:text-white transition-colors">Digital Invoice</a></li>
-                    <li><a href="/pos" class="hover:text-white transition-colors">NestPOS (PRA)</a></li>
-                    <li><a href="/fbr-pos-landing" class="hover:text-white transition-colors">FBR POS</a></li>
+                    <li><a href="/digital-invoice" class="hover:text-white transition-colors">TaxNest Digital Invoice</a></li>
+                    <li><a href="/pos" class="hover:text-white transition-colors">TaxNest PRA POS</a></li>
+                    <li><a href="/fbr-pos-landing" class="hover:text-white transition-colors">TaxNest FBR POS</a></li>
                     <li><a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="hover:text-white transition-colors">{{ \App\Support\NestErps::LABEL }}</a></li>
                     <li><a href="/#compare" class="hover:text-white transition-colors">Compare</a></li>
                     <li><a href="/download" class="hover:text-white transition-colors">Downloads</a></li>

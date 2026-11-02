@@ -87,9 +87,9 @@
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Product Type</label>
                 <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
-                    <option value="di" {{ $plan->product_type === 'di' ? 'selected' : '' }}>Digital Invoice</option>
+                    <option value="di" {{ $plan->product_type === 'di' ? 'selected' : '' }}>TaxNest Digital Invoice</option>
                     <option value="pos" {{ $plan->product_type === 'pos' ? 'selected' : '' }}>PRA POS</option>
-                    <option value="fbrpos" {{ $plan->product_type === 'fbrpos' ? 'selected' : '' }}>FBR POS</option>
+                    <option value="fbrpos" {{ $plan->product_type === 'fbrpos' ? 'selected' : '' }}>TaxNest FBR POS</option>
                     <option value="{{ \App\Support\NestErps::PRODUCT_TYPE }}" {{ \App\Support\NestErps::isProductType($plan->product_type ?? null) ? 'selected' : '' }}>{{ \App\Support\NestErps::LABEL }}</option>
                 </select>
             </div>

@@ -1,4 +1,8 @@
 <x-admin-layout>
+@if(auth('admin')->user()?->isSuperAdmin() && $company->product_type === 'pos')
+<div class="px-6 pt-4"><a class="text-teal-500 underline" href="{{ route('saas.admin.local-bill-records', $company->id) }}">SaaS local bill records &amp; retention</a></div>
+@endif
+
 <div class="tn-content-rail p-4 sm:p-6" x-data="{ showDeleteModal: false }">
     <div class="flex flex-wrap items-center gap-3 mb-6">
         <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
@@ -524,7 +528,7 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Change Company Type</h3>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice, NestPOS (PRA), FBR POS and {{ \App\Support\NestErps::LABEL }}.</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice, TaxNest PRA POS, FBR POS and {{ \App\Support\NestErps::LABEL }}.</p>
         <div class="flex flex-wrap items-center gap-3">
             @if($company->product_type !== 'di')
             <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}">
@@ -537,7 +541,7 @@
             <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}">
                 @csrf
                 <input type="hidden" name="product_type" value="pos">
-                <button type="submit" onclick="return confirm('Are you sure? This will change the company type to NestPOS (PRA).')" class="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 text-sm rounded-lg transition font-medium border border-purple-800">Switch to NestPOS</button>
+                <button type="submit" onclick="return confirm('Are you sure? This will change the company type to TaxNest PRA POS.')" class="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 text-sm rounded-lg transition font-medium border border-purple-800">Switch to TaxNest PRA POS</button>
             </form>
             @endif
             @if($company->product_type !== 'fbrpos')

@@ -38,7 +38,7 @@ use App\Models\Company;
 final class NestErps
 {
     /** Public product name. The vertical is always shown UNDER it, never instead of it. */
-    public const LABEL = 'Nest ERPS';
+    public const LABEL = 'TaxNest ERP';
 
     /** One-line description of the line itself (not of any vertical). */
     public const TAGLINE = 'Purpose-built ERPs, built on demand';

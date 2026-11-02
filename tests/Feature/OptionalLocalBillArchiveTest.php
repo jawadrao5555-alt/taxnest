@@ -99,6 +99,95 @@ class OptionalLocalBillArchiveTest extends TestCase
         return $this->archive->grant($company, $this->owner($company), $days, now()->addDays(7));
     }
 
+    private function prepareSaasRecords(): void
+    {
+        (require database_path('migrations/2026_11_02_100001_create_saas_local_bill_records.php'))->up();
+        Schema::create('pos_transaction_items', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('transaction_id'); $t->string('item_name');
+            $t->decimal('quantity', 10, 2); $t->decimal('subtotal', 12, 2);
+        });
+        Schema::create('admin_audit_logs', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('admin_id'); $t->string('action');
+            $t->string('target_type')->nullable(); $t->unsignedBigInteger('target_id')->nullable();
+            $t->text('metadata')->nullable(); $t->timestamps();
+        });
+    }
+
+    public function test_saas_copy_survives_local_deletion_without_optional_consent_and_repeated_number_is_distinct(): void
+    {
+        $this->prepareSaasRecords();
+        $bill = $this->bill(['invoice_number' => 'L001']);
+        DB::table('pos_transaction_items')->insert(['transaction_id' => $bill->id, 'item_name' => 'Fictional meal', 'quantity' => 2, 'subtotal' => 100]);
+        DB::transaction(function () use ($bill) {
+            $this->archive->capture($bill, 'pos', $this->items());
+            $this->archive->capture($bill, 'pos', $this->items()); // retry deduplication
+            DB::table('pos_transaction_items')->where('transaction_id', $bill->id)->delete();
+            DB::table('pos_transactions')->where('id', $bill->id)->delete();
+        });
+        $row = DB::table('saas_local_bill_records')->first();
+        $this->assertSame(1, DB::table('saas_local_bill_records')->count());
+        $this->assertSame(0, DB::table('support_bill_archives')->count());
+        $this->assertStringNotContainsString('PRIVATE CUSTOMER', $row->encrypted_payload);
+        $payload = app(\App\Services\SaasLocalBillRecord::class)->read(1, $row->id);
+        $this->assertSame('L001', $payload['header']['invoice_number']);
+        $this->assertSame('PRIVATE CUSTOMER', $payload['header']['customer_name']);
+        $this->assertSame('Fictional meal', $payload['items'][0]['item_name']);
+        $this->assertArrayNotHasKey('pra_response', $payload['header']);
+        $this->capture($this->bill(['invoice_number' => 'L001']));
+        $this->assertSame(2, DB::table('saas_local_bill_records')->count());
+        $this->assertSame(2, DB::table('saas_local_bill_records')->distinct()->count('source_id'));
+    }
+
+    public function test_saas_retention_and_deletion_are_super_admin_only_and_company_scoped(): void
+    {
+        $this->prepareSaasRecords();
+        $this->capture($this->bill());
+        $this->capture($this->bill(['company_id' => 2]));
+        $mine = DB::table('saas_local_bill_records')->where('company_id', 1)->value('id');
+        $other = DB::table('saas_local_bill_records')->where('company_id', 2)->value('id');
+        $controller = app(\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class);
+        $archive = app(\App\Services\SaasLocalBillRecord::class);
+        auth('pos')->setUser($this->owner());
+        foreach (['company', 'support'] as $role) {
+            if ($role === 'support') auth('admin')->setUser((new AdminUser)->forceFill(['id' => 901, 'role' => 'support']));
+            try { $controller->download(1, $mine, $archive); $this->fail('Non-super-admin read allowed'); }
+            catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
+            try { $controller->destroy(1, $mine); $this->fail('Non-super-admin delete allowed'); }
+            catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(403, $e->getStatusCode()); }
+        }
+        auth('admin')->setUser((new AdminUser)->forceFill(['id' => 900, 'role' => 'super_admin']));
+        try { $controller->download(1, $other, $archive); $this->fail('Cross-company copy read'); }
+        catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(404, $e->getStatusCode()); }
+        try { $controller->destroy(1, $other); $this->fail('Cross-company copy deleted'); }
+        catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) { $this->assertSame(404, $e->getStatusCode()); }
+        $this->assertSame(200, $controller->download(1, $mine, $archive)->getStatusCode());
+        $controller->update(\Illuminate\Http\Request::create('/', 'PUT', ['retain' => 0]), 1);
+        $this->capture($this->bill());
+        $this->assertSame(1, DB::table('saas_local_bill_records')->where('company_id', 1)->count());
+        $controller->destroy(1, $mine);
+        $this->assertSame(0, DB::table('saas_local_bill_records')->where('company_id', 1)->count());
+        $this->assertSame(1, DB::table('saas_local_bill_records')->where('company_id', 2)->count());
+        $this->assertSame(3, DB::table('admin_audit_logs')->count());
+    }
+
+    public function test_failed_saas_capture_rolls_back_the_entire_cleanup(): void
+    {
+        $this->prepareSaasRecords();
+        $bill = $this->bill();
+        $this->capture($bill);
+        DB::table('pos_transactions')->where('id', $bill->id)->update(['total_amount' => 200]);
+        try {
+            DB::transaction(function () use ($bill) {
+                $this->archive->capture($bill, 'pos', $this->items());
+                DB::table('pos_transactions')->where('id', $bill->id)->delete();
+            });
+            $this->fail('A mismatched copy must prevent cleanup');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('collision', $e->getMessage());
+        }
+        $this->assertTrue(DB::table('pos_transactions')->where('id', $bill->id)->exists());
+    }
+
     public function test_default_off_and_prospective_consent_do_not_copy_live_history_or_change_settings(): void
     {
         $bill = $this->bill();

@@ -183,7 +183,7 @@
                 "name": "Are the products connected to each other?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "No — by design. Digital Invoice, NestPOS, FBR POS and Nest ERPS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean."
+                    "text": "No — by design. Digital Invoice, TaxNest PRA POS, FBR POS and TaxNest ERP each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean."
                 }
             },
             {
@@ -228,9 +228,9 @@
                     <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" x-show="!scrolled && !mobileOpen" alt="TaxNest" class="h-8 w-auto">
                 </a>
                 <div class="hidden md:flex items-center space-x-8">
-                    <a href="/digital-invoice" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Digital Invoice</a>
-                    <a href="/pos" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">NestPOS (PRA)</a>
-                    <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">FBR POS</a>
+                    <a href="/digital-invoice" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest Digital Invoice</a>
+                    <a href="/pos" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest PRA POS</a>
+                    <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">TaxNest FBR POS</a>
                     <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">{{ \App\Support\NestErps::LABEL }}</a>
                     <a href="#compare" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Compare</a>
                     <a href="/download" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Downloads</a>
@@ -247,9 +247,9 @@
                 </div>
             </div>
             <div x-show="mobileOpen" x-cloak @click.away="mobileOpen = false" class="md:hidden border-t border-gray-200 py-4 space-y-1 bg-[#FDFBF7]">
-                <a href="/digital-invoice" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Digital Invoice</a>
-                <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">NestPOS (PRA POS)</a>
-                <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">FBR POS</a>
+                <a href="/digital-invoice" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest Digital Invoice</a>
+                <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest PRA POS</a>
+                <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">TaxNest FBR POS</a>
                 <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">{{ \App\Support\NestErps::LABEL }}</a>
                 <a href="#compare" @click="mobileOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Compare Products</a>
                 <a href="/tutorials" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Tutorials</a>
@@ -380,7 +380,7 @@
                         <div class="inline-block px-3 py-1 mb-6 bg-emerald-50 border border-emerald-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-emerald">
                             FBR Digital Invoicing
                         </div>
-                        <h4 class="text-3xl font-serif text-[#052730] mb-4">Digital Invoice</h4>
+                        <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest Digital Invoice</h4>
                         <p class="text-gray-600 mb-6 leading-relaxed">
                             Direct integration with FBR via the PRAL API. Generate, validate, and submit invoices with zero friction. Built for serious volume with an unyielding focus on data integrity.
                         </p>
@@ -415,15 +415,15 @@
 
                 <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
 
-                <!-- NestPOS -->
+                <!-- TaxNest PRA POS -->
                 <div class="flex flex-col lg:flex-row-reverse gap-12 items-center fade-in-up">
                     <div class="w-full lg:w-1/2">
                         <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
-                            <img src="{{ asset('images/screenshots/pos-sale.jpg') }}" alt="NestPOS Sale Screen" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
+                            <img src="{{ asset('images/screenshots/pos-sale.jpg') }}" alt="TaxNest PRA POS Sale Screen" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
                             <div class="grid grid-cols-3 gap-2 mt-2">
-                                <img src="{{ asset('images/screenshots/pos-tables.jpg') }}?v=1" alt="NestPOS restaurant tables board" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                                <img src="{{ asset('images/screenshots/pos-dash.jpg') }}?v=1" alt="NestPOS dashboard with profit and BI" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
-                                <img src="{{ asset('images/screenshots/pos-tx.jpg') }}?v=1" alt="NestPOS transactions list with PRA status" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
+                                <img src="{{ asset('images/screenshots/pos-tables.jpg') }}?v=1" alt="TaxNest PRA POS restaurant tables board" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
+                                <img src="{{ asset('images/screenshots/pos-dash.jpg') }}?v=1" alt="TaxNest PRA POS dashboard with profit and BI" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
+                                <img src="{{ asset('images/screenshots/pos-tx.jpg') }}?v=1" alt="TaxNest PRA POS transactions list with PRA status" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
                             </div>
                         </div>
                     </div>
@@ -431,7 +431,7 @@
                         <div class="inline-block px-3 py-1 mb-6 bg-purple-50 border border-purple-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
                             Punjab Revenue Authority POS
                         </div>
-                        <h4 class="text-3xl font-serif text-[#052730] mb-4">NestPOS <span class="text-xl text-gray-500 font-sans font-medium">— PRA POS</span></h4>
+                        <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest PRA POS <span class="text-xl text-gray-500 font-sans font-medium">— PRA POS</span></h4>
                         <p class="text-gray-600 mb-6 leading-relaxed">
                             A fast, keyboard-first point of sale built specifically for PRA fiscal integration. Designed for retail and restaurants in Punjab that demand speed at the counter without sacrificing compliance.
                         </p>
@@ -464,7 +464,7 @@
                     </div>
                 </div>
 
-                <!-- NestPOS Promo Video -->
+                <!-- TaxNest PRA POS Promo Video -->
                 <div class="fade-in-up" x-data="{ playing: false }">
                     <div class="max-w-3xl mx-auto text-center mb-8">
                         <div class="inline-block px-3 py-1 mb-4 bg-purple-50 border border-purple-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
@@ -483,7 +483,7 @@
                                 <button x-show="!playing" type="button" aria-label="Play video"
                                         @click="playing = true; $nextTick(() => { $refs.promoVideo.play(); })"
                                         class="absolute inset-0 w-full h-full group cursor-pointer">
-                                    <img src="{{ asset('images/promo-poster.jpg') }}" alt="NestPOS promo video" loading="lazy" class="absolute inset-0 w-full h-full object-cover">
+                                    <img src="{{ asset('images/promo-poster.jpg') }}" alt="TaxNest PRA POS promo video" loading="lazy" class="absolute inset-0 w-full h-full object-cover">
                                     <span class="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors"></span>
                                     <span class="absolute inset-0 flex items-center justify-center">
                                         <span class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/95 shadow-xl flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -514,7 +514,7 @@
                         <div class="inline-block px-3 py-1 mb-6 bg-blue-50 border border-blue-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-blue">
                             FBR Point of Sale
                         </div>
-                        <h4 class="text-3xl font-serif text-[#052730] mb-4">FBR POS</h4>
+                        <h4 class="text-3xl font-serif text-[#052730] mb-4">TaxNest FBR POS</h4>
                         <p class="text-gray-600 mb-6 leading-relaxed">
                             A complete retail &amp; restaurant billing system wired directly to the FBR — cloud submission or fiscal-device local mode. Everything a real shop runs daily, on the same terminal that stays compliant.
                         </p>
@@ -626,15 +626,15 @@
                         <tr class="border-b border-gray-200">
                             <th class="text-left p-5 font-semibold text-gray-500 uppercase tracking-wider text-xs w-1/4"></th>
                             <th class="text-left p-5">
-                                <span class="block font-serif text-lg text-[#052730]">Digital Invoice</span>
+                                <span class="block font-serif text-lg text-[#052730]">TaxNest Digital Invoice</span>
                                 <span class="text-xs font-medium accent-emerald uppercase tracking-wider">FBR e-Invoicing</span>
                             </th>
                             <th class="text-left p-5">
-                                <span class="block font-serif text-lg text-[#052730]">NestPOS</span>
+                                <span class="block font-serif text-lg text-[#052730]">TaxNest PRA POS</span>
                                 <span class="text-xs font-medium accent-purple uppercase tracking-wider">PRA Point of Sale</span>
                             </th>
                             <th class="text-left p-5">
-                                <span class="block font-serif text-lg text-[#052730]">FBR POS</span>
+                                <span class="block font-serif text-lg text-[#052730]">TaxNest FBR POS</span>
                                 <span class="text-xs font-medium accent-blue uppercase tracking-wider">FBR Point of Sale</span>
                             </th>
                         </tr>
@@ -674,7 +674,7 @@
                         <tr>
                             <td class="p-5"></td>
                             <td class="p-5"><a href="/digital-invoice" class="btn-solid btn-primary w-full">Explore DI</a></td>
-                            <td class="p-5"><a href="/pos" class="btn-solid btn-primary w-full">Explore NestPOS</a></td>
+                            <td class="p-5"><a href="/pos" class="btn-solid btn-primary w-full">Explore TaxNest PRA POS</a></td>
                             <td class="p-5"><a href="/fbr-pos-landing" class="btn-solid btn-primary w-full">Explore FBR POS</a></td>
                         </tr>
                     </tbody>
@@ -704,7 +704,7 @@
                         <span class="font-semibold text-[#052730]">Are the products connected to each other?</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">No — by design. Digital Invoice, NestPOS, FBR POS and Nest ERPS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean.</div>
+                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">No — by design. Digital Invoice, TaxNest PRA POS, FBR POS and TaxNest ERP each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean.</div>
                 </div>
                 <div class="card-solid rounded-lg">
                     <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">

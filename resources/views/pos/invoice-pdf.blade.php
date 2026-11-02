@@ -340,7 +340,7 @@
                     'Total: ' . number_format($transaction->total_amount, 2),
                 ];
                 if ($rpPdf['show_business_name'] ?? true) {
-                    $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                    $qrLines[] = $transaction->company->name ?? 'TaxNest PRA POS';
                 }
                 $qrUrl = \App\Support\QrImage::dataUri(implode("\n", $qrLines), 5, 4);
             }

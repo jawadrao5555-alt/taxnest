@@ -922,7 +922,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                         'Total: ' . number_format($transaction->total_amount, 2),
                     ];
                     if ($rp['show_business_name'] ?? true) {
-                        $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                        $qrLines[] = $transaction->company->name ?? 'TaxNest PRA POS';
                     }
                     $qrUrl = \App\Support\QrImage::dataUri(implode("\n", $qrLines), 5, 4);
                     $qrCaption = __('pos.receipt_scan_invoice');

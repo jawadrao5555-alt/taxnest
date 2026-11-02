@@ -1663,6 +1663,8 @@ async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
     await login(page,t.settingsOwner);
   await page.goto(baseUrl+'/pos/receipt-settings',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  if(await page.locator('[data-receipt-advanced]').evaluate(el=>el.open))throw new Error('Technical receipt options should start collapsed');
+  if(await page.locator('[data-printer-support]').evaluate(el=>el.open))throw new Error('Printer setup should start collapsed');
   await b03DesignsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   await page.locator('[name="rp_font_family"]').selectOption('sans');
   await page.locator('[name="rp_item_text"]').selectOption('compact');
@@ -1674,6 +1676,8 @@ async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
   const option = (stream,key) => page.locator('[name="receipt_options_'+stream+'['+key+']"]');
   const preview = page.locator('[data-tn-typography-preview]');
   const openOptions = async stream => {
+    const advanced=page.locator('[data-receipt-advanced]');
+    if(!await advanced.evaluate(el=>el.open))await advanced.locator(':scope > summary').click();
     const panel=page.locator('[data-receipt-options="'+stream+'"]');
     if(!await panel.evaluate(el=>el.open))await panel.locator('summary').click();
   };
@@ -1698,6 +1702,10 @@ async function receiptTypographyPreviewWorkflow(originalPage,t,v) {
   };
   await submit();
   if(await option('pra','show_terminal').inputValue()!=='hide'||await option('local','show_waiter').inputValue()!=='hide'||await option('local','show_terminal').inputValue()!=='inherit')throw new Error('Explicit save lost stream isolation');
+  // Saving basics with Advanced closed must still submit/preserve its inputs.
+  if(await page.locator('[data-receipt-advanced]').evaluate(el=>el.open))throw new Error('Reload unexpectedly opened Advanced');
+  await submit();
+  if(await option('pra','show_terminal').inputValue()!=='hide'||await option('local','show_waiter').inputValue()!=='hide')throw new Error('Saving with Advanced closed erased stored choices');
   await openOptions('pra');await openOptions('local');
   await option('pra','show_terminal').selectOption('inherit');await option('local','show_waiter').selectOption('inherit');
   await submit();

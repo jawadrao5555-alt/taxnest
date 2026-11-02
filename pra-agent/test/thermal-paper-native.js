@@ -52,7 +52,8 @@ app.whenReady().then(async () => {
     }
   }
   // Real Agent settings DOM + real UI module, mocked IPC only (never starts Agent).
-  const ui=new BrowserWindow({show:false,width:900,height:1400,webPreferences:{sandbox:true,contextIsolation:true}});
+  const ui=new BrowserWindow({show:true,width:900,height:1400,webPreferences:{sandbox:true,contextIsolation:true,backgroundThrottling:false}});
+  console.log('Settings fixture: window created');
   const errors=[];
   ui.webContents.on('console-message', (_event, level, message) => { if(level>=3) errors.push(message); });
   ui.webContents.debugger.attach('1.3');
@@ -65,9 +66,12 @@ app.whenReady().then(async () => {
       return async()=>({});
     }});
   `});
+  console.log('Settings fixture: IPC installed');
   await ui.loadFile(path.join(__dirname,'../index.html'));
+  console.log('Settings fixture: loaded');
   await new Promise(resolve=>setTimeout(resolve,100));
   await ui.webContents.executeJavaScript(`window.testProfiles=printerPaperProfiles;document.querySelector('details').open=true;`);
+  console.log('Settings fixture: profiles loaded');
   const state=await ui.webContents.executeJavaScript(`(()=>{const c=document.getElementById('printerPaperModes');const selects=c.querySelectorAll('select');if(selects.length!==3)throw Error('missing printer');selects[1].value='80';selects[1].dispatchEvent(new Event('change'));return {profiles:window.testProfiles,html:c.innerHTML};})()`);
   assert.deepEqual(state.profiles,{'Kitchen <one>':58,Counter:80,Unavailable:80});
   assert.ok(state.html.includes('&lt;one&gt;'),'printer names are text, not injected markup');
@@ -77,6 +81,7 @@ app.whenReady().then(async () => {
   assert.equal(saved.printerExplicit,false);
   assert.deepEqual(saved.printerPaperProfiles,state.profiles);
   assert.deepEqual(errors,[], 'Agent settings must render without JavaScript errors');
+  console.log('Settings fixture: save assertions passed');
   fs.writeFileSync(path.join(out,'settings.png'),(await ui.webContents.capturePage()).toPNG());
   ui.destroy();clearTimeout(watchdog);console.log('Native thermal paper and settings checks passed');app.exit(0);
 }).catch(error=>{console.error(error);clearTimeout(watchdog);app.exit(1);});

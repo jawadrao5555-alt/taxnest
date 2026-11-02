@@ -366,15 +366,6 @@ jobs:
           set -o pipefail
           bash scripts/rc-safe-run -- xvfb-run -a pra-agent/node_modules/electron/dist/electron --no-sandbox pra-agent/test/thermal-paper-native.js 2>&1 | tee "$RUNNER_TEMP/thermal-paper.log"
           grep -Fx 'Native thermal paper and settings checks passed' "$RUNNER_TEMP/thermal-paper.log"
-      - name: Preserve synthetic thermal paper and settings evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: synthetic-thermal-paper-${{ github.run_id }}
-          path: |
-            .local/thermal-paper-evidence/*.pdf
-            .local/thermal-paper-evidence/*.png
-          if-no-files-found: error
-          retention-days: 14
       - name: Exercise real Electron offline reconnect and encrypted persistence
         timeout-minutes: 8
         run: bash scripts/rc-safe-run -- node pra-agent/test/local-core-internet-cut.test.js

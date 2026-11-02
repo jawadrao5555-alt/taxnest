@@ -357,7 +357,8 @@ class LiveOpsDiagnosticsTest extends LiveOpsTestCase
             'requester' => 'test',
         ]);
 
-        $this->assertContains($daily['data']['overall']['status'], ['GREEN', 'ATTENTION', 'CRITICAL']);
+        $this->assertContains($daily['data']['overall']['status'], ['PARTIAL', 'ATTENTION', 'CRITICAL']);
+        $this->assertFalse($daily['data']['coverage']['complete']);
         $this->assertArrayHasKey('server_health', $daily['data']);
         $this->assertArrayHasKey('application_health', $daily['data']);
         $this->assertArrayHasKey('database_health', $daily['data']);

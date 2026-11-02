@@ -1,7 +1,7 @@
-title: "Account ki miyaad aur suspension ka record"
+title: "Day Close ka masla samajhne mein support ke liye behtari"
 audience: pos
 type: improvement
 points:
-  - "Account ki package dates aur company ka status ab admin ko aik jagah nazar aata hai. Account ka masla ho to support se rabta karein."
-  - "Company suspend karte waqt admin wajah aur dobara kholne ki shart likh sakta hai. Naye record mein yeh detail, waqt aur admin ka naam mehfooz rehta hai."
-  - "Company dobara active karne se package ki tareekh nahi barhti. Package renew karna alag qadam hai."
+  - "Day Close mein farq aaye to support ko company, branch aur tareekh batayein. Support saved opening cash, expected cash, gina hua cash aur farq dekh sakti hai."
+  - "Purane record mein koi detail na ho to report usay saaf batati hai. Missing detail ko zero nahi maana jata."
+  - "Yeh jaanch bills ya cash ka record nahi badalti. Report yeh bhi batati hai ke kaun si jaanch abhi baqi hai."

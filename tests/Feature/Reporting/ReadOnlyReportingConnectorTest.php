@@ -139,6 +139,26 @@ class ReadOnlyReportingConnectorTest extends TestCase
         return $this->withToken($token)->postJson('/api/reporting/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => $tool, 'arguments' => $args]]);
     }
 
+    public function test_day_close_and_coverage_use_existing_revocable_connection_with_no_business_writes(): void
+    {
+        [, $tokens] = $this->connection();
+        $before = DB::table('pos_transactions')->orderBy('id')->get()->toJson();
+        $this->toolCall($tokens['access_token'], 'get_pra_day_close_evidence', $this->period())
+            ->assertOk()->assertJsonPath('result.isError', false)
+            ->assertJsonPath('result.structuredContent.coverage.status', 'UNAVAILABLE')
+            ->assertJsonPath('result.structuredContent.company.id', 1);
+        $this->toolCall($tokens['access_token'], 'get_pra_day_close_evidence', $this->period('Pizza Master Twin'))
+            ->assertJsonPath('result.isError', true);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_coverage', ['product' => 'di', 'limit' => 1])
+            ->assertJsonPath('result.structuredContent.complete', false)
+            ->assertJsonPath('result.structuredContent.tenant_checks_run', 0);
+        $this->assertDatabaseHas('reporting_read_audits', ['company_id' => 1, 'tool' => 'get_pra_day_close_evidence', 'date_from' => '2026-10-13']);
+        $this->assertSame($before, DB::table('pos_transactions')->orderBy('id')->get()->toJson());
+        DB::table('reporting_oauth_grants')->update(['revoked_at' => now()]);
+        $this->toolCall($tokens['access_token'], 'get_pra_day_close_evidence', $this->period())->assertUnauthorized();
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_coverage', [])->assertUnauthorized();
+    }
+
     public function test_connection_page_separates_authorisation_from_scoped_read_evidence_without_business_writes(): void
     {
         [$params, $tokens] = $this->connection();
@@ -214,7 +234,7 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_tax_items', $this->period() + ['classification' => 'exempt'])->assertJsonPath('result.structuredContent.items.0.description', 'Exempt item');
         $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period())->assertJsonPath('result.structuredContent.actual_collected_total', null);
         $tools = $this->withToken($t['access_token'])->postJson('/api/reporting/mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'])->json('result.tools');
-        $this->assertCount(7, $tools);
+        $this->assertCount(9, $tools);
         foreach ($tools as $tool) {
             $this->assertTrue($tool['annotations']['readOnlyHint']);
             $this->assertFalse($tool['annotations']['destructiveHint']);

@@ -1261,15 +1261,25 @@ async function reportingConnectorWorkflow(page,t,v) {
   if(own.result?.isError||Number(own.result?.structuredContent?.totals?.net_billing)!==f.billing)throw new Error('Native billing mismatch: '+JSON.stringify({status:ownResponse.status(),rpcError:own.error,toolError:own.result?.isError,content:own.result?.isError?own.result?.content:undefined,totals:own.result?.structuredContent?.totals,period:own.result?.structuredContent?.period}));
   const foreign=await (await report(f.foreignCompanyName)).json();
   if(!foreign.result?.isError)throw new Error('Connection company scope leaked a foreign company report');
+  const diagnostic=async(name,args)=>request.post(baseUrl+'/api/reporting/mcp',{headers:{Authorization:'Bearer '+tokens.access_token},data:{jsonrpc:'2.0',id:2,method:'tools/call',params:{name,arguments:args}}});
+  const cashArgs={company_name:f.companyName,date_from:f.dayCloseDate};
+  const cash=await(await diagnostic('get_pra_day_close_evidence',cashArgs)).json();
+  if(cash.result?.isError||cash.result?.structuredContent?.records?.[0]?.arithmetic?.calculated_expected!==750||cash.result?.structuredContent?.coverage?.complete!==false)throw new Error('Scoped native cash snapshot was not returned as partial evidence');
+  const cashForeign=await(await diagnostic('get_pra_day_close_evidence',{...cashArgs,company_name:f.foreignCompanyName})).json();
+  if(!cashForeign.result?.isError)throw new Error('Foreign cash evidence leaked');
+  const coverage=await(await diagnostic('get_diagnostic_coverage',{product:'pos',limit:1})).json();
+  if(coverage.result?.structuredContent?.complete!==false||coverage.result?.structuredContent?.tenant_checks_run!==0)throw new Error('Capability inventory claimed complete tenant health');
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
   await page.locator('[data-reporting-onboarding]').waitFor();
   const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
-  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 1.'))throw new Error('Successful read evidence missing or failed foreign read counted');
+  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 3.'))throw new Error('Successful read evidence missing or failed foreign read counted');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-read-evidence');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
   if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
   if((await report(f.companyName)).status()!==401)throw new Error('Revoked token retained billing access');
-  pass(t.name+'/'+v.width+': real consent, PKCE, native billing, foreign-company denial and immediate revoke');
+  if((await diagnostic('get_pra_day_close_evidence',cashArgs)).status()!==401)throw new Error('Revoked token retained cash evidence access');
+  if((await diagnostic('get_diagnostic_coverage',{})).status()!==401)throw new Error('Revoked token retained diagnostic catalog access');
+  pass(t.name+'/'+v.width+': real consent, PKCE, native billing/cash, coverage gaps, foreign-company denial and immediate revoke');
 }
 
 async function liveOpsReadability(page,t,v) {

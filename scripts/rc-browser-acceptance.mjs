@@ -2281,6 +2281,13 @@ async function customerBulkNavigation(page,t,v) {
   const href=await link.getAttribute('href');if(!href)throw new Error('Metric detail link missing');
   const r=await page.goto(href,{waitUntil:'domcontentloaded'});if(!r?.ok())throw new Error('Metric detail did not render');
   if(metric==='revenue'&&!await page.locator('[data-report-summary]').count())throw new Error('Sales report shared summary missing');
+  if(metric==='revenue') {
+   const products=page.locator('[data-report-products]');
+   if(await products.count()!==1)throw new Error('Sales needs one complete grouped product section');
+   const ordered=await products.evaluate(el=>Array.from(document.querySelectorAll('canvas')).filter(c=>c.getClientRects().length).every(c=>c.getBoundingClientRect().bottom<=el.getBoundingClientRect().top));
+   if(!ordered)throw new Error('Products appeared before report analytics');
+   if(await products.locator('th.c').evaluate(el=>getComputedStyle(el).textAlign)!=='center')throw new Error('Product quantity is not centered');
+  }
   await page.goto(baseUrl+'/pos/restaurant/dashboard',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
  }
  await saveEvidenceScreenshot(page,'customer-bulk-metrics-'+v.width);

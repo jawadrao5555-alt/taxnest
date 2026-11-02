@@ -1229,7 +1229,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
     </div>
 
     {{-- Category-wise + Top products --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="grid grid-cols-1 {{ ($presentation) ? '' : 'lg:grid-cols-2' }} gap-6 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
@@ -1254,6 +1254,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
             @endif
         </div>
 
+        @if(!$presentation)
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
@@ -1286,6 +1287,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
             </div>
             @endif
         </div>
+        @endif
     </div>
 
     {{-- Hourly sales (CSS bar chart — no JS dependency) --}}

@@ -9,7 +9,7 @@ return [
     'provisional' => 'Provisional/draft amount: PKR :amount (excluded from final net).',
     'no_known_finals' => 'No final activity recorded in the available sources for this scope.',
     'payment' => 'Payment method', 'cashier' => 'Cashier', 'products' => 'Product / size / category reconciliation',
-    'product_basis' => 'Deal component shares replace their parent bundle revenue. Standalone items stay separate. New snapshots freeze labels; legacy labels are identified. Charges and rounding differences have their own row. Quantities and money are net of returns.',
+    'product_basis' => 'Deal component shares replace their parent bundle revenue. Standalone items stay separate. New snapshots freeze labels; legacy labels are identified. Delivery charges stay in the payment/order breakdown; rounding or genuine header differences have a reconciliation row. Quantities and money are net of returns.',
     'category_size' => 'Category / size', 'channel' => 'Sale channel / basis',
     'refund_note' => 'A credit note reduces sales; it does not by itself prove cash was paid back. Aggregates cannot recover deleted bill details. Optional support-copy consent and retention are unchanged.',
     'detail_note' => 'The charts and invoice lists below describe available bill detail only, using their displayed periods. Gross-sales analytics exclude returns. Use the reconciliation above for net amounts and retained deleted-sale totals.',

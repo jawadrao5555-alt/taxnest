@@ -37,5 +37,4 @@
     </div>
     <p class="text-xs text-gray-500">{{ __('pos_history.refund_note') }}</p>
 </section>
-<div class="p-3 mb-4 text-sm bg-blue-50 text-blue-900 rounded-lg">{{ __('pos_history.detail_note') }}</div>
 @endif

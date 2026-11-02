@@ -269,7 +269,7 @@
     <div class="hr"></div>
     @endif
 
-    @if($analytics->top_products->isNotEmpty())
+    @if(!$presentation && $analytics->top_products->isNotEmpty())
     <div class="sec">{{ __('pos.dc_top_products') }}</div>
     <table>
         @foreach($analytics->top_products->take(5) as $pname => $p)

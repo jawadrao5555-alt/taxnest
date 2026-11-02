@@ -19,4 +19,5 @@
  </tbody></table></td>
  @endforeach
  </tr></table>
+ <p class="text-sm">{{ __('pos_history.detail_note') }}</p>
 </section>

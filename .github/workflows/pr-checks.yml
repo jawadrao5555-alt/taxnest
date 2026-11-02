@@ -362,7 +362,10 @@ jobs:
           node pra-agent/node_modules/electron/install.js
       - name: Exercise thermal receipt paper and Agent settings in real Electron
         timeout-minutes: 3
-        run: bash scripts/rc-safe-run -- xvfb-run -a pra-agent/node_modules/electron/dist/electron --no-sandbox pra-agent/test/thermal-paper-native.js
+        run: |
+          set -o pipefail
+          bash scripts/rc-safe-run -- xvfb-run -a pra-agent/node_modules/electron/dist/electron --no-sandbox pra-agent/test/thermal-paper-native.js 2>&1 | tee "$RUNNER_TEMP/thermal-paper.log"
+          grep -Fx 'Native thermal paper and settings checks passed' "$RUNNER_TEMP/thermal-paper.log"
       - name: Preserve synthetic thermal paper and settings evidence
         uses: actions/upload-artifact@v4
         with:

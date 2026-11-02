@@ -41,8 +41,10 @@ now prevent late submission. This is not proof of the photo's duplicate cause.
 - Native Electron launch attempted with both ordinary and single-process
   headless flags. This execution environment denies sockets/udev and exits139
   before BrowserWindow renders. This is a testing limitation, not a passing check.
-- Initial PR runner test passed (run 41465863420); the existing browser smoke
-  needed its loopback static-file allowlist extended for the new UI helper.
+- Initial PR renderer run only completed the first fixture: Electron auto-quit
+  when its window closed. The harness now stays alive between fixtures and CI
+  requires an explicit final success marker; exit 0 alone is insufficient.
+  Existing browser smoke also needed its static-file allowlist extended.
 - Mandatory PR runner test `thermal-paper-native.js` renders synthetic short and
   40-row tickets on 58/80mm, checks one-page PDF dimensions/footer, and exercises
   the real settings DOM/save with mocked IPC. No customer data or print jobs.

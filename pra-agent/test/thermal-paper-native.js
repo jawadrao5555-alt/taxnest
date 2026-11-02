@@ -7,6 +7,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {prepareThermalPaper} = require('../src/thermal-paper');
 app.disableHardwareAcceleration();
+// Keep the test process alive between fixtures. Electron otherwise quits with
+// exit 0 when the first window is destroyed, skipping the remaining assertions.
+app.on('window-all-closed', () => {});
 const out = path.resolve(__dirname, '../../.local/thermal-paper-evidence');
 fs.mkdirSync(out,{recursive:true});
 const watchdog = setTimeout(() => { console.error('Native paper test timed out'); app.exit(1); },60000);

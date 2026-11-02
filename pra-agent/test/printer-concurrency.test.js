@@ -13,15 +13,19 @@ class FakeWebContents extends EventEmitter {
   constructor(owner) {
     super();
     this.owner = owner;
+    this.debugger = { attach() {}, async sendCommand() {} };
   }
 
   async getPrintersAsync() {
     return [];
   }
 
-  async executeJavaScript() {
+  async executeJavaScript(script) {
+    if (this.owner.fontsPending && !script.includes('measureReceipt')) return this.owner.fontsPending;
+    if (script.includes('measureReceipt')) return this.owner.heightPx ?? 96;
     return 'fonts-ok';
   }
+  async insertCSS() {}
 
   print(options, callback) {
     pendingPrints.push({ owner: this.owner, deviceName: options.deviceName, options, callback });
@@ -69,6 +73,7 @@ async function waitForPending(count) {
 }
 
 test.afterEach(() => {
+  printer.setPaperProfiles({});
   while (pendingPrints.length) pendingPrints.shift().callback(true);
 });
 
@@ -170,4 +175,64 @@ test('stop and restart does not clear an in-flight printer lane', async () => {
   assert.equal(pendingPrints[0].owner, firstWindow);
   pendingPrints.shift().callback(true);
   await Promise.all([first, second]);
+});
+
+
+test('opt-in roll measures content, isolates queues, and default mode recovers its original window state', async () => {
+  printer.setPaperProfiles({'Fit kitchen':58, 'Fit counter':80});
+  for (const [queue,width,type] of [['Fit kitchen',58,'kot'],['Fit kitchen',58,'kot_void'],['Fit counter',80,'bill'],['Fit counter',80,'proof'],['Fit kitchen',58,'test']]) {
+    const result = printer.printHtml('<html><body>One item</body></html>',queue,type);
+    await waitForPending(1);
+    const pending = pendingPrints.shift();
+    assert.deepEqual(pending.options.pageSize,{width:width*1000,height:29000});
+    assert.equal(pending.options.usePrinterDefaultPageSize,undefined);
+    pending.callback(true);
+    assert.equal((await result).success,true);
+    assert.equal(pending.owner.isDestroyed(),true,'print-media emulation must not leak');
+  }
+  printer.setPaperProfiles({});
+  const result = printer.printHtml('<html>Normal</html>','Fit kitchen','kot');
+  await waitForPending(1);
+  const pending = pendingPrints.shift();
+  assert.equal(pending.options.usePrinterDefaultPageSize,true);
+  assert.equal(pending.options.pageSize,undefined);
+  pending.callback(true);
+  await result;
+});
+
+test('measurement failure sends no print and never falls back to a duplicate copy', async () => {
+  printer.setPaperProfiles({'Oversize':58});
+  const result = printer.printHtml('<html>Too long</html>','Oversize','kot');
+  await new Promise(resolve => setImmediate(resolve));
+  windows[windows.length-1].heightPx = 100000;
+  assert.match((await result).error,/2000mm/);
+  assert.equal(pendingPrints.length,0);
+  assert.equal(windows[windows.length-1].isDestroyed(),true);
+});
+
+test('driver refusal reports one failure with no automatic fallback', async () => {
+  printer.setPaperProfiles({'Unsupported driver':80});
+  const result = printer.printHtml('<html>One item</html>','Unsupported driver','kot');
+  await waitForPending(1);
+  pendingPrints.shift().callback(false,'Unsupported paper size');
+  assert.deepEqual(await result,{success:false,error:'Unsupported paper size'});
+  assert.equal(pendingPrints.length,0);
+});
+
+
+test('timeout before fonts settle cannot submit a late print or contaminate the next job', async (t) => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  let release;
+  const result=printer.printHtml('<html>Delayed fonts</html>','Delayed','kot');
+  await Promise.resolve();
+  const win=windows[windows.length-1];
+  win.fontsPending=new Promise(resolve=>{release=resolve;});
+  await new Promise(resolve=>setImmediate(resolve));
+  t.mock.timers.tick(30000);
+  assert.match((await result).error,/timeout/);
+  release('fonts-ok');
+  await Promise.resolve();await Promise.resolve();
+  t.mock.timers.tick(1000);
+  assert.equal(pendingPrints.length,0);
+  assert.equal(win.isDestroyed(),true);
 });

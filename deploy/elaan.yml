@@ -1,7 +1,7 @@
-title: "Agent mein printer ke paper size ka istemal"
+title: "Agent mein thermal slip ki lambai ka naya option"
 audience: pos
 type: improvement
 points:
-  - "Naya Desktop Agent bina popup print ke liye chune hue printer ka Windows mein saved paper size istemal karta hai."
-  - "Yeh tabdeeli Agent update install hone par lagu hogi. Windows mein paper size apne printer ke roll ke mutabiq rakhein."
-  - "Update ke baad Printer Settings se ek test slip nikaal kar text aur poori width check karein."
+  - "Naya Agent install karne ke baad Configuration mein 'Lambi khali slip? Printer paper mode' kholein."
+  - "Jis thermal printer par lamba khali paper nikalta ho, uske asal roll ke mutabiq 58mm ya 80mm chunein aur Save & Connect dabayein."
+  - "Ek test slip par text aur lambai check karein. Pehle se chalti Windows paper setting tab tak wahi rahegi jab tak aap naya option na chunein."

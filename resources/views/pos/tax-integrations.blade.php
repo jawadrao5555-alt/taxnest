@@ -5,7 +5,7 @@
     <p class="mb-6">{{ $company->name }} · Set up PRA reporting and choose the federal integration required for this business. Saving a connection does not send an invoice.</p>
     <div class="grid md:grid-cols-3 gap-4">
         <section class="rounded-xl border p-5 bg-white dark:bg-gray-900"><h2 class="text-lg font-bold">PRA POS</h2>
-            <p class="my-3">{{ $company->pra_enabled ? 'Enabled' : 'Check PRA reporting choice' }} · {{ ucfirst($company->pra_environment ?? 'sandbox') }}</p>
+            <p class="my-3">{{ auth('pos')->user()?->praReportingEnabled($company) ? 'Enabled' : 'Disabled' }} · {{ ucfirst($company->pra_environment ?? 'sandbox') }}</p>
             <p>Punjab service-tax registration, connection mode and Desktop Agent.</p>
             <a class="inline-block underline mt-4" href="{{ route('pos.pra-settings') }}">PRA configuration</a>
         </section>

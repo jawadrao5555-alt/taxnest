@@ -810,7 +810,7 @@ foreach ([['pos','/pos/login','/pos/dashboard','pos'],['di','/login','/dashboard
 
 $taxCases=[];
 foreach([1366,390] as $width){
-    $taxCompany=$company('Synthetic tax integration '.$width,'tax-integration-'.$width.'@rc-browser.invalid','1234567','pos',[
+    $taxCompany=$company('Synthetic tax integration '.$width,'tax-integration-'.$width.'@rc-browser.invalid',str_pad('92'.$width,7,'0',STR_PAD_RIGHT),'pos',[
         'business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,'pos_setup_completed'=>true,
         'feature_flags'=>array_merge(PosFeatureService::defaultsForCategory('restaurant'),['inventory'=>false]),
         'inventory_enabled'=>false,'pra_reporting_enabled'=>true,'pra_environment'=>'sandbox','pra_pos_id'=>'10000',

@@ -109,6 +109,8 @@ jobs:
           php-version: '8.4'
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
+      - name: Check PRA DI sandbox and production environment isolation
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PraDiSandboxTest.php --testdox
       - name: Check complete restaurant top-selling list and business dates
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosRestaurantDashboardCountsTest.php
       - name: Check notification read state and product targeting

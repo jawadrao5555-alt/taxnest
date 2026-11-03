@@ -481,3 +481,17 @@ Stock health counts each product/branch row once: empty/negative, low positive, 
 - Offer wali nayi sale online pay hoti hai; offline success ka daawa nahin hota. Receipt par asal offer title/percent/discount rehta hai aur partial returns bhi usi asal raqam se bante hain.
 - Recipe cost sale ke waqt ingredient base-unit rate aur waste ke saath freeze hoti hai. Ingredient cost na ho to unknown rehti hai; missing rate ko zero cost se profit nahin banaya jata.
 - Reports ka aik hi From/To filter detail aur financial milaan dono par lagta hai. Reconciled CSV aur analytics PDF mein known final gross, returns, net aur retained history hoti hai. Purani unavailable detail ka warning zaroor parhein.
+
+
+## PRA + FBR Digital Invoice — Sandbox aur Production
+- Sirf active company owner: Receipt Settings → "PRA + FBR Digital Invoice · Connection setup".
+- Sandbox aur Production ke tokens alag save hotay hain; dono encrypted hain. Token chat mein na mangain. Blank field se purana token mehfooz rehta hai.
+- Pehle Sandbox select karke company ke applicable scenarios test karein. Accepted scenarios ki local list setup par hai; tamam required scenarios ka status IRIS mein confirm karein.
+- FBR production token issue kare to usay Production token field mein save karein, Production select karein aur onboarding/tax mapping ki tasdeeq karein. TaxNest khud production token issue nahi karta aur khud live mode mein nahi jata.
+- Completed bill select karein, selected environment ke liye naya record prepare karein, mapping review/save karein, phir explicitly submit karein. Production par real invoice bhejta hai; Sandbox test hai.
+- Mode badalne se koi invoice khud resend ya convert nahi hoti. Har environment ka invoice number, QR, history aur return reference alag hai.
+- Source sale, stock aur customer balance mein doosri entry nahi banti. PRA apne pehle setup ke mutabiq chalta rehta hai.
+- Accepted result par 58mm/80mm combined receipt preview mein us environment ka DI number/QR aata hai. Sandbox receipt par TEST label rehta hai; unaccepted Production receipt sirf preview hai.
+- Unknown/submitting result ko dobara send na karein; FBR se reconcile karwayein. Disable karne se naye submissions band aur history readable rehti hai.
+- PRA tax ki wajah se FBR exemption/zero rate khud select na karein. Company ki tax mapping review honi hai.
+- FBR POS (IMS) selection, automatic checkout aur normal 9 receipt formats mein integration is workbench ka hissa nahi.

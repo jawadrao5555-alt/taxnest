@@ -1,7 +1,7 @@
-title: "PRA reports aur printing mein behtari"
+title: "PRA POS ke saath DI Sandbox aur Production setup"
 audience: pos
 type: improvement
 points:
-  - "Reprint pehle preview kholta hai; print ke liye Print dabayen."
-  - "Day Close report PDF ya Thermal mein kholain; Sales aur reports mein tafseel saaf groups mein dekhein."
-  - "Dashboard ki raqam aur orders se usi din ki tafseel khol sakte hain."
+  - "Company owner Receipt Settings mein PRA + FBR Digital Invoice · Connection setup khol sakta hai."
+  - "Sandbox mein applicable scenarios test karein; FBR se production token milne par alag token save karke Production select karein."
+  - "Bill review karke khud submit karein. Mode badalne se purani invoices dobara send nahi hotin aur dono environments ka record alag rehta hai."

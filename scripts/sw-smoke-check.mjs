@@ -170,6 +170,20 @@ async function dispatchMessage(data) {
   await Promise.all(waits);
 }
 
+// Fiscal pilot settings, source snapshots and results must never be served
+// from the shared offline HTML cache, including a previous user's stale copy.
+for (const path of ['/pos/di-sandbox', '/pos/di-sandbox/setup', '/pos/di-sandbox/1', '/pos/di-sandbox/1/receipt?width=58']) {
+  cacheStores.clear();
+  await getStore('stale-runtime').put(path, htmlResponse('another-company-snapshot'));
+  let networkCalls = 0;
+  networkHandler = async () => { networkCalls++; return htmlResponse('pilot-secret-snapshot'); };
+  assert(await dispatchFetch(request(path)) === undefined, 'sandbox page intercepted by offline cache: ' + path);
+  assert(networkCalls === 0, 'sandbox page must use browser network directly: ' + path);
+  networkHandler = async () => { throw new Error('offline'); };
+  assert(await dispatchFetch(request(path)) === undefined, 'sandbox page replayed stale offline evidence: ' + path);
+}
+cacheStores.clear();
+
 // 1. Ordinary same-origin routes and cross-origin assets must not throw.
 networkHandler = async (input) => htmlResponse('<html>ordinary</html>', { url: typeof input === 'string' ? input : input.url });
 for (const req of [

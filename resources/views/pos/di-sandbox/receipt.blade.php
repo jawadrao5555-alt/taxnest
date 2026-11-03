@@ -5,7 +5,9 @@
 @php($live = $record->reportingEnvironment() === 'production')
 @php($accepted = $record->state === 'accepted' && $record->fiscalReference())
 <div class="tools"><a href="{{ route('pos.di-sandbox.show', $record->id) }}">Back to DI record</a><button type="button" onclick="window.print()">{{ $live && $accepted ? 'Print receipt' : 'Print preview' }}</button></div>
-<article class="receipt"><div class="test">@if(!$live)SANDBOX TEST COPY<br><span class="small">NOT A VALID TAX INVOICE</span>@elseif(!$accepted)PRODUCTION PREVIEW<br><span class="small">NOT ACCEPTED BY FBR — NOT A FINAL DI INVOICE</span>@elsePRA + FBR DIGITAL INVOICE@endif</div>
+<article class="receipt"><div class="test">@if(!$live)SANDBOX TEST COPY<br><span class="small">NOT A VALID TAX INVOICE</span>@elseif(!$accepted)PRODUCTION PREVIEW<br><span class="small">NOT ACCEPTED BY FBR — NOT A FINAL DI INVOICE</span>@else
+PRA + FBR DIGITAL INVOICE
+@endif</div>
 <h1 class="center">{{ $s['company_name'] }}</h1><p class="center identity">{{ $s['seller_address'] }}<br>NTN: {{ $s['seller_ntn'] }}</p>
 <div class="meta"><span>Bill: {{ $s['invoice_number'] }}</span><span>{{ $s['date'] }}</span></div>
 <p class="small">{{ strtoupper($s['transaction_type']) }} &middot; {{ $s['payment_method'] }}</p>

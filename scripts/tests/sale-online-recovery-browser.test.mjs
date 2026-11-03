@@ -16,6 +16,7 @@ const saleHtml = (variant, label = 'current') => `<!doctype html><html><head>
 test('actual POS service worker opens online PRA/FBR despite failed offline prefetch, and retains safe recovery', {timeout: 90000}, async () => {
   let assetProbes = 0, oldAssetRequests = 0, partial = false;
   let firstProbeSeen = false, waitingBrowserAssets = [];
+  let assetRequests = [];
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     res.setHeader('Cache-Control', 'no-store');
@@ -28,6 +29,7 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
       return res.end('<!doctype html><script>navigator.serviceWorker.register("/sw.js")</script>');
     }
     if (url.pathname.startsWith('/build/')) {
+      if (assetRequests.length < 40) assetRequests.push({path:url.pathname,destination:req.headers['sec-fetch-dest'],cache:req.headers['cache-control'],pragma:req.headers.pragma});
       if (url.pathname.includes('obsolete')) oldAssetRequests++;
       // Exercise the distinct browser resource load and worker prefetch. Only
       // the optional empty-destination prefetch fails; the online assets work.
@@ -72,11 +74,13 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
       partial = false;
       firstProbeSeen = false;
       waitingBrowserAssets = [];
+      assetRequests = [];
       const context = await browser.newContext({viewport:{width,height:844}});
+      const page = await context.newPage();
+      const errors = [], browserMessages = [];
       try {
-        const page = await context.newPage();
-        const errors = [];
         page.on('pageerror', error => errors.push(error.message));
+        page.on('console', message => { if (message.type() === 'error' && browserMessages.length < 20) browserMessages.push(message.text()); });
         await page.goto(base + '/install');
         await page.waitForFunction(() => !!navigator.serviceWorker.controller);
         const salePath = variant === 'pra' ? '/pos/invoice/create' : '/fbr-pos/create';
@@ -136,6 +140,10 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
         await page.waitForFunction(() => document.querySelector('[data-ready]')?.textContent === 'Sale ready');
         assert.equal(await page.evaluate(() => localStorage.getItem('fictional-saved-setting')), 'preserved');
         assert.deepEqual(errors, []);
+      } catch (error) {
+        const screen = await page.locator('body').innerText().catch(() => '<unavailable>');
+        console.error('POS recovery fixture failure:', JSON.stringify({variant,width,assetRequests,errors,browserMessages,screen:screen.slice(0,500)}));
+        throw error;
       } finally { await context.close(); }
     }
   } finally {

@@ -9,6 +9,10 @@
 @if($record->state==='queued_agent')<p>Waiting for the designated Desktop Agent. This queue never changes the existing PRA queue.</p>@endif
 @if($record->state==='local_accepted')<p class="notice">Local FBR IMS acknowledged this invoice. Central FBR synchronization has not been independently verified.</p>@endif
 <a class="button" href="{{ route('pos.tax-integrations.ims.receipt',['id'=>$record->id,'width'=>80]) }}">80mm receipt preview</a><a class="button" href="{{ route('pos.tax-integrations.ims.receipt',['id'=>$record->id,'width'=>58]) }}">58mm receipt preview</a>
+@if(in_array($record->state,['draft','rejected','queued_agent']))
+<form method="post" action="{{ route('pos.tax-integrations.ims.connection',$record->id) }}">@csrf
+<label><input type="checkbox" name="confirm_connection" value="1" required>Use the current IMS connection for this {{ $record->environment }} bill, cancel any undispatched queue entry and clear the mapping for fresh review. Keep the original sale amounts.</label><button>Refresh connection and review again</button></form>
+@endif
 <h2>Attempts</h2><ul>@forelse($record->attempts ?? [] as $a)<li>{{ $a['at'] }} · {{ $a['state'] }} · {{ implode(', ',$a['error_codes'] ?? []) }}</li>@empty<li>No submission.</li>@endforelse</ul></section>
 <section class="card"><h2>Review IMS mapping</h2><p>Enter the reviewed PCT codes, rates, federal tax and totals. PRA tax is never automatically copied into federal tax. A return requires its original accepted IMS reference from this environment.</p>
 <form method="post" action="{{ route('pos.tax-integrations.ims.prepare',$record->id) }}">@csrf<label for="payload">Exact IMS JSON payload</label><textarea id="payload" name="payload_json" spellcheck="false" @readonly(!in_array($record->state,['draft','rejected']))>{{ old('payload_json',json_encode($payload,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_PRESERVE_ZERO_FRACTION)) }}</textarea>

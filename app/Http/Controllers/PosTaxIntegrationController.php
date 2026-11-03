@@ -101,6 +101,12 @@ class PosTaxIntegrationController extends Controller
         $c=$this->company($request);$this->record($c,$id);$request->validate(['confirm_submit'=>'accepted']);
         $svc->submit($c->id,$id,auth('pos')->id());return redirect()->route('pos.tax-integrations.ims.show',$id);
     }
+    public function refreshConnection(Request $request,int $id,PosImsReportingService $svc)
+    {
+        $c=$this->company($request);$this->record($c,$id);$request->validate(['confirm_connection'=>'accepted']);
+        $svc->refreshConnection($c->id,$id,auth('pos')->id());
+        return redirect()->route('pos.tax-integrations.ims.show',$id)->with('success','Current IMS connection selected for this undispatched/rejected bill. Original financial amounts are preserved. Review and save the mapping again.');
+    }
     public function receipt(Request $request,int $id)
     {
         $record=$this->record($this->company($request),$id);$width=$request->query('width')==='58'?58:80;

@@ -11,3 +11,11 @@ Compatibility matrix:
 - Frozen accepted/uncertain evidence → never auto replay, including after switching environments.
 
 Verification will use synthetic data and blocked regulator egress. No live tokens or customer fixtures. PHP runtime is currently unavailable in this workspace; hosted CI supplies application runtime checks.
+
+## Recovery and acceptance evidence
+
+An explicit connection refresh is allowed only for drafts, definitive rejections and never-dispatched queued invoices. It clears the federal mapping for a fresh review, records the previous identity/hash in history and retains the frozen financial source snapshot. Dispatched/accepted/uncertain records cannot refresh or replay. Exact submitted payloads remain in encrypted attempt evidence.
+
+Before the final recovery addition, isolated CI passed 55 focused application tests, native MariaDB migration/concurrency/DI checks, workflow/release safety, locked dependency/build guards, and the new real Chrome desktop/390px Tax Integrations journey. The final head adds a 56th recovery regression and exercises its explicit browser action. Final-head results are recorded in PR #335; full CI and live acceptance are separate.
+
+Scope stays manual reporting and dedicated combined receipt previews. No real FBR/PRA call or live customer write was used to develop this correction.

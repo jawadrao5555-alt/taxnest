@@ -862,4 +862,24 @@ class PraDiSandboxTest extends TestCase
         $this->assertSame('draft',$svc->prepare($this->company->id,$ret->id,$p)->state);
     }
 
+    public function test_ims_connection_recovery_preserves_financial_snapshot_and_blocks_uncertain_replays(): void
+    {
+        $profile=$this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $s=$r->snapshot;$svc->prepare($this->company->id,$r->id,$this->imsPayload($r));
+        Http::fake(fn()=>Http::response(['Code'=>'112','Response'=>'Synthetic explicit rejection'],200));
+        $r=$svc->submit($this->company->id,$r->id,$this->owner->id);$this->assertSame('rejected',$r->state);
+        $profile->update(['connection_mode'=>'fiscal_device']);
+        $r=$svc->refreshConnection($this->company->id,$r->id,$this->owner->id);
+        $this->assertSame($s,$r->snapshot);$this->assertSame('fiscal_device',$r->connection_mode);$this->assertNull($r->payload);
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));$svc->submit($this->company->id,$r->id,$this->owner->id);
+        // A queued, never dispatched request can be withdrawn for fresh review.
+        $r=$svc->refreshConnection($this->company->id,$r->id,$this->owner->id);$this->assertSame('draft',$r->state);
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));$svc->submit($this->company->id,$r->id,$this->owner->id);
+        $claim=$svc->claim($this->company->id,'synthetic-device');
+        try{$svc->refreshConnection($this->company->id,$r->id,$this->owner->id);$this->fail('uncertain replay allowed');}catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        $this->assertSame($claim['claim'],\App\Models\PosImsSubmission::findOrFail($r->id)->agent_claim);
+        Http::assertSentCount(1);
+    }
+
 }

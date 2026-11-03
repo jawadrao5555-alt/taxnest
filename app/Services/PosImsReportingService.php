@@ -99,7 +99,7 @@ class PosImsReportingService
         if ((int)$p['InvoiceType'] === 3) {
             $parent=PosImsSubmission::where('company_id',$r->company_id)->where('source_transaction_id',$r->snapshot['parent_transaction_id'])
                 ->where('environment',$r->environment)->whereIn('state',['accepted','local_accepted'])->first();
-            if (!$parent || !$parent->fiscal_number || $p['RefUSIN'] !== $parent->fiscal_number) $errors[]='Use the accepted original IMS reference from the same company and environment.';
+            if (!$parent || !$parent->fiscal_number || (int)$parent->snapshot['pos_id'] !== (int)$r->snapshot['pos_id'] || $p['RefUSIN'] !== $parent->fiscal_number) $errors[]='Use the accepted original IMS reference from the same company and environment.';
         } elseif (!empty($p['RefUSIN'])) $errors[]='A sale cannot reference another invoice.';
         if ($errors) throw ValidationException::withMessages(['payload_json'=>$errors]);
     }
@@ -112,6 +112,25 @@ class PosImsReportingService
             'IMS connection changed after capture; this record cannot be submitted with another identity or device.');
         return $p;
     }
+    /** Explicit recovery only before dispatch or after an unambiguous rejection. */
+    public function refreshConnection(int $companyId,int $id,int $actor): PosImsSubmission
+    {
+        return DB::transaction(function() use($companyId,$id,$actor){
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $r=$this->locked($companyId,$id);$p=$this->profile($companyId,$r->environment);
+            abort_unless(in_array($r->state,['draft','rejected','queued_agent'],true) && !$r->fiscal_number,409,
+                'A dispatched, accepted or uncertain invoice cannot change connection or be replayed.');
+            self::preventOtherFederalRecord($companyId,$r->source_transaction_id,$r->environment,'ims');
+            $s=$r->snapshot;$a=$r->attempts ?? [];
+            $a[]=['actor_id'=>$actor,'at'=>now()->toIso8601String(),'state'=>'connection_refreshed',
+                'previous_state'=>$r->state,'previous_mode'=>$r->connection_mode,'previous_pos_id'=>$s['pos_id'],
+                'previous_payload_hash'=>$r->payload_hash,'environment'=>$r->environment];
+            $s['pos_id']=(int)$p->{$r->environment.'_pos_id'};$s['device_uid']=$p->device_uid;$s['local_ims_url']=$p->local_ims_url;
+            $r->fill(['connection_mode'=>$p->connection_mode,'snapshot'=>$s,'payload'=>null,'payload_hash'=>null,
+                'state'=>'draft','attempts'=>$a,'agent_claim'=>null,'device_uid'=>null])->save();return $r;
+        });
+    }
+
     public function prepare(int $companyId,int $id,array $payload): PosImsSubmission
     {
         return DB::transaction(function() use($companyId,$id,$payload){
@@ -134,7 +153,7 @@ class PosImsReportingService
             $token=(string)$p->{$r->environment.'_token'};
             if ($r->connection_mode==='cloud' && $token==='') throw ValidationException::withMessages(['token'=>'Configure the selected IMS token.']);
             $state=$r->connection_mode==='fiscal_device' ? 'queued_agent':'submitting';
-            $attempts=$r->attempts ?? []; $attempts[]=['actor_id'=>$actor,'at'=>now()->toIso8601String(),'state'=>$state,'environment'=>$r->environment,'hash'=>$r->payload_hash];
+            $attempts=$r->attempts ?? []; $attempts[]=['actor_id'=>$actor,'at'=>now()->toIso8601String(),'state'=>$state,'environment'=>$r->environment,'hash'=>$r->payload_hash,'payload'=>$r->payload];
             $r->fill(['state'=>$state,'attempted_at'=>now(),'attempts'=>$attempts])->save();return [$r,$token];
         });
         if ($r->state==='queued_agent') return $r;
@@ -181,7 +200,8 @@ class PosImsReportingService
             $this->activeRecord($r); self::preventOtherFederalRecord($companyId,$r->source_transaction_id,$r->environment,'ims');
             $this->validatePayload($r,$r->payload);
             abort_unless(hash_equals($r->payload_hash,hash('sha256',json_encode($r->payload,JSON_THROW_ON_ERROR))),409);
-            $r->fill(['state'=>'submitting','agent_claim'=>bin2hex(random_bytes(32)),'device_uid'=>$deviceUid,'attempted_at'=>now()])->save();
+            $a=$r->attempts;$a[array_key_last($a)]['state']='submitting';
+            $r->fill(['state'=>'submitting','agent_claim'=>bin2hex(random_bytes(32)),'device_uid'=>$deviceUid,'attempted_at'=>now(),'attempts'=>$a])->save();
             return ['id'=>$r->id,'claim'=>$r->agent_claim,'payload'=>$r->payload,'endpoint'=>$r->snapshot['local_ims_url'],'environment'=>$r->environment];
         });
     }

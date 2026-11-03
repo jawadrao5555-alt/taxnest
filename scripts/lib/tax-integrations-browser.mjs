@@ -46,6 +46,10 @@ export async function taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperation
     await saveEvidenceScreenshot(page,'tax-integrations-ims-preview-'+width+'-'+v.width);
     await page.goto(review,{waitUntil:'domcontentloaded'});
   }
+  await page.locator('[name="confirm_connection"]').check();
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Refresh connection and review again',exact:true}).click()]);
+  const reset=JSON.parse(await page.getByLabel('Exact IMS JSON payload',{exact:true}).inputValue());
+  if(reset.TotalTaxCharged!==null||reset.TotalSaleValue!==payload.TotalSaleValue||reset.USIN!==payload.USIN)throw Error('Explicit connection refresh lost source values or retained a stale mapping');
   await page.goto(baseUrl+'/pos/di-sandbox/setup',{waitUntil:'domcontentloaded'});
   if(!(await page.locator('body').innerText()).includes('Disabled'))throw Error('Both federal channels stayed enabled');
   if(!(await page.locator('label[for="sandbox-token"]').innerText()).includes('Saved'))throw Error('DI token lost when selecting IMS');

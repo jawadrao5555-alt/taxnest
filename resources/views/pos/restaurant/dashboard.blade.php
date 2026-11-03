@@ -36,6 +36,13 @@
              hi karte hain, is liye dono jagah. --}}
         @if($dashboardRidersRelevant) @include('pos.partials.rider-settlement-pending') @endif
         @include('pos.partials.inactive-customers')
+        @php
+        $dashboardMetricsRelocated = true;
+        @endphp
+        @php
+        $dashboardOrderSource = 'orders';
+        @endphp
+        @include('pos.partials.dashboard-metrics')
         @if($dashboardKhataRelevant) @include('pos.partials.today-khata') @endif
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
 

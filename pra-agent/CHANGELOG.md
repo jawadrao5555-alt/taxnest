@@ -1,3 +1,9 @@
+## v1.13.29 (2026-11-02)
+**Customer bulk on the latest printer foundation**
+
+- Include the customer-bulk presentation changes while preserving 1.13.28 opt-in thermal paper sizing, Windows-default paper behavior and timeout handling.
+- Keep saved company/device/printer choices and all dependency versions unchanged. Installed Windows and physical-printer acceptance remain separate from source/build checks.
+
 ## v1.13.27 (2026-11-02)
 **Use the selected printer's paper size for automatic printing**
 

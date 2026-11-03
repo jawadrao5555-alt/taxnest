@@ -13,12 +13,12 @@ return [
     /* ─── Product ─── */
     // Nest ERPS is the PRODUCT; Healthcare is the vertical inside it. A second
     // vertical adds its own vertical_name key and reuses everything else.
-    'product_name' => 'Nest ERPS',
+    'product_name' => 'TaxNest ERP',
     'product_tagline' => 'One ERP line, built vertical by vertical',
     'vertical_name' => 'Healthcare',
-    'panel_name' => 'Nest ERPS — Healthcare',
+    'panel_name' => 'TaxNest ERP — Healthcare',
     'panel_tagline' => 'Clinics, hospitals, laboratories and pharmacies on one system',
-    'brand_short' => 'Nest ERPS',
+    'brand_short' => 'TaxNest ERP',
 
     /* ─── Organisation types ─── */
     'org_type' => 'Organisation type',
@@ -29,7 +29,7 @@ return [
 
     /* ─── Authentication ─── */
     'login' => 'Sign in',
-    'login_title' => 'Nest ERPS sign in',
+    'login_title' => 'TaxNest ERP sign in',
     'login_subtitle' => 'Sign in with the account your organisation gave you',
     'login_identifier' => 'Email, phone, NTN or username',
     'password' => 'Password',
@@ -37,7 +37,7 @@ return [
     'remember_me' => 'Keep me signed in',
     'logout' => 'Sign out',
     'register' => 'Create an account',
-    'register_title' => 'Register your healthcare organisation on Nest ERPS',
+    'register_title' => 'Register your healthcare organisation on TaxNest ERP',
     'register_subtitle' => 'Three days free. No card needed.',
     'already_registered' => 'Already registered?',
     'need_account' => 'Need an account?',
@@ -46,7 +46,7 @@ return [
     'auth_deactivated' => 'Your account has been deactivated.',
     'auth_no_company' => 'No organisation is linked to your account.',
     'auth_company_missing' => 'Organisation not found. Please contact support.',
-    'auth_not_healthcare' => 'This sign-in page is for Nest ERPS healthcare organisations only.',
+    'auth_not_healthcare' => 'This sign-in page is for TaxNest ERP healthcare organisations only.',
     'auth_no_role' => 'Your account has no healthcare role yet. Please ask your administrator.',
 
     /* ─── Registration form ─── */
@@ -259,7 +259,7 @@ return [
     /* ─── Settings ─── */
     'settings' => 'Settings',
     'settings_title' => 'Settings',
-    'settings_subtitle' => 'Organisation setup for your Nest ERPS panel.',
+    'settings_subtitle' => 'Organisation setup for your TaxNest ERP panel.',
     'settings_modules_card' => 'Modules',
     'settings_modules_card_desc' => 'Switch the parts of the system your organisation uses on or off.',
     'settings_departments_card' => 'Departments',

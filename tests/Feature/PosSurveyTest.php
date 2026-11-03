@@ -442,4 +442,37 @@ class PosSurveyTest extends TestCase
         // Existing results untouched.
         $this->assertSame(1, SurveyResponse::whereNotNull('answered_at')->count());
     }
+    public function test_publication_window_role_targeting_company_dedup_and_written_answers(): void
+    {
+        (require database_path('migrations/2026_11_02_110000_extend_survey_publication.php'))->up();
+        $survey=Survey::findOrFail($this->surveyId);
+        $survey->update(['starts_at'=>now()->subMinute(),'expires_at'=>now()->addDays(3),
+            'response_policy'=>'company','targeting'=>['companies'=>[$this->companyId], 'roles'=>['pos_admin','pos_cashier']],
+            'questions'=>[['key'=>'rating','text'=>'Rating','type'=>'rating','options'=>array_map(fn($n)=>['key'=>(string)$n,'label'=>(string)$n],range(1,5))],
+                ['key'=>'text','text'=>'Your suggestion','type'=>'text','options'=>[]]]]);
+        $this->actingAs(\App\Models\User::find($this->adminId),'pos')
+            ->postJson('/pos/survey/'.$survey->id.'/respond',['answers'=>['rating'=>'8','text'=>'Good']])->assertStatus(422);
+        $this->postJson('/pos/survey/'.$survey->id.'/respond',['answers'=>['rating'=>'4','text'=>' Good ']])->assertOk();
+        $this->actingAs(\App\Models\User::find($this->cashierId),'pos')
+            ->postJson('/pos/survey/'.$survey->id.'/respond',['answers'=>['rating'=>'1','text'=>'Overwrite']])->assertOk()->assertJsonPath('already',true);
+        $this->assertSame(1,SurveyResponse::whereNotNull('answered_at')->count());
+        $this->assertSame('Good',SurveyResponse::first()->answers['text']);
+        $this->actingAs(\App\Models\User::find($this->restAdminId),'pos')
+            ->postJson('/pos/survey/'.$survey->id.'/respond',['answers'=>['rating'=>'2','text'=>'Foreign']])->assertNotFound();
+        $survey->update(['expires_at'=>now()]);
+        $this->actingAs(\App\Models\User::find($this->adminId),'pos')
+            ->postJson('/pos/survey/'.$survey->id.'/respond',['answers'=>['rating'=>'2','text'=>'Expired']])->assertNotFound();
+        $this->assertFalse(Survey::active()->whereKey($survey->id)->exists());
+    }
+
+    public function test_scheduled_survey_cannot_be_seen_or_answered_before_start(): void
+    {
+        (require database_path('migrations/2026_11_02_110000_extend_survey_publication.php'))->up();
+        Survey::findOrFail($this->surveyId)->update(['starts_at'=>now()->addDay(),'expires_at'=>now()->addDays(4)]);
+        $this->actingAs(\App\Models\User::find($this->adminId),'pos')
+            ->postJson('/pos/survey/'.$this->surveyId.'/dismiss')->assertOk();
+        $this->assertSame(0,SurveyResponse::count());
+        $this->assertSame(0,Survey::active()->count());
+    }
+
 }

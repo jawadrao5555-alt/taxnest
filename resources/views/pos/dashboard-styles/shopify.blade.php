@@ -25,7 +25,8 @@
                 @include('pos.dashboard-styles._style-picker')
             </div>
 
-            <div class="mb-2">
+            @if(!($dashboardMetricsRelocated ?? false))
+<div class="mb-2">
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{{ __("pos.todays_revenue") }}</p>
                 {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
                 <p class="text-5xl sm:text-6xl font-black text-white mt-2 tracking-tight" style="font-variant-numeric:tabular-nums;letter-spacing:-0.03em">Rs.{{ number_format($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0) }}</p>
@@ -39,13 +40,20 @@
                 </div>
                 @endif
             </div>
+@endif
 
             <div class="flex gap-10 mt-8 pt-6 border-t border-white/5">
-                <div><p class="text-3xl font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __("pos.orders_word") }}</p></div>
+                @if(!($dashboardMetricsRelocated ?? false))
+<div><p class="text-3xl font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __("pos.orders_word") }}</p></div>
+@endif
                 {{-- Task 988: Avg. Ticket stat replaced by New Customers (today · this month) --}}
-                <div><p class="text-3xl font-black text-white">{{ number_format($newCustomersToday ?? 0) }}<span class="text-xl text-slate-600"> · {{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</span></p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __("pos.new_customers") }}</p></div>
+                @if(!($dashboardMetricsRelocated ?? false))
+<div><p class="text-3xl font-black text-white">{{ number_format($newCustomersToday ?? 0) }}<span class="text-xl text-slate-600"> · {{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</span></p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __("pos.new_customers") }}</p></div>
+@endif
                 @if($isRestaurant)
-                <div><p class="text-3xl font-black text-white">{{ $occupiedTables ?? 0 }}<span class="text-xl text-slate-600">/{{ $totalTables ?? 0 }}</span></p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __("pos.tables_word") }}</p></div>
+                @if(!($dashboardMetricsRelocated ?? false))
+<div><p class="text-3xl font-black text-white">{{ $occupiedTables ?? 0 }}<span class="text-xl text-slate-600">/{{ $totalTables ?? 0 }}</span></p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __("pos.tables_word") }}</p></div>
+@endif
                 @else
                 <div><p class="text-3xl font-black text-white">Rs.{{ number_format(($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 0) / 1000) }}k</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __("pos.monthly_word") }}</p></div>
                 @endif

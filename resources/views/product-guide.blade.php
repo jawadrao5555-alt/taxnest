@@ -1,7 +1,7 @@
 @php
     $products = [
         'di' => [
-            'name' => 'Digital Invoice', 'path' => '/digital-invoice', 'pricing' => '/digital-invoice#pricing',
+            'name' => 'TaxNest Digital Invoice', 'path' => '/digital-invoice', 'pricing' => '/digital-invoice#pricing',
             'fit' => 'Businesses preparing FBR digital invoices, including batch imports and consultant-managed companies.',
             'steps' => ['Prepare buyer and product records, then create a draft or import rows using the template inside your account.', 'Review identifiers, quantities, HS classification, rates and validation errors. AI suggestions need your confirmation.', 'Test the workflow in Sandbox. Submit approved invoices using your configured production credentials and check the actual authority response.', 'Review invoice status, download PDFs and reconcile sales, tax and payments.'],
             'before' => 'Bring a small sample of your own invoice format with customer details removed. Ask us to demonstrate import mapping, a rejected row, its correction and the final PDF.',
@@ -9,7 +9,7 @@
             'image' => 'di-create.jpg', 'alt' => 'Example Digital Invoice draft screen with blank buyer fields and Sandbox indicator',
         ],
         'pra' => [
-            'name' => 'NestPOS — PRA', 'path' => '/pos', 'pricing' => '/pos#pricing',
+            'name' => 'TaxNest PRA POS', 'path' => '/pos', 'pricing' => '/pos#pricing',
             'fit' => 'Restaurant and service businesses using the PRA product, with screens determined by business type, enabled settings and package.',
             'steps' => ['Choose your business type and package; set up services or menu items, tax settings and permitted staff roles.', 'Build a bill using customer lookup, products or deals. For restaurant workflows, choose dine-in, takeaway or delivery where enabled.', 'Use the available kitchen/table workflow, take payment and check the saved receipt and reporting status.', 'Reconcile cash, card receipts, customer balances and rider settlements in the relevant reports.'],
             'before' => 'Tell us your counter count, printer connections, paper size and kitchen workflow. Ask for a sample bill, kitchen ticket, preview and day-close demonstration.',
@@ -17,7 +17,7 @@
             'image' => 'pos-sale.jpg', 'alt' => 'Example PRA restaurant sale screen showing menu items, order types and empty cart',
         ],
         'fbr' => [
-            'name' => 'FBR POS', 'path' => '/fbr-pos-landing', 'pricing' => '/fbr-pos-landing#pricing',
+            'name' => 'TaxNest FBR POS', 'path' => '/fbr-pos-landing', 'pricing' => '/fbr-pos-landing#pricing',
             'fit' => 'Goods retailers needing the FBR POS product, inventory, counter billing and associated reporting.',
             'steps' => ['Set up products, tax treatment, barcode or SKU and opening stock; configure the required integration and printers.', 'Build the customer bill, take payment and check the receipt and actual FBR response.', 'Review failed or queued submissions and resolve the specific error before retrying.', 'Use stock/purchase, transaction and sales reports; use returns or credit-note workflows against the original sale where supported.'],
             'before' => 'Bring an anonymised product list and the printer models you use. Ask us to show stock receipt, a sale, a return and how the authority response is tracked.',
@@ -25,7 +25,7 @@
             'image' => 'fbr-stock.jpg', 'alt' => 'Example FBR stock screen showing low-stock alerts, purchase entry and supplier fields',
         ],
         'erps' => [
-            'name' => 'Nest ERPS — Healthcare', 'path' => '/nest-erps', 'pricing' => '/contact',
+            'name' => 'TaxNest ERP — Healthcare', 'path' => '/nest-erps', 'pricing' => '/contact',
             'fit' => 'Clinics, hospitals, laboratories and healthcare pharmacies. Other ERP verticals are enquiries for custom work.',
             'steps' => ['Agree organisation type, branches, departments, staff roles and the modules required for your organisation.', 'Use patient registration and appointments or OPD; enable clinical, lab, pharmacy or admission workflows as required.', 'Record services, prescriptions, results or admissions within the enabled modules and authorised user scope.', 'Reconcile billing and accounts reports. Agree your migration, training and acceptance checks before moving existing records.'],
             'before' => 'Request a guided demonstration with fictional patient data. Specify departments, user roles, daily patient volume and any existing data that needs migration.',

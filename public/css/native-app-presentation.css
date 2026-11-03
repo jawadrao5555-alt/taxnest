@@ -1,0 +1,13 @@
+/* The Android shells keep exactly the same routes, permissions and features. */
+@media (max-width: 767px) {
+    html.tn-native-app { background: #f5f7fa; }
+    html.tn-native-app.dark { background: #0f172a; }
+    .tn-native-app body { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    .tn-native-app main { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+    .tn-native-app :is(input:not([type=checkbox]):not([type=radio]), select, textarea) { min-height: 44px; font-size: 16px; border-radius: 12px; }
+    .tn-native-app button { min-height: 44px; touch-action: manipulation; }
+    .tn-native-app :is(a, button, input, select, textarea):focus-visible { outline: 2px solid #0f766e; outline-offset: 3px; }
+    .tn-native-app [data-dashboard-metric] { border-radius: 18px; box-shadow: 0 4px 14px rgba(15, 23, 42, .06); }
+    .tn-native-app [role=dialog] { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    .tn-native-app [data-internal-survey] { right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); }
+}

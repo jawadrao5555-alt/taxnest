@@ -84,9 +84,9 @@
                 <input type="text" name="name" placeholder="Plan Name" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <div>
                     <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                        <option value="di">Digital Invoice</option>
+                        <option value="di">TaxNest Digital Invoice</option>
                         <option value="pos">PRA POS</option>
-                        <option value="fbrpos">FBR POS</option>
+                        <option value="fbrpos">TaxNest FBR POS</option>
                         <option value="{{ \App\Support\NestErps::PRODUCT_TYPE }}">{{ \App\Support\NestErps::LABEL }}</option>
                     </select>
                 </div>

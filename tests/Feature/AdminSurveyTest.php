@@ -161,6 +161,12 @@ class AdminSurveyTest extends TestCase
         ], $overrides);
     }
 
+    public function test_survey_editor_renders_publication_and_targeting_for_existing_surveys(): void
+    {
+        $this->admin()->post('/admin/surveys', $this->validPayload(['is_published'=>'1','target_companies'=>'7','response_policy'=>'company']))->assertRedirect();
+        $this->get('/admin/surveys')->assertOk()->assertSee('Test Survey')->assertSee('target_companies')->assertSee('response_policy')->assertSee('expires_at');
+    }
+
     // ── Create ────────────────────────────────────────────────────────────
 
     public function test_admin_can_create_a_draft_survey(): void
@@ -433,4 +439,21 @@ class AdminSurveyTest extends TestCase
         $resp->assertSessionHas('error');
         $this->assertSame(1, Survey::count());
     }
+    public function test_new_survey_has_three_day_window_and_filtered_formula_safe_export(): void
+    {
+        (require database_path('migrations/2026_11_02_110000_extend_survey_publication.php'))->up();
+        $this->admin()->post('/admin/surveys',$this->validPayload(['is_published'=>'1','target_companies'=>(string)$this->companyId]))->assertRedirect();
+        $survey=Survey::firstOrFail();
+        $this->assertEquals(3,$survey->starts_at->diffInDays($survey->expires_at));
+        $this->assertSame([$this->companyId],$survey->targeting['companies']);
+        SurveyResponse::create(['survey_id'=>$survey->id,'user_id'=>$this->posUserId,'company_id'=>$this->companyId,
+            'answers'=>['q_aaa'=>'o_yes'],'comment'=>'=1+1','answered_at'=>now()]);
+        $export=$this->get('/admin/surveys/'.$survey->id.'/export?company_id='.$this->companyId)->assertOk()->streamedContent();
+        $this->assertStringContainsString("'=1+1",$export);
+        $this->assertStringNotContainsString('=1+1',$this->get('/admin/surveys/'.$survey->id.'/export?company_id=999')->assertOk()->streamedContent());
+        $survey->update(['is_published'=>false]);
+        $this->post('/admin/surveys/'.$survey->id.'/update',$this->validPayload(['title'=>'Changed']))->assertSessionHas('error');
+        $this->assertSame('Test Survey',$survey->fresh()->title);
+    }
+
 }

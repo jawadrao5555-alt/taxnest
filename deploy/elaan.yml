@@ -1,7 +1,7 @@
-title: "Agent mein thermal slip ki lambai ka naya option"
+title: "PRA reports aur printing mein behtari"
 audience: pos
 type: improvement
 points:
-  - "Naya Agent install karne ke baad Configuration mein 'Lambi khali slip? Printer paper mode' kholein."
-  - "Jis thermal printer par lamba khali paper nikalta ho, uske asal roll ke mutabiq 58mm ya 80mm chunein aur Save & Connect dabayein."
-  - "Ek test slip par text aur lambai check karein. Pehle se chalti Windows paper setting tab tak wahi rahegi jab tak aap naya option na chunein."
+  - "Reprint pehle preview kholta hai; print ke liye Print dabayen."
+  - "Day Close report PDF ya Thermal mein kholain; Sales aur reports mein tafseel saaf groups mein dekhein."
+  - "Dashboard ki raqam aur orders se usi din ki tafseel khol sakte hain."

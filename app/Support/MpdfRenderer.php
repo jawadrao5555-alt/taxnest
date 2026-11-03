@@ -64,6 +64,8 @@ final class MpdfRenderer
     ): Response {
         $mpdf = static::makeMpdf($paper, $orientation);
 
+        if ($data['numberReportPages'] ?? false) $mpdf->SetHTMLFooter('<div style="text-align:right;font-size:8pt">{PAGENO} / {nbpg}</div>');
+
         $html = static::prepareHtml(view($view, $data)->render(), $paper);
         $mpdf->WriteHTML($html);
 

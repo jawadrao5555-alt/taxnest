@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ __('pos.restaurant_features_off_title') }} — {{ $company->name ?? 'NestPOS' }}</title>
+    <title>{{ __('pos.restaurant_features_off_title') }} — {{ $company->name ?? 'TaxNest PRA POS' }}</title>
     @vite(['resources/css/app.css'])
     {{-- Urdu-script UI font — renders only for locale 'ur' (Task 1287). --}}
     @include('partials.urdu-font')

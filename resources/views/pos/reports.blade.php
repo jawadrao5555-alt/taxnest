@@ -31,6 +31,10 @@
 
     @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.reports'), 'showExempt' => true])
     @include('pos.partials.financial-history')
+    @php
+$presentation = \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
+@endphp
+    @if($presentation)<div class="rounded-xl border bg-white dark:bg-gray-900 p-4 mb-4 overflow-auto">@include('pos.partials.report-summary-tables')</div>@endif
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 mb-6">
         <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
@@ -69,7 +73,7 @@
         </form>
     </div>
 
-    @if($topItemsDetailed !== null)
+    @if($topItemsDetailed !== null && (!$presentation || !$canAnalyticsPlan))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <div class="flex items-center justify-between gap-3 mb-4">
             <div>
@@ -327,9 +331,9 @@
                     </thead>
                     <tbody>
                         @forelse($ra->categories as $catName => $cat)
-                        <tr class="border-b border-gray-50 dark:border-gray-800 cursor-pointer hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition" @click="open = open === {{ $loop->index }} ? null : {{ $loop->index }}">
+                        <tr class="border-b border-gray-50 dark:border-gray-800" @unless($presentation) @click="open = open === {{ $loop->index }} ? null : {{ $loop->index }}" @endunless>
                             <td class="py-2.5 font-medium text-gray-900 dark:text-white">
-                                <span class="inline-block w-4 text-purple-500 font-bold" x-text="open === {{ $loop->index }} ? '−' : '+'"></span>{{ $catName }}
+                                @unless($presentation)<span class="inline-block w-4 text-purple-500 font-bold" x-text="open === {{ $loop->index }} ? '−' : '+'"></span>@endunless{{ $catName }}
                             </td>
                             <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ rtrim(rtrim(number_format($cat->qty, 2), '0'), '.') }}</td>
                             <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($cat->revenue) }}</td>
@@ -337,6 +341,7 @@
                             @if($ra->is_admin_view)<td class="py-2.5 text-right {{ $cat->profit === null ? 'text-gray-400' : ($cat->profit >= 0 ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') }}">{{ $cat->profit === null ? '—' : 'PKR ' . number_format($cat->profit) }}</td>@endif
                             <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ $cat->share }}%</td>
                         </tr>
+                        @unless($presentation)
                         <tr x-show="open === {{ $loop->index }}" x-cloak>
                             <td colspan="{{ $ra->is_admin_view ? 6 : 5 }}" class="py-2 px-4 bg-gray-50 dark:bg-gray-800/50">
                                 <table class="w-full text-xs">
@@ -359,6 +364,7 @@
                                 </table>
                             </td>
                         </tr>
+                        @endunless
                         @empty
                         <tr><td colspan="{{ $ra->is_admin_view ? 6 : 5 }}" class="py-6 text-center text-gray-400">{{ __('pos.no_sale_in_range') }}</td></tr>
                         @endforelse
@@ -697,7 +703,7 @@
     </script>
     @endif
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="grid grid-cols-1 {{ ($presentation && $canAnalyticsPlan) ? '' : 'lg:grid-cols-2' }} gap-6 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.payment_method_summary_month') }}</h3>
             <div class="overflow-x-auto -mx-5 px-5">
@@ -730,6 +736,7 @@
             </div>
         </div>
 
+        @if(!$presentation || !$canAnalyticsPlan)
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.top_selling_items_month') }}</h3>
             <div class="overflow-x-auto -mx-5 px-5">
@@ -757,6 +764,7 @@
             </table>
             </div>
         </div>
+        @endif
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
@@ -798,6 +806,7 @@
         </div>
     </div>
 </div>
+    @include('pos.partials.financial-history-products')
 @if($hasPinSet ?? false)
 @include('pos.partials.pin-modal')
 @endif

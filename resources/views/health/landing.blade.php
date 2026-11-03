@@ -4,10 +4,10 @@
     use App\Support\NestErps;
 @endphp
 {{--
-    Nest ERPS hub (Task 1568).
+    TaxNest ERP hub (Task 1568).
 
     This page introduces the PRODUCT LINE, not one ERP. It is deliberately
-    small: the three main products own the pricing tables, and Nest ERPS is sold
+    small: the three main products own the pricing tables, and TaxNest ERP is sold
     on enquiry until the owner sets public rates — so there is no price grid
     here, only the live vertical and a way to ask for one that does not exist
     yet. A future vertical appears in the list below the moment it registers
@@ -177,7 +177,7 @@
 </section>
 
 {{-- The footer login link is panel-aware: a visitor on this page belongs to the
-     Nest ERPS panel, never the Digital Invoice one. --}}
+     TaxNest ERP panel, never the Digital Invoice one. --}}
 @include('partials.product-guide-link', ['productGuideKey' => 'erps'])
     <x-site-footer :loginUrl="NestErps::loginPath(NestErps::HEALTH)" :loginLabel="NestErps::LABEL . ' Log In'" />
 </body>

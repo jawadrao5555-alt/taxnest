@@ -458,6 +458,14 @@ export function attachDiagnostics(page) {
     const failedRequests = [];
     const httpErrors = [];
 
+    page.addInitScript(() => {
+        const describe = value => {
+            try { return JSON.stringify(value, Object.getOwnPropertyNames(value || {})); }
+            catch { return String(value); }
+        };
+        window.addEventListener('unhandledrejection', e => console.error('UNHANDLED_REJECTION_DETAIL: ' + describe(e.reason)));
+        window.addEventListener('error', e => console.error('UNCAUGHT_ERROR_DETAIL: ' + describe(e.error) + ' at ' + e.filename + ':' + e.lineno));
+    }).catch(() => {});
     page.on('console', (msg) => {
         if (msg.type() === 'error') {
             const loc = msg.location();
@@ -466,7 +474,7 @@ export function attachDiagnostics(page) {
         }
     });
     page.on('pageerror', (err) => {
-        pageErrors.push(String(err?.message || err));
+        pageErrors.push(String(err?.stack || err?.message || err));
     });
     page.on('requestfailed', (req) => {
         const failure = req.failure();

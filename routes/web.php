@@ -386,6 +386,8 @@ Route::middleware(['pos.auth'])->prefix('pos/local-bills')->group(function () {
 Route::middleware('web')->post('/branch/switch', [BranchSwitchController::class, 'switch'])->name('branch.switch');
 
 Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])->group(function () {
+    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'web')->name('di.survey.respond');
+    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'web')->name('di.survey.dismiss');
 
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
     Route::post('/onboarding/complete', [OnboardingController::class, 'complete']);
@@ -887,6 +889,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/desktop/agent-config', [\App\Http\Controllers\AgentManagementController::class, 'desktopConfig'])->name('pos.desktop.agent-config');
 
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
+    Route::get('/dashboard/detail/{metric}', [PosController::class, 'dashboardDetail'])->name('pos.dashboard.detail');
     Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [PosController::class, 'dismissAllNotifications'])->name('pos.notifications.dismiss-all');
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('pos.whats-new.seen');
@@ -1556,6 +1559,11 @@ Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
+    Route::get('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'index'])->whereNumber('companyId')->name('saas.admin.local-bill-records');
+    Route::put('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'update'])->whereNumber('companyId')->name('saas.admin.local-bill-records.update');
+    Route::get('/companies/{companyId}/local-bill-records/{id}/download', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'download'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-bill-records.download');
+    Route::delete('/companies/{companyId}/local-bill-records/{id}', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'destroy'])->whereNumber(['companyId', 'id'])->name('saas.admin.local-bill-records.destroy');
+
     Route::get('/companies/{companyId}/local-support-copies', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminIndex'])->whereNumber('companyId')->name('saas.admin.local-support-copies');
     Route::get('/companies/{companyId}/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'adminDownload'])->whereNumber(['companyId', 'id'])->middleware('throttle:20,1')->name('saas.admin.local-support-copies.download');
 
@@ -1653,6 +1661,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/surveys', [\App\Http\Controllers\PosSurveyController::class, 'adminIndex'])->name('admin.surveys');
     Route::post('/surveys/feature-toggle', [\App\Http\Controllers\PosSurveyController::class, 'toggleFeature'])->name('admin.surveys.feature-toggle');
     Route::post('/surveys', [\App\Http\Controllers\PosSurveyController::class, 'adminStore'])->name('admin.surveys.store');
+    Route::get('/surveys/{id}/export', [\App\Http\Controllers\PosSurveyController::class, 'adminExport'])->name('admin.surveys.export');
     Route::get('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminShow'])->name('admin.surveys.show');
     Route::post('/surveys/{id}/toggle-close', [\App\Http\Controllers\PosSurveyController::class, 'toggleClose'])->name('admin.surveys.toggle-close');
     Route::post('/surveys/{id}/update', [\App\Http\Controllers\PosSurveyController::class, 'adminUpdate'])->name('admin.surveys.update');
@@ -1903,6 +1912,8 @@ Route::post('/health/logout', [HealthAuthController::class, 'logout'])->name('he
 Route::post('/health/guest-language', [HealthController::class, 'guestLanguage'])->name('health.guest-language');
 
 Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(function () {
+    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'health')->name('health.survey.respond');
+    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'health')->name('health.survey.dismiss');
     Route::get('/', fn () => redirect()->route('health.dashboard'));
     Route::get('/dashboard', [HealthController::class, 'dashboard'])->name('health.dashboard');
 
@@ -2503,6 +2514,8 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
 });
 
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
+    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.respond');
+    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->defaults('survey_guard', 'fbrpos')->name('fbrpos.survey.dismiss');
     // Same shared users.dark_mode preference as PRA POS. This is deliberately
     // outside company settings: each authenticated cashier owns their display.
     Route::post('/set-dark-mode', [PosController::class, 'toggleDarkMode'])->name('fbrpos.set-dark-mode');

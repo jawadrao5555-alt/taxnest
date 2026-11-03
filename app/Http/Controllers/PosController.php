@@ -1103,6 +1103,7 @@ class PosController extends Controller
 
         $validated = $request->validate([
             'type' => 'required|in:bill,kot,proof',
+            'proof_payment_method' => 'nullable|string|in:cash,card,debit_card,credit_card,qr_payment,online,split',
             'transaction_id' => 'required_if:type,bill|nullable|integer',
             'print_attempt_uuid' => 'nullable|uuid',
             // kot: restaurant_order_id OR transaction_id (order-less delivery bills)
@@ -1271,18 +1272,24 @@ class PosController extends Controller
             if (!$deviceRoute && !$settings['receipt_printer']) {
                 return $this->rejectPrintJob($request, 'no_printer');
             }
-            $exists = \App\Models\RestaurantOrder::where('company_id', $companyId)
-                ->where('id', (int) $validated['restaurant_order_id'])
-                ->exists();
-            if (!$exists) {
+            $proofOrder = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->whereNotIn('status', ['cancelled'])
+                ->find((int) $validated['restaurant_order_id']);
+            if (!$proofOrder) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
             }
+            $proofMethod = $validated['proof_payment_method'] ?? null;
+            if ($proofMethod !== null) {
+                \App\Services\RestaurantProofBill::prepare($proofOrder, $company, $proofMethod);
+            }
+            $proofQuery = $proofMethod === null ? null : http_build_query(['payment_method' => $proofMethod]);
             // In-flight dedupe (30 Jul 2026): the client now RETRIES on network
             // blips — a first request that succeeded server-side must not print
             // a second physical copy. Mirrors the bill double-press guard.
             $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
                 ->where('type', 'proof')
                 ->where('restaurant_order_id', (int) $validated['restaurant_order_id'])
+                ->where(fn ($q) => $proofQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $proofQuery))
                 ->whereIn('status', ['pending', 'printing'])
                 ->where('created_at', '>=', now()->subMinutes(2))
                 ->orderByDesc('id')->first();
@@ -1292,6 +1299,7 @@ class PosController extends Controller
             $job = \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'proof',
+                'render_query' => $proofQuery,
                 'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
                 'device_uid' => $deviceRoute['device_uid'] ?? null,
                 'restaurant_order_id' => (int) $validated['restaurant_order_id'],
@@ -6922,6 +6930,7 @@ class PosController extends Controller
     ): \Illuminate\Http\Response {
         $isUrdu = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT;
         $data['pdfUrdu'] = $isUrdu;
+        $data['numberReportPages'] = in_array($view, ['pos.day-close-pdf', 'pos.reports-analytics-pdf'], true);
 
         if ($isUrdu) {
             try {
@@ -6939,6 +6948,14 @@ class PosController extends Controller
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, $data)
             ->setPaper('a4', $orientation);
+
+        if (in_array($view, ['pos.day-close-pdf', 'pos.reports-analytics-pdf'], true)) {
+            $pdf->render();
+            $canvas = $pdf->getDomPDF()->getCanvas();
+            $font = $pdf->getDomPDF()->getFontMetrics()->getFont('DejaVu Sans');
+            $canvas->page_text($canvas->get_width() - 95, $canvas->get_height() - 20,
+                '{PAGE_NUM} / {PAGE_COUNT}', $font, 8, [0, 0, 0]);
+        }
 
         return $download ? $pdf->download($filename) : $pdf->stream($filename);
     }
@@ -11911,6 +11928,30 @@ class PosController extends Controller
         ]);
     }
 
+    public function dashboardDetail(Request $request, string $metric)
+    {
+        abort_unless(in_array($metric,['orders','customers'],true),404);
+        $request->validate(['date'=>'required|date_format:Y-m-d','source'=>'nullable|in:orders,bills','cashier'=>'nullable']);
+        $companyId=(int)app('currentCompanyId'); $user=auth('pos')->user();
+        $cashier=$user->posSalesIsolated() ? (int)$user->id : ($request->input('cashier')==='all' ? null : (int)$request->input('cashier'));
+        [$start,$end]=\App\Services\PosBusinessDay::windowFor($companyId,$request->date,$request->date);
+        if($metric==='customers') {
+            $q=PosCustomer::where('company_id',$companyId)->where('created_at','>=',$start)->where('created_at','<',$end);
+            if($cashier)$q->whereIn('id',PosTransaction::withoutGlobalScope('hide_archived')->where('company_id',$companyId)->where('created_by',$cashier)->whereNotNull('customer_id')->select('customer_id'));
+            $rows=$q->orderBy('name')->paginate(100)->withQueryString();
+        } elseif($request->input('source')==='orders') {
+            abort_unless($user->isPosAdmin(),403);
+            $rows=\App\Models\RestaurantOrder::where('company_id',$companyId)->where('created_at','>=',$start)->where('created_at','<',$end)->where('status','!=','cancelled')->tap(fn($q)=>app(\App\Services\BranchContextService::class)->applyToQuery($q,'branch_id'))->orderByDesc('id')->paginate(100)->withQueryString();
+        } else {
+            $tab=$user->posBillingScope()==='local' ? 'local':'pra';
+            $q=PosTransaction::where('company_id',$companyId)->where('business_date',$request->date)->where('status','completed')
+                ->where(fn($q)=>$q->whereNull('transaction_type')->orWhere('transaction_type','!=','return'));
+            $this->applyReportFilters($q,$tab,$cashier,$user);
+            $rows=$q->orderByDesc('id')->paginate(100)->withQueryString();
+        }
+        return view('pos.dashboard-detail',compact('rows','metric'));
+    }
+
     public function customers(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -14020,6 +14061,7 @@ class PosController extends Controller
             : $this->buildDayCloseStreamSplit($streamTransactions, $hotelRefunds);
         // New reports freeze the tax split inside the existing stream snapshot,
         // so historical screen/PDF/thermal values survive a local-bill wash.
+        if (!$existingReport || $dayCloseIso) $streamSplit['report_groups']=\App\Services\PosFinancialHistory::groups($streamTransactions)->all();
         $frozenTaxSplit = $streamSplit['tax_split'] ?? null;
         if (is_array($frozenTaxSplit)) {
             $stats->taxable_value = (float) ($frozenTaxSplit['taxable'] ?? 0);
@@ -16351,6 +16393,9 @@ class PosController extends Controller
              // The compact payment split follows the report's PRA figure set,
              // not the extra local rows included in stream_summary.
              $streamSummary['summary_payments'] = $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows, $hotelRefunds);
+             $streamSummary['report_groups'] = \App\Services\PosFinancialHistory::groups(
+                $this->withLocalStreamRows($transactions, $companyId, $date, null, $branchId, false)
+             )->all();
              $data['stream_summary'] = $streamSummary;
         }
 
@@ -16641,6 +16686,14 @@ class PosController extends Controller
                             'archived_by_report_id' => $report->id,
                         ]);
                 }
+            }
+
+            // Owner's daily-delete rule (Nov 2026): restart only an empty company
+            // series. Saved/guarded bills and another branch's live bills reserve
+            // their references, so mixed retention continues without collisions.
+            // The company lock spans cleanup + reset; a retry returns above.
+            if ($deletedCount > 0 || $provAction === 'delete' || $finalAction === 'delete') {
+                \App\Services\PosLocalSeries::resetToStart($companyId);
             }
 
             // Persist deleted counts on the report: deleted reporting-OFF finals must
@@ -17338,6 +17391,9 @@ class PosController extends Controller
         }
 
          $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId, false), $hotelRefunds);
+         $streamSplit['report_groups'] = \App\Services\PosFinancialHistory::groups(
+             $this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId, false)
+         )->all();
 
         // Task 705: X display mode-gating (same rule as the Z page/PDF).
         $showLocalStream = (bool) session('pos_local_check')

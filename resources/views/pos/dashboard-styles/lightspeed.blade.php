@@ -22,7 +22,8 @@
                 </div>
                 @include('pos.dashboard-styles._style-picker')
             </div>
-            <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-5">
+            @if(!($dashboardMetricsRelocated ?? false))
+<div class="bg-white/10 backdrop-blur-sm rounded-2xl p-5">
                 <p class="text-[9px] font-bold text-violet-200/60 uppercase tracking-wider mb-1">{{ __("pos.todays_revenue") }}</p>
                 <div class="flex items-end gap-4 flex-wrap">
                     {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
@@ -41,6 +42,7 @@
                     @endif
                 </div>
             </div>
+@endif
         </div>
     </div>
 

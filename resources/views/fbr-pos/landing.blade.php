@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#052730">
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>FBR POS — Bank-Grade Point of Sale by TaxNest</title>
+    <title>TaxNest FBR POS — Bank-Grade Point of Sale by TaxNest</title>
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @include('partials.fast-first-paint')
@@ -199,7 +199,7 @@
                         <img src="{{ asset('images/brand/taxnest-logo.svg') }}" x-show="scrolled || mobileOpen" alt="TaxNest" class="h-8 w-auto">
                         <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" x-show="!scrolled && !mobileOpen" alt="TaxNest" class="h-8 w-auto">
                         <div class="hidden sm:block w-px h-5 mx-4" :class="scrolled ? 'bg-gray-300' : 'bg-white/20'"></div>
-                        <span class="hidden sm:block text-xs font-bold tracking-widest uppercase" :class="scrolled ? 'text-gray-500' : 'text-white/70'">FBR POS</span>
+                        <span class="hidden sm:block text-xs font-bold tracking-widest uppercase" :class="scrolled ? 'text-gray-500' : 'text-white/70'">TaxNest FBR POS</span>
                     </a>
                 </div>
                 

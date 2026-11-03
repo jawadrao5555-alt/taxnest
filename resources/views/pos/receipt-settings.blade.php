@@ -84,8 +84,6 @@
              No marker + no fields of that set = leave the stored set untouched. --}}
         <input type="hidden" name="rp_present" value="1">
         <input type="hidden" name="lp_present" value="1">
-        @include('pos.partials.receipt-optional-controls', ['stream' => 'pra'])
-        @include('pos.partials.receipt-optional-controls', ['stream' => 'local'])
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
             {{-- Tab switcher --}}
@@ -392,18 +390,7 @@
                      wale margin se bilkul alag — kitchen-settings wale hi kot_*
                      columns likhta hai (aakhri save jeet-ti hai). Task 716: left/center
                      ab upar wale theme cards se aata hai; yahan sirf fine-tune margin. --}}
-                <div class="p-5">
-                    <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-0.5">📐 {{ __('pos.kot_print_position') }}</label>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.kot_print_position_hint') }}</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
-                            <input type="number" name="rp_kot_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
-                                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
-                            <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
-                        </div>
-                    </div>
-                </div>
+
             </div>
         </div>
 
@@ -557,6 +544,28 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="rp_wide_names" value="1" @checked($typography['wide_names'])>{{ __('pos.receipt_wide_names') }}</label>
         </section>
         @include('pos.partials.receipt-theme-cards', ['accent' => 'purple'])
+        @include('pos.partials.receipt-design-options')
+
+        {{-- Keep all inputs enabled and submitted: opening Advanced is never a
+             prerequisite for preserving an existing company's preferences. --}}
+        <details data-receipt-advanced class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+            <summary class="cursor-pointer text-sm font-semibold text-gray-800 dark:text-gray-200">{{ __('pos.receipt_advanced_settings') }}</summary>
+            <p class="mt-2 mb-4 text-xs text-gray-500 dark:text-gray-400">{{ __('pos.receipt_advanced_hint') }}</p>
+        @include('pos.partials.receipt-optional-controls', ['stream' => 'pra', 'separateDesigns' => true])
+        @include('pos.partials.receipt-optional-controls', ['stream' => 'local', 'separateDesigns' => true])
+                <div class="p-5">
+                    <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-0.5">📐 {{ __('pos.kot_print_position') }}</label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.kot_print_position_hint') }}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
+                            <input type="number" name="rp_kot_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
+                                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                            <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
+                        </div>
+                    </div>
+                </div>
+        </details>
 
         {{-- Live preview on small screens (the lg aside is hidden there) --}}
         <div class="lg:hidden">
@@ -586,8 +595,8 @@
          own kiosk-printing mode. This card teaches the one-time shortcut setup;
          paired with the sale screen's Auto-Print toggle the receipt then prints
          instantly with zero clicks. Informational only — no server state. --}}
-    <div class="mt-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-        <h2 class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">⚡ {{ __('pos.direct_print_title') }}</h2>
+    <details data-printer-support class="mt-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+        <summary class="cursor-pointer text-base font-bold text-gray-900 dark:text-white">{{ __('pos.receipt_printer_support') }}</summary>
         <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">
             {!! __('pos.direct_print_intro_html', ['instantly' => '<span class="font-semibold">' . e(__('pos.direct_print_instantly')) . '</span>']) !!}
         </p>
@@ -601,7 +610,7 @@
             <li>{!! __('pos.direct_print_step4_html', ['bold' => '<span class="font-semibold">' . e(__('pos.direct_print_step4_bold')) . '</span>']) !!}</li>
         </ol>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">{{ __('pos.direct_print_note') }}</p>
-    </div>
+    </details>
 </div>
 <script src="/js/pos-print-design-preview.js?v=20261031-b03" defer></script>
 </x-pos-layout>

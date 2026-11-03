@@ -47,6 +47,56 @@ use Tests\TestCase;
  */
 class PosOnlinePaymentAwaitedTest extends TestCase
 {
+    public function test_silent_proof_queue_preserves_selected_method_and_does_not_reuse_another_method(): void
+    {
+        Schema::table('companies', function (Blueprint $t) {
+            $t->timestamp('agent_last_seen')->nullable();
+            $t->text('pos_printer_settings')->nullable();
+        });
+        Schema::create('pos_print_jobs', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->string('type');
+            $t->string('target_printer'); $t->string('device_uid')->nullable();
+            $t->unsignedBigInteger('restaurant_order_id'); $t->string('render_query')->nullable();
+            $t->string('status'); $t->unsignedBigInteger('created_by'); $t->timestamps();
+        });
+        $companyId = $this->makeShop(['agent_enabled' => true, 'agent_last_seen' => now(),
+            'pos_printer_settings' => json_encode(['silent_print_enabled' => true, 'receipt_printer' => 'Fictional Receipt'])]);
+        $user = $this->makeCashier($companyId);
+        $orderId = $this->makeOrder($companyId);
+        $ids = [];
+        foreach (['cash', 'card', 'cash'] as $method) {
+            $response = $this->actingAs($user, 'pos')->postJson('/pos/api/print-jobs', [
+                'type' => 'proof', 'restaurant_order_id' => $orderId, 'proof_payment_method' => $method,
+            ])->assertOk()->assertJson(['success' => true]);
+            $ids[] = $response->json('job_id');
+            $this->assertSame('payment_method='.$method, DB::table('pos_print_jobs')->find(end($ids))->render_query);
+        }
+        $this->assertNotSame($ids[0], $ids[1]);
+        $this->assertSame($ids[0], $ids[2]);
+        $this->assertSame(2, DB::table('pos_print_jobs')->count());
+        $this->assertSame('held', DB::table('restaurant_orders')->find($orderId)->status);
+    }
+
+    public function test_proof_bill_requotes_each_selected_method_without_changing_the_held_order(): void
+    {
+        $companyId = $this->makeShop(['pos_tax_rate_cash' => 16, 'pos_tax_rate_card' => 8]);
+        $user = $this->makeCashier($companyId);
+        $orderId = $this->makeOrder($companyId, ['subtotal' => 320, 'tax_amount' => 51, 'total_amount' => 371]);
+        DB::table('restaurant_order_items')->where('order_id', $orderId)->update(['unit_price' => 320, 'subtotal' => 320]);
+        $before = (array) DB::table('restaurant_orders')->find($orderId);
+
+        foreach (['card' => '346', 'cash' => '371', 'debit_card' => '346'] as $method => $amount) {
+            $this->actingAs($user, 'pos')->get("/pos/restaurant/orders/{$orderId}/proof-bill?payment_method={$method}")
+                ->assertOk()->assertSee('Rs '.$amount)
+                ->assertHeader('Cache-Control', 'must-revalidate, no-cache, no-store, private');
+            $this->assertSame($before, (array) DB::table('restaurant_orders')->find($orderId));
+        }
+        $this->assertSame(0, DB::table('pos_transactions')->count());
+        $foreign = $this->makeOrder($this->makeShop());
+        $this->actingAs($user, 'pos')->getJson("/pos/restaurant/orders/{$foreign}/proof-bill?payment_method=card")->assertNotFound();
+        $this->actingAs($user, 'pos')->getJson("/pos/restaurant/orders/{$orderId}/proof-bill?payment_method=invalid")->assertUnprocessable();
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

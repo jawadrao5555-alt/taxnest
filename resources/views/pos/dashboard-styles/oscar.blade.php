@@ -44,7 +44,8 @@
         </div>
     </div>
 
-    <div class="os-stat-strip os-anim os-d2">
+    @if(!($dashboardMetricsRelocated ?? false))
+<div class="os-stat-strip os-anim os-d2">
         <div class="os-stat-cell">
             {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
             <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.revenue_word") }}</p>
@@ -75,6 +76,7 @@
             @endif
         </div>
     </div>
+@endif
 
     <div class="flex flex-wrap gap-2 os-anim os-d2">
         @if($isRestaurant)

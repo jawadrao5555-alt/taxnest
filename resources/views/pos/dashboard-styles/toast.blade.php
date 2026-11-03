@@ -14,7 +14,8 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden t-anim t-d2">
-        <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-800">
+        @if(!($dashboardMetricsRelocated ?? false))
+<div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-800">
             <div class="p-4 sm:p-5">
                 <div class="flex items-center gap-1.5 mb-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span><span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{{ __("pos.revenue_word") }}</span></div>
                 {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
@@ -45,6 +46,7 @@
                 @endif
             </div>
         </div>
+@endif
         <div class="h-1 flex">
             <div class="flex-1 bg-amber-400"></div>
             <div class="flex-1 bg-blue-400"></div>

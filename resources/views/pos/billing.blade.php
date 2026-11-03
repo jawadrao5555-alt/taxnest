@@ -6,7 +6,7 @@
                 Back to Customize
             </a>
             <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">NestPOS Plans</h2>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">TaxNest PRA POS Plans</h2>
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Annual billing — pick a plan, start selling</p>
             </div>
 

@@ -132,7 +132,8 @@
     </div>
     @endif
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 slide-up slide-up-3">
+    @if(!($dashboardMetricsRelocated ?? false))
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 slide-up slide-up-3">
         <div class="stat-card card-reveal bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
             <div class="relative z-10">
                 {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
@@ -175,6 +176,7 @@
         </div>
         @endif
     </div>
+@endif
 
     @include('pos.dashboard-styles._common-sections')
 </div>

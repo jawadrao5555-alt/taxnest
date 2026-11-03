@@ -480,4 +480,55 @@ class PosDashboardTodayKhataTest extends TestCase
         $this->assertStringContainsString(__('pos.khata_pra_stream'), $html);
         $this->assertStringNotContainsString(__('pos.khata_exempt_bills'), $html);
     }
+
+    public function test_ledger_links_keep_business_date_cashier_filter_and_visible_streams(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->seedKhataDay($companyId);
+        foreach (['both' => ['pra', 'local'], 'pra' => ['pra'], 'local' => ['local']] as $scope => $streams) {
+            $user = $this->makeUser($companyId, $scope === 'both' ? 'pos_admin' : 'pos_cashier', $scope);
+            $khata = $this->dashboardKhata($companyId, $user);
+            // A previous business day must not silently become today's calendar date.
+            $khata['date'] = '2026-10-30';
+            $html = view('pos.partials.today-khata', ['todayKhata' => $khata, 'cashierFilter' => '42'])->render();
+            $doc = new \DOMDocument();
+            @$doc->loadHTML($html);
+            $links = iterator_to_array($doc->getElementsByTagName('a'));
+            $this->assertCount(count($streams), $links);
+            foreach ($links as $index => $link) {
+                $this->assertSame($streams[$index], $link->getAttribute('data-ledger-stream'));
+                $this->assertSame(route('pos.reports', [
+                    'tab' => $streams[$index], 'from' => '2026-10-30', 'to' => '2026-10-30', 'cashier' => '42',
+                ]), $link->getAttribute('href'));
+            }
+        }
+    }
+    public function test_metric_cards_link_to_details_with_the_same_business_date_and_cashier(): void
+    {
+        $companyId=$this->makeCompany();$user=$this->makeUser($companyId);
+        auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
+        $html=view('pos.partials.dashboard-metrics',[
+            'company'=>\App\Models\Company::find($companyId),'todayKhata'=>['business_date'=>'2026-10-30'],
+            'cashierFilter'=>'42','todayTotalSale'=>1234,'todayStats'=>(object)['count'=>2],
+        ])->render();
+        $document=new \DOMDocument();@$document->loadHTML($html);$xpath=new \DOMXPath($document);
+        $links=$xpath->query('//a[@data-dashboard-metric]');$this->assertGreaterThanOrEqual(3,$links->length);
+        foreach($links as $link)if($link->getAttribute('data-dashboard-metric')!=='tables') {
+            parse_str(parse_url(html_entity_decode($link->getAttribute('href')),PHP_URL_QUERY),$query);
+            $this->assertSame('42',$query['cashier']);
+            $this->assertSame('2026-10-30',$query['date'] ?? $query['from']);
+        }
+    }
+
+    public function test_metric_order_detail_cannot_escape_isolated_cashier_or_company(): void
+    {
+        $companyId=$this->makeCompany(['pos_cashier_own_sales_only'=>true]);$user=$this->makeUser($companyId,'pos_cashier','pra');
+        $own=$this->makeTxn($companyId,'OWN',['created_by'=>$user->id]);
+        $this->makeTxn($companyId,'OTHER',['created_by'=>$user->id+99]);
+        $foreign=$this->makeCompany();$this->makeTxn($foreign,'FOREIGN',['created_by'=>$user->id]);
+        auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
+        $view=(new PosController())->dashboardDetail(Request::create('/pos/dashboard/detail/orders','GET',['date'=>now()->toDateString(),'cashier'=>'all']),'orders');
+        $this->assertSame([$own],$view->getData()['rows']->pluck('id')->all());
+    }
+
 }

@@ -68,7 +68,7 @@ class PosUniversalTableOrderRecallTest extends TestCase
         $this->assertStringContainsString('text-sm font-extrabold tabular-nums', $blade);
         $this->assertStringContainsString('flex-shrink-0 whitespace-nowrap', $blade);
 
-        foreach (['boardViewEdit()', 'boardProofBill()', 'toggleOnlinePayment(boardMenuTable.order, true)', 'boardAskFinal()'] as $action) {
+        foreach (['boardViewEdit()', "boardProofBill('cash')", "boardProofBill('card')", 'toggleOnlinePayment(boardMenuTable.order, true)', 'boardAskFinal()'] as $action) {
             $this->assertStringContainsString('@click="' . $action . '"', $blade);
         }
     }

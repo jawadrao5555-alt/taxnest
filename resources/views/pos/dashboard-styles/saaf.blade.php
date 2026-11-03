@@ -67,7 +67,8 @@
     </div>
 
     {{-- 4 clean KPI cards --}}
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    @if(!($dashboardMetricsRelocated ?? false))
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
@@ -162,6 +163,7 @@
         </div>
         @endif
     </div>
+@endif
 
     {{-- Two panels: Top items + Roz ke Kaam --}}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">

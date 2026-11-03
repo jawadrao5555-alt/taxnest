@@ -199,7 +199,7 @@
 
     <div class="footer">
         <p>{{ $company->name }} &mdash; {{ __('pos.payroll_pdf_title') }}</p>
-        <p class="brand">NestPOS</p>
+        <p class="brand">TaxNest PRA POS</p>
     </div>
 
 </body>

@@ -13,7 +13,7 @@
         <div class="relative z-10">
             <div class="flex items-start justify-between gap-4 mb-8">
                 <div>
-                    <p class="text-[10px] font-bold text-violet-300/60 uppercase tracking-[0.2em]">FBR POS</p>
+                    <p class="text-[10px] font-bold text-violet-300/60 uppercase tracking-[0.2em]">TaxNest FBR POS</p>
                     <h1 class="text-2xl sm:text-3xl font-black text-white mt-1">{{ $company->name ?? __('pos.business_fallback') }}</h1>
                     <p class="text-[11px] text-violet-200/50 mt-1">{{ now()->format('l, d M Y') }}</p>
                 </div>

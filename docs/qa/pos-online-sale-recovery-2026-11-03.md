@@ -96,3 +96,24 @@ storage reset or physical-printer fix is claimed.
   scope regression reproduced the identical exception before the handler fix
   and passed afterward. The complete four-case browser matrix still requires a
   fresh run; the previous failed run is not acceptance for the new head.
+
+## Integration with merged PRA/DI reporting
+
+Previous head `623f9756b35742045e49bbc9e348e06defbcf243` passed all eight
+required checks, including the complete PRA/FBR desktop/mobile recovery matrix,
+in run `41588257648`. After #331 merged, integrate main
+`435bc5245ceb9e227ef65e444a2c1a59b7bb905e` into this same branch without
+rewriting history.
+
+The only content conflicts were the service-worker cache version and release
+notice. Keep the new Open POS notice and bump the recovery worker to `r2`.
+Preserve #331's `/pos/di-sandbox` cache exclusion, its worker regression and its
+mandatory Sandbox/Production isolation test. All other #331 application files
+remain identical to main; the PR still changes only its original six files.
+
+Post-integration local worker smoke (including both PRs' regressions), pairing
+cache-bypass test, JavaScript syntax, Elaan parser and artifact/whitespace guards
+pass. This refreshed workspace has no PHP or Chromium; fresh hosted full-suite,
+browser and MariaDB verification is required for the integrated head. Earlier
+green checks do not substitute for that verification. Installed-PC acceptance
+and owner release approval remain separate.

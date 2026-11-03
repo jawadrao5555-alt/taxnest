@@ -869,6 +869,17 @@ Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function
 });
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
+    // Explicit company opt-in; fixed sandbox destination, owner + CSRF checks.
+    Route::prefix('di-sandbox')->name('pos.di-sandbox.')->controller(\App\Http\Controllers\PraDiSandboxController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/setup', 'setup')->name('setup');
+        Route::post('/setup', 'saveSetup')->middleware('throttle:6,1')->name('setup.save');
+        Route::post('/capture', 'capture')->name('capture');
+        Route::get('/{id}', 'show')->whereNumber('id')->name('show');
+        Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('prepare');
+        Route::post('/{id}/submit', 'submit')->whereNumber('id')->middleware('throttle:6,1')->name('submit');
+        Route::get('/{id}/receipt', 'receipt')->whereNumber('id')->name('receipt');
+    });
     Route::post('/desktop/local-core-lease', [\App\Http\Controllers\Api\AgentCoreController::class, 'issueLease'])
         ->middleware('throttle:10,1')->name('pos.desktop.local-core-lease');
     Route::get('/desktop/local-core-scope', [PosController::class, 'desktopLocalCoreScope'])

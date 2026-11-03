@@ -49,9 +49,9 @@
         <div class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
             <a href="/"><img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-8 w-auto"></a>
             <div class="flex items-center gap-6 text-sm font-medium text-white/70">
-                <a href="/digital-invoice" class="hover:text-white transition-colors hidden sm:inline">Digital Invoice</a>
-                <a href="/pos" class="hover:text-white transition-colors hidden sm:inline">NestPOS</a>
-                <a href="/fbr-pos-landing" class="hover:text-white transition-colors hidden md:inline">FBR POS</a>
+                <a href="/digital-invoice" class="hover:text-white transition-colors hidden sm:inline">TaxNest Digital Invoice</a>
+                <a href="/pos" class="hover:text-white transition-colors hidden sm:inline">TaxNest PRA POS</a>
+                <a href="/fbr-pos-landing" class="hover:text-white transition-colors hidden md:inline">TaxNest FBR POS</a>
                 <a href="/download" class="hover:text-white transition-colors hidden md:inline">Downloads</a>
                 <a href="/login" class="text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-md transition-colors">Log In</a>
             </div>
@@ -90,7 +90,7 @@
 
             <div id="who" class="scroll-mt-24 legal-prose">
                 <h3 class="text-2xl font-serif text-[#052730] mb-4">1. Who we are</h3>
-                <p>This policy is issued by {{ $legalName }} ("TaxNest", "we", "us"), Pakistan. It covers the TaxNest web platform at taxnest.pk (FBR Digital Invoicing, NestPOS for PRA, FBR POS, and Nest ERPS Healthcare) and the TaxNest Android applications, including <strong>TaxNest Caller ID</strong> (package <code>pk.taxnest.callerid</code>).</p>
+                <p>This policy is issued by {{ $legalName }} ("TaxNest", "we", "us"), Pakistan. It covers the TaxNest web platform at taxnest.pk (FBR Digital Invoicing, TaxNest PRA POS for PRA, FBR POS, and TaxNest ERP Healthcare) and the TaxNest Android applications, including <strong>TaxNest Caller ID</strong> (package <code>pk.taxnest.callerid</code>).</p>
                 <p>TaxNest is business software sold to registered businesses. In almost every case the person using our apps is a shop owner or their staff member, using the software for their own shop.</p>
             </div>
 

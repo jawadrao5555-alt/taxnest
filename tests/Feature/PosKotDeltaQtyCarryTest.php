@@ -818,7 +818,9 @@ class PosKotDeltaQtyCarryTest extends TestCase
         $newId = json_decode($res2->getContent(), true)['order']['id'];
 
         app()->setLocale('en');
-        $html = app(RestaurantPosController::class)->proofBill($newId)->render();
+        $response = app(RestaurantPosController::class)->proofBill($newId);
+        $html = $response->getContent();
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $this->assertSame(1, substr_count($html, 'Bottle'), 'pre-bill must list the dish ONCE with merged qty');
     }
 

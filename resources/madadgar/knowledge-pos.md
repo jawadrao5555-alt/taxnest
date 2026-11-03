@@ -93,7 +93,7 @@ Sale screen ki mazeed cheezein:
 - SILENT printing (bina print dialog ke): Desktop Sync Agent install karein, phir /pos/printer-settings par jayen → "Enable Silent Printing" ON karein → "Bill / Receipt Printer" aur "Kitchen (KOT) Printer" dropdowns se printers chunein (list Agent se aati hai). Ab receipt/KOT seedha printer par jayenge.
 - Counter KOT Copy (30 Jul 2026 se): /pos/printer-settings par TEESRA dropdown "Counter KOT Copy Printer" hai — iske sath "Use karna hai" ka tick ON karein to har DINE-IN order ki KOT ki aik poori copy counter wale printer par bhi khud-ba-khud nikalti hai (kitchen wali KOT apni jagah normal print hoti hai). Takeaway/Delivery par yeh copy kabhi nahi nikalti. Order update (naye items) par copy mein bhi wohi naye items aate hain jo kitchen ko gaye. Tick OFF = feature band. Iske liye Desktop Agent aur Silent Printing ON hona zaroori hai.
 - "Printer Settings mein printers ki list khali hai": PC par PURANA agent chal raha hai — /pos/printer-settings → "Agent Setup" → "Download ZIP" se naya agent lein, extract kar ke install.bat chalayen (settings mehfooz rehti hain). 5 minute mein list aa jayegi.
-- Agar receipt ya KOT ke aage/peeche LAMBA khali kaghaz nikalta hai: Windows mein printer ki Printing Preferences kholein aur paper size A4 se badal kar 80mm Receipt (ya "72mm x Receipt"/"POS80") set kar dein — khali feed khatam ho jayegi. (KOT ka khali patti wala masla — jahan sirf right kinare par 1-2 harf chapte thay — 26 Jul 2026 ko system ki taraf se theek ho chuka hai, iske liye kuch karne ki zaroorat nahi.)
+- Agar Chrome se print aaye magar Agent se blank, kati hui ya lambi khali slip nikle: dono jagah ek hi Windows printer select hone ki tasdeeq karein. Usi printer ki Printing Preferences aur Printing Defaults mein roll ke mutabiq 58mm ya 80mm paper rakhein. Agent 1.13.27 aur us ke baad printer ka saved paper size mangta hai; yeh correction purane Agent par sirf website refresh se lagu nahi hoti. Naya version release/install hone ke baad Printer Settings se ek test slip nikalein. "Accepted by Windows" physical paper ki tasdeeq nahi hai; tray check kiye baghair baar baar reprint na karein.
 - Barcode scanner: koi bhi USB/Bluetooth scanner jo keyboard ki tarah type karta hai seedha chal jata hai — sale screen ke search box mein scan karein. Alag setup nahi chahiye.
 - Cash drawer aksar printer ke kick port se juda hota hai — receipt print par khul jata hai; yeh printer ki apni setting hai.
 - Product barcode stickers: /pos/products/labels — sticker par naam, price, barcode aur SKU aata hai; "Columns" box se sheet ke columns (1-5) set karein aur "Print" dabayen.
@@ -481,3 +481,14 @@ Stock health counts each product/branch row once: empty/negative, low positive, 
 - Offer wali nayi sale online pay hoti hai; offline success ka daawa nahin hota. Receipt par asal offer title/percent/discount rehta hai aur partial returns bhi usi asal raqam se bante hain.
 - Recipe cost sale ke waqt ingredient base-unit rate aur waste ke saath freeze hoti hai. Ingredient cost na ho to unknown rehti hai; missing rate ko zero cost se profit nahin banaya jata.
 - Reports ka aik hi From/To filter detail aur financial milaan dono par lagta hai. Reconciled CSV aur analytics PDF mein known final gross, returns, net aur retained history hoti hai. Purani unavailable detail ka warning zaroor parhein.
+
+
+## PRA + FBR Digital Invoice — sandbox pilot
+- Sirf active company owner: Receipt Settings → "PRA + FBR Digital Invoice · Sandbox setup".
+- Har company ki DI testing pehle band hoti hai. Owner company ka DI sandbox token save karke pilot enable kare; token chat mein na mangain.
+- Completed bill select karein, sandbox copy ki tasdeeq karein, JSON mapping review/save karein, phir "Submit to FBR sandbox" dabayein. Capture ya save se invoice send nahi hota.
+- Yeh FBR production reporting nahi hai. PRA apne pehle setup ke mutabiq chalta rahega. Normal sale, stock aur customer balance mein doosri entry nahi banti.
+- Accepted sandbox result par combined 58mm/80mm TEST receipt preview mein DI number/QR aata hai. Isay customer tax invoice ke taur par na dein.
+- Unknown/submitting result ko dobara send na karein; operator se reconcile karwayein. Disable karne se naye submissions band, purana record mehfooz rahega.
+- PRA tax ki wajah se FBR exemption ya zero rate khud select na karein; mapping tax consultant/PRAL se confirm honi hai.
+- FBR POS (IMS) selection, live DI aur normal 9 receipt formats is pilot mein enable nahi hote.

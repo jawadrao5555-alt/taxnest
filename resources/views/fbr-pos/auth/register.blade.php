@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <title>FBR POS — {{ __('pos.auth_signup_title') }}</title>
+        <title>TaxNest FBR POS — {{ __('pos.auth_signup_title') }}</title>
         {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
         @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700'])
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -37,7 +37,7 @@
                             </svg>
                         </div>
                     </a>
-                    <h1 class="mt-4 text-2xl font-extrabold text-gray-900 tracking-tight">FBR POS</h1>
+                    <h1 class="mt-4 text-2xl font-extrabold text-gray-900 tracking-tight">TaxNest FBR POS</h1>
                     <p class="text-blue-800/60 text-sm mt-1">{{ __('pos.auth_fbr_pos_system') }}</p>
                     <div class="mt-3">
                         <x-guest-language-picker :action="route('fbrpos.guest-language')" theme="light" />

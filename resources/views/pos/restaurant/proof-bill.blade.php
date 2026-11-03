@@ -157,6 +157,9 @@
         @endforeach
     </table>
     <table class="totals" style="width:100%">
+        @if($order->payment_method)
+        <tr><td>Payment method</td><td style="text-align:right">{{ in_array($order->payment_method, ['card', 'debit_card', 'credit_card'], true) ? 'CARD' : strtoupper(str_replace('_', ' ', $order->payment_method)) }}</td></tr>
+        @endif
         <tr><td>{{ __('pos.receipt_total') }}</td><td style="text-align:right">Rs {{ number_format((float)$order->subtotal, 0) }}</td></tr>
         @if((float)$order->discount_amount > 0)
         <tr><td>{{ __('pos.receipt_discount') }}</td><td style="text-align:right">- Rs {{ number_format((float)$order->discount_amount, 0) }}</td></tr>

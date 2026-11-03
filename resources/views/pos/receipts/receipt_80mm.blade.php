@@ -240,10 +240,10 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
             if (urlParams.get('auto_print') !== '1') return;
             if (isInIframe && frameSignal) {
                 var signaled = false;
-                var signalParent = function() {
+                var signalParent = function(event) {
                     if (signaled) return;
                     signaled = true;
-                    try { window.parent.postMessage({ type: 'pos_print_done', signal: frameSignal }, '*'); } catch (e) {}
+                    try { window.parent.postMessage({ type: 'pos_print_done', signal: frameSignal, reason: event && event.type === 'afterprint' ? 'afterprint' : 'timeout' }, '*'); } catch (e) {}
                 };
                 window.addEventListener('afterprint', signalParent, { once: true });
                 // Safety net inside the iframe — if afterprint never fires
@@ -922,7 +922,7 @@ html body { width: auto; max-width: 180mm; margin: 0 auto; padding: 0; }
                         'Total: ' . number_format($transaction->total_amount, 2),
                     ];
                     if ($rp['show_business_name'] ?? true) {
-                        $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                        $qrLines[] = $transaction->company->name ?? 'TaxNest PRA POS';
                     }
                     $qrUrl = \App\Support\QrImage::dataUri(implode("\n", $qrLines), 5, 4);
                     $qrCaption = __('pos.receipt_scan_invoice');

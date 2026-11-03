@@ -30,10 +30,10 @@ class FbrService
      */
     private array $hsMappingCache = [];
 
-    /** Local PRA/DI rehearsal; shares DI response handling without creating a DI Invoice. */
-    public function submitPosSandboxPayload(array $payload, string $sandboxToken): array
+    /** Opt-in PRA/DI sandbox; no DI Invoice or production endpoint. */
+    public function submitPosSandboxPayload(array $payload, string $sandboxToken, ?int $companyId = null): array
     {
-        \App\Support\PraDiSandboxGate::enforce();
+        \App\Support\PraDiSandboxGate::enforce($companyId);
         $unknown = ['state' => 'verification_required', 'reference' => null, 'error_codes' => []];
         try {
             // Fixed sandbox endpoint; no company URL overrides, redirects or automatic retry.

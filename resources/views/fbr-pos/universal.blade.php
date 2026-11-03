@@ -5041,7 +5041,7 @@ function restaurantPos() {
                 // Latin fallback. Empty string for en/rur (no font fetch).
                 {!! json_encode(app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT ? "@font-face{font-family:'Jameel Noori Nastaleeq';src:url('" . url('fonts/jameel-noori-nastaleeq.woff2') . "?v=1') format('woff2');font-display:swap;}body{font-family:'Jameel Noori Nastaleeq','Courier New',monospace;line-height:1.9;}" : '') !!} +
                 '</style></head><body>' +
-                '<h1>' + esc(@json($company->name ?? 'NestPOS')) + '</h1>' +
+                '<h1>' + esc(@json($company->name ?? 'TaxNest FBR POS')) + '</h1>' +
                 '<p>' + new Date(r.queued_at).toLocaleString() + '</p>' +
                 (r.customer ? '<p>' + esc(window.TXT.customer_name) + ': ' + esc(r.customer) + '</p>' : '') +
                 '<p>Ref: ' + esc('OFFLINE-' + r.uuid.slice(0, 8).toUpperCase()) + ' · ' + esc(r.method) + '</p>' +

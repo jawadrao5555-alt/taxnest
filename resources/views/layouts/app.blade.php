@@ -27,7 +27,7 @@
         <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="Tax DI">
+        <meta name="apple-mobile-web-app-title" content="TaxNest Digital Invoice">
         <link rel="manifest" href="/manifest.json?v=2">
         <link rel="apple-touch-icon" href="/icons/tax-di/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/tax-di/icon-192.png">
@@ -203,7 +203,9 @@
         {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur'. --}}
         @include('partials.urdu-font')
         @include('partials.premium-ui')
-    </head>
+    <script src="/js/native-app-presentation.js?v=1"></script>
+<link rel="stylesheet" href="/css/native-app-presentation.css?v=1">
+</head>
     <body class="tn-premium-shell h-screen overflow-hidden font-sans antialiased">
         @include('partials.consultant-banner')
         <x-pwa-init />
@@ -260,7 +262,7 @@
                                 ])
                             @endif
                             {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
-                            <x-pwa-install-menu-item color="emerald" app-name="Tax DI" label="Download App" item-class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition" />
+                            <x-pwa-install-menu-item color="emerald" app-name="TaxNest Digital Invoice" label="Download App" item-class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition" />
                             {{-- App update / refresh control — always visible, badges when update available --}}
                             <x-pwa-refresh-btn color="emerald" variant="light" />
                             <x-dropdown align="right" width="48">
@@ -274,7 +276,7 @@
                                 <x-slot name="content">
                                     <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
                                     {{-- PWA install — always visible --}}
-                                    <x-pwa-install-menu-item color="emerald" app-name="Tax DI" label="Install App on this Device" item-class="w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition duration-150 ease-in-out flex items-center gap-2" />
+                                    <x-pwa-install-menu-item color="emerald" app-name="TaxNest Digital Invoice" label="Install App on this Device" item-class="w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition duration-150 ease-in-out flex items-center gap-2" />
                                     <form method="POST" action="{{ route('toggle.dark-mode') }}">
                                         @csrf
                                         <x-dropdown-link href="#" onclick="event.preventDefault(); this.closest('form').submit();">
@@ -562,5 +564,6 @@
             ])
         @endif
         @include('partials.modal-a11y-support')
-    </body>
+    @include('partials.internal-survey', ['surveyGuard'=>'web', 'surveyRoute'=>'di'])
+</body>
 </html>

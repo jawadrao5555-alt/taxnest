@@ -58,6 +58,7 @@
         .report-title h2 { text-transform: none; letter-spacing: 0; }
     </style>
     @endif
+@include('pos.partials.report-print-style')
 </head>
 <body>
     <div class="header">
@@ -97,6 +98,12 @@
         </div>
     </div>
 
+    @php
+$presentation = \App\Services\PosReportPresentation::forView($financialHistory ?? null, $streamSplit ?? null, auth('pos')->user(), (bool)($showLocalStream ?? false));
+@endphp
+    @if($presentation)
+      @include('pos.partials.report-summary-tables')
+    @else
     <div class="summary-box">
         <div class="lbl">{{ __('pos.dc_total_revenue') }}</div>
         <div class="val">PKR {{ number_format($report->total_amount, 2) }}</div>
@@ -255,6 +262,7 @@
     @endif
     @endif
 
+    @endif
     <div class="section-title">{{ __('pos.dcp_invoice_summary') }}</div>
     <table class="data">
         <thead>
@@ -675,29 +683,7 @@
     </table>
     @endif
 
-    @if($analytics->top_products->isNotEmpty())
-    <div class="section-title">{{ __('pos.dcp_top_products') }}</div>
-    <table class="data">
-        <thead>
-            <tr>
-                <th class="c" style="width:8%;">#</th>
-                <th>{{ __('pos.receipt_item') }}</th>
-                <th class="c">{{ __('pos.receipt_qty') }}</th>
-                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($analytics->top_products as $pname => $p)
-            <tr>
-                <td class="c">{{ $loop->iteration }}</td>
-                <td>{{ $pname }}</td>
-                <td class="c">{{ rtrim(rtrim(number_format($p->qty, 2), '0'), '.') }}</td>
-                <td class="r">{{ number_format($p->revenue, 2) }}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-    @endif
+
 
     <div class="section-title">{{ __('pos.dcp_pra_submission_health') }}</div>
     <table class="data">
@@ -836,6 +822,31 @@
     </div>
     @endif
 
+    @if($presentation) @include('pos.partials.report-product-table') @else
+    @if($analytics->top_products->isNotEmpty())
+    <div class="section-title">{{ __('pos.dcp_top_products') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="c" style="width:8%;">#</th>
+                <th>{{ __('pos.receipt_item') }}</th>
+                <th class="c">{{ __('pos.receipt_qty') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($analytics->top_products as $pname => $p)
+            <tr>
+                <td class="c">{{ $loop->iteration }}</td>
+                <td>{{ $pname }}</td>
+                <td class="c">{{ rtrim(rtrim(number_format($p->qty, 2), '0'), '.') }}</td>
+                <td class="r">{{ number_format($p->revenue, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+    @endif
     <div class="footer">
         <p>{{ __('pos.dcp_sys_report_pra') }}</p>
         <div class="brand">{{ __('pos.dcp_powered_nestpos') }}</div>

@@ -2192,7 +2192,10 @@ class AgentController extends Controller
             $this->setPrintLocale($order->creator?->language, $job, $company);
             // Task 778: KOT-split rows (qty-aware carry) must merge back into
             // one customer line per dish — same rule as the iframe proof route.
-            $order->setRelation('items', \App\Services\PosBillLineConsolidator::consolidate($order->items));
+            parse_str((string) $job->render_query, $proofOptions);
+            $proofMethod = $proofOptions['payment_method'] ?? null;
+            abort_if($proofMethod !== null && !is_string($proofMethod), 422);
+            $order = \App\Services\RestaurantProofBill::prepare($order, $company, $proofMethod);
             return response(view('pos.restaurant.proof-bill', ['order' => $order, 'company' => $company])->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }

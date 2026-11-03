@@ -4,18 +4,19 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\PosDiSandboxSubmission;
+use App\Models\PosDiSandboxProfile;
 use App\Models\PosTransaction;
 use App\Support\PraDiSandboxGate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-/** Explicit, local-only rehearsal. No checkout observer or production switch. */
+/** Explicit sandbox copy. No checkout observer or FBR production switch. */
 class PraDiSandboxService
 {
     public function capture(Company $company, int $transactionId, int $actorId): PosDiSandboxSubmission
     {
-        PraDiSandboxGate::enforce();
+        PraDiSandboxGate::enforce($company->id);
         abort_unless($company->product_type === 'pos', 403);
         return DB::transaction(function () use ($company, $transactionId, $actorId) {
             $sale = PosTransaction::where('company_id', $company->id)->whereKey($transactionId)
@@ -82,7 +83,7 @@ class PraDiSandboxService
 
     public function prepare(int $companyId, int $id, array $payload): PosDiSandboxSubmission
     {
-        PraDiSandboxGate::enforce();
+        PraDiSandboxGate::enforce($companyId);
         return DB::transaction(function () use ($companyId, $id, $payload) {
             $record = $this->locked($companyId, $id);
             abort_unless(in_array($record->state, ['draft', 'rejected'], true), 409, 'This outcome must be preserved; it cannot be edited or replayed.');
@@ -99,14 +100,20 @@ class PraDiSandboxService
 
     public function submit(int $companyId, int $id, int $actorId): PosDiSandboxSubmission
     {
-        PraDiSandboxGate::enforce();
+        PraDiSandboxGate::enforce($companyId);
         $company = Company::findOrFail($companyId);
         abort_unless($company->product_type === 'pos', 403);
         // Explicit environment: never read a production token, URL override or demo flag.
-        $token = app(FbrService::class)->resolveDiToken($company, 'sandbox');
-        if ($token === '') throw ValidationException::withMessages(['sandbox' => 'Configure this fictional company\'s FBR sandbox token in the local environment first.']);
+        $profile = PosDiSandboxProfile::where('company_id', $companyId)->first();
+        // Hosted pilots must use the separate POS sandbox credential. Legacy
+        // local rehearsals alone may use the pre-existing local DI credential.
+        $token = $profile ? (string) $profile->sandbox_token
+            : (PraDiSandboxGate::hostedAvailable() ? '' : app(FbrService::class)->resolveDiToken($company, 'sandbox'));
+        if ($token === '') throw ValidationException::withMessages(['sandbox' => 'Configure this company\'s DI sandbox token in Sandbox setup first.']);
 
         $record = DB::transaction(function () use ($companyId, $id, $actorId) {
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            PraDiSandboxGate::enforce($companyId);
             $record = $this->locked($companyId, $id);
             abort_unless($record->state === 'draft' && $record->payload, 409, 'Prepare a reviewed payload first. Accepted or unknown submissions cannot be replayed.');
             $this->validatePayload($record, $record->payload);
@@ -118,7 +125,7 @@ class PraDiSandboxService
         });
 
         // External I/O outside the DB lock; never retry an uncertain POST.
-        $result = app(FbrService::class)->submitPosSandboxPayload($record->payload, $token);
+        $result = app(FbrService::class)->submitPosSandboxPayload($record->payload, $token, $companyId);
         return DB::transaction(function () use ($companyId, $id, $result) {
             $record = $this->locked($companyId, $id);
             abort_unless($record->state === 'submitting', 409);

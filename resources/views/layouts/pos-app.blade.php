@@ -152,23 +152,24 @@
     // not readonly impersonation, master switch, fail-silent on missing table.
     $surveyPopup = null; $surveyDismissedSession = false;
     try {
-        if (($wnAllowed ?? false) && !($wnPending ?? true) && !($wnReadonlyImp ?? true)
+        if ($posUserLayout && !($wnPending ?? true) && !($wnReadonlyImp ?? true)
             && \Illuminate\Support\Facades\Schema::hasTable('surveys')
             && \App\Models\SystemSetting::get('pos_surveys_enabled', '1') === '1') {
             $svActive = \App\Models\Survey::active()->orderByDesc('created_at')->get();
             foreach ($svActive as $sv) {
                 // Audience targeting: 'pos_all' or restaurant-mode companies only.
-                if ($sv->audience === 'pos_restaurant' && !($companyLayout->restaurant_mode ?? false)) {
+                if (!$sv->eligibleFor($posUserLayout)) {
                     continue;
                 }
                 $svResponse = \App\Models\SurveyResponse::where('survey_id', $sv->id)
-                    ->where('user_id', $posUserLayout->id)->first(['answered_at']);
-                if (!$svResponse?->answered_at) {
+                    ->where('user_id', $posUserLayout->id)->first(['answered_at','updated_at']);
+                if (!$sv->answeredBy($posUserLayout)) {
                     $surveyPopup = $sv;
                     // The unanswered seen row records "Later" across logins. Keep
                     // the header pill so this user can still answer deliberately.
-                    $surveyDismissedSession = (bool) $svResponse
-                        || (bool) session('pos_survey_dismissed_' . $sv->id);
+                    $surveyDismissedSession = $sv->expires_at
+                        ? ($svResponse?->updated_at?->isToday() || session('pos_survey_dismissed_' . $sv->id) === now()->toDateString())
+                        : ((bool) $svResponse || (bool) session('pos_survey_dismissed_' . $sv->id));
                     break;
                 }
             }
@@ -286,14 +287,14 @@
         <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.9') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">
+        <meta name="apple-mobile-web-app-title" content="TaxNest PRA POS">
         <meta name="mobile-web-app-capable" content="yes">
-        <meta name="application-name" content="Nest Pra Pos">
+        <meta name="application-name" content="TaxNest PRA POS">
         <link rel="manifest" href="/manifest-pos.json?v=2">
         <link rel="apple-touch-icon" href="/icons/nest-pra/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-pra/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-pra/icon-512.png">
-        <title>NestPOS — {{ config('app.name', 'TaxNest') }}</title>
+        <title>TaxNest PRA POS — {{ config('app.name', 'TaxNest') }}</title>
         {{-- ONE font CDN only (perf, Jul 2026): Google Fonts duplicate removed — it
              loaded the SAME Inter family from 2 extra domains (2 extra DNS+TLS
              round-trips per fresh visit, render-blocking). Do not re-add. --}}
@@ -618,7 +619,9 @@
             }
         </script>
         @include('partials.premium-ui')
-    </head>
+    <script src="/js/native-app-presentation.js?v=1"></script>
+<link rel="stylesheet" href="/css/native-app-presentation.css?v=1">
+</head>
     <body class="tn-premium-shell pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}"@if($posEffStyleLayout === 'saaf') data-saaf="1"@endif>
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
@@ -632,7 +635,7 @@
                                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
                             <div class="hidden sm:block">
-                                <span class="text-sm font-extrabold text-white tracking-tight">NestPOS</span>
+                                <span class="text-sm font-extrabold text-white tracking-tight">TaxNest PRA POS</span>
                                 <span class="text-[9px] text-white ml-1 hidden lg:inline font-medium">Enterprise</span>
                             </div>
                         </a>
@@ -767,14 +770,14 @@
 
                         @if($surveyPopup)
                         {{-- Survey pill (Task 1022) — stays until answered or survey closed; reopens the popup --}}
-                        <button type="button" @click="window.dispatchEvent(new CustomEvent('open-pos-survey'))"
+                        <button type="button" data-open-pos-survey @click="window.dispatchEvent(new CustomEvent('open-pos-survey'))" @survey-expired.window="$el.remove()"
                                 title="{{ __('pos.survey_badge') }}"
                                 class="relative hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-white bg-white/15 hover:bg-white/25 transition cursor-pointer">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                             {{ __('pos.survey_banner_label') }}
                             <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500"></span>
                         </button>
-                        <button type="button" @click="window.dispatchEvent(new CustomEvent('open-pos-survey'))"
+                        <button type="button" data-open-pos-survey @click="window.dispatchEvent(new CustomEvent('open-pos-survey'))" @survey-expired.window="$el.remove()"
                                 title="{{ __('pos.survey_badge') }}"
                                 class="relative sm:hidden p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
@@ -1732,9 +1735,12 @@
                 svAnswers: {},
                 svComment: '',
                 svDone: false,
+                svExpired: false,
+                svExpiry: @js($surveyPopup->expires_at?->toIso8601String()),
+                svExpire() { if(!this.svExpiry)return;const left=Date.parse(this.svExpiry)-Date.now();if(left<=0){this.svExpired=true;this.svOpen=false;window.dispatchEvent(new CustomEvent('survey-expired'));return;}setTimeout(()=>this.svExpire(),Math.min(left,86400000)); },
                 svBusy: false,
                 svPick(qk, ok) { this.svAnswers[qk] = ok; },
-                svComplete() { return this.svQuestions.every(q => !!this.svAnswers[q.key]); },
+                svComplete() { return this.svQuestions.every(q => String(this.svAnswers[q.key] || '').trim().length > 0); },
                 svDismiss() {
                     const dialog = this.$refs.svDialog;
                     this.svOpen = false;
@@ -1762,9 +1768,9 @@
                     } catch (e) { this.svBusy = false; }
                 } }"
              x-show="svOpen" x-cloak data-pos-survey="{{ $surveyPopup->id }}"
-             @open-pos-survey.window="svOpen = true; $nextTick(() => window.TnModalA11y.open($refs.svDialog))"
+             @open-pos-survey.window="if(svExpired)return;svOpen = true; $nextTick(() => window.TnModalA11y.open($refs.svDialog))"
              x-ref="svDialog"
-             x-init="if (svOpen) $nextTick(() => window.TnModalA11y.open($refs.svDialog))"
+             x-init="svExpire();if (svOpen) $nextTick(() => window.TnModalA11y.open($refs.svDialog))"
              @keydown.tab="window.TnModalA11y.trap($event, $refs.svDialog)"
              @keydown.escape.stop.prevent="svDismiss()"
              role="dialog" aria-modal="true" aria-labelledby="posSurveyTitle"
@@ -1790,8 +1796,9 @@
                     <template x-for="(q, qi) in svQuestions" :key="q.key">
                         <div class="mb-4">
                             <p class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-2"><span x-text="(qi + 1) + '. '"></span><span x-text="q.text"></span></p>
+                            <template x-if="q.type === 'text'"><textarea x-model="svAnswers[q.key]" maxlength="2000" :aria-label="q.text" class="w-full rounded-lg border p-2" rows="3"></textarea></template>
                             <div class="flex flex-wrap gap-2">
-                                <template x-for="opt in q.options" :key="opt.key">
+                                <template x-for="opt in (q.options || [])" :key="opt.key">
                                     <button type="button" @click="svPick(q.key, opt.key)"
                                             class="px-3.5 py-2 rounded-xl text-[13px] font-bold border transition cursor-pointer"
                                             :class="svAnswers[q.key] === opt.key

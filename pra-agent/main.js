@@ -37,7 +37,7 @@ const { SnapshotSyncClient } = require('./src/local-core/snapshot-sync');
 const { createEventIngress } = require('./src/local-core/ingress');
 const { createSaleAcceptance } = require('./src/local-core/sale-acceptance');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
-const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
+const { printHtml: printHtmlSilent, getLocalPrinters, setPaperProfiles } = require('./src/printer');
 const { drainLocalKotQueue } = require('./src/local-kot');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 const {
@@ -370,6 +370,8 @@ function sendUpdateState() {
 }
 
 const store = new Store();
+const { normalizePaperProfiles } = require('./src/thermal-paper');
+setPaperProfiles(store.get('printerPaperProfiles', {}));
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -1368,13 +1370,22 @@ ipcMain.handle('get-config', () => {
   // taxnest.com.pk data from electron-store.
   const cfg = getMigratedAgentConfig() || {};
   // Always surface pcName and receiptPrinter so the UI fields load correctly.
-  return { ...cfg, pcName: cfg.pcName || '', receiptPrinter: cfg.receiptPrinter || '' };
+  return { ...cfg, pcName: cfg.pcName || '', receiptPrinter: cfg.receiptPrinter || '',
+    printerPaperProfiles: normalizePaperProfiles(store.get('printerPaperProfiles', {})) };
 });
 
 ipcMain.handle('save-config', async (event, config) => {
+  // Physical queue settings belong to this PC, not a paired company. Older
+  // callers that omit the field and automatic pairing must not erase them.
+  if (Object.hasOwn(config, 'printerPaperProfiles')) {
+    const profiles = normalizePaperProfiles(config.printerPaperProfiles);
+    store.set('printerPaperProfiles', profiles);
+    setPaperProfiles(profiles);
+  }
+  const { printerPaperProfiles: _paperProfiles, ...connectionConfig } = config;
   // Persist pcName + receiptPrinter alongside the other config fields.
   const toStore = {
-    ...config,
+    ...connectionConfig,
     serverUrl: canonicalAgentServerUrl(config.serverUrl || DEFAULT_SERVER_URL),
     pcName: (config.pcName || '').trim(),
     receiptPrinter: (config.receiptPrinter || '').trim(),

@@ -2,7 +2,7 @@
 <div class="tn-live-ops p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-white">Live Ops</h1>
-        <p class="text-sm text-gray-400 mt-1">NestPOS PRA diagnostics and owner-approved remediation. Diagnosis never auto-fixes.</p>
+        <p class="text-sm text-gray-400 mt-1">TaxNest PRA POS PRA diagnostics and owner-approved remediation. Diagnosis never auto-fixes.</p>
     </div>
 
     @if(session('success'))
@@ -15,7 +15,7 @@
     <div class="grid lg:grid-cols-2 gap-6 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <h2 class="text-sm font-semibold text-white mb-3">Company search</h2>
-            <p class="text-[11px] text-gray-500 mb-3">Same filter pattern as Companies (search + status). NestPOS PRA scope only. Super admin can open any matching shop — POS managers/viewers cannot use this panel.</p>
+            <p class="text-[11px] text-gray-500 mb-3">Same filter pattern as Companies (search + status). TaxNest PRA POS PRA scope only. Super admin can open any matching shop — POS managers/viewers cannot use this panel.</p>
             <form method="get" action="{{ route('saas.admin.live-ops') }}" class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                 <input type="text" name="search" value="{{ $search ?? $q }}" placeholder="Search name, NTN, owner, id, account code…" class="sm:col-span-2 w-full rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
                 <select name="status" class="rounded-lg bg-gray-950 border border-gray-700 text-sm text-white px-3 py-2">
@@ -38,7 +38,7 @@
                         <a href="{{ route('saas.admin.live-ops.company', $c->id) }}" class="text-indigo-400 hover:underline">Diagnostic</a>
                     </li>
                 @empty
-                    <li class="text-gray-500">{{ ($search ?? $q ?? '') === '' && ($status ?? '') === '' ? 'Enter a search term (same idea as /admin/companies).' : 'No NestPOS PRA matches.' }}</li>
+                    <li class="text-gray-500">{{ ($search ?? $q ?? '') === '' && ($status ?? '') === '' ? 'Enter a search term (same idea as /admin/companies).' : 'No TaxNest PRA POS PRA matches.' }}</li>
                 @endforelse
             </ul>
         </div>

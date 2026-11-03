@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\PosDiSandboxSubmission;
+use App\Models\PosDiSandboxProfile;
 use App\Models\User;
 use App\Services\FbrService;
 use App\Services\PraDiSandboxService;
@@ -30,7 +31,7 @@ class PraDiSandboxTest extends TestCase
         parent::setUp();
         Schema::dropAllTables();
         User::flushScopeColumnCache();
-        config(['pra_di_sandbox.enabled' => true]);
+        config(['pra_di_sandbox.enabled' => true, 'pra_di_sandbox.hosted_enabled' => false]);
         Schema::create('companies', function (Blueprint $t) {
             $t->id(); $t->string('name'); $t->string('product_type')->default('pos');
             $t->string('status')->default('approved'); $t->string('company_status')->default('active');
@@ -66,6 +67,7 @@ class PraDiSandboxTest extends TestCase
             Schema::create($name, fn (Blueprint $t) => $t->id());
         }
         (require database_path('migrations/2026_11_02_120000_create_pos_di_sandbox_submissions_table.php'))->up();
+        (require database_path('migrations/2026_11_03_100000_create_pos_di_sandbox_profiles_table.php'))->up();
         $id = DB::table('companies')->insertGetId(['name' => 'Fictional Sandbox Shop',
             'fbr_sandbox_token' => Crypt::encryptString(self::TOKEN),
             'fbr_production_token' => Crypt::encryptString('NEVER-USE-THIS-PRODUCTION-TOKEN'),
@@ -419,4 +421,123 @@ class PraDiSandboxTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->record($id);
     }
+    private function hostedPilot(): void
+    {
+        // Only the environment label changes: the disposable SQLite test DB and
+        // Http::fake remain in use. No live data or credentials are involved.
+        config(['pra_di_sandbox.hosted_enabled' => true]);
+        $this->app->instance('env', 'production');
+        $this->withSession(['_token' => 'pilot-csrf']);
+    }
+
+    private function enablePilot(): void
+    {
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => '1', 'confirm_sandbox_setup' => '1',
+            'sandbox_token' => 'dedicated-fictional-pilot-token',
+        ])->assertSessionHasNoErrors()->assertRedirect(route('pos.di-sandbox.setup'));
+    }
+
+    public function test_hosted_owner_can_configure_and_test_one_bill_without_changing_existing_fiscal_setup(): void
+    {
+        $before = (array) DB::table('companies')->find($this->company->id);
+        $this->hostedPilot();
+        $this->get(route('pos.di-sandbox.setup'))->assertOk()->assertSee('Disabled');
+        $this->getJson(route('pos.di-sandbox.index'))->assertNotFound();
+        $this->enablePilot();
+        $this->assertSame($before, (array) DB::table('companies')->find($this->company->id));
+        $profile = PosDiSandboxProfile::firstOrFail();
+        $this->assertSame('dedicated-fictional-pilot-token', $profile->sandbox_token);
+        $this->assertStringNotContainsString('dedicated-fictional-pilot-token', json_encode($profile));
+        $this->assertStringNotContainsString('dedicated-fictional-pilot-token', DB::table('pos_di_sandbox_profiles')->value('sandbox_token'));
+        $this->get(route('pos.di-sandbox.setup'))->assertOk()->assertSee('Saved')->assertDontSee('dedicated-fictional-pilot-token');
+        $this->get(route('pos.di-sandbox.index'))->assertOk()->assertSee('sandbox_copy');
+        $id = $this->bill();
+        $this->postJson(route('pos.di-sandbox.capture'), ['_token' => 'pilot-csrf', 'transaction_id' => $id])
+            ->assertUnprocessable()->assertJsonValidationErrors('sandbox_copy');
+        $this->post(route('pos.di-sandbox.capture'), [
+            '_token' => 'pilot-csrf', 'transaction_id' => $id, 'sandbox_copy' => 1,
+        ])->assertRedirect();
+        Http::assertNothingSent();
+        $record = PosDiSandboxSubmission::firstOrFail();
+        $this->service->prepare($this->company->id, $record->id, $this->payload($record));
+        Http::fake(['*' => Http::response($this->ack())]);
+        $this->post(route('pos.di-sandbox.submit', $record->id), [
+            '_token' => 'pilot-csrf', 'confirm_sandbox' => 1,
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($r) => $r->url() === 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb'
+            && $r->hasHeader('Authorization', 'Bearer dedicated-fictional-pilot-token'));
+        $this->get(route('pos.di-sandbox.receipt', $record->id))->assertOk()
+            ->assertSee('TEST-SBX-ACK-1')->assertSee('NOT A VALID TAX INVOICE');
+        foreach (['invoices', 'inventory_movements', 'customer_ledger'] as $table) $this->assertDatabaseCount($table, 0);
+        $this->assertSame($before, (array) DB::table('companies')->find($this->company->id));
+    }
+
+    public function test_pilot_disable_retains_credential_and_evidence_but_blocks_submissions(): void
+    {
+        $this->hostedPilot(); $this->enablePilot();
+        $record = $this->record();
+        $this->service->prepare($this->company->id, $record->id, $this->payload($record));
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 0, 'sandbox_token' => '',
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertFalse(PosDiSandboxProfile::firstOrFail()->enabled);
+        $this->assertSame('dedicated-fictional-pilot-token', PosDiSandboxProfile::firstOrFail()->sandbox_token);
+        $this->assertDatabaseCount('pos_di_sandbox_submissions', 1);
+        $this->postJson(route('pos.di-sandbox.submit', $record->id), [
+            '_token' => 'pilot-csrf', 'confirm_sandbox' => 1,
+        ])->assertNotFound();
+        Http::assertNothingSent();
+    }
+
+    public function test_pilot_setup_requires_owner_csrf_consent_and_its_own_token_without_flashing_secrets(): void
+    {
+        $this->hostedPilot();
+        $this->postJson(route('pos.di-sandbox.setup.save'), ['enabled' => 1])->assertStatus(419);
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 1, 'sandbox_token' => 'secret-must-not-flash',
+        ])->assertSessionHasErrors('confirm_sandbox_setup')->assertSessionMissing('_old_input.sandbox_token');
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 1, 'confirm_sandbox_setup' => 1,
+        ])->assertSessionHasErrors('sandbox_token');
+        $this->assertDatabaseCount('pos_di_sandbox_profiles', 0);
+        $this->owner->forceFill(['role' => 'employee', 'pos_role' => 'pos_cashier'])->saveQuietly();
+        $this->getJson(route('pos.di-sandbox.setup'))->assertForbidden();
+        $this->postJson(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 1, 'confirm_sandbox_setup' => 1, 'sandbox_token' => 'ignored',
+        ])->assertForbidden();
+        Http::assertNothingSent();
+    }
+
+    public function test_second_tenant_cannot_use_or_overwrite_first_tenants_pilot_profile(): void
+    {
+        $this->hostedPilot(); $this->enablePilot();
+        $record = $this->record();
+        $other = DB::table('companies')->insertGetId(['name' => 'Other fictional shop']);
+        $uid = DB::table('users')->insertGetId(['company_id' => $other]);
+        $this->actingAs(User::findOrFail($uid), 'pos');
+        $this->get(route('pos.di-sandbox.setup'))->assertOk()->assertSee('Not configured');
+        $this->getJson(route('pos.di-sandbox.show', $record->id))->assertNotFound();
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 0, 'company_id' => $this->company->id,
+        ])->assertSessionHasNoErrors();
+        $this->assertTrue(PosDiSandboxProfile::where('company_id', $this->company->id)->firstOrFail()->enabled);
+        $this->assertFalse(PosDiSandboxProfile::where('company_id', $other)->firstOrFail()->enabled);
+        Http::assertNothingSent();
+    }
+
+    public function test_hosted_transport_requires_company_context_and_global_kill_switch_stops_pilot(): void
+    {
+        $this->hostedPilot(); $this->enablePilot();
+        try {
+            app(FbrService::class)->submitPosSandboxPayload(['items' => [[]]], 'fictional');
+            $this->fail('Hosted transport accepted a missing company context');
+        } catch (HttpException $e) { $this->assertSame(404, $e->getStatusCode()); }
+        config(['pra_di_sandbox.hosted_enabled' => false]);
+        $this->assertFalse(PraDiSandboxGate::available($this->company->id));
+        $this->getJson(route('pos.di-sandbox.setup'))->assertNotFound();
+        Http::assertNothingSent();
+    }
+
 }

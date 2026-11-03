@@ -1,6 +1,6 @@
 {
-    "name": "Tax DI - Digital Invoice",
-    "short_name": "Tax DI",
+    "name": "TaxNest Digital Invoice",
+    "short_name": "TaxNest DI",
     "description": "Pakistan's Smart FBR-Compliant Tax & Invoice Management Platform",
     "start_url": "/dashboard",
     "scope": "/",

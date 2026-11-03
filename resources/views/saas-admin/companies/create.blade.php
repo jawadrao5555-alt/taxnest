@@ -17,7 +17,7 @@
                         <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </div>
                     <div>
-                        <p class="text-sm font-semibold text-white">Digital Invoice</p>
+                        <p class="text-sm font-semibold text-white">TaxNest Digital Invoice</p>
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">FBR integrated invoicing</p>
                     </div>
                 </label>
@@ -37,7 +37,7 @@
                         <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
                     <div>
-                        <p class="text-sm font-semibold text-white">FBR POS</p>
+                        <p class="text-sm font-semibold text-white">TaxNest FBR POS</p>
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">FBR integrated POS</p>
                     </div>
                 </label>
@@ -58,7 +58,7 @@
         </div>
 
         {{-- Which ERP inside the line this organisation runs. Only shown for
-             Nest ERPS; the controller nulls it for the other three products. --}}
+             TaxNest ERP; the controller nulls it for the other three products. --}}
         <div x-show="productType === '{{ \App\Support\NestErps::PRODUCT_TYPE }}'" x-cloak class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-1">{{ \App\Support\NestErps::LABEL }} vertical</h3>
             <p class="text-xs text-gray-500 mb-4">Which ERP inside the line this organisation runs. The panel opens with that vertical's default modules already switched on.</p>

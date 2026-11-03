@@ -419,4 +419,24 @@ class PosAnalyticsPlanGateTest extends TestCase
         $this->assertNotNull($response->viewData('rangeAnalytics'),
             'active trial must evaluate the analytics dashboard');
     }
+    public function test_actual_report_pdf_has_analytics_before_complete_products_and_page_numbers(): void
+    {
+        $cid=$this->makeCompany();$owner=$this->makeOwner($cid);
+        $this->subscribe($cid,['name'=>'Business','analytics_enabled'=>1]);$this->makeTxn($cid);
+        $id=DB::table('pos_transactions')->where('company_id',$cid)->value('id');
+        DB::table('pos_transactions')->where('id',$id)->update(['invoice_mode'=>'pra','pra_status'=>'submitted','pra_invoice_number'=>'SYNTHETIC','total_amount'=>60,'subtotal'=>60]);
+        for($n=0;$n<60;$n++)DB::table('pos_transaction_items')->insert([
+            'transaction_id'=>$id,'item_type'=>'manual','item_name'=>'Synthetic detail '.str_pad((string)$n,2,'0',STR_PAD_LEFT),
+            'quantity'=>1,'unit_price'=>1,'subtotal'=>1,'tax_amount'=>0,'tax_rate'=>0,'created_at'=>now(),'updated_at'=>now()]);
+        $response=$this->actingAs($owner,'pos')->get('/pos/reports/analytics-pdf?tab=pra')->assertOk();
+        $this->assertStringStartsWith('%PDF-',$response->getContent());
+        $document=(new \Smalot\PdfParser\Parser())->parseContent($response->getContent());
+        $text=$document->getText();
+        $this->assertLessThan(strpos($text,'Synthetic detail 00'),strpos($text,__('pos.dc_summary_payments')));
+        $this->assertStringContainsString('Synthetic detail 59',$text);
+        $pages=$document->getPages();$this->assertGreaterThan(1,count($pages));
+        foreach($pages as $index=>$page)$this->assertStringContainsString(($index+1).' / '.count($pages),$page->getText());
+        $this->assertSame(1,substr_count($text,__('pos.ra_system_generated')));
+    }
+
 }

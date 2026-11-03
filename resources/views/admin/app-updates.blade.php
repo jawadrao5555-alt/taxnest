@@ -41,7 +41,7 @@
             <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 flex items-center justify-between flex-wrap gap-3">
                 <div>
                     <div class="font-semibold text-gray-800 dark:text-gray-100">What's New Notifications (POS)</div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Controls the one-time popup and the bell icon on the entire NestPOS panel. When OFF, POS users see nothing.</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Controls the one-time popup and the bell icon on the entire TaxNest PRA POS panel. When OFF, POS users see nothing.</p>
                 </div>
                 <form method="POST" action="/admin/app-updates/feature-toggle">
                     @csrf

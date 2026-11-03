@@ -63,10 +63,10 @@
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Downloads — TaxNest</title>
-    <meta name="description" content="Download the NestPOS Desktop Agent for Windows, the TaxNest POS app for Android, and the TaxNest Rider app — everything you need to run TaxNest on your devices.">
+    <meta name="description" content="Download the TaxNest PRA POS Desktop Agent for Windows, the TaxNest POS app for Android, and the TaxNest Rider app — everything you need to run TaxNest on your devices.">
     @include('partials.meta-og', [
         'ogTitle'       => 'Downloads — TaxNest',
-        'ogDescription' => 'Download the NestPOS Desktop Agent for Windows, the TaxNest POS app for Android, and the TaxNest Rider app — everything you need to run TaxNest on your devices.',
+        'ogDescription' => 'Download the TaxNest PRA POS Desktop Agent for Windows, the TaxNest POS app for Android, and the TaxNest Rider app — everything you need to run TaxNest on your devices.',
         'ogUrl'         => 'https://taxnest.pk/download',
     ])
     <link rel="canonical" href="https://taxnest.pk/download">
@@ -88,9 +88,9 @@
         <div class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
             <a href="/"><img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-8 w-auto"></a>
             <div class="flex items-center gap-6 text-sm font-medium text-white/70">
-                <a href="/digital-invoice" class="hover:text-white transition-colors hidden sm:inline">Digital Invoice</a>
-                <a href="/pos" class="hover:text-white transition-colors hidden sm:inline">NestPOS</a>
-                <a href="/fbr-pos-landing" class="hover:text-white transition-colors hidden md:inline">FBR POS</a>
+                <a href="/digital-invoice" class="hover:text-white transition-colors hidden sm:inline">TaxNest Digital Invoice</a>
+                <a href="/pos" class="hover:text-white transition-colors hidden sm:inline">TaxNest PRA POS</a>
+                <a href="/fbr-pos-landing" class="hover:text-white transition-colors hidden md:inline">TaxNest FBR POS</a>
                 <a href="/contact" class="hover:text-white transition-colors hidden md:inline">Contact</a>
                 <a href="/login" class="text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-md transition-colors">Log In</a>
             </div>
@@ -119,10 +119,10 @@
                         <svg class="w-6 h-6 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
                     <div class="flex items-center gap-2 mb-1">
-                        <h3 class="font-serif text-lg text-[#052730]">NestPOS Desktop Agent</h3>
+                        <h3 class="font-serif text-lg text-[#052730]">TaxNest PRA POS Desktop Agent</h3>
                     </div>
                     <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Windows 10 / 11{{ $agentTag ? ' · ' . $agentTag : '' }}</p>
-                    <p class="text-sm text-gray-500 leading-relaxed flex-1">Silent thermal receipt &amp; KOT printing, offline billing, PRA fiscal-device support and the full-screen NestPOS desktop shell — install once on your counter PC.</p>
+                    <p class="text-sm text-gray-500 leading-relaxed flex-1">Silent thermal receipt &amp; KOT printing, offline billing, PRA fiscal-device support and the full-screen TaxNest PRA POS desktop shell — install once on your counter PC.</p>
                     <div class="mt-5 space-y-2">
                         @if($agentAvailable && $exeAsset)
                         <a href="{{ route('public.agent.download', ['type' => 'exe']) }}" class="block text-center bg-[#0A4D5C] hover:bg-[#083D49] text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">

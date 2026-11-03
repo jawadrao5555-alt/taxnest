@@ -86,9 +86,6 @@ class OptionalLocalBillArchive
         if (!$expected || $bill->getTable() !== $expected) {
             throw new RuntimeException('Unsupported optional archive source.');
         }
-        if (!Schema::hasTable('support_bill_archive_prefs')) {
-            return null; // Safe rolling deployment: no preference means OFF.
-        }
         if (DB::transactionLevel() < 1) {
             throw new RuntimeException('Optional archive capture requires the deletion transaction.');
         }
@@ -107,6 +104,12 @@ class OptionalLocalBillArchive
             || !(($mode === 'local' && in_array($status, ['local', null], true))
                 || ($status === null && in_array($mode, [$prefix, null], true)))) {
             return null;
+        }
+        if ($product === 'pos') {
+            app(SaasLocalBillRecord::class)->capture($bill);
+        }
+        if (!Schema::hasTable('support_bill_archive_prefs')) {
+            return null; // Optional owner-managed support copies are independent.
         }
         $companyId = (int) $bill->getAttribute('company_id');
         $prefs = DB::table('support_bill_archive_prefs')->where('company_id', $companyId)->lockForUpdate()->first();

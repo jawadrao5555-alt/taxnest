@@ -269,13 +269,18 @@ jobs:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=whatsapp-optional-autosend bash scripts/rc-browser-fixture.sh run
+          RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
+          RC_BROWSER_ONLY=survey-pos,survey-di,survey-fbrpos,survey-erps,customer-bulk-navigation bash scripts/rc-browser-fixture.sh run
+          RC_BROWSER_ONLY=occupied-table-orders bash scripts/rc-browser-fixture.sh run
+          bash scripts/rc-browser-fixture.sh stop
+          bash scripts/rc-playwright-install.sh
+          bash scripts/rc-browser-fixture.sh setup
           RC_TUTORIAL_RECORDING=1 RC_BROWSER_ONLY=restaurant-top-selling bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=notification-pra,notification-fbr,notification-di bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=agent-build-identity bash scripts/rc-browser-fixture.sh run
-          RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=readonly-reporting-connection bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-company-directory-contrast bash scripts/rc-browser-fixture.sh run
-          RC_BROWSER_ONLY=whatsapp-optional-autosend bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=rider-realtime-map bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=companyAdminSmartImport bash scripts/rc-browser-fixture.sh run
           test -s "$RC_BROWSER_STATE_ROOT/safe-runtime/browser-state/tutorial-videos/recording-manifest.json"
@@ -287,7 +292,7 @@ jobs:
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
-          bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/table-setting-controls.test.mjs scripts/tests/receipt-typography-browser.test.mjs
+          bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/table-setting-controls.test.mjs scripts/tests/receipt-typography-browser.test.mjs scripts/tests/day-close-roll-browser.test.mjs
       - name: Exercise general isolated browser acceptance
         env:
           RC_MARIADB_PORT: '33117'
@@ -354,12 +359,18 @@ jobs:
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs scripts/tests/dashboard-notice-reading.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
       - name: Check PRA B03 phone continuity and explicit table commit
-        run: bash scripts/rc-safe-run -- node --test scripts/tests/b03-phone-search.test.mjs scripts/tests/b03-table-commit.test.mjs scripts/tests/b03-delivery-navigation.test.mjs
+        run: bash scripts/rc-safe-run -- node --test scripts/tests/b03-phone-search.test.mjs scripts/tests/b03-table-commit.test.mjs scripts/tests/b03-delivery-navigation.test.mjs scripts/tests/customer-bulk-print-flows.test.mjs
       - name: Install patched Electron runtime for real BrowserWindow acceptance
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libatk-bridge2.0-0
           node pra-agent/node_modules/electron/install.js
+      - name: Exercise thermal receipt paper and Agent settings in real Electron
+        timeout-minutes: 3
+        run: |
+          set -o pipefail
+          bash scripts/rc-safe-run -- xvfb-run -a pra-agent/node_modules/electron/dist/electron --no-sandbox pra-agent/test/thermal-paper-native.js 2>&1 | tee "$RUNNER_TEMP/thermal-paper.log"
+          grep -Fx 'Native thermal paper and settings checks passed' "$RUNNER_TEMP/thermal-paper.log"
       - name: Exercise real Electron offline reconnect and encrypted persistence
         timeout-minutes: 8
         run: bash scripts/rc-safe-run -- node pra-agent/test/local-core-internet-cut.test.js
@@ -383,6 +394,11 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
           gradle -p rider-app --no-daemon --console=plain :app:testDebugUnitTest :app:assembleDebug
+      - name: Compile PRA, DI and FBR Android shells without release credentials
+        run: |
+          gradle -p pos-app --no-daemon --console=plain :app:assembleDebug
+          gradle -p di-app --no-daemon --console=plain :app:assembleDebug
+          gradle -p fbr-pos-app --no-daemon --console=plain :app:assembleDebug
       - name: Check sale cache recovery and offline trust boundaries
         run: bash scripts/rc-safe-run -- node scripts/sw-smoke-check.mjs
       - name: Check complete catalog search and exact scanner priority

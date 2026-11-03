@@ -319,6 +319,29 @@ class PosDayClosePerBillActionTest extends TestCase
 
     // ── 1. mixed per-bill actions ────────────────────────────────────────────
 
+    public function test_daily_delete_restarts_empty_series_and_kept_bills_continue_it(): void
+    {
+        config(['app.key' => 'base64:'.base64_encode(str_repeat('d', 32))]);
+        (require database_path('migrations/2026_11_02_100001_create_saas_local_bill_records.php'))->up();
+        Schema::create('pos_local_series_counters', function (Blueprint $t) {
+            $t->unsignedBigInteger('company_id')->primary(); $t->unsignedBigInteger('last_number'); $t->timestamps();
+        });
+        foreach (['delete', 'save'] as $action) {
+            $cid = $this->makeCompany(['pos_dayclose_provisional_action' => $action]);
+            $this->makeBill($cid, ['invoice_number' => 'L041']);
+            $owner = $this->makeUser($cid);
+            $this->closeDay($owner)->assertSessionHas('success');
+            $this->assertSame($action === 'delete' ? 1 : 0,
+                DB::table('saas_local_bill_records')->where('company_id', $cid)->count());
+            $expected = $action === 'delete' ? 'L001' : 'L042';
+            $this->assertSame($expected, \App\Services\PosLocalSeries::previewNext($cid));
+            $this->assertSame($expected, DB::transaction(fn () => \App\Services\PosLocalSeries::issueNext($cid)));
+            // Retried close may not reset a number issued after the winning close.
+            $this->closeDay($owner);
+            $this->assertSame($action === 'delete' ? 'L002' : 'L043', \App\Services\PosLocalSeries::previewNext($cid));
+        }
+    }
+
     public function test_mixed_per_bill_actions_delete_save_and_default(): void
     {
         $cid = $this->makeCompany(); // standing = save

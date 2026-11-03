@@ -15,6 +15,13 @@ import { fileURLToPath } from 'node:url';
 // Reviewed 31 Oct 2026: follow-redirects 1.16.2 and minimatch upstream 11.0.1
 // close GHSA-mrwp-f3q8-3g9p / GHSA-g3hv-75wg-m249. The hash-pinned
 // facade preserves old callable packaging APIs without an older matching engine.
+// Reviewed 2 Nov 2026: Agent 1.13.29 reconciles the customer bulk with 1.13.28.
+// Only the two root release-version fields change; dependency entries remain identical.
+// Reviewed 2 Nov 2026: Agent 1.13.28 adds opt-in thermal paper sizing.
+// Compared the entire lock: only the two root version fields changed.
+// Reviewed 2 Nov 2026: Agent 1.13.27 carries the printer-default-paper fix;
+// 1.13.26 is reserved by the separate customer-bulk PR. A full lock comparison
+// confirmed that only the two root release-version fields changed.
 // Reviewed 31 Oct 2026: Agent 1.13.25 avoids replacing the released 1.13.24 tag.
 // Only the two root version fields change; dependency versions/integrities/edges stay pinned.
 // Reviewed 27 Oct 2026: owner-requested Agent bulk uses source identity 1.13.24.
@@ -70,7 +77,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: 'e1ebea69f9d263af1bfdebaf53563921046b201fdcb2a658ffd7316fbeb27f1b',
+    graph: 'b905fc4253c41fc9585f5094917815df54d1081db49c9ecc3a833b5928eb8434',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

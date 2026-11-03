@@ -6,7 +6,7 @@
 
 <div class="tn-dashboard tn-retail-dashboard w-full overflow-x-hidden">
     <div class="tn-page px-4 sm:px-6 py-5 max-w-7xl mx-auto">
-        <x-pwa-banner color="purple" appName="Nest Pra Pos" />
+        <x-pwa-banner color="purple" appName="TaxNest PRA POS" />
         <x-pwa-push scope="pos" />
 
         {{-- ━━━ Stranded-day warning (Task 466): prior business day(s) never closed.
@@ -372,6 +372,10 @@
         @include('pos.partials.pending-bills-tile')
         @if($dashboardRidersRelevant) @include('pos.partials.rider-settlement-pending') @endif
         @include('pos.partials.inactive-customers')
+        @php
+        $dashboardMetricsRelocated = true;
+        @endphp
+        @include('pos.partials.dashboard-metrics')
         @if($dashboardKhataRelevant) @include('pos.partials.today-khata') @endif
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
         @include('pos.dashboard-styles._drafts-section')

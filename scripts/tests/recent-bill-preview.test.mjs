@@ -18,10 +18,13 @@ const method = name => {
 for (const restaurant of [false, true]) for (const silent of [false, true]) {
     test(`recent bill previews without printing; explicit reprint preserved (restaurant=${restaurant}, silent=${silent})`, async () => {
         const attempts = [], bill = { id: 87, invoice_number: 'L087', total_amount: 346 };
+        let previewFocused = false;
         const cart = [{ item_name: 'Unfinished current sale', quantity: 2 }];
         const d = {
             isRestaurantMode: restaurant, silentBillPrint: silent, reprintBusyId: null,
             reprintPreviewBill: null, cart, selectedCustomer: { id: 22 },
+            $nextTick: fn => fn(),
+            $refs: { reprintPreviewDialog: { focus: () => { previewFocused = true; } } },
             openReprintPreview: method('openReprintPreview'),
             reprintBill: method('reprintBill'), receiptViewUrl: method('receiptViewUrl'),
             _newPrintAttemptUuid: () => 'synthetic-explicit-attempt',
@@ -31,6 +34,7 @@ for (const restaurant of [false, true]) for (const silent of [false, true]) {
         // Execute the live chip's actual click expression, not a test-only handler.
         vm.runInNewContext(click, { ...d, bill, openReprintPreview: d.openReprintPreview.bind(d), reprintBill: d.reprintBill.bind(d) });
         assert.equal(d.reprintPreviewBill, bill, 'Recent Bill must open the existing preview');
+        assert.equal(previewFocused, true, 'Keyboard focus belongs to the opened preview');
         assert.deepEqual(attempts, [], 'viewing must not submit any print');
         assert.equal(d.cart, cart); assert.equal(d.selectedCustomer.id, 22);
         const viewUrl = d.receiptViewUrl(bill);

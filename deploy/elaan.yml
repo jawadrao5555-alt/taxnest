@@ -1,7 +1,7 @@
-title: "PRA bill ke print attempts ki support report"
+title: "PRA POS ke saath Digital Invoice ki sandbox testing"
 audience: pos
 type: improvement
 points:
-  - "Ijazat yafta support report mein bill aur order ke print attempts ka waqt aur mojood natija dekha ja sakta hai."
-  - "Jo record mojood na ho usay report saaf batati hai; PC ka jawab physical paper nikalne ka saboot nahi samjha jata."
-  - "Yeh sirf record dekhne ki sahulat hai; bill, printer ki setting ya dobara print apne aap nahi badalta."
+  - "Company owner Receipt Settings mein PRA + FBR Digital Invoice · Sandbox setup khol sakta hai."
+  - "Testing khud enable karein, sandbox token save karein aur bill ki copy review karke bhejein; live FBR reporting shuru nahi hoti."
+  - "FBR sandbox se bill accept hone par PRA aur DI wali test receipt dekhi ja sakti hai."

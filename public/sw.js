@@ -149,9 +149,12 @@ async function fetchSaleDocument(request, cache, variant, keepAlive) {
         // the document's scripts/styles normally (including an asset origin).
         // Never replace valid online HTML with the offline recovery card or
         // delay showing it while preparing the next offline start.
+        // Own a separate body before returning the live response: respondWith
+        // consumes that body while delayed asset preparation is still running.
+        const offlineResponse = response.clone();
         const prepareOfflineCopy = (async () => {
-            if (await saleDocumentBuildAssetsReady(response)) {
-                await cache.put(request, response.clone());
+            if (await saleDocumentBuildAssetsReady(offlineResponse)) {
+                await cache.put(request, offlineResponse);
             }
         })().catch(() => {}); // Quota/storage failure leaves online billing usable.
         if (keepAlive) keepAlive(prepareOfflineCopy);

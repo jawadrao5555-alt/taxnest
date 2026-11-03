@@ -30,6 +30,9 @@ which exact request failed on the owner's PC remains separate field evidence.
   preparation. The document's own startup/error handling remains active.
 - Prepare offline assets and persist HTML under the real event lifetime with
   `waitUntil`; publish a copy only after its build resources are available.
+- Clone the offline response before returning live HTML, so browser consumption
+  cannot invalidate a later cache write. A native `Response` regression first
+  reproduced that body-used failure, then passed with independent ownership.
 - Cached HTML requires assets already in cache. Missing old hashes go directly
   to fresh HTML instead of probing obsolete resources before opening the screen.
 - Cross-origin required build resources do not silently qualify an incomplete
@@ -43,6 +46,7 @@ which exact request failed on the owner's PC remains separate field evidence.
 |---|---|---|
 | Valid PRA/FBR HTML, failed worker asset preparation | Online document opens; no unusable offline HTML | Actual worker-handler regression passes |
 | Slow optional asset fetch | Navigation resolves before that fetch | Deferred-promise regression passes |
+| Browser consumes live response before assets finish | Successful preparation still stores a readable offline copy | Native Response body-used regression passes |
 | Separate/mixed asset origins | Online remains usable; unverified offline copy rejected | Both variants pass |
 | Valid offline document and assets | Existing offline sale remains available | Existing worker smoke passes |
 | Obsolete hash or incomplete document | Fresh online copy or explicit offline/recovery response | Existing worker smoke passes |

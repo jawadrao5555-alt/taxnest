@@ -337,6 +337,28 @@ releaseAsset(assetResponse('', 503));
 await Promise.all(background);
 assert(!(await getStore(saleName).match('/pos/invoice/create')), 'stalled/failed preparation published offline HTML');
 
+// Once the browser consumes the live body, delayed offline preparation must
+// still own an unread copy. Native Response enforces the real body-used rule.
+cacheStores.clear();
+let releaseReadyAsset;
+const readyAsset = new Promise(resolve => { releaseReadyAsset = resolve; });
+networkHandler = async input => {
+  const path = new URL(input.url || input, ORIGIN).pathname;
+  return path.startsWith('/build/') ? readyAsset
+    : new Response(validHtml('pra', 'consumed-online-body'), {headers:{'content-type':'text/html'}});
+};
+const consumedBodyBackground = [];
+listeners.fetch({request:request('/pos/invoice/create'),
+  respondWith:value => { navigation = Promise.resolve(value); },
+  waitUntil:value => { consumedBodyBackground.push(Promise.resolve(value)); },resultingClientId:'body-used-smoke'});
+served = await navigation;
+assert((await served.text()).includes('consumed-online-body') && served.bodyUsed, 'live body was not consumed before offline preparation');
+releaseReadyAsset(assetResponse());
+await Promise.all(consumedBodyBackground);
+const preparedAfterConsumption = await getStore(saleName).match('/pos/invoice/create');
+assert(preparedAfterConsumption && (await preparedAfterConsumption.text()).includes('consumed-online-body'),
+  'successful delayed preparation lost offline HTML after the browser consumed the live body');
+
 // Explicit re-prime follows the same offline-readiness rule as navigation.
 cacheStores.clear();
 networkHandler = async input => {

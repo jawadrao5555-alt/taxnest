@@ -37,8 +37,10 @@ which exact request failed on the owner's PC remains separate field evidence.
   to fresh HTML instead of probing obsolete resources before opening the screen.
 - Cross-origin required build resources do not silently qualify an incomplete
   offline copy. Explicit re-prime uses the same validation as navigation.
-- Keep existing malformed-document rejection, login/logout separation, recovery
-  button, cache-storage failure tolerance and deferred service-worker activation.
+- Keep existing malformed-document rejection, login/logout separation,
+  cache-storage failure tolerance and deferred service-worker activation.
+- Repair Try again's inline handler: use `window.URL` explicitly because the
+  inline document scope exposes a string-valued `document.URL` first.
 
 ## Compatibility and acceptance
 
@@ -80,3 +82,17 @@ both variants use this service worker. No schema or Agent binary/version change.
 Pending: hosted browser/full required CI and original installed-PC retest after
 an owner-approved release. No merge, deployment, production access, blanket
 storage reset or physical-printer fix is claimed.
+
+## Hosted browser findings during draft review
+
+- The first fixture wrongly rejected all `sec-fetch-dest: empty` asset requests.
+  Chromium also uses that destination for forwarded page resources. Synthetic
+  request traces showed the worker's `cache:no-store` prefetch additionally sends
+  `Cache-Control: no-cache` and `Pragma: no-cache`; the fixture now fails only that
+  optional request and serves normal browser assets. Assertions remain enforced.
+- Run `41587786133` then passed the first PRA desktop online interaction,
+  unavailable/prepared offline navigation and obsolete-hash checks, but the real
+  Try again click raised **`URL is not a constructor`**. A local inline-document
+  scope regression reproduced the identical exception before the handler fix
+  and passed afterward. The complete four-case browser matrix still requires a
+  fresh run; the previous failed run is not acceptance for the new head.

@@ -453,6 +453,16 @@ for (const variant of ['pra', 'fbr']) {
 sandbox.caches.open = openCache;
 sandbox.caches.match = matchCache;
 assert(src.includes("searchParams.set('__tn_sale_recover','1')"), 'recovery retry must bypass the failed cached navigation');
+// Inline HTML handlers resolve document properties before window globals.
+// document.URL is a string: an unqualified `new URL(...)` breaks this button.
+const recoveryMarkup = vm.runInContext('SALE_RECOVERY_HTML', sandbox);
+const retryHandler = recoveryMarkup.match(/onclick="([^"]+)"/)[1];
+let retriedUrl;
+const retryLocation = {href:ORIGIN+'/pos/invoice/create',replace:value => { retriedUrl = value; }};
+vm.runInNewContext('with (document) { '+retryHandler+' }', {
+  URL,location:retryLocation,document:{URL:retryLocation.href},window:{URL,location:retryLocation},
+});
+assert(retriedUrl === ORIGIN+'/pos/invoice/create?__tn_sale_recover=1', 'real inline retry scope did not reach uncached recovery');
 
 // A successful offer edit must invalidate the baked PRA prices before the
 // operator returns to New Sale. Keep FBR and failed-save offline copies intact.

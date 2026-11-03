@@ -261,6 +261,10 @@ jobs:
           RC_BROWSER_STATE_ROOT=/tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }} \
             bash scripts/rc-playwright-install.sh
           node scripts/tests/local-browser-discovery-check.mjs
+      - name: Check online POS recovery with real service-worker navigation
+        env:
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs
       - name: Seed and verify authenticated Smart DI source import
         id: browser-preflight
         env:

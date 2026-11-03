@@ -72,6 +72,7 @@ const sandbox = {
   URL,
   Response: MockResponse,
   Headers: MockHeaders,
+  Request,
   fetch: async (request, init) => networkHandler(request, init),
   caches: {
     open: async (name) => getStore(name),
@@ -156,8 +157,15 @@ async function dispatchFetch(req) {
     waitUntil: (value) => { waits.push(Promise.resolve(value)); },
     resultingClientId: 'smoke-client',
   });
-  await Promise.allSettled(waits);
-  return responsePromise ? responsePromise : undefined;
+  const response = responsePromise ? await responsePromise : undefined;
+  // waitUntil may be extended while respondWith is still pending. Model the
+  // complete event lifetime before inspecting the asynchronously primed cache.
+  for (let count = 0; count < waits.length;) {
+    const batch = waits.slice(count);
+    count = waits.length;
+    await Promise.allSettled(batch);
+  }
+  return response;
 }
 
 async function dispatchMessage(data) {
@@ -278,6 +286,69 @@ networkHandler = async () => { throw new Error('offline with uncached build'); }
 served = await dispatchFetch(request('/pos/invoice/create'));
 assert(served.status === 503, 'offline stale HTML with a missing build asset did not return recovery');
 assert(!(await activeSaleCache.match('/pos/invoice/create')), 'stale HTML with a missing build asset was not evicted');
+
+// A healthy online document is usable even when the worker cannot prepare its
+// offline assets. Chromium loads the page's scripts/styles independently; an
+// optional prefetch failure must not replace that page with a 503 recovery card.
+for (const variant of ['pra', 'fbr']) {
+  const path = variant === 'pra' ? '/pos/invoice/create' : '/fbr-pos/create';
+  for (const assetMode of ['unavailable', 'different-origin', 'mixed-origin']) {
+    cacheStores.clear();
+    let body = validHtml(variant, 'online-' + assetMode).replaceAll(
+      '"/build/', assetMode === 'different-origin' ? '"https://assets.example.test/build/' : '"/build/');
+    if (assetMode === 'mixed-origin') body = body.replace('src="/build/', 'src="https://assets.example.test/build/');
+    networkHandler = async input => {
+      const url = new URL(typeof input === 'string' ? input : input.url, ORIGIN);
+      if (url.pathname.startsWith('/build/')) {
+        if (assetMode === 'unavailable') throw new Error('optional asset prefetch unavailable');
+        return assetResponse();
+      }
+      return htmlResponse(body, {variant, url:ORIGIN + path});
+    };
+    served = await dispatchFetch(request(path));
+    assert(served.status === 200 && (await served.text()).includes('online-' + assetMode),
+      variant + ' valid online document was replaced with recovery after ' + assetMode + ' asset preparation');
+    assert(!(await getStore(saleName).match(path)), 'unprepared assets were advertised as an offline-ready document');
+    networkHandler = async () => { throw new Error('offline'); };
+    served = await dispatchFetch(request(path));
+    assert(served.status === 503, 'unprepared online document was replayed during an outage');
+  }
+}
+
+// A stalled optional prefetch must not hold the navigation response open.
+cacheStores.clear();
+let releaseAsset;
+const pendingAsset = new Promise(resolve => { releaseAsset = resolve; });
+networkHandler = async input => {
+  const path = new URL(input.url || input, ORIGIN).pathname;
+  return path.startsWith('/build/') ? pendingAsset
+    : htmlResponse(validHtml('pra', 'delayed-assets'), {variant:'pra',url:ORIGIN+path});
+};
+const background = [];
+let navigation;
+listeners.fetch({request:request('/pos/invoice/create'),
+  respondWith:value => { navigation = Promise.resolve(value); },
+  waitUntil:value => { background.push(Promise.resolve(value)); },resultingClientId:'delayed-smoke'});
+let deadline;
+served = await Promise.race([navigation, new Promise(resolve => { deadline = setTimeout(() => resolve(null), 1000); })]);
+clearTimeout(deadline);
+assert(served?.status === 200 && (await served.text()).includes('delayed-assets'), 'online navigation waited for stalled offline preparation');
+releaseAsset(assetResponse('', 503));
+await Promise.all(background);
+assert(!(await getStore(saleName).match('/pos/invoice/create')), 'stalled/failed preparation published offline HTML');
+
+// Explicit re-prime follows the same offline-readiness rule as navigation.
+cacheStores.clear();
+networkHandler = async input => {
+  const path = new URL(input.url || input, ORIGIN).pathname;
+  if (path.startsWith('/build/')) return assetResponse('', 503);
+  const variant = path.startsWith('/fbr-pos') ? 'fbr' : 'pra';
+  return htmlResponse(validHtml(variant, 'unprepared-prime'), {variant,url:ORIGIN+path});
+};
+await dispatchMessage({type:'TN_PRIME_SALE_CACHE'});
+for (const path of ['/pos/invoice/create','/fbr-pos/create']) {
+  assert(!(await getStore(saleName).match(path)), 'prime message stored a document without working offline assets');
+}
 
 // 8. Waiter tablet page (Sep 2026): NETWORK-FIRST with an offline fallback to
 // the last validated copy; login redirects pass through and evict; query

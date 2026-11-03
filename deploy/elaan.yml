@@ -1,7 +1,6 @@
-title: "PRA reports aur printing mein behtari"
+title: "Open POS par sale screen kholne mein behtari"
 audience: pos
 type: improvement
 points:
-  - "Reprint pehle preview kholta hai; print ke liye Print dabayen."
-  - "Day Close report PDF ya Thermal mein kholain; Sales aur reports mein tafseel saaf groups mein dekhein."
-  - "Dashboard ki raqam aur orders se usi din ki tafseel khol sakte hain."
+  - "Internet par sale screen mil jaye to offline copy tayar hone ka intezar nahi karna parta."
+  - "Screen par Try again aaye to usay dabakar dobara khol sakte hain."

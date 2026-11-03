@@ -1,7 +1,6 @@
-title: "PRA POS ke saath DI Sandbox aur Production setup"
+title: "Open POS par sale screen kholne mein behtari"
 audience: pos
 type: improvement
 points:
-  - "Company owner Receipt Settings mein PRA + FBR Digital Invoice · Connection setup khol sakta hai."
-  - "Sandbox mein applicable scenarios test karein; FBR se production token milne par alag token save karke Production select karein."
-  - "Bill review karke khud submit karein. Mode badalne se purani invoices dobara send nahi hotin aur dono environments ka record alag rehta hai."
+  - "Internet par sale screen mil jaye to offline copy tayar hone ka intezar nahi karna parta."
+  - "Screen par Try again aaye to usay dabakar dobara khol sakte hain."

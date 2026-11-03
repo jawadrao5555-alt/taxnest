@@ -31,9 +31,10 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
     if (url.pathname.startsWith('/build/')) {
       if (assetRequests.length < 40) assetRequests.push({path:url.pathname,destination:req.headers['sec-fetch-dest'],cache:req.headers['cache-control'],pragma:req.headers.pragma});
       if (url.pathname.includes('obsolete')) oldAssetRequests++;
-      // Exercise the distinct browser resource load and worker prefetch. Only
-      // the optional empty-destination prefetch fails; the online assets work.
-      if (req.headers['sec-fetch-dest'] === 'empty') {
+      // Chromium also gives forwarded browser requests an empty destination.
+      // The optional prefetch alone uses cache:no-store and sends no-cache;
+      // ordinary forwarded script/style requests must remain usable online.
+      if (req.headers['sec-fetch-dest'] === 'empty' && req.headers['cache-control'] === 'no-cache' && req.headers.pragma === 'no-cache') {
         assetProbes++;
         firstProbeSeen = true;
         res.writeHead(503, {'Content-Type':'text/plain'});
@@ -99,8 +100,7 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
         // An unprepared online document must not be offered during an outage.
         await context.setOffline(true);
         await page.goto(base + salePath);
-        assert.match(await page.locator('body').innerText(), /You're Offline|Sale screen needs a fresh copy/);
-        await context.setOffline(false);
+        assert.match(await page.locator('body').innerText(), /You're Offline/);
 
         // A stale document with missing old hashes must go straight to fresh
         // HTML, without blocking navigation on an old asset network probe.
@@ -110,7 +110,9 @@ test('actual POS service worker opens online PRA/FBR despite failed offline pref
           await (await caches.open(key)).put(path, new Response(body, {headers:{'Content-Type':'text/html','X-TaxNest-Sale-Document':variant}}));
         }, {path:salePath,body:saleHtml(variant,'obsolete'),variant});
         const obsoleteBefore = oldAssetRequests;
-        await page.goto(base + salePath);
+        // The real offline screen reloads on the online event. Observe that
+        // navigation instead of racing it with another goto/evaluate call.
+        await Promise.all([page.waitForNavigation({waitUntil:'load'}), context.setOffline(false)]);
         await page.waitForFunction(() => document.querySelector('[data-ready]')?.textContent === 'Sale ready');
         assert.equal(oldAssetRequests, obsoleteBefore, 'stale offline assets were fetched before fresh online HTML');
 

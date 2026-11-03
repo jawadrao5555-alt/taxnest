@@ -540,4 +540,30 @@ class PraDiSandboxTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public static function displayedSellerIds(): array
+    {
+        return [['1234567-8', '1234567'], ['12345-1234567-1', '1234512345671']];
+    }
+
+    #[DataProvider('displayedSellerIds')]
+    public function test_seller_display_format_is_normalized_without_changing_company_identity(string $stored, string $expected): void
+    {
+        $this->company->forceFill(['ntn' => $stored])->saveQuietly();
+        $record = $this->record();
+        $payload = $this->payload($record);
+        $this->assertSame($stored, $record->snapshot['seller_ntn']);
+        $this->assertSame($expected, $payload['sellerNTNCNIC']);
+        $this->service->prepare($this->company->id, $record->id, $payload);
+        $this->assertSame($stored, $this->company->fresh()->ntn);
+        Http::assertNothingSent();
+    }
+
+    public function test_malformed_seller_identifier_is_not_silently_truncated(): void
+    {
+        $this->company->forceFill(['ntn' => '123456789'])->saveQuietly();
+        $record = $this->record();
+        $this->expectException(ValidationException::class);
+        $this->service->prepare($this->company->id, $record->id, $this->payload($record));
+    }
+
 }

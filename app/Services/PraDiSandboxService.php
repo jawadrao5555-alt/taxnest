@@ -45,6 +45,7 @@ class PraDiSandboxService
                 'state' => 'draft', 'attempts' => [],
                 'snapshot' => [
                     'company_name' => $company->name, 'seller_ntn' => $company->ntn,
+                    'seller_fbr_id' => $this->sellerIdentity($company->fbr_registration_no ?: $company->ntn),
                     'seller_address' => $company->address, 'seller_province' => $company->province,
                     'invoice_number' => $sale->invoice_number, 'date' => $sale->created_at->format('Y-m-d'),
                     'transaction_type' => $sale->transaction_type ?? 'sale',
@@ -64,7 +65,7 @@ class PraDiSandboxService
         $s = $record->snapshot;
         return [
             'invoiceType' => $s['transaction_type'] === 'return' ? 'Debit Note' : 'Sale Invoice',
-            'invoiceDate' => $s['date'], 'sellerNTNCNIC' => $s['seller_ntn'] ?? '',
+            'invoiceDate' => $s['date'], 'sellerNTNCNIC' => $s['seller_fbr_id'] ?? $this->sellerIdentity($s['seller_ntn'] ?? ''),
             'sellerBusinessName' => $s['company_name'], 'sellerProvince' => $s['seller_province'] ?? '',
             'sellerAddress' => $s['seller_address'] ?? '', 'buyerNTNCNIC' => '',
             'buyerBusinessName' => 'Fictional walk-in customer', 'buyerProvince' => '',
@@ -140,6 +141,16 @@ class PraDiSandboxService
     private function locked(int $companyId, int $id): PosDiSandboxSubmission
     {
         return PosDiSandboxSubmission::where('company_id', $companyId)->whereKey($id)->lockForUpdate()->firstOrFail();
+    }
+
+    private function sellerIdentity(?string $value): string
+    {
+        $value = trim($value ?? '');
+        // Recognize explicit display formats only. Never truncate an unknown
+        // identifier into a different seller; validation rejects malformed IDs.
+        if (preg_match('/^([0-9]{7})-[0-9]$/', $value, $match)) return $match[1];
+        if (preg_match('/^[0-9]{5}-[0-9]{7}-[0-9]$/', $value)) return str_replace('-', '', $value);
+        return $value;
     }
 
     private function validatePayload(PosDiSandboxSubmission $record, array $p): void

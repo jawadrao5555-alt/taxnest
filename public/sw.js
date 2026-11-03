@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-pra-di-pilot-20261103-r1'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-sale-online-recovery-20261103-r2'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -60,7 +60,7 @@ const STATIC_ASSETS = [
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Offline</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#059669,#047857);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;color:#fff}.box{text-align:center;background:rgba(255,255,255,.08);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:50px 40px;max-width:420px;box-shadow:0 25px 60px rgba(0,0,0,.3)}.ico{font-size:64px;margin-bottom:20px}h1{font-size:28px;margin-bottom:10px;font-weight:700}.sub{opacity:.85;font-size:15px;margin-bottom:30px;line-height:1.6}.status{background:rgba(0,0,0,.2);padding:16px;border-radius:12px;border-left:4px solid #fbbf24;text-align:left;font-size:14px}.btn{margin-top:24px;display:inline-block;background:#fff;color:#059669;padding:12px 28px;border-radius:10px;font-weight:600;text-decoration:none;border:none;cursor:pointer;font-size:15px}</style></head><body><div class="box"><div class="ico">📡</div><h1>You're Offline</h1><p class="sub">Internet connection nahi hai. Cached pages khol sakte hain — ya net wapas aane par auto-reload hoga.</p><div class="status"><strong>Tip:</strong> Net aate hi yeh page khud refresh ho jayega.</div><button class="btn" onclick="location.reload()">Try Again</button></div><script>window.addEventListener('online',()=>location.reload());setInterval(()=>{if(navigator.onLine)location.reload()},5000)</script></body></html>`;
-const SALE_RECOVERY_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Sale Screen Recovery</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f8fafc;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.box{max-width:440px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:34px;box-shadow:0 18px 42px rgba(15,23,42,.11)}h1{font-size:21px;margin:0 0 10px}p{color:#64748b;line-height:1.55;margin:0 0 22px}button{border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;padding:12px 22px;font-size:15px;cursor:pointer}</style></head><body><main class="box"><h1>Sale screen needs a fresh copy</h1><p>The saved screen was incomplete, so it was not opened. Check the internet connection and try again.</p><button onclick="var u=new URL(location.href);u.searchParams.set('__tn_sale_recover','1');location.replace(u.href)">Try again</button></main></body></html>`;
+const SALE_RECOVERY_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Sale Screen Recovery</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f8fafc;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.box{max-width:440px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:34px;box-shadow:0 18px 42px rgba(15,23,42,.11)}h1{font-size:21px;margin:0 0 10px}p{color:#64748b;line-height:1.55;margin:0 0 22px}button{border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;padding:12px 22px;font-size:15px;cursor:pointer}</style></head><body><main class="box"><h1>Sale screen needs a fresh copy</h1><p>The saved screen was incomplete, so it was not opened. Check the internet connection and try again.</p><button onclick="var u=new window.URL(window.location.href);u.searchParams.set('__tn_sale_recover','1');window.location.replace(u.href)">Try again</button></main></body></html>`;
 
 function saleDocumentLooksLikeLogin(response) {
     try {
@@ -89,15 +89,14 @@ async function saleDocumentBuildAssetsReady(response, allowNetwork = true) {
     if (!response || !response.ok) return false;
     try {
         const html = await response.clone().text();
-        const paths = [...new Set(
-            [...html.matchAll(/(?:src|href)=["']([^"']*\/build\/[^"'?#]+(?:\?[^"']*)?)["']/gi)]
-                .map(match => new URL(match[1], location.origin))
-                .filter(url => url.origin === location.origin)
-                .map(url => url.href)
-        )];
+        const urls = [...html.matchAll(/(?:src|href)=["']([^"']*\/build\/[^"'?#]+(?:\?[^"']*)?)["']/gi)]
+            .map(match => new URL(match[1], location.origin));
         // Every current authenticated shell is emitted by @vite. No build
         // references means this is not a production-compatible sale document.
-        if (!paths.length) return false;
+        // Cross-origin build assets can work online, but this worker has no
+        // verified offline copy of them. Do not silently ignore a required file.
+        if (!urls.length || urls.some(url => url.origin !== location.origin)) return false;
+        const paths = [...new Set(urls.map(url => url.href))];
 
         let staticCache;
         try { staticCache = await caches.open(STATIC_CACHE); } catch (_) {}
@@ -130,24 +129,36 @@ async function isValidCachedSaleDocument(response, variant) {
     // universal view. Network writes still undergo the body-marker validation
     // below before cache.put(), so this fast header check is safe and avoids
     // decoding a multi-megabyte catalogue twice on every cache-first open.
+    // Missing cached assets go straight to fresh HTML; probing old asset hashes
+    // over the network first can block an otherwise healthy online navigation.
     if ((response.headers.get(SALE_DOCUMENT_HEADER) || '') === variant) {
-        return saleDocumentBuildAssetsReady(response);
+        return saleDocumentBuildAssetsReady(response, false);
     }
     // One-time upgrade path for a cache written by an older worker: accept it
     // only if the new structural markers are really present.
     return (await isValidSaleDocument(response, variant))
-        && saleDocumentBuildAssetsReady(response);
+        && saleDocumentBuildAssetsReady(response, false);
 }
 
-async function fetchSaleDocument(request, cache, variant) {
+async function fetchSaleDocument(request, cache, variant, keepAlive) {
     const response = await fetch(request);
-    const valid = await isValidSaleDocument(response, variant)
-        && await saleDocumentBuildAssetsReady(response);
+    const valid = await isValidSaleDocument(response, variant);
     if (valid) {
-        try { await cache.put(request, response.clone()); } catch (_) {
-            // Cache persistence is optional while online. Existing validated
-            // offline copies remain untouched if this write cannot complete.
-        }
+        // The live HTML and its offline copy have different readiness rules.
+        // A separate asset prefetch may fail/hang even though Chromium can load
+        // the document's scripts/styles normally (including an asset origin).
+        // Never replace valid online HTML with the offline recovery card or
+        // delay showing it while preparing the next offline start.
+        // Own a separate body before returning the live response: respondWith
+        // consumes that body while delayed asset preparation is still running.
+        const offlineResponse = response.clone();
+        const prepareOfflineCopy = (async () => {
+            if (await saleDocumentBuildAssetsReady(offlineResponse)) {
+                await cache.put(request, offlineResponse);
+            }
+        })().catch(() => {}); // Quota/storage failure leaves online billing usable.
+        if (keepAlive) keepAlive(prepareOfflineCopy);
+        else await prepareOfflineCopy;
     }
     return { response, valid };
 }
@@ -264,7 +275,7 @@ self.addEventListener('fetch', e => {
                 try { await c.delete(req); } catch (_) {}
                 cached = undefined;
             }
-            const network = () => fetchSaleDocument(req, c, variant);
+            const network = () => fetchSaleDocument(req, c, variant, work => e.waitUntil(work));
             // Chrome marks a hard refresh as cache:'reload'. Some terminals send
             // Cache-Control:no-cache instead, so honor that signal too. A live
             // document always wins; a broken 5xx/network result safely falls back
@@ -285,12 +296,12 @@ self.addEventListener('fetch', e => {
                 }
             }
             if (cached) {
-                network().then(fresh => {
+                e.waitUntil(network().then(fresh => {
                     // A background auth redirect means this session is no longer
                     // usable. Delete the personal document immediately; its own
                     // boot check will redirect the already-open page to login.
-                    if (saleDocumentLooksLikeLogin(fresh.response)) c.delete(req);
-                }).catch(() => {}); // background revalidate — cache updated for next boot
+                    if (saleDocumentLooksLikeLogin(fresh.response)) return c.delete(req);
+                }).catch(() => {})); // Keep the cache refresh alive after navigation.
                 return cached;
             }
             try {
@@ -526,8 +537,9 @@ self.addEventListener('message', e => {
                     const cached = await c.match(u);
                     if (cached && await isValidCachedSaleDocument(cached, SALE_DOCUMENT_MARKERS[u])) return;
                     if (cached) await c.delete(u);
-                    const res = await fetch(u, { credentials: 'same-origin' });
-                    if (await isValidSaleDocument(res, SALE_DOCUMENT_MARKERS[u])) await c.put(u, res.clone());
+                    await fetchSaleDocument(new Request(new URL(u, location.origin), {
+                        credentials: 'same-origin'
+                    }), c, SALE_DOCUMENT_MARKERS[u]);
                 }));
             } catch (err) { /* best-effort — normal second-load prime still applies */ }
         })());

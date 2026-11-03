@@ -1,6 +1,8 @@
-title: "Open POS par sale screen kholne mein behtari"
+title: "Tax Integrations — PRA, FBR POS aur Digital Invoice ki aik jagah settings"
 audience: pos
 type: improvement
 points:
-  - "Internet par sale screen mil jaye to offline copy tayar hone ka intezar nahi karna parta."
-  - "Screen par Try again aaye to usay dabakar dobara khol sakte hain."
+  - "Customize POS mein PRA Compliance ka naya naam Tax Integrations hai. PRA POS, FBR POS aur Digital Invoice ki settings yahan hain; receipt settings mein sirf receipt ke options hain."
+  - "Digital Invoice ke FBR details, Sandbox URL/token aur Production URL/token alag save karein. FBR POS ke dono environments ke POS IDs aur credentials bhi alag hain."
+  - "Required federal integration select karein. Aik completed bill ko review karke manual submit karein. Setup save karne se invoice nahi bheji jati."
+  - "Local FBR IMS ke liye designated shop PC par updated Desktop Agent v1.13.30 aur sahi FBR IMS component zaroori hai."

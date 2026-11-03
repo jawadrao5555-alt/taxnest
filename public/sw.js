@@ -423,7 +423,7 @@ self.addEventListener('fetch', e => {
     // a runtime-cached copy would survive logout and could show the NEXT user a
     // previous shop's stock. Network-only, like every other authenticated
     // stock/settings screen.
-    const skipPatterns = ['/pos/di-sandbox', '/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter/', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/return', '/pos/restaurant/tables', '/track/', '/fbr-pos/pharmacy/', ...SETTINGS_PAGES];
+    const skipPatterns = ['/pos/tax-integrations', '/pos/di-sandbox', '/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter/', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/return', '/pos/restaurant/tables', '/track/', '/fbr-pos/pharmacy/', ...SETTINGS_PAGES];
     // '/pos/waiter/' above covers the waiter API + sub-pages; the bare page with a
     // query string (not handled by the WAITER_CACHE block) stays network-only too.
     if (url.pathname === WAITER_PAGE || skipPatterns.some(p => url.pathname.includes(p))) return;

@@ -5,9 +5,6 @@
         {{ __('pos.back_to_customize') }}
     </a>
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ __('pos.receipt_display_options') }}</h1>
-    @if(\App\Support\PraDiSandboxGate::setupAvailable() && auth('pos')->user()?->isCompanyAdmin())
-    <a href="{{ route('pos.di-sandbox.setup') }}" class="inline-block mb-4 text-teal-700 underline">PRA + FBR Digital Invoice · Connection setup</a>
-    @endif
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{!! __('pos.receipt_display_sub_html', ['own' => '<span class="font-semibold text-gray-700 dark:text-gray-200">' . e(__('pos.own_word')) . '</span>']) !!}</p>
 
     @if(session('success'))

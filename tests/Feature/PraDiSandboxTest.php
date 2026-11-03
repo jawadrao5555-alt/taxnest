@@ -39,6 +39,8 @@ class PraDiSandboxTest extends TestCase
             $t->string('address')->default('Fictional test street'); $t->text('fbr_sandbox_token')->nullable();
             $t->text('fbr_production_token')->nullable(); $t->string('fbr_environment')->default('production');
             $t->string('fbr_sandbox_url')->nullable(); $t->string('fbr_connection_status')->nullable();
+            $t->string('fbr_registration_no')->nullable(); $t->string('fbr_business_name')->nullable();
+            $t->boolean('agent_enabled')->default(false);
             $t->softDeletes(); $t->timestamps();
         });
         Schema::create('users', function (Blueprint $t) {
@@ -69,6 +71,7 @@ class PraDiSandboxTest extends TestCase
         (require database_path('migrations/2026_11_02_120000_create_pos_di_sandbox_submissions_table.php'))->up();
         (require database_path('migrations/2026_11_03_100000_create_pos_di_sandbox_profiles_table.php'))->up();
         (require database_path('migrations/2026_11_03_120000_add_environments_to_pos_di_reporting.php'))->up();
+        (require database_path('migrations/2026_11_03_150000_create_pos_fbr_integration_evidence.php'))->up();
         $id = DB::table('companies')->insertGetId(['name' => 'Fictional Sandbox Shop',
             'fbr_sandbox_token' => Crypt::encryptString(self::TOKEN),
             'fbr_production_token' => Crypt::encryptString('NEVER-USE-THIS-PRODUCTION-TOKEN'),
@@ -723,6 +726,160 @@ class PraDiSandboxTest extends TestCase
         $p = $this->payload($record); $p['scenarioId'] = 'SN019';
         $this->expectException(ValidationException::class);
         $this->service->prepare($this->company->id, $record->id, $p);
+    }
+
+    private function imsProfile(string $environment='sandbox', string $mode='cloud'): \App\Models\PosImsProfile
+    {
+        PosDiSandboxProfile::where('company_id',$this->company->id)->update(['enabled'=>false]);
+        return \App\Models\PosImsProfile::updateOrCreate(['company_id'=>$this->company->id],[
+            'enabled'=>true,'environment'=>$environment,'connection_mode'=>$mode,
+            'sandbox_pos_id'=>'12345','production_pos_id'=>'54321','sandbox_token'=>'synthetic-ims-sandbox',
+            'production_token'=>'synthetic-ims-production','production_confirmed_at'=>now(),
+            'device_uid'=>'synthetic-device','local_ims_url'=>'http://127.0.0.1:8525/api/IMSFiscal/GetInvoiceNumberByModel']);
+    }
+    private function imsPayload($r): array
+    {
+        $p=app(\App\Services\PosImsReportingService::class)->template($r);
+        foreach($p['Items'] as &$l){ $l['PCTCode']='12345678';$l['TaxRate']=18;$l['TaxCharged']=round($l['SaleValue']*.18,2);$l['TotalAmount']=$l['SaleValue']+$l['TaxCharged']; } unset($l);
+        $p['TotalTaxCharged']=array_sum(array_column($p['Items'],'TaxCharged'));
+        $p['TotalBillAmount']=$p['TotalSaleValue']+$p['TotalTaxCharged'];return $p;
+    }
+    public function test_di_configuration_has_both_saved_urls_identity_and_correct_navigation(): void
+    {
+        $this->get('/pos/di-sandbox/setup')->assertOk()->assertSee('Sandbox API endpoint')->assertSee('Production API endpoint')
+            ->assertSee('FBR Registration No')->assertSee(route('pos.tax-integrations'),false)->assertDontSee('Back to receipt settings');
+        $token='configuration-test-secret';
+        $this->withSession(['_token'=>'csrf'])->post('/pos/di-sandbox/setup',[
+            '_token'=>'csrf','enabled'=>1,'environment'=>'sandbox','confirm_sandbox_setup'=>1,
+            'sandbox_token'=>$token,'sandbox_url'=>\App\Services\PosTaxIntegrationEndpoints::url('di','sandbox'),
+            'production_url'=>\App\Services\PosTaxIntegrationEndpoints::url('di','production'),
+            'fbr_registration_no'=>'7654321','fbr_business_name'=>'Synthetic federal identity',
+        ])->assertRedirect('/pos/di-sandbox/setup');
+        $profile=PosDiSandboxProfile::where('company_id',$this->company->id)->firstOrFail();
+        $this->assertSame($token,$profile->sandbox_token);
+        $this->assertSame('7654321',$this->company->fresh()->fbr_registration_no);
+        $this->get('/pos/di-sandbox/setup')->assertOk()->assertDontSee($token);
+        Http::fake();
+        $this->withSession(['_token'=>'csrf'])->post('/pos/di-sandbox/check',['_token'=>'csrf'])->assertSessionHas('success');
+        Http::assertNothingSent();
+        $this->withSession(['_token'=>'csrf'])->post('/pos/di-sandbox/setup',[
+            '_token'=>'csrf','enabled'=>0,'sandbox_url'=>'https://untrusted.invalid/leak','sandbox_token'=>'another-secret',
+        ])->assertSessionHasErrors('sandbox_url');
+        $this->assertSame($token,$profile->fresh()->sandbox_token);
+        $this->assertSame('7654321',$this->company->fresh()->fbr_registration_no);
+    }
+    public function test_ims_evidence_preserves_source_and_uses_only_ims_environment_credentials(): void
+    {
+        $this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);$bill=$this->bill('credit');
+        $before=DB::table('pos_transactions')->where('id',$bill)->first();
+        $r=$svc->capture($this->company,$bill,$this->owner->id,'sandbox');
+        $this->assertSame($r->id,$svc->capture($this->company,$bill,$this->owner->id,'sandbox')->id);
+        $this->assertNull($svc->template($r)['TotalTaxCharged']);
+        $p=$this->imsPayload($r);$this->assertSame(1,$p['PaymentMode']);
+        $svc->prepare($this->company->id,$r->id,$p);
+        Http::fake(fn()=>Http::response(['Code'=>'100','InvoiceNumber'=>'TEST-IMS-123456'],200));
+        $r=$svc->submit($this->company->id,$r->id,$this->owner->id);
+        $this->assertSame('accepted',$r->state);
+        Http::assertSent(fn($req)=>$req->url()===\App\Services\PosTaxIntegrationEndpoints::url('ims','sandbox') && $req->hasHeader('Authorization','Bearer synthetic-ims-sandbox') && !isset($req['scenarioId']));
+        $this->get('/pos/tax-integrations/fbr-pos/'.$r->id.'/receipt?width=58')->assertOk()->assertSee('SANDBOX TEST COPY')->assertSee('TEST-IMS-123456')->assertSee('TEST-PRA-ONLY');
+        $this->assertEquals($before,DB::table('pos_transactions')->where('id',$bill)->first());
+        $this->assertSame(0,DB::table('invoices')->count());$this->assertSame(0,DB::table('inventory_movements')->count());$this->assertSame(0,DB::table('customer_ledger')->count());
+        try{$svc->submit($this->company->id,$r->id,$this->owner->id);$this->fail('replay allowed');}catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        Http::assertSentCount(1);
+    }
+    public function test_ims_setup_encrypts_tokens_selects_one_federal_channel_and_preserves_pra_settings(): void
+    {
+        PosDiSandboxProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'sandbox_token'=>'preserved-di','updated_by'=>$this->owner->id]);
+        $original=$this->company->getAttributes();
+        $url='/pos/tax-integrations/fbr-pos/setup';
+        $data=['_token'=>'csrf','enabled'=>1,'environment'=>'sandbox','connection_mode'=>'cloud','sandbox_pos_id'=>'12345','sandbox_token'=>'private-ims-token','confirm_setup'=>1];
+        $this->withSession(['_token'=>'csrf'])->post($url,$data)->assertRedirect('/pos/tax-integrations/fbr-pos');
+        $p=\App\Models\PosImsProfile::where('company_id',$this->company->id)->firstOrFail();
+        $this->assertSame('private-ims-token',$p->sandbox_token);
+        $this->assertStringNotContainsString('private-ims-token',DB::table('pos_ims_profiles')->value('sandbox_token'));
+        $this->assertArrayNotHasKey('sandbox_token',$p->toArray());
+        $this->assertFalse(PosDiSandboxProfile::first()->enabled);$this->assertSame('preserved-di',PosDiSandboxProfile::first()->sandbox_token);
+        $this->assertEquals($original,$this->company->fresh()->getAttributes());
+        $this->get('/pos/tax-integrations/fbr-pos')->assertOk()->assertSee('Sandbox API endpoint')->assertDontSee('private-ims-token');
+        $data['environment']='production';$data['production_pos_id']='54321';$data['production_token']='private-production';
+        $this->withSession(['_token'=>'csrf'])->post($url,$data)->assertSessionHasErrors('confirm_production');
+        $this->assertSame('sandbox',$p->fresh()->environment);
+        $this->assertNull(session()->getOldInput('production_token'));
+        $data['confirm_production']=1;
+        $this->withSession(['_token'=>'csrf'])->post($url,$data)->assertRedirect('/pos/tax-integrations/fbr-pos');
+        $this->assertSame('production',$p->fresh()->environment);
+        $this->withSession(['_token'=>'csrf'])->post('/pos/di-sandbox/setup',['_token'=>'csrf','enabled'=>1,'environment'=>'sandbox','confirm_sandbox_setup'=>1])->assertRedirect('/pos/di-sandbox/setup');
+        $this->assertFalse($p->fresh()->enabled);$this->assertSame('private-production',$p->fresh()->production_token);
+    }
+    public function test_ims_uncertain_result_and_cross_channel_switch_cannot_duplicate_the_same_bill(): void
+    {
+        $this->imsProfile('production');$svc=app(\App\Services\PosImsReportingService::class);$bill=$this->bill();
+        $r=$svc->capture($this->company,$bill,$this->owner->id,'production');$svc->prepare($this->company->id,$r->id,$this->imsPayload($r));
+        Http::fake(fn()=>Http::response('',503));$r=$svc->submit($this->company->id,$r->id,$this->owner->id);
+        $this->assertSame('verification_required',$r->state);
+        $this->get('/pos/tax-integrations/fbr-pos/'.$r->id.'/receipt')->assertOk()->assertSee('PRODUCTION PREVIEW')->assertDontSee('alt="FBR IMS acknowledgement QR"',false);
+        \App\Models\PosImsProfile::query()->update(['enabled'=>false]);
+        $this->withSession(['_token'=>'pilot-csrf']);$this->productionPilot();
+        try{$this->service->capture($this->company,$bill,$this->owner->id,'production');$this->fail('cross-channel replay');}catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        Http::assertSentCount(1);
+    }
+    public function test_ims_local_device_claim_is_exclusive_and_callback_survives_disabling_reporting(): void
+    {
+        $p=$this->imsProfile('sandbox','fiscal_device');$svc=app(\App\Services\PosImsReportingService::class);$r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));Http::fake();
+        $svc->submit($this->company->id,$r->id,$this->owner->id);Http::assertNothingSent();
+        $claim=$svc->claim($this->company->id,'synthetic-device');$this->assertSame($r->id,$claim['id']);
+        $this->assertNull($svc->claim($this->company->id,'synthetic-device'));
+        $p->update(['enabled'=>false]);
+        $r=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],['Code'=>'100','InvoiceNumber'=>'LOCAL-IMS-123456']);
+        $this->assertSame('local_accepted',$r->state);
+        $same=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],['Code'=>'102']);
+        $this->assertSame('LOCAL-IMS-123456',$same->fiscal_number);
+        $this->get('/pos/tax-integrations/fbr-pos/'.$r->id.'/receipt')->assertOk()->assertSee('Central synchronization not independently verified.');
+    }
+    public function test_ims_rejects_wrong_tenant_device_stale_identity_and_unbalanced_mapping(): void
+    {
+        $p=$this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $payload=$this->imsPayload($r);$payload['Items'][0]['SaleValue']=99;
+        try{$svc->prepare($this->company->id,$r->id,$payload);$this->fail('tampered base');}catch(ValidationException $e){$this->assertArrayHasKey('payload_json',$e->errors());}
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));$p->update(['sandbox_pos_id'=>'999']);
+        try{$svc->submit($this->company->id,$r->id,$this->owner->id);$this->fail('stale identity');}catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        $other=Company::create(['name'=>'Other synthetic tenant','ntn'=>'1111111']);$this->owner->update(['company_id'=>$other->id]);
+        $this->getJson('/pos/tax-integrations/fbr-pos/'.$r->id)->assertNotFound();
+        $this->owner->update(['company_id'=>$this->company->id,'role'=>'employee','pos_role'=>'pos_cashier']);
+        $this->getJson('/pos/tax-integrations/fbr-pos')->assertForbidden();
+        Http::assertNothingSent();
+    }
+    public function test_ims_returns_require_same_environment_original_acknowledgement(): void
+    {
+        $this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);$bill=$this->bill();
+        $parent=$svc->capture($this->company,$bill,$this->owner->id,'sandbox');$parent->update(['state'=>'accepted','fiscal_number'=>'ORIGINAL-IMS-123456']);
+        $ret=$svc->capture($this->company,$this->bill('cash',['transaction_type'=>'return','parent_transaction_id'=>$bill]),$this->owner->id,'sandbox');
+        $p=$this->imsPayload($ret);$p['RefUSIN']='WRONG-123456';$p['Items'][0]['RefUSIN']=$p['RefUSIN'];
+        try{$svc->prepare($this->company->id,$ret->id,$p);$this->fail('wrong parent');}catch(ValidationException $e){$this->assertArrayHasKey('payload_json',$e->errors());}
+        $p['RefUSIN']=$parent->fiscal_number;$p['Items'][0]['RefUSIN']=$p['RefUSIN'];
+        $this->assertSame('draft',$svc->prepare($this->company->id,$ret->id,$p)->state);
+    }
+
+    public function test_ims_connection_recovery_preserves_financial_snapshot_and_blocks_uncertain_replays(): void
+    {
+        $profile=$this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $s=$r->snapshot;$svc->prepare($this->company->id,$r->id,$this->imsPayload($r));
+        Http::fake(fn()=>Http::response(['Code'=>'112','Response'=>'Synthetic explicit rejection'],200));
+        $r=$svc->submit($this->company->id,$r->id,$this->owner->id);$this->assertSame('rejected',$r->state);
+        $profile->update(['connection_mode'=>'fiscal_device']);
+        $r=$svc->refreshConnection($this->company->id,$r->id,$this->owner->id);
+        $this->assertSame($s,$r->snapshot);$this->assertSame('fiscal_device',$r->connection_mode);$this->assertNull($r->payload);
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));$svc->submit($this->company->id,$r->id,$this->owner->id);
+        // A queued, never dispatched request can be withdrawn for fresh review.
+        $r=$svc->refreshConnection($this->company->id,$r->id,$this->owner->id);$this->assertSame('draft',$r->state);
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));$svc->submit($this->company->id,$r->id,$this->owner->id);
+        $claim=$svc->claim($this->company->id,'synthetic-device');
+        try{$svc->refreshConnection($this->company->id,$r->id,$this->owner->id);$this->fail('uncertain replay allowed');}catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        $this->assertSame($claim['claim'],\App\Models\PosImsSubmission::findOrFail($r->id)->agent_claim);
+        Http::assertSentCount(1);
     }
 
 }

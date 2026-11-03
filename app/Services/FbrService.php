@@ -39,7 +39,8 @@ class FbrService
     public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId): array
     {
         \App\Support\PraDiSandboxGate::enforce($companyId, $environment);
-        $url = $environment === 'production' ? self::PRODUCTION_POST_URL : self::SANDBOX_POST_URL;
+        $profile = $companyId ? \App\Models\PosDiSandboxProfile::where('company_id', $companyId)->first() : null;
+        $url = PosTaxIntegrationEndpoints::checked('di', $environment, $profile?->{$environment.'_url'});
         $unknown = ['state' => 'verification_required', 'reference' => null, 'error_codes' => []];
         try {
             // Fixed environment endpoint; no overrides, redirects or automatic retry.

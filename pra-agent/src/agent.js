@@ -6,6 +6,7 @@ const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintP
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 const { replayCallbacks } = require('./callback-retry-policy');
 const { parseFiscalResult } = require('./fiscal-result');
+const syncAlongsideIms = require('./pra-ims-bridge').createBridge({ axios, log: (...args) => log(...args) });
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -407,6 +408,7 @@ async function syncOnce() {
   syncInFlight = true;
   try {
     await syncOnceInner();
+    await syncAlongsideIms(currentConfig);
   } finally {
     syncInFlight = false;
   }

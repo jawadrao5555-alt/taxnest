@@ -16,6 +16,8 @@ final class PraDiSandboxGate
         $profile = PosDiSandboxProfile::where('company_id', $companyId)->first();
         if (!$profile) return self::localAvailable() && $environment !== 'production';
         if (!$profile->enabled) return false;
+        if (\Illuminate\Support\Facades\Schema::hasTable('pos_ims_profiles')
+            && \App\Models\PosImsProfile::where('company_id', $companyId)->where('enabled', true)->exists()) return false;
         $selected = $profile->environment ?? 'sandbox';
         if (!in_array($selected, ['sandbox', 'production'], true)) return false;
         if ($environment !== null && $selected !== $environment) return false;
@@ -39,7 +41,13 @@ final class PraDiSandboxGate
 
     public static function setupAvailable(): bool
     {
-        return self::localAvailable() || self::hostedAvailable();
+        // CI browser fixture: exact disposable MariaDB socket/database and external fiscal egress disabled.
+        $db=DB::connection()->getConfig();
+        $rc=app()->environment('rc-browser') && env('TAXNEST_RC_NO_EXTERNAL_FISCAL') === '1'
+            && ($db['driver'] ?? '') === 'mysql' && ($db['database'] ?? '') === 'taxnest_rc_browser'
+            && ($db['host'] ?? '') === '127.0.0.1' && empty($db['url'])
+            && preg_match('~^/tmp/taxnest-rc-mariadb-browser-[0-9]+/run/mariadb\.sock$~',$db['unix_socket'] ?? '');
+        return self::localAvailable() || self::hostedAvailable() || (bool)$rc;
     }
 
     private static function localAvailable(): bool

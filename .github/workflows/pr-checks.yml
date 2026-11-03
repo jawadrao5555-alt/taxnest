@@ -267,6 +267,14 @@ jobs:
         env:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: bash scripts/rc-safe-run -- env PLAYWRIGHT_BROWSERS_PATH="$RC_BROWSER_STATE_ROOT/playwright-cache" node --test scripts/tests/sale-online-recovery-browser.test.mjs
+      - name: Verify Tax Integrations at desktop and 390px mobile
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: |
+          bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
       - name: Seed and verify authenticated Smart DI source import
         id: browser-preflight
         env:
@@ -274,7 +282,6 @@ jobs:
           RC_BROWSER_PORT: '5911'
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
-          bash scripts/rc-browser-fixture.sh setup
           RC_BROWSER_ONLY=whatsapp-optional-autosend bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=survey-pos,survey-di,survey-fbrpos,survey-erps,customer-bulk-navigation bash scripts/rc-browser-fixture.sh run

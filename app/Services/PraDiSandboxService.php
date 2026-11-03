@@ -25,6 +25,7 @@ class PraDiSandboxService
             abort_if(($expectedEnvironment !== null && $expectedEnvironment !== $environment)
                 || ($environment === 'production' && $expectedEnvironment !== 'production'), 409,
                 'DI environment changed. Refresh and explicitly confirm the intended environment.');
+            if (\Illuminate\Support\Facades\Schema::hasTable('pos_ims_submissions')) PosImsReportingService::preventOtherFederalRecord($company->id, $transactionId, $environment, 'di');
             $sale = PosTransaction::where('company_id', $company->id)->whereKey($transactionId)
                 ->lockForUpdate()->firstOrFail();
             abort_unless($sale->status === 'completed', 422, 'Only completed sales or returns can be prepared.');
@@ -33,36 +34,11 @@ class PraDiSandboxService
                 ->where('source_transaction_id', $sale->id)->where('environment', $environment)->first();
             if ($existing) return $existing;
 
-            $lines = $sale->items()->orderBy('id')->get()->map(function ($line) {
-                if ($line->taxable_base === null || $line->exempt_base === null || $line->tax_amount === null) {
-                    throw ValidationException::withMessages(['transaction_id' => 'Stored line tax snapshots are missing. Legacy amounts will not be guessed.']);
-                }
-                return [
-                    'name' => $line->item_name, 'quantity' => (float) $line->quantity,
-                    'base' => round((float) $line->taxable_base + (float) $line->exempt_base, 2),
-                    'pra_tax' => (float) $line->tax_amount,
-                ];
-            })->values()->all();
-            abort_if(!$lines, 422, 'The sale has no lines.');
-
             return PosDiSandboxSubmission::create([
                 'company_id' => $company->id, 'source_transaction_id' => $sale->id,
                 'branch_id' => $sale->branch_id, 'created_by' => $actorId,
                 'state' => 'draft', 'attempts' => [], 'environment' => $environment,
-                'snapshot' => [
-                    'company_name' => $company->name, 'seller_ntn' => $company->ntn,
-                    'seller_fbr_name' => $company->fbr_business_name ?: $company->name,
-                    'seller_fbr_id' => $this->sellerIdentity($company->fbr_registration_no ?: $company->ntn),
-                    'seller_address' => $company->address, 'seller_province' => $company->province,
-                    'invoice_number' => $sale->invoice_number, 'date' => $sale->created_at->format('Y-m-d'),
-                    'transaction_type' => $sale->transaction_type ?? 'sale',
-                    'parent_transaction_id' => $sale->parent_transaction_id,
-                    'subtotal' => (float) $sale->subtotal, 'discount' => (float) $sale->discount_amount,
-                    'pra_tax' => (float) $sale->tax_amount, 'total' => (float) $sale->total_amount,
-                    'payment_method' => $sale->payment_method,
-                    'pra_status' => $sale->pra_status, 'pra_number' => $sale->pra_invoice_number,
-                    'lines' => $lines,
-                ],
+                'snapshot' => PosFiscalSnapshot::capture($company, $sale),
             ]);
         });
     }
@@ -118,6 +94,7 @@ class PraDiSandboxService
             $record = $this->locked($companyId, $id);
             $environment = $record->reportingEnvironment();
             PraDiSandboxGate::enforce($companyId, $environment);
+            if (\Illuminate\Support\Facades\Schema::hasTable('pos_ims_submissions')) PosImsReportingService::preventOtherFederalRecord($companyId, $record->source_transaction_id, $environment, 'di');
             $profile = PosDiSandboxProfile::where('company_id', $companyId)->first();
             $token = $profile ? (string) $profile->{$environment.'_token'}
                 : ($environment === 'sandbox' && !PraDiSandboxGate::hostedAvailable()

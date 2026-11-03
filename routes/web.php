@@ -869,11 +869,24 @@ Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function
 });
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
+    Route::get('/tax-integrations', [\App\Http\Controllers\PosTaxIntegrationController::class,'index'])->name('pos.tax-integrations');
+    Route::prefix('tax-integrations/fbr-pos')->name('pos.tax-integrations.ims')->controller(\App\Http\Controllers\PosTaxIntegrationController::class)->group(function(){
+        Route::get('/', 'ims');
+        Route::post('/setup', 'saveIms')->middleware('throttle:6,1')->name('.save');
+        Route::post('/capture', 'capture')->name('.capture');
+        Route::get('/{id}', 'show')->whereNumber('id')->name('.show');
+        Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('.prepare');
+        Route::post('/{id}/connection', 'refreshConnection')->whereNumber('id')->name('.connection');
+        Route::post('/{id}/submit', 'submit')->whereNumber('id')->middleware('throttle:6,1')->name('.submit');
+        Route::get('/{id}/receipt', 'receipt')->whereNumber('id')->name('.receipt');
+    });
+
     // Explicit company opt-in; fixed sandbox destination, owner + CSRF checks.
     Route::prefix('di-sandbox')->name('pos.di-sandbox.')->controller(\App\Http\Controllers\PraDiSandboxController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/setup', 'setup')->name('setup');
         Route::post('/setup', 'saveSetup')->middleware('throttle:6,1')->name('setup.save');
+        Route::post('/check', 'check')->middleware('throttle:6,1')->name('check');
         Route::post('/capture', 'capture')->name('capture');
         Route::get('/{id}', 'show')->whereNumber('id')->name('show');
         Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('prepare');
@@ -3006,6 +3019,8 @@ Route::prefix('api/live-ops/v1')->middleware(['throttle:30,1'])->withoutMiddlewa
 // agent.auth so unauthenticated floods are bounded too. The v2 group below
 // keeps its own per-route throttles and is NOT double-wrapped.
 Route::prefix('api/agent')->middleware(['throttle:agent-api', 'agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {
+    Route::post('/pra-fbr-ims/claim', [\App\Http\Controllers\PosTaxIntegrationController::class,'agentClaim']);
+    Route::post('/pra-fbr-ims/result', [\App\Http\Controllers\PosTaxIntegrationController::class,'agentResult']);
     // Local realtime gateway credential exchange; deliberately sessionless.
     Route::get('/realtime-auth', [\App\Http\Controllers\AgentController::class, 'realtimeAuth']);
     Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);

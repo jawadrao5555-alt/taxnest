@@ -271,6 +271,7 @@ jobs:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=whatsapp-optional-autosend bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=admin-dashboard-details bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=survey-pos,survey-di,survey-fbrpos,survey-erps,customer-bulk-navigation bash scripts/rc-browser-fixture.sh run

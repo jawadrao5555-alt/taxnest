@@ -42,6 +42,16 @@ class PraDiSandboxController extends Controller
             ->header('Cache-Control', 'no-store, private');
     }
 
+    public function check(Request $request)
+    {
+        $company=$this->company($request,true);
+        $profile=PosDiSandboxProfile::where('company_id',$company->id)->first();
+        $env=$profile?->environment ?? 'sandbox';
+        if (!$profile || !$profile->{$env.'_token'}) return back()->with('error','No token saved for '.$env.'. Save the configuration first.');
+        \App\Services\PosTaxIntegrationEndpoints::checked('di',$env,$profile->{$env.'_url'});
+        return back()->with('success','Saved '.$env.' token and official endpoint are configured. This local check does not validate the token with FBR. Open scenario testing to submit a reviewed test invoice.');
+    }
+
     public function saveSetup(Request $request)
     {
         // Strip both credentials before validation can flash request input.
@@ -54,6 +64,9 @@ class PraDiSandboxController extends Controller
         $data = $request->validate([
             'enabled' => 'required|boolean', 'environment' => 'sometimes|required|in:sandbox,production',
             'confirm_sandbox_setup' => 'sometimes|accepted', 'confirm_production_setup' => 'sometimes|accepted',
+            'sandbox_url' => 'sometimes|nullable|string|max:500', 'production_url' => 'sometimes|nullable|string|max:500',
+            'fbr_registration_no' => ['sometimes','nullable','regex:/^(?:[0-9]{7}|[0-9]{13}|[0-9]{7}-[0-9])$/'],
+            'fbr_business_name' => 'sometimes|nullable|string|max:200',
         ]);
         $tokenRule = ['nullable', 'string', 'max:8192', 'regex:/^[\x21-\x7E]+$/'];
         Validator::make($tokens, ['sandbox_token' => $tokenRule, 'production_token' => $tokenRule])->validate();
@@ -61,6 +74,9 @@ class PraDiSandboxController extends Controller
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
             $profile = PosDiSandboxProfile::firstOrNew(['company_id' => $company->id]);
             $environment = $data['environment'] ?? $profile->environment ?? 'sandbox';
+            foreach (['sandbox','production'] as $env) {
+                if (array_key_exists($env.'_url', $data)) $profile->{$env.'_url'} = \App\Services\PosTaxIntegrationEndpoints::checked('di', $env, $data[$env.'_url']);
+            }
             foreach (['sandbox_token', 'production_token'] as $field) {
                 if (is_string($tokens[$field] ?? null) && $tokens[$field] !== '') $profile->{$field} = $tokens[$field];
             }
@@ -77,6 +93,9 @@ class PraDiSandboxController extends Controller
                     $profile->production_confirmed_by = auth('pos')->id();
                 }
             }
+            if ($data['enabled'] && \Illuminate\Support\Facades\Schema::hasTable('pos_ims_profiles')) \App\Models\PosImsProfile::where('company_id', $company->id)->update(['enabled'=>false]);
+            $identity = array_intersect_key($data, array_flip(['fbr_registration_no','fbr_business_name']));
+            if ($identity) $company->update($identity);
             $profile->environment = $environment;
             $profile->enabled = (bool) $data['enabled'];
             $profile->updated_by = auth('pos')->id();

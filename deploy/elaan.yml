@@ -1,7 +1,8 @@
-title: "PRA POS ke saath DI Sandbox aur Production setup"
+title: "Tax Integrations — PRA, FBR POS aur Digital Invoice ki aik jagah settings"
 audience: pos
 type: improvement
 points:
-  - "Company owner Receipt Settings mein PRA + FBR Digital Invoice · Connection setup khol sakta hai."
-  - "Sandbox mein applicable scenarios test karein; FBR se production token milne par alag token save karke Production select karein."
-  - "Bill review karke khud submit karein. Mode badalne se purani invoices dobara send nahi hotin aur dono environments ka record alag rehta hai."
+  - "Customize POS mein PRA Compliance ka naya naam Tax Integrations hai. PRA POS, FBR POS aur Digital Invoice ki settings yahan hain; receipt settings mein sirf receipt ke options hain."
+  - "Digital Invoice ke FBR details, Sandbox URL/token aur Production URL/token alag save karein. FBR POS ke dono environments ke POS IDs aur credentials bhi alag hain."
+  - "Required federal integration select karein. Aik completed bill ko review karke manual submit karein. Setup save karne se invoice nahi bheji jati."
+  - "Local FBR IMS ke liye designated shop PC par updated Desktop Agent v1.13.30 aur sahi FBR IMS component zaroori hai."

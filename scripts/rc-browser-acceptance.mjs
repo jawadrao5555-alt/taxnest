@@ -1,3 +1,4 @@
+import { taxIntegrationsWorkflow } from './lib/tax-integrations-browser.mjs';
 import { b01CompanyAccountWorkflow } from './lib/b01-company-account-browser.mjs';
 import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow } from './lib/pra-b03-browser.mjs';
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
@@ -1472,6 +1473,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.taxIntegrations)return taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b01Account)return b01CompanyAccountWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b03AutoKot)return b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});
   if(t.optionalArchive)return optionalArchiveWorkflow(page,t,v);
@@ -2297,6 +2299,7 @@ async function customerBulkNavigation(page,t,v) {
  pass(t.name+'/'+v.width+': metrics above ledger; real revenue/order/customer detail routes render without posting or printing');
 }
 async function one(browser,label,v,t) {
+  if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};
   if(t.surveyJourney) t={...t,login:t.surveyJourney.logins[v.width]};
   if(t.optionalArchive) t={...t, login:t.optionalArchive.cases[v.width].login};
   valid(t); const failuresBefore = failures;

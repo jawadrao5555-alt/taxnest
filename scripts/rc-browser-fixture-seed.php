@@ -807,9 +807,26 @@ foreach ([['pos','/pos/login','/pos/dashboard','pos'],['di','/login','/dashboard
         'surveyJourney'=>['id'=>$survey->id,'title'=>$survey->title,'logins'=>$logins,'path'=>$path,'route'=>$route],
         'nativeAgent'=>$product==='pos'?'TaxNestPOSApp/1.2.1':($product==='di'?'TaxNestDIApp/1.0.4':($product==='fbrpos'?'TaxNestFBRPosApp/1.2.0':null))];
 }
+
+$taxCases=[];
+foreach([1366,390] as $width){
+    $taxCompany=$company('Synthetic tax integration '.$width,'tax-integration-'.$width.'@rc-browser.invalid','1234567','pos',[
+        'business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,'pos_setup_completed'=>true,
+        'feature_flags'=>array_merge(PosFeatureService::defaultsForCategory('restaurant'),['inventory'=>false]),
+        'inventory_enabled'=>false,'pra_reporting_enabled'=>true,'pra_environment'=>'sandbox','pra_pos_id'=>'10000',
+        'province'=>'Punjab','address'=>'Synthetic integration street']);
+    $taxOwner=$user($taxCompany,'Synthetic integration owner','tax-integration-owner-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
+    $taxBill=\App\Models\PosTransaction::forceCreate(['company_id'=>$taxCompany->id,'invoice_number'=>'SYN-TAX-'.$width,'status'=>'completed',
+        'invoice_mode'=>'pra','transaction_type'=>'sale','subtotal'=>100,'tax_amount'=>16,'total_amount'=>116,'discount_amount'=>0,
+        'payment_method'=>'cash','pra_status'=>'submitted','pra_invoice_number'=>'SYN-PRA-'.$width]);
+    \App\Models\PosTransactionItem::forceCreate(['transaction_id'=>$taxBill->id,'item_type'=>'product','item_name'=>'Synthetic meal',
+        'quantity'=>2,'unit_price'=>50,'subtotal'=>100,'taxable_base'=>100,'exempt_base'=>0,'tax_amount'=>16,'tax_rate'=>16]);
+    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id];
+}
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
+        ['name'=>'tax-integrations','login'=>$taxCases[1366]['login'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/customize'],'markers'=>[],'taxIntegrations'=>$taxCases],
         ['name'=>'delivery-contact-search','login'=>$contactOwner->email,'password'=>$password,'loginPath'=>'/pos/login',
             'paths'=>['/pos/deliveries'],'markers'=>['Synthetic Contact A'],'deliveryContactSearch'=>true],
         ['name'=>'fbr-fiscal-receipt','login'=>$fiscalUser->email,'password'=>$password,'loginPath'=>'/fbr-pos/login','paths'=>['/fbr-pos/transaction/'.$fiscalReceipt->id.'/receipt'],'markers'=>['FBR: 9000000000001','STRN: 1234567890123','Tax Asaan / SMS 9966'],'fiscalReceipt'=>true],

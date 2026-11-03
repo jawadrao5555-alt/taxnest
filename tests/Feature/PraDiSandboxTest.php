@@ -31,7 +31,7 @@ class PraDiSandboxTest extends TestCase
         parent::setUp();
         Schema::dropAllTables();
         User::flushScopeColumnCache();
-        config(['pra_di_sandbox.enabled' => true, 'pra_di_sandbox.hosted_enabled' => false]);
+        config(['pra_di_sandbox.enabled' => true, 'pra_di_sandbox.hosted_enabled' => false, 'pra_di_sandbox.production_enabled' => true]);
         Schema::create('companies', function (Blueprint $t) {
             $t->id(); $t->string('name'); $t->string('product_type')->default('pos');
             $t->string('status')->default('approved'); $t->string('company_status')->default('active');
@@ -68,6 +68,7 @@ class PraDiSandboxTest extends TestCase
         }
         (require database_path('migrations/2026_11_02_120000_create_pos_di_sandbox_submissions_table.php'))->up();
         (require database_path('migrations/2026_11_03_100000_create_pos_di_sandbox_profiles_table.php'))->up();
+        (require database_path('migrations/2026_11_03_120000_add_environments_to_pos_di_reporting.php'))->up();
         $id = DB::table('companies')->insertGetId(['name' => 'Fictional Sandbox Shop',
             'fbr_sandbox_token' => Crypt::encryptString(self::TOKEN),
             'fbr_production_token' => Crypt::encryptString('NEVER-USE-THIS-PRODUCTION-TOKEN'),
@@ -100,7 +101,9 @@ class PraDiSandboxTest extends TestCase
     private function payload(PosDiSandboxSubmission $record): array
     {
         $p = $this->service->template($record);
-        $p['buyerProvince'] = 'Punjab'; $p['scenarioId'] = 'SN019';
+        $p['buyerProvince'] = 'Punjab';
+        $p['buyerBusinessName'] = 'Synthetic buyer'; $p['buyerAddress'] = 'Synthetic address';
+        if ($record->reportingEnvironment() === 'sandbox') $p['scenarioId'] = 'SN019';
         foreach ($p['items'] as &$line) {
             $line['hsCode'] = '9801.2000'; $line['uoM'] = 'Numbers, pieces, units';
             $line['rate'] = '0%'; $line['saleType'] = 'Services';
@@ -443,7 +446,7 @@ class PraDiSandboxTest extends TestCase
         $before = (array) DB::table('companies')->find($this->company->id);
         $this->hostedPilot();
         $this->get(route('pos.di-sandbox.setup'))->assertOk()->assertSee('Disabled');
-        $this->getJson(route('pos.di-sandbox.index'))->assertNotFound();
+        $this->get(route('pos.di-sandbox.index'))->assertOk()->assertSee('DI submission is disabled');
         $this->enablePilot();
         $this->assertSame($before, (array) DB::table('companies')->find($this->company->id));
         $profile = PosDiSandboxProfile::firstOrFail();
@@ -564,6 +567,162 @@ class PraDiSandboxTest extends TestCase
         $record = $this->record();
         $this->expectException(ValidationException::class);
         $this->service->prepare($this->company->id, $record->id, $this->payload($record));
+    }
+
+    private function productionPilot(): void
+    {
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 1, 'environment' => 'production',
+            'production_token' => 'synthetic-live-token-never-used-on-network', 'confirm_production_setup' => 1,
+        ])->assertSessionHasNoErrors()->assertRedirect();
+    }
+
+    public function test_production_setup_requires_its_own_token_and_explicit_onboarding_confirmation(): void
+    {
+        $this->hostedPilot(); $this->enablePilot();
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 1, 'environment' => 'production',
+            'production_token' => 'secret-live-input', 'confirm_sandbox_setup' => 1,
+        ])->assertSessionHasErrors('confirm_production_setup')->assertSessionMissing('_old_input.production_token');
+        $this->assertSame('sandbox', PosDiSandboxProfile::first()->environment);
+        $this->post(route('pos.di-sandbox.setup.save'), [
+            '_token' => 'pilot-csrf', 'enabled' => 1, 'environment' => 'production', 'confirm_production_setup' => 1,
+        ])->assertSessionHasErrors('production_token');
+        $this->get(route('pos.di-sandbox.setup'))->assertOk(); // consume old validation flash
+        $this->productionPilot();
+        $profile = PosDiSandboxProfile::first();
+        $this->assertSame('dedicated-fictional-pilot-token', $profile->sandbox_token);
+        $this->assertNotNull($profile->production_confirmed_at);
+        $this->assertSame($this->owner->id, $profile->production_confirmed_by);
+        $this->assertStringNotContainsString('synthetic-live-token', json_encode($profile));
+        $this->assertStringNotContainsString('synthetic-live-token', DB::table('pos_di_sandbox_profiles')->value('production_token'));
+        $this->get(route('pos.di-sandbox.setup'))->assertOk()->assertDontSee('synthetic-live-token-never-used-on-network');
+        Http::assertNothingSent();
+    }
+
+    public function test_same_source_has_separate_sandbox_and_production_records_and_correct_credentials(): void
+    {
+        $this->hostedPilot(); $this->enablePilot();
+        $id = $this->bill(); $before = (array) DB::table('pos_transactions')->find($id);
+        $sandbox = $this->record($id);
+        $this->service->prepare($this->company->id, $sandbox->id, $this->payload($sandbox));
+        Http::fake(function ($request) {
+            $ack = $this->ack();
+            if (!str_ends_with($request->url(), '_sb')) $ack['invoiceNumber'] = 'SYNTHETIC-PRODUCTION-ACK';
+            return Http::response($ack);
+        });
+        $this->service->submit($this->company->id, $sandbox->id, $this->owner->id);
+        $this->productionPilot();
+        Http::assertSentCount(1); // changing settings does not send anything
+        $live = $this->service->capture($this->company, $id, $this->owner->id, 'production');
+        $this->assertNotSame($sandbox->id, $live->id);
+        $this->assertNull($live->payload); // no promotion/copy of the test payload
+        $this->assertSame($live->id, $this->service->capture($this->company, $id, $this->owner->id, 'production')->id);
+        $this->assertArrayNotHasKey('scenarioId', $this->service->template($live));
+        $this->assertSame('', $this->service->template($live)['buyerBusinessName']);
+        $this->service->prepare($this->company->id, $live->id, $this->payload($live));
+        $this->postJson(route('pos.di-sandbox.submit', $live->id), [
+            '_token' => 'pilot-csrf', 'confirm_sandbox' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors('confirm_production');
+        $this->post(route('pos.di-sandbox.submit', $live->id), [
+            '_token' => 'pilot-csrf', 'confirm_production' => 1,
+        ])->assertRedirect();
+        Http::assertSent(fn ($r) => $r->url() === 'https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata'
+            && $r->hasHeader('Authorization', 'Bearer synthetic-live-token-never-used-on-network')
+            && !isset($r['scenarioId']));
+        $this->assertSame('SYNTHETIC-PRODUCTION-ACK', $live->fresh()->production_invoice_number);
+        $this->assertNull($live->fresh()->sandbox_invoice_number);
+        $this->assertSame('TEST-SBX-ACK-1', $sandbox->fresh()->sandbox_invoice_number);
+        $this->assertSame($before, (array) DB::table('pos_transactions')->find($id));
+        foreach (['invoices', 'inventory_movements', 'customer_ledger'] as $table) $this->assertDatabaseCount($table, 0);
+        $this->get(route('pos.di-sandbox.receipt', $live->id))->assertOk()->assertSee('SYNTHETIC-PRODUCTION-ACK')
+            ->assertSee('FBR production acknowledgement QR')->assertDontSee('SANDBOX TEST COPY');
+        $this->get(route('pos.di-sandbox.receipt', $sandbox->id))->assertOk()->assertSee('SANDBOX TEST COPY')
+            ->assertDontSee('SYNTHETIC-PRODUCTION-ACK');
+        try { $this->service->submit($this->company->id, $live->id, $this->owner->id); $this->fail('Live replay allowed'); }
+        catch (HttpException $e) { $this->assertSame(409, $e->getStatusCode()); }
+    }
+
+    public function test_environment_switch_cannot_send_a_stale_sandbox_record_or_capture_from_stale_form(): void
+    {
+        $this->hostedPilot(); $this->enablePilot();
+        $sandbox = $this->record();
+        $this->service->prepare($this->company->id, $sandbox->id, $this->payload($sandbox));
+        $this->productionPilot();
+        $this->postJson(route('pos.di-sandbox.submit', $sandbox->id), [
+            '_token' => 'pilot-csrf', 'confirm_sandbox' => 1,
+        ])->assertNotFound();
+        $this->postJson(route('pos.di-sandbox.capture'), [
+            '_token' => 'pilot-csrf', 'transaction_id' => $sandbox->source_transaction_id,
+            'environment' => 'sandbox', 'confirm_production_copy' => 1,
+        ])->assertConflict();
+        $this->assertDatabaseCount('pos_di_sandbox_submissions', 1);
+        Http::assertNothingSent();
+    }
+
+    public function test_live_timeout_blocks_replay_and_disabled_reporting_preserves_receipt_access(): void
+    {
+        $this->hostedPilot(); $this->productionPilot();
+        $live = $this->service->capture($this->company, $this->bill(), $this->owner->id, 'production');
+        $this->service->prepare($this->company->id, $live->id, $this->payload($live));
+        Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('synthetic timeout'));
+        $this->service->submit($this->company->id, $live->id, $this->owner->id);
+        $this->assertSame('verification_required', $live->fresh()->state);
+        $this->get(route('pos.di-sandbox.receipt', $live->id))->assertOk()->assertSee('NOT ACCEPTED BY FBR')
+            ->assertDontSee('FBR production acknowledgement QR');
+        try { $this->service->submit($this->company->id, $live->id, $this->owner->id); $this->fail('Unknown replay allowed'); }
+        catch (HttpException $e) { $this->assertSame(409, $e->getStatusCode()); }
+        $this->post(route('pos.di-sandbox.setup.save'), ['_token' => 'pilot-csrf', 'enabled' => 0])
+            ->assertSessionHasNoErrors();
+        $this->get(route('pos.di-sandbox.receipt', $live->id))->assertOk();
+        $this->assertSame('production', PosDiSandboxProfile::first()->environment);
+    }
+
+    public function test_production_returns_cannot_reference_a_sandbox_acknowledgement(): void
+    {
+        $this->hostedPilot(); $this->enablePilot();
+        $sale = $this->record();
+        $this->service->prepare($this->company->id, $sale->id, $this->payload($sale));
+        Http::fake(function ($request) {
+            $ack = $this->ack();
+            if (!str_ends_with($request->url(), '_sb')) $ack['invoiceNumber'] = 'SYNTHETIC-PRODUCTION-PARENT';
+            return Http::response($ack);
+        });
+        $this->service->submit($this->company->id, $sale->id, $this->owner->id);
+        $this->productionPilot();
+        $returnId = $this->bill('cash', ['transaction_type' => 'return', 'parent_transaction_id' => $sale->source_transaction_id]);
+        $return = $this->service->capture($this->company, $returnId, $this->owner->id, 'production');
+        $p = $this->payload($return); $p['invoiceRefNo'] = 'TEST-SBX-ACK-1';
+        try { $this->service->prepare($this->company->id, $return->id, $p); $this->fail('Cross-environment reference accepted'); }
+        catch (ValidationException $e) { $this->assertStringContainsString('PRODUCTION', $e->getMessage()); }
+        $liveSale = $this->service->capture($this->company, $sale->source_transaction_id, $this->owner->id, 'production');
+        $this->service->prepare($this->company->id, $liveSale->id, $this->payload($liveSale));
+        $this->service->submit($this->company->id, $liveSale->id, $this->owner->id);
+        $p['invoiceRefNo'] = 'SYNTHETIC-PRODUCTION-PARENT';
+        $this->service->prepare($this->company->id, $return->id, $p);
+        $this->assertSame('SYNTHETIC-PRODUCTION-PARENT', $return->fresh()->payload['invoiceRefNo']);
+    }
+
+    public function test_production_kill_switch_and_missing_production_token_never_fall_back_to_sandbox(): void
+    {
+        $this->hostedPilot(); $this->productionPilot();
+        $record = $this->service->capture($this->company, $this->bill(), $this->owner->id, 'production');
+        $this->service->prepare($this->company->id, $record->id, $this->payload($record));
+        PosDiSandboxProfile::first()->update(['production_token' => null]);
+        try { $this->service->submit($this->company->id, $record->id, $this->owner->id); $this->fail('Missing live token accepted'); }
+        catch (ValidationException $e) { $this->assertArrayHasKey('production', $e->errors()); }
+        config(['pra_di_sandbox.production_enabled' => false]);
+        $this->assertFalse(PraDiSandboxGate::available($this->company->id, 'production'));
+        Http::assertNothingSent();
+    }
+
+    public function test_production_payload_rejects_sandbox_scenario_field(): void
+    {
+        $this->hostedPilot(); $this->productionPilot();
+        $record = $this->service->capture($this->company, $this->bill(), $this->owner->id, 'production');
+        $p = $this->payload($record); $p['scenarioId'] = 'SN019';
+        $this->expectException(ValidationException::class);
+        $this->service->prepare($this->company->id, $record->id, $p);
     }
 
 }

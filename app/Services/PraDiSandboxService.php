@@ -11,25 +11,31 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-/** Explicit sandbox copy. No checkout observer or FBR production switch. */
+/** One source sale, separate environment-bound fiscal evidence. Manual submission. */
 class PraDiSandboxService
 {
-    public function capture(Company $company, int $transactionId, int $actorId): PosDiSandboxSubmission
+    public function capture(Company $company, int $transactionId, int $actorId, ?string $expectedEnvironment = null): PosDiSandboxSubmission
     {
         PraDiSandboxGate::enforce($company->id);
         abort_unless($company->product_type === 'pos', 403);
-        return DB::transaction(function () use ($company, $transactionId, $actorId) {
+        return DB::transaction(function () use ($company, $transactionId, $actorId, $expectedEnvironment) {
+            Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
+            $environment = PraDiSandboxGate::environment($company->id);
+            PraDiSandboxGate::enforce($company->id, $environment);
+            abort_if(($expectedEnvironment !== null && $expectedEnvironment !== $environment)
+                || ($environment === 'production' && $expectedEnvironment !== 'production'), 409,
+                'DI environment changed. Refresh and explicitly confirm the intended environment.');
             $sale = PosTransaction::where('company_id', $company->id)->whereKey($transactionId)
                 ->lockForUpdate()->firstOrFail();
-            abort_unless($sale->status === 'completed', 422, 'Only completed test sales or returns can be rehearsed.');
+            abort_unless($sale->status === 'completed', 422, 'Only completed sales or returns can be prepared.');
             abort_unless(in_array($sale->transaction_type ?? 'sale', ['sale', 'return'], true), 422);
             $existing = PosDiSandboxSubmission::where('company_id', $company->id)
-                ->where('source_transaction_id', $sale->id)->first();
+                ->where('source_transaction_id', $sale->id)->where('environment', $environment)->first();
             if ($existing) return $existing;
 
             $lines = $sale->items()->orderBy('id')->get()->map(function ($line) {
                 if ($line->taxable_base === null || $line->exempt_base === null || $line->tax_amount === null) {
-                    throw ValidationException::withMessages(['transaction_id' => 'Stored line tax snapshots are missing. Rehearse a new fictional sale; legacy amounts will not be guessed.']);
+                    throw ValidationException::withMessages(['transaction_id' => 'Stored line tax snapshots are missing. Legacy amounts will not be guessed.']);
                 }
                 return [
                     'name' => $line->item_name, 'quantity' => (float) $line->quantity,
@@ -37,14 +43,15 @@ class PraDiSandboxService
                     'pra_tax' => (float) $line->tax_amount,
                 ];
             })->values()->all();
-            abort_if(!$lines, 422, 'The test sale has no lines.');
+            abort_if(!$lines, 422, 'The sale has no lines.');
 
             return PosDiSandboxSubmission::create([
                 'company_id' => $company->id, 'source_transaction_id' => $sale->id,
                 'branch_id' => $sale->branch_id, 'created_by' => $actorId,
-                'state' => 'draft', 'attempts' => [],
+                'state' => 'draft', 'attempts' => [], 'environment' => $environment,
                 'snapshot' => [
                     'company_name' => $company->name, 'seller_ntn' => $company->ntn,
+                    'seller_fbr_name' => $company->fbr_business_name ?: $company->name,
                     'seller_fbr_id' => $this->sellerIdentity($company->fbr_registration_no ?: $company->ntn),
                     'seller_address' => $company->address, 'seller_province' => $company->province,
                     'invoice_number' => $sale->invoice_number, 'date' => $sale->created_at->format('Y-m-d'),
@@ -63,14 +70,15 @@ class PraDiSandboxService
     public function template(PosDiSandboxSubmission $record): array
     {
         $s = $record->snapshot;
+        $sandbox = $record->reportingEnvironment() === 'sandbox';
         return [
             'invoiceType' => $s['transaction_type'] === 'return' ? 'Debit Note' : 'Sale Invoice',
             'invoiceDate' => $s['date'], 'sellerNTNCNIC' => $s['seller_fbr_id'] ?? $this->sellerIdentity($s['seller_ntn'] ?? ''),
-            'sellerBusinessName' => $s['company_name'], 'sellerProvince' => $s['seller_province'] ?? '',
+            'sellerBusinessName' => $s['seller_fbr_name'] ?? $s['company_name'], 'sellerProvince' => $s['seller_province'] ?? '',
             'sellerAddress' => $s['seller_address'] ?? '', 'buyerNTNCNIC' => '',
-            'buyerBusinessName' => 'Fictional walk-in customer', 'buyerProvince' => '',
-            'buyerAddress' => 'Fictional test address', 'buyerRegistrationType' => 'Unregistered',
-            'invoiceRefNo' => '', 'scenarioId' => '',
+            'buyerBusinessName' => $sandbox ? 'Fictional walk-in customer' : '', 'buyerProvince' => '',
+            'buyerAddress' => $sandbox ? 'Fictional test address' : '', 'buyerRegistrationType' => 'Unregistered',
+            'invoiceRefNo' => '', ...($sandbox ? ['scenarioId' => ''] : []),
             'items' => array_map(fn ($line) => [
                 'hsCode' => '', 'productDescription' => $line['name'], 'rate' => '',
                 'uoM' => '', 'quantity' => $line['quantity'], 'totalValues' => null,
@@ -87,6 +95,7 @@ class PraDiSandboxService
         PraDiSandboxGate::enforce($companyId);
         return DB::transaction(function () use ($companyId, $id, $payload) {
             $record = $this->locked($companyId, $id);
+            PraDiSandboxGate::enforce($companyId, $record->reportingEnvironment());
             abort_unless(in_array($record->state, ['draft', 'rejected'], true), 409, 'This outcome must be preserved; it cannot be edited or replayed.');
             $this->validatePayload($record, $payload);
             $record->payload = $payload;
@@ -104,36 +113,36 @@ class PraDiSandboxService
         PraDiSandboxGate::enforce($companyId);
         $company = Company::findOrFail($companyId);
         abort_unless($company->product_type === 'pos', 403);
-        // Explicit environment: never read a production token, URL override or demo flag.
-        $profile = PosDiSandboxProfile::where('company_id', $companyId)->first();
-        // Hosted pilots must use the separate POS sandbox credential. Legacy
-        // local rehearsals alone may use the pre-existing local DI credential.
-        $token = $profile ? (string) $profile->sandbox_token
-            : (PraDiSandboxGate::hostedAvailable() ? '' : app(FbrService::class)->resolveDiToken($company, 'sandbox'));
-        if ($token === '') throw ValidationException::withMessages(['sandbox' => 'Configure this company\'s DI sandbox token in Sandbox setup first.']);
-
-        $record = DB::transaction(function () use ($companyId, $id, $actorId) {
+        [$record, $token] = DB::transaction(function () use ($company, $companyId, $id, $actorId) {
             Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
-            PraDiSandboxGate::enforce($companyId);
             $record = $this->locked($companyId, $id);
+            $environment = $record->reportingEnvironment();
+            PraDiSandboxGate::enforce($companyId, $environment);
+            $profile = PosDiSandboxProfile::where('company_id', $companyId)->first();
+            $token = $profile ? (string) $profile->{$environment.'_token'}
+                : ($environment === 'sandbox' && !PraDiSandboxGate::hostedAvailable()
+                    ? app(FbrService::class)->resolveDiToken($company, 'sandbox') : '');
+            if ($token === '') throw ValidationException::withMessages([$environment => 'Configure the selected environment\'s DI token first.']);
             abort_unless($record->state === 'draft' && $record->payload, 409, 'Prepare a reviewed payload first. Accepted or unknown submissions cannot be replayed.');
             $this->validatePayload($record, $record->payload);
+            abort_unless(hash_equals((string) $record->payload_hash, hash('sha256', json_encode($record->payload, JSON_THROW_ON_ERROR))), 409, 'Stored payload integrity check failed.');
             $attempts = $record->attempts ?? [];
-            $attempts[] = ['actor_id' => $actorId, 'at' => now()->toIso8601String(),
+            $attempts[] = ['environment' => $environment, 'actor_id' => $actorId, 'at' => now()->toIso8601String(),
                 'hash' => $record->payload_hash, 'payload' => $record->payload, 'state' => 'submitting'];
             $record->fill(['state' => 'submitting', 'attempted_at' => now(), 'attempts' => $attempts])->save();
-            return $record;
+            return [$record, $token];
         });
 
         // External I/O outside the DB lock; never retry an uncertain POST.
-        $result = app(FbrService::class)->submitPosSandboxPayload($record->payload, $token, $companyId);
+        $result = app(FbrService::class)->submitPosDiPayload($record->payload, $token, $record->reportingEnvironment(), $companyId);
         return DB::transaction(function () use ($companyId, $id, $result) {
             $record = $this->locked($companyId, $id);
             abort_unless($record->state === 'submitting', 409);
             $attempts = $record->attempts;
             $attempts[array_key_last($attempts)]['state'] = $result['state'];
             $attempts[array_key_last($attempts)]['error_codes'] = $result['error_codes'];
-            $record->fill(['state' => $result['state'], 'sandbox_invoice_number' => $result['reference'], 'attempts' => $attempts])->save();
+            $referenceField = $record->reportingEnvironment() === 'production' ? 'production_invoice_number' : 'sandbox_invoice_number';
+            $record->fill(['state' => $result['state'], $referenceField => $result['reference'], 'attempts' => $attempts])->save();
             return $record;
         });
     }
@@ -163,7 +172,8 @@ class PraDiSandboxService
             'sellerAddress' => 'required|string|max:500', 'buyerNTNCNIC' => 'present|nullable|string|max:13',
             'buyerBusinessName' => 'required|string|max:200', 'buyerProvince' => 'required|string|max:80',
             'buyerAddress' => 'required|string|max:500', 'buyerRegistrationType' => 'required|in:Registered,Unregistered',
-            'invoiceRefNo' => 'present|nullable|string|max:100', 'scenarioId' => ['required', 'regex:/^SN[0-9]{3}$/'],
+            'invoiceRefNo' => 'present|nullable|string|max:100',
+            'scenarioId' => $record->reportingEnvironment() === 'sandbox' ? ['required', 'regex:/^SN[0-9]{3}$/'] : ['prohibited'],
             'items' => 'required|array|list|size:'.count($template['items']),
             'items.*.hsCode' => ['required', 'regex:/^[0-9]{4}\.[0-9]{4}$/'],
             'items.*.productDescription' => 'required|string|max:500',
@@ -192,9 +202,9 @@ class PraDiSandboxService
         $parentId = $record->snapshot['parent_transaction_id'] ?? null;
         if ($p['invoiceType'] === 'Debit Note') {
             $parent = PosDiSandboxSubmission::where('company_id', $record->company_id)
-                ->where('source_transaction_id', $parentId)->where('state', 'accepted')->first();
-            if (!$parent || !$parent->sandbox_invoice_number || $p['invoiceRefNo'] !== $parent->sandbox_invoice_number) {
-                $errors[] = 'A return requires the accepted FBR SANDBOX reference of its original sale.';
+                ->where('source_transaction_id', $parentId)->where('environment', $record->reportingEnvironment())->where('state', 'accepted')->first();
+            if (!$parent || !$parent->fiscalReference() || $p['invoiceRefNo'] !== $parent->fiscalReference()) {
+                $errors[] = 'A return requires the accepted FBR '.strtoupper($record->reportingEnvironment()).' reference of its original sale.';
             }
         } elseif (!empty($p['invoiceRefNo'])) $errors[] = 'A sale cannot reference another invoice.';
         if ($errors) throw ValidationException::withMessages(['payload_json' => $errors]);

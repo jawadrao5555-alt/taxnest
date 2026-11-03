@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 class PosDiSandboxProfile extends Model
 {
     protected $guarded = ['id'];
-    protected $hidden = ['sandbox_token'];
-    protected $casts = ['enabled' => 'boolean', 'sandbox_token' => 'encrypted'];
+    protected $hidden = ['sandbox_token', 'production_token'];
+    protected $casts = [
+        'enabled' => 'boolean', 'sandbox_token' => 'encrypted',
+        'production_token' => 'encrypted', 'production_confirmed_at' => 'datetime',
+    ];
 }

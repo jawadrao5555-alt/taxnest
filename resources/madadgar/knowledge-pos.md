@@ -483,12 +483,15 @@ Stock health counts each product/branch row once: empty/negative, low positive, 
 - Reports ka aik hi From/To filter detail aur financial milaan dono par lagta hai. Reconciled CSV aur analytics PDF mein known final gross, returns, net aur retained history hoti hai. Purani unavailable detail ka warning zaroor parhein.
 
 
-## PRA + FBR Digital Invoice — sandbox pilot
-- Sirf active company owner: Receipt Settings → "PRA + FBR Digital Invoice · Sandbox setup".
-- Har company ki DI testing pehle band hoti hai. Owner company ka DI sandbox token save karke pilot enable kare; token chat mein na mangain.
-- Completed bill select karein, sandbox copy ki tasdeeq karein, JSON mapping review/save karein, phir "Submit to FBR sandbox" dabayein. Capture ya save se invoice send nahi hota.
-- Yeh FBR production reporting nahi hai. PRA apne pehle setup ke mutabiq chalta rahega. Normal sale, stock aur customer balance mein doosri entry nahi banti.
-- Accepted sandbox result par combined 58mm/80mm TEST receipt preview mein DI number/QR aata hai. Isay customer tax invoice ke taur par na dein.
-- Unknown/submitting result ko dobara send na karein; operator se reconcile karwayein. Disable karne se naye submissions band, purana record mehfooz rahega.
-- PRA tax ki wajah se FBR exemption ya zero rate khud select na karein; mapping tax consultant/PRAL se confirm honi hai.
-- FBR POS (IMS) selection, live DI aur normal 9 receipt formats is pilot mein enable nahi hote.
+## PRA + FBR Digital Invoice — Sandbox aur Production
+- Sirf active company owner: Receipt Settings → "PRA + FBR Digital Invoice · Connection setup".
+- Sandbox aur Production ke tokens alag save hotay hain; dono encrypted hain. Token chat mein na mangain. Blank field se purana token mehfooz rehta hai.
+- Pehle Sandbox select karke company ke applicable scenarios test karein. Accepted scenarios ki local list setup par hai; tamam required scenarios ka status IRIS mein confirm karein.
+- FBR production token issue kare to usay Production token field mein save karein, Production select karein aur onboarding/tax mapping ki tasdeeq karein. TaxNest khud production token issue nahi karta aur khud live mode mein nahi jata.
+- Completed bill select karein, selected environment ke liye naya record prepare karein, mapping review/save karein, phir explicitly submit karein. Production par real invoice bhejta hai; Sandbox test hai.
+- Mode badalne se koi invoice khud resend ya convert nahi hoti. Har environment ka invoice number, QR, history aur return reference alag hai.
+- Source sale, stock aur customer balance mein doosri entry nahi banti. PRA apne pehle setup ke mutabiq chalta rehta hai.
+- Accepted result par 58mm/80mm combined receipt preview mein us environment ka DI number/QR aata hai. Sandbox receipt par TEST label rehta hai; unaccepted Production receipt sirf preview hai.
+- Unknown/submitting result ko dobara send na karein; FBR se reconcile karwayein. Disable karne se naye submissions band aur history readable rehti hai.
+- PRA tax ki wajah se FBR exemption/zero rate khud select na karein. Company ki tax mapping review honi hai.
+- FBR POS (IMS) selection, automatic checkout aur normal 9 receipt formats mein integration is workbench ka hissa nahi.

@@ -30,15 +30,21 @@ class FbrService
      */
     private array $hsMappingCache = [];
 
-    /** Opt-in PRA/DI sandbox; no DI Invoice or production endpoint. */
+    /** Compatibility entry point: this method can only send to sandbox. */
     public function submitPosSandboxPayload(array $payload, string $sandboxToken, ?int $companyId = null): array
     {
-        \App\Support\PraDiSandboxGate::enforce($companyId);
+        return $this->submitPosDiPayload($payload, $sandboxToken, 'sandbox', $companyId);
+    }
+
+    public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId): array
+    {
+        \App\Support\PraDiSandboxGate::enforce($companyId, $environment);
+        $url = $environment === 'production' ? self::PRODUCTION_POST_URL : self::SANDBOX_POST_URL;
         $unknown = ['state' => 'verification_required', 'reference' => null, 'error_codes' => []];
         try {
-            // Fixed sandbox endpoint; no company URL overrides, redirects or automatic retry.
-            $response = Http::withToken($sandboxToken)->acceptJson()->connectTimeout(10)->timeout(45)
-                ->withoutRedirecting()->post(self::SANDBOX_POST_URL, $payload);
+            // Fixed environment endpoint; no overrides, redirects or automatic retry.
+            $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)
+                ->withoutRedirecting()->post($url, $payload);
             if (!$response->successful() || !is_array($response->json())) return $unknown;
             $data = $response->json();
             $validation = $data['validationResponse'] ?? null;

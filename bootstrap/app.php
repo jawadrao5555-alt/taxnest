@@ -107,7 +107,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['sandbox_token']);
+        $exceptions->dontFlash(['sandbox_token', 'production_token']);
         // ── DB unreachable (shared-host MySQL blips) → friendly fail-fast page ──
         // ONLY connection failures are intercepted (DatabaseDown gate); every
         // ordinary query error returns null here and keeps default handling.

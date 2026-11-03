@@ -36,38 +36,54 @@ class PraDiSandboxController extends Controller
     {
         $company = $this->company($request, true);
         $profile = PosDiSandboxProfile::where('company_id', $company->id)->first();
-        return response()->view('pos.di-sandbox.setup', compact('company', 'profile'))
+        $scenarios = PosDiSandboxSubmission::where('company_id', $company->id)->where('environment', 'sandbox')
+            ->where('state', 'accepted')->get()->map(fn ($record) => $record->payload['scenarioId'] ?? null)->filter()->unique()->values();
+        return response()->view('pos.di-sandbox.setup', compact('company', 'profile', 'scenarios'))
             ->header('Cache-Control', 'no-store, private');
     }
 
     public function saveSetup(Request $request)
     {
-        // Remove credentials before any validation can flash request input.
-        $token = $request->input('sandbox_token');
-        $request->request->remove('sandbox_token');
-        if ($request->isJson()) $request->json()->remove('sandbox_token');
+        // Strip both credentials before validation can flash request input.
+        $tokens = $request->only(['sandbox_token', 'production_token']);
+        foreach (['sandbox_token', 'production_token'] as $field) {
+            $request->request->remove($field);
+            if ($request->isJson()) $request->json()->remove($field);
+        }
         $company = $this->company($request, true);
         $data = $request->validate([
-            'enabled' => 'required|boolean', 'confirm_sandbox_setup' => 'exclude_unless:enabled,1|required|accepted',
+            'enabled' => 'required|boolean', 'environment' => 'sometimes|required|in:sandbox,production',
+            'confirm_sandbox_setup' => 'sometimes|accepted', 'confirm_production_setup' => 'sometimes|accepted',
         ]);
-        Validator::make(['sandbox_token' => $token], [
-            'sandbox_token' => ['nullable', 'string', 'max:8192', 'regex:/^[\x21-\x7E]+$/'],
-        ])->validate();
-        DB::transaction(function () use ($company, $data, $token) {
-            // Serialize first-time profile creation and later configuration changes.
+        $tokenRule = ['nullable', 'string', 'max:8192', 'regex:/^[\x21-\x7E]+$/'];
+        Validator::make($tokens, ['sandbox_token' => $tokenRule, 'production_token' => $tokenRule])->validate();
+        DB::transaction(function () use ($company, $data, $tokens) {
             Company::whereKey($company->id)->lockForUpdate()->firstOrFail();
             $profile = PosDiSandboxProfile::firstOrNew(['company_id' => $company->id]);
-            if (is_string($token) && $token !== '') $profile->sandbox_token = $token;
-            if ($data['enabled'] && !$profile->sandbox_token) {
-                throw ValidationException::withMessages(['sandbox_token' => 'Enter this company\'s FBR DI sandbox token before enabling the pilot.']);
+            $environment = $data['environment'] ?? $profile->environment ?? 'sandbox';
+            foreach (['sandbox_token', 'production_token'] as $field) {
+                if (is_string($tokens[$field] ?? null) && $tokens[$field] !== '') $profile->{$field} = $tokens[$field];
             }
+            if ($data['enabled']) {
+                $confirmation = $environment === 'production' ? 'confirm_production_setup' : 'confirm_sandbox_setup';
+                Validator::make($data, [$confirmation => 'accepted'])->validate();
+                $field = $environment.'_token';
+                if (!$profile->{$field}) {
+                    throw ValidationException::withMessages([$field => 'Enter the selected environment\'s DI token before enabling reporting.']);
+                }
+                if ($environment === 'production') {
+                    abort_unless(config('pra_di_sandbox.production_enabled', false), 422, 'Production DI is disabled on this server.');
+                    $profile->production_confirmed_at = now();
+                    $profile->production_confirmed_by = auth('pos')->id();
+                }
+            }
+            $profile->environment = $environment;
             $profile->enabled = (bool) $data['enabled'];
             $profile->updated_by = auth('pos')->id();
             $profile->save();
         });
         return redirect()->route('pos.di-sandbox.setup')->with('success',
-            $data['enabled'] ? 'DI sandbox pilot enabled for this company. No invoice has been sent.'
-                : 'DI sandbox pilot disabled. Existing evidence is retained; an already-started request may still finish.');
+            'DI settings saved. No invoice has been sent. Disabling stops new requests; an already-started request may finish.');
     }
 
     private function record(Company $company, int $id): PosDiSandboxSubmission
@@ -77,10 +93,12 @@ class PraDiSandboxController extends Controller
 
     public function index(Request $request)
     {
-        $company = $this->company($request);
+        $company = $this->company($request, true);
         return response()->view('pos.di-sandbox.index', [
             'company' => $company,
             'hosted' => PraDiSandboxGate::hostedAvailable(),
+            'environment' => PraDiSandboxGate::environment($company->id),
+            'canReport' => PraDiSandboxGate::available($company->id),
             'sales' => PosTransaction::where('company_id', $company->id)->where('status', 'completed')->latest('id')->limit(30)->get(),
             'records' => PosDiSandboxSubmission::where('company_id', $company->id)->latest('id')->limit(30)->get(),
         ])->header('Cache-Control', 'no-store, private');
@@ -89,17 +107,20 @@ class PraDiSandboxController extends Controller
     public function capture(Request $request, PraDiSandboxService $service)
     {
         $company = $this->company($request);
-        $confirmation = PraDiSandboxGate::hostedAvailable() ? 'sandbox_copy' : 'fictional_data';
+        $environment = PraDiSandboxGate::environment($company->id);
+        $confirmation = $environment === 'production' ? 'confirm_production_copy'
+            : (PraDiSandboxGate::hostedAvailable() ? 'sandbox_copy' : 'fictional_data');
         $data = $request->validate(['transaction_id' => 'required|integer|min:1', $confirmation => 'accepted']);
-        $record = $service->capture($company, (int) $data['transaction_id'], auth('pos')->id());
+        $record = $service->capture($company, (int) $data['transaction_id'], auth('pos')->id(), $request->input('environment'));
         return redirect()->route('pos.di-sandbox.show', $record->id);
     }
 
     public function show(Request $request, int $id, PraDiSandboxService $service)
     {
-        $record = $this->record($this->company($request), $id);
+        $record = $this->record($this->company($request, true), $id);
         return response()->view('pos.di-sandbox.show', [
             'record' => $record, 'payload' => $record->payload ?? $service->template($record),
+            'canSubmit' => PraDiSandboxGate::available($record->company_id, $record->reportingEnvironment()),
         ])->header('Cache-Control', 'no-store, private');
     }
 
@@ -112,21 +133,22 @@ class PraDiSandboxController extends Controller
         catch (\JsonException $e) { throw ValidationException::withMessages(['payload_json' => 'Enter a valid JSON invoice object.']); }
         if (!is_array($payload)) throw ValidationException::withMessages(['payload_json' => 'Enter a JSON invoice object.']);
         $service->prepare($company->id, $id, $payload);
-        return redirect()->route('pos.di-sandbox.show', $id)->with('success', 'Sandbox payload saved for review. Nothing has been sent.');
+        return redirect()->route('pos.di-sandbox.show', $id)->with('success', 'DI payload saved for review. Nothing has been sent.');
     }
 
     public function submit(Request $request, int $id, PraDiSandboxService $service)
     {
         $company = $this->company($request);
-        $this->record($company, $id);
-        $request->validate(['confirm_sandbox' => 'accepted']);
+        $record = $this->record($company, $id);
+        $confirmation = $record->reportingEnvironment() === 'production' ? 'confirm_production' : 'confirm_sandbox';
+        $request->validate([$confirmation => 'accepted']);
         $service->submit($company->id, $id, auth('pos')->id());
         return redirect()->route('pos.di-sandbox.show', $id);
     }
 
     public function receipt(Request $request, int $id)
     {
-        $record = $this->record($this->company($request), $id);
+        $record = $this->record($this->company($request, true), $id);
         $width = $request->query('width') === '58' ? 58 : 80;
         return response()->view('pos.di-sandbox.receipt', compact('record', 'width'))
             ->header('Cache-Control', 'no-store, private');

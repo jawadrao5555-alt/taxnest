@@ -9,6 +9,17 @@ class PosDiSandboxSubmission extends Model
 {
     protected $guarded = ['id'];
 
+    public function reportingEnvironment(): string
+    {
+        return $this->environment ?? 'sandbox';
+    }
+
+    public function fiscalReference(): ?string
+    {
+        return $this->reportingEnvironment() === 'production'
+            ? $this->production_invoice_number : $this->sandbox_invoice_number;
+    }
+
     protected $casts = [
         'snapshot' => 'encrypted:array',
         'payload' => 'encrypted:array',

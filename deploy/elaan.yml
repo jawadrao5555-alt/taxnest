@@ -1,7 +1,7 @@
-title: "PRA POS ke saath Digital Invoice ki sandbox testing"
+title: "PRA POS ke saath DI Sandbox aur Production setup"
 audience: pos
 type: improvement
 points:
-  - "Company owner Receipt Settings mein PRA + FBR Digital Invoice · Sandbox setup khol sakta hai."
-  - "Testing khud enable karein, sandbox token save karein aur bill ki copy review karke bhejein; live FBR reporting shuru nahi hoti."
-  - "FBR sandbox se bill accept hone par PRA aur DI wali test receipt dekhi ja sakti hai."
+  - "Company owner Receipt Settings mein PRA + FBR Digital Invoice · Connection setup khol sakta hai."
+  - "Sandbox mein applicable scenarios test karein; FBR se production token milne par alag token save karke Production select karein."
+  - "Bill review karke khud submit karein. Mode badalne se purani invoices dobara send nahi hotin aur dono environments ka record alag rehta hai."

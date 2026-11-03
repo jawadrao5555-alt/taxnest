@@ -1,109 +1,65 @@
-# PRA POS + FBR DI sandbox rehearsal
+# PRA POS + FBR DI: Sandbox and Production
 
-Status: opt-in hosted DI sandbox pilot, plus the original local rehearsal. FBR production reporting remains unavailable. No deployment, live receipt change or regulator approval is implied.
+The same PRA POS source bill can have separate DI evidence in each environment. This implementation reuses `FbrService` acknowledgement handling and the DI endpoints already used by the standalone DI product. It does not create a regular DI `Invoice`, another sale, stock movement, revenue or customer-ledger entry.
 
-## Problem and resulting behavior
+## Owner workflow
 
-PRA POS bills previously had no separate, reviewable FBR DI rehearsal record. The new owner-only workbench captures an explicitly selected completed POS sale or return as a sandbox copy, freezes its amounts, lets a technical reviewer prepare the exact FBR sandbox payload, and records an explicit sandbox submission independently of PRA.
+1. Receipt Settings → **PRA + FBR Digital Invoice · Connection setup**.
+2. Save the company's **Sandbox token**, select **Sandbox**, enable and confirm test use.
+3. Open the workbench, select a completed bill, capture its test copy, review the exact JSON mapping and submit. Required scenario IDs apply only in Sandbox. A complete accepted FBR response enables its test reference/QR. Capturing/saving alone transmits nothing.
+4. Check the company's applicable scenarios in FBR/IRIS. Local accepted scenario IDs are displayed as evidence, not as a certification that all required scenarios have passed. FBR issues the production token after the applicable scenario requirements succeed; TaxNest does not issue tokens or automatically activate Production.
+5. Save the separate **Production token**, choose **Production**, and explicitly confirm completed FBR onboarding and reviewed tax mapping. Existing tokens are preserved when their input is blank; both are encrypted and never echoed/flashed.
+6. Select a real completed bill, explicitly confirm Production capture, review live buyer/classification/tax/total values, save and separately confirm **Submit to FBR PRODUCTION**. The Production template has no fictional buyer defaults or `scenarioId`.
+7. Inspect the accepted Production reference and compact combined receipt. Sandbox receipts remain watermarked. Pending/unknown Production records are labelled preview, without an FBR logo/QR claiming acceptance.
 
-There is one original POS transaction. This workbench never creates a regular DI `Invoice`, stock movement, customer-ledger entry, second sale, or payment collection. Normal checkout, PRA reporting and customer receipts do not call it. This is a manual rehearsal; automatic checkout reporting remains future work after the legal and technical mapping is confirmed.
+This is manual reporting from the workbench, not an automatic checkout hook. FBR POS (IMS) choice and the nine normal receipt layouts remain separate work. PRA continues through its existing cloud/agent connection; this workbench never resends to PRA.
 
-## Hosted company pilot (owner-operated after deployment)
+## Environment invariants
 
-1. Sign in as the active owner of an approved, active PRA POS company. Open **Receipt Settings → PRA + FBR Digital Invoice · Sandbox setup**.
-2. Every company starts disabled. Select **PRA + FBR Digital Invoice · sandbox pilot**, enter that company's **DI sandbox token**, confirm sandbox-only use and save. The dedicated `pos_di_sandbox_profiles` table stores an encrypted, hidden credential; no existing company credentials or reporting settings are overwritten. Blank token means keep the saved value. Never send tokens through chat or PR comments.
-3. Open the workbench, select a completed bill and explicitly authorize a sandbox copy. Capture alone transmits nothing. The buyer defaults are fictional placeholders for sandbox use and must be reviewed with the rest of the JSON payload.
-4. Review the source snapshot, classification, buyer fields, federal tax and payload total. Save, then separately submit. The fixed sandbox endpoint is the only network destination. The workbench never sends to PRA itself.
-5. Accepted acknowledgement enables the DI reference and QR on the watermarked 58/80mm combined test receipt. Do not issue it as a customer tax invoice. PRA details are the frozen source status at capture time, not a new PRA confirmation.
-6. Disable the pilot to block new capture/prepare/submit actions. Previously stored evidence and the saved token remain; an already-started request may finish. Re-enable to review the workbench again.
-
-The server kill switch `PRA_DI_SANDBOX_HOSTED_ENABLED=false` disables hosted setup and submissions. It defaults to true to make owner setup available after deployment, **not** to enable any company: a company's profile remains absent/disabled until the owner opts in. Hosted access is limited to `production`/`staging` application environments. Local/test environments retain the disposable-database gate. The Cloud Agent itself never connects to a live server or uses real company data/tokens.
-
-### Compatibility checks
-
-| Configuration | Expected behavior |
+| Case | Required behavior |
 | --- | --- |
-| Existing PRA-only company | No profile by default; no submissions, financial or receipt-setting changes. |
-| Owner enables DI sandbox | Own encrypted credential; manual copy/review/send only. |
-| Cashier or another company | Cannot change/read the first company's profile or submit its copy. |
-| Blank token / disabled profile | Existing token preserved on edit; missing token cannot enable hosted pilot; disabled blocks sending. |
-| Existing DI/FBR POS credentials | Never overwritten; hosted pilot never falls back to them. |
-| Multiple windows/devices | Existing unique source/claim locks prevent duplicate submissions; profile creation serialized on company row. |
-| Existing agents and nine receipt layouts | No contract or normal receipt changes; pilot uses dedicated test preview. |
+| Existing company or old settings | DI remains off unless previously explicitly enabled; existing profiles/records default to Sandbox. |
+| Switch Sandbox ↔ Production | No automatic sends, payload promotions, reference reuse or alteration of history. |
+| Same source bill in both environments | Unique `(company_id, source_transaction_id, environment)`; separate immutable snapshots, payloads, attempts and references. Production requires explicit new capture/review. |
+| Missing selected token | Refuse submission; never fall back to the other environment or to company production credentials. Legacy local-only Sandbox may use its old local sandbox credential if no profile exists. |
+| Stale browser form | Production capture requires its explicit environment and consent. Prepare/submit refuse a record whose environment is not currently selected. |
+| Return | Original sale must have an accepted DI reference in the same company and environment. A PRA or Sandbox reference cannot adjust Production. |
+| Timeout/partial response/interrupted claim | Block retry/edit; reconcile externally. Never claim success or auto-reset an uncertain request. |
+| Accepted/rejected | Accepted requires a header reference and valid unique acknowledgement for every line; explicit rejection can be reviewed and prepared again. |
+| Disable reporting | Stop new work; preserve history and receipt reads. An already-started network request may finish. |
+| Multiple windows/devices | Company/source locks plus the unique environment constraint and exclusive submission claim prevent duplicate sends. |
+| Another tenant, staff, read-only impersonation | No cross-company access or owner-only setting mutation; existing impersonation middleware remains in force. |
+| Offline browser | `/pos/di-sandbox*` remains network-only; no stale offline fiscal evidence. |
 
-## Enable and review locally
+The physical tables and route names retain `sandbox` for compatibility. Records now carry an immutable reporting environment; `sandbox_invoice_number` and `production_invoice_number` remain distinct. Setup stores `production_confirmed_at/by` as the owner's onboarding attestation, not an FBR certification result. Existing successful scenarios from another integrator are not fabricated or inferred.
 
-1. Use the disposable MariaDB setup in [Cloud Agent development](../ops/cloud-agent-development.md), with fictional data only. Apply migrations in that local database.
-2. Set `APP_ENV=local` and `PRA_DI_SANDBOX_ENABLED=true`. The database must use the `mysql` driver, loopback host, no connection URL, and exactly `taxnest_dev` or `taxnest_staging`. Hosted environments use the separate explicit company opt-in described above. Tests also permit SQLite `:memory:` under `APP_ENV=testing`.
-3. Sign in as the active owner of an approved, active POS company. Open **Receipt Settings → PRA + FBR DI sandbox rehearsal**, or `/pos/di-sandbox`.
-4. Create/select a completed fictional bill and confirm that the source data is fictional. Capturing the same bill returns its existing frozen record.
-5. Review the POS snapshot. Fill the blank scenario, HS classification, UoM, rate, sale type, federal tax and payload total using reviewed sandbox reference data. Save the payload; saving does not transmit it.
-6. A deliberate sandbox transmission requires that fictional company's separately configured, encrypted `fbr_sandbox_token`. There is no production-token fallback. The new Sandbox setup page can save a dedicated pilot token; the legacy local credential is used only when no pilot profile exists. Never paste credentials in a PR or QA evidence.
-7. Explicitly submit the saved payload, then inspect both 58mm and 80mm test receipt previews. Previewing does not print automatically. These watermarked receipts are not customer tax invoices.
+## Endpoints and controls
 
-The sender uses only `https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb`, refuses redirects and ignores company endpoint overrides. Existing DI and IMS POS flows retain their existing behavior.
+- Sandbox: `https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb`
+- Production: `https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata`
+- Endpoint choice is fixed by the captured environment. Company URL overrides, redirects and automatic POST retries are refused.
+- `PRA_DI_SANDBOX_HOSTED_ENABLED=false`: hosted workbench kill switch (legacy name retained).
+- `PRA_DI_PRODUCTION_ENABLED=false`: block production activation/submission without disabling Sandbox.
+- Local rehearsal: `PRA_DI_SANDBOX_ENABLED=true`, local disposable MariaDB guard or testing SQLite `:memory:`. No real tokens/data are used in Cloud Agent verification.
+- New migration defaults old rows to Sandbox and preserves their references. Its downgrade refuses to discard production records or stored production credentials. Roll back application code while preserving fiscal evidence instead.
 
-## Tax mapping still requiring confirmation
+## Mapping and receipt limits
 
-The implementation deliberately does not select a zero rate or exemption for a PRA service. FBR sandbox acceptance proves transport/validation acceptance, not the correct legal tax treatment.
+PRA tax does not imply an FBR exemption or zero rate. Classification, sale type, rate/SRO, buyer fields, federal tax and the treatment of provincial tax in DI totals require review for the company. No automatic tax mapping is introduced. Source quantities/net bases remain fixed and discounts are not deducted twice. Production receipt shows the original customer total and separately labels FBR reported tax/total; those figures do not create a second payment demand.
 
-Before designing production reporting, obtain the applicable written requirement and confirm:
+References reviewed: [FBR DI user manual v1.4](https://download1.fbr.gov.pk/Docs/20256251162757102DIUserManualV1.4.pdf), [DI API v1.12](https://download1.fbr.gov.pk/Docs/20257301172130815TechnicalDocumentationforDIAPIV1.12.pdf). Actual FBR acceptance proves API acceptance, not legal mapping approval.
 
-- Which PRA businesses and supplies must report through FBR DI.
-- The current service/HS classification, `saleType`, rate and any SRO/item requirement.
-- The treatment of provincial tax in `totalValues`, and the correct federal `salesTaxApplicable` value.
-- Which buyer fields are required for each applicable sale and whether reporting timing differs by supply type.
-- Return/debit-note references and reconciliation rules for uncertain submissions.
+## Verification
 
-Reference: [FBR DI API technical documentation v1.12](https://download1.fbr.gov.pk/Docs/20257301172130815TechnicalDocumentationforDIAPIV1.12.pdf). `SN019` is a sandbox scenario, not an exemption decision. Older API sale-type codes must not be assumed to establish a current PRA mapping. The zero-tax values used in mocked tests are hypothetical transport fixtures, not accounting advice or a production mapping.
-
-## Record and receipt rules
-
-| Case | Behavior |
-| --- | --- |
-| Cash, card, credit, split payment | Same completed-sale capture and explicit submission path; payment recovery is not a second sale. |
-| PRA pending, failed or absent | Frozen PRA state remains separate; FBR acceptance cannot mark PRA accepted. |
-| Missing historical line tax snapshots | Capture refuses to guess a base or tax amount. |
-| Duplicate capture or submit | One record per company/source; a transaction lock claims one submission before HTTP. |
-| Explicit rejection without any acknowledgement | Prepare a reviewed payload again before another attempt; encrypted attempt history survives. |
-| Timeout, transport error, malformed/partial response | `verification_required`; no automatic retry, edit, acknowledgement QR or replay. |
-| Interrupted process after submission claim | `submitting` stays blocked for operator reconciliation. No reset button claims it was rejected. |
-| Accepted response | Requires a header reference and a valid, unique status for every line. |
-| Return | Requires the original sale's accepted FBR sandbox reference in the same company. A PRA reference is refused. |
-| Receipt | Original POS total and PRA tax stay intact. Separate, labelled PRA source and FBR sandbox blocks; FBR QR appears only after acceptance. |
-| Access | Active owner only, company-scoped reads/writes, explicit CSRF protection and submission rate limit. |
-
-`pos_di_sandbox_submissions` is separate evidence storage. Snapshot, payload and attempts are encrypted with the application key. Source-bill cleanup does not cascade into this table. Do not discard the local application key while evidence is required. No raw exception text, bearer token or arbitrary regulator response body is persisted.
-
-Existing receipt themes, paper widths, show-tax settings, printer routing, numbering, PRA token/mode, DI settings and FBR POS settings are not rewritten. The rehearsal's dedicated test receipt is separate from normal saved receipt preferences.
-
-## Verification evidence
-
-Commands must run through the repository's isolated runner, which clears inherited credentials and blocks non-loopback network access:
+The standard CI lane runs the focused suite before the broad suite:
 
 ```bash
-bash scripts/rc-safe-run -- php vendor/bin/phpunit \
-  tests/Feature/PraDiSandboxTest.php \
-  tests/Feature/DiAcknowledgementClassificationTest.php \
-  tests/Feature/PosReceiptThemeTest.php --testdox
-bash scripts/rc-safe-run -- php artisan test --compact
+bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PraDiSandboxTest.php --testdox
+bash scripts/rc-safe-run -- node scripts/sw-smoke-check.mjs
+bash scripts/verify-repository-artifacts.sh
 git diff --check
 ```
 
-- Focused HTTP/service tests cover source preservation, payment methods, encrypted evidence, independent PRA failure, missing sandbox token, route submission, tenant isolation, CSRF, owner access, production/default-off gates, return references, duplicate claims, incomplete acknowledgements, rejection/unknown handling and receipt QR conditions.
-- Regulator responses in these tests are mocked. No real sandbox acknowledgement, tax mapping approval or physical printer result has been established.
-- Local Chrome launch was blocked by the execution environment's Unix-socket restriction (`ProcessSingleton`: `Operation not permitted`). HTML route rendering was tested, but visual desktop/mobile and physical thermal-printer verification remain open.
-- Continuing an earlier unrestricted full-suite attempt was rejected by automatic approval review because a legacy test could contact PRAL. That run is not accepted as validation evidence. The subsequent isolated command above is the permitted replacement.
-- A separate, disposable loopback MariaDB 10.11 check passed: migration up/down, encrypted snapshot round-trip, the unique company/source constraint and the local database gate. It ran inside the same isolated process namespace as the database server; no shared database was used.
+Coverage includes separate tokens/endpoints, encrypted/hidden credentials, CSRF and owner confirmation, old-input secrecy, tenant isolation, same-source dual-environment records without duplicate financial entries, stale-mode refusal, Production scenario rejection, same-environment returns, unknown/replay blocking, disabled history access and environment-specific receipts.
 
-Final command outcomes are recorded in the PR description. Keep the PR in draft until the outstanding execution evidence has been reviewed. Hosted pilot setup is announced only to the PRA POS audience. FBR IMS selection, automatic checkout reporting, live DI, and the nine normal receipt formats remain outside this pilot.
-
-
-## Hosted extension verification (3 November 2026)
-
-Added regression cases for owner setup, encrypted/hidden credential storage, CSRF and consent, no token in flashed old input, existing settings preservation, tenant isolation, disable/re-enable boundaries, hosted transport company context and the global kill switch. All fixtures are fictional; HTTP responses are mocked. A production environment label in a test does not change its SQLite in-memory database or mocked network.
-
-The refreshed Cloud workspace has no PHP/Composer runtime. The standard bootstrap could not start; package installation failed on unavailable container user/group operations. New runtime results must come from disposable GitHub checks. No local PHPUnit, browser or real FBR acknowledgement pass is claimed for this extension.
-
-
-Additional local verification: the service-worker test first reproduced that the generic offline cache intercepted `/pos/di-sandbox`. The pilot route family is now network-only, with a cache-version bump. `node scripts/sw-smoke-check.mjs` passes after the fix, including stale cross-company snapshot refusal and all existing sale/offline cases. The standard Node CI lane runs this same regression. Recognized dashed NTN/CNIC formats are normalized in the frozen FBR seller identity; unknown lengths are rejected, and the company's stored/printed NTN is unchanged.
+All regulator responses and credentials in tests are synthetic. Even tests labelled Production execute only against an in-memory test database and mocked HTTP with process egress blocked. No Cloud Agent production access, actual FBR submission or deployment has occurred. Local PHP/Composer is unavailable in the refreshed workspace; JavaScript/PHP syntax checks run locally and PHP behavior runs on the disposable CI runner. Local Chrome/physical printer and real regulator acceptance are not claimed. Current exact-head outcomes are kept in the PR description.

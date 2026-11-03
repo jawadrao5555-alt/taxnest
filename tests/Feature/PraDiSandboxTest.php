@@ -789,7 +789,7 @@ class PraDiSandboxTest extends TestCase
     }
     public function test_ims_setup_encrypts_tokens_selects_one_federal_channel_and_preserves_pra_settings(): void
     {
-        PosDiSandboxProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'sandbox_token'=>'preserved-di']);
+        PosDiSandboxProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'sandbox_token'=>'preserved-di','updated_by'=>$this->owner->id]);
         $original=$this->company->getAttributes();
         $url='/pos/tax-integrations/fbr-pos/setup';
         $data=['_token'=>'csrf','enabled'=>1,'environment'=>'sandbox','connection_mode'=>'cloud','sandbox_pos_id'=>'12345','sandbox_token'=>'private-ims-token','confirm_setup'=>1];
@@ -846,9 +846,9 @@ class PraDiSandboxTest extends TestCase
         $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));$p->update(['sandbox_pos_id'=>'999']);
         try{$svc->submit($this->company->id,$r->id,$this->owner->id);$this->fail('stale identity');}catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
         $other=Company::create(['name'=>'Other synthetic tenant','ntn'=>'1111111']);$this->owner->update(['company_id'=>$other->id]);
-        $this->get('/pos/tax-integrations/fbr-pos/'.$r->id)->assertNotFound();
+        $this->getJson('/pos/tax-integrations/fbr-pos/'.$r->id)->assertNotFound();
         $this->owner->update(['company_id'=>$this->company->id,'role'=>'employee','pos_role'=>'pos_cashier']);
-        $this->get('/pos/tax-integrations/fbr-pos')->assertForbidden();
+        $this->getJson('/pos/tax-integrations/fbr-pos')->assertForbidden();
         Http::assertNothingSent();
     }
     public function test_ims_returns_require_same_environment_original_acknowledgement(): void

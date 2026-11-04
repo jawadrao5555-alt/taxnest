@@ -30,7 +30,7 @@ class PosTaxIntegrationController extends Controller
         $company=$this->company($request);abort_unless(PraDiSandboxGate::setupAvailable(),404);
         $profile=PosImsProfile::where('company_id',$company->id)->first();
         $records=PosImsSubmission::where('company_id',$company->id)->latest('id')->limit(30)->get();
-        $devices=\App\Models\PosAgentDevice::where('company_id',$company->id)->orderBy('id')->get();
+        $devices=\Illuminate\Support\Facades\Schema::hasTable('pos_agent_devices') ? \App\Models\PosAgentDevice::where('company_id',$company->id)->orderBy('id')->get() : collect();
         $deviceOptions=$devices->map(fn($d)=>['uid'=>$d->device_uid,'online'=>$d->isOnline(),'services'=>$d->local_fbr_ims ?? []])->values();
         $sales=PosTransaction::where('company_id',$company->id)->where('status','completed')->latest('id')->limit(30)->get();
         return response()->view('pos.ims.setup',compact('company','profile','records','sales','devices','deviceOptions'))->header('Cache-Control','no-store, private');

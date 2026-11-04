@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { assertLocalOnlyBaseUrl, launchLocalBrowser } from './lib/local-browser.mjs';
 
 const base = assertLocalOnlyBaseUrl(process.env.BASE_URL);
@@ -35,7 +35,21 @@ async function completeClinicalOrders(page, fixture, token) {
         await post(path + '/release', {result:'Synthetic ' + service + ' report'});
         const report = await page.request.get(base + '/health/' + path + '/report');
         assert.equal(report.status(), 200);
-        assert((await report.body()).subarray(0,4).equals(Buffer.from('%PDF')));
+        const bytes = await report.body();
+        assert(bytes.subarray(0,4).equals(Buffer.from('%PDF')));
+        if (service === 'lab') {
+            const attachment = await page.request.post(base + '/health/clinical/visits/' + fixture.visit + '/attachments', {
+                headers: { 'X-CSRF-TOKEN':token, Accept:'application/json' }, maxRedirects:0,
+                multipart:{kind:'report',caption:'Fictional signed lab report',file:{name:'demo-lab.pdf',mimeType:'application/pdf',buffer:bytes}},
+            });
+            assert.equal(attachment.status(),302);
+            await page.goto(base + '/health/clinical/visits/' + fixture.visit);
+            const href = await page.getByRole('link',{name:'demo-lab.pdf',exact:true}).getAttribute('href');
+            const download = await page.request.get(href);
+            assert.equal(download.status(),200);
+            assert(bytes.equals(await download.body()));
+            console.log('PASS private clinical attachment upload and download; SHA-256 ' + createHash('sha256').update(bytes).digest('hex'));
+        }
     }
     console.log('PASS same-patient emergency triage, prescription, C-section, lab and imaging worklists and signed PDFs');
 }

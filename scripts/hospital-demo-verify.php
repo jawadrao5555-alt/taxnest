@@ -9,7 +9,7 @@ $tables = [
     'companies', 'branches', 'users', 'health_patients', 'health_doctors', 'health_visits', 'health_charges',
     'health_bills', 'health_payments', 'health_journals', 'health_journal_lines', 'health_diagnostic_orders',
     'health_audit_events', 'health_cashier_requests', 'health_deliveries', 'health_external_referrals',
-    'health_triage_records', 'health_medicine_batches', 'health_supplier_payments', 'health_attendance_days',
+    'health_triage_records', 'health_visit_attachments', 'health_medicine_batches', 'health_supplier_payments', 'health_attendance_days',
     'health_staff_profiles', 'purchase_orders',
 ];
 $report = [];
@@ -45,6 +45,13 @@ if (in_array('--check-journey', $argv, true)) {
         !DB::table('health_deliveries')->where('health_admission_id',$stay->id)->where('method','caesarean')->exists()) {
         throw new RuntimeException('Restored clinical journey failed.');
     }
+    $attachment = \App\Models\HealthVisitAttachment::withoutGlobalScopes()->where('company_id',$hospital->id)
+        ->where('original_name','demo-lab.pdf')->sole();
+    $bytes = \Illuminate\Support\Facades\Storage::disk('local')->get($attachment->path);
+    if (!is_string($bytes) || !str_starts_with($bytes, '%PDF')) {
+        throw new RuntimeException('Clinical report bytes are missing from the private file store.');
+    }
+    $checks['attachment_sha256'] = hash('sha256', $bytes);
     $checks['clinical'] = ['signed_reports'=>$diagnostics, 'discharge'=>$stay->status, 'bill'=>$bill->bill_no,
         'total'=>$bill->total_amount,'outstanding'=>$bill->outstanding_amount];
 }

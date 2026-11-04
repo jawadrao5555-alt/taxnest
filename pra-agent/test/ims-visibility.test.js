@@ -26,3 +26,8 @@ test('FBR identity without a mode still exposes preparation, never inferred from
   assert.equal(imsMode({running:true, connected:true, serverInfo:{id:101}}), null);
   assert.equal(imsMode({...connected('fbrpos'), running:false}), null);
 });
+
+test('PRA alongside FBR exposes both without changing PRA mode',()=>{
+ assert.equal(imsMode(connected('pos',{pra_connection_mode:'fiscal_device',fbr_alongside_pra:true})),'both');
+ assert.equal(imsMode(connected('pos',{pra_connection_mode:'cloud',fbr_alongside_pra:true})),'both');
+});

@@ -350,6 +350,21 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame(1, DB::table('pos_print_evidence')->where('job_id', $id)->where('event', 'result_received')->count());
     }
 
+    public function test_ims_discovery_is_device_scoped_and_legacy_heartbeats_preserve_it(): void
+    {
+        Schema::table('pos_agent_devices', fn(Blueprint $t) => $t->json('local_fbr_ims')->nullable());
+        $url = 'http://127.0.0.1:8524/TcpService/IMSHttp';
+        $this->agentPost('/api/agent/heartbeat', ['version'=>'1.13.31','device_uid'=>'ims-pc',
+            'local_fbr_ims'=>[['url'=>$url],['url'=>'https://foreign.invalid/steal']]])->assertOk();
+        $device = PosAgentDevice::where('company_id',$this->companyId)->where('device_uid','ims-pc')->firstOrFail();
+        $this->assertSame([['protocol'=>'soap','url'=>$url]],$device->local_fbr_ims);
+        $this->agentPost('/api/agent/heartbeat', ['version'=>'1.13.30','device_uid'=>'other-pc'])->assertOk();
+        $this->assertNull(PosAgentDevice::where('company_id',$this->companyId)->where('device_uid','other-pc')->firstOrFail()->local_fbr_ims);
+        $this->assertSame([['protocol'=>'soap','url'=>$url]],$device->fresh()->local_fbr_ims);
+        $this->agentPost('/api/agent/heartbeat', ['version'=>'1.13.30','device_uid'=>'ims-pc'])->assertOk();
+        $this->assertSame([['protocol'=>'soap','url'=>$url]],$device->fresh()->local_fbr_ims);
+    }
+
     public function test_heartbeat_with_device_uid_registers_device_row(): void
     {
         $response = $this->agentPost('/api/agent/heartbeat', [

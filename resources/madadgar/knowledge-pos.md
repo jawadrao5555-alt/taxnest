@@ -495,3 +495,9 @@ Stock health counts each product/branch row once: empty/negative, low positive, 
 - Unknown/submitting result ko dobara send na karein; FBR se reconcile karwayein. Disable karne se naye submissions band aur history readable rehti hai.
 - PRA tax ki wajah se FBR exemption/zero rate khud select na karein. Company ki tax mapping review honi hai.
 - FBR POS (IMS) selection, automatic checkout aur normal 9 receipt formats mein integration is workbench ka hissa nahi.
+
+## Local IMS ki automatic pehchan (Agent 1.13.31)
+- Tax Integrations → FBR POS mein shop PC list se select karein; Agent se detected local URL khud milta hai. Aik online PC aur aik service ho to fields khud select hoti hain. Zyada PCs/services hon to sahi connection select karein.
+- WCF SOAP IMS aur pehle se saved JSON connection supported hain. Discovery sirf local availability hai; company POS registration aur Sandbox/Production ko alag verify karein.
+- Agent ki installation per-user AppData mein ho sakti hai. Agent mein installation folder aur Windows installed apps/uninstall ke buttons hain; Program Files mein hona zaroori nahi.
+- Failed start ke baad Open POS dabane se offline window dobara connect karti hai; minimized window restore hoti hai.

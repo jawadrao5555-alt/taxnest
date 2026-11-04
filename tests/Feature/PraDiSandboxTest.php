@@ -837,6 +837,21 @@ class PraDiSandboxTest extends TestCase
         $this->assertSame('LOCAL-IMS-123456',$same->fiscal_number);
         $this->get('/pos/tax-integrations/fbr-pos/'.$r->id.'/receipt')->assertOk()->assertSee('Central synchronization not independently verified.');
     }
+    public function test_legacy_agent_cannot_claim_a_soap_record(): void
+    {
+        $p=$this->imsProfile('sandbox','fiscal_device');
+        $p->update(['local_ims_url'=>'http://127.0.0.1:8524/TcpService/IMSHttp']);
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));
+        Http::fake();$svc->submit($this->company->id,$r->id,$this->owner->id);Http::assertNothingSent();
+        $this->assertNull($svc->claim($this->company->id,'synthetic-device'));
+        $this->assertSame('queued_agent',$r->fresh()->state);
+        $claim=$svc->claim($this->company->id,'synthetic-device',true);
+        $this->assertSame($r->id,$claim['id']);
+        $this->assertSame('http://127.0.0.1:8524/TcpService/IMSHttp',$claim['endpoint']);
+    }
+
     public function test_ims_rejects_wrong_tenant_device_stale_identity_and_unbalanced_mapping(): void
     {
         $p=$this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);

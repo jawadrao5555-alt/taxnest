@@ -11,6 +11,7 @@ function imsMode(status) {
     return 'fbr';
   }
   if (company.product_type === 'pos') {
+    if (company.fbr_alongside_pra === true) return 'both';
     return company.pra_connection_mode === 'fiscal_device' ? 'pra' : null;
   }
   return null; // unknown / legacy responses fail closed for this optional UI

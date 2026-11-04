@@ -314,8 +314,8 @@
       from FBR's official server and launches the installer. After installing, open the FBR IMS app once and activate:<br>
       1️⃣ Enter your <b>POS Registration No</b> &nbsp;
       2️⃣ Enter the <b>Access Code</b> from IRIS (Point of Sale Registration page) &nbsp;
-      3️⃣ Select <b>Production</b><br>
-      Then press <b>Re-check</b> — when the badge turns green, queued bills sync automatically.
+      3️⃣ Verify the installed component's <b>Sandbox / Production</b> environment independently.<br>
+      Then press <b>Re-check</b>. Green means a compatible local service was found; reporting still requires the reviewed company setup.
     </div>
     <div id="praImsSteps" style="display:none; font-size:12px; color:#c4b5fd; line-height:1.7;">
       PRA Fiscal Device mode needs PRAL's local IMS service on this PC. Install and activate it using your PRA POS credentials, then press Re-check.
@@ -454,14 +454,16 @@
   function renderStatus(s) {
     const mode = window.TaxNestImsVisibility.imsMode(s);
     $('imsDeviceInfo').textContent = 'This PC: ' + (s.deviceUid || 'Not paired') + ' · ' + (s.localIms || []).map(x=>x.url).join(' · ');
-    $('imsRoutingNote').textContent = mode === 'fbr' && s.serverInfo?.fbr_connection_mode !== 'fiscal_device'
+    $('imsRoutingNote').textContent = s.serverInfo?.product_type === 'pos'
+      ? 'PRA connection stays as saved. FBR IMS setup and Re-check are available even while FBR reporting is disabled. Discovery does not enable reporting or change the installed IMS environment.'
+      : mode === 'fbr' && s.serverInfo?.fbr_connection_mode !== 'fiscal_device'
       ? 'FBR company connected. Local IMS can be checked or installed here. Current reporting mode remains unchanged; installing IMS does not switch bills to local fiscal reporting.'
       : (mode ? 'Local fiscal-device mode. Check or prepare the required IMS service below.' : '');
     if (mode !== currentImsMode) {
       currentImsMode = mode;
       imsGeneration++;
       $('imsCard').style.display = mode ? 'block' : 'none';
-      $('imsHeading').textContent = mode === 'both' ? 'PRA + FBR IMS Services' : (mode === 'fbr' ? 'FBR IMS Fiscal Service' : 'PRA IMS Fiscal Service');
+      $('imsHeading').textContent = mode === 'both' ? 'PRA + optional FBR IMS setup' : (mode === 'fbr' ? 'FBR IMS setup / connection check' : 'PRA IMS Fiscal Service');
       $('imsSteps').style.display = 'none';
       $('praImsSteps').style.display = 'none';
       $('imsInstallBtn').style.display = 'none';

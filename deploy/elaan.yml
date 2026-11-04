@@ -1,7 +1,7 @@
-title: "Local IMS setup — shop PC aur connection ki asaan pehchan"
+title: "PRA login par FBR IMS ki tayari reporting band honay par bhi"
 audience: pos
 type: improvement
 points:
-  - "Updated Desktop Agent 1.13.31 ke saath Tax Integrations mein connected shop PC aur detected local IMS service select karein. UID aur URL manually dhoondne ki zaroorat kam ho gayi hai."
-  - "Compatible SOAP IMS ki support shamil hai. PRA ka pehle se saved setup apni jagah rehta hai; local detection se FBR registration ya environment ki tasdeeq nahi hoti."
-  - "Agent mein installation folder aur Windows installed apps ke buttons hain. Failed start ke baad Open POS se dobara connection ki koshish kar sakte hain."
+  - "Desktop Agent 1.13.32 mein PRA POS login par FBR IMS setup aur Re-check reporting band honay par bhi milta hai. Service check karne ke liye reporting ON karna zaroori nahi."
+  - "Local IMS ki pehchan ke liye mazeed supported metadata address check hota hai. Pehle se chalti PRA connection aur saved settings barqarar rehti hain."
+  - "Service milna FBR POS registration aur Sandbox ya Production environment ki tasdeeq nahi. Reporting company ki reviewed settings se hi chalay gi."

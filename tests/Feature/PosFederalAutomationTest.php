@@ -207,4 +207,31 @@ class PosFederalAutomationTest extends TestCase
         $this->assertSame('dispatched',$row->fresh()->state);
         $this->assertSame('queued_agent',\App\Models\PosImsSubmission::first()->state); Http::assertNothingSent();
     }
+
+    public function test_finalization_event_enqueues_once_and_rollback_retains_no_intent(): void
+    {
+        $this->enable(); $sale=PosTransaction::findOrFail($this->bill(override:['status'=>'hold','pra_status'=>'local']));
+        $sale->update(['status'=>'completed']); $this->assertSame(0,PosFederalOutbox::count());
+        DB::beginTransaction(); $sale->update(['pra_status'=>'submitted']);
+        $this->assertSame(1,PosFederalOutbox::count()); DB::rollBack();
+        $this->assertSame(0,PosFederalOutbox::count());
+        $sale->refresh()->update(['pra_status'=>'submitted']);
+        $sale->update(['pra_invoice_number'=>'TEST-PRA-NEW']);
+        $this->assertSame(1,PosFederalOutbox::count()); Http::assertNothingSent();
+    }
+    public function test_owner_mapping_requires_csrf_and_review_and_does_not_backfill(): void
+    {
+        $this->enable(); PosFederalRule::query()->delete(); $this->bill();
+        $this->get('/pos/tax-integrations/automatic')->assertOk()->assertSee('Automatic reporting');
+        $data=['channel'=>'di','environment'=>'sandbox','enabled'=>1,'hs_code'=>'9801.2000','tax_rate'=>'0',
+            'uom'=>'Numbers, pieces, units','sale_type'=>'Services','buyer_province'=>'Punjab','buyer_address'=>'Synthetic locality','scenario_id'=>'SN019'];
+        $this->postJson('/pos/tax-integrations/automatic',$data)->assertStatus(419);
+        $data['_token']='test-auto-csrf';
+        $this->withSession(['_token'=>'test-auto-csrf'])->postJson('/pos/tax-integrations/automatic',$data)->assertUnprocessable();
+        $data+=['all_items_confirmed'=>1,'mapping_reviewed'=>1];
+        $this->post('/pos/tax-integrations/automatic',$data)->assertRedirect(route('pos.federal-auto'));
+        $this->assertTrue(PosFederalRule::first()->enabled); $this->assertSame(0,PosFederalOutbox::count());
+        $this->owner->forceFill(['role'=>'employee','pos_role'=>'pos_cashier'])->saveQuietly();
+        $this->get('/pos/tax-integrations/automatic')->assertForbidden(); Http::assertNothingSent();
+    }
 }

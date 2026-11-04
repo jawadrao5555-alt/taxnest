@@ -55,5 +55,28 @@ export async function taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperation
   if(!(await page.locator('label[for="sandbox-token"]').innerText()).includes('Saved'))throw Error('DI token lost when selecting IMS');
   await page.goto(baseUrl+'/pos/receipt-settings',{waitUntil:'domcontentloaded'});await waitForOperationalSurface(page);await dismiss(page);
   if(await page.locator('main a[href*="di-sandbox"],main a[href*="tax-integrations"]').count())throw Error('Integration configuration remains in Receipt Display');
+  await page.goto(baseUrl+'/pos/tax-integrations/automatic',{waitUntil:'domcontentloaded'});
+  if(await page.locator('#auto-enabled').inputValue()!=='0')throw Error('Automatic reporting must start OFF');
+  await page.locator('#auto-enabled').selectOption('1');await page.locator('#auto-hs').fill('1234.5678');await page.locator('#auto-rate').fill('18');
+  await page.locator('[name="all_items_confirmed"]').check();await page.locator('[name="mapping_reviewed"]').check();
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save automatic reporting',exact:true}).click()]);
+  if(await page.locator('#auto-enabled').inputValue()!=='1')throw Error('Reviewed mapping did not save');
+  if(!(await page.locator('body').innerText()).includes('No automatic reports yet.'))throw Error('Enabling reporting backfilled historical bills');
+  await saveEvidenceScreenshot(page,'automatic-federal-mapping-'+v.width);
+  await page.locator('#auto-enabled').selectOption('0');
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save automatic reporting',exact:true}).click()]);
+  if(await page.locator('#auto-enabled').inputValue()!=='0')throw Error('Automatic reporting pause failed');
+  await page.goto(baseUrl+'/pos/transaction/'+data.dualBill+'/receipt',{waitUntil:'domcontentloaded'});
+  await page.locator('.dual-fiscal').waitFor();
+  for(const [kind,reference] of [['PRA','SYN-PRA-'+v.width],['FBR','SYN-FBR-'+v.width]]){
+    const image=page.getByAltText(kind+' fiscal QR',{exact:true});
+    await image.evaluate(img=>img.decode());
+    const number=page.locator(kind==='PRA'?'.pra-fiscal-reference':'.fbr-fiscal-reference');
+    if(await number.innerText()!==reference)throw Error('Incorrect '+kind+' acknowledgement on original receipt');
+    const a=await image.boundingBox(),b=await number.boundingBox();if(b.y<a.y+a.height-1)throw Error(kind+' reference is not beneath its QR');
+  }
+  const cells=await page.locator('.dual-fiscal td').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right};}));
+  if(cells.length!==2||Math.abs(cells[0].y-cells[1].y)>1||cells[0].right>cells[1].x+1)throw Error('Fiscal QR cells are not side by side');
+  await saveEvidenceScreenshot(page,'original-dual-fiscal-receipt-'+v.width);
   pass(t.name+'/'+v.width+': Customize → three integration cards → save independent DI URLs/tokens → select IMS without resetting DI → review original bill → 58/80mm combined previews; receipt settings has no connection setup. No fiscal dispatch.');
 }

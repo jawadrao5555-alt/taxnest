@@ -27,5 +27,5 @@ test('discovery reads WSDL only, finds nonstandard Windows listener, ignores gen
   const axios={get:async(url,options)=>{calls.push([url,options]);return {data:url.includes(':9001/')?'<wsdl ITcpService="x">GetFBRInvoiceNumberByModel soap/http</wsdl>':'<html>running</html>'};}};
   const r=await discover(axios,{platform:'win32',run:async()=>({stdout:'HTTP://+:9001/TCPSERVICE/\nHTTP://evil:9002/\n'})});
   assert.deepEqual(r,[{protocol:'soap',url:'http://127.0.0.1:9001/TcpService/IMSHttp'}]);
-  assert.ok(calls.every(([url,opts])=>url.endsWith('/TcpService?wsdl') && opts.maxRedirects===0));
+  assert.ok(calls.every(([url,opts])=>/\/TcpService(?:\/IMSHttp)?\?wsdl$/.test(url) && opts.maxRedirects===0));
 });

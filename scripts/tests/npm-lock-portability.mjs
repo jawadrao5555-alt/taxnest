@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 // Reviewed 31 Oct 2026: follow-redirects 1.16.2 and minimatch upstream 11.0.1
 // close GHSA-mrwp-f3q8-3g9p / GHSA-g3hv-75wg-m249. The hash-pinned
 // facade preserves old callable packaging APIs without an older matching engine.
+// Reviewed 4 Nov 2026: Agent 1.13.32 changes only the two root version fields; dependency graph preserved.
 // Reviewed 4 Nov 2026: Agent 1.13.31; full JSON comparison shows only two root version fields changed.
 // Reviewed 3 Nov 2026: Agent 1.13.30 adds the separate PRA + IMS bridge.
 // Full JSON comparison confirms only the two root release-version fields changed.
@@ -80,7 +81,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: '5f9391839be8858241b4895d8725640dfe1dbff0077c7d8ad946469d7d505f9c',
+    graph: '3b0dfee27db6b1b8d7acbf08c89c58d5fb15c1de5fb3e5645b16ffb3f5506530',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

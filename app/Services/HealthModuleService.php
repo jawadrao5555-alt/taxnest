@@ -32,7 +32,7 @@ class HealthModuleService
      * of an unlisted module can never be granted, and an unlisted key is
      * silently dropped by normalize().
      */
-    public const MODULES = ['opd', 'pharmacy', 'ipd', 'lab', 'accounts', 'hr', 'radiology'];
+    public const MODULES = ['opd', 'pharmacy', 'ipd', 'lab', 'accounts', 'hr', 'radiology', 'maternity', 'emergency'];
 
     /**
      * Capabilities that belong to each module. A capability whose module is OFF
@@ -98,6 +98,8 @@ class HealthModuleService
         'lab' => [
             'lab.view', 'lab.order', 'lab.collect', 'lab.result', 'lab.manage',
         ],
+        'maternity' => ['maternity.record'],
+        'emergency' => ['emergency.triage'],
         'radiology' => ['radiology.view', 'radiology.order', 'radiology.collect', 'radiology.result', 'radiology.manage'],
         'accounts' => [
             // `accounts.approve` is the accountant's ceiling, not their right.
@@ -131,6 +133,8 @@ class HealthModuleService
         'opd'      => ['icon' => '🩺', 'colour' => 'sky'],
         'pharmacy' => ['icon' => '💊', 'colour' => 'emerald'],
         'ipd'      => ['icon' => '🛏️', 'colour' => 'indigo'],
+        'maternity' => ['icon' => '✚', 'colour' => 'rose'],
+        'emergency' => ['icon' => '+', 'colour' => 'red'],
         'radiology' => ['icon' => '☢', 'colour' => 'sky'],
         'lab'      => ['icon' => '🔬', 'colour' => 'violet'],
         'accounts' => ['icon' => '🧾', 'colour' => 'amber'],
@@ -143,7 +147,7 @@ class HealthModuleService
      */
     public const ORG_TYPE_DEFAULTS = [
         'clinic'   => ['opd', 'accounts'],
-        'maternity' => ['opd', 'ipd', 'accounts', 'hr'],
+        'maternity' => ['opd', 'ipd', 'accounts', 'hr', 'maternity'],
         'hospital' => ['opd', 'pharmacy', 'ipd', 'lab', 'accounts', 'hr'],
         'lab'      => ['lab', 'accounts'],
         'pharmacy' => ['pharmacy', 'accounts'],
@@ -266,9 +270,9 @@ class HealthModuleService
                 return self::PLAN_FALLBACK_MODULES;
             }
 
-            $listed = self::normalize($plan->health_modules ?? null);
-
-            return $listed ?: self::PLAN_FALLBACK_MODULES;
+            return $plan->health_modules === null
+                ? self::PLAN_FALLBACK_MODULES
+                : self::normalize($plan->health_modules);
         } catch (\Throwable $e) {
             // Never let plan resolution take the panel down.
             return self::PLAN_FALLBACK_MODULES;

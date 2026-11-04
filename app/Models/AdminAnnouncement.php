@@ -46,8 +46,8 @@ class AdminAnnouncement extends Model
     public function scopeForCompany($query, $companyId, ?Company $company = null)
     {
         $company ??= Company::find($companyId);
-        $panel = PosFeatureService::panelFor($company);
-        $category = PosFeatureService::resolveCategory($company);
+        $panel = self::audiencePanel($company);
+        $category = $panel === \App\Support\NestErps::PRODUCT_TYPE ? null : PosFeatureService::resolveCategory($company);
 
         return $query->where(function ($q) use ($companyId) {
             $q->where('target', 'all')
@@ -61,9 +61,18 @@ class AdminAnnouncement extends Model
             });
         })->when(Schema::hasColumn('admin_announcements', 'target_categories'), function ($q) use ($category) {
             $q->where(function ($w) use ($category) {
-                $w->whereNull('target_categories')->orWhereJsonContains('target_categories', $category);
+                $w->whereNull('target_categories');
+                if ($category !== null) {
+                    $w->orWhereJsonContains('target_categories', $category);
+                }
             });
         });
+    }
+
+    private static function audiencePanel(?Company $company): string
+    {
+        return \App\Support\NestErps::isProductType($company?->product_type)
+            ? \App\Support\NestErps::PRODUCT_TYPE : PosFeatureService::panelFor($company);
     }
 
     /** The preview and the dashboard use the same audience decisions. */
@@ -75,10 +84,11 @@ class AdminAnnouncement extends Model
         if ($this->target !== 'specific' && $this->target !== 'all') {
             return false;
         }
-        if (!in_array($this->audience_panel ?: 'all', ['all', PosFeatureService::panelFor($company)], true)) {
+        if (!in_array($this->audience_panel ?: 'all', ['all', self::audiencePanel($company)], true)) {
             return false;
         }
         $categories = $this->target_categories;
-        return !$categories || in_array(PosFeatureService::resolveCategory($company), $categories, true);
+        return !$categories || (self::audiencePanel($company) !== \App\Support\NestErps::PRODUCT_TYPE
+            && in_array(PosFeatureService::resolveCategory($company), $categories, true));
     }
 }

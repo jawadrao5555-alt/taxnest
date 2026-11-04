@@ -184,6 +184,7 @@
 
                             <form method="POST" action="{{ route('health.billing.bills.pay', $bill->id) }}" x-show="payForm" x-cloak class="mt-3 space-y-3">
                                 @csrf
+                    <input type="hidden" name="request_key" value="{{ \Illuminate\Support\Str::uuid() }}">
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('health.amount') }}</label>
@@ -225,6 +226,7 @@
 
                             <form method="POST" action="{{ route('health.billing.bills.refund', $bill->id) }}" x-show="refundForm" x-cloak class="mt-3 space-y-3">
                                 @csrf
+                    <input type="hidden" name="request_key" value="{{ \Illuminate\Support\Str::uuid() }}">
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('health.amount') }}</label>

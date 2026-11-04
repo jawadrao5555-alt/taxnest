@@ -391,6 +391,12 @@ class HealthBillingService
      */
     public static function recordPayment(int $companyId, int $patientId, array $data, $actor = null): array
     {
+        return self::cashierRequest($companyId, $patientId, 'receive', $data, $actor,
+            fn () => self::receive($companyId, $patientId, $data, $actor));
+    }
+
+    private static function receive(int $companyId, int $patientId, array $data, $actor): array
+    {
         if (!Schema::hasTable('health_payments')) {
             return ['ok' => false, 'reason' => 'not_installed'];
         }
@@ -529,6 +535,54 @@ class HealthBillingService
      * @return array{ok:bool,reason?:string,payment?:HealthPayment}
      */
     public static function refund(HealthBill $bill, float $amount, array $data = [], $actor = null): array
+    {
+        $data['health_bill_id'] = $bill->id;
+        $data['amount'] = $amount;
+        return self::cashierRequest($bill->company_id, $bill->health_patient_id, 'refund', $data, $actor,
+            fn () => self::refundReceipt($bill->fresh(), $amount, $data, $actor));
+    }
+
+    // Serialize deposits and bill payments on the patient first, then the bill.
+    // The receipt, chart posting and optional replay key commit together.
+    private static function cashierRequest(int $companyId, int $patientId, string $action, array $data, $actor, callable $post): array
+    {
+        return DB::transaction(function () use ($companyId, $patientId, $action, $data, $actor, $post) {
+            $patient = HealthPatient::withoutGlobalScopes()->where('company_id', $companyId)
+                ->lockForUpdate()->find($patientId);
+            if (!$patient) {
+                return ['ok' => false, 'reason' => 'patient_not_found'];
+            }
+            if (!empty($data['health_bill_id'])) {
+                HealthBill::withoutGlobalScopes()->where('company_id', $companyId)->where('health_patient_id', $patientId)
+                    ->lockForUpdate()->find($data['health_bill_id']);
+            }
+            $key = $data['request_key'] ?? null;
+            if (!$key) {
+                return $post();
+            }
+            $data['amount'] = number_format((float) ($data['amount'] ?? 0), 2, '.', '');
+            ksort($data);
+            $hash = hash('sha256', json_encode([$action, $actor->id ?? null, $data], JSON_THROW_ON_ERROR));
+            $identity = ['company_id' => $companyId, 'health_patient_id' => $patientId, 'request_key' => $key];
+            $previous = DB::table('health_cashier_requests')->where($identity)->first();
+            if ($previous) {
+                if (!hash_equals($previous->request_hash, $hash)) {
+                    return ['ok' => false, 'reason' => 'request_conflict'];
+                }
+                $payment = HealthPayment::withoutGlobalScopes()->where('company_id', $companyId)->findOrFail($previous->health_payment_id);
+                return ['ok' => true, 'payment' => $payment, 'credited' => (float) $previous->credited];
+            }
+            $result = $post();
+            if ($result['ok']) {
+                DB::table('health_cashier_requests')->insert($identity + [
+                    'request_hash' => $hash, 'health_payment_id' => $result['payment']->id, 'credited' => $result['credited'] ?? 0,
+                ]);
+            }
+            return $result;
+        }, 3);
+    }
+
+    private static function refundReceipt(HealthBill $bill, float $amount, array $data, $actor): array
     {
         $amount = round($amount, 2);
         if ($amount <= 0) {

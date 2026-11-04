@@ -33,7 +33,7 @@ final class DisposableHospitalSeeder extends Seeder
                 'B' => ['Demo Independent Services Hospital', 'hospital', $all],
                 'C' => ['Demo Ward Hospital', 'hospital', ['opd', 'ipd', 'accounts', 'hr']],
                 'D' => ['Demo OPD Clinic', 'clinic', ['opd']],
-                'E' => ['Demo Maternity Home', 'maternity', ['opd', 'ipd', 'accounts', 'hr']],
+                'E' => ['Demo Maternity Home', 'maternity', ['opd', 'ipd', 'accounts', 'hr', 'maternity']],
                 'F' => ['Demo Multispecialty Hospital', 'hospital', $all],
                 'BP' => ['Demo Independent Pharmacy', 'pharmacy', ['pharmacy', 'accounts']],
                 'BL' => ['Demo Independent Laboratory', 'lab', ['lab', 'accounts']],

@@ -428,7 +428,10 @@ class PosAnalyticsPlanGateTest extends TestCase
         for($n=0;$n<60;$n++)DB::table('pos_transaction_items')->insert([
             'transaction_id'=>$id,'item_type'=>'manual','item_name'=>'Synthetic detail '.str_pad((string)$n,2,'0',STR_PAD_LEFT),
             'quantity'=>1,'unit_price'=>1,'subtotal'=>1,'tax_amount'=>0,'tax_rate'=>0,'created_at'=>now(),'updated_at'=>now()]);
-        $response=$this->actingAs($owner,'pos')->get('/pos/reports/analytics-pdf?tab=pra')->assertOk();
+        $date = DB::table('pos_transactions')->where('id', $id)->value('business_date');
+        $response = $this->actingAs($owner, 'pos')->get('/pos/reports/analytics-pdf?'.http_build_query([
+            'tab' => 'pra', 'from' => $date, 'to' => $date,
+        ]))->assertOk();
         $this->assertStringStartsWith('%PDF-',$response->getContent());
         $document=(new \Smalot\PdfParser\Parser())->parseContent($response->getContent());
         $text=$document->getText();

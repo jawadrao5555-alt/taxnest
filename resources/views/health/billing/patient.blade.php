@@ -72,6 +72,7 @@
             <form method="POST" action="{{ route('health.billing.deposit', $patient->id) }}" x-show="depositForm" x-cloak
                   class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                 @csrf
+                    <input type="hidden" name="request_key" value="{{ \Illuminate\Support\Str::uuid() }}">
                 <h2 class="font-black">{{ __('health.pay_take_deposit') }}</h2>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div>

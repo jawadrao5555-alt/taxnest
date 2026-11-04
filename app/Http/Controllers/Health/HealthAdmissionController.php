@@ -13,6 +13,9 @@ use App\Services\HealthIpdService;
 use App\Services\HealthRecordAccessService;
 use App\Services\HealthScopeService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
+use App\Models\HealthOperation;
 use Illuminate\Validation\Rule;
 
 /**
@@ -145,6 +148,9 @@ class HealthAdmissionController extends HealthPanelController
             'charges' => $charges,
             'payments' => $payments,
             'events' => $events,
+            'delivery' => $admission->admission_type === 'maternity' && $this->maySeeClinical()
+                ? DB::table('health_deliveries')->where('company_id', $admission->company_id)->where('health_admission_id', $id)->first() : null,
+            'mayRecordDelivery' => $this->can('ipd.manage') && $this->can('maternity.record'),
             'operations' => $operations,
             'summary' => HealthIpdBillingService::summary($admission),
             'blockers' => HealthIpdBillingService::clearanceBlockers($admission),
@@ -276,6 +282,47 @@ class HealthAdmissionController extends HealthPanelController
         }
 
         return back()->with('success', __('health.adm_transferred'));
+    }
+
+    public function recordDelivery(Request $request, int $id)
+    {
+        $this->require('ipd.manage');
+        $admission = $this->findAdmission($id);
+        $data = $request->validate([
+            'method' => 'required|in:vaginal,caesarean', 'delivered_at' => 'required|date|before_or_equal:now',
+            'operation_id' => 'exclude_unless:method,caesarean|required|integer',
+            'newborns' => 'required|array|min:1|max:12',
+            'newborns.*' => 'required|array:outcome,weight_grams',
+            'newborns.*.outcome' => 'required|in:liveborn,stillborn',
+            'newborns.*.weight_grams' => 'nullable|integer|min:1|max:15000',
+        ]);
+        DB::transaction(function () use ($admission, $data) {
+            $stay = HealthAdmission::query()->lockForUpdate()->findOrFail($admission->id);
+            abort_unless($stay->status === HealthAdmission::STATUS_ADMITTED && $stay->admission_type === 'maternity', 409);
+            $when = \Illuminate\Support\Carbon::parse($data['delivered_at']);
+            abort_if($stay->admitted_at && $when->lt($stay->admitted_at), 422);
+            $operationId = $data['operation_id'] ?? null;
+            if ($operationId) {
+                $operation = HealthOperation::query()->where('company_id', $stay->company_id)
+                    ->where('health_patient_id', $stay->health_patient_id)->where('health_admission_id', $stay->id)
+                    ->where('status', HealthOperation::STATUS_COMPLETED)->findOrFail($operationId);
+                $this->requireBranch($operation->branch_id);
+                $this->requireDepartment($operation->health_department_id);
+            }
+            $newborns = array_map(fn ($baby) => ['outcome' => $baby['outcome'],
+                'weight_grams' => isset($baby['weight_grams']) ? (int) $baby['weight_grams'] : null], $data['newborns']);
+            $prior = DB::table('health_deliveries')->where('health_admission_id', $stay->id)->first();
+            if ($prior) {
+                abort_unless($prior->method === $data['method'] && $prior->delivered_at === $when->toDateTimeString()
+                    && $prior->health_operation_id == $operationId && Crypt::decrypt($prior->newborns) === $newborns, 409);
+                return;
+            }
+            DB::table('health_deliveries')->insert(['company_id' => $stay->company_id, 'health_admission_id' => $stay->id,
+                'health_operation_id' => $operationId, 'method' => $data['method'], 'delivered_at' => $when,
+                'newborns' => Crypt::encrypt($newborns), 'recorded_by' => $this->user()->id, 'created_at' => now(), 'updated_at' => now()]);
+            HealthIpdService::event($stay, 'delivery_recorded', $this->user());
+        }, 3);
+        return redirect()->route('health.ipd.show', $id);
     }
 
     public function recordCare(Request $request, $id)

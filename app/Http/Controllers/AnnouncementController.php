@@ -89,13 +89,16 @@ class AnnouncementController extends Controller
         $request->validate([
             'target' => 'required|in:all,specific',
             'target_company_id' => 'required_if:target,specific|nullable|exists:companies,id',
-            'audience_panel' => 'required_if:target,all|nullable|in:all,pra,fbr',
+            'audience_panel' => 'required_if:target,all|nullable|in:all,pra,fbr,erps',
             'audience_scope' => 'required_if:target,all|nullable|in:all,categories',
             'target_categories' => 'nullable|array',
             'target_categories.*' => 'string|max:60',
         ]);
         if ($request->input('target') !== 'all' || $request->input('audience_scope') !== 'categories') {
             return;
+        }
+        if ($request->input('audience_panel') === \App\Support\NestErps::PRODUCT_TYPE) {
+            throw ValidationException::withMessages(['audience_scope' => 'Select all ERP companies or one specific company.']);
         }
         $selected = $request->input('target_categories', []);
         $panels = $request->input('audience_panel') === 'all' ? ['pra', 'fbr'] : [$request->input('audience_panel')];

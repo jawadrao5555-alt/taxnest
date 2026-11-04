@@ -77,6 +77,16 @@ class AdminAnnouncementAudienceTest extends TestCase
         ]);
     }
 
+    public function test_erp_notices_reach_current_and_legacy_hospitals_only(): void
+    {
+        $notice = $this->notice('all', null, 'erps');
+        foreach (['erps' => true, 'health' => true, 'pos' => false, 'fbrpos' => false, 'di' => false] as $type => $expected) {
+            $company = $this->company('Demo '.$type, $type, null);
+            $this->assertSame($expected, $notice->reachesCompany($company));
+            $this->assertSame($expected, AdminAnnouncement::forCompany($company->id)->whereKey($notice->id)->exists());
+        }
+    }
+
     public function test_existing_all_and_specific_notices_keep_their_reach(): void
     {
         $pra = $this->company('PRA shop', 'pos', 'restaurant');

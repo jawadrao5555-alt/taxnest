@@ -232,6 +232,40 @@ class HealthIpdOperationsTest extends TestCase
 
     // ── 1. the bed is physical ────────────────────────────────────────────
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('deliveryMethods')]
+    public function test_delivery_records_one_birth_event_and_links_the_completed_operation(string $method): void
+    {
+        HealthModuleService::setForCompany($this->company, ['opd', 'ipd', 'maternity']);
+        $admission = $this->seedAdmission(null, ['admission_type' => 'maternity']);
+        $payload = ['method' => $method, 'delivered_at' => now()->toDateTimeString(),
+            'newborns' => [['outcome' => 'liveborn', 'weight_grams' => 3120]]];
+        $url = '/health/ipd/admissions/'.$admission->id.'/delivery';
+        $this->actingAs($this->owner, HealthPanel::GUARD);
+        if ($method === 'caesarean') {
+            $this->postJson($url, $payload)->assertUnprocessable();
+            $operation = HealthOperationService::schedule(['company_id' => $this->company->id,
+                'health_patient_id' => $admission->health_patient_id, 'health_admission_id' => $admission->id,
+                'title' => 'Demo C-section', 'primary_surgeon_id' => $this->doctor->id], $this->doctorUser);
+            $payload['operation_id'] = $operation->id;
+            $this->postJson($url, $payload)->assertNotFound();
+            HealthOperationService::complete($operation, ['outcome' => 'successful'], $this->doctorUser);
+        }
+        $this->post($url, $payload)->assertRedirect('/health/ipd/admissions/'.$admission->id);
+        $this->post($url, $payload)->assertRedirect();
+        $this->get('/health/ipd/admissions/'.$admission->id)->assertOk()->assertSee('3120');
+        $this->assertDatabaseCount('health_deliveries', 1);
+        $this->assertDatabaseHas('health_admission_events', ['health_admission_id' => $admission->id, 'event' => 'delivery_recorded']);
+        $this->assertDatabaseHas('health_deliveries', ['method' => $method, 'health_operation_id' => $payload['operation_id'] ?? null]);
+        HealthModuleService::setForCompany($this->company, ['opd', 'ipd']);
+        $this->postJson($url, $payload)->assertForbidden();
+        $this->assertDatabaseCount('health_deliveries', 1);
+    }
+
+    public static function deliveryMethods(): array
+    {
+        return [['vaginal'], ['caesarean']];
+    }
+
     public function test_admission_claims_the_bed_and_stamps_the_timeline(): void
     {
         $admission = $this->seedAdmission();

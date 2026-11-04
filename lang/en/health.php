@@ -9,6 +9,23 @@
  */
 
 return [
+    'pay_err_request_conflict' => 'This form was already used with different details. Reload the bill and review the existing receipt.',
+    'role_health_radiologist' => 'Radiologist',
+    'cap_lab_order' => 'Order laboratory tests',
+    'cap_lab_manage' => 'Manage laboratory catalogue',
+    'cap_radiology_view' => 'View imaging',
+    'cap_radiology_order' => 'Order imaging',
+    'cap_radiology_collect' => 'Record study',
+    'cap_radiology_result' => 'Release imaging reports',
+    'cap_radiology_manage' => 'Manage imaging catalogue',
+    'cap_maternity_record' => 'Record delivery',
+    'cap_emergency_triage' => 'Record emergency triage',
+
+    'module_maternity' => 'Maternity',
+    'module_maternity_desc' => 'Delivery and newborn records',
+    'module_emergency' => 'Emergency',
+    'module_emergency_desc' => 'Emergency visit triage',
+
     'module_radiology' => 'Radiology',
     'module_radiology_desc' => 'Imaging orders, acquisition and signed reports.',
     'org_type_maternity' => 'Maternity home',
@@ -260,7 +277,7 @@ return [
     'dash_no_package' => 'No package yet',
     'dash_your_modules' => 'Your modules',
     'dash_quick_actions' => 'Quick actions',
-    'dash_fbr_ready' => 'FBR reporting is configured.',
+    'dash_fbr_ready' => 'FBR account details saved. Hospital EFD integration under section 237A requires separate verification.',
     'dash_fbr_not_ready' => 'FBR reporting is not configured yet.',
 
     /* ─── Settings ─── */

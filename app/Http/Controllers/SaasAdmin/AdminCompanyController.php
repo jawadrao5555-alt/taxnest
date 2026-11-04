@@ -83,6 +83,7 @@ class AdminCompanyController extends Controller
             'admin_email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail($request->input('product_type'))],
             'admin_password' => ['required', 'string', \Illuminate\Validation\Rules\Password::defaults()],
             'admin_name' => 'required|string|max:255',
+            'health_org_type' => 'nullable|in:'.implode(',', \App\Support\HealthPanel::ORG_TYPES),
         ], \App\Services\LoginIdentifierResolver::cnicMessages());
 
         // Canonical product type BEFORE anything reads it: a form still open in
@@ -155,10 +156,10 @@ class AdminCompanyController extends Controller
             }
             if ($vertical === \App\Support\NestErps::HEALTH) {
                 if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_org_type')) {
-                    $companyData['health_org_type'] = 'clinic';
+                    $companyData['health_org_type'] = \App\Support\HealthPanel::normalizeOrgType($request->input('health_org_type'));
                 }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_modules')) {
-                    $companyData['health_modules'] = \App\Services\HealthModuleService::ORG_TYPE_DEFAULTS['clinic'];
+                    $companyData['health_modules'] = HealthModuleService::defaultsForOrgType($companyData['health_org_type'] ?? null);
                 }
             }
         }

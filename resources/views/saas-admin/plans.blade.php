@@ -78,12 +78,12 @@
             <h3 class="text-sm font-semibold text-white">Create New Plan</h3>
             <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'Show Form'"></button>
         </div>
-        <form x-show="showForm" method="POST" action="{{ route('saas.admin.plans.store') }}" class="space-y-4">
+        <form x-data="{ selectedProduct: 'di' }" x-show="showForm" method="POST" action="{{ route('saas.admin.plans.store') }}" class="space-y-4">
             @csrf
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <input type="text" name="name" placeholder="Plan Name" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <div>
-                    <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                    <select x-model="selectedProduct" name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         <option value="di">TaxNest Digital Invoice</option>
                         <option value="pos">PRA POS</option>
                         <option value="fbrpos">TaxNest FBR POS</option>
@@ -99,6 +99,8 @@
                         <option value="{{ $key }}">{{ \App\Support\NestErps::LABEL }} vertical: {{ $meta['label'] }}</option>
                         @endforeach
                     </select>
+                    @include('saas-admin.partials.health-plan-modules', ['selected' => \App\Services\HealthModuleService::PLAN_FALLBACK_MODULES])
+
                 </div>
                 <input type="number" name="price" placeholder="Price (PKR — DI = stored monthly base, POS/FBR POS = annual)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="price_yearly" placeholder="Annual Price (DI only — blank = monthly × 12 less 6%)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">

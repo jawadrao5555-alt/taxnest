@@ -527,7 +527,7 @@ class PosDashboardTodayKhataTest extends TestCase
         $this->makeTxn($companyId,'OTHER',['created_by'=>$user->id+99]);
         $foreign=$this->makeCompany();$this->makeTxn($foreign,'FOREIGN',['created_by'=>$user->id]);
         auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
-        $view=(new PosController())->dashboardDetail(Request::create('/pos/dashboard/detail/orders','GET',['date'=>now()->toDateString(),'cashier'=>'all']),'orders');
+        $view=(new PosController())->dashboardDetail(Request::create('/pos/dashboard/detail/orders','GET',['date'=>\App\Services\PosBusinessDay::current($companyId),'cashier'=>'all']),'orders');
         $this->assertSame([$own],$view->getData()['rows']->pluck('id')->all());
     }
 

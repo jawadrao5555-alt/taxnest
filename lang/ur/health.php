@@ -11,6 +11,23 @@
  */
 
 return [
+    'pay_err_request_conflict' => 'یہ فارم مختلف تفصیلات کے ساتھ استعمال ہو چکا ہے۔ بل دوبارہ کھول کر رسید دیکھیں۔',
+    'role_health_radiologist' => 'ماہر ریڈیالوجی',
+    'cap_lab_order' => 'لیب ٹیسٹ کا آرڈر',
+    'cap_lab_manage' => 'لیب فہرست کا انتظام',
+    'cap_radiology_view' => 'امیجنگ دیکھیں',
+    'cap_radiology_order' => 'امیجنگ کا آرڈر',
+    'cap_radiology_collect' => 'اسکین درج کریں',
+    'cap_radiology_result' => 'رپورٹ جاری کریں',
+    'cap_radiology_manage' => 'امیجنگ فہرست کا انتظام',
+    'cap_maternity_record' => 'ولادت درج کریں',
+    'cap_emergency_triage' => 'ایمرجنسی جانچ درج کریں',
+
+    'module_maternity' => 'زچہ و بچہ',
+    'module_maternity_desc' => 'ولادت اور نومولود کا ریکارڈ',
+    'module_emergency' => 'ایمرجنسی',
+    'module_emergency_desc' => 'ایمرجنسی مریض کی ابتدائی جانچ',
+
     'module_radiology' => 'ریڈیالوجی',
     'module_radiology_desc' => 'امیجنگ آرڈر، معائنہ اور تصدیق شدہ رپورٹ۔',
     'org_type_maternity' => 'زچہ و بچہ مرکز',
@@ -261,7 +278,7 @@ return [
     'dash_no_package' => 'ابھی کوئی پیکج نہیں',
     'dash_your_modules' => 'آپ کے حصے',
     'dash_quick_actions' => 'فوری کام',
-    'dash_fbr_ready' => 'ایف بی آر رپورٹنگ مقرر ہے۔',
+    'dash_fbr_ready' => 'ایف بی آر اکاؤنٹ کی تفصیل محفوظ ہے۔ دفعہ 237A کے تحت ہسپتال کے مالیاتی آلے کی علیحدہ تصدیق درکار ہے۔',
     'dash_fbr_not_ready' => 'ایف بی آر رپورٹنگ ابھی مقرر نہیں۔',
 
     /* ─── Settings ─── */

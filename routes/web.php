@@ -2164,6 +2164,8 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         Route::get('/clinical', [HealthClinicalController::class, 'queue'])->name('health.clinical');
         Route::get('/clinical/visits/{id}', [HealthClinicalController::class, 'show'])->whereNumber('id')->name('health.clinical.visit');
         Route::post('/clinical/visits/{id}/start', [HealthClinicalController::class, 'start'])->whereNumber('id')->name('health.clinical.start');
+        Route::post('/clinical/visits/{id}/triage', [HealthClinicalController::class, 'recordTriage'])
+            ->whereNumber('id')->middleware('health.can:emergency.triage')->name('health.clinical.triage');
         Route::post('/clinical/visits/{id}/vitals', [HealthClinicalController::class, 'saveVitals'])->whereNumber('id')->name('health.clinical.vitals');
         Route::post('/clinical/visits/{id}/notes', [HealthClinicalController::class, 'saveNotes'])->whereNumber('id')->name('health.clinical.notes');
         Route::post('/clinical/visits/{id}/reopen', [HealthClinicalController::class, 'reopen'])->whereNumber('id')->name('health.clinical.reopen');
@@ -2199,6 +2201,8 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
             Route::post('/ipd/admissions/{id}/admit', [HealthAdmissionController::class, 'admit'])->whereNumber('id')->name('health.ipd.admit');
             Route::post('/ipd/admissions/{id}/reserve', [HealthAdmissionController::class, 'reserve'])->whereNumber('id')->name('health.ipd.reserve');
             Route::post('/ipd/admissions/{id}/transfer', [HealthAdmissionController::class, 'transfer'])->whereNumber('id')->name('health.ipd.transfer');
+            Route::post('/ipd/admissions/{id}/delivery', [HealthAdmissionController::class, 'recordDelivery'])
+                ->whereNumber('id')->middleware('health.can:maternity.record')->name('health.ipd.delivery');
             Route::post('/ipd/admissions/{id}/care', [HealthAdmissionController::class, 'recordCare'])->whereNumber('id')->name('health.ipd.care');
             Route::post('/ipd/admissions/{id}/discharge-request', [HealthAdmissionController::class, 'requestDischarge'])->whereNumber('id')->name('health.ipd.discharge-request');
             Route::post('/ipd/admissions/{id}/cancel', [HealthAdmissionController::class, 'cancel'])->whereNumber('id')->name('health.ipd.cancel');

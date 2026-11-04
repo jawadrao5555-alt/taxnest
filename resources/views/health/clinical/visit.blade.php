@@ -46,6 +46,21 @@
     $readOnly = !$canWrite || $visit->status === HealthVisit::STATUS_CANCELLED;
 @endphp
 <x-health-layout>
+    @if($visit->visit_type === HealthVisit::TYPE_EMERGENCY && ($mayTriage || $triage))
+        <section class="max-w-5xl mx-auto p-4 rounded border">
+            <h2 class="font-bold">Emergency triage</h2>
+            @if($triage)
+                <p>{{ ucfirst($triage->priority) }} · {{ decrypt($triage->presenting_problem) }}</p>
+            @elseif($mayTriage && in_array($visit->status, [HealthVisit::STATUS_WAITING, HealthVisit::STATUS_IN_CONSULTATION], true))
+                <form method="post" action="{{ route('health.clinical.triage', $visit->id) }}" class="space-y-2">@csrf
+                    <label>Priority <select name="priority"><option>immediate</option><option>urgent</option><option>standard</option></select></label>
+                    <label>Presenting problem <textarea class="block rounded border" name="presenting_problem" required maxlength="2000"></textarea></label>
+                    <button class="rounded bg-teal-700 text-white p-2">Record triage</button>
+                </form>
+            @endif
+        </section>
+    @endif
+
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
         <div>

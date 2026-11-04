@@ -240,6 +240,24 @@ class HealthOpdCoreTest extends TestCase
 
     /* ───────────────── 3. Who may do what ───────────────── */
 
+    public function test_emergency_triage_is_recorded_once_and_denied_when_the_service_is_off(): void
+    {
+        $this->company->forceFill(['is_internal_account' => true, 'health_modules' => ['opd', 'emergency']])->save();
+        \App\Services\HealthModuleService::forget($this->company->id);
+        [, $visit] = $this->seedVisit();
+        $visit->update(['visit_type' => HealthVisit::TYPE_EMERGENCY]);
+        $url = '/health/clinical/visits/'.$visit->id.'/triage';
+        $payload = ['priority' => 'urgent', 'presenting_problem' => 'Fictional observation'];
+        $this->actingAs($this->nurse, HealthPanel::GUARD);
+        $this->post($url, $payload)->assertRedirect('/health/clinical/visits/'.$visit->id);
+        $this->post($url, $payload)->assertRedirect();
+        $this->get('/health/clinical/visits/'.$visit->id)->assertOk()->assertSee('Fictional observation');
+        $this->postJson($url, ['priority' => 'standard'] + $payload)->assertConflict();
+        \App\Services\HealthModuleService::setForCompany($this->company, ['opd']);
+        $this->postJson($url, $payload)->assertForbidden();
+        $this->assertDatabaseCount('health_triage_records', 1);
+    }
+
     public function test_a_nurse_can_open_the_clinical_screen_and_record_vitals(): void
     {
         [, $visit] = $this->seedVisit();

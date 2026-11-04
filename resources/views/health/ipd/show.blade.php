@@ -111,6 +111,39 @@
         </div>
 
         {{-- ── panels ── --}}
+        @if($admission->admission_type === 'maternity' && ($mayRecordDelivery || $delivery))
+            <section class="rounded border p-4 space-y-3">
+                <h2 class="font-bold">Delivery record</h2>
+                @if($delivery)
+                    <p>{{ ucfirst($delivery->method) }} · {{ $delivery->delivered_at }} · Staff ID {{ $delivery->recorded_by }}</p>
+                    @foreach(decrypt($delivery->newborns) as $baby)
+                        <p>Baby {{ $loop->iteration }} · {{ $baby['outcome'] }} @if($baby['weight_grams']) · {{ $baby['weight_grams'] }} g @endif</p>
+                    @endforeach
+                @elseif($mayRecordDelivery && $admission->status === HealthAdmission::STATUS_ADMITTED)
+                    <form method="post" action="{{ route('health.ipd.delivery', $admission->id) }}" x-data="{method:'vaginal', count:1}" class="space-y-2">@csrf
+                        <label>Delivery method <select name="method" x-model="method"><option value="vaginal">Vaginal</option><option value="caesarean">C-section</option></select></label>
+                        <label>Delivery time <input type="datetime-local" name="delivered_at" required></label>
+                        <label x-show="method === 'caesarean'">Completed operation
+                            <select name="operation_id" :required="method === 'caesarean'">
+                                <option value="">Select operation</option>
+                                @foreach($operations->where('status', 'completed') as $op)
+                                    <option value="{{ $op->id }}">{{ $op->operation_no }} · {{ $op->title }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <template x-for="i in count" :key="i"><fieldset class="space-x-2">
+                            <legend>Baby <span x-text="i"></span></legend>
+                            <label>Outcome <select :name="'newborns['+(i-1)+'][outcome]'" required>
+                                <option value="">Select outcome</option><option value="liveborn">Liveborn</option><option value="stillborn">Stillborn</option>
+                            </select></label>
+                            <label>Birth weight (g) <input type="number" min="1" max="15000" :name="'newborns['+(i-1)+'][weight_grams]'"></label>
+                        </fieldset></template>
+                        <button type="button" class="underline" @click="if(count<12) count++">Add baby</button>
+                        <button class="rounded bg-teal-700 p-2 text-white">Record delivery</button>
+                    </form>
+                @endif
+            </section>
+        @endif
         @if($mayManage)
             @foreach([['admit', route('health.ipd.admit', $admission->id), __('health.adm_admit')], ['reserve', route('health.ipd.reserve', $admission->id), __('health.bed_reserve')]] as [$key, $action, $label])
                 <div x-show="panel === '{{ $key }}'" x-cloak class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">

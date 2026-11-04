@@ -88,6 +88,7 @@ class HealthAuth
         view()->share('healthCompany', $company);
         view()->share('healthUser', $user);
         view()->share('healthRole', $role);
+        HealthModuleService::forget($company->id);
         view()->share('healthModules', HealthModuleService::enabled($company));
         view()->share('healthCapabilities', HealthAccessService::capabilitiesFor($user, $company));
         view()->share('healthDepartmentIds', HealthScopeService::departmentIdsFor($user));

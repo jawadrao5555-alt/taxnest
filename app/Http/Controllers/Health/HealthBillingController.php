@@ -376,6 +376,7 @@ class HealthBillingController extends HealthPanelController
         $bill = $this->findBill($id);
 
         $data = $request->validate([
+            'request_key' => ['nullable', 'uuid'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'method' => ['required', Rule::in(HealthPayment::METHODS)],
             'kind' => ['nullable', Rule::in([
@@ -418,6 +419,7 @@ class HealthBillingController extends HealthPanelController
         $patient = $this->findPatient($id);
 
         $data = $request->validate([
+            'request_key' => ['nullable', 'uuid'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'method' => ['required', Rule::in(HealthPayment::METHODS)],
             'reference' => ['nullable', 'string', 'max:120'],
@@ -445,6 +447,7 @@ class HealthBillingController extends HealthPanelController
         $bill = $this->findBill($id);
 
         $data = $request->validate([
+            'request_key' => ['nullable', 'uuid'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'method' => ['required', Rule::in(HealthPayment::METHODS)],
             'reference' => ['nullable', 'string', 'max:120'],

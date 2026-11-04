@@ -161,6 +161,9 @@ class AdminPlanController extends Controller
             'product_type' => 'required|' . ProductCatalog::validationRule(),
             // Which vertical of the umbrella this package belongs to (Nest ERPS only).
             'erps_vertical' => 'nullable|in:' . implode(',', NestErps::verticalKeys()),
+            'configure_health_modules' => 'sometimes|boolean',
+            'health_modules' => 'sometimes|array',
+            'health_modules.*' => 'required|distinct|in:'.implode(',', \App\Services\HealthModuleService::MODULES),
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -193,6 +196,8 @@ class AdminPlanController extends Controller
             'name' => $data['name'],
             'product_type' => $productType,
             NestErps::VERTICAL_COLUMN => $erpsVertical,
+            ...(NestErps::isProductType($productType) && $request->boolean('configure_health_modules')
+                ? ['health_modules' => \App\Services\HealthModuleService::normalize($request->input('health_modules', []))] : []),
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],
@@ -230,6 +235,9 @@ class AdminPlanController extends Controller
             'product_type' => 'required|' . ProductCatalog::validationRule(),
             // Which vertical of the umbrella this package belongs to (Nest ERPS only).
             'erps_vertical' => 'nullable|in:' . implode(',', NestErps::verticalKeys()),
+            'configure_health_modules' => 'sometimes|boolean',
+            'health_modules' => 'sometimes|array',
+            'health_modules.*' => 'required|distinct|in:'.implode(',', \App\Services\HealthModuleService::MODULES),
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -260,6 +268,8 @@ class AdminPlanController extends Controller
             'name' => $data['name'],
             'product_type' => $productType,
             NestErps::VERTICAL_COLUMN => $erpsVertical,
+            ...(NestErps::isProductType($productType) && $request->boolean('configure_health_modules')
+                ? ['health_modules' => \App\Services\HealthModuleService::normalize($request->input('health_modules', []))] : []),
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],

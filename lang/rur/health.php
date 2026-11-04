@@ -8,6 +8,23 @@
  */
 
 return [
+    'pay_err_request_conflict' => 'Yeh form mukhtalif details ke saath use ho chuka hai. Bill dobara khol kar receipt dekhein.',
+    'role_health_radiologist' => 'Radiologist',
+    'cap_lab_order' => 'Lab test order karein',
+    'cap_lab_manage' => 'Lab catalogue manage karein',
+    'cap_radiology_view' => 'Imaging dekhein',
+    'cap_radiology_order' => 'Imaging order karein',
+    'cap_radiology_collect' => 'Scan record karein',
+    'cap_radiology_result' => 'Report jari karein',
+    'cap_radiology_manage' => 'Imaging catalogue manage karein',
+    'cap_maternity_record' => 'Delivery darj karein',
+    'cap_emergency_triage' => 'Emergency triage darj karein',
+
+    'module_maternity' => 'Zacha bacha',
+    'module_maternity_desc' => 'Delivery aur bachon ka record',
+    'module_emergency' => 'Emergency',
+    'module_emergency_desc' => 'Emergency mareez ki triage',
+
     'module_radiology' => 'Radiology',
     'module_radiology_desc' => 'Imaging orders, scan aur tasdeeq shuda reports.',
     'org_type_maternity' => 'Maternity home',
@@ -258,7 +275,7 @@ return [
     'dash_no_package' => 'Abhi koi package nahi',
     'dash_your_modules' => 'Aap ke modules',
     'dash_quick_actions' => 'Foran kaam',
-    'dash_fbr_ready' => 'FBR reporting set hai.',
+    'dash_fbr_ready' => 'FBR account ki details saved hain. Section 237A ke liye hospital EFD integration ki alag tasdeeq zaroori hai.',
     'dash_fbr_not_ready' => 'FBR reporting abhi set nahi.',
 
     /* ─── Settings ─── */

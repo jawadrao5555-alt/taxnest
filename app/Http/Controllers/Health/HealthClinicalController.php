@@ -102,6 +102,9 @@ class HealthClinicalController extends HealthPanelController
             'visit' => $visit,
             'patient' => $visit->patient,
             'history' => $history,
+            'triage' => $visit->visit_type === HealthVisit::TYPE_EMERGENCY
+                ? \Illuminate\Support\Facades\DB::table('health_triage_records')->where('company_id', $visit->company_id)->where('health_visit_id', $id)->first() : null,
+            'mayTriage' => $this->can('emergency.triage'),
             'canWrite' => HealthRecordAccessService::canWriteClinical($this->user(), $visit->patient, $this->company()),
             'canRecordVitals' => $this->can('nursing.record') || $this->can('clinical.write'),
             'canManageFee' => $this->can('appointments.manage'),
@@ -127,6 +130,33 @@ class HealthClinicalController extends HealthPanelController
      * Behind nursing.record OR clinical.write: on a busy OPD floor the person
      * with the thermometer is usually not the person with the prescription pad.
      */
+    public function recordTriage(Request $request, int $id)
+    {
+        $visit = $this->findVisit($id, ['patient']);
+        $this->guardClinicalRead($visit);
+        $data = $request->validate(['priority' => 'required|in:immediate,urgent,standard',
+            'presenting_problem' => 'required|string|max:2000']);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($visit, $data) {
+            $visit = HealthVisit::query()->lockForUpdate()->findOrFail($visit->id);
+            abort_unless($visit->visit_type === HealthVisit::TYPE_EMERGENCY &&
+                in_array($visit->status, [HealthVisit::STATUS_WAITING, HealthVisit::STATUS_IN_CONSULTATION], true), 409);
+            $table = \Illuminate\Support\Facades\DB::table('health_triage_records');
+            $prior = (clone $table)->where('health_visit_id', $visit->id)->first();
+            if ($prior) {
+                abort_unless($prior->priority === $data['priority'] &&
+                    decrypt($prior->presenting_problem) === $data['presenting_problem'], 409);
+                return;
+            }
+            $table->insert(['company_id' => $visit->company_id, 'health_visit_id' => $visit->id,
+                'priority' => $data['priority'], 'presenting_problem' => encrypt($data['presenting_problem']),
+                'recorded_by' => $this->user()->id, 'created_at' => now(), 'updated_at' => now()]);
+            \App\Services\HealthAudit\HealthAuditRecorder::record('triage.recorded', ['actor' => $this->user(),
+                'company_id' => $visit->company_id, 'branch_id' => $visit->branch_id, 'category' => 'clinical',
+                'action' => 'triaged', 'entity_type' => 'health_visits', 'entity_id' => $visit->id]);
+        }, 3);
+        return redirect()->route('health.clinical.visit', $id);
+    }
+
     public function saveVitals(Request $request, $id)
     {
         $visit = $this->findVisit($id, ['patient']);

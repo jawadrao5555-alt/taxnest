@@ -659,6 +659,57 @@ class HealthBillingFbrTest extends TestCase
         );
     }
 
+    public function test_retried_cashier_forms_post_payments_and_refunds_only_once(): void
+    {
+        $bill = $this->billFor([$this->charge(['unit_price' => 1000])->id]);
+        HealthBillingService::finalize($bill, $this->owner);
+        $url = '/health/billing/bills/'.$bill->id;
+        $this->actingAs($this->owner, HealthPanel::GUARD);
+        $pay = ['amount'=>'600.00', 'method'=>'cash', 'request_key'=>(string) \Illuminate\Support\Str::uuid()];
+        $this->post($url.'/pay', $pay)->assertSessionHasNoErrors();
+        $this->post($url.'/pay', $pay)->assertSessionHasNoErrors();
+        $this->assertSame('600.00', $bill->fresh()->paid_amount);
+        $this->assertSame('400.00', $bill->fresh()->outstanding_amount);
+        $this->post($url.'/pay', ['amount'=>'610.00'] + $pay)->assertSessionHas('error');
+        $refund = ['amount'=>'100.00', 'method'=>'cash', 'reason'=>'Demo correction', 'request_key'=>(string) \Illuminate\Support\Str::uuid()];
+        $this->post($url.'/refund', $refund)->assertSessionHasNoErrors();
+        $this->post($url.'/refund', $refund)->assertSessionHasNoErrors();
+        $this->assertSame('100.00', $bill->fresh()->refunded_amount);
+        $this->assertSame(2, \App\Models\HealthPayment::withoutGlobalScopes()->where('company_id', $bill->company_id)->count());
+    }
+
+    public function test_mock_fiscal_transport_retries_and_prints_one_number_for_one_bill(): void
+    {
+        $this->rule(HealthTaxCategory::TREATMENT_FBR, 15, [HealthCharge::CAT_PHARMACY]);
+        $bill = $this->billFor([$this->charge(['category' => HealthCharge::CAT_PHARMACY])->id]);
+        HealthBillingService::finalize($bill, $this->owner);
+        $this->company->forceFill(['fbr_reporting_enabled' => true, 'fbr_pos_id' => '123456',
+            'fbr_pos_environment' => 'sandbox', 'fbr_pos_token' => str_repeat('d', 32)])->save();
+        $fake = new class extends \App\Services\FbrService {
+            public int $calls = 0;
+            protected function sendDirectToFbr(string $url, string $token, string $jsonBody, int $invoiceId): array
+            {
+                $this->calls++;
+                return $this->calls === 1
+                    ? ['body' => '', 'http_code' => 0, 'curl_error' => 'Connection refused']
+                    : ['body' => json_encode(['Code'=>100, 'InvoiceNumber'=>'DEMO-FISCAL-344', 'Response'=>'Generated']),
+                        'http_code' => 200, 'curl_error' => ''];
+            }
+        };
+        $this->app->instance(\App\Services\FbrService::class, $fake);
+        $first = HealthBillFbrService::submit($bill->fresh(), $this->owner);
+        $this->assertFalse($first['ok']);
+        $retry = HealthBillFbrService::submit($bill->fresh(), $this->owner, 'retry');
+        $this->assertTrue($retry['ok'], json_encode($retry));
+        $this->assertSame('DEMO-FISCAL-344', $bill->fresh()->fbrQrPayload());
+        $this->assertSame('already_filed', HealthBillFbrService::submit($bill->fresh(), $this->owner)['reason']);
+        $this->assertSame(2, $fake->calls);
+        $this->assertDatabaseHas('health_fbr_submissions', ['health_bill_id'=>$bill->id, 'attempt_no'=>2,
+            'invoice_number'=>'DEMO-FISCAL-344', 'trigger'=>'retry']);
+        $this->actingAs($this->owner, HealthPanel::GUARD)->get('/health/billing/bills/'.$bill->id.'/receipt')
+            ->assertOk()->assertSee('DEMO-FISCAL-344')->assertSee('alt="QR"', false);
+    }
+
     public function test_retry_using_a_stale_bill_reuses_the_queued_mirror_and_submission_hash(): void
     {
         $this->rule(HealthTaxCategory::TREATMENT_FBR, 15, [HealthCharge::CAT_PHARMACY]);

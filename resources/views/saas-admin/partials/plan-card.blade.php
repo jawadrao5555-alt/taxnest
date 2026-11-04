@@ -76,7 +76,7 @@
         @endif
     </div>
 
-    <form x-show="editing" method="POST" action="{{ route('saas.admin.plans.update', $plan->id) }}" class="space-y-3">
+    <form x-data="{ selectedProduct: '{{ \App\Support\NestErps::canonicalProductType($plan->product_type) }}' }" x-show="editing" method="POST" action="{{ route('saas.admin.plans.update', $plan->id) }}" class="space-y-3">
         @csrf
         @method('PUT')
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -86,7 +86,7 @@
             </div>
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Product Type</label>
-                <select name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+                <select x-model="selectedProduct" name="product_type" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
                     <option value="di" {{ $plan->product_type === 'di' ? 'selected' : '' }}>TaxNest Digital Invoice</option>
                     <option value="pos" {{ $plan->product_type === 'pos' ? 'selected' : '' }}>PRA POS</option>
                     <option value="fbrpos" {{ $plan->product_type === 'fbrpos' ? 'selected' : '' }}>TaxNest FBR POS</option>
@@ -101,6 +101,8 @@
                     <option value="{{ $vKey }}" {{ \App\Support\NestErps::verticalOf($plan) === $vKey ? 'selected' : '' }}>{{ $vMeta['label'] }}</option>
                     @endforeach
                 </select>
+                    @include('saas-admin.partials.health-plan-modules', ['selected' => \App\Services\HealthModuleService::normalize($plan->health_modules ?? \App\Services\HealthModuleService::PLAN_FALLBACK_MODULES)])
+
             </div>
             @endif
             <div>

@@ -46,6 +46,7 @@ class HealthAccessService
         'health_nurse',
         'health_pharmacist',
         'health_lab_tech',
+        'health_radiologist',
         'health_accountant',
         'health_auditor',
         'health_cashier',
@@ -72,7 +73,7 @@ class HealthAccessService
             'ipd.view', 'ipd.manage', 'ipd.charge', 'ipd.discharge',
             'wards.manage',
             'operations.view', 'operations.manage',
-            'lab.view',
+            'lab.view', 'lab.manage', 'radiology.view', 'radiology.manage',
             'billing.view', 'billing.charge',
             // Reads the books and signs off what the accountant prepared —
             // period close and doctor payouts — without being able to post the
@@ -106,7 +107,7 @@ class HealthAccessService
             // past an unpaid bill are two different decisions.
             'ipd.view', 'ipd.manage',
             'operations.view', 'operations.manage',
-            'lab.view', 'lab.order', 'radiology.view', 'radiology.order',
+            'lab.view', 'lab.order', 'radiology.view', 'radiology.order', 'maternity.record', 'emergency.triage',
             'pharmacy.view',
         ],
         // Records observations and runs the ward. No prescribing.
@@ -114,7 +115,7 @@ class HealthAccessService
             'dashboard.view',
             'patients.view',
             'appointments.view',
-            'clinical.view', 'nursing.record',
+            'clinical.view', 'nursing.record', 'emergency.triage',
             'ipd.view', 'ipd.manage',
             'operations.view',
             'lab.view',
@@ -131,6 +132,9 @@ class HealthAccessService
             'dashboard.view',
             'patients.view',
             'lab.view', 'lab.collect', 'lab.result',
+        ],
+        'health_radiologist' => [
+            'dashboard.view', 'patients.view', 'radiology.view', 'radiology.collect', 'radiology.result',
         ],
         // Owns the money side. Reaches an inpatient stay to post its charges,
         // take advances and clear the bill — but holds neither clinical.view
@@ -204,6 +208,7 @@ class HealthAccessService
         'health_nurse',
         'health_pharmacist',
         'health_lab_tech',
+        'health_radiologist',
         'health_accountant',
         'health_cashier',
         'health_hr',

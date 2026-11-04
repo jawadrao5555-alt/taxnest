@@ -55,7 +55,7 @@
                                     </td>
                                     <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
                                         @if($ann->target === 'all')
-                                            <span class="text-emerald-600 font-medium">{{ match ($ann->audience_panel) { 'pra' => 'PRA POS', 'fbr' => 'FBR POS', default => 'All Companies' } }}</span>
+                                            <span class="text-emerald-600 font-medium">{{ match ($ann->audience_panel) { 'pra' => 'PRA POS', 'fbr' => 'FBR POS', 'erps' => \App\Support\NestErps::LABEL, default => 'All Companies' } }}</span>
                                             @if($ann->target_categories)
                                                 <span class="block">{{ implode(', ', $ann->target_categories) }}</span>
                                             @endif
@@ -155,17 +155,18 @@
                     <div x-show="target === 'all'" x-cloak class="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">POS panel</label>
-                            <select name="audience_panel" x-model="panel" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
-                                <option value="all">PRA + FBR (all companies)</option>
+                            <select name="audience_panel" x-model="panel" @change="if(panel === 'erps') scope = 'all'" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
+                                <option value="all">All companies</option>
                                 <option value="pra">PRA POS only</option>
                                 <option value="fbr">FBR POS only</option>
+                                <option value="erps">{{ \App\Support\NestErps::LABEL }} only</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Business categories</label>
                             <select name="audience_scope" x-model="scope" class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
                                 <option value="all">All categories in selected panel</option>
-                                <option value="categories">Selected categories only</option>
+                                <option value="categories" :disabled="panel === 'erps'">Selected categories only</option>
                             </select>
                         </div>
                         <div x-show="scope === 'categories'" x-cloak class="max-h-44 overflow-y-auto space-y-2 text-sm">

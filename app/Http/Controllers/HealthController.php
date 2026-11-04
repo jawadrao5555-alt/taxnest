@@ -83,6 +83,10 @@ class HealthController extends Controller
         $enabled = HealthModuleService::enabled($company);
 
         return view('health.dashboard', [
+            'announcements' => Schema::hasTable('admin_announcements')
+                ? \App\Models\AdminAnnouncement::active()->forCompany($company->id, $company)
+                    ->when(Schema::hasTable('announcement_dismissals'), fn ($q) => $q->whereDoesntHave('dismissals', fn ($d) => $d->where('user_id', $user->id)))
+                    ->latest()->limit(5)->get() : collect(),
             'opdToday' => $this->opdToday($user, $company, $enabled),
             'company' => $company,
             'orgType' => HealthPlatformService::orgType($company),

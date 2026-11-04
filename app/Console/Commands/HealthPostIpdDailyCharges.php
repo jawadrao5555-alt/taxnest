@@ -56,12 +56,13 @@ class HealthPostIpdDailyCharges extends Command
 
         foreach ($companyIds as $companyId) {
             $company = Company::withoutGlobalScopes()->find($companyId);
-            if (!$company) {
+            if (!$company || $company->isSuspended() || $company->status === 'suspended') {
                 continue;
             }
 
             // A hospital that has switched the inpatient module OFF is not
             // billed for beds it is no longer using the system to manage.
+            HealthModuleService::forget($company->id);
             if (!HealthModuleService::isEnabled($company, 'ipd')) {
                 continue;
             }

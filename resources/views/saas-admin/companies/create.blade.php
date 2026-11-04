@@ -67,6 +67,13 @@
                 <option value="{{ $vKey }}" {{ old('erps_vertical', \App\Support\NestErps::DEFAULT_VERTICAL) === $vKey ? 'selected' : '' }}>{{ $vMeta['label'] }}</option>
                 @endforeach
             </select>
+            <label class="block mt-3">Healthcare organisation
+                <select name="health_org_type" :disabled="productType !== '{{ \App\Support\NestErps::PRODUCT_TYPE }}'" class="rounded bg-gray-800 p-2">
+                    @foreach(\App\Support\HealthPanel::ORG_TYPES as $type)
+                        <option value="{{ $type }}">{{ __(\App\Support\HealthPanel::orgTypeLabelKey($type)) }}</option>
+                    @endforeach
+                </select>
+            </label>
         </div>
 
         {{-- Business type (Task 1562) — POS products only. The type stores the

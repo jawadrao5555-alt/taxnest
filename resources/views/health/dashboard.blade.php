@@ -3,6 +3,9 @@
     use App\Support\HealthPanel;
 @endphp
 <x-health-layout>
+    @foreach($announcements ?? [] as $notice)
+        <aside class="mx-auto max-w-6xl rounded border p-3 my-2"><strong>{{ $notice->title }}</strong><p>{{ $notice->message }}</p></aside>
+    @endforeach
     <div class="tn-page tn-health-dashboard max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
         {{-- ── Heading ── --}}

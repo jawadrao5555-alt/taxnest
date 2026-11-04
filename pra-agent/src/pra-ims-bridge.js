@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const soap = require('./ims-soap');
 function localEndpoint(value) {
   try {
     const u = new URL(value);
@@ -39,15 +40,15 @@ function createBridge({ axios, directory = path.join(os.homedir(), '.taxnest-pra
         try { await send(pending); fs.unlinkSync(filename); } catch (_) { return; }
       }
       let data;
-      try { data = (await axios.post(`${config.serverUrl}/pra-fbr-ims/claim`, { device_uid: config.deviceUid }, options)).data; }
+      try { data = (await axios.post(`${config.serverUrl}/pra-fbr-ims/claim`, { device_uid: config.deviceUid, supported_protocols: ['json','soap'] }, options)).data; }
       catch (_) { return; } // absent/disabled on old servers is normal
       const invoice = data?.invoice;
       if (!invoice) return;
       if (!Number.isSafeInteger(invoice.id) || !/^[a-f0-9]{64}$/.test(invoice.claim || '')) return;
       const body = { id: invoice.id, claim: invoice.claim, device_uid: config.deviceUid, response: null };
-      if (localEndpoint(invoice.endpoint)) {
+      if (localEndpoint(invoice.endpoint) || soap.endpoint(invoice.endpoint)) {
         try {
-          const res = await axios.post(invoice.endpoint, invoice.payload, { timeout: 45000, maxRedirects: 0, headers: { 'Content-Type': 'application/json' } });
+          const res = soap.endpoint(invoice.endpoint) ? await soap.submit(axios, invoice.endpoint, invoice.payload) : await axios.post(invoice.endpoint, invoice.payload, { timeout: 45000, maxRedirects: 0, headers: { 'Content-Type': 'application/json' } });
           body.response = resultOnly(res.data);
         } catch (_) { /* timeout / HTTP failure stays unknown, never replay fiscal POST */ }
       }

@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('agentAPI', {
+  openInstallationFolder: () => ipcRenderer.invoke('open-installation-folder'),
+  openInstalledApps: () => ipcRenderer.invoke('open-installed-apps'),
   getConfig: () => ipcRenderer.invoke('get-config'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   getStatus: () => ipcRenderer.invoke('get-status'),

@@ -189,14 +189,15 @@ class PosImsReportingService
             $r->fill(['state'=>$result['state'],'fiscal_number'=>$result['reference'],'attempts'=>$a])->save();return $r;
         });
     }
-    public function claim(int $companyId,string $deviceUid): ?array
+    public function claim(int $companyId,string $deviceUid,bool $supportsSoap=false): ?array
     {
-        return DB::transaction(function() use($companyId,$deviceUid){
+        return DB::transaction(function() use($companyId,$deviceUid,$supportsSoap){
             Company::whereKey($companyId)->lockForUpdate()->firstOrFail();$p=$this->profile($companyId);
             abort_unless($p->connection_mode==='fiscal_device' && $p->device_uid === $deviceUid,409);
             $r=PosImsSubmission::where('company_id',$companyId)->where('environment',$p->environment)
                 ->where('state','queued_agent')->orderBy('id')->lockForUpdate()->first();
             if (!$r) return null;
+            if (str_ends_with($r->snapshot['local_ims_url'] ?? '', '/TcpService/IMSHttp') && !$supportsSoap) return null;
             $this->activeRecord($r); self::preventOtherFederalRecord($companyId,$r->source_transaction_id,$r->environment,'ims');
             $this->validatePayload($r,$r->payload);
             abort_unless(hash_equals($r->payload_hash,hash('sha256',json_encode($r->payload,JSON_THROW_ON_ERROR))),409);

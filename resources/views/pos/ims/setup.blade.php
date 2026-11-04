@@ -14,8 +14,30 @@
     </section>@endforeach</div>
     <p class="muted">Official cloud endpoints only. Blank tokens keep saved values. Local IMS uses its own installed credentials; no cloud token is sent to the local component.</p>
     <h2>Local FBR IMS device</h2><p>Use the FBR component on the designated shop PC. Its URL must identify FBR IMS, not PRA IMS. Both components need separate listeners when installed on one PC. Install an Agent build supporting “FBR alongside PRA”; older Agents continue PRA work and cannot dispatch this queue.</p>
-    <label for="device">Dedicated FBR device UID</label><input id="device" name="device_uid" type="text" value="{{ old('device_uid',$profile?->device_uid) }}">
-    <label for="local-url">FBR IMS local URL</label><input id="local-url" name="local_ims_url" type="url" placeholder="http://127.0.0.1:8525/api/IMSFiscal/GetInvoiceNumberByModel" value="{{ old('local_ims_url',$profile?->local_ims_url) }}">
+    <label for="device">FBR IMS shop PC</label><select id="device" name="device_uid"><option value="">Select a connected PC</option>
+    @foreach($devices as $device)<option value="{{ $device->device_uid }}" @selected(old('device_uid',$profile?->device_uid)===$device->device_uid)>{{ $device->label() }} · {{ $device->isOnline() ? 'Online' : 'Offline' }}</option>@endforeach
+    @if($profile?->device_uid && !$devices->contains('device_uid',$profile->device_uid))<option value="{{ $profile->device_uid }}" selected>Previously selected PC · reconnect Agent</option>@endif
+    </select>
+    <label for="local-url">Detected FBR IMS local service</label><select id="local-url" name="local_ims_url"></select>
+    <p id="ims-discovery-note" class="muted">The Agent detects local services. If more than one is found, select the intended FBR service. Local discovery does not verify its POS registration or environment.</p>
+    <script>
+    (() => {
+      const devices = @json($deviceOptions);
+      const saved = @json(old('local_ims_url',$profile?->local_ims_url));
+      const savedDevice = @json(old('device_uid',$profile?->device_uid));
+      const pc=document.getElementById('device'), url=document.getElementById('local-url');
+      if(!pc.value && !savedDevice) { const online=devices.filter(d=>d.online); if(online.length===1) pc.value=online[0].uid; }
+      function update() {
+        const device=devices.find(d=>d.uid===pc.value);
+        const values=device?.online ? (device.services || []).map(s=>s.url) : [];
+        url.replaceChildren(new Option('No detected service · update/reconnect Agent and reload settings',''));
+        for(const value of [...new Set(values)]) url.add(new Option(value,value));
+        if(pc.value===savedDevice && saved) { if(!values.includes(saved)) url.add(new Option(saved+' · saved connection',saved)); url.value=saved; }
+        else if(values.length===1) url.value=values[0];
+      }
+      pc.addEventListener('change',update); update();
+    })();
+    </script>
     <label><input name="confirm_setup" type="checkbox" value="1">I reviewed the IMS connection, POS ID and federal tax mapping. When enabled, select IMS for new federal submissions and retain DI history.</label>
     <label><input name="confirm_production" type="checkbox" value="1">For Production: this company's FBR POS registration and credentials are live; the selected local component (if used) belongs to this POS and environment. Enable live reporting.</label>
     <button>Save FBR POS setup</button>

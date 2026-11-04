@@ -30,8 +30,10 @@ class PosTaxIntegrationController extends Controller
         $company=$this->company($request);abort_unless(PraDiSandboxGate::setupAvailable(),404);
         $profile=PosImsProfile::where('company_id',$company->id)->first();
         $records=PosImsSubmission::where('company_id',$company->id)->latest('id')->limit(30)->get();
+        $devices=\App\Models\PosAgentDevice::where('company_id',$company->id)->orderBy('id')->get();
+        $deviceOptions=$devices->map(fn($d)=>['uid'=>$d->device_uid,'online'=>$d->isOnline(),'services'=>$d->local_fbr_ims ?? []])->values();
         $sales=PosTransaction::where('company_id',$company->id)->where('status','completed')->latest('id')->limit(30)->get();
-        return response()->view('pos.ims.setup',compact('company','profile','records','sales'))->header('Cache-Control','no-store, private');
+        return response()->view('pos.ims.setup',compact('company','profile','records','sales','devices','deviceOptions'))->header('Cache-Control','no-store, private');
     }
     public function saveIms(Request $request)
     {
@@ -47,7 +49,7 @@ class PosTaxIntegrationController extends Controller
         Validator::make($tokens,['sandbox_token'=>['nullable','string','max:8192','regex:/^[\x21-\x7E]+$/'],
             'production_token'=>['nullable','string','max:8192','regex:/^[\x21-\x7E]+$/']])->validate();
         foreach(['sandbox','production'] as $env) $data[$env.'_url']=PosTaxIntegrationEndpoints::checked('ims',$env,$data[$env.'_url'] ?? null);
-        if (!empty($data['local_ims_url'])) Validator::make($data,['local_ims_url'=>['regex:~^http://(?:127\.0\.0\.1|localhost):[0-9]{4,5}/api/IMSFiscal/GetInvoiceNumberByModel$~']])->validate();
+        if (!empty($data['local_ims_url'])) Validator::make($data,['local_ims_url'=>['regex:~^http://(?:127\.0\.0\.1|localhost):[0-9]{4,5}/(?:api/IMSFiscal/GetInvoiceNumberByModel|TcpService/IMSHttp)$~']])->validate();
         if (!empty($data['local_ims_url'])) {
             $port=(int)parse_url($data['local_ims_url'],PHP_URL_PORT);
             abort_unless($port>=1024 && $port<=65535,422,'Use the designated local FBR IMS port.');
@@ -57,6 +59,9 @@ class PosTaxIntegrationController extends Controller
             foreach(['sandbox','production'] as $env) {
                 foreach(['pos_id','url'] as $field) if(array_key_exists($env.'_'.$field,$data))$p->{$env.'_'.$field}=$data[$env.'_'.$field];
                 if(is_string($tokens[$env.'_token'] ?? null) && $tokens[$env.'_token']!=='')$p->{$env.'_token'}=$tokens[$env.'_token'];
+            }
+            if (!empty($data['device_uid'])) {
+                abort_unless($p->device_uid === $data['device_uid'] || \App\Models\PosAgentDevice::where('company_id',$c->id)->where('device_uid',$data['device_uid'])->exists(),422,'Select a connected company PC.');
             }
             foreach(['device_uid','local_ims_url'] as $k) if(array_key_exists($k,$data))$p->$k=$data[$k];
             if($data['enabled']) {
@@ -116,7 +121,7 @@ class PosTaxIntegrationController extends Controller
     {
         $c=$request->attributes->get('agent_company');
         $d=$request->validate(['device_uid'=>'required|string|max:100']);
-        return response()->json(['invoice'=>$svc->claim($c->id,$d['device_uid'])])->header('Cache-Control','no-store, private');
+        return response()->json(['invoice'=>$svc->claim($c->id,$d['device_uid'],in_array('soap',(array)$request->input('supported_protocols',[]),true))])->header('Cache-Control','no-store, private');
     }
     public function agentResult(Request $request,PosImsReportingService $svc)
     {

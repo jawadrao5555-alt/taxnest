@@ -667,10 +667,10 @@
     badge.innerHTML = '<span class="dot"></span> Checking…';
     const r = await window.agentAPI.checkImsService();
     if (generation !== imsGeneration || !currentImsMode) return;
-    if (r.running) {
+    if (r.running || (currentImsMode === 'pra' && r.pra_reachable)) {
       badge.className = 'badge online';
-      badge.textContent = 'Compatible SOAP IMS detected';
-      $('imsOkNote').textContent = (r.services || []).map(s=>s.url).join(' · ') + ' — POS registration and environment need verification.';
+      badge.textContent = r.running ? 'Compatible SOAP IMS detected' : 'Local PRA address responds · identity unverified';
+      $('imsOkNote').textContent = (r.services || []).map(s=>s.url).join(' · ') + (currentImsMode === 'both' ? ' · PRA local address: ' + (r.pra_reachable ? 'responding (identity unverified)' : 'unreachable') : '') + ' — POS registration and environment need verification.';
       $('imsInstallBtn').style.display = 'none';
       $('imsSteps').style.display = 'none';
       $('praImsSteps').style.display = 'none';

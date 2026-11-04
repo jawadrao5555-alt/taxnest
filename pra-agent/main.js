@@ -1675,7 +1675,9 @@ function sendImsProgress(payload) {
 
 ipcMain.handle('check-ims-service', async () => {
   const services = await require('./src/ims-discovery').discover(axios);
-  return { running: services.length > 0, services, environment: 'unknown' };
+  let praReachable=false;
+  try { await axios.get('http://127.0.0.1:8524/',{timeout:1500,maxRedirects:0,validateStatus:()=>true}); praReachable=true; } catch (_) {}
+  return { running: services.length > 0, pra_reachable:praReachable, services, environment: 'unknown' };
 });
 
 ipcMain.handle('install-fbr-ims', async () => {

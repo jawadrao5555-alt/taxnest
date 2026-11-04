@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Support\DevStagingGuard;
+use App\Models\AdminUser;
+use Illuminate\Support\Str;
 use Database\Seeders\DisposableHospitalSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
@@ -28,6 +30,11 @@ final class HealthDemoHospital extends Command
         if ($this->call('migrate', ['--path' => $paths, '--realpath' => true]) !== self::SUCCESS) {
             return self::FAILURE;
         }
+
+        // The SaaS foundation migration creates a bootstrap administrator. This database
+        // was empty on entry, so repurpose that new row as the synthetic operator.
+        AdminUser::query()->sole()->update(['name' => 'Demo SaaS Owner', 'email' => 'demo.saas@example.test',
+            'password' => env('HOSPITAL_DEMO_PASSWORD') ?: Str::random(40)]);
 
         // Keep subsequent local migrate runs from introducing the intentionally skipped tenants.
         $repository = app('migration.repository');

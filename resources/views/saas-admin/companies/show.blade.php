@@ -418,6 +418,19 @@
                     </form>
                 @endif
                 @if(!empty($extraStats['erps']))
+                    <section class="rounded border border-teal-900 p-3 space-y-2">
+                        <h3 class="font-semibold text-teal-300">Hospital operations</h3>
+                        <p>Active modules: {{ implode(', ', $extraStats['effective_modules'] ?? []) ?: 'None' }}</p>
+                        <p>Independent services: {{ implode(', ', $extraStats['independent_services'] ?? []) ?: 'None' }}</p>
+                        <p>Latest healthcare audit event: {{ $extraStats['last_health_audit'] ?? 'None recorded' }}</p>
+                        <p>FBR POS attempts in the last seven days:
+                            @forelse($extraStats['fiscal_attempts'] ?? [] as $state => $count)
+                                <span>{{ $state }} ({{ $count }})</span>
+                            @empty None recorded @endforelse
+                        </p>
+                        <p class="text-xs">Hospital EFD verification under section 237A requires separate onboarding.</p>
+                        <a class="underline" href="{{ route('saas.admin.support-inbox') }}">Open support inbox</a>
+                    </section>
                 {{-- Nest ERPS: billable documents, not invoices and not POS
                      sales — the two tables its verticals never write to. --}}
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Vertical</span><span class="text-teal-400 font-medium text-right min-w-0">{{ $extraStats['erps_vertical_label'] }}</span></div>

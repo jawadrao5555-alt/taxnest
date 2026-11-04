@@ -391,6 +391,13 @@ class AdminCompanyController extends Controller
             );
             $extraStats['billable_documents'] = \App\Support\NestErps::billableCount($company);
             $extraStats['billable_this_month'] = \App\Support\NestErps::billableCount($company, now()->startOfMonth());
+            $extraStats['effective_modules'] = HealthModuleService::enabled($company);
+            $extraStats['independent_services'] = HealthModuleService::independentServices($company);
+            $extraStats['fiscal_attempts'] = \Illuminate\Support\Facades\Schema::hasTable('health_fbr_submissions')
+                ? DB::table('health_fbr_submissions')->where('company_id', $id)->where('submitted_at', '>=', now()->subDays(7))
+                    ->selectRaw('status, COUNT(*) AS attempts')->groupBy('status')->pluck('attempts','status') : collect();
+            $extraStats['last_health_audit'] = \Illuminate\Support\Facades\Schema::hasTable('health_audit_events')
+                ? DB::table('health_audit_events')->where('company_id', $id)->max('occurred_at') : null;
         } elseif ($company->product_type === 'fbrpos') {
             // FBR POS sales live in fbr_pos_transactions — NOT pos_transactions.
             // Querying the PRA table here always returned zero for FBR companies.

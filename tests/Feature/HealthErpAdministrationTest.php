@@ -23,6 +23,7 @@ class HealthErpAdministrationTest extends TestCase
             'admin_email'=>'maternity.owner@example.test','admin_name'=>'Demo Owner','admin_password'=>'OnlyForDemo!344A',
         ])->assertRedirect()->assertSessionHasNoErrors();
         $hospital = Company::where('ntn','DEMO-ERP-344')->firstOrFail();
+        $this->get('/admin/companies/'.$hospital->id)->assertOk()->assertSee('Hospital operations');
         $owner = User::where('company_id', $hospital->id)->firstOrFail();
         $this->assertSame('maternity', $hospital->health_org_type);
         $this->assertSame(HealthAccessService::ROLE_OWNER, HealthAccessService::roleFor($owner));

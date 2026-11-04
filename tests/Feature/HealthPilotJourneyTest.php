@@ -252,6 +252,8 @@ class HealthPilotJourneyTest extends TestCase
         $this->assertSame('0.00', $bill->outstanding_amount,
             'The receptionist and pharmacist already collected this money. Finalizing their bill must not request it again.');
         $this->assertSame('1700.00', $bill->paid_amount);
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        HealthOpdService::applyFee($visit->fresh(), ['fee_amount'=>1600, 'fee_status'=>'pending'], $this->owner);
 
     }
 

@@ -3,12 +3,16 @@
 namespace App\Services;
 
 use App\Models\HealthAppointment;
+use App\Models\HealthBill;
+use App\Models\HealthCharge;
 use App\Models\HealthDoctor;
 use App\Models\HealthPatient;
 use App\Models\HealthVisit;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The OPD lifecycle — the one place that moves an appointment through the desk
@@ -278,37 +282,50 @@ class HealthOpdService
      */
     public static function applyFee(HealthVisit $visit, array $data, ?User $actor): void
     {
-        $fee = round((float) ($data['fee_amount'] ?? $visit->fee_amount), 2);
-        $concession = round((float) ($data['concession_amount'] ?? 0), 2);
-        $concession = max(0.0, min($concession, $fee));
+        DB::transaction(function () use ($visit, $data, $actor) {
+            if (Schema::hasTable('health_charges')) {
+                $billId = HealthCharge::withoutGlobalScopes()->where('company_id', $visit->company_id)
+                    ->where('source_type', HealthCharge::SOURCE_VISIT)->where('source_id', $visit->id)
+                    ->whereNotNull('health_bill_id')->where('status', '!=', HealthCharge::STATUS_REVERSED)
+                    ->value('health_bill_id');
+                if ($billId && HealthBill::withoutGlobalScopes()->where('company_id', $visit->company_id)
+                    ->lockForUpdate()->find($billId)?->isFinal()) {
+                    throw ValidationException::withMessages(['fee_amount' => __('health.fee_on_final_bill')]);
+                }
+            }
+            $visit = HealthVisit::withoutGlobalScopes()->where('company_id', $visit->company_id)->lockForUpdate()->findOrFail($visit->id);
+            $fee = round((float) ($data['fee_amount'] ?? $visit->fee_amount), 2);
+            $concession = round((float) ($data['concession_amount'] ?? 0), 2);
+            $concession = max(0.0, min($concession, $fee));
 
-        $status = $data['fee_status'] ?? $visit->fee_status;
-        if (!in_array($status, HealthVisit::FEE_STATUSES, true)) {
-            $status = HealthVisit::FEE_PENDING;
-        }
+            $status = $data['fee_status'] ?? $visit->fee_status;
+            if (!in_array($status, HealthVisit::FEE_STATUSES, true)) {
+                $status = HealthVisit::FEE_PENDING;
+            }
 
-        $method = $data['payment_method'] ?? null;
-        if ($method !== null && !in_array($method, HealthVisit::PAYMENT_METHODS, true)) {
-            $method = null;
-        }
+            $method = $data['payment_method'] ?? null;
+            if ($method !== null && !in_array($method, HealthVisit::PAYMENT_METHODS, true)) {
+                $method = null;
+            }
 
-        $visit->fee_amount = $fee;
-        $visit->concession_amount = $concession;
-        $visit->concession_reason = $concession > 0 ? ($data['concession_reason'] ?? $visit->concession_reason) : null;
-        $visit->net_fee = round($fee - $concession, 2);
-        $visit->fee_status = $status;
-        $visit->payment_method = $status === HealthVisit::FEE_PAID ? $method : null;
+            $visit->fee_amount = $fee;
+            $visit->concession_amount = $concession;
+            $visit->concession_reason = $concession > 0 ? ($data['concession_reason'] ?? $visit->concession_reason) : null;
+            $visit->net_fee = round($fee - $concession, 2);
+            $visit->fee_status = $status;
+            $visit->payment_method = $status === HealthVisit::FEE_PAID ? $method : null;
 
-        if ($status === HealthVisit::FEE_PAID) {
-            // Stamp the collection once. Re-saving the same paid visit must not
-            // keep moving the moment the money arrived.
-            $visit->fee_collected_at = $visit->fee_collected_at ?? now();
-            $visit->fee_collected_by = $visit->fee_collected_by ?? $actor?->id;
-        } else {
-            $visit->fee_collected_at = null;
-            $visit->fee_collected_by = null;
-        }
+            if ($status === HealthVisit::FEE_PAID) {
+                // Stamp the collection once. Re-saving the same paid visit must not
+                // keep moving the moment the money arrived.
+                $visit->fee_collected_at = $visit->fee_collected_at ?? now();
+                $visit->fee_collected_by = $visit->fee_collected_by ?? $actor?->id;
+            } else {
+                $visit->fee_collected_at = null;
+                $visit->fee_collected_by = null;
+            }
 
-        $visit->save();
+            $visit->save();
+        }, 3);
     }
 }

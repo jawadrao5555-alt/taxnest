@@ -706,8 +706,14 @@ class HealthBillingFbrTest extends TestCase
         $this->assertSame(2, $fake->calls);
         $this->assertDatabaseHas('health_fbr_submissions', ['health_bill_id'=>$bill->id, 'attempt_no'=>2,
             'invoice_number'=>'DEMO-FISCAL-344', 'trigger'=>'retry']);
-        $this->actingAs($this->owner, HealthPanel::GUARD)->get('/health/billing/bills/'.$bill->id.'/receipt')
+        $receipt = $this->actingAs($this->owner, HealthPanel::GUARD)->get('/health/billing/bills/'.$bill->id.'/receipt')
             ->assertOk()->assertSee('DEMO-FISCAL-344')->assertSee('alt="QR"', false);
+        $dom = new \DOMDocument();
+        $dom->loadHTML($receipt->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $uri = (new \DOMXPath($dom))->evaluate('string(//img[@alt="QR"]/@src)');
+        $this->assertStringStartsWith('data:image/png;base64,', $uri);
+        $scan = (new \chillerlan\QRCode\QRCode())->readFromBlob(base64_decode(explode(',', $uri, 2)[1], true));
+        $this->assertSame('DEMO-FISCAL-344', (string) $scan);
     }
 
     public function test_retry_using_a_stale_bill_reuses_the_queued_mirror_and_submission_hash(): void

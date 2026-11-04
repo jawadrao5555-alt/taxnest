@@ -1,0 +1,277 @@
+{
+  "issue": 344,
+  "tested_implementation_commit": "110ec6c268c2f00d34dc4c8a8d61e03ff4734cef",
+  "base_commit": "da2a0956ca8ede4a4a2fff8cdb6a0b74204d04fe",
+  "release_gate": "held; no PR",
+  "profiles": [
+    {
+      "name": "TaxNest Demo General Hospital",
+      "modules": [
+        "opd",
+        "pharmacy",
+        "ipd",
+        "lab",
+        "accounts",
+        "hr",
+        "radiology",
+        "maternity",
+        "emergency"
+      ],
+      "branches": 1
+    },
+    {
+      "name": "Demo Independent Services Hospital",
+      "modules": [
+        "opd",
+        "ipd",
+        "accounts",
+        "hr",
+        "radiology",
+        "maternity",
+        "emergency"
+      ],
+      "branches": 1
+    },
+    {
+      "name": "Demo Ward Hospital",
+      "modules": [
+        "opd",
+        "ipd",
+        "accounts",
+        "hr"
+      ],
+      "branches": 1
+    },
+    {
+      "name": "Demo OPD Clinic",
+      "modules": [
+        "opd"
+      ],
+      "branches": 1
+    },
+    {
+      "name": "Demo Maternity Home",
+      "modules": [
+        "opd",
+        "ipd",
+        "accounts",
+        "hr",
+        "maternity"
+      ],
+      "branches": 1
+    },
+    {
+      "name": "Demo Multispecialty Hospital",
+      "modules": [
+        "opd",
+        "pharmacy",
+        "ipd",
+        "lab",
+        "accounts",
+        "hr",
+        "radiology",
+        "maternity",
+        "emergency"
+      ],
+      "branches": 2
+    },
+    {
+      "name": "Demo Independent Pharmacy",
+      "modules": [
+        "pharmacy",
+        "accounts"
+      ],
+      "branches": 1
+    },
+    {
+      "name": "Demo Independent Laboratory",
+      "modules": [
+        "lab",
+        "accounts"
+      ],
+      "branches": 1
+    }
+  ],
+  "initial_cash_and_ledger": {
+    "appointment": 1,
+    "visit": 1,
+    "bill": "B000001",
+    "invoiced": "1500.00",
+    "collected": "1500.00",
+    "refunded": "200.00",
+    "debits": "3200.00",
+    "credits": "3200.00"
+  },
+  "concurrent_cashier_workers": {
+    "deposit_workers": [
+      {
+        "ok": true,
+        "receipt": "R000004"
+      },
+      {
+        "ok": true,
+        "receipt": "R000004"
+      }
+    ],
+    "deposit_total": 125,
+    "refund_workers": [
+      false,
+      true
+    ],
+    "new_refund": 1000,
+    "total_refunded": "1200.00"
+  },
+  "patient_journey": {
+    "patient": 9,
+    "visit": 2,
+    "stay": 1,
+    "bill": "B000002",
+    "total": "10040.00",
+    "pharmacy_collected": 40,
+    "inpatient_balance_paid": 6700,
+    "central_cash": 2800,
+    "outstanding": "0.00",
+    "discharge": "discharged",
+    "signed_reports": 2
+  },
+  "browser_log": [
+    "PASS private clinical attachment upload and download; SHA-256 ad306e19047869ec17912ebd5d9d3853929aae2ab6ce74894009c23a59a4c625",
+    "PASS same-patient emergency triage, prescription, C-section, lab and imaging worklists and signed PDFs",
+    "PASS authenticated stock receipt and supplier payment forms",
+    "PASS profile A authenticated; nine service route checks",
+    "PASS profile B authenticated; nine service route checks",
+    "PASS profile C authenticated; nine service route checks",
+    "PASS profile D authenticated; nine service route checks",
+    "PASS profile E authenticated; nine service route checks",
+    "PASS profile F authenticated; nine service route checks",
+    "PASS SaaS login, ERP navigation and filtered hospital list"
+  ],
+  "purchase_and_stock": {
+    "units": "8.000",
+    "received": "120.00",
+    "paid": "70.00",
+    "payable": 50
+  },
+  "restore": {
+    "utility": "Complete mariadb-dump and private clinical files, restored to an independent MariaDB instance and private disk root",
+    "dump_sha256": "c04667c4da6d8c81fa9bb7e05e5df403442e1497602652325de7fd432ed0ff28",
+    "verification_before_sha256": "02501892fdbb1af4bdff3f62c4ebddec5d1184b38afd3743ce616e5d1dea97b4",
+    "verification_after_sha256": "02501892fdbb1af4bdff3f62c4ebddec5d1184b38afd3743ce616e5d1dea97b4",
+    "table_count": 23,
+    "restored_tables": {
+      "companies": [
+        8,
+        "74a6cbf3347d17b9f68ba7c8cbf50e0ab3c154031a0bf8e96091ad4bfdef3eb2"
+      ],
+      "branches": [
+        9,
+        "22b451e73eb4aa1fd4c2ea3c65fdebb395e7f2849ca1e21ee6c3fc59dc5d7380"
+      ],
+      "users": [
+        19,
+        "b759e5f0c9ff07d294230317acb9b365398ca4368597cd94a3ff0c12b3ca9541"
+      ],
+      "health_patients": [
+        9,
+        "4b920b0595ba26320dde4cca546aa02ce62ed086910c2776c1ecc2604cf5cef7"
+      ],
+      "health_doctors": [
+        24,
+        "04872a332e9a22dce908064527ececcd9e70e04ea1a6949e6d35f64d1b1f62e0"
+      ],
+      "health_visits": [
+        2,
+        "a50cd12d82e2a27aede0934fb6b870380db3935aab606940afdae270df78ef95"
+      ],
+      "health_charges": [
+        8,
+        "c9c1b5adf46058c3dad75831f7908fba7d7a6b9b93ac9c933fe27014cd6f168e"
+      ],
+      "health_bills": [
+        2,
+        "9ca049c0f3c6054fd12d6313d7b1e6a34b2a9528b508bd9ed59ae8d860ca19d1"
+      ],
+      "health_payments": [
+        9,
+        "d1e910367273081fe341ca29b0686315a11169118d67ad71c4dba21b89398625"
+      ],
+      "health_journals": [
+        15,
+        "14e0a4801f0c618ff7973f21fed54a940d25945f8ab19eaaa82be9233e96b5bb"
+      ],
+      "health_journal_lines": [
+        36,
+        "a35b1de228dd178e2b1d5380432526dc5b403e6f93db9dde2ec82de0fd1c17e7"
+      ],
+      "health_diagnostic_orders": [
+        2,
+        "c0faccf6b1129cb91f9dcd0f89966f538bf01ca28aa8cfb0c341bd36379b7143"
+      ],
+      "health_audit_events": [
+        134,
+        "421617842daaf3c767d9cc24a26a782cde0c0e632e3e6b83beed91a9994dceae"
+      ],
+      "health_cashier_requests": [
+        2,
+        "405e48194a413014682565dfaca36b09613c910b9c055488db8ac5c0f1203a51"
+      ],
+      "health_deliveries": [
+        1,
+        "003b3f7d1642ae57111fd546d499b33262017e5af13547d17831204e83fc01fd"
+      ],
+      "health_external_referrals": [
+        0,
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "health_triage_records": [
+        1,
+        "5906c48e0c78e47947d8cffbc25f500f680c1041833dcec068d1247164e4fbb0"
+      ],
+      "health_visit_attachments": [
+        1,
+        "4a3947de1a76ae6800e57b5aa89cb6f19bea96b3a09bd653847197fe719b25a9"
+      ],
+      "health_medicine_batches": [
+        1,
+        "f4a18009f399b2f3769e400a05651b7b07440d91caa0f4091ef5dbefad80c34c"
+      ],
+      "health_supplier_payments": [
+        2,
+        "04f8cc17f62291a20c856ea4fc10d1f52021ba23f3bd840ef789d30d40c48180"
+      ],
+      "health_attendance_days": [
+        1,
+        "8e218de7f0ec8d5734d1130f24433bf283450aea2b2dda3cdccc612667ae41a2"
+      ],
+      "health_staff_profiles": [
+        1,
+        "513d7ee822a5d3137044433c129d49553558700511c04c41596f4779330965d9"
+      ],
+      "purchase_orders": [
+        1,
+        "2b036910c32c353aedd2f51c3d3f4b9d6165a1b78bc2bfc7bf44bdd21e57c845"
+      ]
+    },
+    "decrypted_name_count": 8,
+    "clinical": {
+      "signed_reports": 2,
+      "discharge": "discharged",
+      "bill": "B000002",
+      "total": "10040.00",
+      "outstanding": "0.00"
+    },
+    "private_attachment_sha256": "ad306e19047869ec17912ebd5d9d3853929aae2ab6ce74894009c23a59a4c625"
+  },
+  "ipd_sql_retest": {
+    "tests": 102,
+    "assertions": 776,
+    "failures": 0,
+    "errors": 0
+  },
+  "services": [
+    "No production regulator credentials",
+    "FBR retail sandbox transport replaced by an in-process fake",
+    "No healthcare PRA certification or acknowledgement"
+  ],
+  "owner_decision": "no deployment approval due"
+}

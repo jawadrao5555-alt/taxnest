@@ -102,7 +102,7 @@ class PosFederalAutomationTest extends TestCase
 
     private function enable(): PosFederalRule
     {
-        PosDiSandboxProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'environment'=>'sandbox']);
+        PosDiSandboxProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'environment'=>'sandbox','updated_by'=>$this->owner->id]);
         return PosFederalRule::create(['company_id'=>$this->company->id,'channel'=>'di','environment'=>'sandbox',
             'enabled'=>true,'version'=>1,'mapping'=>['hs_code'=>'9801.2000','tax_rate'=>'0','uom'=>'Numbers, pieces, units',
             'sale_type'=>'Services','buyer_province'=>'Punjab','buyer_address'=>'Synthetic test address','scenario_id'=>'SN019'],

@@ -4125,10 +4125,11 @@ class PosController extends Controller
                     $ri['deal_snapshot'] ?? null, (float) $ri['lineTotal'], (float) $itemDiscountShare,
                     (float) $taxRate, $taxInclusive, $menuRate, (bool) $ri['isExempt'], isset($ri['allocated_discount']) || isset($ri['promotion_snapshot'])
                 );
+                $allocationFields += \App\Services\PosFiscalLineFacts::fields((float) $itemTaxableAmount, (float) $itemTaxAmount, $taxInclusive, (bool) $ri['isExempt']);
                 if (isset($allocationFields['deal_snapshot'])) {
                     $allocationFields['deal_snapshot'] = \App\Services\PosDealAllocation::withItemDiscount($allocationFields['deal_snapshot'], (float) ($ri['item_discount_amount'] ?? 0));
                 }
-                if ($allocationFields) {
+                if (isset($allocationFields['tax_amount'])) {
                     $itemTaxAmount = $allocationFields['tax_amount'];
                     $itemTaxRate = $allocationFields['tax_rate'];
                     if ($ri['type'] === 'deal') $frozenCost = \App\Services\PosDealAllocation::unitCost($ri['deal_snapshot']);
@@ -4692,10 +4693,11 @@ class PosController extends Controller
                     $ri['deal_snapshot'] ?? null, (float) $ri['lineTotal'], (float) $itemDiscountShare,
                     (float) $taxRate, $editTaxInclusive, $editMenuRate, (bool) $ri['isExempt'], isset($ri['allocated_discount']) || isset($ri['promotion_snapshot'])
                 );
+                $allocationFields += \App\Services\PosFiscalLineFacts::fields((float) $itemTaxableAmount, (float) $itemTaxAmount, $editTaxInclusive, (bool) $ri['isExempt']);
                 if (isset($allocationFields['deal_snapshot'])) {
                     $allocationFields['deal_snapshot'] = \App\Services\PosDealAllocation::withItemDiscount($allocationFields['deal_snapshot'], (float) ($ri['item_discount_amount'] ?? 0));
                 }
-                if ($allocationFields) {
+                if (isset($allocationFields['tax_amount'])) {
                     $itemTaxAmount = $allocationFields['tax_amount'];
                     $itemTaxRate = $allocationFields['tax_rate'];
                     if ($ri['type'] === 'deal') $frozenCostEdit = \App\Services\PosDealAllocation::unitCost($ri['deal_snapshot']);
@@ -6154,12 +6156,13 @@ class PosController extends Controller
                     $itemTaxAmount = $promoteTaxInclusive
                         ? \App\Services\PosTaxMath::inclusiveLineTax($itemTaxableAmount, (float) $itemTaxRate, $promoteMenuRate)
                         : round($itemTaxableAmount * $itemTaxRate / 100, 2);
+                    $fiscalFacts = \App\Services\PosFiscalLineFacts::fields((float) $itemTaxableAmount, (float) $itemTaxAmount, $promoteTaxInclusive, (bool) $it->is_tax_exempt);
                     $it->update(array_merge([
                         'tax_rate'   => $itemTaxRate,
                         'tax_amount' => $itemTaxAmount,
                     ], \App\Services\PosDealAllocation::lineFields($it->deal_snapshot,
                         (float) $it->subtotal, (float) $itemDiscountShare, (float) $taxRate,
-                        $promoteTaxInclusive, $promoteMenuRate, (bool) $it->is_tax_exempt, $dealBill !== null)));
+                        $promoteTaxInclusive, $promoteMenuRate, (bool) $it->is_tax_exempt, $dealBill !== null) + $fiscalFacts));
 
                 }
 

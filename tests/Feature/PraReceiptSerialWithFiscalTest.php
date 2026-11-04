@@ -434,4 +434,23 @@ class PraReceiptSerialWithFiscalTest extends TestCase
             );
         }
     }
+
+    public function test_dual_fiscal_row_keeps_both_numbers_beneath_qr_and_serial_in_both_widths(): void
+    {
+        $this->app->instance(\App\Services\PosFiscalReceipt::class, new class extends \App\Services\PosFiscalReceipt {
+            public function federal(PosTransaction $sale): ?array {
+                return ['label'=>'FBR DI','environment'=>'SANDBOX','state'=>'accepted','reference'=>'TEST-FBR-ACK'];
+            }
+        });
+        foreach (self::TEMPLATES as $template) {
+            $company=$this->makeCompany(); $txn=$this->makeTransaction($company,'submitted',self::FISCAL);
+            $body=$this->renderBody($template,$company,$txn);
+            $this->assertStringContainsString('class="dual-fiscal"',$body);
+            $this->assertStringContainsString(self::SERIAL,$body);
+            $this->assertSame(1,substr_count($body,self::FISCAL));
+            $this->assertStringContainsString('TEST-FBR-ACK',$body);
+            $this->assertLessThan(strpos($body,'class="pra-fiscal-reference"'),strpos($body,'alt="PRA fiscal QR"'));
+            $this->assertLessThan(strpos($body,'class="fbr-fiscal-reference"'),strpos($body,'alt="FBR fiscal QR"'));
+        }
+    }
 }

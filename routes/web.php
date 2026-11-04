@@ -870,6 +870,8 @@ Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
     Route::get('/tax-integrations', [\App\Http\Controllers\PosTaxIntegrationController::class,'index'])->name('pos.tax-integrations');
+    Route::get('/tax-integrations/automatic', [\App\Http\Controllers\PosFederalAutomationController::class,'index'])->name('pos.federal-auto');
+    Route::post('/tax-integrations/automatic', [\App\Http\Controllers\PosFederalAutomationController::class,'save'])->middleware('throttle:6,1')->name('pos.federal-auto.save');
     Route::prefix('tax-integrations/fbr-pos')->name('pos.tax-integrations.ims')->controller(\App\Http\Controllers\PosTaxIntegrationController::class)->group(function(){
         Route::get('/', 'ims');
         Route::post('/setup', 'saveIms')->middleware('throttle:6,1')->name('.save');

@@ -1,0 +1,49 @@
+<?php
+namespace App\Services;
+use App\Models\{PosFederalOutbox, PosImsSubmission, PosDiSandboxSubmission};
+
+/** Explicitly reviewed flat-rate mapping; never infers federal tax from PRA tax. */
+class PosFederalPayload
+{
+    public function build(PosFederalOutbox $row, $record, $service): array
+    {
+        $m=$row->rule_snapshot['mapping'];
+        $p=$service->template($record);
+        $parent=null;
+        if (($record->snapshot['transaction_type'] ?? 'sale')==='return') {
+            $model=$row->channel==='ims' ? PosImsSubmission::class : PosDiSandboxSubmission::class;
+            $parent=$model::where('company_id',$row->company_id)->where('source_transaction_id',$record->snapshot['parent_transaction_id'])
+                ->where('environment',$row->environment)->whereIn('state',$row->channel==='ims' ? ['accepted','local_accepted'] : ['accepted'])->first();
+            abort_unless($parent,409,'Original federal acknowledgement is required before reporting its return.');
+        }
+        if ($row->channel==='ims') {
+            $p['RefUSIN']=$parent?->fiscal_number;
+            foreach ($p['Items'] as &$line) {
+                $line['PCTCode']=str_replace('.','',$m['hs_code']);
+                $line['TaxRate']=(float)$m['tax_rate'];
+                $line['TaxCharged']=round($line['SaleValue']*$line['TaxRate']/100,2);
+                $line['TotalAmount']=round($line['SaleValue']+$line['TaxCharged'],2);
+                $line['RefUSIN']=$p['RefUSIN'];
+            }
+            unset($line);
+            $p['TotalTaxCharged']=round(array_sum(array_column($p['Items'],'TaxCharged')),2);
+            $p['TotalBillAmount']=round($p['TotalSaleValue']+$p['TotalTaxCharged'],2);
+        } else {
+            $name=strtolower(trim((string)($record->snapshot['customer_name'] ?? '')));
+            abort_unless(empty($record->snapshot['customer_id']) && in_array($name,['','walk-in customer','walk-in','cash customer'],true),422,'Review the actual buyer identity in the federal workbench.');
+            $p['buyerBusinessName']='Walk-in customer';
+            $p['buyerProvince']=$m['buyer_province']; $p['buyerAddress']=$m['buyer_address'];
+            $p['invoiceRefNo']=$parent?->fiscalReference() ?? '';
+            if ($row->environment==='sandbox') $p['scenarioId']=$m['scenario_id'];
+            foreach ($p['items'] as &$line) {
+                $line['hsCode']=$m['hs_code']; $line['uoM']=$m['uom'];
+                $line['saleType']=$m['sale_type']; $line['rate']=$m['tax_rate'].'%';
+                $line['salesTaxApplicable']=round($line['valueSalesExcludingST']*(float)$m['tax_rate']/100,2);
+                $line['totalValues']=round($line['valueSalesExcludingST']+$line['salesTaxApplicable'],2);
+                $line['sroScheduleNo']=$m['sro_schedule'] ?? ''; $line['sroItemSerialNo']=$m['sro_item'] ?? '';
+            }
+            unset($line);
+        }
+        return $p;
+    }
+}

@@ -1,4 +1,6 @@
 <?php
+// Durable, bounded drain. Overlapping runners also take per-record database locks.
+\Illuminate\Support\Facades\Schedule::command('pos:federal-outbox')->everyMinute()->withoutOverlapping();
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;

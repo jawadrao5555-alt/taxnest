@@ -28,6 +28,7 @@ final class PosFiscalSnapshot
             'transaction_type'=>$sale->transaction_type ?? 'sale','parent_transaction_id'=>$sale->parent_transaction_id,
             'subtotal'=>(float)$sale->subtotal,'discount'=>(float)$sale->discount_amount,
             'pra_tax'=>(float)$sale->tax_amount,'total'=>(float)$sale->total_amount,
+            'customer_id'=>$sale->customer_id,'customer_name'=>$sale->customer_name,
             'payment_method'=>$sale->payment_method,'pra_status'=>$sale->pra_status,'pra_number'=>$sale->pra_invoice_number,'lines'=>$lines];
     }
 }

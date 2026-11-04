@@ -419,12 +419,20 @@ class PosAnalyticsPlanGateTest extends TestCase
         $this->assertNotNull($response->viewData('rangeAnalytics'),
             'active trial must evaluate the analytics dashboard');
     }
-    public function test_actual_report_pdf_has_analytics_before_complete_products_and_page_numbers(): void
+    public static function reportHours(): array
     {
+        return ['after midnight' => ['2026-11-05 00:30:00'], 'afternoon' => ['2026-11-05 12:30:00']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('reportHours')]
+    public function test_actual_report_pdf_has_analytics_before_complete_products_and_page_numbers(string $at): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse($at, config('app.timezone')));
         $cid=$this->makeCompany();$owner=$this->makeOwner($cid);
         $this->subscribe($cid,['name'=>'Business','analytics_enabled'=>1]);$this->makeTxn($cid);
         $id=DB::table('pos_transactions')->where('company_id',$cid)->value('id');
-        DB::table('pos_transactions')->where('id',$id)->update(['invoice_mode'=>'pra','pra_status'=>'submitted','pra_invoice_number'=>'SYNTHETIC','total_amount'=>60,'subtotal'=>60]);
+        DB::table('pos_transactions')->where('id',$id)->update(['invoice_mode'=>'pra','pra_status'=>'submitted','pra_invoice_number'=>'SYNTHETIC','total_amount'=>60,'subtotal'=>60,
+            'business_date'=>\App\Services\PosBusinessDay::current($cid)]);
         for($n=0;$n<60;$n++)DB::table('pos_transaction_items')->insert([
             'transaction_id'=>$id,'item_type'=>'manual','item_name'=>'Synthetic detail '.str_pad((string)$n,2,'0',STR_PAD_LEFT),
             'quantity'=>1,'unit_price'=>1,'subtotal'=>1,'tax_amount'=>0,'tax_rate'=>0,'created_at'=>now(),'updated_at'=>now()]);

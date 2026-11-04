@@ -142,16 +142,20 @@ async function logout(win,panel) {
   assert.match(await settings.webContents.executeJavaScript("document.getElementById('imsOkNote').textContent"),/127\.0\.0\.1:8524\/TcpService\/IMSHttp/);
   assert.match(await settings.webContents.executeJavaScript("document.getElementById('imsOkNote').textContent"),/environment need verification/);
   settings.webContents.send('status-update',{running:true,connected:true,deviceUid:'fixture-counter',localIms:[{url:'http://127.0.0.1:8524/TcpService/IMSHttp'}],serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device',fbr_alongside_pra:true}});
-  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsHeading').textContent==='PRA + FBR IMS Services' && document.getElementById('imsDeviceInfo').textContent.includes('fixture-counter')"),'alongside PRA and FBR visibility with automatic identity');
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsHeading').textContent==='PRA + optional FBR IMS setup' && document.getElementById('imsDeviceInfo').textContent.includes('fixture-counter')"),'alongside PRA and FBR visibility with automatic identity');
   await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsOkNote').textContent.includes('PRA local address: responding')"),'separate PRA availability and FBR compatibility status');
   await click(settings,'#installationFolderBtn');await wait(()=>installationOpens===1,'installation folder IPC');
   await click(settings,'#installedAppsBtn');await wait(()=>installedAppsOpens===1,'Windows installed apps IPC');
   imsRunning=false;
   settings.webContents.send('status-update',{running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device'}});
-  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('praImsSteps').style.display==='block'"),'packaged PRA fiscal guidance');
-  await settings.webContents.executeJavaScript("document.getElementById('imsInstallBtn').click()");
-  assert.equal(imsInstalls,1,'PRA must not invoke the FBR installer');
-  for(const s of [{running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'cloud'}},{running:true,connected:true,serverInfo:{product_type:'unknown'}},{running:false,connected:false}]) {
+  await click(settings,'#imsCheckBtn');
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsInstallBtn').style.display==='inline-block' && document.getElementById('imsSteps').style.display==='block'"),'PRA login optional FBR setup while reporting is disabled');
+  assert.equal(imsInstalls,1,'visibility must never auto-install');
+  await click(settings,'#imsInstallBtn');await wait(()=>imsInstalls===2,'explicit optional FBR installer from PRA login');
+  settings.webContents.send('status-update',{running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'cloud'}});
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsCard').style.display==='block' && document.getElementById('imsHeading').textContent==='FBR IMS setup / connection check'"),'PRA cloud login retains optional FBR setup');
+  assert.equal(imsInstalls,2,'PRA cloud visibility must not install automatically');
+  for(const s of [{running:true,connected:true,serverInfo:{product_type:'unknown'}},{running:false,connected:false}]) {
     settings.webContents.send('status-update',s);
     await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsCard').style.display==='none'"),'hidden out-of-scope IMS');
   }

@@ -470,6 +470,7 @@ class InvoiceController extends Controller
     public static function detectBuyerRegistrationType(?string $buyerNtn, ?string $buyerCnic = null): string
     {
         if (!empty($buyerNtn)) {
+            if (preg_match('/^[A-Z][0-9]{6}(?:-?[0-9])?$/i', trim($buyerNtn))) return 'Registered';
             $clean = preg_replace('/[^0-9]/', '', $buyerNtn);
             if (strlen($clean) >= 7) return 'Registered';
         }

@@ -1020,6 +1020,12 @@ class FbrService
     private function formatNtnCnic(?string $value): string
     {
         if (empty($value)) return "";
+        // FBR also issues seven-character NTNs beginning with a letter.
+        // Strip an optional check digit, never the identifying letter.
+        $ntn = strtoupper(trim($value));
+        if (preg_match('/^([A-Z][0-9]{6})(?:-?[0-9])?$/', $ntn, $match)) {
+            return $match[1];
+        }
         $clean = preg_replace('/[^0-9]/', '', $value);
         if (strlen($clean) === 13) return $clean;
         if (strlen($clean) >= 7) return substr($clean, 0, 7);
@@ -1029,6 +1035,7 @@ class FbrService
     private function determineBuyerRegistrationType(?string $buyerNtn): string
     {
         if (empty($buyerNtn)) return "Unregistered";
+        if (preg_match('/^[A-Z][0-9]{6}(?:-?[0-9])?$/i', trim($buyerNtn))) return "Registered";
         $clean = preg_replace('/[^0-9]/', '', $buyerNtn);
         if (strlen($clean) === 7 || strlen($clean) === 13) return "Registered";
         return "Unregistered";

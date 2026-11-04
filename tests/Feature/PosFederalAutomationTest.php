@@ -234,4 +234,14 @@ class PosFederalAutomationTest extends TestCase
         $this->owner->forceFill(['role'=>'employee','pos_role'=>'pos_cashier'])->saveQuietly();
         $this->get('/pos/tax-integrations/automatic')->assertForbidden(); Http::assertNothingSent();
     }
+
+    public function test_automatic_bill_cannot_be_edited_or_deleted_while_federal_ack_is_pending(): void
+    {
+        $this->enable(); $id=$this->bill(override:['pra_status'=>null,'pra_invoice_number'=>null]);
+        app(PosFederalAutomation::class)->enqueue(PosTransaction::findOrFail($id));
+        $this->getJson('/pos/transaction/'.$id.'/edit')->assertStatus(409);
+        $this->putJson('/pos/transaction/'.$id,[])->assertStatus(409);
+        $this->deleteJson('/pos/transaction/'.$id)->assertStatus(409);
+        $this->assertNotNull(DB::table('pos_transactions')->find($id)); Http::assertNothingSent();
+    }
 }

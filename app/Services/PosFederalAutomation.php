@@ -14,6 +14,13 @@ class PosFederalAutomation
             && Schema::hasTable('pos_ims_profiles') && Schema::hasTable('pos_di_sandbox_profiles');
     }
 
+    public function assertSaleMutable(PosTransaction $sale): void
+    {
+        abort_if(Schema::hasTable('pos_federal_outbox') && PosFederalOutbox::where('company_id',$sale->company_id)
+            ->where('source_transaction_id',$sale->id)->exists(),409,
+            'This bill is queued for federal reporting. Use a return/credit note to correct it; do not edit or delete its original sale.');
+    }
+
     public function selected(int $companyId): ?array
     {
         $ims=PosImsProfile::where('company_id',$companyId)->where('enabled',true)->first();

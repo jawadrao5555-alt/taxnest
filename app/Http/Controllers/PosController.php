@@ -4413,6 +4413,8 @@ class PosController extends Controller
             abort(403);
         }
 
+        app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
+
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
                 ->with('error', __('pos.cannot_edit_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
@@ -4461,6 +4463,8 @@ class PosController extends Controller
             }
             abort(403);
         }
+
+        app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
 
         if ($transaction->pra_invoice_number) {
             if ($request->wantsJson()) {
@@ -4833,6 +4837,8 @@ class PosController extends Controller
         }
 
         $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
+
+        app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
 
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)

@@ -688,7 +688,7 @@
   $('imsCheckBtn').addEventListener('click', checkIms);
 
   $('imsInstallBtn').addEventListener('click', async () => {
-    if (currentImsMode !== 'fbr') return;
+    if (!['fbr','both'].includes(currentImsMode)) return;
     const btn = $('imsInstallBtn');
     btn.disabled = true;
     $('imsProgress').style.display = 'block';
@@ -705,7 +705,7 @@
   });
 
   window.agentAPI.onImsProgress((p) => {
-    if (currentImsMode !== 'fbr') return;
+    if (!['fbr','both'].includes(currentImsMode)) return;
     $('imsProgress').style.display = 'block';
     $('imsProgress').style.color = p.stage === 'error' ? '#fca5a5' : '#c4b5fd';
     $('imsProgress').textContent =

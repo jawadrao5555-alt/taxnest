@@ -35,12 +35,15 @@ const server = createServer((request, response) => {
     window.__imsInstalls=0;
     window.__imsRunning=false;
     window.__fixturePosLaunches=0;window.__fixtureBrowserLaunches=0;
+    window.__installationFolderOpens=0;window.__installedAppsOpens=0;
     window.agentAPI=new Proxy({
       getVersion:async()=>{if(${JSON.stringify(mode)}==='ipc-error')throw new Error('Synthetic identity IPC unavailable');return ${JSON.stringify(info)};},
       getConfig:async()=>({serverUrl:location.origin+'/api/agent',companyId:'Fictional company',apiKey:''}),
       getPrinters:async()=>({printers:[]}),getStatus:async()=>({running:false,connected:false}),
       onStatusUpdate:fn=>{window.__emitStatus=fn;},
-      checkImsService:async()=>({running:window.__imsRunning}),
+      checkImsService:async()=>({running:window.__imsRunning,pra_reachable:window.__imsRunning,services:window.__imsRunning?[{protocol:'soap',url:'http://127.0.0.1:8524/TcpService/IMSHttp'}]:[]}),
+      openInstallationFolder:async()=>{window.__installationFolderOpens++;return {ok:true};},
+      openInstalledApps:async()=>{window.__installedAppsOpens++;return {ok:true};},
       installFbrIms:async()=>{window.__imsInstalls++;return {ok:true};},
       checkUpdate:async()=>({available:false}),
       imsMode:()=>null,
@@ -104,15 +107,31 @@ try {
       assert.equal(await page.evaluate(() => window.__imsInstalls), 1, 'explicit click reaches only the fictional installer');
       await page.evaluate(() => { window.__imsRunning=true; });
       await page.locator('#imsCheckBtn').click();
-      await page.waitForFunction(() => document.getElementById('imsBadge').textContent.includes('IMS Running'));
+      await page.waitForFunction(() => document.getElementById('imsBadge').textContent.includes('Compatible SOAP IMS detected'));
       assert.equal(await page.locator('#imsInstallBtn').isVisible(), false);
+      assert.match(await page.locator('#imsOkNote').textContent(), /127\.0\.0\.1:8524\/TcpService\/IMSHttp/);
+      assert.match(await page.locator('#imsOkNote').textContent(), /environment need verification/);
+      await page.evaluate(() => window.__emitStatus({running:true,connected:true,deviceUid:'fixture-counter',localIms:[{url:'http://127.0.0.1:8524/TcpService/IMSHttp'}],serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device',fbr_alongside_pra:true}}));
+      await page.waitForFunction(() => document.getElementById('imsHeading').textContent==='PRA + FBR IMS Services' && document.getElementById('imsOkNote').textContent.includes('PRA local address: responding'));
+      assert.match(await page.locator('#imsDeviceInfo').textContent(), /fixture-counter/);
+      await page.locator('#installationFolderBtn').click();
+      await page.locator('#installedAppsBtn').click();
+      assert.equal(await page.evaluate(()=>window.__installationFolderOpens),1);
+      assert.equal(await page.evaluate(()=>window.__installedAppsOpens),1);
+      await saveEvidenceScreenshot(page,'agent-pra-fbr-ims-identified');
+      await page.evaluate(()=>{window.__imsRunning=false;});
+      await page.locator('#imsCheckBtn').click();
+      await page.waitForFunction(()=>document.getElementById('imsInstallBtn').style.display==='inline-block');
+      await page.locator('#imsInstallBtn').click();
+      await page.waitForFunction(()=>window.__imsInstalls===2);
+
       await page.evaluate(() => { window.__imsRunning=false; window.__emitStatus({running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device'}}); });
       await page.waitForFunction(() => document.getElementById('praImsSteps').style.display === 'block');
       assert(await page.locator('#imsCard').isVisible());
       assert.match(await page.locator('#imsHeading').textContent(), /PRA/);
       assert.equal(await page.locator('#imsInstallBtn').isVisible(), false);
       await page.evaluate(() => document.getElementById('imsInstallBtn').click());
-      assert.equal(await page.evaluate(() => window.__imsInstalls), 1, 'PRA cannot invoke FBR installer even through a hidden control');
+      assert.equal(await page.evaluate(() => window.__imsInstalls), 2, 'PRA cannot invoke FBR installer even through a hidden control');
       await page.evaluate(() => window.__emitStatus({running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'cloud'}}));
       assert.equal(await page.locator('#imsCard').isVisible(), false);
       await page.evaluate(() => window.__emitStatus({running:true,connected:true,serverInfo:{product_type:'unknown'}}));

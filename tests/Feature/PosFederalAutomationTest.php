@@ -244,4 +244,20 @@ class PosFederalAutomationTest extends TestCase
         $this->deleteJson('/pos/transaction/'.$id)->assertStatus(409);
         $this->assertNotNull(DB::table('pos_transactions')->find($id)); Http::assertNothingSent();
     }
+
+    public function test_print_sized_pra_and_fbr_qrs_decode_to_their_own_raw_reference(): void
+    {
+        if (!extension_loaded('gd')) $this->markTestSkipped('GD is required for PNG scan acceptance.');
+        foreach (['202611040000123456789012345','SYN-FBR-ACK-20261104'] as $reference) {
+            $uri=\App\Support\QrImage::dataUri($reference,5,4);
+            $png=base64_decode(explode(',',$uri,2)[1]);
+            foreach ([74,84] as $size) {
+                $src=imagecreatefromstring($png); $dst=imagecreatetruecolor($size,$size);
+                imagecopyresampled($dst,$src,0,0,0,0,$size,$size,imagesx($src),imagesy($src));
+                ob_start(); imagepng($dst); $small=ob_get_clean();
+                $this->assertSame($reference,(string)(new \chillerlan\QRCode\QRCode())->readFromBlob($small));
+                imagedestroy($src); imagedestroy($dst);
+            }
+        }
+    }
 }

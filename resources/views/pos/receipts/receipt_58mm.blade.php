@@ -770,7 +770,7 @@
 
     @include('pos.hotel._credit-summary', ['summary' => $hotelCreditSummary, 'creditAmount' => $transaction->total_amount, 'creditReceipt' => true])
     @if($federalFiscal)
-        @include('pos.receipts._dual-fiscal', ['fiscalQrSize' => 64])
+        @include('pos.receipts._dual-fiscal', ['fiscalQrSize' => 74])
     @elseif($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice

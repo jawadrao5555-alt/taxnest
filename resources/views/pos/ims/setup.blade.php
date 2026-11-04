@@ -23,8 +23,8 @@
     <script>
     (() => {
       const devices = @json($deviceOptions);
-      const saved = @json(old('local_ims_url',$profile?->local_ims_url));
-      const savedDevice = @json(old('device_uid',$profile?->device_uid));
+      const saved = {{ \Illuminate\Support\Js::from(old('local_ims_url',$profile?->local_ims_url)) }};
+      const savedDevice = {{ \Illuminate\Support\Js::from(old('device_uid',$profile?->device_uid)) }};
       const pc=document.getElementById('device'), url=document.getElementById('local-url');
       if(!pc.value && !savedDevice) { const online=devices.filter(d=>d.online); if(online.length===1) pc.value=online[0].uid; }
       function update() {

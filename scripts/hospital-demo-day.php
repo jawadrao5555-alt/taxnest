@@ -2,13 +2,9 @@
 
 use App\Models\{Company, HealthBill, HealthCharge, HealthDoctor, HealthPatient, User};
 use App\Services\{HealthBillingService, HealthChargeIngestService, HealthModuleService, HealthOpdService, HealthPostingService};
-use App\Support\DevStagingGuard;
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
-require __DIR__.'/../vendor/autoload.php';
-$app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
+$company = require __DIR__.'/lib/hospital-demo.php';
 
 function verify(bool $condition, string $label): void
 {
@@ -17,10 +13,6 @@ function verify(bool $condition, string $label): void
     }
 }
 
-verify($app->environment('local', 'testing') && env('HOSPITAL_DEMO_ALLOW') === '1'
-    && !DevStagingGuard::problems(), 'Refused: not the opted-in disposable hospital database.');
-$company = Company::where('ntn', 'DEMO-344-A')->firstOrFail();
-verify($company->name === 'TaxNest Demo General Hospital' && !$company->fbr_reporting_enabled, 'Incorrect demo tenant or fiscal reporting enabled.');
 $owner = User::where('company_id', $company->id)->where('health_role', 'health_owner')->firstOrFail();
 $patient = HealthPatient::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();
 $doctor = HealthDoctor::withoutGlobalScopes()->where('company_id', $company->id)->firstOrFail();

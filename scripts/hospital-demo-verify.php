@@ -1,20 +1,10 @@
 <?php
 
 use App\Models\Company;
-use App\Support\{DevStagingGuard, NestErps};
-use Illuminate\Contracts\Console\Kernel;
+use App\Support\NestErps;
 use Illuminate\Support\Facades\DB;
 
-require __DIR__.'/../vendor/autoload.php';
-$app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
-if (!$app->environment('local', 'testing') || env('HOSPITAL_DEMO_ALLOW') !== '1' || DevStagingGuard::problems()) {
-    throw new RuntimeException('Refused: local, opted-in disposable MariaDB required.');
-}
-$hospital = Company::where('ntn', 'DEMO-344-A')->firstOrFail();
-if ($hospital->name !== 'TaxNest Demo General Hospital' || $hospital->fbr_reporting_enabled) {
-    throw new RuntimeException('Incorrect fixture or regulator reporting enabled.');
-}
+$hospital = require __DIR__.'/lib/hospital-demo.php';
 $tables = [
     'companies', 'branches', 'users', 'health_patients', 'health_doctors', 'health_visits', 'health_charges',
     'health_bills', 'health_payments', 'health_journals', 'health_journal_lines', 'health_diagnostic_orders',
@@ -44,5 +34,18 @@ if (in_array('--check-purchase', $argv, true)) {
     }
     $checks['purchase'] = ['units' => $batch->quantity, 'received' => $order->total_amount,
         'paid' => $paid, 'payable' => round($order->total_amount - $paid, 2)];
+}
+if (in_array('--check-journey', $argv, true)) {
+    $patient = DB::table('health_patients')->where('company_id',$hospital->id)->where('name','Demo Clinical Journey')->sole();
+    $bill = DB::table('health_bills')->where('company_id',$hospital->id)->where('health_patient_id',$patient->id)->sole();
+    $stay = DB::table('health_admissions')->where('company_id',$hospital->id)->where('health_patient_id',$patient->id)->sole();
+    $diagnostics = DB::table('health_diagnostic_orders')->where('company_id',$hospital->id)
+        ->where('health_patient_id',$patient->id)->where('status','released')->count();
+    if ($diagnostics !== 2 || $stay->status !== 'discharged' || (float) $bill->outstanding_amount !== 0.0 ||
+        !DB::table('health_deliveries')->where('health_admission_id',$stay->id)->where('method','caesarean')->exists()) {
+        throw new RuntimeException('Restored clinical journey failed.');
+    }
+    $checks['clinical'] = ['signed_reports'=>$diagnostics, 'discharge'=>$stay->status, 'bill'=>$bill->bill_no,
+        'total'=>$bill->total_amount,'outstanding'=>$bill->outstanding_amount];
 }
 echo json_encode($checks, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), PHP_EOL;

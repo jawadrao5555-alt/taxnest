@@ -323,7 +323,7 @@ class HealthIpdBillingService
             ->where('company_id', $admission->company_id)
             ->where('health_admission_id', $admission->id)
             ->where('status', HealthAdmissionCharge::STATUS_POSTED)
-            ->selectRaw('category, SUM(gross_amount) as gross, SUM(concession_amount) as concession, SUM(net_amount) as net, COUNT(*) as lines')
+            ->selectRaw('category, SUM(gross_amount) as gross, SUM(concession_amount) as concession, SUM(net_amount) as net, COUNT(*) as line_count')
             ->groupBy('category')
             ->get();
 
@@ -364,7 +364,7 @@ class HealthIpdBillingService
                 'gross' => round((float) $row->gross, 2),
                 'concession' => round((float) $row->concession, 2),
                 'net' => round((float) $row->net, 2),
-                'lines' => (int) $row->lines,
+                'lines' => (int) $row->line_count,
             ]])->all(),
         ];
     }

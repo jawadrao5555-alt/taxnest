@@ -2,20 +2,9 @@
 
 use App\Models\{Branch, Company, HealthAdmission, HealthBed, HealthBill, HealthCharge, HealthDoctor, HealthMedicine, HealthOperation, HealthOperationTheatre, HealthPatient, HealthPrescription, HealthProcedure, HealthVisit, User};
 use App\Services\{HealthBillingService, HealthChargeIngestService, HealthIpdBillingService, HealthIpdService, HealthOpdService, HealthOperationService, HealthPatientService, HealthPharmacyCheckoutService};
-use App\Support\DevStagingGuard;
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
-require __DIR__.'/../vendor/autoload.php';
-$app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
-if (!$app->environment('local','testing') || env('HOSPITAL_DEMO_ALLOW') !== '1' || DevStagingGuard::problems()) {
-    throw new RuntimeException('Opted-in local disposable database required.');
-}
-$hospital = Company::where('ntn','DEMO-344-A')->firstOrFail();
-if ($hospital->name !== 'TaxNest Demo General Hospital' || $hospital->fbr_reporting_enabled) {
-    throw new RuntimeException('Unexpected demo tenant or reporting enabled');
-}
+$hospital = require __DIR__.'/lib/hospital-demo.php';
 $id = $hospital->id;
 $owner = User::where('company_id',$id)->where('health_role','health_owner')->firstOrFail();
 $doctor = HealthDoctor::withoutGlobalScopes()->where('company_id',$id)->whereNotNull('user_id')->firstOrFail();

@@ -2,22 +2,12 @@
 
 use App\Models\{Company, HealthBill, HealthPayment, User};
 use App\Services\HealthBillingService;
-use App\Support\DevStagingGuard;
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-require __DIR__.'/../vendor/autoload.php';
-$app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
-
-if (!$app->environment('local', 'testing') || env('HOSPITAL_DEMO_ALLOW') !== '1' || DevStagingGuard::problems()
-    || !function_exists('pcntl_fork')) {
-    throw new RuntimeException('Concurrent demo requires an opted-in local MariaDB and pcntl.');
-}
-$company = Company::where('ntn', 'DEMO-344-A')->firstOrFail();
-if ($company->name !== 'TaxNest Demo General Hospital' || $company->fbr_reporting_enabled) {
-    throw new RuntimeException('Unexpected hospital or regulator reporting enabled.');
+$company = require __DIR__.'/lib/hospital-demo.php';
+if (!function_exists('pcntl_fork')) {
+    throw new RuntimeException('Concurrent demo requires pcntl.');
 }
 $bill = HealthBill::withoutGlobalScopes()->where('company_id', $company->id)->where('bill_no', 'B000001')->firstOrFail();
 $actor = User::where('company_id', $company->id)->where('health_role', 'health_owner')->firstOrFail();

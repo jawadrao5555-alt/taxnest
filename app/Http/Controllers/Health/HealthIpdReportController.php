@@ -205,7 +205,7 @@ class HealthIpdReportController extends HealthPanelController
     {
         $rows = (clone $this->chargeBase())
             ->whereBetween('charge_date', [$from->toDateString(), $to->toDateString()])
-            ->selectRaw('category, status, SUM(gross_amount) as gross, SUM(concession_amount) as concession, SUM(net_amount) as net, COUNT(*) as lines')
+            ->selectRaw('category, status, SUM(gross_amount) as gross, SUM(concession_amount) as concession, SUM(net_amount) as net, COUNT(*) as line_count')
             ->groupBy('category', 'status')
             ->get();
 
@@ -217,7 +217,7 @@ class HealthIpdReportController extends HealthPanelController
         foreach ($rows as $row) {
             if ($row->status === HealthAdmissionCharge::STATUS_REVERSED) {
                 $reversedTotal += (float) $row->net;
-                $reversedLines += (int) $row->lines;
+                $reversedLines += (int) $row->line_count;
                 continue;
             }
 
@@ -225,13 +225,13 @@ class HealthIpdReportController extends HealthPanelController
                 'gross' => round((float) $row->gross, 2),
                 'concession' => round((float) $row->concession, 2),
                 'net' => round((float) $row->net, 2),
-                'lines' => (int) $row->lines,
+                'lines' => (int) $row->line_count,
             ];
 
             $totals['gross'] += (float) $row->gross;
             $totals['concession'] += (float) $row->concession;
             $totals['net'] += (float) $row->net;
-            $totals['lines'] += (int) $row->lines;
+            $totals['lines'] += (int) $row->line_count;
         }
 
         arsort($posted);

@@ -106,7 +106,7 @@ class HealthAccessService
             // past an unpaid bill are two different decisions.
             'ipd.view', 'ipd.manage',
             'operations.view', 'operations.manage',
-            'lab.view',
+            'lab.view', 'lab.order', 'radiology.view', 'radiology.order',
             'pharmacy.view',
         ],
         // Records observations and runs the ward. No prescribing.
@@ -482,6 +482,7 @@ class HealthAccessService
         // capabilities.
         '#^health/ipd#'               => 'ipd.view|ipd.charge|ipd.discharge',
         '#^health/operations#'        => 'operations.view',
+        '#^health/radiology#'         => 'radiology.view',
         '#^health/lab#'               => 'lab.view',
         '#^health/billing#'           => 'billing.view',
         '#^health/accounts#'          => 'accounts.view',

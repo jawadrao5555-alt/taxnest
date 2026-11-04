@@ -44,7 +44,7 @@ final class HealthPanel
     public const LANDING_PATH = '/healthcare';
 
     /** Organisation types a healthcare company can be. */
-    public const ORG_TYPES = ['clinic', 'hospital', 'lab', 'pharmacy'];
+    public const ORG_TYPES = ['clinic', 'hospital', 'lab', 'pharmacy', 'maternity'];
 
     public const DEFAULT_ORG_TYPE = 'clinic';
 

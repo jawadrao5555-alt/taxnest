@@ -8,6 +8,13 @@
  */
 
 return [
+    'module_radiology' => 'Radiology',
+    'module_radiology_desc' => 'Imaging orders, scan aur tasdeeq shuda reports.',
+    'org_type_maternity' => 'Maternity home',
+    'service_owned' => 'Hospital ki apni service',
+    'service_independent' => 'Azad provider (alag billing)',
+    'company_suspended' => 'Hospital ka account suspend hai.',
+
 
     /* ─── Product ─── */
     // Nest ERPS product hai; Healthcare us ke andar ka vertical hai.

@@ -60,6 +60,11 @@ class HealthAuth
             return $this->toLogin()->with('error', __('health.auth_not_healthcare'));
         }
 
+        if ($company->isSuspended() || $company->status === 'suspended') {
+            Auth::guard($guard)->logout();
+            return $this->toLogin()->with('error', __('health.company_suspended'));
+        }
+
         // The account must hold a healthcare role. A user row that belongs to a
         // healthcare company but was never given a role is NOT staff yet.
         $role = HealthAccessService::roleFor($user);

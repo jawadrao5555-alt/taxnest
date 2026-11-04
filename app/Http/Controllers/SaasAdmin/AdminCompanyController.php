@@ -4,6 +4,8 @@ namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Services\HealthModuleService;
+use App\Support\NestErps;
 use App\Models\AdminAuditLog;
 use App\Models\CompanyUsageStat;
 use App\Models\Invoice;
@@ -1052,6 +1054,26 @@ class AdminCompanyController extends Controller
             return response()->json(['success' => !$result['conflict']] + $result, $result['conflict'] ? 409 : 200);
         }
         return back()->with($result['conflict'] ? 'error' : 'success', $result['message']);
+    }
+
+    public function updateErpEntitlements(Request $request, int $id)
+    {
+        abort_unless(auth('admin')->user()?->isSuperAdmin(), 403);
+        $data = $request->validate([
+            'policy' => 'required|in:package,custom',
+            'modules' => 'sometimes|array',
+            'modules.*' => 'required|distinct|in:'.implode(',', HealthModuleService::MODULES),
+        ]);
+        DB::transaction(function () use ($id, $data) {
+            $company = Company::whereIn('product_type', NestErps::PRODUCT_TYPES)->lockForUpdate()->findOrFail($id);
+            $before = $company->health_entitlements;
+            $after = $data['policy'] === 'package' ? null : HealthModuleService::normalize($data['modules'] ?? []);
+            $company->forceFill(['health_entitlements' => $after])->save();
+            AdminAuditLog::log(auth('admin')->id(), 'ERP module entitlements changed', 'Company', $id,
+                ['before' => $before, 'after' => $after]);
+        });
+        HealthModuleService::forget($id);
+        return back()->with('success', 'ERP module entitlements saved.');
     }
 
     public function updateLimits(Request $request, $id)

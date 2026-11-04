@@ -398,6 +398,25 @@
             <h3 class="text-sm font-semibold text-white mb-3">Usage & Revenue</h3>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Users</span><span class="text-white font-medium text-right min-w-0">{{ $extraStats['total_users'] }}</span></div>
+                @if(\App\Support\NestErps::isProductType($company->product_type) && auth('admin')->user()?->isSuperAdmin())
+                    <form method="post" action="{{ route('saas.admin.companies.erp-entitlements', $company->id) }}" class="space-y-3 border rounded-xl p-4">
+                        @csrf
+                        <h3 class="font-semibold">{{ \App\Support\NestErps::LABEL }} module access</h3>
+                        <label>Access policy
+                            <select name="policy" class="rounded bg-gray-800 text-white p-2">
+                                <option value="package" @selected($company->health_entitlements === null)>Use package modules</option>
+                                <option value="custom" @selected($company->health_entitlements !== null)>Restrict package modules</option>
+                            </select>
+                        </label>
+                        <fieldset><legend>Modules permitted under the restricted policy</legend>
+                        @foreach(\App\Services\HealthModuleService::MODULES as $module)
+                            <label class="inline-flex items-center gap-1 mr-3"><input type="checkbox" name="modules[]" value="{{ $module }}"
+                                @checked(in_array($module, $company->health_entitlements ?? \App\Services\HealthModuleService::MODULES, true))>{{ __(\App\Services\HealthModuleService::moduleLabelKey($module)) }}</label>
+                        @endforeach
+                        </fieldset>
+                        <button class="rounded bg-teal-700 px-3 py-2 text-white">Save ERP access</button>
+                    </form>
+                @endif
                 @if(!empty($extraStats['erps']))
                 {{-- Nest ERPS: billable documents, not invoices and not POS
                      sales — the two tables its verticals never write to. --}}

@@ -11,6 +11,13 @@
  */
 
 return [
+    'module_radiology' => 'ریڈیالوجی',
+    'module_radiology_desc' => 'امیجنگ آرڈر، معائنہ اور تصدیق شدہ رپورٹ۔',
+    'org_type_maternity' => 'زچہ و بچہ مرکز',
+    'service_owned' => 'ہسپتال کی اپنی سروس',
+    'service_independent' => 'خود مختار ادارہ (علیحدہ بلنگ)',
+    'company_suspended' => 'ہسپتال کا اکاؤنٹ معطل ہے۔',
+
 
     /* ─── Product ─── */
     // ٹیکس نیسٹ ای آر پی مصنوعہ ہے؛ ہیلتھ کیئر اس کے اندر کا شعبہ ہے۔

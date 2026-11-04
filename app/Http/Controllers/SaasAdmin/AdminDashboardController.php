@@ -28,6 +28,7 @@ class AdminDashboardController extends Controller
             'di_companies' => (int) ($productCounts['di'] ?? 0),
             'pos_companies' => (int) ($productCounts['pos'] ?? 0),
             'fbrpos_companies' => (int) ($productCounts['fbrpos'] ?? 0),
+            'erp_companies' => $productCounts->only(\App\Support\NestErps::PRODUCT_TYPES)->sum(),
             'pending_companies' => Company::where('status', 'pending')->count(),
             'pending_payment_proofs' => Schema::hasTable('payment_proofs')
                 ? \App\Models\PaymentProof::where('status', 'pending')->count() : 0,

@@ -342,6 +342,8 @@ class Company extends Model
         'rider_bill_preview_prefs' => 'array',
         // Healthcare ERP (Task 1547)
         'health_modules' => 'array',
+        'health_entitlements' => 'array',
+        'health_service_modes' => 'array',
         'health_setup_completed' => 'boolean',
         'use_universal_pos' => 'boolean',
         'auto_print_kot' => 'boolean',

@@ -1761,6 +1761,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/reject', [AdminCompanyController::class, 'reject'])->name('saas.admin.companies.reject');
     Route::post('/companies/{id}/suspend', [AdminCompanyController::class, 'suspend'])->name('saas.admin.companies.suspend');
     Route::post('/companies/{id}/activate', [AdminCompanyController::class, 'activate'])->name('saas.admin.companies.activate');
+    Route::post('/companies/{id}/erp-entitlements', [AdminCompanyController::class, 'updateErpEntitlements'])
+        ->whereNumber('id')->name('saas.admin.companies.erp-entitlements');
     Route::post('/companies/{id}/limits', [AdminCompanyController::class, 'updateLimits'])->name('saas.admin.companies.limits');
     // Hand a DI shop AI Reader pages without a payment proof (goodwill, or a
     // transfer paid for outside the panel).
@@ -1944,6 +1946,22 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
     // Per-user display preferences — every signed-in member owns their own.
     Route::post('/set-dark-mode', [HealthController::class, 'toggleDarkMode'])->name('health.set-dark-mode');
     Route::post('/set-language', [HealthController::class, 'setLanguage'])->name('health.set-language');
+
+    foreach (['lab', 'radiology'] as $service) {
+        $desk = \App\Http\Controllers\Health\HealthDiagnosticsController::class;
+        Route::prefix($service)->middleware('health.module:'.$service)->group(function () use ($desk, $service) {
+            Route::get('/', [$desk, 'index'])->defaults('service', $service)->middleware('health.can:'.$service.'.view')->name('health.'.$service);
+            Route::post('/catalog', [$desk, 'catalog'])->defaults('service', $service)->middleware('health.can:'.$service.'.manage')->name('health.'.$service.'.catalog');
+            Route::post('/orders', [$desk, 'order'])->defaults('service', $service)
+                ->middleware(['health.can:'.$service.'.order', \App\Http\Middleware\HealthSubscriptionLock::class])->name('health.'.$service.'.order');
+            Route::post('/orders/{id}/collect', [$desk, 'collect'])->whereNumber('id')->defaults('service', $service)
+                ->middleware('health.can:'.$service.'.collect')->name('health.'.$service.'.collect');
+            Route::post('/orders/{id}/release', [$desk, 'release'])->whereNumber('id')->defaults('service', $service)
+                ->middleware('health.can:'.$service.'.result')->name('health.'.$service.'.release');
+            Route::get('/orders/{id}/report', [$desk, 'report'])->whereNumber('id')->defaults('service', $service)
+                ->middleware('health.can:'.$service.'.view')->name('health.'.$service.'.report');
+        });
+    }
 
     // Settings hub. The capability is also derived from the PATH by HealthAuth,
     // so a forgotten middleware argument here still cannot open the screen.

@@ -237,6 +237,64 @@ class HealthPilotSecurityTest extends TestCase
 
     /* ───────────────────────────── helpers ────────────────────────────────── */
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('diagnosticServices')]
+    public function test_diagnostic_order_charge_release_pdf_retry_and_privacy(string $service): void
+    {
+        $this->actingAs($this->myOwner, HealthPanel::GUARD);
+        $patient = HealthPatientService::register($this->mine->id, ['name' => 'Demo patient', 'gender' => 'female', 'age_years' => 25]);
+        $base = '/health/'.$service;
+        $this->get($base)->assertOk();
+        $this->post($base.'/catalog', ['name' => 'Demo test', 'code' => 'DEMO', 'price' => '650.50'])->assertSessionHasNoErrors();
+        $test = \Illuminate\Support\Facades\DB::table('health_diagnostic_tests')->where('company_id', $this->mine->id)->first();
+        $data = ['test_id' => $test->id, 'patient_id' => $patient->id, 'request_key' => (string) \Illuminate\Support\Str::uuid()];
+        $this->post($base.'/orders', $data)->assertRedirect($base);
+        $this->post($base.'/orders', $data)->assertRedirect($base);
+        $order = \App\Models\HealthDiagnosticOrder::sole();
+        $this->assertDatabaseHas('health_charges', ['health_patient_id' => $patient->id, 'dedupe_key' => 'diagnostic:'.$order->id, 'total_amount' => 650.50]);
+        $path = $base.'/orders/'.$order->id;
+        $this->postJson($path.'/release', ['result' => 'Demo measurement'])->assertConflict();
+        $this->post($path.'/collect', ['accession' => 'SAMPLE-001'])->assertRedirect($base);
+        $this->post($path.'/release', ['result' => 'Demo measurement'])->assertRedirect($base);
+        $this->post($path.'/release', ['result' => 'Demo measurement'])->assertRedirect($base);
+        $this->postJson($path.'/release', ['result' => 'Altered'])->assertConflict();
+        $this->assertNotSame('Demo measurement', $order->fresh()->getRawOriginal('result'));
+        $this->assertSame('Demo measurement', $order->fresh()->result);
+        $pdf = $this->get($path.'/report')->assertOk()->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+        $this->actingAs($this->myCashier, HealthPanel::GUARD)->getJson($path.'/report')->assertForbidden();
+        $this->actingAs($this->user($this->theirs, 'other.owner@example.test', HealthAccessService::ROLE_OWNER), HealthPanel::GUARD)
+            ->getJson($path.'/report')->assertNotFound();
+        $this->assertSame(1, \App\Models\HealthCharge::withoutGlobalScopes()->where('dedupe_key', 'diagnostic:'.$order->id)->count());
+    }
+
+    public static function diagnosticServices(): array
+    {
+        return [['lab'], ['radiology']];
+    }
+
+    public function test_central_entitlements_and_external_operation_preserve_history_and_restore_access(): void
+    {
+        $this->actingAs($this->myOwner, HealthPanel::GUARD);
+        $this->get('/health/lab')->assertOk();
+        $this->post('/health/lab/catalog', ['code'=>'CBC', 'name'=>'Blood count', 'price'=>500])->assertSessionHasNoErrors();
+        $this->post('/health/settings/modules', ['modules' => HealthModuleService::MODULES,
+            'service_modes' => ['lab' => 'independent','pharmacy' => 'independent']])->assertSessionHasNoErrors();
+        $this->getJson('/health/lab')->assertForbidden();
+        $this->getJson('/health/pharmacy')->assertForbidden();
+        $this->assertDatabaseHas('health_diagnostic_tests', ['code' => 'CBC', 'company_id' => $this->mine->id]);
+        $this->post('/health/settings/modules', ['modules' => HealthModuleService::MODULES,
+            'service_modes' => ['lab' => 'owned', 'pharmacy' => 'owned']])->assertSessionHasNoErrors();
+        $admin = \App\Models\AdminUser::create(['name'=>'Demo admin','email'=>'erp@example.test','password'=>'unused','role'=>'super_admin']);
+        $url = '/admin/companies/'.$this->mine->id.'/erp-entitlements';
+        $this->actingAs($admin, 'admin')->post($url, ['policy'=>'custom','modules'=>['opd']])->assertSessionHasNoErrors();
+        $this->actingAs($this->myOwner, HealthPanel::GUARD)->postJson('/health/lab/catalog', ['name'=>'blocked'])->assertForbidden();
+        $this->post('/health/settings/modules', ['modules'=>['lab','opd']])->assertSessionHasNoErrors();
+        $this->getJson('/health/lab')->assertForbidden();
+        $this->actingAs($admin, 'admin')->post($url, ['policy'=>'package'])->assertSessionHasNoErrors();
+        $this->actingAs($this->myOwner, HealthPanel::GUARD)->get('/health/lab')->assertOk();
+        $this->assertDatabaseHas('health_diagnostic_tests', ['code'=>'CBC']);
+    }
+
     private function hospital(string $name, string $ntn): Company
     {
         $company = Company::create([

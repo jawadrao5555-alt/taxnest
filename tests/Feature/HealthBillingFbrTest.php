@@ -659,6 +659,22 @@ class HealthBillingFbrTest extends TestCase
         );
     }
 
+    public function test_retry_using_a_stale_bill_reuses_the_queued_mirror_and_submission_hash(): void
+    {
+        $this->rule(HealthTaxCategory::TREATMENT_FBR, 15, [HealthCharge::CAT_PHARMACY]);
+        $bill = $this->billFor([$this->charge(['category' => HealthCharge::CAT_PHARMACY])->id]);
+        HealthBillingService::finalize($bill, $this->owner);
+        $first = $bill->fresh();
+        $retry = $bill->fresh();
+        $mirror = HealthBillFbrService::mirror($first, $this->owner);
+        $mirror->forceFill(['fbr_submission_hash' => str_repeat('a', 64)])->save();
+        $again = HealthBillFbrService::mirror($retry, $this->owner);
+
+        $this->assertSame($mirror->id, $again->id);
+        $this->assertSame(str_repeat('a', 64), $again->fbr_submission_hash);
+        $this->assertSame(1, DB::table('fbr_pos_transactions')->where('health_bill_id', $bill->id)->count());
+    }
+
     /** @test */
     public function a_bill_already_carrying_an_fbr_number_is_never_filed_again(): void
     {

@@ -47,6 +47,11 @@
             <p class="text-[10px] text-blue-500 uppercase tracking-wide mb-1">TaxNest FBR POS</p>
             <p class="text-xl font-bold text-blue-400">{{ $stats['fbrpos_companies'] }}</p>
         </div>
+        <a href="{{ route('saas.admin.companies', ['product_type' => \App\Support\NestErps::PRODUCT_TYPE]) }}"
+           class="block bg-gray-900 border border-teal-900 rounded-xl p-4">
+            <p class="text-[10px] text-teal-400 uppercase tracking-wide">{{ \App\Support\NestErps::LABEL }}</p>
+            <p class="text-xl font-bold text-teal-300">{{ $stats['erp_companies'] ?? 0 }}</p>
+        </a>
         <div class="relative group bg-gray-900 border border-amber-900/50 rounded-xl p-4">
 <a data-dashboard-metric="pending_companies" aria-label="Open pending companies details" class="absolute z-10 inset-0 rounded-xl focus:ring-2 focus:ring-indigo-400 group-hover:ring-1 group-hover:ring-indigo-400" href="{{ route('saas.admin.dashboard.detail', 'pending_companies') }}"></a>
             <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending</p>

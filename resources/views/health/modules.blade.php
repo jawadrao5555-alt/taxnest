@@ -39,7 +39,7 @@
                 @foreach($allModules as $module)
                     @php
                         $sold = in_array($module, $planModules, true);
-                        $on = in_array($module, $enabledModules, true);
+                        $on = $sold && in_array($module, HealthModuleService::companyModules($company), true);
                         $meta = HealthModuleService::MODULE_META[$module] ?? [];
                     @endphp
                     <label class="flex items-start gap-4 rounded-2xl border p-4 transition
@@ -71,6 +71,18 @@
                     </label>
                 @endforeach
             </div>
+
+            @foreach(['pharmacy', 'lab'] as $service)
+                @if(in_array($service, $planModules, true))
+                    <label class="block text-sm font-semibold">{{ __(HealthModuleService::moduleLabelKey($service)) }}
+                        <select class="rounded border p-2" name="service_modes[{{ $service }}]">
+                            @foreach(['owned', 'independent'] as $mode)
+                                <option value="{{ $mode }}" @selected(($company->health_service_modes[$service] ?? 'owned') === $mode)>{{ __('health.service_'.$mode) }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                @endif
+            @endforeach
 
             <div class="flex items-center justify-between gap-3">
                 <a href="{{ route('health.dashboard') }}" class="text-sm font-bold text-gray-500 dark:text-gray-400 hover:underline">

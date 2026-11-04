@@ -157,7 +157,7 @@ class HealthBillFbrService
             'actor_id' => $actor->id ?? null,
         ]);
 
-        self::copyBack($bill, $mirror, $status, $errorText);
+        self::copyBack($bill, $mirror, $status, $errorText, true);
 
         return [
             'ok' => $status === HealthFbrSubmission::STATUS_SUBMITTED,
@@ -184,7 +184,7 @@ class HealthBillFbrService
             return false;
         }
 
-        $mirror = FbrPosTransaction::find($bill->fbr_pos_transaction_id);
+        $mirror = self::linkedMirror($bill);
         if (!$mirror) {
             return false;
         }
@@ -279,14 +279,6 @@ class HealthBillFbrService
             return null;
         }
 
-        $existing = $bill->fbr_pos_transaction_id
-            ? FbrPosTransaction::find($bill->fbr_pos_transaction_id)
-            : null;
-
-        if ($existing && $existing->fbr_invoice_number) {
-            return $existing;
-        }
-
         $patient = HealthBillingService::patient((int) $bill->company_id, (int) $bill->health_patient_id);
 
         // Totals from the REPORTABLE lines only. Never from the bill's own
@@ -299,7 +291,15 @@ class HealthBillFbrService
 
         $mirror = null;
 
-        DB::transaction(function () use ($bill, $lines, $existing, $patient, $subtotal, $tax, $total, $rates, $actor, &$mirror) {
+        DB::transaction(function () use ($bill, $lines, $patient, $subtotal, $tax, $total, $rates, $actor, &$mirror) {
+            $bill = HealthBill::withoutGlobalScopes()->where('company_id', $bill->company_id)
+                ->lockForUpdate()->findOrFail($bill->id);
+            if ($bill->fbr_pos_transaction_id) {
+                // A retry may carry a stale bill. Preserve the frozen lines and the
+                // transport lock, including while an agent is still submitting.
+                $mirror = self::linkedMirror($bill);
+                return;
+            }
             $attrs = [
                 'company_id' => $bill->company_id,
                 'branch_id' => $bill->branch_id,
@@ -333,19 +333,8 @@ class HealthBillFbrService
                 $attrs['health_bill_id'] = $bill->id;
             }
 
-            if ($existing) {
-                // A never-filed mirror is refreshed in place so a bill corrected
-                // before its first successful submission does not file stale
-                // money. The submission hash is cleared with it — a hash left
-                // over from an abandoned attempt would block the retry forever.
-                $existing->forceFill(array_merge($attrs, [
-                    'fbr_submission_hash' => null,
-                ]))->save();
-                FbrPosTransactionItem::where('transaction_id', $existing->id)->delete();
-                $mirror = $existing;
-            } else {
-                $mirror = FbrPosTransaction::create($attrs);
-            }
+            $mirror = new FbrPosTransaction();
+            $mirror->forceFill($attrs)->save();
 
             foreach ($lines as $line) {
                 FbrPosTransactionItem::create([
@@ -375,6 +364,17 @@ class HealthBillFbrService
         });
 
         return $mirror;
+    }
+
+    private static function linkedMirror(HealthBill $bill): ?FbrPosTransaction
+    {
+        $query = FbrPosTransaction::query()->where('company_id', $bill->company_id)
+            ->where('invoice_number', $bill->bill_no);
+        if (Schema::hasColumn('fbr_pos_transactions', 'health_bill_id')) {
+            // Legacy mirrors were written before the reverse link was fillable.
+            $query->where(fn ($q) => $q->whereNull('health_bill_id')->orWhere('health_bill_id', $bill->id));
+        }
+        return $query->find($bill->fbr_pos_transaction_id);
     }
 
     /** The lines the regulator is actually told about. */
@@ -429,7 +429,7 @@ class HealthBillFbrService
     }
 
     /** Copy the mirror's fiscal state onto the bill. */
-    private static function copyBack(HealthBill $bill, FbrPosTransaction $mirror, string $status, ?string $error): void
+    private static function copyBack(HealthBill $bill, FbrPosTransaction $mirror, string $status, ?string $error, bool $attempt = false): void
     {
         $patch = [
             'fbr_status' => $status,
@@ -442,11 +442,14 @@ class HealthBillFbrService
         if ($status === HealthFbrSubmission::STATUS_SUBMITTED) {
             $patch['fbr_submitted_at'] = $mirror->updated_at ?: now();
             $patch['fbr_error_message'] = null;
-        } else {
+        } elseif ($attempt) {
             $patch['fbr_retry_count'] = (int) $bill->fbr_retry_count + 1;
         }
 
-        $bill->forceFill($patch)->save();
+        $bill->forceFill($patch);
+        if ($bill->isDirty()) {
+            $bill->save();
+        }
     }
 
     /**

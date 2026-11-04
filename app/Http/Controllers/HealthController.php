@@ -172,11 +172,19 @@ class HealthController extends Controller
             'modules' => 'nullable|array',
             'modules.*' => 'string|in:' . implode(',', HealthModuleService::MODULES),
             'org_type' => 'nullable|in:' . implode(',', HealthPanel::ORG_TYPES),
+            'service_modes' => 'sometimes|array:pharmacy,lab',
+            'service_modes.*' => 'required|in:owned,independent',
         ]);
 
         if ($request->filled('org_type') && Schema::hasColumn('companies', 'health_org_type')) {
             $company->health_org_type = HealthPanel::normalizeOrgType($request->input('org_type'));
             $company->save();
+        }
+
+        if ($request->has('service_modes')) {
+            $permitted = array_flip(HealthModuleService::planModules($company));
+            $modes = array_intersect_key($request->input('service_modes'), $permitted);
+            $company->health_service_modes = array_replace($company->health_service_modes ?? [], $modes);
         }
 
         $saved = HealthModuleService::setForCompany($company, $request->input('modules', []));

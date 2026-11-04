@@ -32,7 +32,7 @@ class HealthModuleService
      * of an unlisted module can never be granted, and an unlisted key is
      * silently dropped by normalize().
      */
-    public const MODULES = ['opd', 'pharmacy', 'ipd', 'lab', 'accounts', 'hr'];
+    public const MODULES = ['opd', 'pharmacy', 'ipd', 'lab', 'accounts', 'hr', 'radiology'];
 
     /**
      * Capabilities that belong to each module. A capability whose module is OFF
@@ -96,8 +96,9 @@ class HealthModuleService
             'operations.view', 'operations.manage',
         ],
         'lab' => [
-            'lab.view', 'lab.collect', 'lab.result',
+            'lab.view', 'lab.order', 'lab.collect', 'lab.result', 'lab.manage',
         ],
+        'radiology' => ['radiology.view', 'radiology.order', 'radiology.collect', 'radiology.result', 'radiology.manage'],
         'accounts' => [
             // `accounts.approve` is the accountant's ceiling, not their right.
             // Closing a financial period and signing off a doctor's payout are
@@ -130,6 +131,7 @@ class HealthModuleService
         'opd'      => ['icon' => '🩺', 'colour' => 'sky'],
         'pharmacy' => ['icon' => '💊', 'colour' => 'emerald'],
         'ipd'      => ['icon' => '🛏️', 'colour' => 'indigo'],
+        'radiology' => ['icon' => '☢', 'colour' => 'sky'],
         'lab'      => ['icon' => '🔬', 'colour' => 'violet'],
         'accounts' => ['icon' => '🧾', 'colour' => 'amber'],
         'hr'       => ['icon' => '👥', 'colour' => 'rose'],
@@ -141,6 +143,7 @@ class HealthModuleService
      */
     public const ORG_TYPE_DEFAULTS = [
         'clinic'   => ['opd', 'accounts'],
+        'maternity' => ['opd', 'ipd', 'accounts', 'hr'],
         'hospital' => ['opd', 'pharmacy', 'ipd', 'lab', 'accounts', 'hr'],
         'lab'      => ['lab', 'accounts'],
         'pharmacy' => ['pharmacy', 'accounts'],
@@ -219,6 +222,9 @@ class HealthModuleService
         }
 
         $modules = self::resolvePlanModules($company);
+        if ($company->health_entitlements !== null) {
+            $modules = array_values(array_intersect($modules, self::normalize($company->health_entitlements)));
+        }
 
         return self::$planCache[$key] = $modules;
     }
@@ -321,6 +327,12 @@ class HealthModuleService
             self::planModules($company)
         ));
 
+        foreach (['pharmacy', 'lab'] as $service) {
+            if (($company->health_service_modes[$service] ?? 'owned') === 'independent') {
+                $enabled = array_values(array_diff($enabled, [$service]));
+            }
+        }
+
         return self::$enabledCache[$key] = $enabled;
     }
 
@@ -347,7 +359,8 @@ class HealthModuleService
             // The column is cast to 'array' on the model — assigning a JSON
             // STRING here would store JSON inside JSON and every later read
             // would come back as one meaningless string.
-            $company->health_modules = $wanted;
+            $previouslyMasked = array_diff(self::companyModules($company), self::planModules($company));
+            $company->health_modules = self::normalize(array_merge($wanted, $previouslyMasked));
             if (Schema::hasColumn('companies', 'health_setup_completed')) {
                 $company->health_setup_completed = true;
             }

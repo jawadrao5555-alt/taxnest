@@ -89,6 +89,7 @@ class HealthAuthController extends Controller
             $company = $user->company_id ? Company::find($user->company_id) : null;
 
             if (HealthPlatformService::isHealthcareCompany($company)
+                && !$company->isSuspended() && $company->status !== 'suspended'
                 && HealthAccessService::roleFor($user) !== null
                 && $user->is_active) {
                 RateLimiter::clear($throttleKey);

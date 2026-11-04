@@ -39,6 +39,7 @@
         ['key' => 'operations',   'route' => 'health.operations',   'cap' => 'operations.view',     'module' => 'ipd',      'label' => 'health.nav_operations'],
         ['key' => 'pharmacy',     'route' => 'health.pharmacy',     'cap' => 'pharmacy.view',       'module' => 'pharmacy', 'label' => 'health.nav_pharmacy'],
         ['key' => 'lab',          'route' => 'health.lab',          'cap' => 'lab.view',            'module' => 'lab',      'label' => 'health.nav_lab'],
+        ['key' => 'radiology', 'route' => 'health.radiology', 'cap' => 'radiology.view', 'module' => 'radiology', 'label' => 'health.module_radiology'],
         ['key' => 'billing',      'route' => 'health.billing',      'cap' => 'billing.view',        'module' => 'accounts', 'label' => 'health.nav_billing'],
         ['key' => 'accounts',     'route' => 'health.accounts',     'cap' => 'accounts.view',       'module' => 'accounts', 'label' => 'health.nav_accounts'],
         ['key' => 'hr',           'route' => 'health.hr',           'cap' => 'hr.view',             'module' => 'hr',       'label' => 'health.nav_hr'],

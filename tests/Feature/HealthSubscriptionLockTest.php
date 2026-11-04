@@ -145,6 +145,18 @@ class HealthSubscriptionLockTest extends TestCase
 
     /* ─────────────────────────── locked ─────────────────────────── */
 
+    public function test_suspension_stops_an_existing_hospital_session_until_reactivation(): void
+    {
+        $this->subscription();
+        $this->asOwner()->get('/health/patients')->assertOk();
+        $this->company->update(['company_status' => 'suspended']);
+        $this->get('/health/patients')->assertRedirect('/health/login');
+        $this->assertGuest(HealthPanel::GUARD);
+        $this->assertDatabaseHas('health_patients', ['id' => $this->patient->id]);
+        $this->company->update(['company_status' => 'active']);
+        $this->asOwner()->get('/health/patients')->assertOk();
+    }
+
     public function test_locked_company_can_still_read_patients_and_billing(): void
     {
         $this->subscription(['end_date' => now()->subDay()->toDateString()]);

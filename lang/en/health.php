@@ -9,6 +9,13 @@
  */
 
 return [
+    'module_radiology' => 'Radiology',
+    'module_radiology_desc' => 'Imaging orders, acquisition and signed reports.',
+    'org_type_maternity' => 'Maternity home',
+    'service_owned' => 'Hospital-operated',
+    'service_independent' => 'Independent provider (bills separately)',
+    'company_suspended' => 'This hospital account is suspended.',
+
 
     /* ─── Product ─── */
     // Nest ERPS is the PRODUCT; Healthcare is the vertical inside it. A second

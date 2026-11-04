@@ -32,11 +32,7 @@ class HealthDiagnosticsController extends HealthPanelController
         $tests = DB::table('health_diagnostic_tests')->where('company_id', $this->company()->id)
             ->where('service', $service)->orderBy('name')->get();
         $orders = $this->orders($service);
-        if (!HealthAccessService::isAdministrative($this->user())) {
-            // Confidential cases are opened only through a specific, authorized clinical record.
-            $orders->whereIn('health_patient_id', HealthPatient::withoutGlobalScopes()
-                ->where('company_id', $this->company()->id)->where('is_confidential', false)->select('id'));
-        }
+        HealthRecordAccessService::hideConfidential($orders, $this->user());
         return view('health.diagnostics.index', ['service' => $service, 'tests' => $tests,
             'orders' => $orders->latest('id')->paginate(30), 'capabilities' => HealthAccessService::capabilitiesFor($this->user(), $this->company())]);
     }

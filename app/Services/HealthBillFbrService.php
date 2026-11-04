@@ -120,11 +120,6 @@ class HealthBillFbrService
             ]);
         }
 
-        $attemptNo = (int) HealthFbrSubmission::withoutGlobalScopes()
-            ->where('company_id', $bill->company_id)
-            ->where('health_bill_id', $bill->id)
-            ->max('attempt_no') + 1;
-
         $startedAt = microtime(true);
         try {
             $result = $fbr->submitFbrPosTransaction($mirror);
@@ -141,23 +136,28 @@ class HealthBillFbrService
             ? FbrPosLog::where('transaction_id', $mirror->id)->orderByDesc('id')->first()
             : null;
 
-        $status = self::mapStatus($result['status'] ?? 'failed', $mirror);
-        $errorText = self::errorText($result, $mirror);
+        [$status, $errorText] = DB::transaction(function () use ($bill, $mirror, $result, $payload, $log, $durationMs, $actor, $trigger) {
+            $bill = self::lockBill($bill);
+            $mirror->refresh();
+            $status = self::mapStatus($result['status'] ?? 'failed', $mirror);
+            $errorText = self::errorText($result, $mirror);
 
-        self::record($bill, $mirror, [
-            'attempt_no' => $attemptNo,
-            'status' => $status,
-            'trigger' => $trigger,
-            'request_payload' => self::encode($payload ?? ($log->request_payload ?? null)),
-            'response_payload' => self::encode($mirror->fbr_response ?? ($log->response_payload ?? null)),
-            'response_code' => $mirror->fbr_response_code,
-            'invoice_number' => $mirror->fbr_invoice_number,
-            'error_message' => $errorText,
-            'duration_ms' => $durationMs,
-            'actor_id' => $actor->id ?? null,
-        ]);
+            self::record($bill, $mirror, [
+                'status' => $status,
+                'trigger' => $trigger,
+                'request_payload' => self::encode($payload ?? ($log->request_payload ?? null)),
+                'response_payload' => self::encode($mirror->fbr_response ?? ($log->response_payload ?? null)),
+                'response_code' => $mirror->fbr_response_code,
+                'invoice_number' => $mirror->fbr_invoice_number,
+                'error_message' => $errorText,
+                'duration_ms' => $durationMs,
+                'actor_id' => $actor->id ?? null,
+            ]);
 
-        self::copyBack($bill, $mirror, $status, $errorText, true);
+            self::copyBack($bill, $mirror, $status, $errorText, true);
+
+            return [$status, $errorText];
+        }, 3);
 
         return [
             'ok' => $status === HealthFbrSubmission::STATUS_SUBMITTED,
@@ -184,51 +184,48 @@ class HealthBillFbrService
             return false;
         }
 
-        $mirror = self::linkedMirror($bill);
-        if (!$mirror) {
-            return false;
-        }
+        return DB::transaction(function () use ($bill) {
+            $bill = self::lockBill($bill);
+            $mirror = self::linkedMirror($bill);
+            if (!$mirror) {
+                return false;
+            }
 
-        $status = self::mapStatus($mirror->fbr_status ?: 'pending', $mirror);
-        $before = [$bill->fbr_invoice_number, $bill->fbr_status, $bill->fbr_response_code];
+            $status = self::mapStatus($mirror->fbr_status ?: 'pending', $mirror);
+            $before = [$bill->fbr_invoice_number, $bill->fbr_status, $bill->fbr_response_code];
 
-        self::copyBack($bill, $mirror, $status, $mirror->fbr_error_message ?? null);
+            self::copyBack($bill, $mirror, $status, $mirror->fbr_error_message ?? null);
 
-        $bill->refresh();
+            $bill->refresh();
 
-        $changed = $before !== [$bill->fbr_invoice_number, $bill->fbr_status, $bill->fbr_response_code];
+            $changed = $before !== [$bill->fbr_invoice_number, $bill->fbr_status, $bill->fbr_response_code];
 
-        // A success that arrived through somebody else's retry still deserves an
-        // evidence row, or the bill's history would show only the failures.
-        if ($changed && $bill->isFbrFiled()) {
-            $known = HealthFbrSubmission::withoutGlobalScopes()
-                ->where('company_id', $bill->company_id)
-                ->where('health_bill_id', $bill->id)
-                ->where('invoice_number', $bill->fbr_invoice_number)
-                ->exists();
-
-            if (!$known) {
-                $attemptNo = (int) HealthFbrSubmission::withoutGlobalScopes()
+            // A success that arrived through somebody else's retry still deserves an
+            // evidence row, or the bill's history would show only the failures.
+            if ($bill->isFbrFiled()) {
+                $known = HealthFbrSubmission::withoutGlobalScopes()
                     ->where('company_id', $bill->company_id)
                     ->where('health_bill_id', $bill->id)
-                    ->max('attempt_no') + 1;
+                    ->where('invoice_number', $bill->fbr_invoice_number)
+                    ->exists();
 
-                self::record($bill, $mirror, [
-                    'attempt_no' => $attemptNo,
-                    'status' => HealthFbrSubmission::STATUS_SUBMITTED,
-                    'trigger' => HealthFbrSubmission::TRIGGER_AUTO,
-                    'request_payload' => null,
-                    'response_payload' => self::encode($mirror->fbr_response),
-                    'response_code' => $mirror->fbr_response_code,
-                    'invoice_number' => $mirror->fbr_invoice_number,
-                    'error_message' => null,
-                    'duration_ms' => null,
-                    'actor_id' => null,
-                ]);
+                if (!$known) {
+                    self::record($bill, $mirror, [
+                        'status' => HealthFbrSubmission::STATUS_SUBMITTED,
+                        'trigger' => HealthFbrSubmission::TRIGGER_AUTO,
+                        'request_payload' => null,
+                        'response_payload' => self::encode($mirror->fbr_response),
+                        'response_code' => $mirror->fbr_response_code,
+                        'invoice_number' => $mirror->fbr_invoice_number,
+                        'error_message' => null,
+                        'duration_ms' => null,
+                        'actor_id' => null,
+                    ]);
+                }
             }
-        }
 
-        return $changed;
+            return $changed;
+        }, 3);
     }
 
     /**
@@ -265,8 +262,7 @@ class HealthBillFbrService
      *
      * Idempotent: a bill files through exactly one mirror for its whole life, so
      * a retry re-uses the same row and the submission hash keeps doing its job.
-     * The mirror is rebuilt only while it has never reached FBR — once it holds
-     * an invoice number it is evidence and is left alone.
+     * A previously created mirror retains its items and transport claim on every retry.
      */
     public static function mirror(HealthBill $bill, $actor = null): ?FbrPosTransaction
     {
@@ -292,8 +288,7 @@ class HealthBillFbrService
         $mirror = null;
 
         DB::transaction(function () use ($bill, $lines, $patient, $subtotal, $tax, $total, $rates, $actor, &$mirror) {
-            $bill = HealthBill::withoutGlobalScopes()->where('company_id', $bill->company_id)
-                ->lockForUpdate()->findOrFail($bill->id);
+            $bill = self::lockBill($bill);
             if ($bill->fbr_pos_transaction_id) {
                 // A retry may carry a stale bill. Preserve the frozen lines and the
                 // transport lock, including while an agent is still submitting.
@@ -366,6 +361,12 @@ class HealthBillFbrService
         return $mirror;
     }
 
+    private static function lockBill(HealthBill $bill): HealthBill
+    {
+        return HealthBill::withoutGlobalScopes()->where('company_id', $bill->company_id)
+            ->lockForUpdate()->findOrFail($bill->id);
+    }
+
     private static function linkedMirror(HealthBill $bill): ?FbrPosTransaction
     {
         $query = FbrPosTransaction::query()->where('company_id', $bill->company_id)
@@ -395,37 +396,24 @@ class HealthBillFbrService
     /** Write one immutable attempt row. */
     private static function record(HealthBill $bill, ?FbrPosTransaction $mirror, array $data): ?HealthFbrSubmission
     {
-        if (!Schema::hasTable('health_fbr_submissions')) {
-            return null;
-        }
-
-        try {
-            return HealthFbrSubmission::withoutGlobalScopes()->create([
-                'company_id' => $bill->company_id,
-                'health_bill_id' => $bill->id,
-                'fbr_pos_transaction_id' => $mirror->id ?? null,
-                'attempt_no' => $data['attempt_no'],
-                'status' => $data['status'],
-                'trigger' => $data['trigger'],
-                'request_payload' => $data['request_payload'],
-                'response_payload' => $data['response_payload'],
-                'response_code' => $data['response_code'] ? mb_substr((string) $data['response_code'], 0, 16) : null,
-                'invoice_number' => $data['invoice_number'],
-                'error_message' => $data['error_message'] ? mb_substr((string) $data['error_message'], 0, 1000) : null,
-                'submitted_at' => now(),
-                'duration_ms' => $data['duration_ms'],
-                'actor_id' => $data['actor_id'],
-            ]);
-        } catch (\Throwable $e) {
-            // Evidence failing to write must never swallow the filing itself —
-            // the money reached FBR either way and the bill has to learn that.
-            Log::warning('health.fbr.evidence_write_failed', [
-                'bill_id' => $bill->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
+        $attempt = HealthFbrSubmission::withoutGlobalScopes()->where('company_id', $bill->company_id)
+            ->where('health_bill_id', $bill->id)->max('attempt_no');
+        return HealthFbrSubmission::withoutGlobalScopes()->create([
+            'company_id' => $bill->company_id,
+            'health_bill_id' => $bill->id,
+            'fbr_pos_transaction_id' => $mirror->id ?? null,
+            'attempt_no' => (int) $attempt + 1,
+            'status' => $data['status'],
+            'trigger' => $data['trigger'],
+            'request_payload' => $data['request_payload'],
+            'response_payload' => $data['response_payload'],
+            'response_code' => $data['response_code'] ? mb_substr((string) $data['response_code'], 0, 16) : null,
+            'invoice_number' => $data['invoice_number'],
+            'error_message' => $data['error_message'] ? mb_substr((string) $data['error_message'], 0, 1000) : null,
+            'submitted_at' => now(),
+            'duration_ms' => $data['duration_ms'],
+            'actor_id' => $data['actor_id'],
+        ]);
     }
 
     /** Copy the mirror's fiscal state onto the bill. */
@@ -466,10 +454,9 @@ class HealthBillFbrService
         }
 
         return match ($raw) {
-            'success', 'submitted' => HealthFbrSubmission::STATUS_SUBMITTED,
             'queued_agent', 'pending', 'offline' => HealthFbrSubmission::STATUS_QUEUED_AGENT,
             'config_error' => HealthFbrSubmission::STATUS_CONFIG_ERROR,
-            'blocked' => HealthFbrSubmission::STATUS_BLOCKED,
+            'blocked', 'verification_pending', 'submitted', 'success' => HealthFbrSubmission::STATUS_BLOCKED,
             default => HealthFbrSubmission::STATUS_FAILED,
         };
     }

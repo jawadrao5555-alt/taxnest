@@ -211,4 +211,24 @@
             </div>
         @endif
     </div>
+    @if($independentServices || $referrals->isNotEmpty())
+        <section class="mx-auto max-w-5xl px-4 py-4 space-y-3">
+            <h2 class="font-bold">Independent provider referrals</h2>
+            @if($independentServices)
+                <p>The provider bills separately. Give the referral to the patient.</p>
+                <form method="post" class="space-y-2" action="{{ route('health.patients.refer', $patient->id) }}">@csrf
+                    <input type="hidden" name="request_key" value="{{ \Illuminate\Support\Str::uuid() }}">
+                    <label>Service <select name="service">@foreach($independentServices as $service)
+                        <option value="{{ $service }}">{{ __(\App\Services\HealthModuleService::moduleLabelKey($service)) }}</option>
+                    @endforeach</select></label>
+                    <label>Provider <input class="rounded border" name="provider" maxlength="160" required></label>
+                    <label>Requested service <textarea class="block rounded border" name="instructions" maxlength="2000" required></textarea></label>
+                    <button class="rounded bg-teal-700 text-white p-2">Record referral</button>
+                </form>
+            @endif
+            @foreach($referrals as $ref)
+                <p>#{{ $ref->id }} · {{ $ref->provider }} · {{ $ref->instructions }}</p>
+            @endforeach
+        </section>
+    @endif
 </x-health-layout>

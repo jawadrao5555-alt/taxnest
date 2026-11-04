@@ -21,7 +21,7 @@ class HealthErpAdministrationTest extends TestCase
             'name'=>'Demo Maternity','owner_name'=>'Demo Owner','email'=>'maternity@example.test','ntn'=>'DEMO-ERP-344',
             'status'=>'approved','product_type'=>NestErps::PRODUCT_TYPE,'health_org_type'=>'maternity',
             'admin_email'=>'maternity.owner@example.test','admin_name'=>'Demo Owner','admin_password'=>'OnlyForDemo!344A',
-        ])->assertSessionHasNoErrors();
+        ])->assertRedirect()->assertSessionHasNoErrors();
         $hospital = Company::where('ntn','DEMO-ERP-344')->firstOrFail();
         $owner = User::where('company_id', $hospital->id)->firstOrFail();
         $this->assertSame('maternity', $hospital->health_org_type);
@@ -45,7 +45,7 @@ class HealthErpAdministrationTest extends TestCase
         $this->actingAs($admin,'admin')->post('/admin/companies/'.$hospital->id.'/activate')->assertSessionHasNoErrors();
         $this->actingAs($owner,'health')->get('/health/patients')->assertOk();
         $retail = Company::create(['name'=>'Demo POS','ntn'=>'DEMO-RETAIL-344','product_type'=>'pos','status'=>'approved']);
-        $this->actingAs($admin,'admin')->post('/admin/companies/'.$retail->id.'/erp-entitlements',
+        $this->actingAs($admin,'admin')->postJson('/admin/companies/'.$retail->id.'/erp-entitlements',
             ['policy'=>'custom', 'modules'=>['opd']])->assertNotFound();
         $this->assertNull($retail->fresh()->health_entitlements);
     }

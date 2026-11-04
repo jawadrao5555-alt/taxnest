@@ -340,6 +340,13 @@ class HealthModuleService
         return self::$enabledCache[$key] = $enabled;
     }
 
+    public static function independentServices(Company $company): array
+    {
+        return array_values(array_filter(array_intersect(
+            ['lab', 'pharmacy'], self::companyModules($company), self::planModules($company)
+        ), fn (string $key) => ($company->health_service_modes[$key] ?? 'owned') === 'independent'));
+    }
+
     public static function isEnabled(?Company $company, string $module): bool
     {
         return in_array($module, self::enabled($company), true);

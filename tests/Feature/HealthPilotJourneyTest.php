@@ -46,6 +46,7 @@ use App\Support\NestErps;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -248,24 +249,81 @@ class HealthPilotJourneyTest extends TestCase
         $this->assertTrue($finalized['ok'], 'Finalize refused the bill: ' . ($finalized['reason'] ?? ''));
         $bill = $bill->fresh();
 
-        $payment = HealthBillingService::recordPayment(
-            $this->company->id,
-            (int) $patient->id,
-            [
-                'health_bill_id' => $bill->id,
-                'amount' => (float) $bill->patient_payable,
-                'method' => 'cash',
-            ],
-            $this->owner
-        );
+        $this->assertSame('0.00', $bill->outstanding_amount,
+            'The receptionist and pharmacist already collected this money. Finalizing their bill must not request it again.');
+        $this->assertSame('1700.00', $bill->paid_amount);
 
-        $this->assertTrue($payment['ok'], 'Payment refused: ' . ($payment['reason'] ?? ''));
-        $this->assertEqualsWithDelta(
-            0.0,
-            (float) $bill->fresh()->outstanding_amount,
-            0.01,
-            'Paying the full payable must clear the bill to exactly zero, not to a rounding remainder.'
-        );
+    }
+
+    public function test_one_patient_from_registration_to_laboratory_dispensing_surgery_and_discharge(): void
+    {
+        $patient = $this->register('Demo Complete Journey');
+        $company = $this->company->id;
+        $appointment = HealthOpdService::book(['company_id'=>$company, 'health_patient_id'=>$patient->id,
+            'health_doctor_id'=>$this->doctor->id, 'kind'=>'walkin', 'appointment_date'=>today()->toDateString()], $this->owner);
+        $visit = HealthOpdService::checkIn($appointment, $this->owner, ['fee_amount'=>1500]);
+        HealthOpdService::startConsultation($visit);
+        $this->actingAs($this->owner, 'health')->post('/health/lab/catalog', [
+            'code'=>'CBC', 'name'=>'Demo blood count', 'price'=>650])->assertSessionHasNoErrors();
+        $catalog = DB::table('health_diagnostic_tests')->where('company_id', $company)->sole();
+        $this->post('/health/lab/orders', ['patient_id'=>$patient->id, 'test_id'=>$catalog->id,
+            'request_key'=>(string) \Illuminate\Support\Str::uuid()])->assertRedirect('/health/lab');
+        $order = \App\Models\HealthDiagnosticOrder::where('company_id', $company)->sole();
+        $this->post('/health/lab/orders/'.$order->id.'/collect', ['accession'=>'LAB-344-A'])->assertRedirect('/health/lab');
+        $this->post('/health/lab/orders/'.$order->id.'/release', ['result'=>'Synthetic result'])->assertRedirect('/health/lab');
+        $medicine = $this->stockedMedicine('Demo supply', 20, 12, 100);
+        $rx = $this->prescriptionFor($patient, $visit->id, $medicine, 10);
+        Checkout::sell($company, ['prescription_id'=>$rx->id, 'payment_method'=>'credit', 'paid_amount'=>0,
+            'lines'=>[['medicine_id'=>$medicine->id,'quantity'=>10]]], null, $this->owner->id, $this->company);
+        HealthOpdService::complete($visit->fresh(), $this->doctorUser);
+        HealthChargeIngestService::syncPatient($company, $patient->id, $this->owner);
+        $charges = HealthCharge::withoutGlobalScopes()->where('company_id',$company)->where('health_patient_id',$patient->id)->get();
+        $this->assertSame(2350.0, (float) $charges->sum('total_amount'));
+        $bill = HealthBillingService::createBill($company, $patient->id, $charges->modelKeys(), [], $this->owner)['bill'];
+        $this->assertTrue(HealthBillingService::finalize($bill, $this->owner)['ok']);
+        $this->assertTrue(HealthBillingService::recordPayment($company, $patient->id, ['health_bill_id'=>$bill->id,
+            'amount'=>2350,'method'=>'cash'], $this->owner)['ok']);
+        $this->assertSame('0.00', $bill->fresh()->outstanding_amount);
+        $this->assertSame(90.0, $this->onHand($medicine));
+        $stay = HealthIpdService::request(['company_id'=>$company,'health_patient_id'=>$patient->id,
+            'health_doctor_id'=>$this->doctor->id,'admission_type'=>'maternity'], $this->owner);
+        $stay = HealthIpdService::admit($stay, $this->bed->id, $this->owner);
+        HealthIpdBillingService::recordPayment($stay, ['kind'=>'advance', 'amount'=>500], $this->owner);
+        HealthIpdService::recordCare($stay, $this->nurse, 'stable', 'Synthetic nursing note');
+        $operation = HealthOperationService::schedule(['company_id'=>$company,'health_patient_id'=>$patient->id,
+            'health_admission_id'=>$stay->id,'primary_surgeon_id'=>$this->doctor->id, 'price'=>4000, 'title'=>'Demo C-section'], $this->doctorUser);
+        HealthOperationService::complete($operation, ['outcome'=>'successful'], $this->doctorUser);
+        $this->post('/health/ipd/admissions/'.$stay->id.'/delivery', ['method'=>'caesarean','operation_id'=>$operation->id,
+            'delivered_at'=>now()->toDateTimeString(),'newborns'=>[['outcome'=>'liveborn','weight_grams'=>3100]]])->assertRedirect();
+        $this->assertDatabaseHas('health_deliveries', ['health_admission_id'=>$stay->id,'health_operation_id'=>$operation->id]);
+        $stay = HealthIpdService::requestDischarge($stay->fresh(), $this->doctorUser, ['discharge_summary'=>'Synthetic discharge']);
+        $balance = (float) HealthIpdBillingService::summary($stay)['outstanding'];
+        $this->assertGreaterThan(0, $balance);
+        HealthIpdBillingService::recordPayment($stay, ['kind'=>'payment', 'amount'=>$balance], $this->owner);
+        $this->assertEquals(0, HealthIpdBillingService::summary($stay)['outstanding']);
+        $this->assertSame(HealthAdmission::STATUS_DISCHARGED, HealthIpdService::discharge($stay, $this->owner)->status);
+        $this->assertNotSame(HealthBed::STATUS_OCCUPIED, $this->bed->fresh()->status);
+    }
+
+    public function test_inpatient_advance_net_of_refund_is_shared_across_bills_only_once(): void
+    {
+        $patient = $this->register('Demo advance patient');
+        $stay = HealthIpdService::request(['company_id'=>$this->company->id,'health_patient_id'=>$patient->id,
+            'health_doctor_id'=>$this->doctor->id,'admission_type'=>'planned'], $this->owner);
+        $stay = HealthIpdService::admit($stay, $this->bed->id, $this->owner);
+        HealthIpdBillingService::recordPayment($stay, ['kind'=>'advance','amount'=>1000], $this->owner);
+        HealthIpdBillingService::recordPayment($stay, ['kind'=>'refund','amount'=>200], $this->owner);
+        foreach ([600, 400] as $value) {
+            $line = HealthIpdBillingService::postCharge($stay, ['unit_price'=>$value,'description'=>'Demo service'], $this->owner);
+            HealthChargeIngestService::syncPatient($this->company->id, $patient->id, $this->owner);
+            $charge = HealthCharge::withoutGlobalScopes()->where('company_id',$this->company->id)
+                ->where('source_type',HealthCharge::SOURCE_ADMISSION_CHARGE)->where('source_id',$line->id)->firstOrFail();
+            $bill = HealthBillingService::createBill($this->company->id, $patient->id, [$charge->id], [], $this->owner)['bill'];
+            $this->assertTrue(HealthBillingService::finalize($bill, $this->owner)['ok']);
+            $this->assertSame($value === 600 ? '0.00' : '200.00', $bill->fresh()->outstanding_amount);
+        }
+        $this->assertEquals(800, DB::table('health_payments')->where('company_id',$this->company->id)
+            ->where('collection_source','ipd_advance')->sum('amount'));
     }
 
     public function test_the_pharmacy_shelf_falls_by_exactly_what_was_dispensed(): void

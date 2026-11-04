@@ -8,6 +8,8 @@ use App\Models\HealthPrescription;
 use App\Models\HealthVisit;
 use App\Services\HealthAccessService;
 use App\Services\HealthPatientService;
+use App\Services\HealthModuleService;
+use App\Models\HealthExternalReferral;
 use App\Services\HealthPlatformService;
 use App\Services\HealthRecordAccessService;
 use App\Services\HealthScopeService;
@@ -209,6 +211,11 @@ class HealthPatientController extends HealthPanelController
 
         return view('health.patients.show', [
             'patient' => $patient,
+            'independentServices' => HealthRecordAccessService::canWriteClinical($user, $patient, $company)
+                ? HealthModuleService::independentServices($company) : [],
+            'referrals' => $canSeeClinical && Schema::hasTable('health_external_referrals')
+                ? $this->scope(HealthExternalReferral::where('company_id', $company->id)->where('health_patient_id', $id))
+                    ->latest('id')->limit(30)->get() : collect(),
             'visits' => $visits,
             'appointments' => $appointments,
             'prescriptions' => $prescriptions,
@@ -370,6 +377,22 @@ class HealthPatientController extends HealthPanelController
     }
 
     /** Company-scoped and branch-scoped: a stray id must never open another desk's file. */
+    public function refer(Request $request, int $id)
+    {
+        $patient = $this->findPatient($id);
+        abort_unless(HealthRecordAccessService::canWriteClinical($this->user(), $patient, $this->company()), 403);
+        $data = $request->validate(['service'=>'required|in:lab,pharmacy','provider'=>'required|string|max:160',
+            'instructions'=>'required|string|max:2000','request_key'=>'required|uuid']);
+        abort_unless(in_array($data['service'], HealthModuleService::independentServices($this->company()), true), 403);
+        $ref = HealthExternalReferral::firstOrCreate(['company_id'=>$patient->company_id,'request_key'=>$data['request_key']], [
+            'health_patient_id'=>$patient->id,'branch_id'=>$patient->branch_id,'health_department_id'=>$this->user()->health_department_id,
+            'service'=>$data['service'],'provider'=>$data['provider'],'instructions'=>$data['instructions'],'ordered_by'=>$this->user()->id,
+        ]);
+        abort_unless($ref->health_patient_id == $patient->id && $ref->service === $data['service'] &&
+            $ref->provider === $data['provider'] && $ref->instructions === $data['instructions'] && $ref->ordered_by == $this->user()->id, 409);
+        return redirect()->route('health.patients.show', $patient->id);
+    }
+
     protected function findPatient($id): HealthPatient
     {
         $query = HealthPatient::query()->with(['branch:id,name']);

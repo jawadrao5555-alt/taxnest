@@ -255,13 +255,16 @@ class HealthBillingService
          * patient for a returned medicine or a cancelled procedure, with the
          * charge ledger and the printed bill each telling a different story.
          */
-        self::dropDeadLines($bill);
-
-        if ($bill->lines()->count() === 0) {
-            return ['ok' => false, 'reason' => 'no_lines'];
-        }
-
-        DB::transaction(function () use ($bill, $actor) {
+        $sourceReceipts = [];
+        $refusal = DB::transaction(function () use ($bill, $actor, &$sourceReceipts) {
+            $bill = HealthBill::withoutGlobalScopes()->where('company_id', $bill->company_id)->lockForUpdate()->findOrFail($bill->id);
+            if ($bill->status !== HealthBill::STATUS_DRAFT) {
+                return 'not_draft';
+            }
+            self::dropDeadLines($bill);
+            if (!$bill->lines()->exists()) {
+                return 'no_lines';
+            }
             $lines = HealthBillLine::withoutGlobalScopes()
                 ->where('company_id', $bill->company_id)
                 ->where('health_bill_id', $bill->id)
@@ -301,14 +304,22 @@ class HealthBillingService
                     'updated_at' => now(),
                 ]);
 
+            $sourceReceipts = HealthSourceCollectionService::apply($bill);
             self::recomputeBill($bill->fresh());
-        });
+            return null;
+        }, 3);
+        if ($refusal !== null) {
+            return ['ok' => false, 'reason' => $refusal];
+        }
 
         // The books follow the document, never lead it. Posting happens AFTER
         // the bill is safely finalized and outside its transaction, so a ledger
         // problem can never roll back a bill the counter has already printed —
         // anything missed here is picked up by the accounts sweep.
         HealthPostingService::auto('postBill', $bill->fresh(), $actor);
+        foreach ($sourceReceipts as $receipt) {
+            HealthPostingService::auto('postPayment', $receipt, $actor);
+        }
 
         return ['ok' => true, 'bill' => $bill->fresh()];
     }
@@ -639,6 +650,9 @@ class HealthBillingService
      */
     public static function reversePayment(HealthPayment $payment, $actor = null, string $reason = ''): array
     {
+        if ($payment->collection_source) {
+            return ['ok' => false, 'reason' => 'source_receipt'];
+        }
         if ($payment->reversed_at) {
             return ['ok' => true, 'reason' => 'already_reversed'];
         }

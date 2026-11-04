@@ -117,7 +117,7 @@ class AdminCompanyController extends Controller
             'company_status' => $request->status === 'pending' ? 'pending' : 'active',
             'standard_tax_rate' => $request->product_type === 'di' ? 18.00 : 16.00,
             'fbr_pos_enabled' => $request->product_type === 'fbrpos',
-            'fbr_pos_environment' => $request->product_type === 'fbrpos' ? 'sandbox' : null,
+            ...($request->product_type === 'fbrpos' ? ['fbr_pos_environment' => 'sandbox'] : []),
             'fbr_reporting_enabled' => $request->product_type === 'fbrpos',
         ];
 

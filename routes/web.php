@@ -2134,6 +2134,8 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         Route::get('/patients/duplicates', [HealthPatientController::class, 'duplicates'])->name('health.patients.duplicates');
         Route::get('/patients/new', [HealthPatientController::class, 'create'])->name('health.patients.create');
         Route::post('/patients', [HealthPatientController::class, 'store'])->name('health.patients.store');
+        Route::post('/patients/{id}/referrals', [HealthPatientController::class, 'refer'])->whereNumber('id')
+            ->middleware('health.can:clinical.write')->name('health.patients.refer');
         Route::get('/patients/{id}', [HealthPatientController::class, 'show'])->whereNumber('id')->name('health.patients.show');
         Route::get('/patients/{id}/edit', [HealthPatientController::class, 'edit'])->whereNumber('id')->name('health.patients.edit');
         Route::put('/patients/{id}', [HealthPatientController::class, 'update'])->whereNumber('id')->name('health.patients.update');

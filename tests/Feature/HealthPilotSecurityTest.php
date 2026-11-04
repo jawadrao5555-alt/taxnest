@@ -295,6 +295,30 @@ class HealthPilotSecurityTest extends TestCase
         $this->assertDatabaseHas('health_diagnostic_tests', ['code'=>'CBC']);
     }
 
+    public function test_external_referral_belongs_to_the_hospital_but_no_provider_charge_or_stock_is_posted(): void
+    {
+        $patient = HealthPatientService::register($this->mine->id, ['name'=>'Demo referral','age_years'=>25,'gender'=>'female']);
+        $this->actingAs($this->myOwner, HealthPanel::GUARD);
+        $this->post('/health/settings/modules', ['modules'=>HealthModuleService::MODULES,
+            'service_modes'=>['lab'=>'independent','pharmacy'=>'independent']])->assertSessionHasNoErrors();
+        foreach (['lab', 'pharmacy'] as $service) {
+            $data = ['service'=>$service, 'provider'=>'Demo Independent Provider','instructions'=>'Fictional referral '.$service,
+                'request_key'=>(string) \Illuminate\Support\Str::uuid()];
+            $url = '/health/patients/'.$patient->id.'/referrals';
+            $this->post($url, $data)->assertRedirect('/health/patients/'.$patient->id);
+            $this->post($url, $data)->assertRedirect();
+            $this->postJson('/health/patients/'.$this->theirPatient->id.'/referrals', $data)->assertNotFound();
+        }
+        $this->get('/health/patients/'.$patient->id)->assertSee('Demo Independent Provider');
+        $this->post('/health/settings/modules', ['modules'=>['opd','accounts']])->assertSessionHasNoErrors();
+        $this->postJson($url, $data)->assertForbidden();
+        $this->assertDatabaseCount('health_external_referrals', 2);
+        $this->assertDatabaseCount('health_charges', 0);
+        $this->assertDatabaseCount('health_pharmacy_sales', 0);
+        $this->get('/health/patients/'.$patient->id)->assertSee('Demo Independent Provider');
+        $this->actingAs($this->myCashier, HealthPanel::GUARD)->get('/health/patients/'.$patient->id)->assertDontSee('Fictional referral');
+    }
+
     private function hospital(string $name, string $ntn): Company
     {
         $company = Company::create([

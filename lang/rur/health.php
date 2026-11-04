@@ -8,6 +8,7 @@
  */
 
 return [
+    'pay_err_source_receipt' => 'Yeh receipt asal transaction se linked hai. Correction se pehle asal collection dekhein.',
     'pay_err_request_conflict' => 'Yeh form mukhtalif details ke saath use ho chuka hai. Bill dobara khol kar receipt dekhein.',
     'role_health_radiologist' => 'Radiologist',
     'cap_lab_order' => 'Lab test order karein',

@@ -9,6 +9,7 @@
  */
 
 return [
+    'pay_err_source_receipt' => 'This receipt belongs to a source transaction. Review that collection before correcting it.',
     'pay_err_request_conflict' => 'This form was already used with different details. Reload the bill and review the existing receipt.',
     'role_health_radiologist' => 'Radiologist',
     'cap_lab_order' => 'Order laboratory tests',

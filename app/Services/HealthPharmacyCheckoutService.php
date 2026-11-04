@@ -226,7 +226,7 @@ class HealthPharmacyCheckoutService
             $total = round($subtotal - $discountTotal + $taxTotal, 2);
             $paid = isset($payload['paid_amount']) && $payload['paid_amount'] !== ''
                 ? round((float) $payload['paid_amount'], 2)
-                : $total;
+                : ($sale->payment_method === 'credit' ? 0.0 : $total);
 
             $readiness = HealthPlatformService::fbrReadiness($company);
 

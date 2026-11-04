@@ -64,6 +64,8 @@ class HealthPayment extends Model
         // Set when this receipt was carved out of a bigger advance rather than
         // taken at the counter. The books credit the cash once, on the parent.
         'split_from_payment_id',
+        'collection_source',
+        'collection_source_id',
         'health_admission_id',
         'health_cashier_shift_id',
         'receipt_no',

@@ -318,23 +318,39 @@
                     this.confirmText = '';
                     this.hasSandboxToken = !!this.form.fbr_sandbox_token;
                     this.hasProductionToken = !!this.form.fbr_production_token;
-                    let connRes = await fetch('/company/test-connection', {
-                        method: 'POST',
-                        headers: headers
-                    });
-                    let connData = await connRes.json();
-                    this.connStatus = connData.status;
-                    this.testMessage = connData.message;
+                    // Persistence succeeded. A separate diagnostic failure must
+                    // never be reported as a failed token save.
                     this.saving = false;
                     this.saveDone = true;
-                    if (connData.status === 'green') {
-                        this.saveMessage = 'Settings saved & connection healthy! (' + this.form.fbr_environment + ')';
-                        this.saveSuccess = true;
-                    } else {
-                        this.saveMessage = 'Settings saved but connection issue: ' + (connData.message || 'Unknown error');
-                        this.saveSuccess = false;
-                    }
+                    this.saveSuccess = true;
+                    this.saveMessage = 'FBR settings saved (' + this.form.fbr_environment + ').';
                     setTimeout(() => { this.saveDone = false; }, 4000);
+                    try {
+                        let connRes = await fetch('/company/test-connection', {
+                            method: 'POST',
+                            headers: headers
+                        });
+                        if (!connRes.ok || connRes.redirected || !(connRes.headers.get('content-type') || '').includes('application/json')) {
+                            throw new Error('Connection check unavailable');
+                        }
+                        let connData = await connRes.json();
+                        this.connStatus = connData.status;
+                        this.testMessage = connData.message;
+                        this.saving = false;
+                        this.saveDone = true;
+                        if (connData.status === 'green') {
+                            this.saveMessage = 'Settings saved & connection healthy! (' + this.form.fbr_environment + ')';
+                            this.saveSuccess = true;
+                        } else {
+                            this.saveMessage = 'Settings saved but connection issue: ' + (connData.message || 'Unknown error');
+                            this.saveSuccess = false;
+                        }
+                    } catch (connectionError) {
+                        this.connStatus = 'unknown';
+                        this.testMessage = 'Settings saved. Connection check unavailable; refresh the page and try Test Connection.';
+                        this.saveMessage = 'FBR settings saved. Connection has not been verified.';
+                        this.saveSuccess = true;
+                    }
                 } catch(e) {
                     this.saving = false;
                     this.saveMessage = 'Error saving settings. Please try again.';

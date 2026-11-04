@@ -84,7 +84,13 @@ class CompanyIsolation
 
             if (!$request->is('onboarding*') && !$request->is('billing/*') && !$request->is('api/*')) {
                 if ($company && !$company->onboarding_completed && !$company->is_internal_account) {
-                    if (!$request->is('branches*') && !$request->is('company/fbr-settings*') && !$request->is('products*') && !$request->is('invoice*') && !$request->is('invoices*')) {
+                    // These companion JSON endpoints belong to the FBR setup
+                    // screen. Redirecting them to HTML onboarding makes a saved
+                    // token look unsaved and prevents setup diagnostics.
+                    $isFbrSetup = $request->is('company/fbr-settings*')
+                        || $request->is('company/test-connection')
+                        || $request->is('company/sandbox-test/*');
+                    if (!$request->is('branches*') && !$isFbrSetup && !$request->is('products*') && !$request->is('invoice*') && !$request->is('invoices*')) {
                         return redirect('/onboarding');
                     }
                 }

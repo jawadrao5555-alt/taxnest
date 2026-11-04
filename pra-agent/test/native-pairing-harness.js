@@ -117,10 +117,12 @@ async function logout(win,panel) {
   handle('toggle-agent',(_e,on)=>{calls.toggle++;running=on;return{ok:true};});
   handle('get-pos-settings',()=>({}));handle('get-lan-settings',()=>({}));handle('get-lan-status',()=>({enabled:false}));
   handle('lan-list-devices',()=>({devices:[]}));handle('lan-core-list-devices',()=>({devices:[]}));
-  let imsRunning=false, imsInstalls=0;
-  handle('check-update',()=>({available:false}));handle('check-ims-service',()=>({running:imsRunning}));
+  let imsRunning=false, imsInstalls=0, installationOpens=0, installedAppsOpens=0;
+  handle('check-update',()=>({available:false}));handle('check-ims-service',()=>({running:imsRunning,pra_reachable:imsRunning,services:imsRunning?[{protocol:'soap',url:'http://127.0.0.1:8524/TcpService/IMSHttp'}]:[]}));
   handle('install-fbr-ims',()=>{imsInstalls++;return {ok:true};}); // Fictional IPC only; never download or launch FBR software.
   handle('open-pos-window',()=>{calls.open++;return{ok:true};});
+  handle('open-installation-folder',()=>{installationOpens++;return{ok:true};});
+  handle('open-installed-apps',()=>{installedAppsOpens++;return{ok:true};});
   settings=watch(new BrowserWindow({width:900,height:900,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,preload:path.join(root,'preload.js')}}));
   await settings.loadFile(path.join(root,'index.html'));
   await wait(()=>settings.webContents.executeJavaScript("!!window.agentAPI && document.getElementById('apiKey').value==='fixture-old'"),'real sandbox preload bridge');
@@ -135,8 +137,15 @@ async function logout(win,panel) {
   }
   await click(settings,'#imsInstallBtn');await wait(()=>imsInstalls===1,'explicit fictional IMS installation IPC');
   imsRunning=true;await click(settings,'#imsCheckBtn');
-  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsBadge').textContent.includes('IMS Running')"),'running IMS badge');
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsBadge').textContent.includes('Compatible SOAP IMS detected')"),'running IMS badge');
   assert.equal(await settings.webContents.executeJavaScript("document.getElementById('imsInstallBtn').style.display"),'none');
+  assert.match(await settings.webContents.executeJavaScript("document.getElementById('imsOkNote').textContent"),/127\.0\.0\.1:8524\/TcpService\/IMSHttp/);
+  assert.match(await settings.webContents.executeJavaScript("document.getElementById('imsOkNote').textContent"),/environment need verification/);
+  settings.webContents.send('status-update',{running:true,connected:true,deviceUid:'fixture-counter',localIms:[{url:'http://127.0.0.1:8524/TcpService/IMSHttp'}],serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device',fbr_alongside_pra:true}});
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsHeading').textContent==='PRA + FBR IMS Services' && document.getElementById('imsDeviceInfo').textContent.includes('fixture-counter')"),'alongside PRA and FBR visibility with automatic identity');
+  await wait(()=>settings.webContents.executeJavaScript("document.getElementById('imsOkNote').textContent.includes('PRA local address: responding')"),'separate PRA availability and FBR compatibility status');
+  await click(settings,'#installationFolderBtn');await wait(()=>installationOpens===1,'installation folder IPC');
+  await click(settings,'#installedAppsBtn');await wait(()=>installedAppsOpens===1,'Windows installed apps IPC');
   imsRunning=false;
   settings.webContents.send('status-update',{running:true,connected:true,serverInfo:{product_type:'pos',pra_connection_mode:'fiscal_device'}});
   await wait(()=>settings.webContents.executeJavaScript("document.getElementById('praImsSteps').style.display==='block'"),'packaged PRA fiscal guidance');

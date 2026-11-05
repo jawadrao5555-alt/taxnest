@@ -43,7 +43,7 @@ final class PosImsFee
             $request->validate(['fbr_service_charge'=>'nullable|numeric|in:0,1']);
             return (float)$request->input('fbr_service_charge',0);
         }
-        $fee=$fiscal ? self::quote($companyId) : 0;
+        $fee=$fiscal ? self::quote($companyId) : 0.0;
         if ($request->has('fbr_service_charge')) {
             $request->validate(['fbr_service_charge'=>'required|numeric|in:0,1']);
             if ((float)$request->input('fbr_service_charge')!==$fee) {

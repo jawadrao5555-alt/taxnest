@@ -509,6 +509,34 @@ class PosKotOnFinalPayResponseTest extends TestCase
 
     // ── 1. payOrder: the owner's Table 02 bill ──────────────────────────────
 
+    public function test_provisional_delivery_accepts_zero_fee_and_rejects_stale_fee(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->decimal('fbr_service_charge', 12, 2)->default(0);
+        });
+        $companyId = $this->makeShop();
+        $user = $this->makeCashier($companyId);
+        $body = [
+            'items' => [['type' => 'product', 'item_id' => null, '_manual' => true,
+                'name' => 'Synthetic delivery', 'quantity' => 1, 'unit_price' => 100,
+                'is_tax_exempt' => true]],
+            'payment_method' => 'cash', 'order_type' => 'delivery',
+            'delivery_address' => 'Synthetic test address',
+            'save_as_provisional' => true, 'fbr_service_charge' => 0,
+            'discount_type' => 'amount', 'discount_value' => 0,
+        ];
+        $response = $this->actingAs($user, 'pos')->postJson('/pos/invoice/store', $body);
+        $response->assertOk()->assertJson(['success' => true]);
+        $sale = DB::table('pos_transactions')->find($response->json('transaction_id'));
+        $this->assertNotNull($sale);
+        $this->assertEquals(0, $sale->fbr_service_charge);
+        $this->assertEquals(100, $sale->total_amount);
+        $body['fbr_service_charge'] = 1;
+        $this->postJson('/pos/invoice/store', $body)->assertUnprocessable()
+            ->assertJsonValidationErrors('fbr_service_charge');
+        $this->assertSame(1, DB::table('pos_transactions')->count());
+    }
+
     public function test_held_order_finalization_preserves_original_fiscal_line_facts(): void
     {
         Schema::table('pos_transaction_items',function(Blueprint $t){

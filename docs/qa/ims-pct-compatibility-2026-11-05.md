@@ -97,3 +97,16 @@ was blocked before an IMS record/fiscal POST. The existing bill remains intact.
 Owner approval and deployment are separate. Only after deployment may the real
 bill be prepared/reviewed and submitted once; local acknowledgement is still
 not proof of central FBR synchronization. Never blindly resend an uncertain bill.
+
+## Browser CI zero-fee correction
+The occupied-table browser journey failed when saving a provisional delivery:
+`forCheckout` compared float request zero with integer fallback zero using strict
+identity. Use a float fallback so equal fees pass; retain numeric/range validation
+and rejection of an actual stale fee. A real `/pos/invoice/store` regression
+reproduced the exact 422 before the fix and passes afterward, checking stored
+zero fee/unchanged total, rejection of fee one, and absence of a second sale.
+Local PHP 8.3 focused files passed separately: KOT/final pay 10 tests / 85
+assertions; federal automation 20 tests / 130 assertions. Running those two files
+in KOT-first order in one process exposed three IMS fixture failures; federal
+passes independently. Updated hosted full suite and browser checks remain the
+authoritative PHP 8.4 validation. No checks or stale-fee guards were weakened.

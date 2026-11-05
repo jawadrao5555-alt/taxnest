@@ -48,3 +48,19 @@ test('SOAP string-wrapped acknowledgement reaches callback once; diagnostic does
   assert.equal(callbacks[0].diagnostic,'response_received');assert(!JSON.stringify(callbacks).includes(result.Token));
  } finally {fs.rmSync(directory,{recursive:true,force:true});}
 });
+
+test('actual alongside bridge normalizes nested response fields once and holds conflicting codes',async()=>{
+ for(const [value,accepted] of [[{d:{code:' 100 ',invoice_number:'123456TEST12345678'}},true],
+  [{Code:100,code:400,InvoiceNumber:'123456TEST12345678'},false]]) {
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'ims-normalized-'));let fiscal=0,claims=0;const callbacks=[];
+  const axios={post:async(url,body)=>{
+   if(url.endsWith('/claim'))return{data:{invoice:++claims===1?invoice:null}};
+   if(url.endsWith('/result')){callbacks.push(body);return{data:{ok:true}};}
+   fiscal++;return{data:value};
+  }};
+  try {const sync=createBridge({axios,directory});await sync(config);await sync(config);
+   assert.equal(fiscal,1);assert.equal(callbacks.length,1);
+   assert.equal(require('../src/fiscal-result').parseFiscalResult(callbacks[0].response).accepted,accepted);
+  }finally{fs.rmSync(directory,{recursive:true,force:true});}
+ }
+});

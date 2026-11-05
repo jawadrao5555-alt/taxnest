@@ -135,8 +135,8 @@ class PosTaxIntegrationController extends Controller
     }
     public function agentResult(Request $request,PosImsReportingService $svc)
     {
-        $c=$request->attributes->get('agent_company');$d=$request->validate(['id'=>'required|integer','device_uid'=>'required|string|max:100','claim'=>'required|string|size:64','response'=>'nullable|array|max:10','diagnostic'=>'nullable|in:invalid_endpoint,response_received,unrecognized_response,transport_timeout,http_error,invalid_json_result,unconfirmed_soap_or_transport']);
-        $r=$svc->callback($c->id,$d['id'],$d['device_uid'],$d['claim'],$d['response'] ?? null,$d['diagnostic'] ?? null);
+        $c=$request->attributes->get('agent_company');$d=$request->validate(['id'=>'required|integer','device_uid'=>'required|string|max:100','claim'=>'required|string|size:64','response'=>'nullable|array|max:10','response_fields'=>'sometimes|array|max:16','response_fields.*'=>['string','max:100','regex:/^[A-Za-z0-9_.]+:(string|number|boolean|object|array|null)$/D'],'diagnostic'=>'nullable|in:invalid_endpoint,response_received,unrecognized_response,transport_timeout,http_error,invalid_json_result,unconfirmed_soap_or_transport']);
+        $r=$svc->callback($c->id,$d['id'],$d['device_uid'],$d['claim'],$d['response'] ?? null,$d['diagnostic'] ?? null,$d['response_fields'] ?? []);
         return response()->json(['ok'=>true,'state'=>$r->state]);
     }
 }

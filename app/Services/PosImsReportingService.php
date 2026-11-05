@@ -176,7 +176,14 @@ class PosImsReportingService
         $unknown=['state'=>'verification_required','reference'=>null,'error_codes'=>[]];
         if (!is_array($data)) return $unknown;
         $number=FbrPosFiscalResult::fromResponse($data);
-        $code=(string)($data['Code'] ?? $data['code'] ?? '');
+        $codes=[];
+        foreach (['Code','code'] as $key) {
+            if (!isset($data[$key])) continue;
+            if (!is_string($data[$key]) && !is_int($data[$key]) && !(is_float($data[$key]) && is_finite($data[$key]))) return $unknown;
+            $codes[]=trim((string)$data[$key]);
+        }
+        if (count(array_unique($codes))>1) return $unknown;
+        $code=$codes[0] ?? '';
         if ($code==='100' && $number) return ['state'=>$local?'local_accepted':'accepted','reference'=>$number,'error_codes'=>[]];
         // Any acknowledgement evidence makes a conflicting rejection uncertain.
         if ($number || !empty($data['InvoiceNumber']) || !empty($data['FBRInvoiceNumber']) || !empty($data['invoiceNumber'])) return $unknown;
@@ -192,6 +199,8 @@ class PosImsReportingService
             if ($r->state !== 'submitting') return $r;
             $a=$r->attempts;$a[array_key_last($a)]['state']=$result['state'];$a[array_key_last($a)]['error_codes']=$result['error_codes'];
             if ($diagnostic !== null && in_array($diagnostic,['invalid_endpoint','response_received','unrecognized_response','transport_timeout','http_error','invalid_json_result','unconfirmed_soap_or_transport'],true)) $a[array_key_last($a)]['diagnostic']=$diagnostic;
+            if (!empty($result['response_fields'])) $a[array_key_last($a)]['response_fields']=$result['response_fields'];
+            if (isset($result['acknowledgement'])) $a[array_key_last($a)]['acknowledgement']=$result['acknowledgement'];
             $r->fill(['state'=>$result['state'],'fiscal_number'=>$result['reference'],'attempts'=>$a])->save();return $r;
         });
     }
@@ -212,11 +221,26 @@ class PosImsReportingService
             return ['id'=>$r->id,'claim'=>$r->agent_claim,'payload'=>$r->payload,'endpoint'=>$r->snapshot['local_ims_url'],'environment'=>$r->environment];
         });
     }
-    public function callback(int $companyId,int $id,string $deviceUid,string $claim,$response,?string $diagnostic=null): PosImsSubmission
+    public function callback(int $companyId,int $id,string $deviceUid,string $claim,$response,?string $diagnostic=null,array $responseFields=[]): PosImsSubmission
     {
         $r=PosImsSubmission::where('company_id',$companyId)->findOrFail($id);
         abort_unless($r->connection_mode==='fiscal_device' && $r->device_uid===$deviceUid,403);
-        return $this->complete($companyId,$id,self::result($response,true),$claim,$diagnostic);
+        $result=self::result($response,true);
+        // Retain only bounded, validated fiscal fields in encrypted evidence.
+        // The original code used to discard all callback evidence after classification.
+        $evidence=[];
+        foreach (['Code','code'] as $key) {
+            $value=is_array($response) ? ($response[$key] ?? null) : null;
+            if ((is_string($value) || is_int($value) || (is_float($value) && is_finite($value))) && preg_match('/^[A-Za-z0-9_-]{1,12}$/D',trim((string)$value))) $evidence[$key]=trim((string)$value);
+        }
+        foreach (['InvoiceNumber','FBRInvoiceNumber','invoiceNumber','Response'] as $key) {
+            $value=is_array($response) ? ($response[$key] ?? null) : null;
+            if ($key==='Response' && (!is_string($value) || !preg_match('/^(?:[0-9]{6}|[A-Z][A-Z-]*-[0-9]{3,}$)/',trim($value)))) continue;
+            if ($number=FbrPosFiscalResult::number($value)) $evidence[$key]=$number;
+        }
+        $result['acknowledgement']=$evidence;
+        $result['response_fields']=array_values(array_filter(array_slice($responseFields,0,16),fn($field)=>is_string($field) && strlen($field)<=100 && preg_match('/^[A-Za-z0-9_.]+:(string|number|boolean|object|array|null)$/D',$field)));
+        return $this->complete($companyId,$id,$result,$claim,$diagnostic);
     }
     /** Record independently checked portal evidence; NEVER dispatch an invoice. */
     public function reconcilePortal(int $companyId,int $id,int $actor,array $evidence): PosImsSubmission

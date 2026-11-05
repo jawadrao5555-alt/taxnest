@@ -806,6 +806,26 @@ class PraDiSandboxTest extends TestCase
         $this->assertSame('draft',$second->fresh()->state);Http::assertNothingSent();
     }
 
+    public function test_ims_callback_trims_status_keeps_safe_evidence_and_refuses_conflicting_codes(): void
+    {
+        $service=\App\Services\PosImsReportingService::class;
+        $this->assertSame('local_accepted',$service::result(['Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->assertSame('verification_required',$service::result(['Code'=>'100','code'=>'400','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->imsProfile('sandbox','fiscal_device');$svc=app($service);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));Http::fake();
+        $svc->submit($this->company->id,$r->id,$this->owner->id);$claim=$svc->claim($this->company->id,'synthetic-device');
+        $r=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],[
+            'Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456','Token'=>'private-token',
+            'BuyerCNIC'=>'private-identity','Response'=>'Private buyer details never retained'], 'response_received',['Code:string','InvoiceNumber:string','bad value with spaces']);
+        $this->assertSame('local_accepted',$r->state);
+        $this->assertSame(['Code'=>'100','InvoiceNumber'=>'LOCAL-IMS-123456'],$r->attempts[0]['acknowledgement']);
+        $this->assertSame(['Code:string','InvoiceNumber:string'],$r->attempts[0]['response_fields']);
+        $this->assertStringNotContainsString('private',json_encode($r->attempts));
+        $this->get(route('pos.tax-integrations.ims.show',$r->id))->assertOk()->assertSee('Code: 100')->assertSee('LOCAL-IMS-123456');
+        Http::assertNothingSent();
+    }
+
     private function imsProfile(string $environment='sandbox', string $mode='cloud'): \App\Models\PosImsProfile
     {
         PosDiSandboxProfile::where('company_id',$this->company->id)->update(['enabled'=>false]);

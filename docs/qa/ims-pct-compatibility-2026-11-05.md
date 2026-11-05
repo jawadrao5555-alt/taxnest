@@ -46,6 +46,10 @@ tax rate remains mandatory. Existing catalogue codes are not replaced.
 - Full PHPUnit attempted locally. ComposerPlatformContractTest rejects local
   PHP 8.3.6 because the repository requires PHP ^8.4.1. No platform requirement
   or test was weakened; exact-head hosted PHP 8.4 CI remains required.
+  Automatic approval review subsequently blocked continuation of that run
+  because an external PRAL IMS HTTPS request was detected. No workaround or
+  retry of that external access was attempted. The local full suite is NOT a
+  pass; focused tests prevent stray Laravel HTTP requests and ran successfully.
 - Native MariaDB server unavailable locally. No schema change is introduced;
   hosted MariaDB checks remain required.
 

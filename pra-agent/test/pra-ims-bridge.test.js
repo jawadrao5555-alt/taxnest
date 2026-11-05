@@ -32,3 +32,19 @@ test('response reference conflicts survive sanitization; endpoints allow only ex
  assert(localEndpoint(invoice.endpoint));assert(!localEndpoint('http://localhost:8525/api/IMSFiscal/GetInvoiceNumberByModel?redirect=1'));
  assert.deepEqual(resultOnly({Code:100,InvoiceNumber:'TEST-111111',FBRInvoiceNumber:'TEST-222222',Token:'secret'}),{Code:'100',InvoiceNumber:'TEST-111111',FBRInvoiceNumber:'TEST-222222'});
 });
+
+test('SOAP string-wrapped acknowledgement reaches callback once; diagnostic does not leak raw response',async()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'ims-ack-'));let posts=0,claims=0;const callbacks=[];
+ const soapInvoice={...invoice,endpoint:'http://127.0.0.1:8524/TcpService/IMSHttp'};
+ const result={Code:100,InvoiceNumber:'123456TEST12345678',Token:'secret-must-not-persist'};
+ const axios={post:async(url,body)=>{
+  if(url.endsWith('/claim')) return {data:{invoice:++claims===1?soapInvoice:null}};
+  if(url.endsWith('/result')) {callbacks.push(body);return {data:{ok:true}};}
+  posts++;return {data:'<GetFBRInvoiceNumberByModelResult>'+JSON.stringify(JSON.stringify(result))+'</GetFBRInvoiceNumberByModelResult>'};
+ }};
+ try {const sync=createBridge({axios,directory});await sync(config);await sync(config);
+  assert.equal(posts,1);assert.equal(callbacks.length,1);
+  assert.equal(callbacks[0].response.InvoiceNumber,result.InvoiceNumber);
+  assert.equal(callbacks[0].diagnostic,'response_received');assert(!JSON.stringify(callbacks).includes(result.Token));
+ } finally {fs.rmSync(directory,{recursive:true,force:true});}
+});

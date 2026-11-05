@@ -34,3 +34,12 @@ test('discovery reads WSDL only, finds nonstandard Windows listener, ignores gen
   assert.deepEqual(r,[{protocol:'soap',url:'http://127.0.0.1:9001/TcpService/IMSHttp'}]);
   assert.ok(calls.every(([url,opts])=>/\/TcpService(?:\/IMSHttp)?\?wsdl$/.test(url) && opts.maxRedirects===0));
 });
+
+test('bounded JSON-string WCF result preserves explicit acknowledgement, never accepts bare references',()=>{
+ const data={Code:100,InvoiceNumber:'123456TEST12345678'};
+ const xml='<GetFBRInvoiceNumberByModelResult>'+JSON.stringify(JSON.stringify(data))+'</GetFBRInvoiceNumberByModelResult>';
+ assert.deepEqual(soap.decode(xml),data);
+ for(const value of [JSON.stringify('123456TEST12345678'),JSON.stringify(JSON.stringify(JSON.stringify(data)))]) {
+  assert.throws(()=>soap.decode('<GetFBRInvoiceNumberByModelResult>'+value+'</GetFBRInvoiceNumberByModelResult>'));
+ }
+});

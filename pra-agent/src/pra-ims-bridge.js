@@ -45,12 +45,18 @@ function createBridge({ axios, directory = path.join(os.homedir(), '.taxnest-pra
       const invoice = data?.invoice;
       if (!invoice) return;
       if (!Number.isSafeInteger(invoice.id) || !/^[a-f0-9]{64}$/.test(invoice.claim || '')) return;
-      const body = { id: invoice.id, claim: invoice.claim, device_uid: config.deviceUid, response: null };
+      const body = { id: invoice.id, claim: invoice.claim, device_uid: config.deviceUid, response: null, diagnostic: 'invalid_endpoint' };
       if (localEndpoint(invoice.endpoint) || soap.endpoint(invoice.endpoint)) {
         try {
           const res = soap.endpoint(invoice.endpoint) ? await soap.submit(axios, invoice.endpoint, invoice.payload) : await axios.post(invoice.endpoint, invoice.payload, { timeout: 45000, maxRedirects: 0, headers: { 'Content-Type': 'application/json' } });
           body.response = resultOnly(res.data);
-        } catch (_) { /* timeout / HTTP failure stays unknown, never replay fiscal POST */ }
+          body.diagnostic = body.response ? 'response_received' : 'unrecognized_response';
+        } catch (error) {
+          // Enum only: never persist raw response XML, headers, URLs or credentials.
+          body.diagnostic = ['ECONNABORTED','ETIMEDOUT'].includes(error?.code) ? 'transport_timeout'
+            : error?.response ? 'http_error' : error instanceof SyntaxError ? 'invalid_json_result'
+            : 'unconfirmed_soap_or_transport';
+        }
       }
       // Persist only the scoped result (not the source invoice, token or raw response).
       fs.mkdirSync(directory, { recursive: true });

@@ -183,14 +183,15 @@ class PosImsReportingService
         if (preg_match('/^[0-9]{3}$/',$code) && $code !== '100') return ['state'=>'rejected','reference'=>null,'error_codes'=>[$code]];
         return $unknown;
     }
-    private function complete(int $companyId,int $id,array $result,?string $claim=null): PosImsSubmission
+    private function complete(int $companyId,int $id,array $result,?string $claim=null,?string $diagnostic=null): PosImsSubmission
     {
-        return DB::transaction(function() use($companyId,$id,$result,$claim){
+        return DB::transaction(function() use($companyId,$id,$result,$claim,$diagnostic){
             $r=$this->locked($companyId,$id);
             if ($claim !== null) abort_unless(is_string($r->agent_claim) && hash_equals($r->agent_claim,$claim),409);
             // Replayed callbacks are idempotent and never overwrite terminal evidence.
             if ($r->state !== 'submitting') return $r;
             $a=$r->attempts;$a[array_key_last($a)]['state']=$result['state'];$a[array_key_last($a)]['error_codes']=$result['error_codes'];
+            if ($diagnostic !== null && in_array($diagnostic,['invalid_endpoint','response_received','unrecognized_response','transport_timeout','http_error','invalid_json_result','unconfirmed_soap_or_transport'],true)) $a[array_key_last($a)]['diagnostic']=$diagnostic;
             $r->fill(['state'=>$result['state'],'fiscal_number'=>$result['reference'],'attempts'=>$a])->save();return $r;
         });
     }
@@ -211,12 +212,54 @@ class PosImsReportingService
             return ['id'=>$r->id,'claim'=>$r->agent_claim,'payload'=>$r->payload,'endpoint'=>$r->snapshot['local_ims_url'],'environment'=>$r->environment];
         });
     }
-    public function callback(int $companyId,int $id,string $deviceUid,string $claim,$response): PosImsSubmission
+    public function callback(int $companyId,int $id,string $deviceUid,string $claim,$response,?string $diagnostic=null): PosImsSubmission
     {
         $r=PosImsSubmission::where('company_id',$companyId)->findOrFail($id);
         abort_unless($r->connection_mode==='fiscal_device' && $r->device_uid===$deviceUid,403);
-        return $this->complete($companyId,$id,self::result($response,true),$claim);
+        return $this->complete($companyId,$id,self::result($response,true),$claim,$diagnostic);
     }
+    /** Record independently checked portal evidence; NEVER dispatch an invoice. */
+    public function reconcilePortal(int $companyId,int $id,int $actor,array $evidence): PosImsSubmission
+    {
+        return DB::transaction(function() use($companyId,$id,$actor,$evidence){
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $r=$this->locked($companyId,$id);
+            abort_unless(in_array($r->state,['verification_required','local_accepted'],true) && $r->payload,409,
+                'Only an unresolved or locally acknowledged invoice can be reconciled. Never resend it.');
+            $evidence=Validator::make($evidence,[
+                'environment'=>'required|in:sandbox,production','pos_id'=>'required|integer|min:1',
+                'usin'=>'required|string|max:100','invoice_date'=>'required|date_format:Y-m-d',
+                'invoice_type'=>'required|integer|in:1,3','sale_value'=>'required|numeric|min:0|decimal:0,2',
+                'tax_charged'=>'required|numeric|min:0|decimal:0,2','total_amount'=>'required|numeric|min:0|decimal:0,2',
+                'quantity'=>'required|numeric|min:0|decimal:0,3','fiscal_number'=>'required|string|max:100',
+                'evidence_note'=>'required|string|min:20|max:1000','confirm_portal'=>'accepted',
+            ])->validate();
+            $number=FbrPosFiscalResult::number($evidence['fiscal_number']);
+            if (!$number) throw ValidationException::withMessages(['fiscal_number'=>'Enter the exact FBR invoice number shown in the portal.']);
+            $p=$r->payload;
+            $identity=$evidence['environment']===$r->environment
+                && (int)$evidence['pos_id']===(int)$p['POSID'] && $evidence['usin']===$p['USIN']
+                && $evidence['invoice_date']===substr($p['DateTime'],0,10)
+                && (int)$evidence['invoice_type']===(int)$p['InvoiceType'];
+            foreach(['sale_value'=>'TotalSaleValue','tax_charged'=>'TotalTaxCharged',
+                'total_amount'=>'TotalBillAmount','quantity'=>'TotalQuantity'] as $input=>$field) {
+                $identity=$identity && round((float)$evidence[$input],$field==='TotalQuantity'?3:2)
+                    ===round((float)$p[$field],$field==='TotalQuantity'?3:2);
+            }
+            if (!$identity) throw ValidationException::withMessages(['confirm_portal'=>'Portal identity and amounts must match this exact frozen IMS payload.']);
+            abort_if($r->fiscal_number && $r->fiscal_number!==$number,409,'Existing acknowledgement conflicts with this reference.');
+            abort_if(PosImsSubmission::where('company_id',$companyId)->where('environment',$r->environment)
+                ->where('id','!=',$id)->where('fiscal_number',$number)->exists(),409,'This reference already belongs to another invoice.');
+            self::preventOtherFederalRecord($companyId,$r->source_transaction_id,$r->environment,'ims');
+            $attempts=$r->attempts ?? [];
+            $attempts[]=['at'=>now()->toIso8601String(),'state'=>'accepted','error_codes'=>[],
+                'source'=>'owner_verified_fbr_portal','actor_id'=>$actor,'previous_state'=>$r->state,
+                'fiscal_number'=>$number,'evidence'=>$evidence];
+            $r->fill(['state'=>'accepted','fiscal_number'=>$number,'attempts'=>$attempts])->save();
+            return $r;
+        });
+    }
+
     private function locked(int $companyId,int $id): PosImsSubmission
     { return PosImsSubmission::where('company_id',$companyId)->lockForUpdate()->findOrFail($id); }
 }

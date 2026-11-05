@@ -879,6 +879,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/{id}', 'show')->whereNumber('id')->name('.show');
         Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('.prepare');
         Route::post('/{id}/connection', 'refreshConnection')->whereNumber('id')->name('.connection');
+        Route::post('/{id}/reconcile', 'reconcilePortal')->whereNumber('id')->middleware('throttle:6,1')->name('.reconcile');
         Route::post('/{id}/submit', 'submit')->whereNumber('id')->middleware('throttle:6,1')->name('.submit');
         Route::get('/{id}/receipt', 'receipt')->whereNumber('id')->name('.receipt');
     });

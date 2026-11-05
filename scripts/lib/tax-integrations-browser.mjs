@@ -83,6 +83,31 @@ export async function taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperation
   if(!(await page.locator('body').innerText()).includes('Original bill amounts were recovered'))throw Error('Complete stored original bill could not be recovered');
   if(!(await page.locator('body').innerText()).includes('No submission.'))throw Error('Recovery unexpectedly dispatched a fiscal invoice');
   await saveEvidenceScreenshot(page,'ims-stored-original-recovery-'+v.width);
+  await page.goto(baseUrl+'/pos/tax-integrations/fbr-pos/'+data.portal.id,{waitUntil:'domcontentloaded'});
+  await page.getByRole('heading',{name:'Recover an invoice already visible in FBR',exact:true}).waitFor();
+  const fillPortal=async total=>{
+    for(const [label,value] of [['FBR invoice number from portal',data.portal.reference],['Portal POS ID','12345'],
+      ['Portal USIN / original bill number',data.portal.usin],['Portal invoice date',data.portal.date],
+      ['Portal sale value','100'],['Portal tax charged','16'],['Portal total amount',total],['Portal total quantity','2'],
+      ['Evidence note (report date and how you checked)','Synthetic FBR portal fixture; all invoice fields independently checked.']])
+      await page.getByLabel(label,{exact:true}).fill(value);
+    await page.getByLabel('Portal environment',{exact:true}).selectOption('sandbox');
+    await page.getByLabel('Portal invoice type',{exact:true}).selectOption('1');
+    await page.locator('[name="confirm_portal"]').check();
+  };
+  await fillPortal('999');
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save verified portal evidence — do not resend',exact:true}).click()]);
+  if(!(await page.locator('body').innerText()).includes('Portal identity and amounts must match'))throw Error('Mismatched portal total was accepted');
+  await fillPortal('116');
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save verified portal evidence — do not resend',exact:true}).click()]);
+  const reconciled=await page.locator('body').innerText();
+  if(!reconciled.includes('FBR portal evidence recorded. No invoice was sent.')||!reconciled.includes(data.portal.reference))throw Error('Portal reference not recovered');
+  if(await page.locator('[name="confirm_portal"]').count())throw Error('Recovered invoice still offers reconciliation');
+  await saveEvidenceScreenshot(page,'ims-portal-recovery-'+v.width);
+  await page.getByRole('link',{name:'80mm receipt preview',exact:true}).click();
+  await page.getByAltText('FBR IMS acknowledgement QR',{exact:true}).waitFor();
+  if(!(await page.locator('body').innerText()).includes(data.portal.reference))throw Error('Recovered receipt lacks FBR reference');
+  await saveEvidenceScreenshot(page,'ims-portal-recovered-receipt-'+v.width);
   await page.goto(baseUrl+'/pos/transaction/'+data.dualBill+'/receipt',{waitUntil:'domcontentloaded'});
   await page.locator('.dual-fiscal').waitFor();
   for(const [kind,reference] of [['PRA','SYN-PRA-'+v.width],['FBR','SYN-FBR-'+v.width]]){
@@ -95,5 +120,5 @@ export async function taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperation
   const cells=await page.locator('.dual-fiscal td').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right};}));
   if(cells.length!==2||Math.abs(cells[0].y-cells[1].y)>1||cells[0].right>cells[1].x+1)throw Error('Fiscal QR cells are not side by side');
   await saveEvidenceScreenshot(page,'original-dual-fiscal-receipt-'+v.width);
-  pass(t.name+'/'+v.width+': Customize → three integration cards → save independent DI URLs/tokens → select IMS without resetting DI → review original bill → 58/80mm combined previews; receipt settings has no connection setup. No fiscal dispatch.');
+  pass(t.name+'/'+v.width+': Customize → three integration cards → save independent DI URLs/tokens → select IMS without resetting DI → review original bill → 58/80mm combined previews; receipt settings has no connection setup. Portal recovery rejects mismatched amounts and restores the synthetic receipt acknowledgement. No fiscal dispatch.');
 }

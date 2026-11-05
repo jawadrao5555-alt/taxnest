@@ -1,9 +1,8 @@
-title: "PRA aur FBR POS: asal bill ki reporting aur alag POS fee"
+title: "FBR par report huay bill ka number aur receipt recovery"
 audience: pos
 type: improvement
 points:
-  - "PRA ke sath FBR POS ki automatic reporting setup mein catalogue ka PCT code optional hai. Maujood code diya ho to wohi istemal hota hai."
-  - "IMS mein reporting percentage khaali chhorne par original bill ka pehle se laga tax report hota hai. Is se customer par dobara tax nahi lagta; yeh 0% ya exemption ka faisla nahi hai. Digital Invoice ki zaroori mapping alag hai."
-  - "Mukammal Production IMS setup ke naye final bills par Rs 1 FBR POS fee alag line mein aik martaba shamil hoti hai. Receipt aur Day Close par fee tax se alag nazar aati hai."
-  - "Restaurant se final bill banne par reporting ke zaroori amounts save hote hain. Complete stored facts walay PRA-accepted bills ko original sale badlay baghair review ke liye recover kiya ja sakta hai."
-  - "Automatic reporting aap ke save kiye hue faislay ke mutabiq hi chalay gi. Is update se reporting khud ON nahi hoti."
+  - "Agar bill FBR portal par aa gaya ho lekin TaxNest mein number na aya ho, company admin usi bill ki portal details mila kar number save kar sakta hai. Is se invoice dobara nahi bheji jati."
+  - "Recovery ke liye FBR number, POS ID, bill number, date, quantity aur amounts match karna zaroori hai. Save ke baad receipt dobara khol kar PRA aur FBR dono references dekhein."
+  - "Desktop Agent ke naye version mein IMS response ki mazeed compatible reading aur response na milne ki wajah record hoti hai. Agent update ke baad yeh tabdeeli lagu hogi."
+  - "Reporting khud ON nahi hoti. Purani sale, payment, stock, PRA settings aur Agent pairing apni jagah mehfooz rehte hain."

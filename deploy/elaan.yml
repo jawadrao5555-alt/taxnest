@@ -1,7 +1,9 @@
-title: "PRA ke sath FBR POS setup mein PCT code ki asani"
+title: "PRA aur FBR POS: asal bill ki reporting aur alag POS fee"
 audience: pos
 type: improvement
 points:
   - "PRA ke sath FBR POS ki automatic reporting setup mein catalogue ka PCT code optional hai. Maujood code diya ho to wohi istemal hota hai."
-  - "Digital Invoice ke liye HS code ab bhi zaroori hai. FBR POS ki reporting se pehle tax rate aur selected environment review karein."
+  - "IMS mein reporting percentage khaali chhorne par original bill ka pehle se laga tax report hota hai. Is se customer par dobara tax nahi lagta; yeh 0% ya exemption ka faisla nahi hai. Digital Invoice ki zaroori mapping alag hai."
+  - "Mukammal Production IMS setup ke naye final bills par Rs 1 FBR POS fee alag line mein aik martaba shamil hoti hai. Receipt aur Day Close par fee tax se alag nazar aati hai."
+  - "Restaurant se final bill banne par reporting ke zaroori amounts save hote hain. Complete stored facts walay PRA-accepted bills ko original sale badlay baghair review ke liye recover kiya ja sakta hai."
   - "Automatic reporting aap ke save kiye hue faislay ke mutabiq hi chalay gi. Is update se reporting khud ON nahi hoti."

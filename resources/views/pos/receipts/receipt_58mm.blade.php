@@ -679,6 +679,9 @@
     </table>
     <div class="double-separator"></div>
     <table class="totals-table">
+        @if((float)($transaction->fbr_service_charge ?? 0)>0)
+        <tr><td class="tot-label">FBR POS Fee:</td><td class="tot-value">{{ number_format($transaction->fbr_service_charge,2) }}</td></tr>
+        @endif
         <tr class="grand-total">
             <td class="tot-label">{{ $hotelCreditSummary ? __('hotel_credit.credit_amount', [], 'en') : __('pos.receipt_total_caps') }}:</td>
             <td class="tot-value">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</td>

@@ -106,6 +106,7 @@
         @endif
         @endif
         <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">{{ number_format($report->total_tax, 2) }}</td></tr>
+        @if((float)($report->total_fbr_fee ?? 0)!=0)<tr><td>FBR POS Fee</td><td class="r">{{ number_format($report->total_fbr_fee,2) }}</td></tr>@endif
         <tr><td class="b lg">{{ __('pos.dc_total_revenue') }}</td><td class="r b lg">{{ number_format($report->total_amount, 2) }}</td></tr>
     </table>
     <div class="hr"></div>

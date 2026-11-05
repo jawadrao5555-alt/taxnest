@@ -60,6 +60,7 @@
         <tr><td>{{ __('pos.dc_discount') }}</td><td class="amount negative">PKR {{ number_format($summary['discount'], 2) }}</td></tr>
         <tr><td>{{ __('pos.dc_net_sales') }}</td><td class="amount">PKR {{ number_format($summary['net_sales'], 2) }}</td></tr>
         <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="amount">PKR {{ number_format($summary['tax'], 2) }}</td></tr>
+        @if((float)($summary['fbr_pos_fee'] ?? 0)!=0)<tr><td>FBR POS Fee</td><td class="amount">PKR {{ number_format($summary['fbr_pos_fee'],2) }}</td></tr>@endif
         <tr><td><strong>{{ __('pos.dc_total_revenue') }}</strong></td><td class="amount"><strong>PKR {{ number_format($summary['total'], 2) }}</strong></td></tr>
     </table>
 

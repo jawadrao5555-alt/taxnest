@@ -2,7 +2,7 @@
 namespace App\Services;
 use App\Models\{PosFederalOutbox, PosImsSubmission, PosDiSandboxSubmission};
 
-/** Explicitly reviewed flat-rate mapping; never infers federal tax from PRA tax. */
+/** Reviewed mapping or explicit original-bill disclosure; never infers an exemption. */
 class PosFederalPayload
 {
     public function build(PosFederalOutbox $row, $record, $service): array
@@ -18,18 +18,29 @@ class PosFederalPayload
         }
         if ($row->channel==='ims') {
             $p['RefUSIN']=$parent?->fiscal_number;
-            foreach ($p['Items'] as &$line) {
+            foreach ($p['Items'] as $i=>&$line) {
                 // Match standalone FBR POS's existing no-catalogue-code transport
                 // default. This is not an exemption or a tax classification.
                 $line['PCTCode']=empty($m['hs_code']) ? '00000000' : str_replace('.','',$m['hs_code']);
-                $line['TaxRate']=(float)$m['tax_rate'];
-                $line['TaxCharged']=round($line['SaleValue']*$line['TaxRate']/100,2);
+                if (($m['tax_source'] ?? null)==='original_bill') {
+                    $original=$record->snapshot['lines'][$i];
+                    abort_unless(isset($original['tax_rate']) && is_numeric($original['tax_rate']),422,'Original bill tax rate snapshot is missing; review the bill in the IMS workbench.');
+                    $line['TaxRate']=(float)$original['tax_rate'];
+                    $line['TaxCharged']=(float)$original['pra_tax'];
+                } else {
+                    $line['TaxRate']=(float)$m['tax_rate'];
+                    $line['TaxCharged']=round($line['SaleValue']*$line['TaxRate']/100,2);
+                }
                 $line['TotalAmount']=round($line['SaleValue']+$line['TaxCharged'],2);
                 $line['RefUSIN']=$p['RefUSIN'];
             }
             unset($line);
             $p['TotalTaxCharged']=round(array_sum(array_column($p['Items'],'TaxCharged')),2);
             $p['TotalBillAmount']=round($p['TotalSaleValue']+$p['TotalTaxCharged'],2);
+            if (($m['tax_source'] ?? null)==='original_bill') {
+                abort_unless(abs($p['TotalBillAmount']-((float)$record->snapshot['total']-(float)($record->snapshot['fbr_service_charge'] ?? 0)))<0.01,
+                    422,'Original bill totals require review; automatic reporting will not change customer money.');
+            }
         } else {
             $name=strtolower(trim((string)($record->snapshot['customer_name'] ?? '')));
             abort_unless(empty($record->snapshot['customer_id']) && in_array($name,['','walk-in customer','walk-in','cash customer'],true),422,'Review the actual buyer identity in the federal workbench.');

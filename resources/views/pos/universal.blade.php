@@ -1834,6 +1834,7 @@ window.addEventListener('popstate', function() {
                             </div>
                             <div x-show="exemptAmount > 0" class="flex gap-2 text-green-300"><span>{{ __('pos.tax_exempt') }}</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
                             <div class="flex gap-2"><span x-text="taxInclusive ? (window.TXT.tax_paren + taxRate + window.TXT.pct_incl) : (window.TXT.tax_paren + taxRate + '%)')"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
+                            <div x-show="imsFee > 0" class="flex gap-2"><span>FBR POS Fee</span><span x-text="'Rs. ' + imsFee.toFixed(2)"></span></div>
                             <div x-show="Math.abs(roundOff) > 0.001" class="flex gap-2 text-white/60">
                                 <span>{{ __('pos.round_off') }}</span>
                                 <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
@@ -1854,8 +1855,8 @@ window.addEventListener('popstate', function() {
                     <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-white/50 pt-1">
                         <span>{{ __('pos.est_cost') }}</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
                     </div>
-                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - taxAmount - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
-                        <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - taxAmount - getCartCost()).toLocaleString()"></span>
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - taxAmount - imsFee - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
+                        <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - taxAmount - imsFee - getCartCost()).toLocaleString()"></span>
                     </div>
                 </div>
                 <div class="tn-payment-actions px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
@@ -4968,6 +4969,9 @@ function restaurantPos() {
         // Total for a given rate under card-save: base derived at the MENU (cash)
         // rate, chosen method's rate applied on top. Exempt items pass through.
         cardSaveTotalForRate(rate) {
+            return this.cardSaveBeforeImsFee(rate) + this.imsFee;
+        },
+        cardSaveBeforeImsFee(rate) {
             const allocated = this.allocatedDealBill(rate);
             if (allocated) return allocated.total_amount;
             const after = Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
@@ -5660,7 +5664,15 @@ function restaurantPos() {
             }
             return this.r2(this.taxableSubtotal * this.taxRate / 100);
         },
+        imsFeeConfigured: {{ \App\Services\PosImsFee::quote((int)$company->id) }},
+        get imsFee() {
+            if (this.editingBillId) return Number(this.editingBillData?.fbr_service_charge || 0);
+            return this.praEnabled && !this.saveAsProvisional && (this.cart.length || this.payingHeldOrderId) ? this.imsFeeConfigured : 0;
+        },
         get totalAmount() {
+            return this.totalBeforeImsFee + this.imsFee;
+        },
+        get totalBeforeImsFee() {
             const allocated = this.allocatedDealBill();
             if (allocated) return allocated.total_amount;
             // Inclusive mode: menu prices already contain tax — never add it on top.
@@ -5683,13 +5695,16 @@ function restaurantPos() {
         // Mirrors heldOrderEstimate()/payModalTotal math for the LIVE cart.
         get cartQtyCount() { return this.cart.reduce((s, i) => s + this._safeQty(i.quantity), 0); },
         cartTotalForMethod(method) {
+            return this.cartTotalBeforeImsFee(method) + this.imsFee;
+        },
+        cartTotalBeforeImsFee(method) {
             const rate = method === 'card'
                 ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
                 : (this.taxRules['cash'] ?? this.taxRate);
             const allocated = this.allocatedDealBill(rate);
             if (allocated) return allocated.total_amount;
             if (this.taxInclusive) {
-                if (this.cardSaveMode() && Math.abs(this.taxMenuRate - rate) >= 0.005) return this.cardSaveTotalForRate(rate);
+                if (this.cardSaveMode() && Math.abs(this.taxMenuRate - rate) >= 0.005) return this.cardSaveBeforeImsFee(rate);
                 // Plain inclusive: menu total is method-independent.
                 return Math.round(Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount)));
             }
@@ -6553,7 +6568,7 @@ function restaurantPos() {
             if (!bridge || typeof bridge.acceptImmediateSale !== 'function') return false;
             // Deliberately narrow: immediate final universal sale only. Every
             // unsupported shape returns to the established IndexedDB path.
-            if (!['cash', 'card'].includes(method) || !this.praEnabled || payload.save_as_provisional ||
+            if (this.imsFee > 0 || !['cash', 'card'].includes(method) || !this.praEnabled || payload.save_as_provisional ||
                 this._localCoreInventoryEnabled || payload.incoming_order_id ||
                 payload.recalled_order_id || payload.table_id ||
                 payload.online_payment_confirmed || this.orderType === 'delivery' ||
@@ -11575,6 +11590,7 @@ function restaurantPos() {
                             : null,
                     })),
                     payment_method: method,
+                    fbr_service_charge: this.imsFee,
                     // Cash Received / Wapsi — server stores cash_received + change_due
                     // so the printed receipt (agent silent print incl.) carries them.
                     cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null,
@@ -11849,12 +11865,12 @@ function restaurantPos() {
                     const after = Math.max(0, sub - disc);
                     const taxableAfter = taxable * ratio;
                     const exemptShare = Math.max(0, after - taxableAfter);
-                    return Math.round(exemptShare + taxableAfter * (100 + rate) / (100 + this.taxMenuRate));
+                    return Math.round(exemptShare + taxableAfter * (100 + rate) / (100 + this.taxMenuRate)) + Number(this.imsFee || 0);
                 }
-                return Math.round(sub - disc);
+                return Math.round(sub - disc) + Number(this.imsFee || 0);
             }
             const tax = Math.round(taxable * ratio * rate / 100);
-            return Math.round(sub - disc + tax);
+            return Math.round(sub - disc + tax) + Number(this.imsFee || 0);
         },
         payingOrderAwaitingOnline() {
             if (this.boardConfirm?.table?.order?.online_payment_awaited_at) return true;

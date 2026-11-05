@@ -6,7 +6,7 @@
     <p>Finalize one bill as usual. Its original sale, stock and payment stay single; PRA and the selected federal channel retain their own acknowledgement.</p>
     @if($selected)
         <p><strong>{{ $selected[0]==='ims' ? 'FBR POS IMS' : 'FBR Digital Invoice' }} · {{ strtoupper($selected[1]->environment) }}</strong></p>
-        <p>Review this mapping once for future finalized bills. It applies one flat federal rate/classification to every sold item. Use the manual review workbench for mixed classifications or unsupported statutory calculations.</p>
+        <p>@if($selected[0]==='ims')Review the reporting policy once. A blank percentage reports the original bill's stored tax amounts, including its original rounding. This does not add customer tax or declare the sale zero-rated/exempt.@else Review this mapping once for future finalized bills. It applies one flat federal rate/classification to every sold item. Use the manual review workbench for mixed classifications or unsupported statutory calculations.@endif</p>
         <form method="post" action="{{ route('pos.federal-auto.save') }}">@csrf
             <input type="hidden" name="channel" value="{{ $selected[0] }}">
             <input type="hidden" name="environment" value="{{ $selected[1]->environment }}">
@@ -17,6 +17,7 @@
                 <p>A blank PCT uses the existing FBR POS compatibility value 00000000. This does not select a tax exemption or prove acceptance by your installed IMS. Review the applicable rate separately.</p>
             @endif
             <label for="auto-rate">Reviewed federal percentage (separate from PRA)</label><input id="auto-rate" type="number" min="0" max="100" step="0.01" name="tax_rate" value="{{ old('tax_rate',$rule?->mapping['tax_rate'] ?? '') }}">
+            @if($selected[0]==='ims')<p>Leave the percentage blank to report the tax amounts already stored on the original bill. No additional tax is added to the customer bill. Blank does not mean a 0% rate or an exemption, and does not omit the IMS tax fields. A completed Production IMS setup collects a separate Rs 1 FBR POS fee once.</p>@endif
             @if($selected[0]==='di')
                 <label for="auto-uom">FBR unit of measure</label><input id="auto-uom" name="uom" value="{{ old('uom',$rule?->mapping['uom'] ?? '') }}">
                 <label for="auto-sale-type">FBR sale type</label><input id="auto-sale-type" name="sale_type" value="{{ old('sale_type',$rule?->mapping['sale_type'] ?? '') }}">
@@ -29,7 +30,7 @@
                 <label for="auto-sro">SRO schedule (if applicable)</label><input id="auto-sro" name="sro_schedule" value="{{ old('sro_schedule',$rule?->mapping['sro_schedule'] ?? '') }}">
                 <label for="auto-sro-item">SRO item (if applicable)</label><input id="auto-sro-item" name="sro_item" value="{{ old('sro_item',$rule?->mapping['sro_item'] ?? '') }}">
             @endif
-            <label><input type="checkbox" name="all_items_confirmed" value="1">This flat mapping applies to all items and these sales qualify for the buyer treatment shown above.</label>
+            <label><input type="checkbox" name="all_items_confirmed" value="1">@if($selected[0]==='ims')I reviewed this reporting policy for all items on these bills.@else This flat mapping applies to all items and these sales qualify for the buyer treatment shown above.@endif</label>
             <label><input type="checkbox" name="mapping_reviewed" value="1">I reviewed the tax classification, rate and selected environment. Enable future automatic submissions using this mapping.</label>
             <button>Save automatic reporting</button>
         </form>

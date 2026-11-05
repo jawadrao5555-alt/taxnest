@@ -17,7 +17,7 @@ class PosDayCloseReport extends Model
     protected $fillable = [
         'company_id', 'branch_id', 'report_date', 'report_number',
         'total_invoices', 'pra_invoices', 'local_invoices', 'offline_invoices',
-        'gross_sales', 'total_discount', 'net_sales', 'total_tax', 'total_amount',
+        'gross_sales', 'total_discount', 'net_sales', 'total_tax', 'total_amount', 'total_fbr_fee',
         'cash_amount', 'card_amount', 'other_amount',
         'first_invoice_number', 'last_invoice_number',
         'first_invoice_time', 'last_invoice_time',

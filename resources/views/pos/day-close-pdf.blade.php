@@ -162,6 +162,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                 <td>{{ __('pos.dcp_sales_tax_collected') }}</td>
                 <td class="r">{{ number_format($report->total_tax, 2) }}</td>
             </tr>
+            @if((float)($report->total_fbr_fee ?? 0)!=0)<tr><td>FBR POS Fee</td><td class="r">{{ number_format($report->total_fbr_fee,2) }}</td></tr>@endif
         </tbody>
     </table>
 

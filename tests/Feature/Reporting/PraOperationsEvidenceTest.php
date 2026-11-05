@@ -177,6 +177,13 @@ class PraOperationsEvidenceTest extends TestCase
         $this->assertSame(2,$this->read('agent_collection')['observed']['matching_samples']);
     }
 
+    public function test_diagnostic_upload_accepts_rfc3339_microseconds_and_normalizes_to_milliseconds(): void
+    {
+        $sample=$this->sample(4); $sample['at']='2026-11-01T10:00:00.123456Z';
+        $this->assertSame([4],$this->upload([$sample])['accepted']);
+        $this->assertSame('2026-11-01 15:00:00.123',DB::table('pra_diagnostic_samples')->value('source_event_at'));
+    }
+
     public function test_retention_migration_retry_limits_and_unavailable_storage_never_acknowledge_lost_samples(): void
     {
         $this->assertNull($this->upload(array_fill(0,51,$this->sample(1))));

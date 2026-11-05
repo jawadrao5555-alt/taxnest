@@ -56,7 +56,7 @@ final class PraAgentDiagnosticEvidence
     private function clean(mixed $event): ?array
     {
         if (!is_array($event) || !is_int($event['sequence'] ?? null) || $event['sequence'] < 1 || $event['sequence'] > 9007199254740991
-            || !is_string($event['at'] ?? null) || !preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/D', $event['at'])) return null;
+            || !is_string($event['at'] ?? null) || !preg_match('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?Z$/D', $event['at'])) return null;
         try { $at = Carbon::parse($event['at'])->setTimezone(config('app.timezone')); } catch (\Throwable $e) { return null; }
         if ($at->year < 2000 || $at->year > 2100) return null;
         return ['sequence' => $event['sequence'], 'at' => $at->format('Y-m-d H:i:s.v'), 'facts' => self::facts($event)];

@@ -4586,7 +4586,7 @@ window.addEventListener('popstate', function() {
          Wajah ka text server ke `reason` se banta hai, is liye teenon keys
          zabardasti bake karwani hain: --}}
     {{-- @posI18nExtra: caller_dial_no_device caller_dial_old_app caller_dial_notif_off --}}
-    <div data-tn-caller-dial-fallback x-show="callerDialFallback && callerNumberOf(callerDialFallback)" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
+    <div data-tn-caller-dial-fallback x-show="!!(callerDialFallback && callerNumberOf(callerDialFallback))" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_dial_title') }}</span>

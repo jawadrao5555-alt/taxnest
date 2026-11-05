@@ -85,3 +85,18 @@ FBR evidence separately. If still unknown, the retained code/reference/field
 shape identifies the precise unsupported reply without resending any bill.
 The historical customer root cause remains unconfirmed until that evidence is
 observed. Do not label manual portal recovery as automatic network success.
+
+## Hosted browser regression follow-up
+The initial exact-HEAD hosted run passed PHP, Node, MariaDB, Windows and release
+safety, but browser acceptance reported an unhandled Alpine transition cancellation.
+A local Chromium component reproduction using the actual fallback predicate and
+Alpine `x-transition.opacity` reproduced this at 1280px and 390px: blank phone ->
+null -> valid phone within a frame creates multiple hide transitions for distinct
+falsy values. The overwritten hide promise can reject before its handler attaches.
+Boolean-coercing the predicate keeps all empty states false and avoids duplicate
+hides. The same reproduction passes after correction, valid number opens and closes,
+and the existing empty-popup/style/resize reproduction still passes at both widths.
+Run `CHROMIUM_BIN=<cached binary> node scripts/qa/caller-transition-repro.mjs cac227f1`
+to compare the pre-correction tree with working source. The actual hosted sale-screen
+journey now includes this sequence and retains strict page-error checking. Hosted
+acceptance of the new exact HEAD remains required; no production acceptance inferred.

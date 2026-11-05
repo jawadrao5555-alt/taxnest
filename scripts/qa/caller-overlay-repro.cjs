@@ -3,7 +3,7 @@ const root=require('path').resolve(__dirname,'../..');
 const baseline=execFileSync('git',['show',(process.argv[2]||'HEAD^')+':resources/views/pos/universal.blade.php'],{cwd:root,encoding:'utf8',maxBuffer:4*1024*1024});
 async function check(source){
  const a=source.indexOf('        callerOverlayStyle('),method=source.slice(a,source.indexOf('\n        },',a)+11);
- const condition=source.match(/<div[^>]*x-show="(callerDialFallback[^"]*)"[^>]*:style="callerOverlayStyle\(330\)"/)[1];
+ const condition=source.match(/<div[^>]*x-show="([^"]*callerDialFallback[^"]*)"[^>]*:style="callerOverlayStyle\(330\)"/)[1];
  const n=source.indexOf('        callerNumberOf(ev) {'),numberMethod=source.slice(n,source.indexOf('\n        },',n)+11);
  const dom=new JSDOM('<div x-data="fixture" @resize.window="callerOverlayEpoch++"><div id="dial" x-show="'+condition+'" :style="callerOverlayStyle(330)">Number</div></div>',{runScripts:'outside-only',pretendToBeVisual:true});
  dom.window.eval(fs.readFileSync(require.resolve('alpinejs/dist/cdn.js'),'utf8'));

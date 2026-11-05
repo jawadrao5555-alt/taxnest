@@ -12,7 +12,7 @@ const original=execFileSync('git',['show',(process.argv[2]||'HEAD^')+':resources
 const updated=fs.readFileSync(path.join(root,'resources/views/pos/universal.blade.php'),'utf8');
 function fixture(source){
  const method=name=>{const start=source.indexOf('        '+name);return source.slice(start,source.indexOf('\n        },',start)+11);};
- const condition=source.match(/<div[^>]*x-show="(callerDialFallback[^"]*)"[^>]*:style="callerOverlayStyle\(330\)"/)[1];
+ const condition=source.match(/<div[^>]*x-show="([^"]*callerDialFallback[^"]*)"[^>]*:style="callerOverlayStyle\(330\)"/)[1];
  return `<!doctype html><style>[x-cloak]{display:none!important}body{font:16px Arial;background:#f5f7f8;margin:0}header{height:64px;background:#073c45;color:white}button{margin:8px;padding:12px}#dial{position:fixed;right:16px;border:1px solid #aaa;background:white}#dial h2{background:#f5a400;color:white;padding:12px;margin:0}</style>
  <header data-tn-topnav="pra">Synthetic POS header — component QA only</header>
  <script>window.fixture=()=>({callerDialFallback:null,callerOverlayEpoch:0,${method('callerOverlayStyle(')}${method('callerNumberOf(ev) {')}});</script>

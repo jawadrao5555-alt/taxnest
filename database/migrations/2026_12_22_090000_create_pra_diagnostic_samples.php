@@ -18,8 +18,11 @@ return new class extends Migration
                 $t->unsignedBigInteger('dropped')->default(0);
                 $t->unsignedInteger('resets')->default(0);
                 $t->string('storage_status', 32);
-                $t->timestamp('first_received_at');
-                $t->timestamp('last_received_at')->index();
+                // Use DATETIME rather than TIMESTAMP so MariaDB installations
+                // with explicit_defaults_for_timestamp disabled do not invent a
+                // zero default for the second required timestamp column.
+                $t->dateTime('first_received_at');
+                $t->dateTime('last_received_at')->index();
                 $t->unique(['company_id', 'device_hash', 'stream_id'], 'pra_diag_stream_identity');
             });
         }
@@ -30,7 +33,7 @@ return new class extends Migration
                 $t->unsignedBigInteger('diagnostic_stream_id');
                 $t->unsignedBigInteger('sequence');
                 $t->dateTime('source_event_at', 3);
-                $t->timestamp('received_at');
+                $t->dateTime('received_at');
                 $t->char('content_hash', 64);
                 $t->text('facts');
                 $t->unique(['diagnostic_stream_id', 'sequence'], 'pra_diag_sample_sequence');

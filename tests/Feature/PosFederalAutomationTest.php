@@ -226,6 +226,9 @@ class PosFederalAutomationTest extends TestCase
         $record=\App\Models\PosImsSubmission::firstOrFail();
         $this->assertSame('queued_agent',$record->state);
         $this->assertSame('00000000',$record->payload['Items'][0]['PCTCode']);
+        $this->assertSame(0,(int)$record->payload['Items'][0]['TaxRate']);
+        $this->assertSame(0,(int)$record->payload['TotalTaxCharged']);
+        $this->assertSame('0',PosFederalRule::first()->mapping['tax_rate']);
         $this->assertSame($before,(array)DB::table('pos_transactions')->find($id));
         $this->assertSame(1,\App\Models\PosImsSubmission::count());
         $this->get('/pos/tax-integrations/automatic')->assertOk()
@@ -234,6 +237,105 @@ class PosFederalAutomationTest extends TestCase
         $this->postJson('/pos/tax-integrations/automatic',array_replace($data,['hs_code'=>'not-a-code']))
             ->assertUnprocessable()->assertJsonValidationErrors('hs_code');
         $this->assertSame($version,PosFederalRule::first()->version);
+        Http::assertNothingSent();
+    }
+
+    private function storedOriginalBill(): int
+    {
+        Schema::table('pos_transactions',function(Blueprint $t){
+            $t->boolean('tax_inclusive')->default(false);$t->decimal('tax_rate',8,2)->default(16);
+        });
+        Schema::table('pos_transaction_items',function(Blueprint $t){
+            $t->string('item_type')->default('product');$t->unsignedBigInteger('item_id')->nullable();
+            $t->text('deal_snapshot')->nullable();$t->decimal('unit_price',12,2)->default(460);
+            $t->decimal('subtotal',12,2)->default(460);$t->decimal('tax_rate',8,2)->nullable()->default(16);
+            $t->boolean('is_tax_exempt')->default(false);
+        });
+        $id=$this->bill(override:['subtotal'=>460,'tax_amount'=>74,'total_amount'=>534]);
+        DB::table('pos_transaction_items')->where('transaction_id',$id)->update([
+            'quantity'=>1,'tax_amount'=>73.6,'taxable_base'=>null,'exempt_base'=>null]);
+        return $id;
+    }
+
+    public function test_blank_ims_rate_reports_original_stored_tax_and_recovery_never_rewrites_sale(): void
+    {
+        $rule=$this->enable();PosDiSandboxProfile::query()->update(['enabled'=>false]);$rule->delete();
+        PosImsProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'environment'=>'sandbox','connection_mode'=>'fiscal_device',
+            'sandbox_pos_id'=>'12345','device_uid'=>'synthetic-device','local_ims_url'=>'http://127.0.0.1:8524/TcpService/IMSHttp']);
+        $data=['_token'=>'original-tax-test','channel'=>'ims','environment'=>'sandbox','enabled'=>1,
+            'hs_code'=>'','tax_rate'=>'','all_items_confirmed'=>1,'mapping_reviewed'=>1];
+        $this->withSession(['_token'=>'original-tax-test'])->post('/pos/tax-integrations/automatic',$data)
+            ->assertRedirect(route('pos.federal-auto'));
+        $this->assertSame('original_bill',PosFederalRule::first()->mapping['tax_source']);
+        $this->assertArrayNotHasKey('tax_rate',PosFederalRule::first()->mapping);
+        $id=$this->storedOriginalBill();
+        $before=(array)DB::table('pos_transactions')->find($id);$lineBefore=(array)DB::table('pos_transaction_items')->where('transaction_id',$id)->first();
+        $service=app(PosFederalAutomation::class);$service->enqueue(PosTransaction::findOrFail($id));
+        $row=PosFederalOutbox::sole();$service->process($row->id);$service->process($row->id);
+        $record=\App\Models\PosImsSubmission::sole();
+        $this->assertSame('dispatched',$row->fresh()->state);$this->assertSame('queued_agent',$record->state);
+        $this->assertSame('stored_original_bill',$record->snapshot['recovery']['source']);
+        $this->assertSame('original_pra_bill_projection',$record->snapshot['rounding_source']);
+        $this->assertSame(16.0,(float)$record->payload['Items'][0]['TaxRate']);
+        $this->assertSame(74.0,(float)$record->payload['TotalTaxCharged']);
+        $this->assertSame(534.0,(float)$record->payload['TotalBillAmount']);
+        $this->assertSame($before,(array)DB::table('pos_transactions')->find($id));
+        $this->assertSame($lineBefore,(array)DB::table('pos_transaction_items')->where('transaction_id',$id)->first());
+        $this->assertSame(1,\App\Models\PosImsSubmission::count());Http::assertNothingSent();
+    }
+
+    public function test_legacy_recovery_refuses_unknown_or_inconsistent_money_and_cross_tenants(): void
+    {
+        $id=$this->storedOriginalBill();$sale=PosTransaction::findOrFail($id);
+        $this->assertNotNull(\App\Services\PosStoredFiscalRecovery::recover($sale));
+        foreach (['discount_amount'=>1,'total_amount'=>600,'pra_status'=>'pending'] as $key=>$bad) {
+            $copy=clone $sale;$copy->$key=$bad;
+            $this->assertNull(\App\Services\PosStoredFiscalRecovery::recover($copy));
+        }
+        $other=new Company(['id'=>$this->company->id+1]);
+        try {\App\Services\PosFiscalSnapshot::capture($other,$sale,true);$this->fail('Cross tenant recovery accepted');}
+        catch(HttpException $e){$this->assertSame(422,$e->getStatusCode());}
+        DB::table('pos_transaction_items')->where('transaction_id',$id)->update(['tax_rate'=>null]);
+        $this->assertNull(\App\Services\PosStoredFiscalRecovery::recover($sale));
+        $this->assertSame(0,\App\Models\PosImsSubmission::count());Http::assertNothingSent();
+    }
+
+    public function test_fee_migration_preserves_old_money_and_old_offline_packets(): void
+    {
+        $id=$this->bill();$before=(array)DB::table('pos_transactions')->find($id);
+        Schema::create('pos_day_close_reports',function(Blueprint $t){$t->id();$t->decimal('total_amount',12,2);});
+        DB::table('pos_day_close_reports')->insert(['total_amount'=>116]);
+        $migration=require database_path('migrations/2026_11_05_080000_add_pra_ims_service_fee.php');
+        $migration->up();$migration->up();
+        $after=(array)DB::table('pos_transactions')->find($id);unset($after['fbr_service_charge']);
+        $this->assertSame($before,$after);$this->assertEquals(0,DB::table('pos_transactions')->value('fbr_service_charge'));
+        $this->assertEquals(116,DB::table('pos_day_close_reports')->value('total_amount'));
+        $legacy=\Illuminate\Http\Request::create('/local-test','POST',['offline_queued_at'=>now()->toIso8601String()]);
+        $this->assertSame(0.0,\App\Services\PosImsFee::forCheckout($legacy,$this->company->id,true));
+        $legacy->merge(['fbr_service_charge'=>1]);
+        $this->assertSame(1.0,\App\Services\PosImsFee::forCheckout($legacy,$this->company->id,false));
+        $this->assertSame(0.0,\App\Services\PosImsFee::forCheckout($legacy,$this->company->id,true,[]));
+        $this->assertSame(1.0,\App\Services\PosImsFee::forCheckout($legacy,$this->company->id,true,['fbr_service_charge'=>1]));
+        try {\App\Services\PosImsFee::forCheckout($legacy,$this->company->id,true,['fbr_service_charge'=>2]);$this->fail('Invalid signed fee was silently changed');}
+        catch(HttpException $e){$this->assertSame(422,$e->getStatusCode());}
+        $migration->down();$this->assertTrue(Schema::hasColumn('pos_transactions','fbr_service_charge'));
+        Http::assertNothingSent();
+    }
+
+    public function test_original_ims_snapshot_retains_mixed_deal_component_tax_facts(): void
+    {
+        $id=$this->storedOriginalBill();
+        $components=[];
+        foreach([false,true] as $i=>$exempt) $components[]=['product_id'=>$i+1,'name'=>'Synthetic component '.$i,
+            'qty'=>1,'allocation_version'=>1,'allocation_weight'=>1,'tax_facts'=>['is_tax_exempt'=>$exempt]];
+        $components=\App\Services\PosDealAllocation::capture($components,100,0,16,false);
+        DB::table('pos_transactions')->where('id',$id)->update(['subtotal'=>100,'tax_amount'=>8,'total_amount'=>108]);
+        DB::table('pos_transaction_items')->where('transaction_id',$id)->update(['item_type'=>'deal','quantity'=>1,
+            'subtotal'=>100,'unit_price'=>100,'tax_amount'=>8,'taxable_base'=>50,'exempt_base'=>50,'deal_snapshot'=>json_encode($components)]);
+        $snapshot=\App\Services\PosFiscalSnapshot::capture($this->company,PosTransaction::findOrFail($id),true);
+        $this->assertCount(2,$snapshot['lines']);
+        $this->assertSame(8.0,$snapshot['lines'][0]['pra_tax']);$this->assertSame(0.0,$snapshot['lines'][1]['pra_tax']);
+        $this->assertSame(16.0,$snapshot['lines'][0]['tax_rate']);$this->assertSame(0.0,$snapshot['lines'][1]['tax_rate']);
         Http::assertNothingSent();
     }
 

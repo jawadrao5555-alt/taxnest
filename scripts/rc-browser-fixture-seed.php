@@ -827,7 +827,11 @@ foreach([1366,390] as $width){
     \App\Models\PosDiSandboxSubmission::create(['company_id'=>$taxCompany->id,'source_transaction_id'=>$dualBill->id,
         'created_by'=>$taxOwner->id,'environment'=>'sandbox','state'=>'accepted','snapshot'=>[],
         'sandbox_invoice_number'=>'SYN-FBR-'.$width,'attempts'=>[]]);
-    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id,'dualBill'=>$dualBill->id];
+    $legacyBill=$taxBill->replicate();$legacyBill->invoice_number='SYN-RECOVER-'.$width;
+    $legacyBill->tax_inclusive=false;$legacyBill->tax_rate=16;$legacyBill->save();
+    foreach($taxBill->items as $item){$copy=$item->replicate();$copy->transaction_id=$legacyBill->id;
+        $copy->taxable_base=null;$copy->exempt_base=null;$copy->save();}
+    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id,'dualBill'=>$dualBill->id,'legacyBill'=>$legacyBill->id];
 }
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,

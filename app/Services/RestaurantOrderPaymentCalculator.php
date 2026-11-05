@@ -75,6 +75,9 @@ class RestaurantOrderPaymentCalculator
             $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
         }
 
+        $fee = (auth('pos')->user()?->praReportingEnabled($company) ?? false)
+            ? PosImsFee::quote((int)$company->id) : 0;
+        $totalAmount = round($totalAmount + $fee, 2);
         return [
             'payment_method' => $paymentMethod,
             'tax_rate' => (float) $taxRate,
@@ -89,6 +92,7 @@ class RestaurantOrderPaymentCalculator
             'inclusive_header' => $inclusiveHeader,
             'tax_amount' => $taxAmount,
             'total_amount' => $totalAmount,
+            'fbr_service_charge' => $fee,
         ];
     }
 }

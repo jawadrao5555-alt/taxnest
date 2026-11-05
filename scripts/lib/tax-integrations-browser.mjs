@@ -65,14 +65,24 @@ export async function taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperation
   if(!(await page.locator('body').innerText()).includes('No automatic reports yet.'))throw Error('Enabling reporting backfilled historical bills');
   await saveEvidenceScreenshot(page,'automatic-federal-mapping-'+v.width);
   await page.getByLabel('Reviewed PCT code (optional)',{exact:true}).fill('');
+  await page.locator('#auto-rate').fill('');
   await page.locator('[name="all_items_confirmed"]').check();await page.locator('[name="mapping_reviewed"]').check();
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save automatic reporting',exact:true}).click()]);
   if(await page.locator('#auto-enabled').inputValue()!=='1'||await page.locator('#auto-hs').inputValue()!=='')throw Error('IMS blank catalogue PCT did not save');
+  if(await page.locator('#auto-rate').inputValue()!=='')throw Error('Blank IMS rate was silently changed to a numeric rate');
   if(!(await page.locator('body').innerText()).includes('No automatic reports yet.'))throw Error('Blank-code setup backfilled historical bills');
   await saveEvidenceScreenshot(page,'automatic-ims-without-catalogue-pct-'+v.width);
   await page.locator('#auto-enabled').selectOption('0');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save automatic reporting',exact:true}).click()]);
   if(await page.locator('#auto-enabled').inputValue()!=='0')throw Error('Automatic reporting pause failed');
+  await page.getByRole('link',{name:'Tax Integrations',exact:true}).click();
+  await page.getByRole('link',{name:'FBR POS configuration',exact:true}).click();
+  await page.getByLabel('Completed POS bill',{exact:true}).selectOption(String(data.legacyBill));
+  await page.locator('[name="confirm_copy"]').check();
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Prepare IMS record',exact:true}).click()]);
+  if(!(await page.locator('body').innerText()).includes('Original bill amounts were recovered'))throw Error('Complete stored original bill could not be recovered');
+  if(!(await page.locator('body').innerText()).includes('No submission.'))throw Error('Recovery unexpectedly dispatched a fiscal invoice');
+  await saveEvidenceScreenshot(page,'ims-stored-original-recovery-'+v.width);
   await page.goto(baseUrl+'/pos/transaction/'+data.dualBill+'/receipt',{waitUntil:'domcontentloaded'});
   await page.locator('.dual-fiscal').waitFor();
   for(const [kind,reference] of [['PRA','SYN-PRA-'+v.width],['FBR','SYN-FBR-'+v.width]]){

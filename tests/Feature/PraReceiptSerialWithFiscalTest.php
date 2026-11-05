@@ -439,7 +439,7 @@ class PraReceiptSerialWithFiscalTest extends TestCase
     {
         $this->app->instance(\App\Services\PosFiscalReceipt::class, new class extends \App\Services\PosFiscalReceipt {
             public function federal(PosTransaction $sale): ?array {
-                return ['label'=>'FBR DI','environment'=>'SANDBOX','state'=>'accepted','reference'=>'TEST-FBR-ACK'];
+                return ['label'=>'FBR POS','environment'=>'SANDBOX','state'=>'accepted','reference'=>'TEST-FBR-ACK'];
             }
         });
         foreach (array_keys(\App\Support\PosPrintDesigns::RECEIPTS) as $design) {
@@ -447,11 +447,15 @@ class PraReceiptSerialWithFiscalTest extends TestCase
             $company=$this->makeCompany();
             $company->invoice_display_prefs=array_replace_recursive($company->invoice_display_prefs,['receipt_options'=>['pra'=>['design'=>$design]]]);
             $txn=$this->makeTransaction($company,'submitted',self::FISCAL);
+            $txn->fbr_service_charge=1; $txn->total_amount=581;
             $body=$this->renderBody($template,$company,$txn);
             $this->assertStringContainsString('class="dual-fiscal"',$body);
             $this->assertStringContainsString(self::SERIAL,$body);
             $this->assertSame(1,substr_count($body,self::FISCAL));
             $this->assertStringContainsString('TEST-FBR-ACK',$body);
+            $this->assertSame(1,substr_count($body,'FBR POS Fee:'));
+            $this->assertStringContainsString('581.00',$body);
+            $this->assertStringContainsString('80.00',$body);
             $this->assertLessThan(strpos($body,'class="pra-fiscal-reference"'),strpos($body,'alt="PRA fiscal QR"'));
             $this->assertLessThan(strpos($body,'class="fbr-fiscal-reference"'),strpos($body,'alt="FBR fiscal QR"'));
         }

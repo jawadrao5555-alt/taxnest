@@ -33,6 +33,7 @@
         @endforeach
     </div>
 
+    @if((float)($summary['fbr_pos_fee'] ?? 0)!=0)<p class="text-sm mb-3">FBR POS Fee: PKR {{ $money($summary['fbr_pos_fee']) }}</p>@endif
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         @foreach([
             [__('pos.dc_cash'), $payments['cash'] ?? 0],

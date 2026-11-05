@@ -261,7 +261,9 @@ class PraIntegrationService
             // every reported bill covers the WHOLE receipt — always mirror the
             // stored whole-rupee total (memory rule pos-rounding-convention).
             $target = round($totalBillAmount);
-            $storedTotal = round((float) $transaction->total_amount);
+            // The separate FBR POS fee is collected once, outside PRA tax.
+            // Do not absorb it into the largest line's PRA tax as rounding.
+            $storedTotal = round((float) $transaction->total_amount - (float)($transaction->fbr_service_charge ?? 0));
             if (abs($storedTotal - $totalBillAmount) <= 1.00) {
                 $target = $storedTotal;
             }

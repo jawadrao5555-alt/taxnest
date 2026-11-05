@@ -2939,6 +2939,7 @@ class PosController extends Controller
                 $editBillForJs = [
                     'id' => (int) $editTxn->id,
                     'invoice_number' => (string) $editTxn->invoice_number,
+                    'fbr_service_charge' => (float)($editTxn->fbr_service_charge ?? 0),
                     'order_type' => $editTxn->order_type ?: 'takeaway',
                     'rider_collection_amount' => $editTxn->rider_collection_amount,
                     'customer_id' => $editCustomer ? (int) $editCustomer->id : null,
@@ -3830,6 +3831,11 @@ class PosController extends Controller
             $initialPraStatus = null;
         }
 
+        $fbrServiceCharge = \App\Services\PosImsFee::forCheckout($request, (int)$companyId, $praEnabled,
+            $agentCoreInventorySale ? (array)($agentCoreInventorySale['totals'] ?? []) : null);
+        if (!$agentCoreInventorySale) $totalAmount = round($totalAmount + $fbrServiceCharge, 2);
+        $taxInclusiveFields += \App\Services\PosImsFee::fields($fbrServiceCharge);
+
         // ── Billing Scope (owner request 07 Aug 2026) ─────────────────────────
         // Stream lock per staff account. Stream definition MIRRORS the report
         // tabs (applyReportFilters): PRA stream = bill enters the PRA pipeline
@@ -4620,6 +4626,10 @@ class PosController extends Controller
         }
 
         $goingToPra = $isPipelineEdit || $reportRequested;
+        // Existing charged fees are immutable snapshots even if setup changes.
+        $fbrServiceCharge = (float)($transaction->fbr_service_charge ?? 0);
+        if ($reportRequested && $fbrServiceCharge===0.0) $fbrServiceCharge = \App\Services\PosImsFee::quote((int)$companyId);
+        $totalAmount = round($totalAmount + $fbrServiceCharge, 2);
         // Serial split: a bill headed to PRA must carry a real fiscal serial
         // (PRA must never receive an L-NNN USIN). A local bill KEEPS its L number;
         // a bill that already holds a fiscal serial (short P-036 or legacy
@@ -4662,7 +4672,7 @@ class PosController extends Controller
                     ? 'local'
                     : ($goingToPra ? 'pending' : null),
                 'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
-            ]);
+            ] + \App\Services\PosImsFee::fields($fbrServiceCharge));
 
             $transaction->items()->delete();
 
@@ -6122,6 +6132,9 @@ class PosController extends Controller
                     $exemptAfterDiscount = $dealBill['exempt_amount']; $headerSubtotal = $dealBill['subtotal_col'];
                 }
 
+                $fbrServiceCharge = $reportingOn ? \App\Services\PosImsFee::quote((int)$companyId) : 0;
+                $totalAmount = round($totalAmount + $fbrServiceCharge, 2);
+
                 // Serial split (owner rule Jul 2026): a real POS fiscal serial replaces
                 // the provisional L-NNN ONLY when the bill actually goes to PRA
                 // (reporting ON). Reporting-OFF finalize keeps the L number — fiscal
@@ -6152,7 +6165,8 @@ class PosController extends Controller
                     // on the normal POS surfaces (archived local finals included).
                     'is_archived'       => false,
                     'archived_at'       => null,
-                ] + ($reportingOn ? $this->praStreamBillTokenFields($companyId) : []));
+                ] + \App\Services\PosImsFee::fields($fbrServiceCharge)
+                  + ($reportingOn ? $this->praStreamBillTokenFields($companyId) : []));
 
                 // Re-tax each line for the new rate — the PRA payload reads per-item tax_rate.
                 foreach ($items as $index => $it) {
@@ -13911,6 +13925,7 @@ class PosController extends Controller
             'taxable_value' => $streamTaxSplit['taxable'],
             'exempt_value' => $streamTaxSplit['exempt'],
             'total_tax' => $dcSaleRows->sum('tax_amount') - $dcReturnRows->sum('tax_amount'),
+            'total_fbr_fee' => $dcSaleRows->sum('fbr_service_charge') - $dcReturnRows->sum('fbr_service_charge'),
             'total_amount' => $dcSaleRows->sum('total_amount') - $dcReturnRows->sum('total_amount'),
             'cash_amount' => round($payBuckets['cash'] - $refundBuckets['cash'], 2),
             'card_amount' => round($payBuckets['card'] - $refundBuckets['card'], 2),
@@ -13941,6 +13956,7 @@ class PosController extends Controller
             $stats->total_discount = (float) $existingReport->total_discount;
             $stats->net_sales = (float) $existingReport->net_sales;
             $stats->total_tax = (float) $existingReport->total_tax;
+            $stats->total_fbr_fee = (float)($existingReport->total_fbr_fee ?? 0);
             $stats->total_amount = (float) $existingReport->total_amount;
             $stats->cash_amount = (float) $existingReport->cash_amount;
             $stats->card_amount = (float) $existingReport->card_amount;
@@ -14230,6 +14246,7 @@ class PosController extends Controller
              'discount' => (float) ($source->total_discount ?? 0),
              'net_sales' => (float) ($source->net_sales ?? 0),
              'tax' => (float) ($source->total_tax ?? 0),
+             'fbr_pos_fee' => (float) ($source->total_fbr_fee ?? 0),
              'total' => (float) ($source->total_amount ?? 0),
              'returns_count' => (int) ($source->returns_count ?? 0),
              'returns_amount' => (float) ($source->returns_amount ?? 0),
@@ -17062,6 +17079,10 @@ class PosController extends Controller
             'first_invoice_time' => $saleRows->first()->created_at ?? null,
             'last_invoice_time' => $saleRows->last()->created_at ?? null,
         ];
+
+        if (\Schema::hasColumn('pos_day_close_reports','total_fbr_fee')) {
+            $data['total_fbr_fee'] = $saleRows->sum('fbr_service_charge') - $returnRows->sum('fbr_service_charge');
+        }
 
         // Returns detail on the Z-report (schema-guarded, drift self-heal).
         if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'returns_count')) {

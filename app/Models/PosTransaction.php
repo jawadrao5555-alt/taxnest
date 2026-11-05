@@ -15,6 +15,7 @@ class PosTransaction extends Model
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
         'tax_rate', 'tax_amount', 'exempt_amount', 'total_amount', 'tax_inclusive', 'tax_menu_rate', 'payment_method',
         'cash_received', 'change_due',
+        'fbr_service_charge',
         'status', 'locked_by_terminal_id', 'lock_time',
         'pra_invoice_number', 'pra_response_code', 'pra_error_message', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
         'business_date',
@@ -141,6 +142,7 @@ class PosTransaction extends Model
     }
 
     protected $casts = [
+        'fbr_service_charge' => 'decimal:2',
         'has_delivery_items' => 'boolean', 'rider_collection_amount' => 'decimal:2',
         'hotel_money_from_folio' => 'boolean',
         'subtotal' => 'decimal:2',

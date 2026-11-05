@@ -36,7 +36,8 @@ class PosImsReportingService
             self::preventOtherFederalRecord($company->id,$sourceId,$environment,'ims');
             $sale=PosTransaction::where('company_id',$company->id)->lockForUpdate()->findOrFail($sourceId);
             if ($old=PosImsSubmission::where('company_id',$company->id)->where('source_transaction_id',$sourceId)->where('environment',$environment)->first()) return $old;
-            $s=PosFiscalSnapshot::capture($company,$sale);
+            $s=PosFiscalSnapshot::capture($company,$sale,true);
+            $s=PosImsOriginalAmounts::snapshot($company,$sale,$s);
             $s['pos_id']=(int)$p->{$environment.'_pos_id'};
             $s['device_uid']=$p->device_uid;
             $s['local_ims_url']=$p->local_ims_url;
@@ -90,7 +91,11 @@ class PosImsReportingService
             foreach (['ItemCode','ItemName','Quantity','SaleValue','InvoiceType'] as $key) {
                 if ((string)$line[$key] !== (string)$t['Items'][$i][$key]) $errors[]='Keep original IMS line values.';
             }
-            if (abs((float)$line['TaxCharged']-round((float)$line['SaleValue']*(float)$line['TaxRate']/100,2))>0.01
+            $original=$r->snapshot['lines'][$i];
+            $originalTax=isset($original['tax_rate'])
+                && abs((float)$line['TaxRate']-(float)$original['tax_rate'])<0.00001
+                && abs((float)$line['TaxCharged']-(float)$original['pra_tax'])<0.00001;
+            if ((!$originalTax && abs((float)$line['TaxCharged']-round((float)$line['SaleValue']*(float)$line['TaxRate']/100,2))>0.01)
                 || abs((float)$line['TotalAmount']-(float)$line['SaleValue']-(float)$line['TaxCharged'])>0.01) $errors[]='IMS line totals/rates do not balance.';
             if (($line['RefUSIN'] ?? '') !== ($p['RefUSIN'] ?? '')) $errors[]='Item RefUSIN must match the header.';
         }

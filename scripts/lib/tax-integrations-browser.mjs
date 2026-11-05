@@ -32,6 +32,7 @@ export async function taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperation
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Prepare IMS record',exact:true}).click()]);
   const payload=JSON.parse(await page.getByLabel('Exact IMS JSON payload',{exact:true}).inputValue());
   if(payload.TotalTaxCharged!==null)throw Error('PRA tax copied into federal tax');
+  if(payload.Items.some(line=>line.PCTCode!=='00000000'))throw Error('Manual IMS no-catalogue PCT default missing');
   for(const line of payload.Items){line.PCTCode='12345678';line.TaxRate=18;line.TaxCharged=Math.round(line.SaleValue*18)/100;line.TotalAmount=line.SaleValue+line.TaxCharged;}
   payload.TotalTaxCharged=payload.Items.reduce((sum,l)=>sum+l.TaxCharged,0);payload.TotalBillAmount=payload.TotalSaleValue+payload.TotalTaxCharged;
   await page.getByLabel('Exact IMS JSON payload',{exact:true}).fill(JSON.stringify(payload,null,2));
@@ -63,6 +64,12 @@ export async function taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperation
   if(await page.locator('#auto-enabled').inputValue()!=='1')throw Error('Reviewed mapping did not save');
   if(!(await page.locator('body').innerText()).includes('No automatic reports yet.'))throw Error('Enabling reporting backfilled historical bills');
   await saveEvidenceScreenshot(page,'automatic-federal-mapping-'+v.width);
+  await page.getByLabel('Reviewed PCT code (optional)',{exact:true}).fill('');
+  await page.locator('[name="all_items_confirmed"]').check();await page.locator('[name="mapping_reviewed"]').check();
+  await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save automatic reporting',exact:true}).click()]);
+  if(await page.locator('#auto-enabled').inputValue()!=='1'||await page.locator('#auto-hs').inputValue()!=='')throw Error('IMS blank catalogue PCT did not save');
+  if(!(await page.locator('body').innerText()).includes('No automatic reports yet.'))throw Error('Blank-code setup backfilled historical bills');
+  await saveEvidenceScreenshot(page,'automatic-ims-without-catalogue-pct-'+v.width);
   await page.locator('#auto-enabled').selectOption('0');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Save automatic reporting',exact:true}).click()]);
   if(await page.locator('#auto-enabled').inputValue()!=='0')throw Error('Automatic reporting pause failed');

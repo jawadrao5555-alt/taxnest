@@ -41,6 +41,9 @@ tax rate remains mandatory. Existing catalogue codes are not replaced.
   IMS blank-code form interaction and DI-specific fields checked; no pageerrors.
   This is rendered-form browser coverage, NOT a complete browser save journey;
   actual HTTP save and service dispatch are covered by the feature tests.
+  The hosted browser workflow is also extended to save a valid PCT mapping,
+  clear it and save again through the actual form at both widths, checking
+  that no historical bill is backfilled. Exact-head hosted results are required.
   Screenshots: .local/browser-evidence/ims-pct-optional-{1280,390}.png and
   di-hs-required-{1280,390}.png (untracked).
 - Full PHPUnit attempted locally. ComposerPlatformContractTest rejects local

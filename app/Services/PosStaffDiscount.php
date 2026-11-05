@@ -65,12 +65,19 @@ final class PosStaffDiscount
             if (DB::transactionLevel()>0) $orderQuery->lockForUpdate();
             $order=$orderQuery->first();
             abort_unless($order,404);
-            $orderState=[$order->updated_at, $order->status,
-                DB::table('restaurant_order_items')->where('order_id',$orderId)->orderBy('id')->get()->toArray()];
+            $orderFacts=array_intersect_key((array)$order,array_flip(['source','assigned_cashier_id','edit_revision','order_type','table_id',
+                'customer_id','customer_name','customer_phone','delivery_address','delivery_collection_mode','kitchen_notes',
+                'subtotal','discount_type','discount_value','discount_amount','online_payment_awaited_at','pos_transaction_id']));
+            $orderFacts['open']=in_array($order->status,['held','preparing','ready'],true);
+            $orderLines=DB::table('restaurant_order_items')->where('order_id',$orderId)->orderBy('id')->get()->map(function($line){
+                return array_diff_key((array)$line,array_flip(['kot_printed_at','kot_batch_no','prepared_quantity','was_made','created_at','updated_at']));
+            })->all();
+            $orderState=[$orderFacts,$orderLines];
         }
+        $actor=auth('pos')->user()?->fresh();
         return hash('sha256', json_encode([$input, $items, $company->posTaxPricingMode(),
             PosTaxRule::getRateForMethod($request->payment_method, $company),
-            (bool) auth('pos')->user()?->praReportingEnabled($company),
+            (bool) $actor?->praReportingEnabled($company),
             app(BranchContextService::class)->stampBranchId(), $orderState], JSON_THROW_ON_ERROR));
     }
 
@@ -78,6 +85,7 @@ final class PosStaffDiscount
     {
         if (!self::requested($request)) return null;
         if (!$company->pos_staff_discount_enabled) self::fail('Staff/family discount is not enabled by the owner.');
+        if ($request->integer('incoming_order_id') && $request->integer('recalled_order_id')) self::fail('Select one held order for this request.');
         if ($request->boolean('save_as_provisional') || $request->filled('draft_id') || $request->filled('offline_queued_at') || $request->attributes->get('agent_core_inventory_sale')) self::fail('Staff bills need online approval before final payment.');
         $hash = self::fingerprint($request, $company, $items);
         $user = auth('pos')->user();
@@ -116,6 +124,9 @@ final class PosStaffDiscount
             if ($orderId) {
                 $order = DB::table('restaurant_orders')->where('company_id', $company->id)->where('id', $orderId)->lockForUpdate()->first();
                 abort_unless($order && in_array($order->status, ['held', 'preparing', 'ready'], true), 409, 'Order is no longer available.');
+                if ($request->integer('incoming_order_id')) {
+                    abort_unless(($order->source ?? null)==='waiter' && ($user->isPosAdmin() || empty($order->assigned_cashier_id) || (int)$order->assigned_cashier_id===(int)$user->id),403);
+                } else abort_if(($order->source ?? null)==='waiter',403,'Load waiter orders through their assigned cashier.');
                 self::assertOrderAvailable((int) $company->id, $orderId);
             }
             $id = DB::table('pos_staff_discount_requests')->insertGetId([
@@ -148,7 +159,8 @@ final class PosStaffDiscount
         if (!$approval) return;
         if (!Company::whereKey($companyId)->value('pos_staff_discount_enabled')) self::fail('The owner disabled staff discount approval.');
         if (!User::where('company_id',$companyId)->whereKey($approval['row']->employee_id)->where('is_active',true)->lockForUpdate()->first()) self::fail('The selected employee is no longer active.');
-        if (!hash_equals($approval['hash'],self::fingerprint($approval['request'],$approval['company'],$approval['items']))) self::fail('The cart or held order changed during payment. Request approval again.');
+        $currentCompany=Company::findOrFail($companyId);
+        if (!hash_equals($approval['hash'],self::fingerprint($approval['request'],$currentCompany,$approval['items']))) self::fail('The cart or held order changed during payment. Request approval again.');
         $row = DB::table('pos_staff_discount_requests')->where('company_id', $companyId)->where('id', $approval['row']->id)->lockForUpdate()->first();
         if (!$row || $row->status !== 'approved' || $row->revision !== $approval['row']->revision || !hash_equals($row->cart_hash, $approval['hash'])) self::fail('This approval was already used or changed. Refresh the request.');
     }
@@ -158,7 +170,7 @@ final class PosStaffDiscount
         if (!$approval) return;
         $row = $approval['row'];
         DB::table('pos_staff_discount_requests')->where('id', $row->id)->where('company_id', $row->company_id)->update(['status' => 'finalized', 'transaction_id' => $transactionId, 'updated_at' => now()]);
-        $row->transaction_id = $transactionId; self::event($row, 'finalized', (int) auth('pos')->id());
+        self::event(DB::table('pos_staff_discount_requests')->where('id',$row->id)->where('company_id',$row->company_id)->first(), 'finalized', (int) auth('pos')->id());
     }
 
     public static function event(object $row, string $action, int $actor): void

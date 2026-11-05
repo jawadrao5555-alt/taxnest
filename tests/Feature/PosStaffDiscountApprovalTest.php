@@ -65,6 +65,7 @@ class PosStaffDiscountApprovalTest extends TestCase
         $this->postJson('/pos/invoice/store',$payload)->assertOk()->assertJsonPath('transaction_id',$first->json('transaction_id'));
         $this->assertSame(1,PosTransaction::count()); $this->assertSame('finalized',DB::table('pos_staff_discount_requests')->value('status'));
         $this->assertSame(3,DB::table('pos_staff_discount_events')->count());
+        $this->assertSame('finalized',json_decode(DB::table('pos_staff_discount_events')->where('action','finalized')->value('snapshot'),true)['status']);
         Http::assertNothingSent();
     }
 
@@ -212,5 +213,45 @@ class PosStaffDiscountApprovalTest extends TestCase
         $this->assertSame('held',$order->fresh()->status); $this->assertSame(0,PosTransaction::count());
         $this->postJson('/pos/staff-discounts/'.$id.'/review',['action'=>'cancel','revision'=>2])->assertOk();
         $this->assertSame('cancelled',DB::table('pos_staff_discount_requests')->value('status'));
+    }
+
+    public function test_claim_rechecks_current_company_policy_after_preparation(): void
+    {
+        [$company,$owner,$cashier]=$this->shop(); $p=$this->payload($cashier); $id=$this->propose($cashier,$p); $this->approve($owner,$id);
+        $items=json_decode(DB::table('pos_staff_discount_requests')->where('id',$id)->value('order_snapshot'),true)['items'];
+        unset($p['staff_discount']); $p+=['staff_discount_request_id'=>$id,'staff_discount_revision'=>2];
+        $this->actingAs($cashier,'pos');
+        $request=\Illuminate\Http\Request::create('/pos/invoice/store','POST',$p);
+        $request->setLaravelSession(app('session')->driver());
+        $approval=app(PosStaffDiscount::class)->prepare($request,$company,$items,1000);
+        $company->forceFill(['pos_tax_pricing_mode'=>'inclusive'])->save();
+        try {PosStaffDiscount::claim($approval,$company->id); $this->fail('Changed policy must invalidate the approval');}
+        catch(\Illuminate\Validation\ValidationException $e) {$this->assertArrayHasKey('staff_discount',$e->errors());}
+        $this->assertSame('approved',DB::table('pos_staff_discount_requests')->where('id',$id)->value('status'));
+        $this->assertSame(0,PosTransaction::count());
+    }
+
+    public function test_kitchen_progress_does_not_invalidate_unchanged_approved_order(): void
+    {
+        [$company,$owner,$cashier]=$this->shop();
+        $order=\App\Models\RestaurantOrder::create(['company_id'=>$company->id,'created_by'=>$cashier->id,'order_number'=>'SYN-STAFF-READY',
+            'status'=>'held','order_type'=>'takeaway','subtotal'=>1000,'total_amount'=>1160,'source'=>'cashier']);
+        $item=\App\Models\RestaurantOrderItem::create(['order_id'=>$order->id,'item_type'=>'product','item_name'=>'Fictional meal',
+            'quantity'=>1,'unit_price'=>1000,'subtotal'=>1000,'is_tax_exempt'=>false]);
+        $p=$this->payload($cashier); $p['recalled_order_id']=$order->id; $id=$this->propose($cashier,$p); $this->approve($owner,$id);
+        $order->update(['status'=>'ready','kitchen_ready_at'=>now()]); $item->update(['kot_printed_at'=>now()]);
+        unset($p['staff_discount']); $p+=['staff_discount_request_id'=>$id,'staff_discount_revision'=>2];
+        $this->actingAs($cashier,'pos')->postJson('/pos/invoice/store',$p)->assertOk();
+        $this->assertSame('completed',$order->fresh()->status); $this->assertSame(1,PosTransaction::count());
+    }
+
+    public function test_cashier_cannot_reserve_another_cashiers_assigned_waiter_order(): void
+    {
+        [$company,$owner,$cashier]=$this->shop();
+        $order=\App\Models\RestaurantOrder::create(['company_id'=>$company->id,'created_by'=>$owner->id,'assigned_cashier_id'=>$owner->id,
+            'order_number'=>'SYN-STAFF-ASSIGNEE','status'=>'held','order_type'=>'takeaway','subtotal'=>1000,'total_amount'=>1160,'source'=>'waiter']);
+        $p=$this->payload($cashier); $p['incoming_order_id']=$order->id;
+        $this->actingAs($cashier,'pos')->postJson('/pos/invoice/store',$p)->assertForbidden();
+        $this->assertSame(0,DB::table('pos_staff_discount_requests')->count());
     }
 }

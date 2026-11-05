@@ -279,6 +279,12 @@ jobs:
         run: |
           bash scripts/rc-browser-fixture.sh setup
           RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
+      - name: Verify staff discount owner approval at desktop and 390px
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: RC_BROWSER_ONLY=staff-discount-approval bash scripts/rc-browser-fixture.sh run
       - name: Seed and verify authenticated Smart DI source import
         id: browser-preflight
         env:

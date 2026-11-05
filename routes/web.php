@@ -1003,6 +1003,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'download'])->whereNumber('id')->middleware('throttle:20,1')->name('pos.local-support-copies.download');
 
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store')->middleware('plan.limit:invoices');
+    Route::get('/staff-discounts', [\App\Http\Controllers\PosStaffDiscountController::class, 'index'])->name('pos.staff-discounts');
+    Route::post('/staff-discounts/settings', [\App\Http\Controllers\PosStaffDiscountController::class, 'toggle'])->name('pos.staff-discounts.settings');
+    Route::get('/staff-discounts/{id}', [\App\Http\Controllers\PosStaffDiscountController::class, 'show'])->whereNumber('id')->name('pos.staff-discounts.show');
+    Route::post('/staff-discounts/{id}/review', [\App\Http\Controllers\PosStaffDiscountController::class, 'review'])->whereNumber('id')->name('pos.staff-discounts.review');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
     Route::get('/transaction/{id}/edit', [PosController::class, 'editTransaction'])->name('pos.transaction.edit');

@@ -111,6 +111,8 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Check PRA DI sandbox and production environment isolation
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PraDiSandboxTest.php tests/Feature/PosFederalAutomationTest.php tests/Feature/PraReceiptSerialWithFiscalTest.php --testdox
+      - name: Check PRA staff approval and unchanged operations
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosStaffDiscountApprovalTest.php tests/Feature/PosPhoneSearchContinuityTest.php tests/Feature/PosSaleCustomerNameEditTest.php tests/Feature/PosReceiptOptionalControlsTest.php tests/Feature/PosKotDeviceRoutingTest.php --testdox
       - name: Check complete restaurant top-selling list and business dates
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosRestaurantDashboardCountsTest.php
       - name: Check notification read state and product targeting

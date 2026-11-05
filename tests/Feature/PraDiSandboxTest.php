@@ -768,6 +768,26 @@ class PraDiSandboxTest extends TestCase
         $this->assertSame($token,$profile->fresh()->sandbox_token);
         $this->assertSame('7654321',$this->company->fresh()->fbr_registration_no);
     }
+    public function test_ims_manual_preparation_keeps_no_catalogue_code_compatibility_and_rejects_invalid_pct(): void
+    {
+        $this->imsProfile();
+        $ims=app(\App\Services\PosImsReportingService::class);
+        $record=$ims->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $p=$this->imsPayload($record);
+        $this->assertSame('00000000',$ims->template($record)['Items'][0]['PCTCode']);
+        foreach ($p['Items'] as &$line) $line['PCTCode']='00000000'; unset($line);
+        $ims->prepare($this->company->id,$record->id,$p);
+        $this->assertSame('00000000',$record->fresh()->payload['Items'][0]['PCTCode']);
+        $p['Items'][0]['PCTCode']='invalid';
+        try {
+            $ims->prepare($this->company->id,$record->id,$p);
+            $this->fail('Malformed PCT accepted');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('Items.0.PCTCode',$e->errors());
+        }
+        Http::assertNothingSent();
+    }
+
     public function test_ims_evidence_preserves_source_and_uses_only_ims_environment_credentials(): void
     {
         $this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);$bill=$this->bill('credit');

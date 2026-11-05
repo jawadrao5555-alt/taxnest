@@ -22,6 +22,11 @@ test('faults, missing/duplicate results, DTDs and non JSON results stay unconfir
   assert.equal(soap.endpoint('http://127.0.0.1:8524/TcpService/IMSHttp'),true);
   for(const url of ['http://evil.example:8524/TcpService/IMSHttp','http://localhost:8524/TcpService/IMSHttp?x=1','http://u:p@localhost:8524/TcpService/IMSHttp']) assert.equal(soap.endpoint(url),false);
 });
+test('no-catalogue-code compatibility value remains an eight-digit string in SOAP',()=>{
+  const xml=soap.envelope({Items:[{ItemCode:'synthetic',ItemName:'Synthetic meal',PCTCode:'00000000',Quantity:1,TaxRate:0,SaleValue:1,TaxCharged:0,TotalAmount:1}]});
+  assert.match(xml,/<a:PCTCode>00000000<\/a:PCTCode>/);
+  assert.ok(xml.indexOf('<a:PCTCode>')<xml.indexOf('<a:Quantity>'));
+});
 test('discovery reads WSDL only, finds nonstandard Windows listener, ignores generic HTTP',async()=>{
   const calls=[];
   const axios={get:async(url,options)=>{calls.push([url,options]);return {data:url.includes(':9001/')?'<wsdl ITcpService="x">GetFBRInvoiceNumberByModel soap/http</wsdl>':'<html>running</html>'};}};

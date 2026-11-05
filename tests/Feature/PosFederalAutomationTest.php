@@ -208,6 +208,51 @@ class PosFederalAutomationTest extends TestCase
         $this->assertSame('queued_agent',\App\Models\PosImsSubmission::first()->state); Http::assertNothingSent();
     }
 
+    public function test_ims_without_catalogue_pct_uses_existing_pos_compatibility_default_once(): void
+    {
+        $rule=$this->enable(); PosDiSandboxProfile::query()->update(['enabled'=>false]);
+        PosImsProfile::create(['company_id'=>$this->company->id,'enabled'=>true,'environment'=>'sandbox','connection_mode'=>'fiscal_device',
+            'sandbox_pos_id'=>'12345','device_uid'=>'synthetic-device','local_ims_url'=>'http://127.0.0.1:8525/api/IMSFiscal/GetInvoiceNumberByModel']);
+        $rule->delete();
+        $data=['_token'=>'ims-code-test','channel'=>'ims','environment'=>'sandbox','enabled'=>1,
+            'hs_code'=>'','tax_rate'=>'0','all_items_confirmed'=>1,'mapping_reviewed'=>1];
+        $this->withSession(['_token'=>'ims-code-test'])->post('/pos/tax-integrations/automatic',$data)
+            ->assertRedirect(route('pos.federal-auto'));
+        $id=$this->bill(); $before=(array)DB::table('pos_transactions')->find($id);
+        $service=app(PosFederalAutomation::class); $sale=PosTransaction::findOrFail($id);
+        $service->enqueue($sale); $service->enqueue($sale);
+        $row=PosFederalOutbox::firstOrFail(); $service->process($row->id); $service->process($row->id);
+        $this->assertSame(1,PosFederalOutbox::count());
+        $record=\App\Models\PosImsSubmission::firstOrFail();
+        $this->assertSame('queued_agent',$record->state);
+        $this->assertSame('00000000',$record->payload['Items'][0]['PCTCode']);
+        $this->assertSame($before,(array)DB::table('pos_transactions')->find($id));
+        $this->assertSame(1,\App\Models\PosImsSubmission::count());
+        $this->get('/pos/tax-integrations/automatic')->assertOk()
+            ->assertSee('Reviewed PCT code (optional)')->assertSee('00000000');
+        $version=PosFederalRule::first()->version;
+        $this->postJson('/pos/tax-integrations/automatic',array_replace($data,['hs_code'=>'not-a-code']))
+            ->assertUnprocessable()->assertJsonValidationErrors('hs_code');
+        $this->assertSame($version,PosFederalRule::first()->version);
+        Http::assertNothingSent();
+    }
+
+    public function test_di_still_rejects_missing_or_invalid_hs_code(): void
+    {
+        $this->enable();
+        $this->get('/pos/tax-integrations/automatic')->assertOk()->assertSee('Reviewed HS code (required)')
+            ->assertDontSee('existing FBR POS compatibility value');
+        $data=['_token'=>'di-code-test','channel'=>'di','environment'=>'sandbox','enabled'=>1,'tax_rate'=>'0',
+            'uom'=>'Numbers, pieces, units','sale_type'=>'Services','buyer_province'=>'Punjab',
+            'buyer_address'=>'Synthetic locality','scenario_id'=>'SN019','all_items_confirmed'=>1,'mapping_reviewed'=>1];
+        foreach (['','bad','00000000'] as $code) {
+            $this->withSession(['_token'=>'di-code-test'])->postJson('/pos/tax-integrations/automatic',$data+['hs_code'=>$code])
+                ->assertUnprocessable()->assertJsonValidationErrors('hs_code');
+        }
+        $this->assertSame('9801.2000',PosFederalRule::first()->mapping['hs_code']);
+        Http::assertNothingSent();
+    }
+
     public function test_finalization_event_enqueues_once_and_rollback_retains_no_intent(): void
     {
         $this->enable(); $sale=PosTransaction::findOrFail($this->bill(override:['status'=>'hold','pra_status'=>'local']));

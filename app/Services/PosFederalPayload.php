@@ -19,7 +19,9 @@ class PosFederalPayload
         if ($row->channel==='ims') {
             $p['RefUSIN']=$parent?->fiscal_number;
             foreach ($p['Items'] as &$line) {
-                $line['PCTCode']=str_replace('.','',$m['hs_code']);
+                // Match standalone FBR POS's existing no-catalogue-code transport
+                // default. This is not an exemption or a tax classification.
+                $line['PCTCode']=empty($m['hs_code']) ? '00000000' : str_replace('.','',$m['hs_code']);
                 $line['TaxRate']=(float)$m['tax_rate'];
                 $line['TaxCharged']=round($line['SaleValue']*$line['TaxRate']/100,2);
                 $line['TotalAmount']=round($line['SaleValue']+$line['TaxCharged'],2);

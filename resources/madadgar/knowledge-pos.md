@@ -501,3 +501,7 @@ Stock health counts each product/branch row once: empty/negative, low positive, 
 - WCF SOAP IMS aur pehle se saved JSON connection supported hain. Discovery sirf local availability hai; company POS registration aur Sandbox/Production ko alag verify karein.
 - Agent ki installation per-user AppData mein ho sakti hai. Agent mein installation folder aur Windows installed apps/uninstall ke buttons hain; Program Files mein hona zaroori nahi.
 - Failed start ke baad Open POS dabane se offline window dobara connect karti hai; minimized window restore hoti hai.
+## Day Close aur print ki jaanch ke records
+- Owner ke ijazat diye huay reporting connection se Day Close ke saved totals ko mojood bills, returns, opening cash aur dated rider receipts se compare kiya ja sakta hai. Farq aaye to pehle wajah dekhein; yeh cash chori ya asal drawer ki tasdeeq nahi.
+- Print ki har koshish ka mojood record alag dekha ja sakta hai. PC ne print accept ki ho to bhi kagaz nikalne ki tasdeeq zaroori hai. Result na mile to baghair dekhe dobara print na karein.
+- Supported server se connect hone ke baad naya Agent chaltay waqt har paanch minute mein chand operational counts save karta hai. Internet wapas aaye to bachi hui samples bhejta hai. PC band, puranay Agent, storage maslay ya puranay delete huay records ko mukammal history na samjhein.

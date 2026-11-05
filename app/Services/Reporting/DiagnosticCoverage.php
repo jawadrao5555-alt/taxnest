@@ -11,8 +11,8 @@ final class DiagnosticCoverage
     private const FEATURES = [
         'pos.sales' => ['pos', 'Sales, returns, split payments and discounts', 'get_company_billing_summary'],
         'pos.day_close' => ['pos', 'Day Close, opening and counter cash snapshots', 'get_pra_day_close_evidence'],
-        'pos.restaurant' => ['pos', 'Orders, tables, KOT, riders and settlements', null],
-        'pos.printing' => ['pos', 'Printing, desktop agent and offline synchronization', 'get_company_operational_summary'],
+        'pos.restaurant' => ['pos', 'Orders, tables, KOT, riders and settlements', 'get_pra_operations_evidence'],
+        'pos.printing' => ['pos', 'Printing, desktop agent and offline synchronization', 'get_pra_operations_evidence'],
         'pos.stock_accounts' => ['pos', 'Inventory, purchases, expenses and accounts', 'get_company_operational_summary'],
         'pos.fiscal' => ['pos', 'PRA submission and stored fiscal evidence', 'get_company_billing_summary'],
         'di.billing' => ['di', 'Digital invoices, credit notes and tax items', 'get_company_billing_summary'],
@@ -86,7 +86,7 @@ final class DiagnosticCoverage
 
         return ['status' => 'PARTIAL', 'complete' => false, 'registered_feature_families' => count($features),
             'fully_checked_features' => 0, 'retention_verified' => false, 'features' => $features,
-            'reason' => 'Partial operational signals and saved snapshots only. Cash movements, deleted evidence, all features and seven-day retention are not fully checked.'];
+            'reason' => 'Partial operational samples, retained print attempts and independently compared cash sources are available through scoped reports. Deleted evidence, all features, installed rollout and seven-day completeness are not fully checked.'];
     }
 
     private function features(?string $product): array

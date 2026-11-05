@@ -27,6 +27,9 @@ Schedule::call(function () {
     }
 })->everyFiveMinutes()->name('print-evidence-retention')->withoutOverlapping();
 
+Schedule::call(fn () => \App\Services\PraAgentDiagnosticEvidence::prune())
+    ->everyFiveMinutes()->name('pra-diagnostic-sample-retention')->withoutOverlapping();
+
 // Scheduler heartbeat: records the last time the cron actually fired so the
 // admin System Control page can show whether background jobs run on prod.
 Schedule::call(function () {

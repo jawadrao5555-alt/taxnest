@@ -1,8 +1,7 @@
-title: "PRA POS: khali call popup aur FBR response compatibility"
+title: "Day Close aur print ke maslay ki jaanch mein mazeed madad"
 audience: pos
 type: improvement
 points:
-  - "Khali 'Yeh number milayein' popup screen par khud nahi khulega. Resize ya fullscreen ke baad band popup band rahega; asal number wala call-back popup kaam karega."
-  - "Desktop Agent ke naye version mein mukhtalif supported IMS reply formats se fiscal number parhne ki compatibility behtar ki gayi hai. Conflicting ya adhura jawab dobara invoice bhejne ki wajah nahi banega."
-  - "IMS history mein safe response code aur fiscal reference ka record rahega taake number na milne ki wajah check ki ja sake. Purane reported bills dobara nahi bheje jatay."
-  - "Reporting settings, printers, pairing, purani sales aur payments apni jagah rehte hain. Agent wali tabdeeli naye Agent update ke baad lagu hogi."
+  - "Day Close ke saved hisaab ko mojood bills aur rider receipts se mila kar farq dekha ja sakta hai."
+  - "Print ki alag alag koshishon aur naye Agent ke mojood records se masla samajhne mein madad milti hai."
+  - "Jahan record poora na ho wahan kami wazeh rehti hai; print aur cash ki asal tasdeeq alag zaroori hai."

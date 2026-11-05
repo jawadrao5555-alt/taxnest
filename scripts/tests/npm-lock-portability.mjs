@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Reviewed 5 November: only Agent root release versions advance 1.13.34 -> 1.13.35; dependency graph unchanged.
 /**
  * Offline guard for the five committed npm lockfiles.
  *
@@ -83,7 +84,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: '0e900a68bea9bbdd36d324c0134d75fd19c1c97828cbeac8c5915c0b077e7d7e',
+    graph: 'd3dff61b60427d18adc75b09fefb4595ca82940e4b503908b919acba101eb2c6',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

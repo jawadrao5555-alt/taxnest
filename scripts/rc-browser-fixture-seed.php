@@ -555,10 +555,31 @@ $amountOwner = $user($amountCompany, 'Synthetic Amount Owner', 'amount-owner@rc-
 $diagnosticDate = $now->copy()->subDays(7)->toDateString();
 \App\Models\PosDayCloseReport::forceCreate([
     'company_id' => $amountCompany->id, 'branch_id' => 0, 'report_date' => $diagnosticDate, 'report_number' => 'RC-DIAGNOSTIC-CASH',
+    'total_invoices'=>3, 'returns_count'=>1, 'other_amount'=>0,
     'opening_float' => 0, 'cash_amount' => 800, 'card_amount' => 200, 'expected_cash' => 750, 'counted_cash' => 760, 'cash_variance' => 10,
     'rider_summary' => ['cash_out' => 100, 'cash_in' => 50, 'notes' => 'SYNTHETIC-PRIVATE-RIDER'],
     'counter_summary' => [['terminal_id' => 0, 'opening' => 0, 'cash_sales' => 800, 'rider_out' => 100, 'rider_in' => 50, 'expected' => 750, 'counted' => 760, 'variance' => 10]],
 ]);
+// Independent source evidence: the frozen arithmetic passes, but cash is Rs100 low.
+DB::table('pos_day_openings')->insert(['company_id'=>$amountCompany->id,'branch_id'=>0,'business_date'=>$diagnosticDate,'opening_cash'=>0]);
+foreach ([[900,'cash','sale',false],[100,'cash','sale',true],[100,'cash','return',false],[200,'debit_card','sale',false],[50,'cash','sale',false]] as $n => [$amount,$method,$kind,$delivery]) {
+    $sourceDate = $n === 4 ? $now->copy()->subDays(8)->toDateString() : $diagnosticDate;
+    $sourceBill = \App\Models\PosTransaction::forceCreate(['company_id'=>$amountCompany->id,'created_by'=>$amountOwner->id,
+        'invoice_number'=>'RC-DIAG-SOURCE-'.$n,'invoice_mode'=>'pra','status'=>'completed','transaction_type'=>$kind,
+        'subtotal'=>$amount,'total_amount'=>$amount,'payment_method'=>$method,'business_date'=>$sourceDate,
+        'order_type'=>$delivery?'delivery':'takeaway','rider_partial_paid'=>0,
+        'created_at'=>$sourceDate.' 22:00:00','updated_at'=>$sourceDate.' 22:00:00']);
+}
+DB::table('pos_rider_settlements')->insert(['company_id'=>$amountCompany->id,'rider_id'=>0,'panel'=>'pra',
+    'business_date'=>$diagnosticDate,'total_amount'=>50,'bill_count'=>1,'created_at'=>$diagnosticDate.' 23:00:00',
+    'allocation'=>json_encode([['bill_id'=>$sourceBill->id,'amount'=>50,'business_date'=>$sourceBill->business_date]])]);
+$sampleUpload = ['version'=>1,'stream_id'=>'22222222-2222-4222-8222-222222222222','pending'=>2,'dropped'=>0,'resets'=>0,'storage_status'=>'available',
+    'events'=>[['sequence'=>1,'at'=>$now->copy()->subDays(2)->toISOString(),'pending_callbacks'=>2,'raw_error'=>'FICTIONAL_DIAGNOSTIC_SECRET'],
+        ['sequence'=>3,'at'=>$now->toISOString(),'pending_callbacks'=>0]]];
+foreach ([1,2] as $retry) {
+    $ack = app(\App\Services\PraAgentDiagnosticEvidence::class)->ingest($amountCompany, 'FICTIONAL_DIAGNOSTIC_SECRET', $sampleUpload);
+    if (($ack['accepted'] ?? []) !== [1,3]) throw new RuntimeException('Native diagnostic upload/deduplication failed');
+}
 $amountCustomer = \App\Models\PosCustomer::create([
     'company_id' => $amountCompany->id, 'name' => 'Synthetic Amount Customer', 'phone' => '00000000111',
 ]);

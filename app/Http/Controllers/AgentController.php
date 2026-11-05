@@ -428,6 +428,8 @@ class AgentController extends Controller
         }
 
         $this->syncHeartbeatDiagnostics($company, $request);
+        $diagnosticAck = app(\App\Services\PraAgentDiagnosticEvidence::class)->ingest(
+            $company, $request->input('device_uid'), $request->input('diagnostic_evidence'));
 
         $this->telemetryUpdate($company, $update);
 
@@ -519,6 +521,7 @@ class AgentController extends Controller
             'repromoted' => $repromoted,
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
+            'diagnostic_evidence_ack' => $diagnosticAck,
             'agent_update' => $this->agentUpdateInfo($request->input('version')),
             // Additive discovery for Local TaxNest Core-aware agents. Legacy
             // agents ignore unknown response keys; the database flag defaults off.

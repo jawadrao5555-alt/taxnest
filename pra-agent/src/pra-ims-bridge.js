@@ -13,15 +13,7 @@ function localEndpoint(value) {
       u.pathname === '/api/IMSFiscal/GetInvoiceNumberByModel' && !u.username && !u.password && !u.search && !u.hash;
   } catch (_) { return false; }
 }
-function resultOnly(data) {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-  // Keep every supplied reference so a conflicting response remains uncertain on the server.
-  const result = {};
-  for (const k of ['Code', 'code', 'InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber', 'Response']) {
-    if (typeof data[k] === 'string' || typeof data[k] === 'number') result[k] = String(data[k]).slice(0, 120);
-  }
-  return result;
-}
+const {resultOnly,describeResponse}=require('./ims-result');
 function createBridge({ axios, directory = path.join(os.homedir(), '.taxnest-pra-agent'), log = () => {} }) {
   let busy = false;
   return async function sync(config) {
@@ -49,6 +41,7 @@ function createBridge({ axios, directory = path.join(os.homedir(), '.taxnest-pra
       if (localEndpoint(invoice.endpoint) || soap.endpoint(invoice.endpoint)) {
         try {
           const res = soap.endpoint(invoice.endpoint) ? await soap.submit(axios, invoice.endpoint, invoice.payload) : await axios.post(invoice.endpoint, invoice.payload, { timeout: 45000, maxRedirects: 0, headers: { 'Content-Type': 'application/json' } });
+          body.response_fields = describeResponse(res.data);
           body.response = resultOnly(res.data);
           body.diagnostic = body.response ? 'response_received' : 'unrecognized_response';
         } catch (error) {

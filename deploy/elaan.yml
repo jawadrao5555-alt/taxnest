@@ -1,8 +1,8 @@
-title: "FBR par report huay bill ka number aur receipt recovery"
+title: "PRA POS: khali call popup aur FBR response compatibility"
 audience: pos
 type: improvement
 points:
-  - "Agar bill FBR portal par aa gaya ho lekin TaxNest mein number na aya ho, company admin usi bill ki portal details mila kar number save kar sakta hai. Is se invoice dobara nahi bheji jati."
-  - "Recovery ke liye FBR number, POS ID, bill number, date, quantity aur amounts match karna zaroori hai. Save ke baad receipt dobara khol kar PRA aur FBR dono references dekhein."
-  - "Desktop Agent ke naye version mein IMS response ki mazeed compatible reading aur response na milne ki wajah record hoti hai. Agent update ke baad yeh tabdeeli lagu hogi."
-  - "Reporting khud ON nahi hoti. Purani sale, payment, stock, PRA settings aur Agent pairing apni jagah mehfooz rehte hain."
+  - "Khali 'Yeh number milayein' popup screen par khud nahi khulega. Resize ya fullscreen ke baad band popup band rahega; asal number wala call-back popup kaam karega."
+  - "Desktop Agent ke naye version mein mukhtalif supported IMS reply formats se fiscal number parhne ki compatibility behtar ki gayi hai. Conflicting ya adhura jawab dobara invoice bhejne ki wajah nahi banega."
+  - "IMS history mein safe response code aur fiscal reference ka record rahega taake number na milne ki wajah check ki ja sake. Purane reported bills dobara nahi bheje jatay."
+  - "Reporting settings, printers, pairing, purani sales aur payments apni jagah rehte hain. Agent wali tabdeeli naye Agent update ke baad lagu hogi."

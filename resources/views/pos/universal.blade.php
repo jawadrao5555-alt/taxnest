@@ -4452,7 +4452,7 @@ window.addEventListener('popstate', function() {
          blocks hide this layer and callerBlocked() still defers new rings.
          No NEW arbitrary Tailwind classes (vite-arbitrary-classes.md):
          width via inline style, z-[60]/text-[10px]/text-[11px] already built. --}}
-    <div x-show="callerPopup" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
+    <div data-tn-caller-incoming x-show="callerPopup" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 text-white" :class="callerPopup && callerPopup.source === 'whatsapp' ? 'bg-green-600' : 'bg-sky-600'">
                 <svg class="w-4 h-4 animate-pulse flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -4586,7 +4586,7 @@ window.addEventListener('popstate', function() {
          Wajah ka text server ke `reason` se banta hai, is liye teenon keys
          zabardasti bake karwani hain: --}}
     {{-- @posI18nExtra: caller_dial_no_device caller_dial_old_app caller_dial_notif_off --}}
-    <div x-show="callerDialFallback" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
+    <div data-tn-caller-dial-fallback x-show="!!(callerDialFallback && callerNumberOf(callerDialFallback))" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_dial_title') }}</span>
@@ -14185,8 +14185,10 @@ function restaurantPos() {
             const height = window.innerHeight;
             const bottom = header ? header.getBoundingClientRect().bottom : 64;
             const top = Math.min(Math.max(8, bottom + 8), Math.max(8, height - 120));
-            return 'top:' + top + 'px;max-height:' + Math.max(100, height - top - 8)
-                + 'px;max-width:calc(100vw - 32px);overflow-y:auto;width:' + (width ? width + 'px' : 'auto') + ';';
+            // Alpine merges object style properties; a string replaces cssText
+            // and removes the display:none owned by x-show on hidden overlays.
+            return { top: top + 'px', maxHeight: Math.max(100, height - top - 8) + 'px',
+                maxWidth: 'calc(100vw - 32px)', overflowY: 'auto', width: width ? width + 'px' : 'auto' };
         },
         callerBlocked() {
             return this.showPayModal || this.showReceipt || this.showManagerPinModal

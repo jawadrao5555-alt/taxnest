@@ -1853,6 +1853,30 @@ async function tableOrderWorkflow(page,t,v) {
   await reprint.locator('[x-model="reprintPayment"]').selectOption('');
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).filteredReprintBills().length===3);
   await root.evaluate(el=>{window.Alpine.$data(el).showReprint=false;});
+  // Position recalculation must never remove x-show's display:none.
+  const assertCallerClosed=async()=>{
+    await root.evaluate(el=>{const d=window.Alpine.$data(el);d.callerPopup=null;d.callerDialFallback=null;d.showCallerLog=false;d.callerOverlayEpoch++;});
+    await page.waitForFunction(()=>['[data-tn-caller-dial-fallback]','[data-tn-caller-incoming]','[data-tn-caller-history]'].every(selector=>{
+      const el=document.querySelector(selector);return el&&getComputedStyle(el).display==='none';
+    }));
+  };
+  await assertCallerClosed();
+  await root.evaluate(el=>{window.Alpine.$data(el).callerDialFallback={phone:' '};});
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-tn-caller-dial-fallback]')).display==='none');
+  await root.evaluate(async el=>{
+    const d=window.Alpine.$data(el);
+    // Empty-state changes within one frame must not cancel a second hide promise.
+    // Keep pageerror/unhandled-rejection diagnostics strict throughout.
+    d.callerDialFallback={phone:' '};await Promise.resolve();await Promise.resolve();
+    d.callerDialFallback=null;await Promise.resolve();await Promise.resolve();
+    d.callerDialFallback={phone:'03000000000',dial:'03000000000',reason:'no_device'};
+  });
+  const fallback=page.locator('[data-tn-caller-dial-fallback]');await fallback.waitFor({state:'visible'});
+  if(!(await fallback.innerText()).includes('03000000000'))throw Error('Valid Caller ID fallback number missing');
+  await saveEvidenceScreenshot(page,'caller-valid-fallback-'+v.width+'.png');
+  await assertCallerClosed();await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-tn-caller-dial-fallback]')).display==='none');
+  await saveEvidenceScreenshot(page,'caller-empty-fallback-hidden-'+v.width+'.png');
   const savedStyle=await root.getAttribute('style');
   await root.evaluate(el=>{
     el.style.zoom='0.8';

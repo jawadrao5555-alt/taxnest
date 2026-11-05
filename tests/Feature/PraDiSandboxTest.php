@@ -728,6 +728,84 @@ class PraDiSandboxTest extends TestCase
         $this->service->prepare($this->company->id, $record->id, $p);
     }
 
+    private function unresolvedImsForPortal(): array
+    {
+        $this->imsProfile('production','fiscal_device');
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'production');
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));
+        $svc->submit($this->company->id,$r->id,$this->owner->id);
+        $claim=$svc->claim($this->company->id,'synthetic-device');
+        $r=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],null,'invalid_json_result');
+        $p=$r->payload;
+        return [$r,['_token'=>'portal-csrf','environment'=>'production','pos_id'=>$p['POSID'],
+            'usin'=>$p['USIN'],'invoice_date'=>substr($p['DateTime'],0,10),'invoice_type'=>$p['InvoiceType'],
+            'sale_value'=>$p['TotalSaleValue'],'tax_charged'=>$p['TotalTaxCharged'],
+            'total_amount'=>$p['TotalBillAmount'],'quantity'=>$p['TotalQuantity'],
+            'fiscal_number'=>'54321TEST12345678','evidence_note'=>'Fictional portal report checked against all frozen invoice fields.',
+            'confirm_portal'=>1],$claim];
+    }
+
+    public function test_owner_portal_recovery_restores_receipt_reference_without_resending_or_changing_sale(): void
+    {
+        Http::preventStrayRequests();
+        [$r,$evidence,$claim]=$this->unresolvedImsForPortal();
+        $before=(array)DB::table('pos_transactions')->find($r->source_transaction_id);
+        $this->assertSame('invalid_json_result',$r->attempts[0]['diagnostic']);
+        $this->get(route('pos.tax-integrations.ims.show',$r->id))->assertOk()
+            ->assertSee('Recover an invoice already visible in FBR')->assertSee('invalid_json_result');
+        $url=route('pos.tax-integrations.ims.reconcile',$r->id);
+        $this->postJson($url,$evidence)->assertStatus(419);
+        $this->withSession(['_token'=>'portal-csrf'])->post($url,$evidence)->assertRedirect();
+        $r->refresh();$this->assertSame('accepted',$r->state);
+        $this->assertSame($evidence['fiscal_number'],$r->fiscal_number);
+        $this->assertSame('owner_verified_fbr_portal',$r->attempts[1]['source']);
+        $this->assertSame($this->owner->id,$r->attempts[1]['actor_id']);
+        $this->assertSame($before,(array)DB::table('pos_transactions')->find($r->source_transaction_id));
+        $this->get(route('pos.tax-integrations.ims.receipt',$r->id))->assertOk()->assertSee($evidence['fiscal_number']);
+        $this->postJson($url,$evidence)->assertStatus(409);
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $late=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],null);
+        $this->assertSame('accepted',$late->state);$this->assertCount(2,$late->attempts);
+        try {$svc->submit($this->company->id,$r->id,$this->owner->id);$this->fail('Accepted bill resent');}
+        catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        Http::assertNothingSent();
+    }
+
+    public function test_portal_recovery_rejects_mismatched_evidence_staff_and_second_tenant(): void
+    {
+        Http::preventStrayRequests();[$r,$data]=$this->unresolvedImsForPortal();
+        $url=route('pos.tax-integrations.ims.reconcile',$r->id);
+        $this->withSession(['_token'=>'portal-csrf']);
+        foreach(['pos_id'=>999,'usin'=>'WRONG-BILL','invoice_date'=>'2000-01-01','environment'=>'sandbox',
+            'invoice_type'=>3,'sale_value'=>999,'tax_charged'=>999,'total_amount'=>999,'quantity'=>999] as $key=>$wrong) {
+            \Illuminate\Support\Facades\Cache::flush(); // Each synthetic case has its own request budget.
+            $this->postJson($url,array_replace($data,[$key=>$wrong]))->assertUnprocessable();
+            $this->assertSame('verification_required',$r->fresh()->state);
+        }
+        $this->postJson($url,array_replace($data,['confirm_portal'=>0]))->assertUnprocessable();
+        $this->owner->forceFill(['role'=>'employee','pos_role'=>'pos_cashier'])->saveQuietly();
+        $this->postJson($url,$data)->assertForbidden();
+        $other=DB::table('companies')->insertGetId(['name'=>'Second fictional shop']);
+        $uid=DB::table('users')->insertGetId(['company_id'=>$other]);
+        $this->actingAs(User::findOrFail($uid),'pos')->postJson($url,$data)->assertNotFound();
+        Http::assertNothingSent();
+    }
+
+    public function test_portal_reference_cannot_be_reused_for_another_bill_or_applied_before_dispatch(): void
+    {
+        Http::preventStrayRequests();[$first,$firstData]=$this->unresolvedImsForPortal();
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $svc->reconcilePortal($this->company->id,$first->id,$this->owner->id,$firstData);
+        [$second,$secondData]=$this->unresolvedImsForPortal();
+        try {$svc->reconcilePortal($this->company->id,$second->id,$this->owner->id,$secondData);$this->fail('Reference reused');}
+        catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        $second->update(['state'=>'draft']);
+        try {$svc->reconcilePortal($this->company->id,$second->id,$this->owner->id,$secondData);$this->fail('Draft marked accepted');}
+        catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        $this->assertSame('draft',$second->fresh()->state);Http::assertNothingSent();
+    }
+
     private function imsProfile(string $environment='sandbox', string $mode='cloud'): \App\Models\PosImsProfile
     {
         PosDiSandboxProfile::where('company_id',$this->company->id)->update(['enabled'=>false]);

@@ -831,7 +831,22 @@ foreach([1366,390] as $width){
     $legacyBill->tax_inclusive=false;$legacyBill->tax_rate=16;$legacyBill->save();
     foreach($taxBill->items as $item){$copy=$item->replicate();$copy->transaction_id=$legacyBill->id;
         $copy->taxable_base=null;$copy->exempt_base=null;$copy->save();}
-    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id,'dualBill'=>$dualBill->id,'legacyBill'=>$legacyBill->id];
+    // Fictional central-portal evidence: no regulator or local IMS request.
+    $portalBill=$taxBill->replicate();$portalBill->invoice_number='SYN-PORTAL-BILL-'.$width;$portalBill->save();
+    foreach($taxBill->items as $item){$copy=$item->replicate();$copy->transaction_id=$portalBill->id;$copy->save();}
+    $portalSnapshot=\App\Services\PosFiscalSnapshot::capture($taxCompany,$portalBill,true);
+    $portalSnapshot['pos_id']=12345;
+    $portalRecord=\App\Models\PosImsSubmission::create(['company_id'=>$taxCompany->id,'source_transaction_id'=>$portalBill->id,
+        'created_by'=>$taxOwner->id,'environment'=>'sandbox','connection_mode'=>'fiscal_device',
+        'state'=>'verification_required','snapshot'=>$portalSnapshot,'attempts'=>[['at'=>now()->toIso8601String(),
+            'state'=>'verification_required','error_codes'=>[],'diagnostic'=>'invalid_json_result']]]);
+    $portalPayload=app(\App\Services\PosImsReportingService::class)->template($portalRecord);
+    foreach($portalPayload['Items'] as &$line){$line['TaxRate']=16;$line['TaxCharged']=16;$line['TotalAmount']=116;}unset($line);
+    $portalPayload['TotalTaxCharged']=16;$portalPayload['TotalBillAmount']=116;
+    $portalRecord->update(['payload'=>$portalPayload]);
+    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id,'dualBill'=>$dualBill->id,'legacyBill'=>$legacyBill->id,
+        'portal'=>['id'=>$portalRecord->id,'usin'=>$portalPayload['USIN'],'date'=>substr($portalPayload['DateTime'],0,10),
+            'reference'=>'SYN-PORTAL-'.$width]];
 }
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,

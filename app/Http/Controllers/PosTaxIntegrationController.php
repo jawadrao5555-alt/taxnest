@@ -112,6 +112,16 @@ class PosTaxIntegrationController extends Controller
         $svc->refreshConnection($c->id,$id,auth('pos')->id());
         return redirect()->route('pos.tax-integrations.ims.show',$id)->with('success','Current IMS connection selected for this undispatched/rejected bill. Original financial amounts are preserved. Review and save the mapping again.');
     }
+    public function reconcilePortal(Request $request,int $id,PosImsReportingService $svc)
+    {
+        $c=$this->company($request);$this->record($c,$id);
+        $svc->reconcilePortal($c->id,$id,auth('pos')->id(),$request->only([
+            'environment','pos_id','usin','invoice_date','invoice_type','sale_value','tax_charged',
+            'total_amount','quantity','fiscal_number','evidence_note','confirm_portal',
+        ]));
+        return redirect()->route('pos.tax-integrations.ims.show',$id)
+            ->with('success','FBR portal evidence recorded. No invoice was sent. Reprint to show the recovered FBR number and QR.');
+    }
     public function receipt(Request $request,int $id)
     {
         $record=$this->record($this->company($request),$id);$width=$request->query('width')==='58'?58:80;
@@ -125,8 +135,8 @@ class PosTaxIntegrationController extends Controller
     }
     public function agentResult(Request $request,PosImsReportingService $svc)
     {
-        $c=$request->attributes->get('agent_company');$d=$request->validate(['id'=>'required|integer','device_uid'=>'required|string|max:100','claim'=>'required|string|size:64','response'=>'nullable|array|max:10']);
-        $r=$svc->callback($c->id,$d['id'],$d['device_uid'],$d['claim'],$d['response'] ?? null);
+        $c=$request->attributes->get('agent_company');$d=$request->validate(['id'=>'required|integer','device_uid'=>'required|string|max:100','claim'=>'required|string|size:64','response'=>'nullable|array|max:10','diagnostic'=>'nullable|in:invalid_endpoint,response_received,unrecognized_response,transport_timeout,http_error,invalid_json_result,unconfirmed_soap_or_transport']);
+        $r=$svc->callback($c->id,$d['id'],$d['device_uid'],$d['claim'],$d['response'] ?? null,$d['diagnostic'] ?? null);
         return response()->json(['ok'=>true,'state'=>$r->state]);
     }
 }

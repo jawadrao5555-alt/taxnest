@@ -29,7 +29,10 @@ function decode(xml) {
   const matches = [...xml.matchAll(/<(?:\w+:)?GetFBRInvoiceNumberByModelResult\b[^>]*>([\s\S]*?)<\/(?:\w+:)?GetFBRInvoiceNumberByModelResult\s*>/g)];
   if(matches.length!==1) throw new Error('Missing IMS SOAP result');
   const result = matches[0][1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&#(x[\da-f]+|\d+);/gi,(_,n)=>String.fromCodePoint(n[0].toLowerCase()==='x'?parseInt(n.slice(1),16):Number(n))).replace(/&(quot|apos|lt|gt|amp);/g,(_,n)=>({quot:'"',apos:"'",lt:'<',gt:'>',amp:'&'}[n]));
-  const data=JSON.parse(result);
+  // Some WCF installations JSON-encode the JSON response string once more.
+  // Decode only that bounded wrapper; never infer success from a bare number.
+  let data=JSON.parse(result);
+  if (typeof data==='string') data=JSON.parse(data);
   if (!data || typeof data!=='object' || Array.isArray(data)) throw new Error('Invalid IMS result');
   return data;
 }

@@ -140,6 +140,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelGuestHouseV1Test.php tests/Feature/HotelCategoryNativeUiTest.php tests/Feature/HotelSimpleDeskPricingTest.php tests/Feature/HotelCreditNotePolicyTest.php tests/Feature/HotelGuestHouseFinalDeliveryTest.php
       - name: Check Caller ID recovery, timestamp, package and legacy regressions
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosCallerRingUuidTest.php tests/Feature/PosCallerRingCollapseTest.php tests/Feature/PosCallerEventsEtagTest.php tests/Feature/PosCallerIdPlanGateTest.php tests/Feature/PosCallerIdToggleAndEventsTest.php tests/Feature/AgentCallerReplayTest.php
+      - name: Check combined PRA cash, print and offline diagnostics
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/Reporting tests/Feature/AgentHeartbeatUpdateTelemetryClearTest.php --testdox
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence

@@ -5,6 +5,7 @@ const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 const { replayCallbacks } = require('./callback-retry-policy');
+const { DiagnosticBuffer } = require('./diagnostic-buffer');
 const { parseFiscalResult } = require('./fiscal-result');
 const imsSoap = require('./ims-soap');
 const imsDiscovery = require('./ims-discovery');
@@ -288,6 +289,14 @@ async function heartbeat() {
     if (heartbeatExtraProvider) {
       try { extra = heartbeatExtraProvider() || {}; } catch (e) { extra = {}; }
     }
+    let diagnostics = null, diagnosticBatch = null;
+    try {
+      if (requestConfig.deviceUid) {
+        diagnostics = new DiagnosticBuffer(QUEUE_DIR, requestConfig);
+        diagnostics.capture(extra.agent_diagnostics);
+        diagnosticBatch = diagnostics.batch();
+      }
+    } catch (_) { /* Diagnostic storage must never block heartbeat or billing. */ }
     const res = await axios.post(
       `${requestConfig.serverUrl}/heartbeat`,
       {
@@ -303,6 +312,7 @@ async function heartbeat() {
         // Sent only when non-blank; server never wipes an existing name on blank.
         pc_name: requestConfig.pcName || null,
         ...extra,
+        ...(diagnosticBatch ? {diagnostic_evidence: diagnosticBatch} : {}),
       },
       {
         headers: { Authorization: `Bearer ${requestConfig.apiKey}` },
@@ -313,6 +323,7 @@ async function heartbeat() {
     // must not mark a replacement agent connected, invoke Core, or mutate any
     // other status after stop or a company/device switch.
     if (!stillCurrent()) return;
+    try { if (diagnostics && diagnosticBatch) diagnostics.acknowledge(res.data?.diagnostic_evidence_ack, diagnosticBatch); } catch (_) { /* Preserve normal heartbeat on storage failure. */ }
     status.connected = true;
     status.serverInfo = res.data.company;
     status.lastError = null;

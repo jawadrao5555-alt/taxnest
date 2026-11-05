@@ -1274,10 +1274,19 @@ async function reportingConnectorWorkflow(page,t,v) {
   if(!cashForeign.result?.isError)throw new Error('Foreign cash evidence leaked');
   const coverage=await(await diagnostic('get_diagnostic_coverage',{product:'pos',limit:1})).json();
   if(coverage.result?.structuredContent?.complete!==false||coverage.result?.structuredContent?.tenant_checks_run!==0)throw new Error('Capability inventory claimed complete tenant health');
+  const operations=async(stream,companyName=f.companyName)=>diagnostic('get_pra_operations_evidence',{company_name:companyName,date_from:stream==='cash_reconciliation'?f.dayCloseDate:f.date,stream});
+  for(const stream of ['cash_reconciliation','print_chains','agent_collection']) {
+    const response=await(await operations(stream)).json(), data=response.result?.structuredContent;
+    if(response.result?.isError||data?.complete!==false||data?.company?.id!==f.companyId||JSON.stringify(data).includes('FICTIONAL_DIAGNOSTIC_SECRET'))throw new Error('Combined operational evidence scope/redaction failed: '+stream);
+    if(stream==='cash_reconciliation'&&(data.records[0]?.status!=='STORED_SOURCE_DIFFERENCE'||data.records[0]?.cash?.frozen_minus_observed!==-100))throw new Error('Native independent cash discrepancy was not detected: '+JSON.stringify(data));
+    if(stream==='print_chains'&&(data.chains[0]?.job_id!==f.diagnosticJobId||data.chains[0]?.attempts[0]?.state!=='SPOOL_ACCEPTED'||data.physical_print!=='unknown'))throw new Error('Native print-chain observations missing');
+    if(stream==='agent_collection'&&(data.observed?.matching_samples!==2||data.streams[0]?.missing_sequences_between_retained_endpoints!==1||data.seven_day_complete_record_proven!==false))throw new Error('Native offline duplicate/gap evidence missing');
+    if(!(await(await operations(stream,f.foreignCompanyName)).json()).result?.isError)throw new Error('Combined operational evidence foreign-company leak: '+stream);
+  }
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
   await page.locator('[data-reporting-onboarding]').waitFor();
   const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
-  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 4.'))throw new Error('Successful read evidence missing or failed foreign read counted');
+  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 7.'))throw new Error('Successful read evidence missing or failed foreign read counted');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-read-evidence');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
   if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
@@ -1285,7 +1294,8 @@ async function reportingConnectorWorkflow(page,t,v) {
   if((await incident(f.companyName)).status()!==401)throw new Error('Revoked token retained diagnostic access');
   if((await diagnostic('get_pra_day_close_evidence',cashArgs)).status()!==401)throw new Error('Revoked token retained cash evidence access');
   if((await diagnostic('get_diagnostic_coverage',{})).status()!==401)throw new Error('Revoked token retained diagnostic catalog access');
-  pass(t.name+'/'+v.width+': real consent, PKCE, native billing/cash, retained print timeline, coverage gaps, foreign-company denial and immediate revoke');
+  for(const stream of ['cash_reconciliation','print_chains','agent_collection']) if((await operations(stream)).status()!==401)throw new Error('Revoked token retained combined operational access');
+  pass(t.name+'/'+v.width+': real consent, PKCE, native independent cash difference, print attempts, offline upload deduplication/gaps, foreign-company denial and immediate revoke');
 }
 
 async function liveOpsReadability(page,t,v) {

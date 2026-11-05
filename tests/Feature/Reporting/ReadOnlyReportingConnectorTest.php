@@ -257,7 +257,7 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_tax_items', $this->period() + ['classification' => 'exempt'])->assertJsonPath('result.structuredContent.items.0.description', 'Exempt item');
         $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period())->assertJsonPath('result.structuredContent.actual_collected_total', null);
         $tools = $this->withToken($t['access_token'])->postJson('/api/reporting/mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'])->json('result.tools');
-        $this->assertCount(10, $tools);
+        $this->assertCount(11, $tools);
         foreach ($tools as $tool) {
             $this->assertTrue($tool['annotations']['readOnlyHint']);
             $this->assertFalse($tool['annotations']['destructiveHint']);
@@ -443,4 +443,29 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period() + ['branch_id' => 3])->assertJsonPath('result.structuredContent.hotel_folio_movements', null);
         $this->toolCall($t['access_token'], 'get_company_operational_summary', $this->period() + ['branch_id' => 3])->assertJsonPath('result.isError',true);
     }
+    public function test_combined_operations_are_scoped_read_only_and_immediately_revocable(): void
+    {
+        (require database_path('migrations/2026_12_22_090000_create_pra_diagnostic_samples.php'))->up();
+        $payload = ['version'=>1,'stream_id'=>'11111111-1111-4111-8111-111111111111','events'=>[
+            ['sequence'=>1,'at'=>'2026-10-13T12:00:00.123Z','pending_callbacks'=>2,'raw_error'=>'PRIVATE-RAW']]];
+        app(\App\Services\PraAgentDiagnosticEvidence::class)->ingest(\App\Models\Company::find(1), 'PRIVATE-DEVICE', $payload);
+        DB::table('pra_diagnostic_samples')->update(['received_at'=>'2026-10-13 12:00:00']);
+        [$p, $t] = $this->connection([1]);
+        $before = DB::table('pos_transactions')->get()->toJson();
+        foreach (['cash_reconciliation','print_chains','agent_collection'] as $stream) {
+            $args = $this->period() + ['stream'=>$stream];
+            $result = $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args)->assertOk()->json('result.structuredContent');
+            $this->assertFalse($result['complete']);
+            $this->assertSame(1, $result['company']['id']);
+            $this->assertStringNotContainsString('PRIVATE', json_encode($result));
+            if ($stream === 'agent_collection') $this->assertSame(2, $result['samples'][0]['facts']['pending_callbacks']);
+            $this->toolCall($t['access_token'], 'get_pra_operations_evidence', array_replace($args, ['company_name'=>'Pizza Master Twin']))->assertJsonPath('result.isError', true);
+            $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $args + ['arbitrary_sql'=>'SELECT 1'])->assertJsonPath('result.isError', true);
+        }
+        $this->assertSame($before, DB::table('pos_transactions')->get()->toJson());
+        $grant = DB::table('reporting_oauth_grants')->first();
+        $this->post('/admin/reporting/connections/'.$grant->id.'/revoke')->assertRedirect();
+        $this->toolCall($t['access_token'], 'get_pra_operations_evidence', $this->period() + ['stream'=>'agent_collection'])->assertUnauthorized();
+    }
+
 }

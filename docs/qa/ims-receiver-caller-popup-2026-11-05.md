@@ -63,8 +63,13 @@ from this development and is not proof of an automatic acknowledgement fix.
 - Real-Alpine DOM baseline/updated reproduction passed. Reproduce independently:
   `npm install --prefix /tmp/ims-caller-tools --no-audit --no-fund jsdom@26.1.0 alpinejs@3.14.9`
   `NODE_PATH=/tmp/ims-caller-tools/node_modules node scripts/qa/caller-overlay-repro.cjs bfad147d8092379f6233230ed441de0293f66784`
-- Local Chrome archive installation returned incomplete downloads/missing binary;
-  no local real-Chrome screenshot claimed. Required hosted Chrome now asserts
+- Chromium 153 synthetic loopback component reproduction passed at 1280px and
+  390px: baseline empty popup reappears on resize, updated popup stays hidden,
+  valid number opens and close remains closed. Screenshots saved locally via
+  the repository browser helper. This is a component test, not a full Laravel
+  screen run. Reproduce with `CHROMIUM_BIN=<supported cached binary> node
+  scripts/qa/caller-overlay-browser-repro.mjs bfad147d8092379f6233230ed441de0293f66784`.
+  Required hosted Chrome additionally asserts
   idle/closed/blank-number overlays stay hidden, opens a valid fallback, resizes,
   checks history placement, and saves synthetic desktop/mobile screenshots.
 - Local PHP 8.3.6 is below the unchanged ^8.4.1 full-suite runtime contract;

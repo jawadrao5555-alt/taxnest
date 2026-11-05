@@ -1,6 +1,6 @@
 title: "PRA POS: khali call popup aur FBR response compatibility"
 audience: pos
-type: fix
+type: improvement
 points:
   - "Khali 'Yeh number milayein' popup screen par khud nahi khulega. Resize ya fullscreen ke baad band popup band rahega; asal number wala call-back popup kaam karega."
   - "Desktop Agent ke naye version mein mukhtalif supported IMS reply formats se fiscal number parhne ki compatibility behtar ki gayi hai. Conflicting ya adhura jawab dobara invoice bhejne ki wajah nahi banega."

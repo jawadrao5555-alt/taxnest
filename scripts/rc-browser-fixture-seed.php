@@ -814,14 +814,20 @@ foreach([1366,390] as $width){
         'business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,'pos_setup_completed'=>true,
         'feature_flags'=>array_merge(PosFeatureService::defaultsForCategory('restaurant'),['inventory'=>false]),
         'inventory_enabled'=>false,'pra_reporting_enabled'=>true,'pra_environment'=>'sandbox','pra_pos_id'=>'10000',
-        'province'=>'Punjab','address'=>'Synthetic integration street']);
+        'province'=>'Punjab','address'=>'Synthetic integration street','receipt_printer_size'=>$width===390?'58mm':'80mm']);
     $taxOwner=$user($taxCompany,'Synthetic integration owner','tax-integration-owner-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
     $taxBill=\App\Models\PosTransaction::forceCreate(['company_id'=>$taxCompany->id,'invoice_number'=>'SYN-TAX-'.$width,'status'=>'completed',
         'invoice_mode'=>'pra','transaction_type'=>'sale','subtotal'=>100,'tax_amount'=>16,'total_amount'=>116,'discount_amount'=>0,
         'payment_method'=>'cash','pra_status'=>'submitted','pra_invoice_number'=>'SYN-PRA-'.$width]);
     \App\Models\PosTransactionItem::forceCreate(['transaction_id'=>$taxBill->id,'item_type'=>'product','item_name'=>'Synthetic meal',
         'quantity'=>2,'unit_price'=>50,'subtotal'=>100,'taxable_base'=>100,'exempt_base'=>0,'tax_amount'=>16,'tax_rate'=>16]);
-    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id];
+    // Receipt-only acknowledgement is synthetic evidence, never a regulator call.
+    $dualBill=$taxBill->replicate(); $dualBill->invoice_number='SYN-DUAL-'.$width; $dualBill->save();
+    foreach($taxBill->items as $item){$copy=$item->replicate();$copy->transaction_id=$dualBill->id;$copy->save();}
+    \App\Models\PosDiSandboxSubmission::create(['company_id'=>$taxCompany->id,'source_transaction_id'=>$dualBill->id,
+        'created_by'=>$taxOwner->id,'environment'=>'sandbox','state'=>'accepted','snapshot'=>[],
+        'sandbox_invoice_number'=>'SYN-FBR-'.$width,'attempts'=>[]]);
+    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id,'dualBill'=>$dualBill->id];
 }
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,

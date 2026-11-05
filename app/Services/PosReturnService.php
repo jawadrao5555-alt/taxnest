@@ -252,6 +252,12 @@ class PosReturnService
                     : RecipeInventoryService::normalizeDisposition($row['disposition'] ?? null);
 
                 $returnItems[] = [
+                    // Only slice facts frozen on the original sale. Legacy nulls remain null.
+                    ...(!$allocatedBill && $orig->taxable_base !== null && $orig->exempt_base !== null
+                        && Schema::hasColumn('pos_transaction_items', 'taxable_base') ? [
+                        'taxable_base' => (round((float)$orig->taxable_base * 100 * min(1, ($beforeQty+$qty)/$soldQty)) - round((float)$orig->taxable_base * 100 * min(1, $beforeQty/$soldQty))) / 100,
+                        'exempt_base' => (round((float)$orig->exempt_base * 100 * min(1, ($beforeQty+$qty)/$soldQty)) - round((float)$orig->exempt_base * 100 * min(1, $beforeQty/$soldQty))) / 100,
+                    ] : []),
                     'parent_item_id' => $orig->id,
                     'item_type' => $orig->item_type,
                     'item_id' => $orig->item_id,

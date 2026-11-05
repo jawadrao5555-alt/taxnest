@@ -21,6 +21,6 @@
         </section>
     </div>
     <p class="mt-6">PRA keeps its own connection. Enabling FBR POS selects IMS and disables new DI requests; enabling DI disables new IMS requests. Saved credentials and history remain. An accepted or unresolved bill cannot be resent through the other federal integration.</p>
-    <p class="mt-3">Federal submission is manual after reviewing each completed bill. PRA tax does not automatically make a federal sale exempt or zero-rated.</p>
+    <p class="mt-3"><a class="underline" href="{{ route('pos.federal-auto') }}">Automatic reporting and dual-QR receipts</a> · review a supported tax mapping once, then new finalized bills enter the reporting queue automatically. Existing manual recovery remains available. PRA tax does not automatically make a federal sale exempt or zero-rated.</p>
 </div>
 </x-pos-layout>

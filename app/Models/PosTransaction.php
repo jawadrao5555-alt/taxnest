@@ -53,6 +53,10 @@ class PosTransaction extends Model
         $enqueueWhatsApp = function (self $bill) {
             try { app(\App\Services\PosWhatsAppOutbox::class)->enqueue($bill); }
             catch (\Throwable $e) { report($e); } // Delivery must not roll back payment.
+            // Persist intent inside the sale transaction; external reporting runs
+            // later, after its item/payment rows are committed. No HTTP in checkout.
+            try { app(\App\Services\PosFederalAutomation::class)->enqueue($bill); }
+            catch (\Throwable $e) { report($e); }
         };
         static::created($enqueueWhatsApp);
         static::updated(function (self $bill) use ($enqueueWhatsApp) {

@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
+@php
+        $federalFiscal = app(\App\Services\PosFiscalReceipt::class)->federal($transaction);
+ $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
 <html lang="{{ $urduScript ? 'ur' : 'en' }}" dir="{{ $urduScript ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
@@ -398,10 +400,12 @@
                  it as a small Ref row (token already dominant above); serial style
                  prints it as a full POS Invoice row. --}}
             @if($transaction->pra_invoice_number)
+            @unless($federalFiscal)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pra_fiscal') }}:</td>
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
+            @endunless
             @if($rcptBillToken !== null)
             <tr>
                 <td class="inv-label" style="font-size:8px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}:</td>
@@ -765,7 +769,9 @@
     @endif
 
     @include('pos.hotel._credit-summary', ['summary' => $hotelCreditSummary, 'creditAmount' => $transaction->total_amount, 'creditReceipt' => true])
-    @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
+    @if($federalFiscal)
+        @include('pos.receipts._dual-fiscal', ['fiscalQrSize' => 74])
+    @elseif($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice
         // QR — visually consistent QRs, content untouched. Mirrors receipt_80mm.

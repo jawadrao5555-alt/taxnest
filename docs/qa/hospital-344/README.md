@@ -7,9 +7,9 @@
 | Check | Result |
 |---|---|
 | Original healthcare baseline on main | 370 passed, 2,028 assertions and 25 PHPUnit deprecations |
-| Repository-wide SQLite verification with sockets denied at OS level | 5,893 passed, 11 skipped, 0 failed and 0 errored across 5,904 cases with 48,619 assertions |
-| Supplemental cases | The same 11 skipped cases passed under their required conditions. Two used the repository's loopback-only DI mock. Seven checked native MariaDB schema and KOT behavior. Two exercised competing POS cash and stock workers on a disposable MariaDB. These 11 are already included in the 5,904 unique cases. |
-| Focused healthcare verification after fixes | 384 passed, 0 skipped, 0 failed, 2,219 assertions. The 25 PHPUnit deprecation notices are separate from failures. After the MariaDB IPD correction, 102 affected IPD, patient-journey and accounts tests passed with 776 assertions. |
+| Repository-wide SQLite verification with sockets denied at OS level | 5,894 passed, 11 skipped, 0 failed and 0 errored across 5,905 cases with 48,687 assertions |
+| Supplemental cases | The same 11 skipped cases passed under their required conditions. Two used the repository's loopback-only DI mock. Seven checked native MariaDB schema and KOT behavior. Two exercised competing POS cash and stock workers on a disposable MariaDB. These 11 are already included in the 5,905 unique cases. |
+| Focused healthcare verification after fixes | 385 passed, 0 skipped, 0 failed, 2,285 assertions. The 25 PHPUnit deprecation notices are separate from failures. After the MariaDB IPD correction, 102 affected IPD, patient-journey and accounts tests passed with 776 assertions. |
 | Browser profiles | A–F each exercised all nine services, 54 protected access checks. Seven service landing pages per profile were checked for access or rejection. Two write routes used nonexistent IDs to distinguish denied operations from permitted requests reaching record lookup. Real successful clinical writes were exercised separately. |
 | Build and dependencies | Vite production asset build passed. Composer platform requirements passed under PHP 8.4.27. Application integration ran on MariaDB 10.11.14. |
 | Hosted GitHub PR CI | No PR was opened, so there is no hosted PR check to approve. |
@@ -17,6 +17,8 @@
 An initial unrestricted full-suite invocation was stopped by automatic safety review when an existing test attempted to reach the PRA IMS host. That run is excluded. The replacement SQLite runner verifies kernel socket denial before launching PHPUnit, including its children. The additional DI tests used a loopback test server with a simulated response. The synthetic hospital had FBR reporting disabled. The POS adapter test replaced the transport method. No production credentials were used.
 
 The [machine-readable test index](test-results.json) includes individual healthcare case names and the supplemental case identities. The [lab runbook](runbook.md) contains the setup and reproduction commands. The [regulatory decision](regulatory.md) distinguishes the hospital EFD requirements from the existing retail adapter.
+
+The latest run also validates immutable signed diagnostic corrections (66 focused assertions), a second room day across local midnight, and a final trial balance of PKR 30,619 debit and credit. The finance sweep repeated without adding a journal. Backup verification matched 24 tables and private attachment bytes in a separate restore instance. See [final structure and scope](structure.md).
 
 ## Hospital profiles
 
@@ -33,15 +35,15 @@ The two additional providers have their own company boundaries, administrator an
 
 ## One patient, registration to discharge
 
-The named MariaDB fixture registered a second fictional patient, opened an emergency consultation, recorded triage and issued a prescription. It admitted the patient to a bed, took a PKR 500 advance, recorded a nursing observation, completed a C-section with a consumable, and linked the delivery record to the completed operation. The clinical desk signed and opened both laboratory and radiology PDFs. The pharmacy dispensed the prescription from the purchased batch. The patient went home with the bed released and a consolidated bill of **PKR 10,040**.
+The named MariaDB fixture registered a second fictional patient, opened an emergency consultation, recorded triage and issued a prescription. It admitted the patient to a bed, took a PKR 500 advance, recorded a nursing observation, completed a C-section with a consumable, and linked the delivery record to the completed operation. The clinical desk signed and opened both laboratory and radiology PDFs. The pharmacy dispensed the prescription from the purchased batch. The patient went home with the bed released and a consolidated bill of **PKR 13,040**.
 
 | Collection source | PKR |
 |---|---:|
 | Inpatient advance | 500 |
-| Inpatient balance at discharge | 6,700 |
+| Inpatient balance at discharge | 9,700 |
 | Pharmacy counter | 40 |
 | Central cashier for the consultation and two investigations | 2,800 |
-| **Total collected** | **10,040** |
+| **Total collected** | **13,040** |
 | **Outstanding** | **0** |
 
 The second MariaDB instance restored this clinical case from the full dump. It contained both signed results, the delivery linked to the operation, the discharged stay, two patient invoices and nine healthcare payment rows. The verification compared 23 tables, decrypted tenant names, the clinical balance, stock results and the SHA-256 of a private lab-report attachment restored to a separate storage root.
@@ -71,6 +73,9 @@ The second MariaDB instance restored this clinical case from the full dump. It c
 
 ## Bugs reproduced and corrected
 
+- Released diagnostic reports had no supported correction route (reproduced HTTP 404). Signed amendments now preserve the original, record reason/signer/revision, reject stale or conflicting retries, enforce clinical access, and never rebill. The two-service regression passed 66 assertions.
+- A long-running demo crossed local midnight. Discharge correctly refused the newly accrued room balance; the acceptance script now refreshes daily charges before collecting the final payment. No discharge override was used.
+
 - A suspended hospital session still returned HTTP 200 for the patient register. Healthcare rechecks central suspension, logs out the session and enforces reactivation before access resumes.
 - Creating a non-FBR-POS hospital through central Admin explicitly inserted NULL into the non-nullable FBR POS environment column. The create path now leaves that unrelated value to the schema default. The new ERP organisation was created, subscribed and suspended/reactivated through normal routes.
 - Duplicate submission of a PKR 600 payment against a PKR 1,000 bill overstated both the payment and the patient's surplus. Cashier forms now carry replay keys. Deposit and refund writes lock patient/bill state, reject changed reuse and commit the receipt and its replay record together.
@@ -83,5 +88,5 @@ The second MariaDB instance restored this clinical case from the full dump. It c
 
 1. Obtain and validate the hospital-specific EFD/SDC contract, licensing, sandbox onboarding and regulator acceptance. The retail POS mock does not certify section 237A.
 2. Verify the applicable provincial reporting route, service classification, payload, acknowledgement, correction and reconciliation. No hospital-specific PRA submission has passed in this branch.
-3. Validate the facility's clinical amendment and sign-off workflow, statutory payroll requirements, physical printing and offsite key recovery. Existing finalized legacy accounts that may contain manually entered receipts for already-collected charges need a migration reconciliation trial. This branch does not rewrite historic finalized bills.
+3. Validate the facility's operational sign-off and critical-result notification workflow, statutory payroll requirements, physical printing and offsite key recovery. Existing finalized legacy accounts that may contain manually entered receipts for already-collected charges need a migration reconciliation trial. This branch does not rewrite historic finalized bills.
 4. After those gates close, rerun the suite and create the PR with migrations, release notes and rollback evidence. Wait for **PR checks / validate** on the exact final head before owner approval. Follow the [owner procedure](../../ops/owner-merge-and-deploy.md). Until then, this branch is for review and further development only.

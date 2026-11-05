@@ -1,6 +1,6 @@
 {
   "issue": 344,
-  "tested_implementation_commit": "110ec6c268c2f00d34dc4c8a8d61e03ff4734cef",
+  "tested_implementation_commit": "e6ffa2ee98f9492b409808dab8be52a304ff1d20",
   "base_commit": "da2a0956ca8ede4a4a2fff8cdb6a0b74204d04fe",
   "release_gate": "held; no PR",
   "profiles": [
@@ -126,18 +126,15 @@
     "visit": 2,
     "stay": 1,
     "bill": "B000002",
-    "total": "10040.00",
+    "total": "13040.00",
     "pharmacy_collected": 40,
-    "inpatient_balance_paid": 6700,
+    "inpatient_balance_paid": 9700,
     "central_cash": 2800,
     "outstanding": "0.00",
     "discharge": "discharged",
     "signed_reports": 2
   },
   "browser_log": [
-    "PASS private clinical attachment upload and download; SHA-256 ad306e19047869ec17912ebd5d9d3853929aae2ab6ce74894009c23a59a4c625",
-    "PASS same-patient emergency triage, prescription, C-section, lab and imaging worklists and signed PDFs",
-    "PASS authenticated stock receipt and supplier payment forms",
     "PASS profile A authenticated; nine service route checks",
     "PASS profile B authenticated; nine service route checks",
     "PASS profile C authenticated; nine service route checks",
@@ -154,70 +151,70 @@
   },
   "restore": {
     "utility": "Complete mariadb-dump and private clinical files, restored to an independent MariaDB instance and private disk root",
-    "dump_sha256": "c04667c4da6d8c81fa9bb7e05e5df403442e1497602652325de7fd432ed0ff28",
-    "verification_before_sha256": "02501892fdbb1af4bdff3f62c4ebddec5d1184b38afd3743ce616e5d1dea97b4",
-    "verification_after_sha256": "02501892fdbb1af4bdff3f62c4ebddec5d1184b38afd3743ce616e5d1dea97b4",
-    "table_count": 23,
+    "dump_sha256": "2f32dd8549111986b11f874cd9de7f3fca2453e2881a1f742249a573b64415b8",
+    "verification_before_sha256": "2327b3f6e1e5875e30d8794e893e8ad5297be811b17319758e87423b072d18f0",
+    "verification_after_sha256": "2327b3f6e1e5875e30d8794e893e8ad5297be811b17319758e87423b072d18f0",
+    "table_count": 24,
     "restored_tables": {
       "companies": [
         8,
-        "74a6cbf3347d17b9f68ba7c8cbf50e0ab3c154031a0bf8e96091ad4bfdef3eb2"
+        "e75cb759bb4c3ba4ae9edcc4c3130d401c02974fd0c60bdfd39a698f34b14f2c"
       ],
       "branches": [
         9,
-        "22b451e73eb4aa1fd4c2ea3c65fdebb395e7f2849ca1e21ee6c3fc59dc5d7380"
+        "7aaf8053454227e2d92e14d5351004918048b3d220f420925d12e298b48f134d"
       ],
       "users": [
         19,
-        "b759e5f0c9ff07d294230317acb9b365398ca4368597cd94a3ff0c12b3ca9541"
+        "093f0c26495cb10942815eee12e616d76546806dc83446c8f922453a393fc12e"
       ],
       "health_patients": [
         9,
-        "4b920b0595ba26320dde4cca546aa02ce62ed086910c2776c1ecc2604cf5cef7"
+        "4fbd58d46f52372f3fc4c8c063d214e23c814d8fe80321b5cd1461c4b061ab69"
       ],
       "health_doctors": [
         24,
-        "04872a332e9a22dce908064527ececcd9e70e04ea1a6949e6d35f64d1b1f62e0"
+        "5549d85819cfca66d05382819a57fb41fdaca79caac20379f8a1c797639a45e8"
       ],
       "health_visits": [
         2,
-        "a50cd12d82e2a27aede0934fb6b870380db3935aab606940afdae270df78ef95"
+        "e23f930e1e43a7758c6d23af55e344eb749bfdf1944bafc92d214cd187770b73"
       ],
       "health_charges": [
-        8,
-        "c9c1b5adf46058c3dad75831f7908fba7d7a6b9b93ac9c933fe27014cd6f168e"
+        9,
+        "499a4147964948bb618ed1a3738f06182d7c3bea0ccf23b94b4ca6e358541e7d"
       ],
       "health_bills": [
         2,
-        "9ca049c0f3c6054fd12d6313d7b1e6a34b2a9528b508bd9ed59ae8d860ca19d1"
+        "6cd90e5376d95d0e81b9422395f0496cdebe1d3cae1857ed90e930280d588247"
       ],
       "health_payments": [
         9,
-        "d1e910367273081fe341ca29b0686315a11169118d67ad71c4dba21b89398625"
+        "6a19467022b97a3c521660b8149eafc65d69d4cd4da63b1eb6e77204bb5e503a"
       ],
       "health_journals": [
         15,
-        "14e0a4801f0c618ff7973f21fed54a940d25945f8ab19eaaa82be9233e96b5bb"
+        "88fa95ca787f06c26b792ff7f9f138b2b409513316d6c890428707c19add7757"
       ],
       "health_journal_lines": [
         36,
-        "a35b1de228dd178e2b1d5380432526dc5b403e6f93db9dde2ec82de0fd1c17e7"
+        "63dde4f4bb50bb854b5c3482333581950a5767060a7541cc4a7e244ef1ce3a78"
       ],
       "health_diagnostic_orders": [
         2,
-        "c0faccf6b1129cb91f9dcd0f89966f538bf01ca28aa8cfb0c341bd36379b7143"
+        "0226dd37cd81f30b7c007d7c954a86039b2fc732628e87660fb7a2b374aa363e"
       ],
       "health_audit_events": [
-        134,
-        "421617842daaf3c767d9cc24a26a782cde0c0e632e3e6b83beed91a9994dceae"
+        146,
+        "cf247bd3447fe558a8736993a941fc83d59169d9f95d4607fba6ecf5c6693e7c"
       ],
       "health_cashier_requests": [
         2,
-        "405e48194a413014682565dfaca36b09613c910b9c055488db8ac5c0f1203a51"
+        "3e600633f9dd3bb54cd9c52d49f9040841298328552136acbda9041818283104"
       ],
       "health_deliveries": [
         1,
-        "003b3f7d1642ae57111fd546d499b33262017e5af13547d17831204e83fc01fd"
+        "7a292d5a723938f90ceb58878a477883656623040f5c41190848c6f1283ddee4"
       ],
       "health_external_referrals": [
         0,
@@ -225,31 +222,35 @@
       ],
       "health_triage_records": [
         1,
-        "5906c48e0c78e47947d8cffbc25f500f680c1041833dcec068d1247164e4fbb0"
+        "8e5aafd9eec5f128d6f27c178eb2fd8bba447558f10516ddd73ff829cabbccc9"
       ],
       "health_visit_attachments": [
         1,
-        "4a3947de1a76ae6800e57b5aa89cb6f19bea96b3a09bd653847197fe719b25a9"
+        "7f18efd4b46518fa1ff83620efa10c5a501b8792e88d8be963c56b78e4f44321"
       ],
       "health_medicine_batches": [
         1,
-        "f4a18009f399b2f3769e400a05651b7b07440d91caa0f4091ef5dbefad80c34c"
+        "614a92ca042f77daf94fa54878d335ace0ca3c5c23f9139a80cefca0286bcfa9"
       ],
       "health_supplier_payments": [
         2,
-        "04f8cc17f62291a20c856ea4fc10d1f52021ba23f3bd840ef789d30d40c48180"
+        "cd9cd684bb3014276348457ed9e354c8b0990706bfef91d639b5397f54f8492d"
       ],
       "health_attendance_days": [
         1,
-        "8e218de7f0ec8d5734d1130f24433bf283450aea2b2dda3cdccc612667ae41a2"
+        "ef4175aa66bffcb0b02ff37ce8df7a3212c6dfb34bd7ae8e003c66a2f300281e"
       ],
       "health_staff_profiles": [
         1,
-        "513d7ee822a5d3137044433c129d49553558700511c04c41596f4779330965d9"
+        "d3cd9f5c871897fbde5425dc65c0a2aa43541fef321fd8cb1b0966a367dd93be"
       ],
       "purchase_orders": [
         1,
-        "2b036910c32c353aedd2f51c3d3f4b9d6165a1b78bc2bfc7bf44bdd21e57c845"
+        "0503a9f218b302ba4b8c77ef55defda7776133da4de6ae1d22ce865d9ff72403"
+      ],
+      "health_diagnostic_amendments": [
+        2,
+        "e71e341ca0b8f90ccb77382067673c23db3a0d2e9ff82f62323e4d1382263267"
       ]
     },
     "decrypted_name_count": 8,
@@ -257,10 +258,10 @@
       "signed_reports": 2,
       "discharge": "discharged",
       "bill": "B000002",
-      "total": "10040.00",
+      "total": "13040.00",
       "outstanding": "0.00"
     },
-    "private_attachment_sha256": "ad306e19047869ec17912ebd5d9d3853929aae2ab6ce74894009c23a59a4c625"
+    "private_attachment_sha256": "0372bdc0ce5e4bddafbe85fedcd8a70c47f634e8246838452fb1d7e69da258d1"
   },
   "ipd_sql_retest": {
     "tests": 102,
@@ -273,5 +274,26 @@
     "FBR retail sandbox transport replaced by an in-process fake",
     "No healthcare PRA certification or acknowledgement"
   ],
-  "owner_decision": "no deployment approval due"
+  "owner_decision": "no deployment approval due",
+  "ledger_final": {
+    "accounts": {
+      "cash": 13395,
+      "pharmacy_inventory": 96,
+      "supplier_payable": -50,
+      "patient_receivable": 1200,
+      "patient_advance": -125,
+      "cogs_pharmacy": 24
+    },
+    "debit": "30619.00",
+    "credit": "30619.00",
+    "journals": 15,
+    "repeat_sweep_added_journals": 0
+  },
+  "day_rollover": "Final bill includes an additional 3000 room day; acceptance refreshes daily charges before final payment.",
+  "diagnostic_corrections": {
+    "original_reports_preserved": 2,
+    "corrections_restored": 2,
+    "focused_regression_tests": 1,
+    "assertions": 66
+  }
 }

@@ -257,6 +257,57 @@ class HealthPilotJourneyTest extends TestCase
 
     }
 
+    public function test_signed_diagnostics_support_audited_corrections_without_rebilling_or_overwrite(): void
+    {
+        $patient = $this->register('Demo report correction');
+        foreach (['lab', 'radiology'] as $service) {
+            $this->actingAs($this->owner, 'health')->post('/health/'.$service.'/catalog', [
+                'code'=>'CORRECT', 'name'=>'Demo correction test', 'price'=>650])->assertSessionHasNoErrors();
+            $test = DB::table('health_diagnostic_tests')->where('company_id', $this->company->id)->where('service', $service)->sole();
+            $this->post('/health/'.$service.'/orders', ['patient_id'=>$patient->id, 'test_id'=>$test->id,
+                'request_key'=>(string) \Illuminate\Support\Str::uuid()])->assertRedirect();
+            $order = \App\Models\HealthDiagnosticOrder::where('company_id', $this->company->id)->where('service', $service)->sole();
+            $url = '/health/'.$service.'/orders/'.$order->id;
+            $payload = ['result'=>'Corrected synthetic finding', 'reason'=>'Synthetic transcription correction',
+                'request_key'=>(string) \Illuminate\Support\Str::uuid(), 'expected_revision'=>0];
+            $this->postJson($url.'/amend', $payload)->assertStatus(409);
+            $this->post($url.'/collect', ['accession'=>'CORRECT-'.$service])->assertRedirect();
+            $this->post($url.'/release', ['result'=>'Original synthetic finding'])->assertRedirect();
+            $charges = HealthCharge::withoutGlobalScopes()->where('company_id', $this->company->id)->count();
+            $this->post($url.'/amend', $payload)->assertRedirect('/health/'.$service);
+            $this->post($url.'/amend', $payload)->assertRedirect('/health/'.$service);
+            $this->assertSame(1, $order->amendments()->count());
+            $this->assertSame('Original synthetic finding', $order->fresh()->result);
+            $this->assertSame('Corrected synthetic finding', $order->amendments()->sole()->result);
+            $raw = DB::table('health_diagnostic_amendments')->where('health_diagnostic_order_id', $order->id)->sole();
+            $this->assertStringNotContainsString('synthetic', $raw->result);
+            $this->assertStringNotContainsString('Synthetic', $raw->reason);
+            $this->postJson($url.'/amend', array_replace($payload, ['result'=>'Conflicting retry']))->assertStatus(409);
+            $this->postJson($url.'/amend', array_replace($payload, ['request_key'=>(string) \Illuminate\Support\Str::uuid()]))->assertStatus(409);
+            $this->postJson($url.'/release', ['result'=>'Overwrite attempt'])->assertStatus(409);
+            $next = array_replace($payload, ['expected_revision'=>1, 'request_key'=>(string) \Illuminate\Support\Str::uuid(), 'result'=>'Final synthetic finding']);
+            $this->actingAs($this->nurse, 'health')->postJson($url.'/amend', $next)->assertForbidden();
+            $other = $this->makeUser($this->makeHospital('Other correction hospital', 'OTHER-'.$service), 'other.'.$service.'@example.test', HealthAccessService::ROLE_OWNER);
+            $this->actingAs($other, 'health')->postJson($url.'/amend', $next)->assertNotFound();
+            $this->actingAs($this->owner, 'health')->postJson($url.'/amend', array_replace($next, ['reason'=>'']))->assertUnprocessable();
+            $this->post($url.'/amend', $next)->assertRedirect();
+            $this->assertSame(2, $order->amendments()->count());
+            $this->assertSame($charges, HealthCharge::withoutGlobalScopes()->where('company_id', $this->company->id)->count());
+            $this->get('/health/'.$service)->assertOk()->assertSee('Correct signed report');
+            $this->get($url.'/report')->assertOk()->assertHeader('Content-Type', 'application/pdf');
+            $html = view('health.diagnostics.report', ['order'=>$order->fresh()->load('amendments'), 'patient'=>$patient])->render();
+            $this->assertStringContainsString('Final synthetic finding', $html);
+            $this->assertStringContainsString('Original synthetic finding', $html);
+            $this->assertStringContainsString('Superseded results', $html);
+            $this->company->update(['health_modules'=>json_encode(['opd', 'accounts'])]);
+            HealthModuleService::forget();
+            $this->postJson($url.'/amend', $next)->assertForbidden();
+            $this->assertSame(2, $order->amendments()->count());
+            $this->company->update(['health_modules'=>json_encode(HealthModuleService::MODULES)]);
+            HealthModuleService::forget();
+        }
+    }
+
     public function test_one_patient_from_registration_to_laboratory_dispensing_surgery_and_discharge(): void
     {
         $patient = $this->register('Demo Complete Journey');

@@ -56,7 +56,9 @@ $result = DB::transaction(function () use ($id,$hospital,$owner,$doctor,$doctorU
         'lines'=>[['medicine_id'=>$medicine->id,'prescription_item_id'=>$rx->items()->sole()->id,'quantity'=>2]]],$branch->id,$owner->id,$hospital);
     HealthOpdService::complete($visit,$doctorUser);
     $stay = HealthIpdService::requestDischarge($stay,$doctorUser,['discharge_summary'=>'Demo discharge after observation']);
-    $balance = (float) HealthIpdBillingService::summary($stay)['outstanding'];
+    // Refresh accrued bed-days before taking the final payment (including midnight rollover).
+    HealthIpdBillingService::postDailyCharges($stay, $owner);
+    $balance = (float) HealthIpdBillingService::summary($stay->refresh())['outstanding'];
     if ($balance) {
         HealthIpdBillingService::recordPayment($stay,['kind'=>'advance','amount'=>$balance,'method'=>'cash'],$owner);
     }

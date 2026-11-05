@@ -31,7 +31,7 @@ class HealthDiagnosticsController extends HealthPanelController
         $service = $request->route('service');
         $tests = DB::table('health_diagnostic_tests')->where('company_id', $this->company()->id)
             ->where('service', $service)->orderBy('name')->get();
-        $orders = $this->orders($service);
+        $orders = $this->orders($service)->withCount('amendments');
         HealthRecordAccessService::hideConfidential($orders, $this->user());
         return view('health.diagnostics.index', ['service' => $service, 'tests' => $tests,
             'orders' => $orders->latest('id')->paginate(30), 'capabilities' => HealthAccessService::capabilitiesFor($this->user(), $this->company())]);
@@ -103,6 +103,39 @@ class HealthDiagnosticsController extends HealthPanelController
         return $this->advance($request, $id, 'collected', 'released', $data);
     }
 
+    public function amend(Request $request, int $id)
+    {
+        $data = $request->validate([
+            'result' => 'required|string|max:12000', 'reason' => 'required|string|max:2000',
+            'request_key' => 'required|uuid', 'expected_revision' => 'required|integer|min:0',
+        ]);
+        $service = $request->route('service');
+        DB::transaction(function () use ($service, $id, $data) {
+            $order = $this->orders($service)->lockForUpdate()->findOrFail($id);
+            $this->patient($order->health_patient_id);
+            abort_unless($order->status === 'released', 409);
+            $existing = $order->amendments()->where('request_key', $data['request_key'])->first();
+            if ($existing) {
+                abort_unless($existing->result === $data['result'] && $existing->reason === $data['reason']
+                    && (int) $existing->signed_by === (int) $this->user()->id
+                    && (int) $existing->revision === (int) $data['expected_revision'] + 1, 409);
+                return;
+            }
+            $latest = $order->amendments()->reorder()->latest('revision')->first();
+            abort_unless((int) ($latest?->revision ?? 0) === (int) $data['expected_revision'], 409);
+            abort_if(($latest?->result ?? $order->result) === $data['result'], 422, 'The corrected result must differ.');
+            $order->amendments()->create([
+                'revision' => (int) $data['expected_revision'] + 1, 'request_key' => $data['request_key'],
+                'result' => $data['result'], 'reason' => $data['reason'],
+                'signed_by' => $this->user()->id, 'signed_at' => now(),
+            ]);
+            // Preserve the original signed result and financial charge. Audit
+            // metadata deliberately excludes result text and correction reason.
+            $this->record($order, 'amended');
+        }, 3);
+        return redirect()->route('health.'.$service);
+    }
+
     private function advance(Request $request, int $id, string $from, string $to, array $attributes)
     {
         $service = $request->route('service');
@@ -137,6 +170,8 @@ class HealthDiagnosticsController extends HealthPanelController
         $order = $this->orders($service)->findOrFail($id);
         $patient = $this->patient($order->health_patient_id);
         abort_unless($order->status === 'released', 409);
+        $order->load('amendments');
+        $this->record($order, 'report_viewed');
         return Pdf::loadView('health.diagnostics.report', compact('order', 'patient'))
             ->stream($service.'-'.$order->id.'.pdf', ['Attachment' => false]);
     }

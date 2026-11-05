@@ -34,6 +34,18 @@
                 <button class="underline">Sign and release</button></form>
             @elseif($order->status === 'released' && (in_array($service.'.result', $capabilities) || in_array('clinical.view', $capabilities)))
                 <a class="underline" href="{{ route('health.'.$service.'.report', $order->id) }}">Open PDF report</a>
+                @if(in_array($service.'.result', $capabilities))
+                <details class="border rounded p-3"><summary>Correct signed report (revision {{ $order->amendments_count }})</summary>
+                    <p>The original and previous signed results remain in the report history. Inform the treating clinician of the correction.</p>
+                    <form method="post" action="{{ route('health.'.$service.'.amend', $order->id) }}">@csrf
+                        <input type="hidden" name="request_key" value="{{ \Illuminate\Support\Str::uuid() }}">
+                        <input type="hidden" name="expected_revision" value="{{ $order->amendments_count }}">
+                        <label>Complete corrected result <textarea class="block border rounded w-full" name="result" maxlength="12000" required></textarea></label>
+                        <label>Reason for correction <textarea class="block border rounded w-full" name="reason" maxlength="2000" required></textarea></label>
+                        <button class="underline">Sign corrected report</button>
+                    </form>
+                </details>
+                @endif
             @endif
         </section>
     @empty <p>No orders.</p> @endforelse

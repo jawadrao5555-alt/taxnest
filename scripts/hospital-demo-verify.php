@@ -10,7 +10,7 @@ $tables = [
     'health_bills', 'health_payments', 'health_journals', 'health_journal_lines', 'health_diagnostic_orders',
     'health_audit_events', 'health_cashier_requests', 'health_deliveries', 'health_external_referrals',
     'health_triage_records', 'health_visit_attachments', 'health_medicine_batches', 'health_supplier_payments', 'health_attendance_days',
-    'health_staff_profiles', 'purchase_orders',
+    'health_staff_profiles', 'purchase_orders', 'health_diagnostic_amendments',
 ];
 $report = [];
 foreach ($tables as $table) {
@@ -52,6 +52,16 @@ if (in_array('--check-journey', $argv, true)) {
         throw new RuntimeException('Clinical report bytes are missing from the private file store.');
     }
     $checks['attachment_sha256'] = hash('sha256', $bytes);
+    $orders = \App\Models\HealthDiagnosticOrder::where('company_id', $hospital->id)
+        ->where('health_patient_id', $patient->id)->with('amendments')->get();
+    foreach ($orders as $order) {
+        if ($order->result !== 'Synthetic '.$order->service.' report'
+            || $order->amendments->count() !== 1
+            || $order->amendments->sole()->result !== 'Corrected synthetic '.$order->service.' report'
+            || $order->amendments->sole()->reason !== 'Demo transcription correction') {
+            throw new RuntimeException('Signed original or corrected clinical history failed restoration.');
+        }
+    }
     $checks['clinical'] = ['signed_reports'=>$diagnostics, 'discharge'=>$stay->status, 'bill'=>$bill->bill_no,
         'total'=>$bill->total_amount,'outstanding'=>$bill->outstanding_amount];
 }

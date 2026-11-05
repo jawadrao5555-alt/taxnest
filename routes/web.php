@@ -1958,6 +1958,8 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
                 ->middleware('health.can:'.$service.'.collect')->name('health.'.$service.'.collect');
             Route::post('/orders/{id}/release', [$desk, 'release'])->whereNumber('id')->defaults('service', $service)
                 ->middleware('health.can:'.$service.'.result')->name('health.'.$service.'.release');
+            Route::post('/orders/{id}/amend', [$desk, 'amend'])->whereNumber('id')->defaults('service', $service)
+                ->middleware('health.can:'.$service.'.result')->name('health.'.$service.'.amend');
             Route::get('/orders/{id}/report', [$desk, 'report'])->whereNumber('id')->defaults('service', $service)
                 ->middleware('health.can:'.$service.'.view')->name('health.'.$service.'.report');
         });

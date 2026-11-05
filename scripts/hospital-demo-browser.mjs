@@ -33,6 +33,13 @@ async function completeClinicalOrders(page, fixture, token) {
         const path = new URL(action).pathname.replace('/health/', '').replace(/\/collect$/, '');
         await post(path + '/collect', {accession:'DEMO-' + service + '-' + fixture.patient});
         await post(path + '/release', {result:'Synthetic ' + service + ' report'});
+        await page.goto(base + '/health/' + service);
+        const correction = page.locator('form[action$="/' + path + '/amend"]');
+        await correction.locator('..').locator('summary').click();
+        await correction.locator('[name=result]').fill('Corrected synthetic ' + service + ' report');
+        await correction.locator('[name=reason]').fill('Demo transcription correction');
+        await Promise.all([page.waitForNavigation(), correction.getByRole('button', {name:'Sign corrected report'}).click()]);
+        assert.equal(await page.locator('form[action$="/' + path + '/amend"] [name=expected_revision]').inputValue(), '1');
         const report = await page.request.get(base + '/health/' + path + '/report');
         assert.equal(report.status(), 200);
         const bytes = await report.body();
@@ -51,7 +58,7 @@ async function completeClinicalOrders(page, fixture, token) {
             console.log('PASS private clinical attachment upload and download; SHA-256 ' + createHash('sha256').update(bytes).digest('hex'));
         }
     }
-    console.log('PASS same-patient emergency triage, prescription, C-section, lab and imaging worklists and signed PDFs');
+    console.log('PASS same-patient emergency triage, prescription, C-section, lab and imaging worklists, corrected signed reports and PDFs');
 }
 
 async function receiveDemoStock(page) {
@@ -89,6 +96,10 @@ try {
         f: ['opd','pharmacy','ipd','lab','accounts','hr','radiology','maternity','emergency'],
     })) {
         const context = await browser.newContext({ serviceWorkers: 'block' });
+        // Shared disposable runners can be CPU-bound while PHPUnit is active.
+        // Keep response/status assertions unchanged, but allow bounded navigation time.
+        context.setDefaultTimeout(90000);
+        context.setDefaultNavigationTimeout(90000);
         await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
         const page = await context.newPage();
         page.on('pageerror', e => errors.push(e.message));
@@ -131,6 +142,8 @@ try {
     const context = await browser.newContext({ serviceWorkers: 'block' });
     await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
     const page = await context.newPage();
+    context.setDefaultTimeout(90000);
+    context.setDefaultNavigationTimeout(90000);
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(base + '/admin/login');
     await page.locator('input[name=email]').fill('demo.saas@example.test');

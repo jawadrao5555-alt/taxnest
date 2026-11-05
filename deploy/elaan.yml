@@ -1,7 +1,7 @@
-title: "PRA login par FBR IMS ki tayari reporting band honay par bhi"
+title: "PRA ke sath FBR POS setup mein PCT code ki asani"
 audience: pos
 type: improvement
 points:
-  - "Desktop Agent 1.13.32 mein PRA POS login par FBR IMS setup aur Re-check reporting band honay par bhi milta hai. Service check karne ke liye reporting ON karna zaroori nahi."
-  - "Local IMS ki pehchan ke liye mazeed supported metadata address check hota hai. Pehle se chalti PRA connection aur saved settings barqarar rehti hain."
-  - "Service milna FBR POS registration aur Sandbox ya Production environment ki tasdeeq nahi. Reporting company ki reviewed settings se hi chalay gi."
+  - "PRA ke sath FBR POS ki automatic reporting setup mein catalogue ka PCT code optional hai. Maujood code diya ho to wohi istemal hota hai."
+  - "Digital Invoice ke liye HS code ab bhi zaroori hai. FBR POS ki reporting se pehle tax rate aur selected environment review karein."
+  - "Automatic reporting aap ke save kiye hue faislay ke mutabiq hi chalay gi. Is update se reporting khud ON nahi hoti."

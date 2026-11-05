@@ -50,7 +50,7 @@ class PosImsReportingService
         $s=$r->snapshot; $type=$s['transaction_type']==='return' ? 3 : 1;
         $items=[];
         foreach ($s['lines'] as $i=>$line) $items[]=['ItemCode'=>(string)($i+1),'ItemName'=>$line['name'],
-            'Quantity'=>$line['quantity'],'PCTCode'=>'','TaxRate'=>null,'SaleValue'=>$line['base'],
+            'Quantity'=>$line['quantity'],'PCTCode'=>'00000000','TaxRate'=>null,'SaleValue'=>$line['base'],
             'TotalAmount'=>null,'TaxCharged'=>null,'Discount'=>0,'FurtherTax'=>0,'InvoiceType'=>$type,'RefUSIN'=>null];
         return ['InvoiceNumber'=>'','POSID'=>$s['pos_id'],'USIN'=>$s['invoice_number'],
             'DateTime'=>$s['date_time'],'BuyerNTN'=>'','BuyerCNIC'=>'','BuyerName'=>'','BuyerPhoneNumber'=>'',

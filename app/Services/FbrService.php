@@ -2469,9 +2469,9 @@ class FbrService
             ];
         }
 
-        // NOTE: PCTCode (HS code) is OPTIONAL for FBR IMS POS Fiscalization (SRO 1279/2021),
-        // unlike Digital Invoicing where hsCode is mandatory. Retail POS items often have no
-        // HS code, so we send PCTCode when available and blank otherwise — never block the bill.
+        // buildFbrPosPayload keeps PCTCode present and uses the existing
+        // 00000000 compatibility default when the catalogue has no HS code.
+        // Do not confuse that transport fallback with a statutory exemption.
 
         $token = $this->getFbrPosToken($company);
         $url = $this->getFbrPosUrl($company);

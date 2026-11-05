@@ -32,7 +32,7 @@ class PosFederalAutomationController extends Controller
         $mapping=[];
         if ($data['enabled']) {
             $mapping=$request->validate([
-                'hs_code'=>['required','regex:/^[0-9]{4}\.[0-9]{4}$/'],
+                'hs_code'=>[$data['channel']==='di' ? 'required' : 'nullable','regex:/^[0-9]{4}\.[0-9]{4}$/'],
                 'tax_rate'=>['required','numeric','between:0,100','regex:/^\d{1,3}(?:\.\d{1,2})?$/'],
                 'uom'=>($data['channel']==='di' ? 'required' : 'nullable').'|string|max:100',
                 'sale_type'=>($data['channel']==='di' ? 'required' : 'nullable').'|string|max:150',

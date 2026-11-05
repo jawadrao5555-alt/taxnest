@@ -12,7 +12,10 @@
             <input type="hidden" name="environment" value="{{ $selected[1]->environment }}">
             <label for="auto-enabled">Automatic reporting</label>
             <select id="auto-enabled" name="enabled"><option value="0" @selected(!$rule?->enabled)>OFF</option><option value="1" @selected($rule?->enabled)>ON · future bills only</option></select>
-            <label for="auto-hs">Reviewed HS/PCT code</label><input id="auto-hs" name="hs_code" value="{{ old('hs_code',$rule?->mapping['hs_code'] ?? '') }}" placeholder="0000.0000">
+            <label for="auto-hs">{{ $selected[0]==='di' ? 'Reviewed HS code (required)' : 'Reviewed PCT code (optional)' }}</label><input id="auto-hs" name="hs_code" value="{{ old('hs_code',$rule?->mapping['hs_code'] ?? '') }}" placeholder="0000.0000">
+            @if($selected[0]==='ims')
+                <p>A blank PCT uses the existing FBR POS compatibility value 00000000. This does not select a tax exemption or prove acceptance by your installed IMS. Review the applicable rate separately.</p>
+            @endif
             <label for="auto-rate">Reviewed federal percentage (separate from PRA)</label><input id="auto-rate" type="number" min="0" max="100" step="0.01" name="tax_rate" value="{{ old('tax_rate',$rule?->mapping['tax_rate'] ?? '') }}">
             @if($selected[0]==='di')
                 <label for="auto-uom">FBR unit of measure</label><input id="auto-uom" name="uom" value="{{ old('uom',$rule?->mapping['uom'] ?? '') }}">

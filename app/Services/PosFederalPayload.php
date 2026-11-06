@@ -48,14 +48,26 @@ class PosFederalPayload
             $p['buyerProvince']=$m['buyer_province']; $p['buyerAddress']=$m['buyer_address'];
             $p['invoiceRefNo']=$parent?->fiscalReference() ?? '';
             if ($row->environment==='sandbox') $p['scenarioId']=$m['scenario_id'];
-            foreach ($p['items'] as &$line) {
+            $originalTax = ($m['tax_source'] ?? null) === 'original_bill';
+            foreach ($p['items'] as $index => &$line) {
                 $line['hsCode']=$m['hs_code']; $line['uoM']=$m['uom'];
-                $line['saleType']=$m['sale_type']; $line['rate']=$m['tax_rate'].'%';
-                $line['salesTaxApplicable']=round($line['valueSalesExcludingST']*(float)$m['tax_rate']/100,2);
+                $line['saleType']=$m['sale_type'];
+                $original = $record->snapshot['lines'][$index];
+                abort_if($originalTax && (!is_numeric($original['tax_rate'] ?? null) || !is_numeric($original['pra_tax'] ?? null)),
+                    422, 'Original item tax and rate are required for automatic DI.');
+                $line['rate'] = ($originalTax ? $original['tax_rate'] : $m['tax_rate']).'%';
+                $line['salesTaxApplicable'] = $originalTax ? round((float) $original['pra_tax'], 2)
+                    : round($line['valueSalesExcludingST'] * (float) $m['tax_rate'] / 100, 2);
                 $line['totalValues']=round($line['valueSalesExcludingST']+$line['salesTaxApplicable'],2);
                 $line['sroScheduleNo']=$m['sro_schedule'] ?? ''; $line['sroItemSerialNo']=$m['sro_item'] ?? '';
             }
             unset($line);
+            if ($originalTax) {
+                $snapshot = $record->snapshot;
+                $total = (float) $snapshot['total'] - (float) ($snapshot['fbr_service_charge'] ?? 0);
+                abort_unless(abs(array_sum(array_column($p['items'], 'totalValues')) - $total) < 0.01,
+                    422, 'Original bill totals require review before automatic DI.');
+            }
         }
         return $p;
     }

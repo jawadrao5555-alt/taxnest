@@ -13,6 +13,9 @@
         <td style="width:50%;vertical-align:top;text-align:center;padding:2px;font-size:9px;overflow-wrap:anywhere">
             <div>{{ $federalFiscal['label'] }} · {{ $federalFiscal['environment'] }}</div>
             @if($federalFiscal['reference'])
+                @if($federalFiscal['label'] === 'FBR DI' && $federalFiscal['environment'] === 'PRODUCTION')
+                    <img src="{{ asset('images/fbr-digital-invoice-logo-print.png') }}" alt="FBR DI logo" style="display:block;max-width:{{ $fiscalQrSize }}px;height:auto;margin:2px auto">
+                @endif
                 <img src="{{ \App\Support\QrImage::dataUri($federalFiscal['reference'],5,4) }}" alt="FBR fiscal QR" style="display:block;width:{{ $fiscalQrSize }}px;height:{{ $fiscalQrSize }}px;margin:2px auto">
                 <div class="fbr-fiscal-reference" style="font-weight:bold;word-break:break-all">{{ $federalFiscal['reference'] }}</div>
                 @if(str_contains($federalFiscal['state'],'central unverified'))<div>{{ $federalFiscal['state'] }}</div>@endif

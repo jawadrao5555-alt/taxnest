@@ -33,7 +33,7 @@ class PosFederalAutomationController extends Controller
         if ($data['enabled']) {
             $mapping=$request->validate([
                 'hs_code'=>[$data['channel']==='di' ? 'required' : 'nullable','regex:/^[0-9]{4}\.[0-9]{4}$/'],
-                'tax_rate'=>[$data['channel']==='di' ? 'required' : 'nullable','numeric','between:0,100','regex:/^\d{1,3}(?:\.\d{1,2})?$/'],
+                'tax_rate'=>['nullable','numeric','between:0,100','regex:/^\d{1,3}(?:\.\d{1,2})?$/'],
                 'uom'=>($data['channel']==='di' ? 'required' : 'nullable').'|string|max:100',
                 'sale_type'=>($data['channel']==='di' ? 'required' : 'nullable').'|string|max:150',
                 'buyer_province'=>($data['channel']==='di' ? 'required' : 'nullable').'|string|max:80',
@@ -42,8 +42,13 @@ class PosFederalAutomationController extends Controller
                 'sro_schedule'=>'nullable|string|max:100','sro_item'=>'nullable|string|max:100',
                 'all_items_confirmed'=>'accepted','mapping_reviewed'=>'accepted',
             ]);
+            if ($data['channel'] === 'di' && $data['environment'] === 'production' && !filled($company->province)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'buyer_province' => 'Set the company seller province before enabling automatic DI.',
+                ]);
+            }
             unset($mapping['all_items_confirmed'],$mapping['mapping_reviewed']);
-            if ($data['channel']==='ims' && !$request->filled('tax_rate')) {
+            if (!$request->filled('tax_rate')) {
                 $mapping['tax_source']='original_bill';
                 unset($mapping['tax_rate']);
             }

@@ -52,9 +52,9 @@ class PraDiSandboxService
         $buyerProvince = '';
         $sellerProvince = $s['seller_province'] ?? '';
         if (!$sandbox && $s['transaction_type'] === 'sale') {
-            $company = Company::query()->select(['id', 'city', 'province'])->find($record->company_id);
+            $company = Company::query()->find($record->company_id);
             $sale = PosTransaction::query()->where('company_id', $record->company_id)
-                ->select(['id', 'delivery_address'])->find($record->source_transaction_id);
+                ->find($record->source_transaction_id);
             $customer = !empty($s['customer_id'])
                 ? \App\Models\PosCustomer::query()->where('company_id', $record->company_id)
                     ->select(['id', 'name', 'address', 'city'])->find($s['customer_id'])
@@ -104,7 +104,7 @@ class PraDiSandboxService
         });
     }
 
-    public function submit(int $companyId, int $id, int $actorId): PosDiSandboxSubmission
+    public function submit(int $companyId, int $id, int $actorId, bool $automatic = false): PosDiSandboxSubmission
     {
         PraDiSandboxGate::enforce($companyId);
         $company = Company::findOrFail($companyId);
@@ -131,7 +131,7 @@ class PraDiSandboxService
         });
 
         // External I/O outside the DB lock; never retry an uncertain POST.
-        $result = app(FbrService::class)->submitPosDiPayload($record->payload, $token, $record->reportingEnvironment(), $companyId);
+        $result = app(FbrService::class)->submitPosDiPayload($record->payload, $token, $record->reportingEnvironment(), $companyId, $automatic);
         return DB::transaction(function () use ($companyId, $id, $result) {
             $record = $this->locked($companyId, $id);
             abort_unless($record->state === 'submitting', 409);

@@ -182,6 +182,12 @@ class PosFederalAutomationTest extends TestCase
         $this->assertNull($reader->federal($sale)['reference']);
         $r->update(['state'=>'accepted','sandbox_invoice_number'=>'TEST-SANDBOX-ACK']);
         $this->assertSame('TEST-SANDBOX-ACK',$reader->federal($sale)['reference']);
+        $live = $r->replicate();
+        $live->fill(['environment'=>'production','state'=>'accepted','production_invoice_number'=>'TEST-LIVE-ACK'])->save();
+        $this->assertSame('TEST-LIVE-ACK', $reader->federal($sale)['reference']);
+        $live->update(['state'=>'verification_required']);
+        $this->assertSame('PRODUCTION', $reader->federal($sale)['environment']);
+        $this->assertNull($reader->federal($sale)['reference']);
         $sale->company_id=999; $this->assertNull($reader->federal($sale));
     }
 

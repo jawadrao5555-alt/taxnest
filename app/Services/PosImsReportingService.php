@@ -236,7 +236,8 @@ class PosImsReportingService
             && in_array(array_keys($response), [['InvoiceNumber'], ['FBRInvoiceNumber']], true)) {
             $number = FbrPosFiscalResult::fromResponse($response);
             $posId = str_pad((string) $r->payload['POSID'], 6, '0', STR_PAD_LEFT);
-            if ($number && preg_match('/^'.preg_quote($posId, '/').'[A-Z]{2}[A-Z0-9]{1,6}[0-9]{5,14}$/D', $number)) {
+            if ($number && strlen($posId) === 6 && str_starts_with($number, $posId)
+                && preg_match('/[0-9]/', substr($number, 6))) {
                 $result = ['state'=>'local_accepted','reference'=>$number,'error_codes'=>[]];
             }
         }

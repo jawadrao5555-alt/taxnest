@@ -55,7 +55,7 @@ class PosFederalPayload
                 $original = $record->snapshot['lines'][$index];
                 abort_if($originalTax && (!is_numeric($original['tax_rate'] ?? null) || !is_numeric($original['pra_tax'] ?? null)),
                     422, 'Original item tax and rate are required for automatic DI.');
-                $line['rate'] = ($originalTax ? $original['tax_rate'] : $m['tax_rate']).'%';
+                $line['rate'] = ($originalTax ? (float) $original['tax_rate'] : $m['tax_rate']).'%';
                 $line['salesTaxApplicable'] = $originalTax ? round((float) $original['pra_tax'], 2)
                     : round($line['valueSalesExcludingST'] * (float) $m['tax_rate'] / 100, 2);
                 $line['totalValues']=round($line['valueSalesExcludingST']+$line['salesTaxApplicable'],2);

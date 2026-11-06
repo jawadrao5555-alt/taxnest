@@ -1010,6 +1010,13 @@ class PosCashierSalesIsolationTest extends TestCase
             ->assertSessionHas('error');
         $this->assertSame('failed', DB::table('pos_transactions')->where('id', $failed)->value('pra_status'));
 
+        // Own bill must remain readable while the receipt waits for fiscal status.
+        $own = $this->makePraTxn($cid, ['created_by' => $cashier->id, 'pra_status' => 'submitted']);
+        $this->actingAs($cashier, 'pos')
+            ->getJson("/pos/transaction/{$own}/pra-status")
+            ->assertOk()
+            ->assertJsonPath('pra_status', 'submitted');
+
         // Fiscal-status probe — peer bill mirrors not-found (no existence oracle).
         $this->actingAs($cashier, 'pos')
             ->getJson("/pos/transaction/{$failed}/pra-status")

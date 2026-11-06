@@ -826,6 +826,30 @@ class PraDiSandboxTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_live_ims_number_only_acknowledgement_must_match_the_claimed_pos(): void
+    {
+        foreach ([
+            ['production', '054321FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'local_accepted'],
+            ['production', '054322FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'verification_required'],
+            ['production', '054321FK6N1234567', ['InvoiceNumber:string'], 'response_received', 'verification_required'],
+            ['production', '054321FK6N1234567', ['FBRInvoiceNumber:string'], 'transport_timeout', 'verification_required'],
+            ['sandbox', '012345FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'verification_required'],
+        ] as [$environment, $number, $fields, $diagnostic, $state]) {
+            $this->imsProfile($environment, 'fiscal_device');
+            $service = app(\App\Services\PosImsReportingService::class);
+            $record = $service->capture($this->company, $this->bill(), $this->owner->id, $environment);
+            $service->prepare($this->company->id, $record->id, $this->imsPayload($record));
+            Http::fake();
+            $service->submit($this->company->id, $record->id, $this->owner->id);
+            $claim = $service->claim($this->company->id, 'synthetic-device');
+            $record = $service->callback($this->company->id, $record->id, 'synthetic-device',
+                $claim['claim'], ['InvoiceNumber'=>$number], $diagnostic, $fields);
+            $this->assertSame($state, $record->state);
+            $this->assertSame($state === 'local_accepted' ? $number : null, $record->fiscal_number);
+            Http::assertNothingSent();
+        }
+    }
+
     private function imsProfile(string $environment='sandbox', string $mode='cloud'): \App\Models\PosImsProfile
     {
         PosDiSandboxProfile::where('company_id',$this->company->id)->update(['enabled'=>false]);

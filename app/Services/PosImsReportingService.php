@@ -226,6 +226,21 @@ class PosImsReportingService
         $r=PosImsSubmission::where('company_id',$companyId)->findOrFail($id);
         abort_unless($r->connection_mode==='fiscal_device' && $r->device_uid===$deviceUid,403);
         $result=self::result($response,true);
+        // The live IMS component can acknowledge with only FBRInvoiceNumber.
+        // Bind that reply shape to this claimed POS and keep central verification separate.
+        if ($result['state'] === 'verification_required'
+            && $r->environment === 'production'
+            && $diagnostic === 'response_received'
+            && $responseFields === ['FBRInvoiceNumber:string']
+            && is_array($response)
+            && in_array(array_keys($response), [['InvoiceNumber'], ['FBRInvoiceNumber']], true)) {
+            $number = FbrPosFiscalResult::fromResponse($response);
+            $posId = str_pad((string) $r->payload['POSID'], 6, '0', STR_PAD_LEFT);
+            if ($number && preg_match('/^'.preg_quote($posId, '/').'FK6N[0-9]{7}$/D', $number)) {
+                $result = ['state'=>'local_accepted','reference'=>$number,'error_codes'=>[]];
+            }
+        }
+
         // Retain only bounded, validated fiscal fields in encrypted evidence.
         // The original code used to discard all callback evidence after classification.
         $evidence=[];

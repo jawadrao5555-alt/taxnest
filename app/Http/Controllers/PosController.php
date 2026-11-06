@@ -6436,7 +6436,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $tx = PosTransaction::where('company_id', $companyId)
-            ->select(['id', 'pra_status', 'pra_invoice_number'])
+            ->select(['id', 'company_id', 'created_by', 'pra_status', 'pra_invoice_number'])
             ->find($id);
         if (!$tx) {
             return response()->json(['success' => false], 404);
@@ -6446,8 +6446,12 @@ class PosController extends Controller
         if (!$tx->allowedForCashierIsolationOf(auth('pos')->user())) {
             return response()->json(['success' => false], 404);
         }
+        $federal = app(\App\Services\PosFiscalReceipt::class)->federal($tx);
         return response()->json([
             'success' => true,
+            'fbr_pos_pending' => ($federal['label'] ?? null) === 'FBR POS'
+                && in_array($federal['state'], ['queued', 'processing', 'dispatched', 'linked existing', 'draft', 'queued agent', 'submitting'], true),
+            'fbr_pos_ready' => ($federal['label'] ?? null) === 'FBR POS' && !empty($federal['reference']),
             'pra_status' => $tx->pra_status,
             'pra_invoice_number' => $tx->pra_invoice_number,
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');

@@ -23,6 +23,59 @@
     <section class="card"><h2>FBR {{ ucfirst($env) }} mapping</h2>
         <p class="muted">Resolve classification and tax fields explicitly; PRA tax is not copied into federal sales tax. Confirm provincial-tax treatment with PRAL. Production requires reviewed live buyer and tax details. Sandbox scenario IDs do not establish an exemption.</p>
         @if($s['transaction_type'] === 'return')<p class="notice">Use the original sale's accepted FBR reference from the same environment as invoiceRefNo. Sandbox references cannot adjust production invoices.</p>@endif
+        @if($env === 'sandbox' && $canSubmit && $s['transaction_type'] === 'sale' && in_array($record->state, ['draft','rejected']))
+        <details>
+            <summary>Punjab restaurant sandbox presets</summary>
+            <p class="muted">Use only for Punjab restaurant services and scenarios assigned to this company in IRIS. Choose a different source bill for each scenario. Review the generated payload before saving.</p>
+            <label for="restaurant-scenario">Assigned IRIS scenario</label>
+            <select id="restaurant-scenario">
+                <option value="">Select a scenario</option>
+                <option value="SN019">SN019 · Services</option>
+                <option value="SN018">SN018 · Services (FED in ST Mode)</option>
+            </select>
+            <button type="button" id="apply-restaurant-preset">Fill sandbox payload</button>
+            <p id="restaurant-preset-status" class="muted" role="status"></p>
+        </details>
+        <script>
+            document.getElementById('apply-restaurant-preset').addEventListener('click', () => {
+                const scenario = document.getElementById('restaurant-scenario').value;
+                const status = document.getElementById('restaurant-preset-status');
+                if (!['SN018', 'SN019'].includes(scenario)) {
+                    status.textContent = 'Select an assigned scenario first.';
+                    return;
+                }
+                const payload = {{ Illuminate\Support\Js::from($payload) }};
+                const province = payload.sellerProvince.trim();
+                if (province && province.toLowerCase() !== 'punjab') {
+                    status.textContent = 'This preset is only for Punjab restaurant services.';
+                    return;
+                }
+                Object.assign(payload, {
+                    scenarioId: scenario, sellerProvince: 'Punjab', buyerProvince: 'Punjab',
+                    buyerNTNCNIC: '', buyerBusinessName: 'Fictional walk-in customer',
+                    buyerAddress: 'Fictional test address', buyerRegistrationType: 'Unregistered',
+                });
+                for (const item of payload.items) {
+                    const base = Number(item.valueSalesExcludingST);
+                    const tax = Math.round(base * 16) / 100;
+                    Object.assign(item, {
+                        hsCode: '9801.2000', uoM: 'Numbers, pieces, units', rate: '16%',
+                        saleType: scenario === 'SN018' ? 'Services (FED in ST Mode)' : 'Services',
+                        salesTaxApplicable: tax, totalValues: Number((base + tax).toFixed(2)),
+                        fixedNotifiedValueOrRetailPrice: 0, salesTaxWithheldAtSource: 0,
+                        extraTax: 0, furtherTax: 0, fedPayable: 0, discount: 0,
+                        sroScheduleNo: '', sroItemSerialNo: '',
+                    });
+                }
+                const editor = document.getElementById('payload');
+                editor.value = JSON.stringify(payload, null, 2);
+                editor.form.elements.mapping_reviewed.checked = false;
+                const submit = document.getElementById('di-submit-reviewed');
+                if (submit) submit.hidden = true;
+                status.textContent = scenario + ' filled. Review and save this payload before submitting.';
+            });
+        </script>
+        @endif
         <form method="post" action="{{ route('pos.di-sandbox.prepare', $record->id) }}">@csrf
             <label for="payload">Exact {{ ucfirst($env) }} JSON payload</label>
             <textarea id="payload" name="payload_json" spellcheck="false" @readonly(!$canSubmit || !in_array($record->state, ['draft','rejected']))>{{ old('payload_json', json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION)) }}</textarea>
@@ -30,7 +83,7 @@
         </form>
         @if($canSubmit && $record->state === 'draft' && $record->payload)
         <p class="muted">Payload saved. Sending uses this company's {{ $env }} token and the fixed FBR {{ $env }} endpoint.</p>
-        <form method="post" action="{{ route('pos.di-sandbox.submit', $record->id) }}">@csrf<label><input type="checkbox" name="{{ $env === 'production' ? 'confirm_production' : 'confirm_sandbox' }}" value="1" required>{{ $env === 'production' ? 'Report this real invoice to FBR PRODUCTION now. This is a live fiscal submission.' : 'Send this reviewed test copy to the FBR sandbox.' }}</label><button type="submit">Submit to FBR {{ strtoupper($env) }}</button></form>
+        <form id="di-submit-reviewed" method="post" action="{{ route('pos.di-sandbox.submit', $record->id) }}">@csrf<label><input type="checkbox" name="{{ $env === 'production' ? 'confirm_production' : 'confirm_sandbox' }}" value="1" required>{{ $env === 'production' ? 'Report this real invoice to FBR PRODUCTION now. This is a live fiscal submission.' : 'Send this reviewed test copy to the FBR sandbox.' }}</label><button type="submit">Submit to FBR {{ strtoupper($env) }}</button></form>
         @endif
     </section>
 </div>

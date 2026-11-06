@@ -36,16 +36,25 @@ class FbrService
         return $this->submitPosDiPayload($payload, $sandboxToken, 'sandbox', $companyId);
     }
 
-    public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId): array
+    public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId, bool $automatic = false): array
     {
         \App\Support\PraDiSandboxGate::enforce($companyId, $environment);
         $profile = $companyId ? \App\Models\PosDiSandboxProfile::where('company_id', $companyId)->first() : null;
         $url = PosTaxIntegrationEndpoints::checked('di', $environment, $profile?->{$environment.'_url'});
         $unknown = ['state' => 'verification_required', 'reference' => null, 'error_codes' => []];
         try {
-            // Fixed environment endpoint; no overrides, redirects or automatic retry.
-            $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)
-                ->withoutRedirecting()->post($url, $payload);
+            $request = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)->withoutRedirecting();
+            if ($automatic) {
+                // DNS or connect failures happen before an HTTP request reaches FBR.
+                // Timeouts, HTTP errors and incomplete replies remain ambiguous.
+                $request->retry(3, 1000, function (\Throwable $exception): bool {
+                    $cause = $exception instanceof \Illuminate\Http\Client\ConnectionException
+                        ? $exception->getPrevious() : $exception;
+                    return $cause instanceof \GuzzleHttp\Exception\ConnectException
+                        && in_array($cause->getHandlerContext()['errno'] ?? null, [5, 6, 7], true);
+                }, throw: false);
+            }
+            $response = $request->post($url, $payload);
             if (!$response->successful() || !is_array($response->json())) return $unknown;
             $data = $response->json();
             $validation = $data['validationResponse'] ?? null;

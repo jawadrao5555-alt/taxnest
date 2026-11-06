@@ -83,7 +83,9 @@ class PosFederalAutomation
             }
             $payload=app(PosFederalPayload::class)->build($row,$record,$svc);
             $svc->prepare($row->company_id,$record->id,$payload);
-            $record=$svc->submit($row->company_id,$record->id,$actor);
+            $record = $row->channel === 'di'
+                ? $svc->submit($row->company_id, $record->id, $actor, automatic: true)
+                : $svc->submit($row->company_id, $record->id, $actor);
             $row->update(['state'=>'dispatched','error_code'=>null]);
         } catch (\Throwable $e) {
             $record=$row->submission_id ? ($row->channel==='ims' ? PosImsSubmission::class : PosDiSandboxSubmission::class)::where('company_id',$row->company_id)->find($row->submission_id) : null;

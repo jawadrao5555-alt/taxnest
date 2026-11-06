@@ -3079,10 +3079,24 @@ window.addEventListener('popstate', function() {
                         <button type="button" @click="pdSearch = ''" class="mt-2 text-xs font-bold text-amber-600 hover:text-amber-800 underline">{{ __('pos.clear_word') }}</button>
                     </div>
                 </template>
+                <div x-show="canAssignRider && bulkAssignableBills().length" class="flex flex-wrap items-center gap-2 px-4 py-2 border-b dark:border-gray-700">
+                    <button type="button" @click="toggleAllDeliveryBills()" :disabled="!!riderAssignBusyId" class="text-xs font-semibold text-blue-600"
+                            x-text="bulkAssignableBills().every(b => bulkDeliveryIds.includes(String(b.id))) ? 'Clear selection' : 'Select all shown'"></button>
+                    <span class="text-xs" x-text="bulkSelectedBills().length + ' selected'"></span>
+                    <select x-model="bulkDeliveryRider" aria-label="Rider for selected deliveries" class="text-xs rounded dark:bg-gray-800">
+                        <option value="">{{ __('pos.no_rider_opt') }}</option>
+                        <template x-for="r in deliveryRiders" :key="r.id"><option :value="r.id" x-text="r.name"></option></template>
+                    </select>
+                    <button type="button" @click="assignSelectedDeliveries()" :disabled="!bulkDeliveryRider || !bulkSelectedBills().length || !!riderAssignBusyId"
+                            class="px-2 py-1 rounded bg-blue-600 text-white text-xs disabled:opacity-50">Assign selected</button>
+                </div>
                 <template x-for="bill in pdFiltered(pendingDeliveryBills()).slice(0, 100)" :key="bill.id">
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800">
                         <div class="flex items-center justify-between mb-1.5">
                             <div class="flex items-center gap-2 flex-wrap">
+                                <input type="checkbox" x-show="canAssignRider && canBulkAssign(bill)" :value="String(bill.id)"
+                                       :disabled="!!riderAssignBusyId" x-model="bulkDeliveryIds"
+                                       :aria-label="'Select delivery ' + billDisplayNumber(bill)">
                                 <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="billDisplayNumber(bill)"></span>
                                 <span class="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" x-text="window.TXT.delivery"></span>
                                 <template x-if="bill.rider_name">
@@ -3104,7 +3118,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <template x-if="bill.rider_collection_amount != null">
                             <div class="text-xs font-semibold text-teal-700 dark:text-teal-300 mb-2">
-                                <p x-text="window.TXT.fulfill_rider_cash + ': Rs. ' + Number(Math.max(0, Number(bill.rider_collection_amount) - Number(bill.rider_partial_paid || 0))).toLocaleString()"></p>
+                                <p x-text="window.TXT.fulfill_rider_cash + ': Rs. ' + Number(Math.max(0, Number(bill.rider_collection_amount) - Number(bill.rider_partial_paid || 0) - Number(bill.delivery_credit_amount || 0))).toLocaleString()"></p>
                                 <p x-text="(bill.delivery_items || []).map(i => i.quantity + ' × ' + i.name).join(' · ')"></p>
                             </div>
                         </template>
@@ -3181,10 +3195,10 @@ window.addEventListener('popstate', function() {
                             <div class="mb-2 flex items-center gap-2">
                                 <span class="text-[11px] font-semibold text-gray-500">{{ __('pos.rider_word') }}:</span>
                                 <select @change="assignRider(bill, $event.target.value); $event.target.value = bill.rider_id"
-                                        :value="bill.rider_id" :disabled="riderAssignBusyId"
+                                        :disabled="riderAssignBusyId"
                                         class="flex-1 rounded-lg border-amber-300 dark:border-amber-700 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-amber-500 focus:border-amber-500 disabled:opacity-50">
                                     <template x-for="r in deliveryRiders" :key="'reassign-' + bill.id + '-' + r.id">
-                                        <option :value="r.id" x-text="r.name + (r.battery_pct != null && r.battery_pct <= 20 ? ' 🪫 ' + r.battery_pct + '%' : '')"></option>
+                                        <option :value="r.id" :selected="String(r.id) === String(bill.rider_id)" x-text="r.name + (r.battery_pct != null && r.battery_pct <= 20 ? ' 🪫 ' + r.battery_pct + '%' : '')"></option>
                                     </template>
                                 </select>
                             </div>
@@ -5327,6 +5341,9 @@ function restaurantPos() {
         deliveryRiders: [],
         canAssignRider: false,
         riderAssignBusyId: null,
+        bulkDeliveryIds: [],
+        bulkDeliveryRider: '',
+        localBillsRequestId: 0,
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
@@ -12858,14 +12875,15 @@ function restaurantPos() {
         // Lightweight fetch + inline action methods. All errors degrade to a
         // toast — modal stays open so cashier doesn't lose context.
         async loadLocalBills() {
+            const requestId = ++this.localBillsRequestId;
             this.localBillsLoading = true;
             try {
                 const res = await fetch('{{ route('pos.api.provisional-bills') }}', {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
-                if (!res.ok) { this.localBillsLoading = false; return; }
+                if (!res.ok) return;
                 const data = await res.json();
-                if (data && data.success) {
+                if (requestId === this.localBillsRequestId && data && data.success) {
                     this.localBills = data.bills || [];
                     this.finalDeliveryBills = data.final_deliveries || [];
                     this.deliveryRiders = data.riders || [];
@@ -12876,7 +12894,7 @@ function restaurantPos() {
                     }
                 }
             } catch (e) { console.warn('loadLocalBills error', e); }
-            this.localBillsLoading = false;
+            finally { if (requestId === this.localBillsRequestId) this.localBillsLoading = false; }
         },
         openLocalBills() {
             this.activeLocalIndex = 0;
@@ -13047,6 +13065,49 @@ function restaurantPos() {
         // /pos/deliveries/{id}/assign (same backend as the Deliveries board;
         // koi naya path nahi). Success = list refresh (bill assigned-section
         // mein chala jata hai, khata rider_id follow karta hai).
+        canBulkAssign(bill) {
+            return !bill.rider_settlement_id && !Number(bill.rider_partial_paid || 0)
+                && !['delivered', 'returned'].includes(bill.delivery_status);
+        },
+        bulkAssignableBills() {
+            return this.pdFiltered(this.pendingDeliveryBills()).slice(0, 100).filter(b => this.canBulkAssign(b));
+        },
+        bulkSelectedBills() {
+            return this.bulkAssignableBills().filter(b => this.bulkDeliveryIds.includes(String(b.id)));
+        },
+        toggleAllDeliveryBills() {
+            const ids = this.bulkAssignableBills().map(b => String(b.id));
+            this.bulkDeliveryIds = ids.every(id => this.bulkDeliveryIds.includes(id)) ? [] : ids;
+        },
+        async assignSelectedDeliveries() {
+            const bills = this.bulkSelectedBills();
+            const riderId = this.bulkDeliveryRider;
+            if (!bills.length || !riderId || this.riderAssignBusyId) return;
+            const rider = this.deliveryRiders.find(r => String(r.id) === String(riderId));
+            if (!rider || !window.confirm('Assign ' + bills.length + ' deliveries to ' + rider.name + '?')) return;
+            this.riderAssignBusyId = 'bulk';
+            try {
+                const response = await fetch(@json(route('pos.deliveries.bulk-assign')), {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ rider_id: riderId, bills: bills.map(b => ({
+                        id: b.id, expected_rider_id: b.rider_id || null, assignment_revision: b.assignment_revision || null
+                    })) }),
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data?.success) {
+                    this.showToast(data?.message || @json(__('pos.rider_assign_failed')), 'error');
+                } else {
+                    this.bulkDeliveryIds = [];
+                    this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                }
+                await this.loadLocalBills();
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            } finally {
+                this.riderAssignBusyId = null;
+            }
+        },
         async assignRider(bill, riderId) {
             if (!bill || !riderId || this.riderAssignBusyId) return;
             if (bill.rider_id && Number(bill.rider_id) !== Number(riderId)
@@ -13071,7 +13132,7 @@ function restaurantPos() {
                 if (res.ok && data && data.success) {
                     this.showToast(@json(__('pos.rider_assign_ok')), 'success');
                     if (data.print_receipt) this.printAssignedDeliveryReceipt(bill);
-                    this.loadLocalBills();
+                    await this.loadLocalBills();
                 } else {
                     this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
                 }
@@ -13145,7 +13206,7 @@ function restaurantPos() {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     },
-                    body: JSON.stringify({ settle_all: 1, received_amount: received }),
+                    body: JSON.stringify({ settle_all: 1, received_amount: received, expected_outstanding: outstanding }),
                 });
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {
@@ -14003,7 +14064,7 @@ function restaurantPos() {
                 if (this.receiptCloseLeft > 1) { this.receiptCloseLeft--; return; }
                 // Reached zero — if popup-print iframes/timers are still in flight,
                 // wait 2 more seconds instead of cancelling their prints.
-                if ((this.pendingPrintTimers && this.pendingPrintTimers.length) || (this.printMessageHandlers && this.printMessageHandlers.length)) {
+                if (this.printWorkInFlight > 0 || (this.pendingPrintTimers && this.pendingPrintTimers.length) || (this.printMessageHandlers && this.printMessageHandlers.length)) {
                     this.receiptCloseLeft = 2;
                     return;
                 }

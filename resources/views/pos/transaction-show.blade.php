@@ -309,6 +309,17 @@
                         <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.total_word') }}</span>
                         <span class="font-bold text-lg text-emerald-600">PKR {{ number_format($transaction->total_amount, 2) }}</span>
                     </div>
+                    @if($transaction->transaction_type === 'return' && (float) $transaction->delivery_credit_amount > 0)
+                    <div class="flex justify-between text-sm">
+                        <span>{{ __('pos_delivery.credit_cancelled') }}</span>
+                        <span>PKR {{ number_format($transaction->delivery_credit_amount, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm font-semibold">
+                        <span>{{ __('pos_delivery.cash_refund') }}</span>
+                        <span>PKR {{ number_format($transaction->total_amount - $transaction->delivery_credit_amount, 2) }}</span>
+                    </div>
+                    @endif
+
                 </div>
             </div>
 

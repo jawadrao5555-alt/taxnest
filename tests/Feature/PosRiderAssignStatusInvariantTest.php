@@ -220,6 +220,35 @@ class PosRiderAssignStatusInvariantTest extends TestCase
 
     // ── 1. assign: fiscal identity unchanged, only rider_id/delivery_status ─
 
+    public function test_bulk_assignment_rolls_back_when_one_selected_bill_is_stale(): void
+    {
+        $this->actAs();
+        $rider = $this->makeRider();
+        $first = $this->makeBill(null);
+        $second = $this->makeBill(null);
+        $selection = fn ($id, $expected) => [
+            'id' => $id, 'expected_rider_id' => $expected, 'assignment_revision' => null,
+        ];
+        $request = fn ($expected) => $this->makeRequest('/pos/deliveries/bulk-assign', [
+            'rider_id' => $rider,
+            'bills' => [$selection($first, null), $selection($second, $expected)],
+        ]);
+
+        try {
+            $this->controller()->bulkAssign($request($rider));
+            $this->fail('The stale selection should be rejected.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('bills', $e->errors());
+        }
+        $this->assertNull($this->tx($first)->rider_id);
+        $this->assertNull($this->tx($second)->rider_id);
+
+        $response = $this->controller()->bulkAssign($request(null));
+        $this->assertSame(2, $response->getData(true)['assigned_count']);
+        $this->assertSame($rider, (int) $this->tx($first)->rider_id);
+        $this->assertSame($rider, (int) $this->tx($second)->rider_id);
+    }
+
     public function test_assign_rider_never_mutates_fiscal_identity(): void
     {
         $rider = $this->makeRider();

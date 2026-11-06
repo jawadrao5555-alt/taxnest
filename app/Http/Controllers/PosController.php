@@ -5461,6 +5461,8 @@ class PosController extends Controller
         // out of this list — those were polluting the F10 modal before.
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
+        $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
+        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
         // Prepaid conversion stamp — PROD-drift guarded (older installs may not
         // have run the prepaid-conversion migration yet).
@@ -5497,6 +5499,8 @@ class PosController extends Controller
                        ...($hasBillToken ? ['bill_token'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : []),
                    ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
+                   ...($hasDelStatus ? ['delivery_status'] : []),
+                   ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
                    ...($hasBizDate ? ['business_date'] : [])]);
 
         // ─── FINAL delivery bills still OPEN (owner bug report, 3 Aug 2026) ───
@@ -5507,7 +5511,6 @@ class PosController extends Controller
         // par hai. Display + delivered-mark/settle ONLY — promote (Final
         // Cash/Card) in par KABHI nahi chalta (bill pehle se final hai).
         $finalBills = collect();
-        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
         // Task 807: stream-scope for final delivery bills — mirrors
         // PosRiderController::applyStreamScope (EXPLICIT scope, Task 1186:
         // delivery tracking stays stream-agnostic for derived-default staff —
@@ -5579,6 +5582,8 @@ class PosController extends Controller
                 ->orderBy('id', 'desc')
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
+                    ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
+                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_credit_amount') ? ['delivery_credit_amount'] : []),
                        ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'has_delivery_items') ? ['has_delivery_items', 'rider_collection_amount'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid') ? ['rider_partial_paid'] : []),
                        ...($hasBillToken ? ['bill_token'] : []),
@@ -5607,7 +5612,7 @@ class PosController extends Controller
                 // the rider's ENTIRE khata (all dates, archived included) — same
                 // scope as PosRiderController::settle with settle_all. Show the
                 // cashier the real count+amount so "poore rider ka settle" is clear.
-                $riderOpen = PosTransaction::withoutGlobalScope('hide_archived')
+                $riderOpen = PosRiderController::scopeBillingStream(PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->whereIn('rider_id', $riderIds)
                     ->where('payment_method', 'cash')
@@ -5615,7 +5620,7 @@ class PosController extends Controller
                     ->whereNull('rider_settlement_id')
                     ->where(function ($q) {
                         $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
-                    })
+                    }), auth('pos')->user()?->posBillingScopeExplicit() ?? 'both')
                     ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('pos_transactions') . '),0) as amt')
                     ->groupBy('rider_id')
                     ->get()
@@ -5652,7 +5657,6 @@ class PosController extends Controller
             }
         }
 
-        $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
         // Mixed-delivery summaries read item rows below. Production refuses
         // implicit loading; fetch only mixed bills in a batch before mapping.
         // Empty/legacy collections keep their previous query behavior.
@@ -5704,6 +5708,8 @@ class PosController extends Controller
                 'rider_unsettled'  => $hasRiderCols && $b->rider_id && empty($b->rider_settlement_id),
                 // Task 123: whole-khata scope for the panel's Settle button.
                 'rider_id'         => $hasRiderCols ? ($b->rider_id ? (int) $b->rider_id : null) : null,
+                'delivery_status' => $b->delivery_status,
+                'rider_settlement_id' => $b->rider_settlement_id,
                 'assignment_revision' => $hasAssignmentRevision ? $b->rider_assignment_revision : null,
                 'rider_open_count' => ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                 'rider_open_amount'=> ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
@@ -5741,6 +5747,8 @@ class PosController extends Controller
                 'delivery_address' => $b->delivery_address,
                 'total_amount'     => (float) $b->total_amount,
                 'rider_collection_amount' => $b->rider_collection_amount === null ? null : (float) $b->rider_collection_amount,
+                'delivery_credit_amount' => (float) ($b->delivery_credit_amount ?? 0),
+                'rider_settlement_id' => $b->rider_settlement_id,
                 'rider_partial_paid' => (float) ($b->rider_partial_paid ?? 0),
                 'has_delivery_items' => (bool) $b->has_delivery_items,
                 'delivery_items' => $b->has_delivery_items ? $b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
@@ -5774,6 +5782,7 @@ class PosController extends Controller
                     && $b->order_type === 'delivery'
                     && $b->rider_id
                     && $b->payment_method === 'cash'
+                    && !(float) $b->delivery_credit_amount
                     && empty($b->rider_settlement_id)
                     && $b->delivery_status !== 'returned'),
                 'can_unmark_prepaid' => (bool) ($canPrepaidRole
@@ -6427,7 +6436,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $tx = PosTransaction::where('company_id', $companyId)
-            ->select(['id', 'company_id', 'pra_status', 'pra_invoice_number'])
+            ->select(['id', 'company_id', 'created_by', 'pra_status', 'pra_invoice_number'])
             ->find($id);
         if (!$tx) {
             return response()->json(['success' => false], 404);
@@ -15847,7 +15856,8 @@ class PosController extends Controller
      */
     private function buildRiderDayFigures(int $companyId, string $date, ?int $onlyCreatedBy = null, ?int $branchId = null): array
     {
-        $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
+        $creditIn = $onlyCreatedBy ? 0.0 : \App\Services\PosDeliveryAccount::recoveries($companyId, $date, $branchId);
+        $empty = ['active' => $creditIn > 0, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0, 'credit_in' => $creditIn];
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('pos_riders') || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
                 return $empty;
@@ -15963,7 +15973,7 @@ class PosController extends Controller
                 ];
             }
 
-            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2)];
+            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2), 'credit_in' => $creditIn];
         } catch (\Throwable $e) {
             // Rider figures are reporting sugar — never let them break day-close.
             return $empty;
@@ -16385,7 +16395,8 @@ class PosController extends Controller
         // days get a zero-figure Z-report so they finally leave the banner —
         // the "close one, another appears" whack-a-mole ender.
         $hotelRefunds = \App\Services\HotelCreditNoteRefundReporting::buckets($companyId, $date, $branchId);
-        if ($transactions->isEmpty() && !$hasLocalBills && array_sum(array_map('abs', $hotelRefunds)) < 0.009 && !$allowEmpty) {
+        if ($transactions->isEmpty() && !$hasLocalBills && array_sum(array_map('abs', $hotelRefunds)) < 0.009
+            && !\App\Services\PosDeliveryAccount::recoveries($companyId, $date, $branchId) && !$allowEmpty) {
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 
@@ -16484,9 +16495,9 @@ class PosController extends Controller
             if ($openingFloat === null) {
                 $openingFloat = \App\Models\PosDayOpening::totalForDate($companyId, $date, $branchId);
             }
-            if ($openingFloat !== null || $countedCash !== null) {
+            if ($openingFloat !== null || $countedCash !== null || $riderFigures['credit_in'] > 0) {
                 $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
-                    - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'], 2);
+                    - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'] + (float) $riderFigures['credit_in'], 2);
                 $data['opening_float'] = $openingFloat;
                 $data['counted_cash'] = $countedCash;
                 $data['expected_cash'] = $expectedCash;
@@ -17327,7 +17338,9 @@ class PosController extends Controller
                  : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
                      ? 'card'
                      : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
-             $sums[$bucket] += (float) ($transaction->total_amount ?? 0);
+             $credit = PosPaymentBuckets::creditComponent($transaction);
+             $sums[$bucket] += (float) ($transaction->total_amount ?? 0) - $credit;
+             $sums['other'] += $credit;
          }
          foreach ($returnRows as $transaction) {
              if ($transaction->payment_method === 'hotel_credit_note' || ($transaction->hotel_money_from_folio ?? false)) {
@@ -17339,7 +17352,9 @@ class PosController extends Controller
                  : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
                      ? 'card'
                      : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
-             $sums[$bucket] -= (float) ($transaction->total_amount ?? 0);
+             $credit = PosPaymentBuckets::creditComponent($transaction);
+             $sums[$bucket] -= (float) ($transaction->total_amount ?? 0) - $credit;
+             $sums['other'] -= $credit;
          }
 
          foreach (['cash', 'card', 'other'] as $bucket) $sums[$bucket] -= $hotelRefunds[$bucket] ?? 0;

@@ -119,13 +119,16 @@ class PosRider extends Model
     {
         $amount = \Illuminate\Support\Facades\Schema::hasColumn($table, 'rider_collection_amount')
             ? 'COALESCE(rider_collection_amount, total_amount)' : 'total_amount';
+        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'delivery_credit_amount')) {
+            $amount = '(' . $amount . ' - COALESCE(delivery_credit_amount, 0))';
+        }
         return \Illuminate\Support\Facades\Schema::hasColumn($table, 'rider_partial_paid')
             ? '(' . $amount . ' - COALESCE(rider_partial_paid, 0))' : $amount;
     }
 
     public static function collectionAmount($bill): float
     {
-        return (float) ($bill->rider_collection_amount ?? $bill->total_amount);
+        return max(0, round((float) ($bill->rider_collection_amount ?? $bill->total_amount) - (float) ($bill->delivery_credit_amount ?? 0), 2));
     }
 
     public static function remainingAmount($bill): float

@@ -24,6 +24,9 @@
          already have partial cash deposited by the rider — that money is in the
          drawer; the refund below goes OUT of the drawer. Surface it so day-close
          cash reconciliation is understood, never silently lost. --}}
+    @if((float) $original->delivery_credit_amount > 0)
+        <p class="mb-3 text-sm text-amber-700">{{ __('pos_delivery.return_hint') }}</p>
+    @endif
     @if((float) ($original->rider_partial_paid ?? 0) > 0)
     <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 px-4 py-3 rounded-xl mb-4 text-sm">
         {{ __('pos.return_rider_partial_notice', ['amount' => number_format((float) $original->rider_partial_paid)]) }}
@@ -31,7 +34,9 @@
     @endif
 
     <form method="POST" action="{{ route('pos.transaction.return', $original->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6"
-          data-local-core-command="refund.record" data-local-core-aggregate="refund-{{ $original->id }}" data-order-id="{{ $original->id }}">
+          @if((float) $original->delivery_credit_amount <= 0)
+          data-local-core-command="refund.record" data-local-core-aggregate="refund-{{ $original->id }}" data-order-id="{{ $original->id }}"
+          @endif>
         @csrf
         <h3 class="font-bold mb-3 text-gray-900 dark:text-white">{{ __('pos.select_items_to_return') }}</h3>
         <table class="w-full text-sm mb-5 table-cards">

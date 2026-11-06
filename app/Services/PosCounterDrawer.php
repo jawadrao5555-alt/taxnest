@@ -196,7 +196,7 @@ final class PosCounterDrawer
             : [];
         // Settlements received today against EARLIER days' bills belong to no
         // counter — they were handed to the shop, so they sit on drawer 0.
-        $shopCashIn = round((float) ($riderFigures['cash_in'] ?? 0), 2);
+        $shopCashIn = round((float) ($riderFigures['cash_in'] ?? 0) + (float) ($riderFigures['credit_in'] ?? 0), 2);
 
         $keys = $counters->keys()
             ->merge($byDrawer->keys())
@@ -206,6 +206,10 @@ final class PosCounterDrawer
             ->merge(array_keys($hotelCashOut))
             ->map(fn ($k) => (int) $k)
             ->unique();
+
+        if ($shopCashIn > 0) {
+            $keys = $keys->push(self::SHOP_DRAWER)->unique();
+        }
 
         // The shop drawer only earns a row when something actually sits in it.
         if (abs($hotelCashOut[self::SHOP_DRAWER] ?? 0) < 0.009 && $shopCashIn <= 0.0

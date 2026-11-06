@@ -64,6 +64,9 @@
                 </div>
                 @endif
 
+                @if(session('status'))
+                    <p role="status" class="mb-4 text-sm text-emerald-300">{{ session('status') }}</p>
+                @endif
                 <form method="POST" action="/admin/login" class="px-7 pb-7 pt-4 space-y-4">
                     @csrf
                     <div>
@@ -82,6 +85,7 @@
                         Sign In
                     </button>
                 </form>
+                <a class="mt-4 block text-center text-sm text-cyan-200" href="{{ route('admin.recovery.forgot') }}">Forgot password?</a>
             </div>
 
             <div class="mt-5 text-center">

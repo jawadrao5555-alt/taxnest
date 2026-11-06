@@ -1566,6 +1566,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
 });
 
 use App\Http\Controllers\SaasAdmin\AdminAuthController;
+use App\Http\Controllers\SaasAdmin\AdminRecoveryController;
 use App\Http\Controllers\SaasAdmin\AdminDashboardController;
 use App\Http\Controllers\SaasAdmin\AdminCompanyController;
 use App\Http\Controllers\SaasAdmin\AdminGroupController;
@@ -1584,6 +1585,22 @@ use App\Http\Controllers\Franchise\FranchiseDashboardController;
 Route::get('/admin/login', [AdminAuthController::class, 'showLogin'])->name('admin.login');
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
 Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+
+Route::prefix('admin/recovery')->name('admin.recovery.')->group(function () {
+    Route::get('/forgot', [AdminRecoveryController::class, 'forgot'])->name('forgot');
+    Route::post('/forgot', [AdminRecoveryController::class, 'send'])->middleware('throttle:4,15')->name('send');
+    Route::get('/reset/{token}', [AdminRecoveryController::class, 'reset'])->where('token', '[a-f0-9]{64}')->name('reset');
+    Route::get('/backup', [AdminRecoveryController::class, 'backup'])->name('backup');
+    Route::post('/reset', [AdminRecoveryController::class, 'finish'])->middleware('throttle:5,15')->name('finish');
+
+    Route::middleware('admin.auth')->group(function () {
+        Route::get('/settings', [AdminRecoveryController::class, 'settings'])->name('settings');
+        Route::post('/settings', [AdminRecoveryController::class, 'enroll'])->middleware('throttle:5,15')->name('enroll');
+        Route::match(['get', 'post'], '/verify/{nonce}', [AdminRecoveryController::class, 'verify'])
+            ->middleware(['signed', 'throttle:10,15'])->block()->name('verify');
+    });
+});
+
 
 Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/companies/{companyId}/local-bill-records', [\App\Http\Controllers\SaasAdmin\AdminLocalBillRecordController::class, 'index'])->whereNumber('companyId')->name('saas.admin.local-bill-records');

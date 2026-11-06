@@ -401,6 +401,9 @@
                         <p class="text-sm font-medium text-gray-300">{{ auth('admin')->user()->name ?? auth()->user()->name ?? 'Admin' }}</p>
                         <p class="text-xs admin-text-muted-functional">{{ auth('admin')->user()->email ?? auth()->user()->email ?? '' }}</p>
                     </div>
+                    @if(auth('admin')->user()?->isSuperAdmin())
+                        <a href="{{ route('admin.recovery.settings') }}" class="text-xs text-cyan-400">Recovery</a>
+                    @endif
                     <form method="POST" action="{{ route('admin.logout') }}">
                         @csrf
                         <button type="submit" class="text-gray-500 dark:text-gray-400 hover:text-red-400 transition" aria-label="Log out">

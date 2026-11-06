@@ -42,6 +42,7 @@ class AdminAuthController extends Controller
         if (Auth::guard('admin')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             RateLimiter::clear($identityKey);
             $request->session()->regenerate();
+            $request->session()->put('admin.recovery_version', Auth::guard('admin')->user()->recovery_session_version);
             return redirect()->intended('/admin/dashboard');
         }
 

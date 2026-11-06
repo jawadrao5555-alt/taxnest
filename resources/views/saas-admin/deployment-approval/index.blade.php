@@ -16,6 +16,54 @@
                 </div>
             </div>
 
+
+            <nav class="mb-6 flex flex-wrap gap-4 text-sm font-semibold text-cyan-300">
+                <a href="{{ route('saas.admin.deployment-approval') }}" class="underline">Open PR approvals</a>
+                <a href="{{ route('saas.admin.deployment-approval', ['history' => 1]) }}" class="underline">Release history</a>
+            </nav>
+
+            @if($showHistory ?? false)
+                <section class="space-y-4">
+                    <h2 class="text-xl font-bold">Recently merged pull requests</h2>
+                    <p class="text-sm text-slate-400">GitHub supplies merge records. TaxNest matches deployment and live verification to the exact merge commit. A successful check describes that release at deploy time.</p>
+                    @if(session('success'))<p role="status">{{ session('success') }}</p>@endif
+                    @if($errors->any())
+                        <ul role="alert" class="text-amber-300">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+                    @endif
+                    @if($historyWarning)
+                        <p role="alert" class="text-amber-300">{{ $historyWarning }}</p>
+                    @else
+                        @forelse($releases as $release)
+                            <article class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                                <h3 class="font-semibold"><a class="text-cyan-300 underline" href="https://github.com/jawadrao5555-alt/taxnest/pull/{{ $release['number'] }}">#{{ $release['number'] }} {{ $release['title'] }}</a></h3>
+                                <p class="mt-1 text-sm">Merged {{ $release['merged_at'] }}</p>
+                                <p class="break-all font-mono text-xs">{{ $release['sha'] }}</p>
+                                <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+                                    <div><dt>Admin approval</dt><dd>{{ $release['approval_recorded'] ? 'Recorded for this commit' : 'No matching Admin approval record' }}</dd></div>
+                                    <div><dt>Deployment</dt><dd>{{ $release['deployment'] }}</dd></div>
+                                    <div><dt>Live verification</dt><dd>{{ $release['live_verified'] ? 'Passed for this commit' : 'Unverified' }}</dd></div>
+                                </dl>
+                                @if($release['run_id'])
+                                    <a class="text-sm text-cyan-300 underline" href="https://github.com/jawadrao5555-alt/taxnest/actions/runs/{{ $release['run_id'] }}">Deployment evidence</a>
+                                @endif
+                                @if($release['can_request'])
+                                    <form method="post" action="{{ route('saas.admin.deployment-approval.store') }}" class="mt-4 flex flex-wrap gap-2">
+                                        @csrf
+                                        <input type="hidden" name="pull_request_number" value="{{ $release['number'] }}">
+                                        <input type="hidden" name="merge_sha" value="{{ $release['sha'] }}">
+                                        <label class="text-sm">Current admin password
+                                            <input class="rounded bg-slate-950 text-white" name="password" type="password" required autocomplete="current-password">
+                                        </label>
+                                        <button class="rounded bg-amber-300 px-3 py-2 font-semibold text-slate-950" type="submit">Approve deployment of this commit</button>
+                                    </form>
+                                @endif
+                            </article>
+                        @empty
+                            <p>No merges found in the recent GitHub results.</p>
+                        @endforelse
+                    @endif
+                </section>
+            @else
             <section class="mb-6 rounded-2xl border {{ !empty($poller['recovery_needed']) ? 'border-amber-400/40 bg-amber-400/10' : 'border-slate-800 bg-slate-900' }} px-5 py-5 sm:px-6" data-approval-poller>
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -165,6 +213,7 @@
                     <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-400">Create a request above when a pull request is ready for an owner decision.</p>
                 </div>
             @endforelse
+            @endif
         </div>
     </div>
 </x-admin-layout>

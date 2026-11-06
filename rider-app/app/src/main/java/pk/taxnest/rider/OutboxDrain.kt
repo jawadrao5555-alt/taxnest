@@ -85,6 +85,8 @@ object OutboxDrain {
         p.put("captured_at", entry.optLong("captured_at", 0L))
         val revision = entry.optString("assignment_revision")
         if (revision.isNotBlank()) p.put("assignment_revision", revision)
+        val receivedAmount = entry.optString("received_amount")
+        if (receivedAmount.isNotBlank()) p.put("received_amount", receivedAmount)
         return p
     }
 }

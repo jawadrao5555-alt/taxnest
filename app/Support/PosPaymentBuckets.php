@@ -56,7 +56,10 @@ final class PosPaymentBuckets
             if ($t->payment_method === 'hotel_credit_note' || ($t->hotel_money_from_folio ?? false)) {
                 continue; // Sales credit is not money refunded.
             }
-            $sums[self::bucket($t->payment_method)] += (float) ($t->{$column} ?? 0);
+            $amount = (float) ($t->{$column} ?? 0);
+            $credit = $column === 'total_amount' ? min($amount, (float) ($t->delivery_credit_amount ?? 0)) : 0;
+            $sums[self::bucket($t->payment_method)] += $amount - $credit;
+            $sums['other'] += $credit;
         }
 
         return $sums;

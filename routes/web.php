@@ -1442,6 +1442,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/api/held-sales/{id}/recall', [\App\Http\Controllers\PosHeldSaleController::class, 'recall'])->name('pos.held-sales.recall');
     Route::delete('/api/held-sales/{id}', [\App\Http\Controllers\PosHeldSaleController::class, 'destroy'])->name('pos.held-sales.destroy');
 
+    Route::get('/delivery-accounts', [\App\Http\Controllers\PosDeliveryAccountController::class, 'index'])->name('pos.delivery-accounts.index');
+    Route::post('/delivery-accounts/{accountId}/collect', [\App\Http\Controllers\PosDeliveryAccountController::class, 'collect'])->name('pos.delivery-accounts.collect');
+
     Route::middleware('restaurant.only')->group(function () {
     Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/{id}/shift-table', [RestaurantPosController::class, 'shiftTable'])->name('pos.restaurant.orders.shift-table');

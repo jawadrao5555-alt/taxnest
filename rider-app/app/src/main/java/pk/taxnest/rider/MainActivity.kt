@@ -1042,6 +1042,14 @@ class MainActivity : AppCompatActivity() {
         val placeGroup = dialogView.findViewById<RadioGroup>(R.id.placeTypeGroup)
         val labelEdit = dialogView.findViewById<EditText>(R.id.placeLabel)
 
+        val cashEdit = dialogView.findViewById<EditText>(R.id.deliveryCashReceived)
+        val cashDue = item.optString("amount").toBigDecimalOrNull()
+        val canEnterCash = item.optBoolean("delivery_cash_entry") && cashDue != null
+        if (canEnterCash) {
+            cashEdit.visibility = View.VISIBLE
+            cashEdit.setText(cashDue?.stripTrailingZeros()?.toPlainString())
+        }
+
         // Pre-select place type from server metadata if available.
         when (meta.placeType) {
             "home" -> placeGroup.check(R.id.placeHome)
@@ -1067,7 +1075,12 @@ class MainActivity : AppCompatActivity() {
                     R.id.placeBusiness -> "business"
                     else -> "other"
                 }
-                submitDelivery(item, btn, placeType, label, meta)
+                val cash = if (canEnterCash) cashEdit.text.toString().trim().toBigDecimalOrNull() else null
+                if (canEnterCash && (cash == null || cashDue == null || cash.signum() < 0 || cash.scale() !in 0..2 || cash > cashDue)) {
+                    showMsg(getString(R.string.delivery_cash_invalid))
+                    return@setPositiveButton
+                }
+                submitDelivery(item, btn, placeType, label, meta, cash?.toPlainString())
             }
             .setNegativeButton(R.string.delivered_no, null)
             .show()
@@ -1084,7 +1097,8 @@ class MainActivity : AppCompatActivity() {
         btn: Button,
         placeType: String,
         placeLabel: String,
-        meta: DestinationMeta
+        meta: DestinationMeta,
+        receivedAmount: String?
     ) {
         val txnId = item.optInt("id")
         val clientEventId = UUID.randomUUID().toString()
@@ -1111,6 +1125,7 @@ class MainActivity : AppCompatActivity() {
             put("accuracy_m", capAcc.toDouble())
             put("captured_at", capAt)
             put("assignment_revision", meta.assignmentRevision)
+            if (receivedAmount != null) put("received_amount", receivedAmount)
         }
 
         // Persist to outbox BEFORE network call.

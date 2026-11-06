@@ -1,4 +1,5 @@
 <x-pos-layout>
+@if($errors->any()) <p role="alert" class="text-red-700 p-3">{{ $errors->first() }}</p> @endif
 {{-- Rider portal (Jul 2026) — pos_rider role is CONFINED here by PosAuth.
      Today's own deliveries + mark-delivered; read-only cash khata banner. --}}
 <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
@@ -65,6 +66,13 @@
                 @if(in_array($st, ['assigned', 'dispatched']))
                 <form method="POST" action="{{ route('pos.rider.delivered', $b->id) }}" class="shrink-0">
                     @csrf
+                    @if(\App\Services\PosDeliveryAccount::ready() && $b->invoice_mode !== 'local' && $b->payment_method === 'cash' && \App\Models\PosRider::collectionAmount($b) > 0)
+                        <input type="hidden" name="assignment_revision" value="{{ $b->preview_assignment_revision }}">
+                        <label class="block text-xs mb-2">Cash received (balance goes to Udhaar Book)
+                            <input type="number" name="received_amount" min="0" max="{{ \App\Models\PosRider::collectionAmount($b) }}"
+                                   step="0.01" value="{{ \App\Models\PosRider::collectionAmount($b) }}" required class="block rounded w-28">
+                        </label>
+                    @endif
                     <button type="submit" class="px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold shadow-sm hover:bg-emerald-700 transition">{{ __('pos.delivered_check') }}</button>
                 </form>
                 @endif

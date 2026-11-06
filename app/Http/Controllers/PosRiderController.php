@@ -1242,7 +1242,7 @@ class PosRiderController extends Controller
         // forget (runs in app()->terminating, all failures swallowed) — the
         // assign itself can never block or fail because of push. The 15-min
         // app poll stays as fallback for phones where push is unavailable.
-        DB::afterCommit(function () use ($isNewAssignment, $riderId, $txn, $oldRiderId) {
+        $queuePush = function () use ($isNewAssignment, $riderId, $txn, $oldRiderId) {
             if ($isNewAssignment) {
                 \Illuminate\Support\Facades\Log::info('RiderPushService: queued from Deliveries-board assign', [
                     'rider_id' => $riderId,
@@ -1257,9 +1257,12 @@ class PosRiderController extends Controller
                 \App\Services\RiderPushService::queuePush($oldRiderId);
             }
 
-            // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —
-            // JSON clients get JSON; the Deliveries board form keeps back().
-        });
+        };
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($queuePush);
+        } else {
+            $queuePush();
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -2044,7 +2047,8 @@ class PosRiderController extends Controller
         $bills = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('rider_id', $rider->id)
-            ->whereBetween('created_at', [now()->startOfDay(), now()->endOfDay()])
+            ->where(fn ($q) => $q->whereIn('delivery_status', ['assigned', 'dispatched'])
+                ->orWhereBetween('created_at', [now()->startOfDay(), now()->endOfDay()]))
             ->orderByDesc('id')
             ->get();
 
@@ -2058,7 +2062,7 @@ class PosRiderController extends Controller
     }
 
     /** Rider marks his OWN bill delivered — the only write he can do. */
-    public function portalMarkDelivered($txnId)
+    public function portalMarkDelivered(Request $request, $txnId)
     {
         $user = auth('pos')->user();
         $companyId = app('currentCompanyId');
@@ -2069,18 +2073,30 @@ class PosRiderController extends Controller
 
         $rider = PosRider::where('company_id', $companyId)->where('user_id', $user->id)->firstOrFail();
 
-        $txn = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('rider_id', $rider->id)
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
-            ->whereNull('rider_settlement_id')
-            ->findOrFail($txnId);
+        $data = $request->validate(['received_amount' => 'nullable|numeric|decimal:0,2|min:0|max:999999999999.99',
+            'assignment_revision' => 'required_with:received_amount|nullable|string|max:150']);
 
-        $upd = ['delivery_status' => 'delivered'];
-        if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
-            $upd['delivered_at'] = now();
-        }
-        $txn->update($upd);
+        DB::transaction(function () use ($txnId, $companyId, $rider, $data) {
+            $txn = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('rider_id', $rider->id)
+                ->whereIn('delivery_status', ['assigned', 'dispatched'])
+                ->whereNull('rider_settlement_id')
+                ->lockForUpdate()->findOrFail($txnId);
+
+            if (isset($data['received_amount'])) {
+                $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($txn, $rider);
+                abort_unless(hash_equals($revision, $data['assignment_revision']), 409);
+                \App\Services\PosDeliveryAccount::record($txn, $rider, (string) $data['received_amount']);
+            }
+
+            $upd = ['delivery_status' => 'delivered'];
+            if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
+                $upd['delivered_at'] = now();
+            }
+            $txn->update($upd);
+
+        });
 
         return back()->with('success', 'Marked delivered.');
     }

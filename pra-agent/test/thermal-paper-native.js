@@ -61,6 +61,7 @@ app.whenReady().then(async () => {
       getConfig:async()=>({serverUrl:'http://127.0.0.1:8000/api/agent',apiKey:'fixture-only',receiptPrinter:'Counter',printerPaperProfiles:{'Kitchen <one>':58,Unavailable:80}}),
       getPrinters:async()=>({printers:[{name:'Kitchen <one>'},{name:'Counter'}]}),
       saveConfig:config=>ipcRenderer.invoke('thermal-fixture-save',config),
+      getAutoUpdate:async()=>true,
       checkUpdate:async()=>({available:false})
     };
     for(const key of ['getVersion','getStatus','getLanSettings','getLanStatus','getPosSettings','lanListDevices','checkImsService']) api[key]=async()=>({});

@@ -45,6 +45,7 @@ const server = createServer((request, response) => {
       openInstallationFolder:async()=>{window.__installationFolderOpens++;return {ok:true};},
       openInstalledApps:async()=>{window.__installedAppsOpens++;return {ok:true};},
       installFbrIms:async()=>{window.__imsInstalls++;return {ok:true};},
+      getAutoUpdate:async()=>true,
       checkUpdate:async()=>({available:false}),
       imsMode:()=>null,
       openPosWindow:async()=>{window.__fixturePosLaunches++;return {ok:false};},

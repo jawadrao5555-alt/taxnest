@@ -272,11 +272,13 @@ async function heartbeat() {
   if (!currentConfig) return;
   // Overlap guard: a slow beat (10s timeout) must never stack with the next
   // tick or a wake/retry-triggered beat.
-  if (heartbeatInFlight) return;
+  if (heartbeatInFlight) return heartbeatInFlight.done;
   const activeConfig = currentConfig;
   const requestConfig = Object.freeze({ ...activeConfig });
   const requestGen = runGen;
-  const flight = { requestGen };
+  let finishHeartbeat;
+  const done = new Promise((resolve) => { finishHeartbeat = resolve; });
+  const flight = { requestGen, done };
   heartbeatInFlight = flight;
   const stillCurrent = () => isCurrentHeartbeatRequest(requestGen, activeConfig, {
     runGen, currentConfig, running: status.running,
@@ -334,7 +336,7 @@ async function heartbeat() {
     }
     // Self-update: the server piggybacks the latest release info on every
     // heartbeat; main.js decides whether it is actually newer.
-    if (updateCallback && res.data.agent_update) {
+    if (updateCallback) {
       try { updateCallback(res.data.agent_update); } catch (e) {}
     }
 
@@ -414,6 +416,7 @@ async function heartbeat() {
     scheduleHeartbeatRetry();
   } finally {
     if (heartbeatInFlight === flight) heartbeatInFlight = false;
+    finishHeartbeat();
   }
   if (stillCurrent()) notify();
 }
@@ -713,6 +716,7 @@ module.exports = {
   setLanBridge,
   setCoreBridge,
   wakeAgent,
+  heartbeat,
   getRecentLogs,
   setSafeRestartHandler,
 };

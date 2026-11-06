@@ -137,6 +137,9 @@
     <p>Auto-syncs your POS invoices to PRA via your local Pakistani IP</p>
     <p style="font-size:13px; color:#e9d5ff; margin-top:6px; line-height:1.6;">
       Agent version: <strong id="agentVersion">Loading…</strong><br>Build date: <time id="buildVer">Loading…</time>
+      <label style="margin-left:8px; font-size:11px;">
+        <input id="autoUpdateToggle" type="checkbox" disabled> Auto Update <span id="autoUpdateState"></span>
+      </label>
       <button id="checkUpdateBtn" title="Check for updates" style="background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.3); color:#c4b5fd; cursor:pointer; padding:3px 10px; border-radius:6px; margin-left:8px; font-size:11px; vertical-align:middle;">↻ Check Updates</button>
     </p>
   </div>
@@ -605,6 +608,19 @@
 
   window.agentAPI.onStatusUpdate(renderStatus);
 
+  function renderAutoUpdate(enabled) {
+    $('autoUpdateToggle').checked = enabled;
+    $('autoUpdateState').textContent = enabled ? 'ON' : 'OFF';
+    $('autoUpdateToggle').disabled = false;
+  }
+
+  window.agentAPI.getAutoUpdate().then(renderAutoUpdate);
+  $('autoUpdateToggle').addEventListener('change', async (event) => {
+    const toggle = event.currentTarget;
+    toggle.disabled = true;
+    renderAutoUpdate(await window.agentAPI.setAutoUpdate(toggle.checked));
+  });
+
   function showUpdateBanner(info) {
     if (info && info.available) {
       $('updateBanner').style.display = 'block';
@@ -639,13 +655,23 @@
 
   $('checkUpdateBtn').addEventListener('click', async () => {
     const btn = $('checkUpdateBtn');
-    const original = btn.textContent;
+    const original = '↻ Check Updates';
     btn.textContent = '⟳ Checking...';
     btn.disabled = true;
-    const u = await window.agentAPI.checkUpdate();
-    showUpdateBanner(u);
-    btn.textContent = original;
-    btn.disabled = false;
+    try {
+      const u = await window.agentAPI.checkUpdate(true);
+      if (u?.checkUnavailable) {
+        btn.textContent = 'Agent offline';
+        setTimeout(() => { if (!btn.disabled) btn.textContent = original; }, 4000);
+      } else {
+        showUpdateBanner(u);
+        btn.textContent = original;
+      }
+    } catch (_) {
+      btn.textContent = original;
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   window.agentAPI.onUpdateAvailable(showUpdateBanner);

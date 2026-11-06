@@ -869,6 +869,16 @@ foreach([1366,390] as $width){
         'portal'=>['id'=>$portalRecord->id,'usin'=>$portalPayload['USIN'],'date'=>substr($portalPayload['DateTime'],0,10),
             'reference'=>'SYN-PORTAL-'.$width]];
 }
+$staffCases=[];
+foreach ([1366,390] as $staffWidth) {
+    $staffCompany=$company('Synthetic Staff Approval '.$staffWidth,'staff-company-'.$staffWidth.'@rc-browser.invalid','RCSTAFF'.$staffWidth,'pos',[
+        'pos_integration_mode'=>'pra','pra_reporting_enabled'=>false,'pos_setup_completed'=>true,'pos_tax_rate_cash'=>16,'pos_tax_rate_card'=>5]);
+    $staffPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic staff acceptance '.$staffWidth,'product_type'=>'pos','price'=>100,'invoice_limit'=>100]);
+    \App\Models\Subscription::create(['company_id'=>$staffCompany->id,'pricing_plan_id'=>$staffPlan->id,'active'=>true,'start_date'=>now()->subDay()->toDateString(),'end_date'=>now()->addDays(30)->toDateString()]);
+    $staffOwner=$user($staffCompany,'Synthetic Staff Owner','staff-owner-'.$staffWidth.'@rc-browser.invalid','company_admin','pos_admin');
+    $staffCashier=$user($staffCompany,'Synthetic Staff Cashier','staff-cashier-'.$staffWidth.'@rc-browser.invalid','user','pos_cashier');
+    $staffCases[$staffWidth]=['owner'=>$staffOwner->email,'cashier'=>$staffCashier->email,'employee'=>$staffCashier->id];
+}
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -911,6 +921,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,
         ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',
             'paths'=>[], 'b01Account'=>$b01Cases],

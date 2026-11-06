@@ -410,10 +410,18 @@
                      ho to dhoondna aasan. Client-side filter, koi request nahi. --}}
                 <input type="text" id="del-search" name="delsearch_nofill" autocomplete="off"
                        data-lpignore="true" data-form-type="other" data-1p-ignore
-                       placeholder="{{ __('pos.del_search_ph') }}"
+                       aria-label="{{ __('Search by order, customer, mobile, email or address') }}"
+                       placeholder="{{ __('Order, name, mobile, email or address') }}"
                        class="w-full sm:w-64 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500">
                 <span class="text-[11px] text-gray-400 flex-shrink-0"><span id="del-count">{{ $bills->count() }}</span>{{ __('pos.sfx_bills') }}</span>
             </div>
+        </div>
+        <div class="px-4 py-2">
+            <label for="delivery-detail-mode" class="text-xs font-semibold">{{ __('Show orders as') }}</label>
+            <select id="delivery-detail-mode" class="rounded-lg border-gray-300 dark:bg-gray-800 text-xs">
+                <option value="full">{{ __('Full detail') }}</option>
+                <option value="brief">{{ __('Brief detail') }}</option>
+            </select>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -432,7 +440,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($bills as $b)
-                    <tr data-delrow data-phone="{{ $b->customer_phone ?? '' }}" data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra') . ' ' . (!$b->rider_id && !empty($b->delivered_by) && !empty($deliveredByUsers[$b->delivered_by]) ? $deliveredByUsers[$b->delivered_by] : '')) }}">
+                    <tr data-delrow data-phone="{{ $b->customer_phone ?? '' }}" data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->customer_email ?? $deliveryEmails->get($b->customer_id, '')) . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra') . ' ' . (!$b->rider_id && !empty($b->delivered_by) && !empty($deliveredByUsers[$b->delivered_by]) ? $deliveredByUsers[$b->delivered_by] : '')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                                 <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
@@ -450,7 +458,24 @@
                         </td>
                         <td class="px-4 py-3">
                             <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
-                            @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
+                            @if($b->customer_phone)<div class="text-xs">{{ $b->customer_phone }}</div>@endif
+                            <div data-del-detail class="min-w-44 max-w-sm break-words text-xs text-gray-600 dark:text-gray-300">
+                                @if($email = $b->customer_email ?? $deliveryEmails->get($b->customer_id))<div>{{ $email }}</div>@endif
+                                @if($b->delivery_address)<div>{{ $b->delivery_address }}</div>@endif
+                                @if($b->items->isNotEmpty())
+                                    <ul class="mt-2 space-y-1">
+                                        @foreach($b->items as $item)
+                                            <li>{{ (float) $item->quantity }} × {{ $item->item_name }} · Rs. {{ number_format((float) $item->unit_price, 2) }} · <strong>Rs. {{ number_format((float) $item->subtotal, 2) }}</strong></li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                                @if((float) ($b->rider_partial_paid ?? 0) > 0)
+                                    <div class="mt-2">{{ __('Cash received') }}: Rs. {{ number_format((float) $b->rider_partial_paid, 2) }}</div>
+                                @endif
+                                @if((float) ($b->delivery_credit_amount ?? 0) > 0)
+                                    <div>{{ __('Remaining Udhaar') }}: Rs. {{ number_format((float) $b->delivery_credit_amount, 2) }}</div>
+                                @endif
+                            </div>
                             {{-- Task 1105: customer pin + ETA chip + public track link (Unlimited tracking, open bills only) --}}
                             @if(!empty($custLocReady) && $activeTab === 'pending' && !in_array($b->delivery_status, ['delivered', 'returned']))
                             @php $hasPin = $b->customer_lat !== null && $b->customer_lng !== null; @endphp
@@ -714,7 +739,7 @@
                     @foreach($oldUnassigned as $b)
                     {{-- Task 536: data-oldrow (data-delrow NAHIN — main count alag rahe) + same
                          data-search recipe as the main table so the one search box filters both. --}}
-                    <tr data-oldrow data-phone="{{ $b->customer_phone ?? '' }}" data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra')) }}">
+                    <tr data-oldrow data-phone="{{ $b->customer_phone ?? '' }}" data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->customer_email ?? $deliveryEmails->get($b->customer_id, '')) . ' ' . ($b->isLocalBill() ? 'local' : 'pra')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
                                 <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
@@ -724,7 +749,24 @@
                         </td>
                         <td class="px-4 py-3">
                             <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
-                            @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
+                            @if($b->customer_phone)<div class="text-xs">{{ $b->customer_phone }}</div>@endif
+                            <div data-del-detail class="min-w-44 max-w-sm break-words text-xs text-gray-600 dark:text-gray-300">
+                                @if($email = $b->customer_email ?? $deliveryEmails->get($b->customer_id))<div>{{ $email }}</div>@endif
+                                @if($b->delivery_address)<div>{{ $b->delivery_address }}</div>@endif
+                                @if($b->items->isNotEmpty())
+                                    <ul class="mt-2 space-y-1">
+                                        @foreach($b->items as $item)
+                                            <li>{{ (float) $item->quantity }} × {{ $item->item_name }} · Rs. {{ number_format((float) $item->unit_price, 2) }} · <strong>Rs. {{ number_format((float) $item->subtotal, 2) }}</strong></li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                                @if((float) ($b->rider_partial_paid ?? 0) > 0)
+                                    <div class="mt-2">{{ __('Cash received') }}: Rs. {{ number_format((float) $b->rider_partial_paid, 2) }}</div>
+                                @endif
+                                @if((float) ($b->delivery_credit_amount ?? 0) > 0)
+                                    <div>{{ __('Remaining Udhaar') }}: Rs. {{ number_format((float) $b->delivery_credit_amount, 2) }}</div>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}
                             @if($b->rider_collection_amount !== null)
@@ -1227,4 +1269,18 @@ function tnCustLoc() {
 })();
 </script>
 @endif
+<script>
+(() => {
+    const mode = document.getElementById('delivery-detail-mode');
+    if (!mode) return;
+
+    const apply = () => {
+        document.querySelectorAll('[data-del-detail]').forEach(section => {
+            section.hidden = mode.value === 'brief';
+        });
+    };
+    mode.addEventListener('change', apply);
+    apply();
+})();
+</script>
 </x-pos-layout>

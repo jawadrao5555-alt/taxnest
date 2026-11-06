@@ -47,13 +47,33 @@ class PraDiSandboxService
     {
         $s = $record->snapshot;
         $sandbox = $record->reportingEnvironment() === 'sandbox';
+        $buyerName = $sandbox ? 'Fictional walk-in customer' : '';
+        $buyerAddress = $sandbox ? 'Fictional test address' : '';
+        $buyerProvince = '';
+        $sellerProvince = $s['seller_province'] ?? '';
+        if (!$sandbox && $s['transaction_type'] === 'sale') {
+            $company = Company::query()->find($record->company_id);
+            $sale = PosTransaction::query()->where('company_id', $record->company_id)
+                ->find($record->source_transaction_id);
+            $customer = !empty($s['customer_id'])
+                ? \App\Models\PosCustomer::query()->where('company_id', $record->company_id)
+                    ->select(['id', 'name', 'address', 'city'])->find($s['customer_id'])
+                : null;
+            $sellerProvince = trim((string) $sellerProvince) ?: trim((string) $company?->province);
+            $buyerName = trim((string) ($s['customer_name'] ?? ''))
+                ?: (trim((string) $customer?->name) ?: 'Walk-in customer');
+            $buyerAddress = trim((string) $sale?->delivery_address)
+                ?: (trim((string) $customer?->address)
+                    ?: (trim((string) $customer?->city) ?: trim((string) $company?->city)));
+            $buyerProvince = $sellerProvince;
+        }
         return [
             'invoiceType' => $s['transaction_type'] === 'return' ? 'Debit Note' : 'Sale Invoice',
             'invoiceDate' => $s['date'], 'sellerNTNCNIC' => $s['seller_fbr_id'] ?? $this->sellerIdentity($s['seller_ntn'] ?? ''),
-            'sellerBusinessName' => $s['seller_fbr_name'] ?? $s['company_name'], 'sellerProvince' => $s['seller_province'] ?? '',
+            'sellerBusinessName' => $s['seller_fbr_name'] ?? $s['company_name'], 'sellerProvince' => $sellerProvince,
             'sellerAddress' => $s['seller_address'] ?? '', 'buyerNTNCNIC' => '',
-            'buyerBusinessName' => $sandbox ? 'Fictional walk-in customer' : '', 'buyerProvince' => '',
-            'buyerAddress' => $sandbox ? 'Fictional test address' : '', 'buyerRegistrationType' => 'Unregistered',
+            'buyerBusinessName' => $buyerName, 'buyerProvince' => $buyerProvince,
+            'buyerAddress' => $buyerAddress, 'buyerRegistrationType' => 'Unregistered',
             'invoiceRefNo' => '', ...($sandbox ? ['scenarioId' => ''] : []),
             'items' => array_map(fn ($line) => [
                 'hsCode' => '', 'productDescription' => $line['name'], 'rate' => '',
@@ -84,7 +104,7 @@ class PraDiSandboxService
         });
     }
 
-    public function submit(int $companyId, int $id, int $actorId): PosDiSandboxSubmission
+    public function submit(int $companyId, int $id, int $actorId, bool $automatic = false): PosDiSandboxSubmission
     {
         PraDiSandboxGate::enforce($companyId);
         $company = Company::findOrFail($companyId);
@@ -111,7 +131,7 @@ class PraDiSandboxService
         });
 
         // External I/O outside the DB lock; never retry an uncertain POST.
-        $result = app(FbrService::class)->submitPosDiPayload($record->payload, $token, $record->reportingEnvironment(), $companyId);
+        $result = app(FbrService::class)->submitPosDiPayload($record->payload, $token, $record->reportingEnvironment(), $companyId, $automatic);
         return DB::transaction(function () use ($companyId, $id, $result) {
             $record = $this->locked($companyId, $id);
             abort_unless($record->state === 'submitting', 409);

@@ -173,6 +173,23 @@ class PosFederalAutomationTest extends TestCase
         $this->assertEquals(116,PosTransaction::findOrFail($id)->total_amount);
         Http::assertNothingSent();
     }
+    public function test_automatic_di_preserves_original_line_tax_when_no_flat_rate_is_set(): void
+    {
+        $rule = $this->enable();
+        $rule->update(['mapping' => array_replace($rule->mapping, ['tax_source' => 'original_bill'])]);
+        Schema::table('pos_transaction_items', fn (Blueprint $table) => $table->decimal('tax_rate', 8, 2)->nullable());
+        $id = $this->bill('card', ['tax_amount' => 5, 'total_amount' => 105]);
+        DB::table('pos_transaction_items')->where('transaction_id', $id)->update(['tax_rate' => 5, 'tax_amount' => 5]);
+        $sale = PosTransaction::findOrFail($id);
+        app(PosFederalAutomation::class)->enqueue($sale);
+        $record = $this->service->capture($this->company, $id, $this->owner->id, 'sandbox');
+        $payload = app(PosFederalPayload::class)->build(PosFederalOutbox::firstOrFail(), $record, $this->service);
+        $this->assertSame('5%', $payload['items'][0]['rate']);
+        $this->assertEquals(5, $payload['items'][0]['salesTaxApplicable']);
+        $this->assertEquals(105, $payload['items'][0]['totalValues']);
+        Http::assertNothingSent();
+    }
+
     public function test_receipt_never_shows_unaccepted_reference_and_is_tenant_scoped(): void
     {
         $this->enable(); $id=$this->bill(); $sale=PosTransaction::findOrFail($id);
@@ -182,6 +199,12 @@ class PosFederalAutomationTest extends TestCase
         $this->assertNull($reader->federal($sale)['reference']);
         $r->update(['state'=>'accepted','sandbox_invoice_number'=>'TEST-SANDBOX-ACK']);
         $this->assertSame('TEST-SANDBOX-ACK',$reader->federal($sale)['reference']);
+        $live = $r->replicate();
+        $live->fill(['environment'=>'production','state'=>'accepted','production_invoice_number'=>'TEST-LIVE-ACK'])->save();
+        $this->assertSame('TEST-LIVE-ACK', $reader->federal($sale)['reference']);
+        $live->update(['state'=>'verification_required']);
+        $this->assertSame('PRODUCTION', $reader->federal($sale)['environment']);
+        $this->assertNull($reader->federal($sale)['reference']);
         $sale->company_id=999; $this->assertNull($reader->federal($sale));
     }
 

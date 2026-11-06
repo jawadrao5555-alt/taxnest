@@ -622,7 +622,7 @@ class PraDiSandboxTest extends TestCase
         $this->assertNull($live->payload); // no promotion/copy of the test payload
         $this->assertSame($live->id, $this->service->capture($this->company, $id, $this->owner->id, 'production')->id);
         $this->assertArrayNotHasKey('scenarioId', $this->service->template($live));
-        $this->assertSame('', $this->service->template($live)['buyerBusinessName']);
+        $this->assertSame('Walk-in customer', $this->service->template($live)['buyerBusinessName']);
         $this->service->prepare($this->company->id, $live->id, $this->payload($live));
         $this->postJson(route('pos.di-sandbox.submit', $live->id), [
             '_token' => 'pilot-csrf', 'confirm_sandbox' => 1,

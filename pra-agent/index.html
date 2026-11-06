@@ -608,6 +608,19 @@
 
   window.agentAPI.onStatusUpdate(renderStatus);
 
+  function renderAutoUpdate(enabled) {
+    $('autoUpdateToggle').checked = enabled;
+    $('autoUpdateState').textContent = enabled ? 'ON' : 'OFF';
+    $('autoUpdateToggle').disabled = false;
+  }
+
+  window.agentAPI.getAutoUpdate().then(renderAutoUpdate);
+  $('autoUpdateToggle').addEventListener('change', async (event) => {
+    const toggle = event.currentTarget;
+    toggle.disabled = true;
+    renderAutoUpdate(await window.agentAPI.setAutoUpdate(toggle.checked));
+  });
+
   function showUpdateBanner(info) {
     if (info && info.available) {
       $('updateBanner').style.display = 'block';
@@ -639,19 +652,6 @@
       setTimeout(() => { $('upToDateBanner').style.display = 'none'; }, 4000);
     }
   }
-
-  function renderAutoUpdate(enabled) {
-    $('autoUpdateToggle').checked = enabled;
-    $('autoUpdateState').textContent = enabled ? 'ON' : 'OFF';
-    $('autoUpdateToggle').disabled = false;
-  }
-
-  window.agentAPI.getAutoUpdate().then(renderAutoUpdate);
-  $('autoUpdateToggle').addEventListener('change', async (event) => {
-    const toggle = event.currentTarget;
-    toggle.disabled = true;
-    renderAutoUpdate(await window.agentAPI.setAutoUpdate(toggle.checked));
-  });
 
   $('checkUpdateBtn').addEventListener('click', async () => {
     const btn = $('checkUpdateBtn');

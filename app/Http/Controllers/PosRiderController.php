@@ -845,7 +845,16 @@ class PosRiderController extends Controller
             }
         }
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix', 'custLocReady', 'billEtas', 'rememberedLoc', 'savedPlacesByBill', 'shopPin'));
+        $bills->loadMissing('items');
+        $oldUnassigned->loadMissing('items');
+        $deliveryCustomerIds = $bills->pluck('customer_id')->merge($oldUnassigned->pluck('customer_id'))->filter()->unique();
+        $deliveryEmails = collect();
+        if ($deliveryCustomerIds->isNotEmpty() && Schema::hasColumn('pos_customers', 'email')) {
+            $deliveryEmails = \App\Models\PosCustomer::where('company_id', $companyId)
+                ->whereIn('id', $deliveryCustomerIds)->pluck('email', 'id');
+        }
+
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix', 'custLocReady', 'billEtas', 'rememberedLoc', 'savedPlacesByBill', 'shopPin', 'deliveryEmails'));
     }
 
     // ─── Task 1105: customer pin, public track link & ETA poll ─────────────

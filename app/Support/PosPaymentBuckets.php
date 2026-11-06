@@ -44,6 +44,11 @@ final class PosPaymentBuckets
         return in_array($method, self::CARD_ALIASES, true) ? 'card' : 'other';
     }
 
+    public static function creditComponent($transaction): float
+    {
+        return max(0, min((float) $transaction->total_amount, (float) ($transaction->delivery_credit_amount ?? 0)));
+    }
+
     /**
      * Sum an already-loaded transaction collection into the three buckets.
      *
@@ -57,7 +62,7 @@ final class PosPaymentBuckets
                 continue; // Sales credit is not money refunded.
             }
             $amount = (float) ($t->{$column} ?? 0);
-            $credit = $column === 'total_amount' ? max(0, min($amount, (float) ($t->delivery_credit_amount ?? 0))) : 0;
+            $credit = $column === 'total_amount' ? self::creditComponent($t) : 0;
             $sums[self::bucket($t->payment_method)] += $amount - $credit;
             $sums['other'] += $credit;
         }

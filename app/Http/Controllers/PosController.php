@@ -16464,7 +16464,7 @@ class PosController extends Controller
             if ($openingFloat === null) {
                 $openingFloat = \App\Models\PosDayOpening::totalForDate($companyId, $date, $branchId);
             }
-            if ($openingFloat !== null || $countedCash !== null) {
+            if ($openingFloat !== null || $countedCash !== null || $riderFigures['credit_in'] > 0) {
                 $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
                     - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'] + (float) $riderFigures['credit_in'], 2);
                 $data['opening_float'] = $openingFloat;
@@ -17307,7 +17307,9 @@ class PosController extends Controller
                  : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
                      ? 'card'
                      : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
-             $sums[$bucket] += (float) ($transaction->total_amount ?? 0);
+             $credit = PosPaymentBuckets::creditComponent($transaction);
+             $sums[$bucket] += (float) ($transaction->total_amount ?? 0) - $credit;
+             $sums['other'] += $credit;
          }
          foreach ($returnRows as $transaction) {
              if ($transaction->payment_method === 'hotel_credit_note' || ($transaction->hotel_money_from_folio ?? false)) {
@@ -17319,7 +17321,9 @@ class PosController extends Controller
                  : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
                      ? 'card'
                      : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
-             $sums[$bucket] -= (float) ($transaction->total_amount ?? 0);
+             $credit = PosPaymentBuckets::creditComponent($transaction);
+             $sums[$bucket] -= (float) ($transaction->total_amount ?? 0) - $credit;
+             $sums['other'] -= $credit;
          }
 
          foreach (['cash', 'card', 'other'] as $bucket) $sums[$bucket] -= $hotelRefunds[$bucket] ?? 0;

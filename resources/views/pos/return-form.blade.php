@@ -34,7 +34,9 @@
     @endif
 
     <form method="POST" action="{{ route('pos.transaction.return', $original->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6"
-          data-local-core-command="refund.record" data-local-core-aggregate="refund-{{ $original->id }}" data-order-id="{{ $original->id }}">
+          @if((float) $original->delivery_credit_amount <= 0)
+          data-local-core-command="refund.record" data-local-core-aggregate="refund-{{ $original->id }}" data-order-id="{{ $original->id }}"
+          @endif>
         @csrf
         <h3 class="font-bold mb-3 text-gray-900 dark:text-white">{{ __('pos.select_items_to_return') }}</h3>
         <table class="w-full text-sm mb-5 table-cards">

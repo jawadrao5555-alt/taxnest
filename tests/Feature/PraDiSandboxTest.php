@@ -830,6 +830,8 @@ class PraDiSandboxTest extends TestCase
     {
         foreach ([
             ['production', '054321FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'local_accepted'],
+            ['production', '054321FK6R647396', ['FBRInvoiceNumber:string'], 'response_received', 'local_accepted'],
+            ['production', '054321FK6RFAILED', ['FBRInvoiceNumber:string'], 'response_received', 'verification_required'],
             ['production', '054322FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'verification_required'],
             ['production', '054321FK6N1234567', ['InvoiceNumber:string'], 'response_received', 'verification_required'],
             ['production', '054321FK6N1234567', ['FBRInvoiceNumber:string'], 'transport_timeout', 'verification_required'],

@@ -181,6 +181,9 @@
         @if(is_array($report->rider_summary) && ($report->rider_summary['cash_out'] ?? 0) > 0)
         <tr><td>{{ __('pos.dc_rider_cash') }}</td><td class="r">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td></tr>
         @endif
+        @if(($report->rider_summary['credit_in'] ?? 0) > 0)
+        <tr><td>{{ __('pos_delivery.recoveries') }}</td><td class="r">+{{ number_format($report->rider_summary['credit_in'], 2) }}</td></tr>
+        @endif
         @if(is_array($report->rider_summary) && ($report->rider_summary['cash_in'] ?? 0) > 0)
         <tr><td>{{ __('pos.dc_rider_settlements_old') }}</td><td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td></tr>
         @endif

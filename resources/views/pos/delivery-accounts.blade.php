@@ -1,6 +1,6 @@
 <x-pos-layout>
     <div class="max-w-5xl mx-auto p-4 space-y-4">
-        <h1 class="text-xl font-bold">Delivery Udhaar Book</h1>
+        <h1 class="text-xl font-bold">{{ __('pos_delivery.title') }}</h1>
         @if($errors->any())
             <p role="alert" class="text-red-700">{{ $errors->first() }}</p>
         @endif

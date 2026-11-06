@@ -164,7 +164,7 @@ class PosRiderPortalDeliveredInvariantTest extends TestCase
         $request->setLaravelSession(app('session.store'));
         app()->instance('request', $request);
 
-        return app(\App\Http\Controllers\PosRiderController::class)->portalMarkDelivered($txnId);
+        return app(\App\Http\Controllers\PosRiderController::class)->portalMarkDelivered($request, $txnId);
     }
 
     /** Attempt that MUST 404 (bill unreachable for this rider). */

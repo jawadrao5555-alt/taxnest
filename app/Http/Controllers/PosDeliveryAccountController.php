@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\PosBusinessDay;
 use App\Services\PosDeliveryAccount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +41,7 @@ class PosDeliveryAccountController extends Controller
             'amount' => 'required|numeric|decimal:0,2|min:0.01|max:999999999999.99',
         ]);
         PosDeliveryAccount::collect($companyId, $accountId, (int) auth('pos')->id(),
-            $data['request_id'], (string) $data['amount'], PosBusinessDay::current($companyId));
+            $data['request_id'], (string) $data['amount']);
 
         return back()->with('success', 'Customer payment recorded.');
     }

@@ -15825,7 +15825,8 @@ class PosController extends Controller
      */
     private function buildRiderDayFigures(int $companyId, string $date, ?int $onlyCreatedBy = null, ?int $branchId = null): array
     {
-        $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
+        $creditIn = $onlyCreatedBy ? 0.0 : \App\Services\PosDeliveryAccount::recoveries($companyId, $date, $branchId);
+        $empty = ['active' => $creditIn > 0, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0, 'credit_in' => $creditIn];
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('pos_riders') || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
                 return $empty;
@@ -15941,7 +15942,7 @@ class PosController extends Controller
                 ];
             }
 
-            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2)];
+            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2), 'credit_in' => $creditIn];
         } catch (\Throwable $e) {
             // Rider figures are reporting sugar — never let them break day-close.
             return $empty;
@@ -16363,7 +16364,8 @@ class PosController extends Controller
         // days get a zero-figure Z-report so they finally leave the banner —
         // the "close one, another appears" whack-a-mole ender.
         $hotelRefunds = \App\Services\HotelCreditNoteRefundReporting::buckets($companyId, $date, $branchId);
-        if ($transactions->isEmpty() && !$hasLocalBills && array_sum(array_map('abs', $hotelRefunds)) < 0.009 && !$allowEmpty) {
+        if ($transactions->isEmpty() && !$hasLocalBills && array_sum(array_map('abs', $hotelRefunds)) < 0.009
+            && !\App\Services\PosDeliveryAccount::recoveries($companyId, $date, $branchId) && !$allowEmpty) {
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 
@@ -16464,7 +16466,7 @@ class PosController extends Controller
             }
             if ($openingFloat !== null || $countedCash !== null) {
                 $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
-                    - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'], 2);
+                    - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'] + (float) $riderFigures['credit_in'], 2);
                 $data['opening_float'] = $openingFloat;
                 $data['counted_cash'] = $countedCash;
                 $data['expected_cash'] = $expectedCash;

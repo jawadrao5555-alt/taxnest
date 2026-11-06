@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Company;
+use App\Models\PosDayCloseReport;
 use App\Models\PosRider;
 use App\Models\PosTransaction;
 use Illuminate\Support\Facades\DB;
@@ -62,10 +64,11 @@ final class PosDeliveryAccount
         );
     }
 
-    public static function collect(int $companyId, int $accountId, int $userId, string $requestId, string $amount, string $businessDate): void
+    public static function collect(int $companyId, int $accountId, int $userId, string $requestId, string $amount): void
     {
         $received = self::cents($amount);
-        DB::transaction(function () use ($companyId, $accountId, $userId, $requestId, $received, $businessDate) {
+        DB::transaction(function () use ($companyId, $accountId, $userId, $requestId, $received) {
+            Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
             $account = self::scopedAccounts($companyId)->where('id', $accountId)->lockForUpdate()->first();
             abort_unless($account, 404);
             $prior = DB::table('pos_delivery_account_events')->where('account_id', $accountId)
@@ -73,6 +76,14 @@ final class PosDeliveryAccount
             if ($prior) {
                 abort_unless(self::cents($prior->amount) === $received, 409);
                 return;
+            }
+
+            $businessDate = PosBusinessDay::current($companyId);
+            $branchId = $account->branch_id === null ? null : (int) $account->branch_id;
+            if (PosDayCloseReport::where('company_id', $companyId)->forBranch($branchId)
+                ->whereDate('report_date', $businessDate)->exists()
+                || PosCounterDrawer::closes($companyId, $branchId, $businessDate)->has(PosCounterDrawer::SHOP_DRAWER)) {
+                throw ValidationException::withMessages(['amount' => 'Open the shop drawer before recording a recovery.']);
             }
 
             $outstanding = self::cents($account->outstanding_amount);
@@ -94,6 +105,55 @@ final class PosDeliveryAccount
                 'updated_at' => now(),
             ]);
         });
+    }
+
+    /** The return and credit adjustment commit together under the original bill lock. */
+    public static function offsetReturn(PosTransaction $original, PosTransaction $return, ?int $userId): void
+    {
+        if ((float) $original->delivery_credit_amount <= 0) {
+            return;
+        }
+
+        $account = DB::table('pos_delivery_accounts')
+            ->where('company_id', $original->company_id)
+            ->where('transaction_id', $original->id)->lockForUpdate()->first();
+        abort_unless($account, 409, 'The delivery credit record is missing.');
+        $outstanding = self::cents($account->outstanding_amount);
+        $offset = min($outstanding, self::cents($return->total_amount));
+        if ($offset <= 0) {
+            return;
+        }
+
+        DB::table('pos_delivery_account_events')->insert([
+            'account_id' => $account->id,
+            'kind' => 'return',
+            'recorded_by' => $userId,
+            'return_transaction_id' => $return->id,
+            'amount' => $offset / 100,
+            'business_date' => $return->business_date ?: $return->created_at->toDateString(),
+            'created_at' => now(),
+        ]);
+        DB::table('pos_delivery_accounts')->where('id', $account->id)->update([
+            'outstanding_amount' => ($outstanding - $offset) / 100,
+            'updated_at' => now(),
+        ]);
+        $return->forceFill(['delivery_credit_amount' => $offset / 100])->save();
+    }
+
+    public static function recoveries(int $companyId, string $date, ?int $branchId): float
+    {
+        if (!self::ready()) {
+            return 0.0;
+        }
+
+        return (float) DB::table('pos_delivery_account_events as events')
+            ->join('pos_delivery_accounts as accounts', 'accounts.id', '=', 'events.account_id')
+            ->where('accounts.company_id', $companyId)
+            ->when($branchId, fn ($q) => $q->where(fn ($scope) =>
+                $scope->where('accounts.branch_id', $branchId)->orWhereNull('accounts.branch_id')))
+            ->where('events.business_date', $date)
+            ->where('events.kind', 'collection')
+            ->sum('events.amount');
     }
 
     private static function cents($amount): int

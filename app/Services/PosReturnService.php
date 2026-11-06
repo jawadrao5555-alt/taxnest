@@ -468,6 +468,7 @@ class PosReturnService
                 $data['hotel_money_from_folio'] = (bool) $original->hotel_money_from_folio;
             }
             $return = PosTransaction::create($data);
+            PosDeliveryAccount::offsetReturn($original, $return, $userId);
 
             foreach ($returnItems as $it) {
                 $it['transaction_id'] = $return->id;

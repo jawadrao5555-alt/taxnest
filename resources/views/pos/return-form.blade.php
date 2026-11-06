@@ -24,6 +24,9 @@
          already have partial cash deposited by the rider — that money is in the
          drawer; the refund below goes OUT of the drawer. Surface it so day-close
          cash reconciliation is understood, never silently lost. --}}
+    @if((float) $original->delivery_credit_amount > 0)
+        <p class="mb-3 text-sm text-amber-700">{{ __('pos_delivery.return_hint') }}</p>
+    @endif
     @if((float) ($original->rider_partial_paid ?? 0) > 0)
     <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 px-4 py-3 rounded-xl mb-4 text-sm">
         {{ __('pos.return_rider_partial_notice', ['amount' => number_format((float) $original->rider_partial_paid)]) }}

@@ -5438,6 +5438,7 @@ class PosController extends Controller
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
         $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
+        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
         // Prepaid conversion stamp — PROD-drift guarded (older installs may not
         // have run the prepaid-conversion migration yet).
@@ -5474,6 +5475,7 @@ class PosController extends Controller
                        ...($hasBillToken ? ['bill_token'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : []),
                    ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
+                   ...($hasDelStatus ? ['delivery_status'] : []),
                    ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
                    ...($hasBizDate ? ['business_date'] : [])]);
 
@@ -5485,7 +5487,6 @@ class PosController extends Controller
         // par hai. Display + delivered-mark/settle ONLY — promote (Final
         // Cash/Card) in par KABHI nahi chalta (bill pehle se final hai).
         $finalBills = collect();
-        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
         // Task 807: stream-scope for final delivery bills — mirrors
         // PosRiderController::applyStreamScope (EXPLICIT scope, Task 1186:
         // delivery tracking stays stream-agnostic for derived-default staff —
@@ -5683,6 +5684,8 @@ class PosController extends Controller
                 'rider_unsettled'  => $hasRiderCols && $b->rider_id && empty($b->rider_settlement_id),
                 // Task 123: whole-khata scope for the panel's Settle button.
                 'rider_id'         => $hasRiderCols ? ($b->rider_id ? (int) $b->rider_id : null) : null,
+                'delivery_status' => $b->delivery_status,
+                'rider_settlement_id' => $b->rider_settlement_id,
                 'assignment_revision' => $hasAssignmentRevision ? $b->rider_assignment_revision : null,
                 'rider_open_count' => ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                 'rider_open_amount'=> ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,

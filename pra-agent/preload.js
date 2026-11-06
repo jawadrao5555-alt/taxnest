@@ -12,7 +12,9 @@ contextBridge.exposeInMainWorld('agentAPI', {
     ipcRenderer.on('status-update', (event, status) => callback(status)),
   onConfigAutofilled: (callback) =>
     ipcRenderer.on('config-autofilled', (event, info) => callback(info)),
-  checkUpdate: () => ipcRenderer.invoke('check-update'),
+  checkUpdate: (interactive = false) => ipcRenderer.invoke('check-update', interactive),
+  getAutoUpdate: () => ipcRenderer.invoke('get-auto-update'),
+  setAutoUpdate: (enabled) => ipcRenderer.invoke('set-auto-update', enabled),
   openDownload: () => ipcRenderer.invoke('open-download'),
   getVersion: () => ipcRenderer.invoke('get-version'),
   onUpdateAvailable: (callback) =>

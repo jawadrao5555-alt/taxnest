@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
-const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent, setSafeRestartHandler } = require('./src/agent');
+const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent, heartbeat, setSafeRestartHandler } = require('./src/agent');
 const { validateUpdateInfo } = require('./src/release-manifest');
 const { registerPortableUninstall } = require('./src/windows-uninstall');
 const { buildUpdateHandoffScript } = require('./src/update-handoff');
@@ -94,9 +94,16 @@ function isNewerVersion(remote, local) {
   return false;
 }
 
-async function handleAgentUpdate(info) {
+let availableUpdate = null;
+
+function autoUpdateEnabled() {
+  return store.get('autoUpdateEnabled') !== false;
+}
+
+async function handleAgentUpdate(info, manual = false) {
   let updStage = 'check'; // telemetry: which phase a failure happened in
   try {
+    if (!manual) availableUpdate = null;
     if (!info || !info.version || !info.zip_url) return;
     // Host pin: only ever download update zips from our own GitHub releases.
     // (No code-signing available, so a compromised/misconfigured server must
@@ -121,6 +128,8 @@ async function handleAgentUpdate(info) {
     if (process.platform !== 'win32' || !app.isPackaged) return;
     if (updateInProgress) return;
     if (!isNewerVersion(info.version, app.getVersion())) return;
+    if (!manual) availableUpdate = info;
+    if (!manual && !autoUpdateEnabled()) return;
     const priorHandoff = store.get('updateHandoffState') || {};
     if (recoveryPending(priorHandoff, (file, encoding) => fs.readFileSync(file, encoding))) {
       updateInfo = {
@@ -355,7 +364,7 @@ async function handleAgentUpdate(info) {
       ...updateInfo,
       downloading: false,
       error: (e && e.message) || 'Update failed',
-      autoRetrying: retryPending,
+      autoRetrying: retryPending && autoUpdateEnabled(),
       manualRequired: !retryPending,
     };
     sendUpdateState();
@@ -1451,20 +1460,45 @@ ipcMain.handle('toggle-agent', (event, enabled) => {
   }
 });
 
-ipcMain.handle('check-update', async () => {
-  // Updates are server-driven now: every heartbeat (30s) carries the latest
-  // release info and a newer version installs itself automatically.
-  return updateInfo || { available: false, currentBuild: BUILD_TIMESTAMP };
+ipcMain.handle('get-auto-update', () => autoUpdateEnabled());
+
+ipcMain.handle('set-auto-update', (event, enabled) => {
+  if (event.sender !== mainWindow?.webContents || typeof enabled !== 'boolean' || updateInProgress) {
+    return autoUpdateEnabled();
+  }
+  store.set('autoUpdateEnabled', enabled);
+  return autoUpdateEnabled();
+});
+
+ipcMain.handle('check-update', async (event, interactive) => {
+  if (event.sender !== mainWindow?.webContents) return null;
+  if (interactive === true && getStatus().running) await heartbeat();
+  if (interactive === true && getStatus().connected && !autoUpdateEnabled() && availableUpdate && !updateInProgress) {
+    const update = availableUpdate;
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      title: 'TaxNest Agent Update',
+      message: `Install TaxNest Agent v${update.version}?`,
+      detail: 'The Agent will restart to finish installing the update.',
+      buttons: ['Install update', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0 && availableUpdate?.version === update.version && getStatus().connected) {
+      void handleAgentUpdate(availableUpdate, true);
+      return updateInfo;
+    }
+    return null;
+  }
+  if (interactive === true && !getStatus().connected && !updateInfo.available) {
+    return { checkUnavailable: true };
+  }
+  return updateInfo;
 });
 
 ipcMain.handle('open-download', async () => {
   await shell.openExternal(DOWNLOAD_URL);
   return { ok: true };
-});
-
-ipcMain.handle('install-update-now', async () => {
-  // Self-update installs automatically as soon as it is downloaded.
-  return { ok: false, error: 'Updates now install automatically — nothing to do.' };
 });
 
 ipcMain.handle('get-version', () => ({ ...BUILD_INFO, version: app.getVersion() }));

@@ -119,7 +119,11 @@ class PosRiderController extends Controller
     /** Constrain a pos_transactions query to the current user's stream. */
     private function applyStreamScope($q)
     {
-        $scope = $this->billingScope();
+        return self::scopeBillingStream($q, $this->billingScope());
+    }
+
+    public static function scopeBillingStream($q, string $scope)
+    {
         if ($scope === 'local') {
             $q->where(function ($s) {
                 $s->where('invoice_mode', 'local')
@@ -1068,6 +1072,44 @@ class PosRiderController extends Controller
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */
+    public function bulkAssign(Request $request)
+    {
+        $data = $request->validate([
+            'rider_id' => 'required|integer|min:1',
+            'bills' => 'required|array|min:1|max:100',
+            'bills.*.id' => 'required|integer|distinct|min:1',
+            'bills.*.expected_rider_id' => 'present|nullable|integer|min:1',
+            'bills.*.assignment_revision' => 'present|nullable|string|max:100',
+        ]);
+        $companyId = app('currentCompanyId');
+        $ids = array_column($data['bills'], 'id');
+
+        return DB::transaction(function () use ($companyId, $ids, $data) {
+            $bills = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)->whereIn('id', $ids)
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            abort_unless($bills->count() === count($ids), 404);
+
+            foreach ($data['bills'] as $bill) {
+                $transaction = $bills[$bill['id']];
+                if ($transaction->is_archived || $transaction->status !== 'completed') {
+                    throw ValidationException::withMessages(['bills' => 'A selected bill is no longer available for assignment.']);
+                }
+                $assignment = Request::create('/', 'POST', [
+                    'rider_id' => $data['rider_id'],
+                    'expected_rider_id' => $bill['expected_rider_id'],
+                    'assignment_revision' => $bill['assignment_revision'],
+                ], [], [], ['HTTP_ACCEPT' => 'application/json']);
+                $response = $this->assign($assignment, $bill['id']);
+                if ($response->getStatusCode() >= 400) {
+                    throw ValidationException::withMessages(['bills' => $response->getData(true)['message']]);
+                }
+            }
+
+            return response()->json(['success' => true, 'assigned_count' => count($ids)]);
+        });
+    }
+
     public function assign(Request $request, $txnId)
     {
         $companyId = app('currentCompanyId');
@@ -1105,7 +1147,7 @@ class PosRiderController extends Controller
             abort(403);
         }
 
-        if ($txn->rider_settlement_id) {
+        if ($txn->rider_settlement_id || (float) $txn->rider_partial_paid > 0) {
             return $this->statusError($request, 'This bill is already settled — rider cannot be changed.');
         }
         // Rider is LOCKED once the delivery reached a terminal state (owner,
@@ -1200,22 +1242,25 @@ class PosRiderController extends Controller
         // forget (runs in app()->terminating, all failures swallowed) — the
         // assign itself can never block or fail because of push. The 15-min
         // app poll stays as fallback for phones where push is unavailable.
-        if ($isNewAssignment) {
-            \Illuminate\Support\Facades\Log::info('RiderPushService: queued from Deliveries-board assign', [
-                'rider_id' => $riderId,
-                'txn_id'   => $txn->id,
-            ]);
-            \App\Services\RiderPushService::queuePush((int) $riderId);
-        }
-        // The previous rider must also receive an authoritative current-list
-        // push. This removes the mistaken card/cache immediately and prevents
-        // stale arrival/completion work while the app remains backgrounded.
-        if ($oldRiderId && $oldRiderId !== (int) $riderId) {
-            \App\Services\RiderPushService::queuePush($oldRiderId);
-        }
+        DB::afterCommit(function () use ($isNewAssignment, $riderId, $txn, $oldRiderId) {
+            if ($isNewAssignment) {
+                \Illuminate\Support\Facades\Log::info('RiderPushService: queued from Deliveries-board assign', [
+                    'rider_id' => $riderId,
+                    'txn_id'   => $txn->id,
+                ]);
+                \App\Services\RiderPushService::queuePush((int) $riderId);
+            }
+            // The previous rider must also receive an authoritative current-list
+            // push. This removes the mistaken card/cache immediately and prevents
+            // stale arrival/completion work while the app remains backgrounded.
+            if ($oldRiderId && $oldRiderId !== (int) $riderId) {
+                \App\Services\RiderPushService::queuePush($oldRiderId);
+            }
 
-        // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —
-        // JSON clients get JSON; the Deliveries board form keeps back().
+            // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —
+            // JSON clients get JSON; the Deliveries board form keeps back().
+        });
+
         if ($request->expectsJson()) {
             return response()->json([
                 'success'         => true,
@@ -1570,6 +1615,7 @@ class PosRiderController extends Controller
             'bill_ids' => ($settleAll ? 'nullable' : 'required') . '|array|min:1',
             'bill_ids.*' => 'integer',
             'received_amount' => 'nullable|numeric',
+            'expected_outstanding' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -1604,6 +1650,10 @@ class PosRiderController extends Controller
             $hasPartialCol = Schema::hasColumn('pos_transactions', 'rider_partial_paid');
             $remainingOf = fn ($b) => PosRider::remainingAmount($b);
             $outstanding = round((float) $bills->sum($remainingOf), 2);
+
+            if ($request->filled('expected_outstanding') && abs((float) $request->input('expected_outstanding') - $outstanding) > 0.009) {
+                return $this->statusError($request, 'The rider balance changed. Refresh and try again.');
+            }
 
             // Received amount: default = full outstanding of the selection.
             $receivedRaw = $request->input('received_amount');

@@ -1517,6 +1517,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/deliveries', [\App\Http\Controllers\PosRiderController::class, 'deliveries'])->name('pos.deliveries');
     Route::match(['get', 'post'], '/deliveries/shop-cash', [\App\Http\Controllers\PosRiderController::class, 'shopCash'])->name('pos.deliveries.shop-cash');
     Route::post('/deliveries/{id}/assign', [\App\Http\Controllers\PosRiderController::class, 'assign'])->name('pos.deliveries.assign');
+    Route::post('/deliveries/bulk-assign', [\App\Http\Controllers\PosRiderController::class, 'bulkAssign'])->name('pos.deliveries.bulk-assign');
     Route::post('/deliveries/{id}/status', [\App\Http\Controllers\PosRiderController::class, 'updateStatus'])->name('pos.deliveries.status');
     // Prepaid conversion (Task 285, Aug 2026) — admin/manager only; role-checked in controller.
     Route::post('/deliveries/{id}/mark-prepaid', [\App\Http\Controllers\PosRiderController::class, 'markPrepaid'])->name('pos.deliveries.mark-prepaid');

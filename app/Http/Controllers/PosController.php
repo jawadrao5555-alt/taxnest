@@ -5437,6 +5437,7 @@ class PosController extends Controller
         // out of this list — those were polluting the F10 modal before.
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
+        $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
         // Prepaid conversion stamp — PROD-drift guarded (older installs may not
         // have run the prepaid-conversion migration yet).
@@ -5473,6 +5474,7 @@ class PosController extends Controller
                        ...($hasBillToken ? ['bill_token'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : []),
                    ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
+                   ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
                    ...($hasBizDate ? ['business_date'] : [])]);
 
         // ─── FINAL delivery bills still OPEN (owner bug report, 3 Aug 2026) ───
@@ -5555,6 +5557,7 @@ class PosController extends Controller
                 ->orderBy('id', 'desc')
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
+                    ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
                        ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'has_delivery_items') ? ['has_delivery_items', 'rider_collection_amount'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid') ? ['rider_partial_paid'] : []),
                        ...($hasBillToken ? ['bill_token'] : []),
@@ -5583,7 +5586,7 @@ class PosController extends Controller
                 // the rider's ENTIRE khata (all dates, archived included) — same
                 // scope as PosRiderController::settle with settle_all. Show the
                 // cashier the real count+amount so "poore rider ka settle" is clear.
-                $riderOpen = PosTransaction::withoutGlobalScope('hide_archived')
+                $riderOpen = PosRiderController::scopeBillingStream(PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->whereIn('rider_id', $riderIds)
                     ->where('payment_method', 'cash')
@@ -5591,7 +5594,7 @@ class PosController extends Controller
                     ->whereNull('rider_settlement_id')
                     ->where(function ($q) {
                         $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
-                    })
+                    }), auth('pos')->user()?->posBillingScopeExplicit() ?? 'both')
                     ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('pos_transactions') . '),0) as amt')
                     ->groupBy('rider_id')
                     ->get()
@@ -5628,7 +5631,6 @@ class PosController extends Controller
             }
         }
 
-        $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
         // Mixed-delivery summaries read item rows below. Production refuses
         // implicit loading; fetch only mixed bills in a batch before mapping.
         // Empty/legacy collections keep their previous query behavior.

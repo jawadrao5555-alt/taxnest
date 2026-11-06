@@ -1588,16 +1588,16 @@ Route::post('/admin/logout', [AdminAuthController::class, 'logout'])->name('admi
 
 Route::prefix('admin/recovery')->name('admin.recovery.')->group(function () {
     Route::get('/forgot', [AdminRecoveryController::class, 'forgot'])->name('forgot');
-    Route::post('/forgot', [AdminRecoveryController::class, 'send'])->middleware('throttle:4,15')->name('send');
+    Route::post('/forgot', [AdminRecoveryController::class, 'send'])->middleware('throttle:4,15,admin-recovery-send:')->name('send');
     Route::get('/reset/{token}', [AdminRecoveryController::class, 'reset'])->where('token', '[a-f0-9]{64}')->name('reset');
     Route::get('/backup', [AdminRecoveryController::class, 'backup'])->name('backup');
-    Route::post('/reset', [AdminRecoveryController::class, 'finish'])->middleware('throttle:5,15')->name('finish');
+    Route::post('/reset', [AdminRecoveryController::class, 'finish'])->middleware('throttle:5,15,admin-recovery-finish:')->name('finish');
 
     Route::middleware('admin.auth')->group(function () {
         Route::get('/settings', [AdminRecoveryController::class, 'settings'])->name('settings');
-        Route::post('/settings', [AdminRecoveryController::class, 'enroll'])->middleware('throttle:5,15')->name('enroll');
+        Route::post('/settings', [AdminRecoveryController::class, 'enroll'])->middleware('throttle:5,15,admin-recovery-enroll:')->name('enroll');
         Route::match(['get', 'post'], '/verify/{nonce}', [AdminRecoveryController::class, 'verify'])
-            ->middleware(['signed', 'throttle:10,15'])->block()->name('verify');
+            ->middleware(['signed', 'throttle:10,15,admin-recovery-verify:'])->block()->name('verify');
     });
 });
 

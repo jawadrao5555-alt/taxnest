@@ -3,6 +3,7 @@ import { b01CompanyAccountWorkflow } from './lib/b01-company-account-browser.mjs
 import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow } from './lib/pra-b03-browser.mjs';
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
+import { staffDiscountWorkflow } from './lib/pra-staff-discount-browser.mjs';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -1621,6 +1622,7 @@ async function workflow(page,t,v,diagnostics) {
     return;
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
+  if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
@@ -2334,6 +2336,7 @@ async function customerBulkNavigation(page,t,v) {
 }
 async function one(browser,label,v,t) {
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};
+  if(t.staffDiscount)t={...t,login:t.staffDiscount[v.width].cashier};
   if(t.surveyJourney) t={...t,login:t.surveyJourney.logins[v.width]};
   if(t.optionalArchive) t={...t, login:t.optionalArchive.cases[v.width].login};
   valid(t); const failuresBefore = failures;

@@ -2096,6 +2096,21 @@ window.addEventListener('popstate', function() {
                  — rider assignment now happens ONLY on the /pos/deliveries board after
                  payment; cash bills enter the rider khata the moment a rider is assigned. --}}
             <div x-show="!payingOrderAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
+                <div class="col-span-2 border rounded p-2 space-y-2" data-staff-discount-panel>
+                    <a href="{{ route('pos.staff-discounts') }}" target="_blank" rel="noopener" class="underline text-xs">Staff / family requests and owner settings</a>
+                    <button type="button" x-show="!staffDiscount" @click="openStaffDiscount()" :disabled="!cart.length || submitting" class="border rounded p-2 text-sm">Request staff / family discount</button>
+                    <template x-if="staffDiscount"><div class="space-y-2">
+                        <select aria-label="Employee" x-model="staffDiscount.employee_id" :disabled="!!staffDiscountRequest" class="w-full"><option value="">Choose employee</option><template x-for="person in staffDiscountEmployees" :key="person.id"><option :value="person.id" x-text="person.name"></option></template></select>
+                        <select aria-label="Staff or family" x-model="staffDiscount.kind" :disabled="!!staffDiscountRequest"><option value="staff">Staff</option><option value="family">Family</option></select>
+                        <input aria-label="Discount reason" x-model="staffDiscount.reason" :disabled="!!staffDiscountRequest" maxlength="500" placeholder="Reason" class="w-full">
+                        <select aria-label="Staff discount type" x-model="discountType" @change="recalcDiscount()" :disabled="!!staffDiscountRequest"><option value="percentage">Percent</option><option value="amount">Rupees</option></select>
+                        <input aria-label="Staff discount value" type="number" min="0.01" step="0.01" x-model.number="discountValue" @input="recalcDiscount()" :disabled="!!staffDiscountRequest" class="w-28">
+                        <p class="text-xs">Cash/Card sends the proposal first. After owner approval, check approval and press the same payment method to finalize.</p>
+                        <button type="button" x-show="staffDiscountRequest" @click="checkStaffApproval()" class="border rounded p-2">Check approval</button>
+                        <span x-text="staffDiscountRequest ? ('#' + staffDiscountRequest.id + ': ' + staffDiscountRequest.status) : ''"></span>
+                        <button type="button" x-show="!staffDiscountRequest" @click="staffDiscount=null; discountValue=0" class="border rounded p-2">Cancel proposal</button>
+                    </div></template>
+                </div>
                 <button data-video="cash-payment" @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -5594,6 +5609,53 @@ function restaurantPos() {
         // Cart-level Bill Note toggle (owner, 28 Jul 2026) — same kitchenNotes model
         // as the Pay-modal note; collapsed by default so cart height is untouched.
         showCartNote: false,
+        staffDiscount: null,
+        staffDiscountEmployees: [],
+        staffDiscountRequest: null,
+        async openStaffDiscount() {
+            if (!navigator.onLine || this.editingBillId) { this.showToast('Staff approval needs an online new cart.', 'error'); return; }
+            try {
+                const res = await fetch('{{ route("pos.staff-discounts") }}', {headers: {'Accept':'application/json'}});
+                const data = await res.json();
+                if (!res.ok || !data.enabled) throw new Error('Owner must enable staff discount in the requests page.');
+                this.staffDiscountEmployees = data.employees || [];
+                this.staffDiscount = {employee_id:'',kind:'staff',reason:'',request_uuid:this._newOfflineUuid()};
+                this.staffDiscountRequest = null;
+            } catch (e) { this.showToast(e.message, 'error'); }
+        },
+        async checkStaffApproval() {
+            if (!this.staffDiscountRequest) return;
+            try {
+                const res = await fetch('{{ url("/pos/staff-discounts") }}/' + Number(this.staffDiscountRequest.id), {headers: {'Accept':'application/json'}});
+                const data = await res.json();
+                const row = data.request;
+                if (!res.ok || !row) throw new Error('Request is unavailable.');
+                this.staffDiscountRequest = {id:row.id,revision:row.revision,status:row.status};
+                if (row.status === 'approved') { this.discountType = row.approved_type; this.discountValue = Number(row.approved_value); this.recalcDiscount(); }
+                this.showToast('Discount request: ' + row.status, row.status === 'approved' ? 'success' : 'error');
+            } catch (e) { this.showToast(e.message, 'error'); }
+        },
+        async resumeStaffRequest(id) {
+            try {
+                const res=await fetch('{{ url("/pos/staff-discounts") }}/'+Number(id),{headers:{'Accept':'application/json'}});
+                const data=await res.json(), row=data.request;
+                if(!res.ok || !row || !['pending','approved'].includes(row.status)) throw new Error('Request cannot be resumed.');
+                if(this.cart.length && !confirm('Replace this draft with the saved staff request cart?')) return;
+                const saved=JSON.parse(row.order_snapshot).checkout;
+                this.clearCart();
+                this.cart=saved.items.map((item,index)=>({...item,item_name:item.name,item_type:item._manual?'manual':(item.type||'product'),cart_uid:'staff-'+row.id+'-'+index}));
+                this.orderType=saved.order_type||'takeaway'; this.selectedTable=saved.table_id?{id:saved.table_id}:null;
+                this.selectedCustomer={name:saved.customer_name||'',phone:saved.customer_phone||''};
+                this.selectedDeliveryAddress=saved.delivery_address||''; this.deliveryCollectionMode=saved.delivery_collection_mode||null;
+                this.kitchenNotes=saved.kitchen_notes||''; this.incomingOrderId=saved.incoming_order_id||null;
+                this.incomingEditRevision=saved.expected_incoming_revision??null; this.recalledOrderId=saved.recalled_order_id||null;
+                this.terminalId=saved.terminal_id||null;
+                this.staffDiscount={employee_id:row.employee_id,kind:row.kind,reason:row.reason,request_uuid:row.request_uuid};
+                this.staffDiscountEmployees=data.employees||[]; this.staffDiscountRequest={id:row.id,revision:row.revision,status:row.status};
+                this.discountType=row.approved_type||row.proposed_type; this.discountValue=Number(row.approved_value||row.proposed_value);
+                this.recalcDiscount(); this.showPayModal=true;
+            }catch(e){this.showToast(e.message,'error');}
+        },
         discountType: 'percentage',
         discountValue: 0,
         discountAmount: 0,
@@ -5941,6 +6003,8 @@ function restaurantPos() {
             // Do NOT call this.restoreCart() here without explicit product approval.
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
+            const staffResumeId = new URLSearchParams(window.location.search).get('staff_request');
+            if (/^[1-9][0-9]*$/.test(staffResumeId || '')) this.$nextTick(() => this.resumeStaffRequest(staffResumeId));
             // Held-window search (owner, 26 Aug 2026): window band hote hi search
             // saaf ho — warna agli dafa khulte hi purani filter lagi milti aur
             // cashier ko lagta "baqi orders gayab ho gaye".
@@ -6866,6 +6930,7 @@ function restaurantPos() {
             } catch(e) {}
         },
         clearCartStorage() {
+            this.staffDiscount = null; this.staffDiscountRequest = null;
             try { localStorage.removeItem(this.storageKey); localStorage.removeItem(this.notesKey); } catch(e) {}
         },
 
@@ -11378,6 +11443,12 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
+            if (this.staffDiscount) {
+                if (!this.staffDiscount.employee_id || this.staffDiscount.reason.trim().length < 3 || this.saveAsProvisional) { this.showToast('Choose employee, add a reason and use final payment.', 'error'); return; }
+                if (this.staffDiscountRequest && this.staffDiscountRequest.status !== 'approved') { this.showToast('Check owner approval before payment.', 'error'); return; }
+                if (this.staffDiscountRequest?.status === 'approved') this.reserveWaWindow(this.selectedCustomer?.phone);
+                return await this.processPaymentManual(method, false, !this.payPrintReceipt);
+            }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.selectedCustomer?.phone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
@@ -11560,6 +11631,8 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            const wasStaffDiscount = !!this.staffDiscount;
+            const staffNeedsTransactionKot = wasStaffDiscount && this.isRestaurantMode && !this.incomingOrderId && !this.recalledOrderId && !this.payingHeldOrderId && this.cart.some(item => item.item_id && !item.skip_kitchen);
             if (!window.PosDealAllocation && this.cart.some(i => i.item_type === 'deal')) { this.showToast(window.TXT.deal_calculation_unavailable, 'error'); return; }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
@@ -11639,7 +11712,7 @@ function restaurantPos() {
                     // ISI manual raste se aati hai. Bina is id ke woh parked order
                     // khula reh jata aur roz ka day-close block kar deta.
                     // Provisionals kabhi settle nahi karte (bill final hi nahi).
-                    recalled_order_id: (!provisional && this.recalledOrderId) ? this.recalledOrderId : null,
+                    recalled_order_id: (!provisional && (this.recalledOrderId || (this.staffDiscount && this.payingHeldOrderId))) ? (this.recalledOrderId || this.payingHeldOrderId) : null,
                     // Online-adaigi ki tasdeeq isi waiter order ke saath jati hai,
                     // warna server (jaiz taur par) dobara rok deta hai.
                     online_payment_confirmed: (() => { const oid = this.incomingOrderId || this.recalledOrderId; return !!(oid && this._onlineOkByOrder[oid]); })(),
@@ -11656,6 +11729,15 @@ function restaurantPos() {
                     // the counter is gone — a sale is never blocked over it.
                     terminal_id: this.terminalId || null,
                 };
+                if (this.staffDiscount) {
+                    if (!navigator.onLine) throw new Error('Staff discount approval and payment require an online connection.');
+                    payload.offline_uuid = this.staffDiscount.request_uuid;
+                    this.payAttemptUuid = payload.offline_uuid;
+                    if (this.staffDiscountRequest) {
+                        payload.staff_discount_request_id = this.staffDiscountRequest.id;
+                        payload.staff_discount_revision = this.staffDiscountRequest.revision;
+                    } else payload.staff_discount = {...this.staffDiscount, employee_id:Number(this.staffDiscount.employee_id)};
+                }
                 // OFFLINE-FIRST (Jul 2026): no internet → queue the bill on this
                 // device (IndexedDB) and keep billing. Sync engine replays it.
                 // Task 117: NEW offline queueing is plan-gated (Business+). Cart
@@ -11692,6 +11774,7 @@ function restaurantPos() {
                         body: JSON.stringify(payload),
                     });
                 } catch (netErr) {
+                    if (this.staffDiscount) throw new Error('Connection interrupted. Keep this cart and retry with the same request key.');
                     // fetch threw = server unreachable (WiFi says "connected" but
                     // internet is dead) OR timed out. Same offline path — HTTP
                     // errors from a REACHABLE server never land here.
@@ -11720,6 +11803,10 @@ function restaurantPos() {
                 let data = null;
                 let rawBody = '';
                 try { rawBody = await res.text(); data = JSON.parse(rawBody); } catch(_) {}
+                if (res.ok && data?.approval_pending) {
+                    this.staffDiscountRequest = {id:data.request_id,revision:data.revision,status:'pending'};
+                    this.showToast(data.message, 'success'); this.submitting = false; return;
+                }
                 if (!res.ok || !data || !data.success) {
                     console.error('[storeInvoice] HTTP', res.status, res.statusText, rawBody.slice(0, 500));
                     const msg = (data && (data.message || data.error)) || ('Failed (HTTP ' + res.status + ') — F12 console');
@@ -11758,6 +11845,7 @@ function restaurantPos() {
                 }
                 // Mirror payHeldOrderDirect success path so receipt modal works.
                 console.log('[storeInvoice] OK response:', data);
+                this.staffDiscount = null; this.staffDiscountRequest = null;
                 console.log('[storeInvoice] isRestaurantMode=', this.isRestaurantMode, 'transaction_id=', data.transaction_id);
                 this.lastIsOffline = false;
                 this.lastOfflineRec = null;
@@ -11797,7 +11885,7 @@ function restaurantPos() {
                 // (payment confirm) par nikalti hai. Final bills = payment ho chuki → KOT abhi.
                 const kotHeldForPayment = !!this.kitchenSettings.delivery_kot_after_payment
                     && this.orderType === 'delivery' && (data.pra_status === 'local');
-                const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId && !kotHeldForPayment)
+                const txnKotId = ((this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId || staffNeedsTransactionKot) && !kotHeldForPayment)
                     ? (data.transaction_id || null) : null;
                 if (kotHeldForPayment) this.showToast(window.TXT.kot_held_until_payment, 'info');
                 // Task 1356: waiter-origin final bills DO have a restaurant order.

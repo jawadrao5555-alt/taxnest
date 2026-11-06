@@ -1389,6 +1389,7 @@ class RestaurantPosController extends Controller
         DB::beginTransaction();
         try {
             $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            \App\Services\PosStaffDiscount::assertOrderAvailable((int) $companyId, (int) $orderId);
             // ── Single-winner guard (Table Board, Jul 2026) ──────────────────
             // Cross-terminal pays are first-class now (sale-screen Table Board):
             // re-fetch the order under a ROW LOCK and re-check status INSIDE the

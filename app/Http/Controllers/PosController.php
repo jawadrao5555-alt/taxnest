@@ -3449,6 +3449,12 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $agentCoreInventorySale = $request->attributes->get('agent_core_inventory_sale');
+        \App\Services\PosStaffDiscount::assertBoundUuid($request, (int) $companyId);
+        if (\App\Services\PosStaffDiscount::requested($request)) {
+            foreach ((array) $request->input('items', []) as $item) {
+                abort_if(!is_array($item) || (empty($item['item_id']) && empty($item['_manual'])), 422, 'Select existing items or explicit manual lines before requesting approval.');
+            }
+        }
 
         // Plan gate (Aug 2026 matrix): deal LINES are server-priced, so a
         // crafted payload could bill deals even when the sale screen hides
@@ -3582,7 +3588,7 @@ class PosController extends Controller
         // discount through the manual-cart bypass / legacy form post and bypass
         // the per-company limit. Admin/manager roles are unaffected.
         $posUser = auth('pos')->user();
-        if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+        if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier' && !\App\Services\PosStaffDiscount::requested($request)) {
             $cashierMaxPct = (float) ($company->cashier_discount_limit ?? 50);
             if ($request->discount_type === 'percentage' && (float) $request->discount_value > $cashierMaxPct) {
                 $request->merge(['discount_value' => $cashierMaxPct]);
@@ -3633,6 +3639,13 @@ class PosController extends Controller
         $taxableSubtotal = array_sum(array_map(fn($i) => \App\Services\PosDealAllocation::taxableSubtotal($i['deal_snapshot'] ?? null, (float) $i['lineTotal'], (bool) $i['isExempt']), $companyItems));
         $exemptSubtotal = $subtotal - $taxableSubtotal;
 
+        $staffApproval = app(\App\Services\PosStaffDiscount::class)->prepare($request, $company, $companyItems, (float) $subtotal);
+        if (isset($staffApproval['proposal'])) {
+            return response()->json(['success' => true, 'approval_pending' => true,
+                'request_id' => $staffApproval['proposal']->id, 'revision' => $staffApproval['proposal']->revision,
+                'message' => 'Discount request saved. Owner approval is required before payment.'], 202);
+        }
+
         $discountValue = (float) ($request->discount_value ?? 0);
         $discountType = $request->discount_type;
         if ($discountType === 'percentage') {
@@ -3641,7 +3654,7 @@ class PosController extends Controller
             // Amount-type cashier guardrail (owner rule, Jul 2026): capped at
             // cashier_discount_limit% of the subtotal — mirrors the percentage rule.
             $maxAmountDiscount = $subtotal;
-            if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+            if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier' && !$staffApproval) {
                 $maxAmountDiscount = round($subtotal * ((float) ($company->cashier_discount_limit ?? 50)) / 100, 2);
             }
             $discountAmount = min($discountValue, $maxAmountDiscount);
@@ -3958,6 +3971,8 @@ class PosController extends Controller
         DB::beginTransaction();
         try {
             $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            \App\Services\PosStaffDiscount::claim($staffApproval, (int) $companyId);
+            \App\Services\PosStaffDiscount::assertOrderAvailable((int) $companyId, (int) $settleOrderIdIn, $staffApproval['row']->id ?? null);
             if (!$agentCoreInventorySale && !$request->filled('offline_queued_at')) \App\Services\PosPromotions::assertRowsCurrent($companyItems, $lockedPromotionCompany);
             $draftId = $request->input('draft_id');
             $transaction = null;
@@ -4249,6 +4264,7 @@ class PosController extends Controller
                 );
             }
 
+            \App\Services\PosStaffDiscount::consumed($staffApproval, (int) $transaction->id);
             DB::commit();
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();
@@ -4471,6 +4487,10 @@ class PosController extends Controller
         }
 
         app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
+        if (\Schema::hasTable('pos_staff_discount_requests') && \DB::table('pos_staff_discount_requests')
+            ->where('company_id', $companyId)->where('transaction_id', $transaction->id)->exists()) {
+            abort(422, 'Approved staff bills cannot be edited. Use the normal return process.');
+        }
 
         if ($transaction->pra_invoice_number) {
             if ($request->wantsJson()) {
@@ -4849,6 +4869,10 @@ class PosController extends Controller
         $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
 
         app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
+        if (\Schema::hasTable('pos_staff_discount_requests') && \DB::table('pos_staff_discount_requests')
+            ->where('company_id', $companyId)->where('transaction_id', $transaction->id)->exists()) {
+            abort(422, 'Approved staff bills cannot be deleted. Use the normal return process.');
+        }
 
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)

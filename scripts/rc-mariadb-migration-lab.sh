@@ -95,6 +95,7 @@ concurrency(){
     export DB_DATABASE="$FULL_DB"
     clean_php php "$ROOT/tests/native/rc_mariadb_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_notification_concurrency.php"
+    clean_php php "$ROOT/tests/native/rc_staff_discount_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
     clean_php php "$ROOT/tests/native/rc_pra_incident_timeline.php"
     clean_php php "$ROOT/tests/native/rc_survey_company_response.php"

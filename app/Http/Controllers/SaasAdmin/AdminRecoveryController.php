@@ -120,7 +120,7 @@ class AdminRecoveryController extends Controller
                 ]);
             });
             if ($issued) {
-                $link = route('admin.recovery.reset', ['token' => $token]);
+                $link = rtrim(config('app.url'), '/') . route('admin.recovery.reset', ['token' => $token], false);
                 $this->mail($email, 'Reset your TaxNest Admin password', "This one-time link expires in 15 minutes. If you did not request it, ignore this email.\n".$link);
             }
         }

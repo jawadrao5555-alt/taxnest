@@ -91,6 +91,29 @@ class AdminAccountRecoveryTest extends TestCase
             ->assertRedirect('/admin/login');
     }
 
+    public function test_recovery_email_is_not_active_until_signed_verification(): void
+    {
+        $mail = [];
+        Mail::shouldReceive('raw')->twice()->andReturnUsing(function ($body) use (&$mail) {
+            $mail[] = $body;
+        });
+        $this->actingAs($this->admin, 'admin');
+        $this->from('/admin/recovery/settings')->post('/admin/recovery/settings', [
+            'slot' => 1, 'email' => 'one@example.test', 'password' => self::ORIGINAL,
+        ])->assertSessionHas('status');
+        $this->assertDatabaseCount('admin_recovery_contacts', 0);
+        $url = substr($mail[0], strrpos($mail[0], "\n") + 1);
+        $this->get($url)->assertOk();
+        $this->assertDatabaseCount('admin_recovery_contacts', 0);
+        $response = $this->post($url, ['password' => self::ORIGINAL])->assertOk();
+        $code = $response->viewData('backup');
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{48}$/', $code);
+        $this->assertDatabaseHas('admin_recovery_contacts', [
+            'slot' => 1, 'email' => 'one@example.test', 'code_hash' => hash('sha256', $code),
+        ]);
+        $this->post($url, ['password' => self::ORIGINAL])->assertForbidden();
+    }
+
     private function contact(int $slot, string $email): string
     {
         $code = bin2hex(random_bytes(24));

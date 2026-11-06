@@ -12351,9 +12351,13 @@ function restaurantPos() {
             // unchanged and the exact finalized transaction is still what the
             // server renders when the agent fetches this job.
             this.praPrintGrace().catch(() => {});
-            const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
-            console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             const txnId = this.lastTransactionId;
+            if (txnId && !this.lastIsOffline) {
+                await this.waitForFbrPosReceipt(txnId);
+                if (this.lastTransactionId !== txnId || !this.showReceipt) return;
+            }
+            const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + txnId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
+            console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             const fallback = () => {
                 // Silent path failed → bill now depends on the popup/iframe route
                 // (invisible when blocked). Leave a trail (Task #63).
@@ -14018,6 +14022,16 @@ function restaurantPos() {
         // Poll the tiny status endpoint (~2.5s interval, bounded 30s) so the
         // badge flips to PRA VERIFIED + fiscal number and the receipt iframe
         // reloads with the fiscal box + QR. Popup band → stopPraPoll (x-effect).
+        async waitForFbrPosReceipt(txnId) {
+            const deadline = Date.now() + 18000;
+            do {
+                const status = await this._fetchPraStatus(txnId, Math.min(2000, Math.max(1, deadline - Date.now())));
+                if (this.lastTransactionId !== txnId || !this.showReceipt) return;
+                if (status?.fbr_pos_ready) this.refreshReceiptIframe();
+                if (!status?.fbr_pos_pending) return;
+                await new Promise(resolve => setTimeout(resolve, Math.min(750, Math.max(0, deadline - Date.now()))));
+            } while (Date.now() < deadline);
+        },
         praPollTimer: null,
         startPraPoll() {
             this.stopPraPoll();
@@ -14043,9 +14057,9 @@ function restaurantPos() {
         stopPraPoll() {
             if (this.praPollTimer) { clearInterval(this.praPollTimer); this.praPollTimer = null; }
         },
-        async _fetchPraStatus(txnId) {
+        async _fetchPraStatus(txnId, timeoutMs = 5000) {
             try {
-                const res = await fetch('/pos/transaction/' + txnId + '/pra-status', { headers: { 'Accept': 'application/json' } });
+                const res = await fetch('/pos/transaction/' + txnId + '/pra-status', { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(timeoutMs) });
                 if (!res.ok) return null;
                 return await res.json();
             } catch (e) { return null; } // network blip — next tick retries

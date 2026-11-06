@@ -509,6 +509,92 @@ class PosKotOnFinalPayResponseTest extends TestCase
 
     // ── 1. payOrder: the owner's Table 02 bill ──────────────────────────────
 
+    public function test_provisional_delivery_accepts_zero_fee_and_rejects_stale_fee(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $t) {
+            $t->decimal('fbr_service_charge', 12, 2)->default(0);
+        });
+        $companyId = $this->makeShop();
+        $user = $this->makeCashier($companyId);
+        $body = [
+            'items' => [['type' => 'product', 'item_id' => null, '_manual' => true,
+                'name' => 'Synthetic delivery', 'quantity' => 1, 'unit_price' => 100,
+                'is_tax_exempt' => true]],
+            'payment_method' => 'cash', 'order_type' => 'delivery',
+            'delivery_address' => 'Synthetic test address',
+            'save_as_provisional' => true, 'fbr_service_charge' => 0,
+            'discount_type' => 'amount', 'discount_value' => 0,
+        ];
+        $response = $this->actingAs($user, 'pos')->postJson('/pos/invoice/store', $body);
+        $response->assertOk()->assertJson(['success' => true]);
+        $sale = DB::table('pos_transactions')->find($response->json('transaction_id'));
+        $this->assertNotNull($sale);
+        $this->assertEquals(0, $sale->fbr_service_charge);
+        $this->assertEquals(100, $sale->total_amount);
+        $body['fbr_service_charge'] = 1;
+        $this->postJson('/pos/invoice/store', $body)->assertUnprocessable()
+            ->assertJsonValidationErrors('fbr_service_charge');
+        $this->assertSame(1, DB::table('pos_transactions')->count());
+    }
+
+    public function test_held_order_finalization_preserves_original_fiscal_line_facts(): void
+    {
+        Schema::table('pos_transaction_items',function(Blueprint $t){
+            $t->decimal('taxable_base',12,2)->nullable(); $t->decimal('exempt_base',12,2)->nullable();
+        });
+        $companyId=$this->makeShop(); $user=$this->makeCashier($companyId);
+        $orderId=$this->makeOrder($companyId,[false,false],['table_id'=>$this->makeTable($companyId)]);
+        $this->pay($orderId,$user)->assertOk()->assertJson(['success'=>true]);
+        $lines=DB::table('pos_transaction_items')->get();
+        $this->assertNotEmpty($lines);
+        foreach($lines as $line) {
+            $this->assertNotNull($line->taxable_base); $this->assertNotNull($line->exempt_base);
+            $this->assertEqualsWithDelta((float)$line->subtotal,(float)$line->taxable_base+(float)$line->exempt_base,0.01);
+        }
+    }
+
+    public function test_production_ims_fee_is_collected_once_and_never_added_to_pra_tax(): void
+    {
+        Schema::table('pos_transactions',fn(Blueprint $t)=>$t->decimal('fbr_service_charge',12,2)->default(0));
+        Schema::create('pos_di_sandbox_profiles',function(Blueprint $t){$t->id();$t->unsignedBigInteger('company_id');$t->boolean('enabled')->default(false);});
+        Schema::create('pos_ims_profiles',function(Blueprint $t){
+            $t->id();$t->unsignedBigInteger('company_id');$t->boolean('enabled')->default(true);
+            $t->string('environment');$t->string('connection_mode');$t->string('production_pos_id');
+            $t->string('device_uid');$t->string('local_ims_url');$t->timestamp('production_confirmed_at')->nullable();$t->timestamps();
+        });
+        config(['pra_di_sandbox.production_enabled'=>true]);
+        $companyId=$this->makeShop(['pra_reporting_enabled'=>true,'agent_enabled'=>true,'pra_connection_mode'=>'fiscal_device','pra_pos_id'=>'12345']);
+        $user=$this->makeCashier($companyId);
+        \App\Models\PosImsProfile::create(['company_id'=>$companyId,'environment'=>'production','connection_mode'=>'fiscal_device',
+            'production_pos_id'=>'54321','device_uid'=>'fictional-device','local_ims_url'=>'http://127.0.0.1:8524/TcpService/IMSHttp','production_confirmed_at'=>now()]);
+        $orderId=$this->makeOrder($companyId,[false,false],['table_id'=>$this->makeTable($companyId)]);
+        $this->pay($orderId,$user,['pay_uuid'=>'synthetic-ims-fee-once'])->assertOk()->assertJson(['success'=>true]);
+        $bill=\App\Models\PosTransaction::where('company_id',$companyId)->sole();
+        $this->assertSame(233.0,(float)$bill->total_amount);
+        $this->assertSame(32.0,(float)$bill->tax_amount);
+        $this->assertSame(1.0,(float)$bill->fbr_service_charge);
+        $payload=(new \App\Services\PraIntegrationService(\App\Models\Company::find($companyId)))->generatePayload($bill);
+        $this->assertSame(232.0,(float)$payload['TotalBillAmount']);
+        $this->assertSame(32.0,(float)$payload['TotalTaxCharged']);
+        $ghost=$this->makeOrder($companyId,[false,false]);
+        $this->pay($ghost,$user,['pay_uuid'=>'synthetic-ims-fee-once'])->assertOk();
+        $this->assertSame(1,\App\Models\PosTransaction::where('company_id',$companyId)->count());
+        $this->assertSame(1.0,(float)$bill->fresh()->fbr_service_charge);
+        $second=$this->makeOrder($companyId,[false],['source'=>'waiter']);
+        $this->settleWaiterOrderAtCounter($second,$user)->assertOk();
+        $counter=\App\Models\PosTransaction::where('company_id',$companyId)->where('id','!=',$bill->id)->sole();
+        $this->assertSame(117.0,(float)$counter->total_amount);
+        $this->assertSame(1.0,(float)$counter->fbr_service_charge);
+        $this->assertSame(16.0,(float)$counter->tax_amount);
+        DB::table('pos_di_sandbox_profiles')->insert(['company_id'=>$companyId,'enabled'=>true]);
+        $this->assertSame(0.0,\App\Services\PosImsFee::quote($companyId),'Ambiguous DI/IMS configuration cannot collect a POS fee');
+        DB::table('pos_di_sandbox_profiles')->where('company_id',$companyId)->delete();
+        $this->assertSame(0.0,\App\Services\PosImsFee::quote($companyId+1000));
+        \App\Models\PosImsProfile::where('company_id',$companyId)->update(['environment'=>'sandbox']);
+        $this->assertSame(0.0,\App\Services\PosImsFee::quote($companyId));
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
     public function test_dine_in_cart_paid_straight_to_cash_returns_a_pending_kitchen_ticket(): void
     {
         // The owner's video: cashier hits CASH on a dine-in cart without ever

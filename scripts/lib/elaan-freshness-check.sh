@@ -61,7 +61,7 @@ elaan_freshness_check() {
   local ELAAN_OUT ELAAN_RC PAYLOAD
   PAYLOAD=$(base64 < "$ROOT/scripts/lib/elaan-receipt.php" | tr -d '\n')
   ELAAN_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "LIVE_DIR='$LIVE_DIR' LIVE_PHP='${LIVE_PHP:-/usr/bin/php}' MARKER_FILE='$LIVE_DEPLOY_MARKER' TARGET_SHA='$TARGET_SHA' SCOPE_B64='$SCOPE_B64' PAYLOAD='$PAYLOAD' bash -s" 2>&1 <<'EOFELAAN'
+    "LIVE_DIR='$LIVE_DIR' LIVE_PHP='${LIVE_PHP:-/usr/bin/php}' MARKER_FILE='$LIVE_DEPLOY_MARKER' TARGET_SHA='$TARGET_SHA' SCOPE_B64='$SCOPE_B64' PAYLOAD='$PAYLOAD' bash -s" <<'EOFELAAN'
 set -eu
 SCRIPT=$(mktemp /tmp/taxnest-elaan-receipt.XXXXXX.php)
 trap 'rm -f "$SCRIPT"' EXIT
@@ -71,7 +71,8 @@ EOFELAAN
   )
   ELAAN_RC=$?
   [ "$ELAAN_RC" -eq 0 ] && [ -n "$ELAAN_OUT" ] || fail "elaan receipt check failed (rc=$ELAAN_RC): $ELAAN_OUT"
-  # Accept exactly one protocol line; PHP warnings/transport noise never count.
+  # SSH diagnostics remain visible on stderr, outside the receipt protocol.
+  # Accept exactly one stdout line; PHP warnings/extra output never count.
   [[ "$ELAAN_OUT" =~ ^ELAAN_COUNT=([0-9]+)\ MARKER_COMMIT=([0-9a-f]{40})\ RECEIPT_COUNT=([0-9]+)$ ]] \
     || fail "elaan receipt check blocked deploy: $ELAAN_OUT"
   local COUNT="${BASH_REMATCH[1]}" MARKER_COMMIT="${BASH_REMATCH[2]}"

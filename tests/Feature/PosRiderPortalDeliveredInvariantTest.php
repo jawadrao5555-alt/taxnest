@@ -155,16 +155,64 @@ class PosRiderPortalDeliveredInvariantTest extends TestCase
         auth('pos')->setUser(User::find($userId));
     }
 
-    private function markDelivered(int $userId, int $txnId)
+    private function markDelivered(int $userId, int $txnId, array $data = [])
     {
         $this->actAsRider($userId);
 
         // portalMarkDelivered ends with back()->with(...) — needs a request + session.
-        $request = \Illuminate\Http\Request::create('/pos/rider/deliveries/' . $txnId . '/delivered', 'POST');
+        $request = \Illuminate\Http\Request::create('/pos/rider/deliveries/' . $txnId . '/delivered', 'POST', $data);
         $request->setLaravelSession(app('session.store'));
         app()->instance('request', $request);
 
-        return app(\App\Http\Controllers\PosRiderController::class)->portalMarkDelivered($txnId);
+        return app(\App\Http\Controllers\PosRiderController::class)->portalMarkDelivered($request, $txnId);
+    }
+
+    public function test_delivery_cash_recovery_and_credit_first_return(): void
+    {
+        Schema::table('pos_transactions', function (Blueprint $table) {
+            $table->string('customer_name')->nullable();
+            $table->unsignedBigInteger('branch_id')->nullable();
+        });
+        Schema::create('pos_day_close_reports', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->date('report_date');
+        });
+        $migration = require database_path('migrations/2026_11_06_000001_create_pos_delivery_accounts.php');
+        $migration->up();
+
+        [$riderId, $userId] = $this->makeRiderWithUser();
+        $billId = $this->makeBill($riderId, ['total_amount' => 1000, 'customer_name' => 'Demo Customer', 'branch_id' => 4]);
+        $bill = \App\Models\PosTransaction::findOrFail($billId);
+        $rider = \App\Models\PosRider::findOrFail($riderId);
+        $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($bill, $rider);
+        $this->markDelivered($userId, $billId, ['received_amount' => '600.00', 'assignment_revision' => $revision]);
+
+        $bill->refresh();
+        $this->assertSame('delivered', $bill->delivery_status);
+        $this->assertSame(600.0, \App\Models\PosRider::remainingAmount($bill));
+        $account = DB::table('pos_delivery_accounts')->where('transaction_id', $billId)->first();
+        $this->assertSame(400.0, (float) $account->outstanding_amount);
+
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $today = \App\Services\PosBusinessDay::current(self::COMPANY);
+        for ($i = 0; $i < 2; $i++) {
+            \App\Services\PosDeliveryAccount::collect(self::COMPANY, $account->id, $userId, $requestId, '150.00');
+        }
+        $this->assertSame(150.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY, $today, 4));
+        $this->assertSame(0.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY, $today, 5));
+        $this->assertSame(0.0, \App\Services\PosDeliveryAccount::recoveries(self::COMPANY + 1, $today, 4));
+
+        $return = \App\Models\PosTransaction::findOrFail($this->makeBill(null, ['total_amount' => 300]));
+        DB::transaction(fn () => \App\Services\PosDeliveryAccount::offsetReturn($bill, $return, $userId));
+
+        $this->assertSame(0.0, (float) DB::table('pos_delivery_accounts')->where('id', $account->id)->value('outstanding_amount'));
+        $this->assertSame(250.0, (float) $return->delivery_credit_amount);
+        $this->assertSame(50.0, \App\Support\PosPaymentBuckets::split(collect([$return]))['cash']);
+
+        DB::table('pos_transactions')->where('id', $billId)->delete();
+        $this->assertDatabaseHas('pos_delivery_accounts', ['transaction_id' => $billId]);
+        $this->assertDatabaseCount('pos_delivery_account_events', 2);
     }
 
     /** Attempt that MUST 404 (bill unreachable for this rider). */

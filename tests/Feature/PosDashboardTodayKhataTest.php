@@ -520,14 +520,21 @@ class PosDashboardTodayKhataTest extends TestCase
         }
     }
 
-    public function test_metric_order_detail_cannot_escape_isolated_cashier_or_company(): void
+    public static function detailHours(): array
     {
+        return ['after midnight' => ['2026-11-05 00:30:00'], 'afternoon' => ['2026-11-05 12:30:00']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('detailHours')]
+    public function test_metric_order_detail_cannot_escape_isolated_cashier_or_company(string $at): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse($at, config('app.timezone')));
         $companyId=$this->makeCompany(['pos_cashier_own_sales_only'=>true]);$user=$this->makeUser($companyId,'pos_cashier','pra');
         $own=$this->makeTxn($companyId,'OWN',['created_by'=>$user->id]);
         $this->makeTxn($companyId,'OTHER',['created_by'=>$user->id+99]);
         $foreign=$this->makeCompany();$this->makeTxn($foreign,'FOREIGN',['created_by'=>$user->id]);
         auth('pos')->setUser($user);app()->instance('currentCompanyId',$companyId);
-        $view=(new PosController())->dashboardDetail(Request::create('/pos/dashboard/detail/orders','GET',['date'=>now()->toDateString(),'cashier'=>'all']),'orders');
+        $view=(new PosController())->dashboardDetail(Request::create('/pos/dashboard/detail/orders','GET',['date'=>\App\Services\PosBusinessDay::current($companyId),'cashier'=>'all']),'orders');
         $this->assertSame([$own],$view->getData()['rows']->pluck('id')->all());
     }
 

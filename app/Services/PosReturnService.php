@@ -252,6 +252,12 @@ class PosReturnService
                     : RecipeInventoryService::normalizeDisposition($row['disposition'] ?? null);
 
                 $returnItems[] = [
+                    // Only slice facts frozen on the original sale. Legacy nulls remain null.
+                    ...(!$allocatedBill && $orig->taxable_base !== null && $orig->exempt_base !== null
+                        && Schema::hasColumn('pos_transaction_items', 'taxable_base') ? [
+                        'taxable_base' => (round((float)$orig->taxable_base * 100 * min(1, ($beforeQty+$qty)/$soldQty)) - round((float)$orig->taxable_base * 100 * min(1, $beforeQty/$soldQty))) / 100,
+                        'exempt_base' => (round((float)$orig->exempt_base * 100 * min(1, ($beforeQty+$qty)/$soldQty)) - round((float)$orig->exempt_base * 100 * min(1, $beforeQty/$soldQty))) / 100,
+                    ] : []),
                     'parent_item_id' => $orig->id,
                     'item_type' => $orig->item_type,
                     'item_id' => $orig->item_id,
@@ -286,6 +292,14 @@ class PosReturnService
                     'return_disposition' => $disposition,
                     'disposition' => $disposition,
                 ];
+                if (!$allocatedBill && $orig->taxable_base!==null && $orig->exempt_base!==null
+                    && Schema::hasColumn('pos_transaction_items','taxable_base') && Schema::hasColumn('pos_transaction_items','exempt_base')) {
+                    $sliceBase=static fn(float $value)=>(round($value*100*min(1,($beforeQty+$qty)/$soldQty))
+                        -round($value*100*min(1,$beforeQty/$soldQty)))/100;
+                    $last=array_key_last($returnItems);
+                    $returnItems[$last] += ['taxable_base'=>$sliceBase((float)$orig->taxable_base),
+                        'exempt_base'=>$sliceBase((float)$orig->exempt_base)];
+                }
                 if ($orig->item_type === 'product' && $orig->item_id) {
                     $stockReturnItems[] = [
                         'item_type' => 'product', 'item_id' => (int) $orig->item_id,
@@ -392,6 +406,17 @@ class PosReturnService
                 }
             }
 
+            $feeRefund = 0.0;
+            if ((float)($original->fbr_service_charge ?? 0)>0) {
+                $priorFeeReturns = PosTransaction::withoutGlobalScope('hide_archived')->where('company_id',$companyId)
+                    ->where('parent_transaction_id',$original->id)->where('transaction_type','return')->get();
+                $allFeeItemsReturned = !$original->items()->whereRaw('quantity > COALESCE(returned_quantity, 0)')->exists();
+                if ($allFeeItemsReturned) {
+                    $feeRefund = max(0,round((float)$original->fbr_service_charge-(float)$priorFeeReturns->sum('fbr_service_charge'),2));
+                    $refundTotal = max(0,round((float)$original->total_amount-(float)$priorFeeReturns->sum('total_amount'),2));
+                }
+            }
+
             $invNum = 'RET-' . date('ymd') . '-' . strtoupper(Str::random(5));
 
             $data = [
@@ -425,6 +450,7 @@ class PosReturnService
                 'pra_status' => $localParent ? 'local' : null,
                 'created_by' => $userId,
             ];
+            $data += PosImsFee::fields($feeRefund);
             // Tax-inclusive snapshot rides the return so payload math branches
             // exactly like the parent (schema-drift guard: columns may lag).
             if (Schema::hasColumn('pos_transactions', 'tax_inclusive')) {
@@ -442,6 +468,7 @@ class PosReturnService
                 $data['hotel_money_from_folio'] = (bool) $original->hotel_money_from_folio;
             }
             $return = PosTransaction::create($data);
+            PosDeliveryAccount::offsetReturn($original, $return, $userId);
 
             foreach ($returnItems as $it) {
                 $it['transaction_id'] = $return->id;

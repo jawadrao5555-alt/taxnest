@@ -34,6 +34,23 @@ use Illuminate\Database\Schema\Blueprint;
  */
 class PosPaymentBucketsTest extends TestCase
 {
+    public function test_delivery_credit_is_excluded_from_rider_cash_and_cash_sales(): void
+    {
+        $delivery = (object) [
+            'payment_method' => 'cash',
+            'total_amount' => 1000,
+            'delivery_credit_amount' => 400,
+            'rider_partial_paid' => 100,
+        ];
+
+        $this->assertSame(500.0, \App\Models\PosRider::remainingAmount($delivery));
+        $this->assertSame(['cash' => 600.0, 'card' => 0.0, 'other' => 400.0],
+            PosPaymentBuckets::split(collect([$delivery])));
+        $this->assertSame(-100.0, PosPaymentBuckets::split(collect([
+            (object) ['payment_method' => 'cash', 'total_amount' => -100],
+        ]))['cash']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

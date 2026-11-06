@@ -169,8 +169,13 @@ function openPosWindow(config, opts = {}) {
     // Keep-alive path (v1.5.2): the window survived its last "close" as a
     // hidden window — showing it is INSTANT (no page reload). Freshness is
     // handled by the resume check below.
+    if (existing.isMinimized()) existing.restore();
     existing.show();
     existing.focus();
+    // An explicit Open POS click must recover a previously failed cold start.
+    if (existing.webContents.getURL().startsWith('file:') && targetUrl) {
+      existing.loadURL(targetUrl).catch(() => loadOfflinePage(existing, targetUrl, 'retry failed'));
+    }
     runResumeCheck(existing);
     return existing;
   }

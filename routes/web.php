@@ -870,6 +870,8 @@ Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
     Route::get('/tax-integrations', [\App\Http\Controllers\PosTaxIntegrationController::class,'index'])->name('pos.tax-integrations');
+    Route::get('/tax-integrations/automatic', [\App\Http\Controllers\PosFederalAutomationController::class,'index'])->name('pos.federal-auto');
+    Route::post('/tax-integrations/automatic', [\App\Http\Controllers\PosFederalAutomationController::class,'save'])->middleware('throttle:6,1')->name('pos.federal-auto.save');
     Route::prefix('tax-integrations/fbr-pos')->name('pos.tax-integrations.ims')->controller(\App\Http\Controllers\PosTaxIntegrationController::class)->group(function(){
         Route::get('/', 'ims');
         Route::post('/setup', 'saveIms')->middleware('throttle:6,1')->name('.save');
@@ -877,6 +879,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/{id}', 'show')->whereNumber('id')->name('.show');
         Route::post('/{id}/prepare', 'prepare')->whereNumber('id')->name('.prepare');
         Route::post('/{id}/connection', 'refreshConnection')->whereNumber('id')->name('.connection');
+        Route::post('/{id}/reconcile', 'reconcilePortal')->whereNumber('id')->middleware('throttle:6,1')->name('.reconcile');
         Route::post('/{id}/submit', 'submit')->whereNumber('id')->middleware('throttle:6,1')->name('.submit');
         Route::get('/{id}/receipt', 'receipt')->whereNumber('id')->name('.receipt');
     });
@@ -1000,6 +1003,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/local-support-copies/{id}/download', [\App\Http\Controllers\OptionalLocalBillArchiveController::class, 'download'])->whereNumber('id')->middleware('throttle:20,1')->name('pos.local-support-copies.download');
 
     Route::post('/invoice/store', [PosController::class, 'storeInvoice'])->name('pos.invoice.store')->middleware('plan.limit:invoices');
+    Route::get('/staff-discounts', [\App\Http\Controllers\PosStaffDiscountController::class, 'index'])->name('pos.staff-discounts');
+    Route::post('/staff-discounts/settings', [\App\Http\Controllers\PosStaffDiscountController::class, 'toggle'])->name('pos.staff-discounts.settings');
+    Route::get('/staff-discounts/{id}', [\App\Http\Controllers\PosStaffDiscountController::class, 'show'])->whereNumber('id')->name('pos.staff-discounts.show');
+    Route::post('/staff-discounts/{id}/review', [\App\Http\Controllers\PosStaffDiscountController::class, 'review'])->whereNumber('id')->name('pos.staff-discounts.review');
     Route::get('/transactions', [PosController::class, 'transactions'])->name('pos.transactions');
     Route::get('/transaction/{id}', [PosController::class, 'transactionShow'])->name('pos.transaction.show');
     Route::get('/transaction/{id}/edit', [PosController::class, 'editTransaction'])->name('pos.transaction.edit');
@@ -1439,6 +1446,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/api/held-sales/{id}/recall', [\App\Http\Controllers\PosHeldSaleController::class, 'recall'])->name('pos.held-sales.recall');
     Route::delete('/api/held-sales/{id}', [\App\Http\Controllers\PosHeldSaleController::class, 'destroy'])->name('pos.held-sales.destroy');
 
+    Route::get('/delivery-accounts', [\App\Http\Controllers\PosDeliveryAccountController::class, 'index'])->name('pos.delivery-accounts.index');
+    Route::post('/delivery-accounts/{accountId}/collect', [\App\Http\Controllers\PosDeliveryAccountController::class, 'collect'])->name('pos.delivery-accounts.collect');
+
     Route::middleware('restaurant.only')->group(function () {
     Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/{id}/shift-table', [RestaurantPosController::class, 'shiftTable'])->name('pos.restaurant.orders.shift-table');
@@ -1514,6 +1524,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/deliveries', [\App\Http\Controllers\PosRiderController::class, 'deliveries'])->name('pos.deliveries');
     Route::match(['get', 'post'], '/deliveries/shop-cash', [\App\Http\Controllers\PosRiderController::class, 'shopCash'])->name('pos.deliveries.shop-cash');
     Route::post('/deliveries/{id}/assign', [\App\Http\Controllers\PosRiderController::class, 'assign'])->name('pos.deliveries.assign');
+    Route::post('/deliveries/bulk-assign', [\App\Http\Controllers\PosRiderController::class, 'bulkAssign'])->name('pos.deliveries.bulk-assign');
     Route::post('/deliveries/{id}/status', [\App\Http\Controllers\PosRiderController::class, 'updateStatus'])->name('pos.deliveries.status');
     // Prepaid conversion (Task 285, Aug 2026) — admin/manager only; role-checked in controller.
     Route::post('/deliveries/{id}/mark-prepaid', [\App\Http\Controllers\PosRiderController::class, 'markPrepaid'])->name('pos.deliveries.mark-prepaid');

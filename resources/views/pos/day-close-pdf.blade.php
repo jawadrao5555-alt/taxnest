@@ -162,6 +162,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                 <td>{{ __('pos.dcp_sales_tax_collected') }}</td>
                 <td class="r">{{ number_format($report->total_tax, 2) }}</td>
             </tr>
+            @if((float)($report->total_fbr_fee ?? 0)!=0)<tr><td>FBR POS Fee</td><td class="r">{{ number_format($report->total_fbr_fee,2) }}</td></tr>@endif
         </tbody>
     </table>
 
@@ -371,7 +372,10 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                 <td class="r" style="color:#dc2626;">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td>
             </tr>
             @endif
-            @if(is_array($report->rider_summary) && ($report->rider_summary['cash_in'] ?? 0) > 0)
+            @if(($report->rider_summary['credit_in'] ?? 0) > 0)
+        <tr><td>{{ __('pos_delivery.recoveries') }}</td><td class="r">+{{ number_format($report->rider_summary['credit_in'], 2) }}</td></tr>
+        @endif
+        @if(is_array($report->rider_summary) && ($report->rider_summary['cash_in'] ?? 0) > 0)
             <tr>
                 <td>{{ __('pos.dcp_rider_settlements_received') }}</td>
                 <td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td>

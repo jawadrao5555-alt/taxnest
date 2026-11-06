@@ -143,6 +143,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_total_tax') }}</p>
             <p class="text-2xl font-bold text-purple-600 mt-1">PKR {{ number_format($stats->total_tax) }}</p>
+            @if((float)($stats->total_fbr_fee ?? 0)!=0)<p class="text-xs mt-1">FBR POS Fee: PKR {{ number_format($stats->total_fbr_fee,2) }}</p>@endif
             {{-- PRA segregation (owner 9 Aug 2026): taxable vs exempt values --}}
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.dc_taxable_value') }}: PKR {{ number_format($stats->taxable_value) }}</p>
             @if($stats->exempt_value > 0)
@@ -816,7 +817,7 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
             @php $openingFromDayStart = ($dayOpeningTotal ?? null) !== null ? (float) $dayOpeningTotal : (($dayOpening ?? null) !== null ? (float) $dayOpening->opening_cash : null); @endphp
             <div class="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
                  x-data="{ float: '{{ $openingFromDayStart !== null ? $openingFromDayStart : '' }}', counted: '', cashSales: {{ (float) $stats->cash_amount }},
-                           riderOut: {{ (float) ($rf['cash_out'] ?? 0) }}, riderIn: {{ (float) ($rf['cash_in'] ?? 0) }},
+                           riderOut: {{ (float) ($rf['cash_out'] ?? 0) }}, riderIn: {{ (float) ($rf['cash_in'] ?? 0) + (float) ($rf['credit_in'] ?? 0) }},
                            get expected() { return (parseFloat(this.float) || 0) + this.cashSales - this.riderOut + this.riderIn; },
                            get variance() { return this.counted === '' ? null : (parseFloat(this.counted) || 0) - this.expected; } }">
                 <p class="text-sm font-bold text-gray-900 dark:text-white mb-1">{{ __('pos.cash_reconciliation_optional') }}</p>
@@ -843,6 +844,9 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
                     @endif
                     @if(!empty($rf['active']) && ($rf['cash_in'] ?? 0) > 0)
                     <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos.rider_settlements_old_bills') }} <b>+ PKR {{ number_format($rf['cash_in'], 2) }}</b></span>
+                    @endif
+                    @if(($rf['credit_in'] ?? 0) > 0)
+                    <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos_delivery.recoveries') }} <b>+ PKR {{ number_format($rf['credit_in'], 2) }}</b></span>
                     @endif
                     <span class="text-gray-600 dark:text-gray-400">{{ __('pos.expected_in_drawer_colon') }} <b class="text-gray-900 dark:text-white" x-text="'PKR ' + expected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></b></span>
                     <template x-if="variance !== null">
@@ -1467,6 +1471,9 @@ $presentation = \App\Services\PosReportPresentation::forView($financialHistory ?
         <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
             @if(($existingReport->rider_summary['cash_out'] ?? 0) > 0)
             <span class="text-amber-700 dark:text-amber-400">{{ __('pos.with_rider_at_close') }} <b>− PKR {{ number_format($existingReport->rider_summary['cash_out'], 2) }}</b></span>
+            @endif
+            @if(($existingReport->rider_summary['credit_in'] ?? 0) > 0)
+            <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos_delivery.recoveries') }} <b>+ PKR {{ number_format($existingReport->rider_summary['credit_in'], 2) }}</b></span>
             @endif
             @if(($existingReport->rider_summary['cash_in'] ?? 0) > 0)
             <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos.old_bills_settled_today') }} <b>+ PKR {{ number_format($existingReport->rider_summary['cash_in'], 2) }}</b></span>

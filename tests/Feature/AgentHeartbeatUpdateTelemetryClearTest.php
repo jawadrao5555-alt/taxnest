@@ -228,4 +228,23 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
         $settings = (array) $company->fresh()->pos_printer_settings;
         $this->assertSame(['receipt_printer' => 'Existing thermal'], $settings);
     }
+    public function test_authenticated_offline_sample_upload_is_durable_idempotent_and_preserves_settings(): void
+    {
+        (require database_path('migrations/2026_12_22_090000_create_pra_diagnostic_samples.php'))->up();
+        $company = $this->makeCompany(['pos_printer_settings'=>['receipt_printer'=>'Counter-A','silent_print_enabled'=>true]]);
+        $this->makeCompany(['agent_api_key'=>'other-synthetic-key']);
+        $payload = ['device_uid'=>'synthetic-device','diagnostic_evidence'=>['version'=>1,'stream_id'=>'11111111-1111-4111-8111-111111111111',
+            'events'=>[['sequence'=>1,'at'=>'2026-11-01T01:02:03.456Z','pending_callbacks'=>4,'raw_error'=>'PRIVATE']]]];
+        $this->postJson('/api/agent/heartbeat', $payload)->assertUnauthorized();
+        foreach ([1,2] as $retry) $this->postJson('/api/agent/heartbeat', $payload, ['Authorization'=>'Bearer test-agent-key-1209'])
+            ->assertOk()->assertJsonPath('diagnostic_evidence_ack.accepted', [1]);
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('pra_diagnostic_samples')->count());
+        $this->assertSame($company->id, \Illuminate\Support\Facades\DB::table('pra_diagnostic_samples')->value('company_id'));
+        $this->assertSame(['receipt_printer'=>'Counter-A','silent_print_enabled'=>true], $company->fresh()->pos_printer_settings);
+        Schema::drop('pra_diagnostic_samples');
+        $this->postJson('/api/agent/heartbeat', $payload, ['Authorization'=>'Bearer test-agent-key-1209'])
+            ->assertOk()->assertJsonPath('diagnostic_evidence_ack.status', 'unavailable')->assertJsonPath('diagnostic_evidence_ack.accepted', []);
+        $this->beat('1.9.0');
+    }
+
 }

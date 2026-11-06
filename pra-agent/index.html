@@ -236,6 +236,8 @@
       straight from there like a separate app (own icon on the taskbar too).
     </p>
     <div class="btn-row" style="margin-bottom:14px;">
+      <button id="installationFolderBtn" class="btn">Agent installation folder</button>
+      <button id="installedAppsBtn" class="btn">Windows installed apps / uninstall</button>
       <button id="openPosBtn" class="btn btn-primary">🖥️ Open POS Screen</button>
       <button id="openPosBrowserBtn" class="btn btn-secondary">Browser mein POS kholein</button>
     </div>
@@ -312,12 +314,13 @@
       from FBR's official server and launches the installer. After installing, open the FBR IMS app once and activate:<br>
       1️⃣ Enter your <b>POS Registration No</b> &nbsp;
       2️⃣ Enter the <b>Access Code</b> from IRIS (Point of Sale Registration page) &nbsp;
-      3️⃣ Select <b>Production</b><br>
-      Then press <b>Re-check</b> — when the badge turns green, queued bills sync automatically.
+      3️⃣ Verify the installed component's <b>Sandbox / Production</b> environment independently.<br>
+      Then press <b>Re-check</b>. Green means a compatible local service was found; reporting still requires the reviewed company setup.
     </div>
     <div id="praImsSteps" style="display:none; font-size:12px; color:#c4b5fd; line-height:1.7;">
       PRA Fiscal Device mode needs PRAL's local IMS service on this PC. Install and activate it using your PRA POS credentials, then press Re-check.
     </div>
+    <div id="imsDeviceInfo" style="font-size:12px;overflow-wrap:anywhere"></div>
     <div id="imsOkNote" style="display:none; font-size:12px; color:#10b981;">
       ✓ Local IMS service detected on this PC. This checks local availability only; invoice submission is confirmed separately.
     </div>
@@ -450,14 +453,17 @@
 
   function renderStatus(s) {
     const mode = window.TaxNestImsVisibility.imsMode(s);
-    $('imsRoutingNote').textContent = mode === 'fbr' && s.serverInfo?.fbr_connection_mode !== 'fiscal_device'
+    $('imsDeviceInfo').textContent = 'This PC: ' + (s.deviceUid || 'Not paired') + ' · ' + (s.localIms || []).map(x=>x.url).join(' · ');
+    $('imsRoutingNote').textContent = s.serverInfo?.product_type === 'pos'
+      ? 'PRA connection stays as saved. FBR IMS setup and Re-check are available even while FBR reporting is disabled. Discovery does not enable reporting or change the installed IMS environment.'
+      : mode === 'fbr' && s.serverInfo?.fbr_connection_mode !== 'fiscal_device'
       ? 'FBR company connected. Local IMS can be checked or installed here. Current reporting mode remains unchanged; installing IMS does not switch bills to local fiscal reporting.'
       : (mode ? 'Local fiscal-device mode. Check or prepare the required IMS service below.' : '');
     if (mode !== currentImsMode) {
       currentImsMode = mode;
       imsGeneration++;
       $('imsCard').style.display = mode ? 'block' : 'none';
-      $('imsHeading').textContent = mode === 'fbr' ? 'FBR IMS Fiscal Service' : 'PRA IMS Fiscal Service';
+      $('imsHeading').textContent = mode === 'both' ? 'PRA + optional FBR IMS setup' : (mode === 'fbr' ? 'FBR IMS setup / connection check' : 'PRA IMS Fiscal Service');
       $('imsSteps').style.display = 'none';
       $('praImsSteps').style.display = 'none';
       $('imsInstallBtn').style.display = 'none';
@@ -663,9 +669,10 @@
     badge.innerHTML = '<span class="dot"></span> Checking…';
     const r = await window.agentAPI.checkImsService();
     if (generation !== imsGeneration || !currentImsMode) return;
-    if (r.running) {
+    if (r.running || (currentImsMode === 'pra' && r.pra_reachable)) {
       badge.className = 'badge online';
-      badge.innerHTML = '<span class="dot"></span> IMS Running';
+      badge.textContent = r.running ? 'Compatible SOAP IMS detected' : 'Local PRA address responds · identity unverified';
+      $('imsOkNote').textContent = (r.services || []).map(s=>s.url).join(' · ') + (currentImsMode === 'both' ? ' · PRA local address: ' + (r.pra_reachable ? 'responding (identity unverified)' : 'unreachable') : '') + ' — POS registration and environment need verification.';
       $('imsInstallBtn').style.display = 'none';
       $('imsSteps').style.display = 'none';
       $('praImsSteps').style.display = 'none';
@@ -673,8 +680,8 @@
     } else {
       badge.className = 'badge error';
       badge.innerHTML = '<span class="dot"></span> IMS Not Found';
-      $('imsInstallBtn').style.display = currentImsMode === 'fbr' ? 'inline-block' : 'none';
-      $('imsSteps').style.display = currentImsMode === 'fbr' ? 'block' : 'none';
+      $('imsInstallBtn').style.display = ['fbr','both'].includes(currentImsMode) ? 'inline-block' : 'none';
+      $('imsSteps').style.display = ['fbr','both'].includes(currentImsMode) ? 'block' : 'none';
       $('praImsSteps').style.display = currentImsMode === 'pra' ? 'block' : 'none';
       $('imsOkNote').style.display = 'none';
     }
@@ -683,7 +690,7 @@
   $('imsCheckBtn').addEventListener('click', checkIms);
 
   $('imsInstallBtn').addEventListener('click', async () => {
-    if (currentImsMode !== 'fbr') return;
+    if (!['fbr','both'].includes(currentImsMode)) return;
     const btn = $('imsInstallBtn');
     btn.disabled = true;
     $('imsProgress').style.display = 'block';
@@ -700,7 +707,7 @@
   });
 
   window.agentAPI.onImsProgress((p) => {
-    if (currentImsMode !== 'fbr') return;
+    if (!['fbr','both'].includes(currentImsMode)) return;
     $('imsProgress').style.display = 'block';
     $('imsProgress').style.color = p.stage === 'error' ? '#fca5a5' : '#c4b5fd';
     $('imsProgress').textContent =
@@ -729,6 +736,8 @@
   $('posStartup').addEventListener('change', savePosSettings);
   $('posKiosk').addEventListener('change', savePosSettings);
   $('posOffline').addEventListener('change', savePosSettings);
+  $('installationFolderBtn').addEventListener('click',()=>window.agentAPI.openInstallationFolder());
+  $('installedAppsBtn').addEventListener('click',()=>window.agentAPI.openInstalledApps());
   window.TnPosLaunch.bindPosLaunch($('openPosBtn'), $('openPosBrowserBtn'), $('posLaunchStatus'), window.agentAPI);
   $('posAskDownload').addEventListener('change', savePosSettings);
   loadPosSettings();

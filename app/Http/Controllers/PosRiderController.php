@@ -119,7 +119,11 @@ class PosRiderController extends Controller
     /** Constrain a pos_transactions query to the current user's stream. */
     private function applyStreamScope($q)
     {
-        $scope = $this->billingScope();
+        return self::scopeBillingStream($q, $this->billingScope());
+    }
+
+    public static function scopeBillingStream($q, string $scope)
+    {
         if ($scope === 'local') {
             $q->where(function ($s) {
                 $s->where('invoice_mode', 'local')
@@ -845,7 +849,16 @@ class PosRiderController extends Controller
             }
         }
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix', 'custLocReady', 'billEtas', 'rememberedLoc', 'savedPlacesByBill', 'shopPin'));
+        $bills->loadMissing('items');
+        $oldUnassigned->loadMissing('items');
+        $deliveryCustomerIds = $bills->pluck('customer_id')->merge($oldUnassigned->pluck('customer_id'))->filter()->unique();
+        $deliveryEmails = collect();
+        if ($deliveryCustomerIds->isNotEmpty() && Schema::hasColumn('pos_customers', 'email')) {
+            $deliveryEmails = \App\Models\PosCustomer::where('company_id', $companyId)
+                ->whereIn('id', $deliveryCustomerIds)->pluck('email', 'id');
+        }
+
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix', 'custLocReady', 'billEtas', 'rememberedLoc', 'savedPlacesByBill', 'shopPin', 'deliveryEmails'));
     }
 
     // ─── Task 1105: customer pin, public track link & ETA poll ─────────────
@@ -1068,6 +1081,44 @@ class PosRiderController extends Controller
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */
+    public function bulkAssign(Request $request)
+    {
+        $data = $request->validate([
+            'rider_id' => 'required|integer|min:1',
+            'bills' => 'required|array|min:1|max:100',
+            'bills.*.id' => 'required|integer|distinct|min:1',
+            'bills.*.expected_rider_id' => 'present|nullable|integer|min:1',
+            'bills.*.assignment_revision' => 'present|nullable|string|max:100',
+        ]);
+        $companyId = app('currentCompanyId');
+        $ids = array_column($data['bills'], 'id');
+
+        return DB::transaction(function () use ($companyId, $ids, $data) {
+            $bills = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)->whereIn('id', $ids)
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            abort_unless($bills->count() === count($ids), 404);
+
+            foreach ($data['bills'] as $bill) {
+                $transaction = $bills[$bill['id']];
+                if ($transaction->is_archived || $transaction->status !== 'completed') {
+                    throw ValidationException::withMessages(['bills' => 'A selected bill is no longer available for assignment.']);
+                }
+                $assignment = Request::create('/', 'POST', [
+                    'rider_id' => $data['rider_id'],
+                    'expected_rider_id' => $bill['expected_rider_id'],
+                    'assignment_revision' => $bill['assignment_revision'],
+                ], [], [], ['HTTP_ACCEPT' => 'application/json']);
+                $response = $this->assign($assignment, $bill['id']);
+                if ($response->getStatusCode() >= 400) {
+                    throw ValidationException::withMessages(['bills' => $response->getData(true)['message']]);
+                }
+            }
+
+            return response()->json(['success' => true, 'assigned_count' => count($ids)]);
+        });
+    }
+
     public function assign(Request $request, $txnId)
     {
         $companyId = app('currentCompanyId');
@@ -1105,7 +1156,7 @@ class PosRiderController extends Controller
             abort(403);
         }
 
-        if ($txn->rider_settlement_id) {
+        if ($txn->rider_settlement_id || (float) $txn->rider_partial_paid > 0) {
             return $this->statusError($request, 'This bill is already settled — rider cannot be changed.');
         }
         // Rider is LOCKED once the delivery reached a terminal state (owner,
@@ -1200,22 +1251,28 @@ class PosRiderController extends Controller
         // forget (runs in app()->terminating, all failures swallowed) — the
         // assign itself can never block or fail because of push. The 15-min
         // app poll stays as fallback for phones where push is unavailable.
-        if ($isNewAssignment) {
-            \Illuminate\Support\Facades\Log::info('RiderPushService: queued from Deliveries-board assign', [
-                'rider_id' => $riderId,
-                'txn_id'   => $txn->id,
-            ]);
-            \App\Services\RiderPushService::queuePush((int) $riderId);
-        }
-        // The previous rider must also receive an authoritative current-list
-        // push. This removes the mistaken card/cache immediately and prevents
-        // stale arrival/completion work while the app remains backgrounded.
-        if ($oldRiderId && $oldRiderId !== (int) $riderId) {
-            \App\Services\RiderPushService::queuePush($oldRiderId);
+        $queuePush = function () use ($isNewAssignment, $riderId, $txn, $oldRiderId) {
+            if ($isNewAssignment) {
+                \Illuminate\Support\Facades\Log::info('RiderPushService: queued from Deliveries-board assign', [
+                    'rider_id' => $riderId,
+                    'txn_id'   => $txn->id,
+                ]);
+                \App\Services\RiderPushService::queuePush((int) $riderId);
+            }
+            // The previous rider must also receive an authoritative current-list
+            // push. This removes the mistaken card/cache immediately and prevents
+            // stale arrival/completion work while the app remains backgrounded.
+            if ($oldRiderId && $oldRiderId !== (int) $riderId) {
+                \App\Services\RiderPushService::queuePush($oldRiderId);
+            }
+
+        };
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($queuePush);
+        } else {
+            $queuePush();
         }
 
-        // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —
-        // JSON clients get JSON; the Deliveries board form keeps back().
         if ($request->expectsJson()) {
             return response()->json([
                 'success'         => true,
@@ -1570,6 +1627,7 @@ class PosRiderController extends Controller
             'bill_ids' => ($settleAll ? 'nullable' : 'required') . '|array|min:1',
             'bill_ids.*' => 'integer',
             'received_amount' => 'nullable|numeric',
+            'expected_outstanding' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -1604,6 +1662,10 @@ class PosRiderController extends Controller
             $hasPartialCol = Schema::hasColumn('pos_transactions', 'rider_partial_paid');
             $remainingOf = fn ($b) => PosRider::remainingAmount($b);
             $outstanding = round((float) $bills->sum($remainingOf), 2);
+
+            if ($request->filled('expected_outstanding') && abs((float) $request->input('expected_outstanding') - $outstanding) > 0.009) {
+                return $this->statusError($request, 'The rider balance changed. Refresh and try again.');
+            }
 
             // Received amount: default = full outstanding of the selection.
             $receivedRaw = $request->input('received_amount');
@@ -1825,6 +1887,8 @@ class PosRiderController extends Controller
             ->where('company_id', $companyId)
             ->where('id', $txn->id)
             ->where('payment_method', 'cash')
+            ->when(Schema::hasColumn('pos_transactions', 'delivery_credit_amount'),
+                fn ($query) => $query->where('delivery_credit_amount', 0))
             ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
             ->update($upd);
         if ($written === 0) {
@@ -1994,7 +2058,8 @@ class PosRiderController extends Controller
         $bills = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('rider_id', $rider->id)
-            ->whereBetween('created_at', [now()->startOfDay(), now()->endOfDay()])
+            ->where(fn ($q) => $q->whereIn('delivery_status', ['assigned', 'dispatched'])
+                ->orWhereBetween('created_at', [now()->startOfDay(), now()->endOfDay()]))
             ->orderByDesc('id')
             ->get();
 
@@ -2008,7 +2073,7 @@ class PosRiderController extends Controller
     }
 
     /** Rider marks his OWN bill delivered — the only write he can do. */
-    public function portalMarkDelivered($txnId)
+    public function portalMarkDelivered(Request $request, $txnId)
     {
         $user = auth('pos')->user();
         $companyId = app('currentCompanyId');
@@ -2019,18 +2084,30 @@ class PosRiderController extends Controller
 
         $rider = PosRider::where('company_id', $companyId)->where('user_id', $user->id)->firstOrFail();
 
-        $txn = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('rider_id', $rider->id)
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
-            ->whereNull('rider_settlement_id')
-            ->findOrFail($txnId);
+        $data = $request->validate(['received_amount' => 'nullable|numeric|decimal:0,2|min:0|max:999999999999.99',
+            'assignment_revision' => 'required_with:received_amount|nullable|string|max:150']);
 
-        $upd = ['delivery_status' => 'delivered'];
-        if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
-            $upd['delivered_at'] = now();
-        }
-        $txn->update($upd);
+        DB::transaction(function () use ($txnId, $companyId, $rider, $data) {
+            $txn = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('rider_id', $rider->id)
+                ->whereIn('delivery_status', ['assigned', 'dispatched'])
+                ->whereNull('rider_settlement_id')
+                ->lockForUpdate()->findOrFail($txnId);
+
+            if (isset($data['received_amount'])) {
+                $revision = app(\App\Services\RiderBillPreviewService::class)->assignmentRevision($txn, $rider);
+                abort_unless(hash_equals($revision, $data['assignment_revision']), 409);
+                \App\Services\PosDeliveryAccount::record($txn, $rider, (string) $data['received_amount']);
+            }
+
+            $upd = ['delivery_status' => 'delivered'];
+            if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
+                $upd['delivered_at'] = now();
+            }
+            $txn->update($upd);
+
+        });
 
         return back()->with('success', 'Marked delivered.');
     }

@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
+@php
+        $federalFiscal = app(\App\Services\PosFiscalReceipt::class)->federal($transaction);
+ $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
 <html lang="{{ $urduScript ? 'ur' : 'en' }}" dir="{{ $urduScript ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
@@ -398,10 +400,12 @@
                  it as a small Ref row (token already dominant above); serial style
                  prints it as a full POS Invoice row. --}}
             @if($transaction->pra_invoice_number)
+            @unless($federalFiscal)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pra_fiscal') }}:</td>
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
+            @endunless
             @if($rcptBillToken !== null)
             <tr>
                 <td class="inv-label" style="font-size:8px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}:</td>
@@ -675,6 +679,9 @@
     </table>
     <div class="double-separator"></div>
     <table class="totals-table">
+        @if((float)($transaction->fbr_service_charge ?? 0)>0)
+        <tr><td class="tot-label">FBR POS Fee:</td><td class="tot-value">{{ number_format($transaction->fbr_service_charge,2) }}</td></tr>
+        @endif
         <tr class="grand-total">
             <td class="tot-label">{{ $hotelCreditSummary ? __('hotel_credit.credit_amount', [], 'en') : __('pos.receipt_total_caps') }}:</td>
             <td class="tot-value">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</td>
@@ -765,7 +772,9 @@
     @endif
 
     @include('pos.hotel._credit-summary', ['summary' => $hotelCreditSummary, 'creditAmount' => $transaction->total_amount, 'creditReceipt' => true])
-    @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
+    @if($federalFiscal)
+        @include('pos.receipts._dual-fiscal', ['fiscalQrSize' => 74])
+    @elseif($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice
         // QR — visually consistent QRs, content untouched. Mirrors receipt_80mm.

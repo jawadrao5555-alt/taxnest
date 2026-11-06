@@ -2939,6 +2939,7 @@ class PosController extends Controller
                 $editBillForJs = [
                     'id' => (int) $editTxn->id,
                     'invoice_number' => (string) $editTxn->invoice_number,
+                    'fbr_service_charge' => (float)($editTxn->fbr_service_charge ?? 0),
                     'order_type' => $editTxn->order_type ?: 'takeaway',
                     'rider_collection_amount' => $editTxn->rider_collection_amount,
                     'customer_id' => $editCustomer ? (int) $editCustomer->id : null,
@@ -3448,6 +3449,12 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $agentCoreInventorySale = $request->attributes->get('agent_core_inventory_sale');
+        \App\Services\PosStaffDiscount::assertBoundUuid($request, (int) $companyId);
+        if (\App\Services\PosStaffDiscount::requested($request)) {
+            foreach ((array) $request->input('items', []) as $item) {
+                abort_if(!is_array($item) || (empty($item['item_id']) && empty($item['_manual'])), 422, 'Select existing items or explicit manual lines before requesting approval.');
+            }
+        }
 
         // Plan gate (Aug 2026 matrix): deal LINES are server-priced, so a
         // crafted payload could bill deals even when the sale screen hides
@@ -3581,7 +3588,7 @@ class PosController extends Controller
         // discount through the manual-cart bypass / legacy form post and bypass
         // the per-company limit. Admin/manager roles are unaffected.
         $posUser = auth('pos')->user();
-        if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+        if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier' && !\App\Services\PosStaffDiscount::requested($request)) {
             $cashierMaxPct = (float) ($company->cashier_discount_limit ?? 50);
             if ($request->discount_type === 'percentage' && (float) $request->discount_value > $cashierMaxPct) {
                 $request->merge(['discount_value' => $cashierMaxPct]);
@@ -3632,6 +3639,13 @@ class PosController extends Controller
         $taxableSubtotal = array_sum(array_map(fn($i) => \App\Services\PosDealAllocation::taxableSubtotal($i['deal_snapshot'] ?? null, (float) $i['lineTotal'], (bool) $i['isExempt']), $companyItems));
         $exemptSubtotal = $subtotal - $taxableSubtotal;
 
+        $staffApproval = app(\App\Services\PosStaffDiscount::class)->prepare($request, $company, $companyItems, (float) $subtotal);
+        if (isset($staffApproval['proposal'])) {
+            return response()->json(['success' => true, 'approval_pending' => true,
+                'request_id' => $staffApproval['proposal']->id, 'revision' => $staffApproval['proposal']->revision,
+                'message' => 'Discount request saved. Owner approval is required before payment.'], 202);
+        }
+
         $discountValue = (float) ($request->discount_value ?? 0);
         $discountType = $request->discount_type;
         if ($discountType === 'percentage') {
@@ -3640,7 +3654,7 @@ class PosController extends Controller
             // Amount-type cashier guardrail (owner rule, Jul 2026): capped at
             // cashier_discount_limit% of the subtotal — mirrors the percentage rule.
             $maxAmountDiscount = $subtotal;
-            if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+            if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier' && !$staffApproval) {
                 $maxAmountDiscount = round($subtotal * ((float) ($company->cashier_discount_limit ?? 50)) / 100, 2);
             }
             $discountAmount = min($discountValue, $maxAmountDiscount);
@@ -3830,6 +3844,11 @@ class PosController extends Controller
             $initialPraStatus = null;
         }
 
+        $fbrServiceCharge = \App\Services\PosImsFee::forCheckout($request, (int)$companyId, $praEnabled,
+            $agentCoreInventorySale ? (array)($agentCoreInventorySale['totals'] ?? []) : null);
+        if (!$agentCoreInventorySale) $totalAmount = round($totalAmount + $fbrServiceCharge, 2);
+        $taxInclusiveFields += \App\Services\PosImsFee::fields($fbrServiceCharge);
+
         // ── Billing Scope (owner request 07 Aug 2026) ─────────────────────────
         // Stream lock per staff account. Stream definition MIRRORS the report
         // tabs (applyReportFilters): PRA stream = bill enters the PRA pipeline
@@ -3952,6 +3971,8 @@ class PosController extends Controller
         DB::beginTransaction();
         try {
             $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            \App\Services\PosStaffDiscount::claim($staffApproval, (int) $companyId);
+            \App\Services\PosStaffDiscount::assertOrderAvailable((int) $companyId, (int) $settleOrderIdIn, $staffApproval['row']->id ?? null);
             if (!$agentCoreInventorySale && !$request->filled('offline_queued_at')) \App\Services\PosPromotions::assertRowsCurrent($companyItems, $lockedPromotionCompany);
             $draftId = $request->input('draft_id');
             $transaction = null;
@@ -4125,10 +4146,11 @@ class PosController extends Controller
                     $ri['deal_snapshot'] ?? null, (float) $ri['lineTotal'], (float) $itemDiscountShare,
                     (float) $taxRate, $taxInclusive, $menuRate, (bool) $ri['isExempt'], isset($ri['allocated_discount']) || isset($ri['promotion_snapshot'])
                 );
+                $allocationFields += \App\Services\PosFiscalLineFacts::fields((float) $itemTaxableAmount, (float) $itemTaxAmount, $taxInclusive, (bool) $ri['isExempt']);
                 if (isset($allocationFields['deal_snapshot'])) {
                     $allocationFields['deal_snapshot'] = \App\Services\PosDealAllocation::withItemDiscount($allocationFields['deal_snapshot'], (float) ($ri['item_discount_amount'] ?? 0));
                 }
-                if ($allocationFields) {
+                if (isset($allocationFields['tax_amount'])) {
                     $itemTaxAmount = $allocationFields['tax_amount'];
                     $itemTaxRate = $allocationFields['tax_rate'];
                     if ($ri['type'] === 'deal') $frozenCost = \App\Services\PosDealAllocation::unitCost($ri['deal_snapshot']);
@@ -4242,6 +4264,7 @@ class PosController extends Controller
                 );
             }
 
+            \App\Services\PosStaffDiscount::consumed($staffApproval, (int) $transaction->id);
             DB::commit();
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();
@@ -4412,6 +4435,8 @@ class PosController extends Controller
             abort(403);
         }
 
+        app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
+
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
                 ->with('error', __('pos.cannot_edit_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
@@ -4459,6 +4484,12 @@ class PosController extends Controller
                 return response()->json(['success' => false, 'message' => __('pos.custom_access_denied')], 403);
             }
             abort(403);
+        }
+
+        app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
+        if (\Schema::hasTable('pos_staff_discount_requests') && \DB::table('pos_staff_discount_requests')
+            ->where('company_id', $companyId)->where('transaction_id', $transaction->id)->exists()) {
+            abort(422, 'Approved staff bills cannot be edited. Use the normal return process.');
         }
 
         if ($transaction->pra_invoice_number) {
@@ -4615,6 +4646,10 @@ class PosController extends Controller
         }
 
         $goingToPra = $isPipelineEdit || $reportRequested;
+        // Existing charged fees are immutable snapshots even if setup changes.
+        $fbrServiceCharge = (float)($transaction->fbr_service_charge ?? 0);
+        if ($reportRequested && $fbrServiceCharge===0.0) $fbrServiceCharge = \App\Services\PosImsFee::quote((int)$companyId);
+        $totalAmount = round($totalAmount + $fbrServiceCharge, 2);
         // Serial split: a bill headed to PRA must carry a real fiscal serial
         // (PRA must never receive an L-NNN USIN). A local bill KEEPS its L number;
         // a bill that already holds a fiscal serial (short P-036 or legacy
@@ -4657,7 +4692,7 @@ class PosController extends Controller
                     ? 'local'
                     : ($goingToPra ? 'pending' : null),
                 'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
-            ]);
+            ] + \App\Services\PosImsFee::fields($fbrServiceCharge));
 
             $transaction->items()->delete();
 
@@ -4692,10 +4727,11 @@ class PosController extends Controller
                     $ri['deal_snapshot'] ?? null, (float) $ri['lineTotal'], (float) $itemDiscountShare,
                     (float) $taxRate, $editTaxInclusive, $editMenuRate, (bool) $ri['isExempt'], isset($ri['allocated_discount']) || isset($ri['promotion_snapshot'])
                 );
+                $allocationFields += \App\Services\PosFiscalLineFacts::fields((float) $itemTaxableAmount, (float) $itemTaxAmount, $editTaxInclusive, (bool) $ri['isExempt']);
                 if (isset($allocationFields['deal_snapshot'])) {
                     $allocationFields['deal_snapshot'] = \App\Services\PosDealAllocation::withItemDiscount($allocationFields['deal_snapshot'], (float) ($ri['item_discount_amount'] ?? 0));
                 }
-                if ($allocationFields) {
+                if (isset($allocationFields['tax_amount'])) {
                     $itemTaxAmount = $allocationFields['tax_amount'];
                     $itemTaxRate = $allocationFields['tax_rate'];
                     if ($ri['type'] === 'deal') $frozenCostEdit = \App\Services\PosDealAllocation::unitCost($ri['deal_snapshot']);
@@ -4831,6 +4867,12 @@ class PosController extends Controller
         }
 
         $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
+
+        app(\App\Services\PosFederalAutomation::class)->assertSaleMutable($transaction);
+        if (\Schema::hasTable('pos_staff_discount_requests') && \DB::table('pos_staff_discount_requests')
+            ->where('company_id', $companyId)->where('transaction_id', $transaction->id)->exists()) {
+            abort(422, 'Approved staff bills cannot be deleted. Use the normal return process.');
+        }
 
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
@@ -5419,6 +5461,8 @@ class PosController extends Controller
         // out of this list — those were polluting the F10 modal before.
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
+        $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
+        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
         // Prepaid conversion stamp — PROD-drift guarded (older installs may not
         // have run the prepaid-conversion migration yet).
@@ -5455,6 +5499,8 @@ class PosController extends Controller
                        ...($hasBillToken ? ['bill_token'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : []),
                    ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
+                   ...($hasDelStatus ? ['delivery_status'] : []),
+                   ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
                    ...($hasBizDate ? ['business_date'] : [])]);
 
         // ─── FINAL delivery bills still OPEN (owner bug report, 3 Aug 2026) ───
@@ -5465,7 +5511,6 @@ class PosController extends Controller
         // par hai. Display + delivered-mark/settle ONLY — promote (Final
         // Cash/Card) in par KABHI nahi chalta (bill pehle se final hai).
         $finalBills = collect();
-        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
         // Task 807: stream-scope for final delivery bills — mirrors
         // PosRiderController::applyStreamScope (EXPLICIT scope, Task 1186:
         // delivery tracking stays stream-agnostic for derived-default staff —
@@ -5537,6 +5582,8 @@ class PosController extends Controller
                 ->orderBy('id', 'desc')
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
+                    ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
+                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_credit_amount') ? ['delivery_credit_amount'] : []),
                        ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'has_delivery_items') ? ['has_delivery_items', 'rider_collection_amount'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid') ? ['rider_partial_paid'] : []),
                        ...($hasBillToken ? ['bill_token'] : []),
@@ -5565,7 +5612,7 @@ class PosController extends Controller
                 // the rider's ENTIRE khata (all dates, archived included) — same
                 // scope as PosRiderController::settle with settle_all. Show the
                 // cashier the real count+amount so "poore rider ka settle" is clear.
-                $riderOpen = PosTransaction::withoutGlobalScope('hide_archived')
+                $riderOpen = PosRiderController::scopeBillingStream(PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->whereIn('rider_id', $riderIds)
                     ->where('payment_method', 'cash')
@@ -5573,7 +5620,7 @@ class PosController extends Controller
                     ->whereNull('rider_settlement_id')
                     ->where(function ($q) {
                         $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
-                    })
+                    }), auth('pos')->user()?->posBillingScopeExplicit() ?? 'both')
                     ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('pos_transactions') . '),0) as amt')
                     ->groupBy('rider_id')
                     ->get()
@@ -5610,7 +5657,6 @@ class PosController extends Controller
             }
         }
 
-        $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
         // Mixed-delivery summaries read item rows below. Production refuses
         // implicit loading; fetch only mixed bills in a batch before mapping.
         // Empty/legacy collections keep their previous query behavior.
@@ -5662,6 +5708,8 @@ class PosController extends Controller
                 'rider_unsettled'  => $hasRiderCols && $b->rider_id && empty($b->rider_settlement_id),
                 // Task 123: whole-khata scope for the panel's Settle button.
                 'rider_id'         => $hasRiderCols ? ($b->rider_id ? (int) $b->rider_id : null) : null,
+                'delivery_status' => $b->delivery_status,
+                'rider_settlement_id' => $b->rider_settlement_id,
                 'assignment_revision' => $hasAssignmentRevision ? $b->rider_assignment_revision : null,
                 'rider_open_count' => ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                 'rider_open_amount'=> ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
@@ -5699,6 +5747,8 @@ class PosController extends Controller
                 'delivery_address' => $b->delivery_address,
                 'total_amount'     => (float) $b->total_amount,
                 'rider_collection_amount' => $b->rider_collection_amount === null ? null : (float) $b->rider_collection_amount,
+                'delivery_credit_amount' => (float) ($b->delivery_credit_amount ?? 0),
+                'rider_settlement_id' => $b->rider_settlement_id,
                 'rider_partial_paid' => (float) ($b->rider_partial_paid ?? 0),
                 'has_delivery_items' => (bool) $b->has_delivery_items,
                 'delivery_items' => $b->has_delivery_items ? $b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
@@ -5732,6 +5782,7 @@ class PosController extends Controller
                     && $b->order_type === 'delivery'
                     && $b->rider_id
                     && $b->payment_method === 'cash'
+                    && !(float) $b->delivery_credit_amount
                     && empty($b->rider_settlement_id)
                     && $b->delivery_status !== 'returned'),
                 'can_unmark_prepaid' => (bool) ($canPrepaidRole
@@ -6114,6 +6165,9 @@ class PosController extends Controller
                     $exemptAfterDiscount = $dealBill['exempt_amount']; $headerSubtotal = $dealBill['subtotal_col'];
                 }
 
+                $fbrServiceCharge = $reportingOn ? \App\Services\PosImsFee::quote((int)$companyId) : 0;
+                $totalAmount = round($totalAmount + $fbrServiceCharge, 2);
+
                 // Serial split (owner rule Jul 2026): a real POS fiscal serial replaces
                 // the provisional L-NNN ONLY when the bill actually goes to PRA
                 // (reporting ON). Reporting-OFF finalize keeps the L number — fiscal
@@ -6144,7 +6198,8 @@ class PosController extends Controller
                     // on the normal POS surfaces (archived local finals included).
                     'is_archived'       => false,
                     'archived_at'       => null,
-                ] + ($reportingOn ? $this->praStreamBillTokenFields($companyId) : []));
+                ] + \App\Services\PosImsFee::fields($fbrServiceCharge)
+                  + ($reportingOn ? $this->praStreamBillTokenFields($companyId) : []));
 
                 // Re-tax each line for the new rate — the PRA payload reads per-item tax_rate.
                 foreach ($items as $index => $it) {
@@ -6154,12 +6209,13 @@ class PosController extends Controller
                     $itemTaxAmount = $promoteTaxInclusive
                         ? \App\Services\PosTaxMath::inclusiveLineTax($itemTaxableAmount, (float) $itemTaxRate, $promoteMenuRate)
                         : round($itemTaxableAmount * $itemTaxRate / 100, 2);
+                    $fiscalFacts = \App\Services\PosFiscalLineFacts::fields((float) $itemTaxableAmount, (float) $itemTaxAmount, $promoteTaxInclusive, (bool) $it->is_tax_exempt);
                     $it->update(array_merge([
                         'tax_rate'   => $itemTaxRate,
                         'tax_amount' => $itemTaxAmount,
                     ], \App\Services\PosDealAllocation::lineFields($it->deal_snapshot,
                         (float) $it->subtotal, (float) $itemDiscountShare, (float) $taxRate,
-                        $promoteTaxInclusive, $promoteMenuRate, (bool) $it->is_tax_exempt, $dealBill !== null)));
+                        $promoteTaxInclusive, $promoteMenuRate, (bool) $it->is_tax_exempt, $dealBill !== null) + $fiscalFacts));
 
                 }
 
@@ -6380,7 +6436,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $tx = PosTransaction::where('company_id', $companyId)
-            ->select(['id', 'pra_status', 'pra_invoice_number'])
+            ->select(['id', 'company_id', 'created_by', 'pra_status', 'pra_invoice_number'])
             ->find($id);
         if (!$tx) {
             return response()->json(['success' => false], 404);
@@ -6390,8 +6446,12 @@ class PosController extends Controller
         if (!$tx->allowedForCashierIsolationOf(auth('pos')->user())) {
             return response()->json(['success' => false], 404);
         }
+        $federal = app(\App\Services\PosFiscalReceipt::class)->federal($tx);
         return response()->json([
             'success' => true,
+            'fbr_pos_pending' => ($federal['label'] ?? null) === 'FBR POS'
+                && in_array($federal['state'], ['queued', 'processing', 'dispatched', 'linked existing', 'draft', 'queued agent', 'submitting'], true),
+            'fbr_pos_ready' => ($federal['label'] ?? null) === 'FBR POS' && !empty($federal['reference']),
             'pra_status' => $tx->pra_status,
             'pra_invoice_number' => $tx->pra_invoice_number,
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
@@ -13902,6 +13962,7 @@ class PosController extends Controller
             'taxable_value' => $streamTaxSplit['taxable'],
             'exempt_value' => $streamTaxSplit['exempt'],
             'total_tax' => $dcSaleRows->sum('tax_amount') - $dcReturnRows->sum('tax_amount'),
+            'total_fbr_fee' => $dcSaleRows->sum('fbr_service_charge') - $dcReturnRows->sum('fbr_service_charge'),
             'total_amount' => $dcSaleRows->sum('total_amount') - $dcReturnRows->sum('total_amount'),
             'cash_amount' => round($payBuckets['cash'] - $refundBuckets['cash'], 2),
             'card_amount' => round($payBuckets['card'] - $refundBuckets['card'], 2),
@@ -13932,6 +13993,7 @@ class PosController extends Controller
             $stats->total_discount = (float) $existingReport->total_discount;
             $stats->net_sales = (float) $existingReport->net_sales;
             $stats->total_tax = (float) $existingReport->total_tax;
+            $stats->total_fbr_fee = (float)($existingReport->total_fbr_fee ?? 0);
             $stats->total_amount = (float) $existingReport->total_amount;
             $stats->cash_amount = (float) $existingReport->cash_amount;
             $stats->card_amount = (float) $existingReport->card_amount;
@@ -14221,6 +14283,7 @@ class PosController extends Controller
              'discount' => (float) ($source->total_discount ?? 0),
              'net_sales' => (float) ($source->net_sales ?? 0),
              'tax' => (float) ($source->total_tax ?? 0),
+             'fbr_pos_fee' => (float) ($source->total_fbr_fee ?? 0),
              'total' => (float) ($source->total_amount ?? 0),
              'returns_count' => (int) ($source->returns_count ?? 0),
              'returns_amount' => (float) ($source->returns_amount ?? 0),
@@ -15793,7 +15856,8 @@ class PosController extends Controller
      */
     private function buildRiderDayFigures(int $companyId, string $date, ?int $onlyCreatedBy = null, ?int $branchId = null): array
     {
-        $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
+        $creditIn = $onlyCreatedBy ? 0.0 : \App\Services\PosDeliveryAccount::recoveries($companyId, $date, $branchId);
+        $empty = ['active' => $creditIn > 0, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0, 'credit_in' => $creditIn];
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('pos_riders') || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
                 return $empty;
@@ -15909,7 +15973,7 @@ class PosController extends Controller
                 ];
             }
 
-            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2)];
+            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2), 'credit_in' => $creditIn];
         } catch (\Throwable $e) {
             // Rider figures are reporting sugar — never let them break day-close.
             return $empty;
@@ -16331,7 +16395,8 @@ class PosController extends Controller
         // days get a zero-figure Z-report so they finally leave the banner —
         // the "close one, another appears" whack-a-mole ender.
         $hotelRefunds = \App\Services\HotelCreditNoteRefundReporting::buckets($companyId, $date, $branchId);
-        if ($transactions->isEmpty() && !$hasLocalBills && array_sum(array_map('abs', $hotelRefunds)) < 0.009 && !$allowEmpty) {
+        if ($transactions->isEmpty() && !$hasLocalBills && array_sum(array_map('abs', $hotelRefunds)) < 0.009
+            && !\App\Services\PosDeliveryAccount::recoveries($companyId, $date, $branchId) && !$allowEmpty) {
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 
@@ -16430,9 +16495,9 @@ class PosController extends Controller
             if ($openingFloat === null) {
                 $openingFloat = \App\Models\PosDayOpening::totalForDate($companyId, $date, $branchId);
             }
-            if ($openingFloat !== null || $countedCash !== null) {
+            if ($openingFloat !== null || $countedCash !== null || $riderFigures['credit_in'] > 0) {
                 $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
-                    - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'], 2);
+                    - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'] + (float) $riderFigures['credit_in'], 2);
                 $data['opening_float'] = $openingFloat;
                 $data['counted_cash'] = $countedCash;
                 $data['expected_cash'] = $expectedCash;
@@ -17054,6 +17119,10 @@ class PosController extends Controller
             'last_invoice_time' => $saleRows->last()->created_at ?? null,
         ];
 
+        if (\Schema::hasColumn('pos_day_close_reports','total_fbr_fee')) {
+            $data['total_fbr_fee'] = $saleRows->sum('fbr_service_charge') - $returnRows->sum('fbr_service_charge');
+        }
+
         // Returns detail on the Z-report (schema-guarded, drift self-heal).
         if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'returns_count')) {
             $data['returns_count'] = $returnRows->count();
@@ -17269,7 +17338,9 @@ class PosController extends Controller
                  : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
                      ? 'card'
                      : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
-             $sums[$bucket] += (float) ($transaction->total_amount ?? 0);
+             $credit = PosPaymentBuckets::creditComponent($transaction);
+             $sums[$bucket] += (float) ($transaction->total_amount ?? 0) - $credit;
+             $sums['other'] += $credit;
          }
          foreach ($returnRows as $transaction) {
              if ($transaction->payment_method === 'hotel_credit_note' || ($transaction->hotel_money_from_folio ?? false)) {
@@ -17281,7 +17352,9 @@ class PosController extends Controller
                  : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
                      ? 'card'
                      : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
-             $sums[$bucket] -= (float) ($transaction->total_amount ?? 0);
+             $credit = PosPaymentBuckets::creditComponent($transaction);
+             $sums[$bucket] -= (float) ($transaction->total_amount ?? 0) - $credit;
+             $sums['other'] -= $credit;
          }
 
          foreach (['cash', 'card', 'other'] as $bucket) $sums[$bucket] -= $hotelRefunds[$bucket] ?? 0;

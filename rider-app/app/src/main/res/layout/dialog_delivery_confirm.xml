@@ -74,4 +74,13 @@
         android:background="@android:drawable/edit_text"
         android:padding="8dp" />
 
+    <EditText
+        android:id="@+id/deliveryCashReceived"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="@string/delivery_cash_received"
+        android:inputType="numberDecimal"
+        android:visibility="gone" />
+
 </LinearLayout>

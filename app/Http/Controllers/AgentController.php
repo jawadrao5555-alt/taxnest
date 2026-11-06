@@ -170,6 +170,14 @@ class AgentController extends Controller
         }
         try {
             $attrs = ['last_seen_at' => now()] + $extra;
+            if ($request->has('local_fbr_ims') && \Illuminate\Support\Facades\Schema::hasColumn('pos_agent_devices', 'local_fbr_ims')) {
+                $candidates = [];
+                foreach (array_slice((array)$request->input('local_fbr_ims'), 0, 16) as $candidate) {
+                    $url = is_array($candidate) ? ($candidate['url'] ?? '') : '';
+                    if (is_string($url) && preg_match('~^http://127\.0\.0\.1:([0-9]{4,5})/TcpService/IMSHttp$~', $url, $m) && (int)$m[1]>=1024 && (int)$m[1]<=65535) $candidates[] = ['protocol'=>'soap','url'=>$url];
+                }
+                $attrs['local_fbr_ims'] = $candidates;
+            }
             if ($request->filled('hostname')) {
                 $attrs['hostname'] = mb_substr(trim((string) $request->input('hostname')), 0, 120);
             }
@@ -420,6 +428,8 @@ class AgentController extends Controller
         }
 
         $this->syncHeartbeatDiagnostics($company, $request);
+        $diagnosticAck = app(\App\Services\PraAgentDiagnosticEvidence::class)->ingest(
+            $company, $request->input('device_uid'), $request->input('diagnostic_evidence'));
 
         $this->telemetryUpdate($company, $update);
 
@@ -504,12 +514,14 @@ class AgentController extends Controller
                 // fields; new agents never infer FBR from a listening port.
                 'product_type' => $company->product_type,
                 'pra_connection_mode' => $company->pra_connection_mode ?? 'cloud',
+                'fbr_alongside_pra' => \Illuminate\Support\Facades\Schema::hasTable('pos_ims_profiles') && \App\Models\PosImsProfile::where('company_id',$company->id)->where('enabled',true)->where('connection_mode','fiscal_device')->exists(),
                 'fbr_connection_mode' => $company->fbr_connection_mode ?? 'cloud',
             ],
             'healed' => $healed,
             'repromoted' => $repromoted,
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
+            'diagnostic_evidence_ack' => $diagnosticAck,
             'agent_update' => $this->agentUpdateInfo($request->input('version')),
             // Additive discovery for Local TaxNest Core-aware agents. Legacy
             // agents ignore unknown response keys; the database flag defaults off.
@@ -726,6 +738,7 @@ class AgentController extends Controller
                 // above intentionally retain their existing FBR values.
                 'product_type' => $company->product_type,
                 'pra_connection_mode' => $company->pra_connection_mode ?? 'cloud',
+                'fbr_alongside_pra' => \Illuminate\Support\Facades\Schema::hasTable('pos_ims_profiles') && \App\Models\PosImsProfile::where('company_id',$company->id)->where('enabled',true)->where('connection_mode','fiscal_device')->exists(),
                 'fbr_connection_mode' => $company->fbr_connection_mode ?? 'cloud',
             ],
             'healed' => $healed,

@@ -1,4 +1,6 @@
 <?php
+// Durable, bounded drain. Overlapping runners also take per-record database locks.
+\Illuminate\Support\Facades\Schedule::command('pos:federal-outbox')->everyMinute()->withoutOverlapping();
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -24,6 +26,9 @@ Schedule::call(function () {
         \App\Services\PrintJobEvidence::prune(1000);
     }
 })->everyFiveMinutes()->name('print-evidence-retention')->withoutOverlapping();
+
+Schedule::call(fn () => \App\Services\PraAgentDiagnosticEvidence::prune())
+    ->everyFiveMinutes()->name('pra-diagnostic-sample-retention')->withoutOverlapping();
 
 // Scheduler heartbeat: records the last time the cron actually fired so the
 // admin System Control page can show whether background jobs run on prod.

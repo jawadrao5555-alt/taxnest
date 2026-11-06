@@ -1356,6 +1356,11 @@ class RestaurantPosController extends Controller
             $initialPraStatus = null;
         }
 
+        // Calculator includes the final-bill fee in its payment quote. A
+        // deliberate provisional must not collect a final FBR reporting fee.
+        $fbrServiceCharge = $praEnabled ? (float)($payment['fbr_service_charge'] ?? 0) : 0;
+        $totalAmount = round($totalAmount - (float)($payment['fbr_service_charge'] ?? 0) + $fbrServiceCharge, 2);
+
         // ── Billing Scope (owner request 07 Aug 2026) — mirrors storeInvoice ──
         // PRA stream = pra_status 'pending' at birth; local stream = provisionals
         // AND reporting-OFF finals. Guards direct POSTs; UI hides the buttons.
@@ -1384,6 +1389,7 @@ class RestaurantPosController extends Controller
         DB::beginTransaction();
         try {
             $lockedPromotionCompany = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            \App\Services\PosStaffDiscount::assertOrderAvailable((int) $companyId, (int) $orderId);
             // ── Single-winner guard (Table Board, Jul 2026) ──────────────────
             // Cross-terminal pays are first-class now (sale-screen Table Board):
             // re-fetch the order under a ROW LOCK and re-check status INSIDE the
@@ -1490,7 +1496,7 @@ class RestaurantPosController extends Controller
                 'submission_hash' => $submissionHash,
                 'created_by' => (int) $user->id,
                 'notes' => $order->kitchen_notes,
-            ] + $billTokenFields;
+            ] + $billTokenFields + \App\Services\PosImsFee::fields($fbrServiceCharge);
             if ($taxInclusiveColumnExists) {
                 $transactionData['tax_inclusive'] = $taxInclusive;
             }
@@ -1573,6 +1579,10 @@ class RestaurantPosController extends Controller
                     ? \App\Services\PosTaxMath::inclusiveLineTax((float) $lineAfterOrderDisc, (float) $taxRate, $menuRate)
                     : round($lineAfterOrderDisc * $taxRate / 100, 2));
                 $itemQty = (float) $item->quantity;
+                $fiscalAllocation=\App\Services\PosDealAllocation::lineFields(
+                    is_array($item->deal_snapshot) ? $item->deal_snapshot : null,
+                    (float)$item->subtotal,round((float)$item->subtotal-(float)$lineAfterOrderDisc,2),
+                    (float)$taxRate,$taxInclusive,$menuRate,(bool)$item->is_tax_exempt);
                 PosTransactionItem::create([
                     'transaction_id' => (int) $transaction->id,
                     'item_type' => $item->item_type,
@@ -1594,10 +1604,12 @@ class RestaurantPosController extends Controller
                     'is_tax_exempt' => (bool) $item->is_tax_exempt,
                     'tax_rate' => $item->is_tax_exempt ? 0 : (float) $taxRate,
                     'tax_amount' => (float) $lineTax,
+                    ...\App\Services\PosFiscalLineFacts::fields((float)$lineAfterOrderDisc,(float)$lineTax,$taxInclusive,(bool)$item->is_tax_exempt),
                     'item_discount_type' => $item->item_discount_type ?? 'percentage',
                     'item_discount_value' => (float) ($item->item_discount_value ?? 0),
                     'item_discount_amount' => (float) ($item->item_discount_amount ?? 0),
                     ...(Schema::hasColumn('pos_transaction_items', 'promotion_snapshot') ? ['promotion_snapshot'=>$item->promotion_snapshot, 'promotion_discount'=>$item->promotion_discount] : []),
+                    ...$fiscalAllocation,
                 ]);
             }
 

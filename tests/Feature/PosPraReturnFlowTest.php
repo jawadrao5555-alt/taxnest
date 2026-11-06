@@ -529,6 +529,23 @@ class PosPraReturnFlowTest extends TestCase
 
     // ── 3. return math ───────────────────────────────────────────────────────
 
+    public function test_final_partial_return_refunds_original_pos_fee_once(): void
+    {
+        Schema::table('pos_transactions',fn(Blueprint $t)=>$t->decimal('fbr_service_charge',12,2)->default(0));
+        $this->actAs('pos_admin');
+        $parent=$this->seedParent(['discount_amount'=>0,'total_amount'=>2341,'fbr_service_charge'=>1]);
+        $ids=$this->itemIds($parent);
+        $this->postReturn($parent,[['item_id'=>$ids[0],'return_qty'=>4]]);
+        $first=$this->returnRows($parent)->sole();
+        $this->assertSame(0.0,(float)$first->fbr_service_charge);
+        $this->assertSame(1170.0,(float)$first->total_amount);
+        $this->postReturn($parent,[['item_id'=>$ids[1],'return_qty'=>2]]);
+        $rows=$this->returnRows($parent);
+        $this->assertSame(1.0,(float)$rows->sum('fbr_service_charge'));
+        $this->assertSame(2341.0,(float)$rows->sum('total_amount'));
+        $this->assertSame(340.0,(float)$rows->sum('tax_amount'));
+    }
+
     public function test_partial_return_math_discount_share_and_returned_quantity(): void
     {
         $this->actAs('pos_admin');

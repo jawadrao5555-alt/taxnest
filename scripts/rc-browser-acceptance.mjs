@@ -3,6 +3,7 @@ import { b01CompanyAccountWorkflow } from './lib/b01-company-account-browser.mjs
 import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow } from './lib/pra-b03-browser.mjs';
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
+import { staffDiscountWorkflow } from './lib/pra-staff-discount-browser.mjs';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -1274,10 +1275,19 @@ async function reportingConnectorWorkflow(page,t,v) {
   if(!cashForeign.result?.isError)throw new Error('Foreign cash evidence leaked');
   const coverage=await(await diagnostic('get_diagnostic_coverage',{product:'pos',limit:1})).json();
   if(coverage.result?.structuredContent?.complete!==false||coverage.result?.structuredContent?.tenant_checks_run!==0)throw new Error('Capability inventory claimed complete tenant health');
+  const operations=async(stream,companyName=f.companyName)=>diagnostic('get_pra_operations_evidence',{company_name:companyName,date_from:stream==='cash_reconciliation'?f.dayCloseDate:f.date,stream});
+  for(const stream of ['cash_reconciliation','print_chains','agent_collection']) {
+    const response=await(await operations(stream)).json(), data=response.result?.structuredContent;
+    if(response.result?.isError||data?.complete!==false||data?.company?.id!==f.companyId||JSON.stringify(data).includes('FICTIONAL_DIAGNOSTIC_SECRET'))throw new Error('Combined operational evidence scope/redaction failed: '+stream);
+    if(stream==='cash_reconciliation'&&(data.records[0]?.status!=='STORED_SOURCE_DIFFERENCE'||data.records[0]?.cash?.frozen_minus_observed!==-100))throw new Error('Native independent cash discrepancy was not detected: '+JSON.stringify(data));
+    if(stream==='print_chains'&&(data.chains[0]?.job_id!==f.diagnosticJobId||data.chains[0]?.attempts[0]?.state!=='SPOOL_ACCEPTED'||data.physical_print!=='unknown'))throw new Error('Native print-chain observations missing');
+    if(stream==='agent_collection'&&(data.observed?.matching_samples!==2||data.streams[0]?.missing_sequences_between_retained_endpoints!==1||data.seven_day_complete_record_proven!==false))throw new Error('Native offline duplicate/gap evidence missing');
+    if(!(await(await operations(stream,f.foreignCompanyName)).json()).result?.isError)throw new Error('Combined operational evidence foreign-company leak: '+stream);
+  }
   await page.goto(baseUrl+'/admin/reporting/connections',{waitUntil:'domcontentloaded'});
   await page.locator('[data-reporting-onboarding]').waitFor();
   const card=page.locator('article').filter({has:page.getByRole('heading',{name:client.client_name,exact:true})});
-  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 4.'))throw new Error('Successful read evidence missing or failed foreign read counted');
+  if(!(await card.locator('[data-report-read-evidence]').innerText()).includes('Successful report reads: 7.'))throw new Error('Successful read evidence missing or failed foreign read counted');
   await saveEvidenceScreenshot(page,'rc-'+v.width+'-reporting-read-evidence');
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),card.getByRole('button',{name:'Revoke connection',exact:true}).click()]);
   if(!(await card.innerText()).includes('Revoked'))throw new Error('Owner revocation did not persist');
@@ -1285,7 +1295,8 @@ async function reportingConnectorWorkflow(page,t,v) {
   if((await incident(f.companyName)).status()!==401)throw new Error('Revoked token retained diagnostic access');
   if((await diagnostic('get_pra_day_close_evidence',cashArgs)).status()!==401)throw new Error('Revoked token retained cash evidence access');
   if((await diagnostic('get_diagnostic_coverage',{})).status()!==401)throw new Error('Revoked token retained diagnostic catalog access');
-  pass(t.name+'/'+v.width+': real consent, PKCE, native billing/cash, retained print timeline, coverage gaps, foreign-company denial and immediate revoke');
+  for(const stream of ['cash_reconciliation','print_chains','agent_collection']) if((await operations(stream)).status()!==401)throw new Error('Revoked token retained combined operational access');
+  pass(t.name+'/'+v.width+': real consent, PKCE, native independent cash difference, print attempts, offline upload deduplication/gaps, foreign-company denial and immediate revoke');
 }
 
 async function liveOpsReadability(page,t,v) {
@@ -1611,6 +1622,7 @@ async function workflow(page,t,v,diagnostics) {
     return;
   }
   if(t.b02Deal)return b02DealWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
+  if(t.staffDiscount)return staffDiscountWorkflow(page,t,v,{baseUrl,login,dismiss,waitForOperationalSurface,saveEvidenceScreenshot,pass,loopback});
   if(t.smartImport)return smartImportWorkflow(page,t,v);
   if(t.ingredientUnitAudit)return ingredientUnitAudit(page,t,v);
   if (t.mixedFulfillment) return mixedFulfillmentWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,openMobileCart,saveEvidenceScreenshot,pass});
@@ -1853,6 +1865,30 @@ async function tableOrderWorkflow(page,t,v) {
   await reprint.locator('[x-model="reprintPayment"]').selectOption('');
   await page.waitForFunction(()=>window.Alpine.$data(document.querySelector('[data-tn-sale-root]')).filteredReprintBills().length===3);
   await root.evaluate(el=>{window.Alpine.$data(el).showReprint=false;});
+  // Position recalculation must never remove x-show's display:none.
+  const assertCallerClosed=async()=>{
+    await root.evaluate(el=>{const d=window.Alpine.$data(el);d.callerPopup=null;d.callerDialFallback=null;d.showCallerLog=false;d.callerOverlayEpoch++;});
+    await page.waitForFunction(()=>['[data-tn-caller-dial-fallback]','[data-tn-caller-incoming]','[data-tn-caller-history]'].every(selector=>{
+      const el=document.querySelector(selector);return el&&getComputedStyle(el).display==='none';
+    }));
+  };
+  await assertCallerClosed();
+  await root.evaluate(el=>{window.Alpine.$data(el).callerDialFallback={phone:' '};});
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-tn-caller-dial-fallback]')).display==='none');
+  await root.evaluate(async el=>{
+    const d=window.Alpine.$data(el);
+    // Empty-state changes within one frame must not cancel a second hide promise.
+    // Keep pageerror/unhandled-rejection diagnostics strict throughout.
+    d.callerDialFallback={phone:' '};await Promise.resolve();await Promise.resolve();
+    d.callerDialFallback=null;await Promise.resolve();await Promise.resolve();
+    d.callerDialFallback={phone:'03000000000',dial:'03000000000',reason:'no_device'};
+  });
+  const fallback=page.locator('[data-tn-caller-dial-fallback]');await fallback.waitFor({state:'visible'});
+  if(!(await fallback.innerText()).includes('03000000000'))throw Error('Valid Caller ID fallback number missing');
+  await saveEvidenceScreenshot(page,'caller-valid-fallback-'+v.width+'.png');
+  await assertCallerClosed();await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-tn-caller-dial-fallback]')).display==='none');
+  await saveEvidenceScreenshot(page,'caller-empty-fallback-hidden-'+v.width+'.png');
   const savedStyle=await root.getAttribute('style');
   await root.evaluate(el=>{
     el.style.zoom='0.8';
@@ -2300,6 +2336,7 @@ async function customerBulkNavigation(page,t,v) {
 }
 async function one(browser,label,v,t) {
   if(t.taxIntegrations)t={...t,login:t.taxIntegrations[v.width].login};
+  if(t.staffDiscount)t={...t,login:t.staffDiscount[v.width].cashier};
   if(t.surveyJourney) t={...t,login:t.surveyJourney.logins[v.width]};
   if(t.optionalArchive) t={...t, login:t.optionalArchive.cases[v.width].login};
   valid(t); const failuresBefore = failures;

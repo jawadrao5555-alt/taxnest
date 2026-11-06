@@ -5,7 +5,12 @@ const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus, reportPrinters, nudgePrintPoll } = require('./printer');
 const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 const { replayCallbacks } = require('./callback-retry-policy');
+const { DiagnosticBuffer } = require('./diagnostic-buffer');
 const { parseFiscalResult } = require('./fiscal-result');
+const imsSoap = require('./ims-soap');
+const imsDiscovery = require('./ims-discovery');
+let discoveredIms = [];
+let discoveredAt = 0;
 const syncAlongsideIms = require('./pra-ims-bridge').createBridge({ axios, log: (...args) => log(...args) });
 
 let pollInterval = null;
@@ -220,7 +225,7 @@ async function flushCallbackQueueInner() {
 }
 
 function getStatus() {
-  return { ...status, printer: getPrintStatus() };
+  return { ...status, deviceUid: currentConfig?.deviceUid || null, localIms: discoveredIms, printer: getPrintStatus() };
 }
 
 function notify() {
@@ -277,10 +282,21 @@ async function heartbeat() {
     runGen, currentConfig, running: status.running,
   });
   try {
+    if (Date.now()-discoveredAt>60000) {
+      discoveredIms = await imsDiscovery.discover(axios); discoveredAt=Date.now();
+    }
     let extra = {};
     if (heartbeatExtraProvider) {
       try { extra = heartbeatExtraProvider() || {}; } catch (e) { extra = {}; }
     }
+    let diagnostics = null, diagnosticBatch = null;
+    try {
+      if (requestConfig.deviceUid) {
+        diagnostics = new DiagnosticBuffer(QUEUE_DIR, requestConfig);
+        diagnostics.capture(extra.agent_diagnostics);
+        diagnosticBatch = diagnostics.batch();
+      }
+    } catch (_) { /* Diagnostic storage must never block heartbeat or billing. */ }
     const res = await axios.post(
       `${requestConfig.serverUrl}/heartbeat`,
       {
@@ -291,10 +307,12 @@ async function heartbeat() {
         // server can tell multi-counter installs (same key) apart.
         device_uid: requestConfig.deviceUid || null,
         hostname: requestConfig.hostname || null,
+        local_fbr_ims: discoveredIms,
         // PC Name (v1.9.0): shopkeeper-entered friendly name ("Counter 1").
         // Sent only when non-blank; server never wipes an existing name on blank.
         pc_name: requestConfig.pcName || null,
         ...extra,
+        ...(diagnosticBatch ? {diagnostic_evidence: diagnosticBatch} : {}),
       },
       {
         headers: { Authorization: `Bearer ${requestConfig.apiKey}` },
@@ -305,6 +323,7 @@ async function heartbeat() {
     // must not mark a replacement agent connected, invoke Core, or mutate any
     // other status after stop or a company/device switch.
     if (!stillCurrent()) return;
+    try { if (diagnostics && diagnosticBatch) diagnostics.acknowledge(res.data?.diagnostic_evidence_ack, diagnosticBatch); } catch (_) { /* Preserve normal heartbeat on storage failure. */ }
     status.connected = true;
     status.serverInfo = res.data.company;
     status.lastError = null;
@@ -498,7 +517,14 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode, praEnvironme
   log(`Submitting txn ${invoice.transaction_id} to PRA${isFiscalDevice ? ' (Fiscal Device — localhost:8524)' : ''}`);
 
   try {
-    const praRes = await axios.post(praEndpoint, invoice.payload, {
+    // FBR-only protocol selection. PRA transport remains unchanged.
+    let fiscalEndpoint = praEndpoint;
+    if (isFbrPos && isFiscalDevice) {
+      const candidates = (await imsDiscovery.discover(axios)).filter(s => new URL(s.url).port === new URL(praEndpoint).port);
+      if (candidates.length > 1) throw new Error("FBR IMS discovery requires exactly one compatible service; no invoice sent");
+      if (candidates.length === 1) fiscalEndpoint = candidates[0].url;
+    }
+    const praRes = imsSoap.endpoint(fiscalEndpoint) ? await imsSoap.submit(axios, fiscalEndpoint, invoice.payload) : await axios.post(fiscalEndpoint, invoice.payload, {
       headers: {
         Authorization: `Bearer ${praToken}`,
         'Content-Type': 'application/json',

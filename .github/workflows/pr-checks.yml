@@ -110,7 +110,9 @@ jobs:
       - name: Install locked PHP dependencies without application scripts
         run: composer install --no-interaction --prefer-dist --no-progress --no-ansi --no-scripts
       - name: Check PRA DI sandbox and production environment isolation
-        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PraDiSandboxTest.php --testdox
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PraDiSandboxTest.php tests/Feature/PosFederalAutomationTest.php tests/Feature/PraReceiptSerialWithFiscalTest.php --testdox
+      - name: Check PRA staff approval and unchanged operations
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosStaffDiscountApprovalTest.php tests/Feature/PosPhoneSearchContinuityTest.php tests/Feature/PosSaleCustomerNameEditTest.php tests/Feature/PosReceiptOptionalControlsTest.php tests/Feature/PosKotDeviceRoutingTest.php --testdox
       - name: Check complete restaurant top-selling list and business dates
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosRestaurantDashboardCountsTest.php
       - name: Check notification read state and product targeting
@@ -140,6 +142,8 @@ jobs:
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/HotelGuestHouseV1Test.php tests/Feature/HotelCategoryNativeUiTest.php tests/Feature/HotelSimpleDeskPricingTest.php tests/Feature/HotelCreditNotePolicyTest.php tests/Feature/HotelGuestHouseFinalDeliveryTest.php
       - name: Check Caller ID recovery, timestamp, package and legacy regressions
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/PosCallerRingUuidTest.php tests/Feature/PosCallerRingCollapseTest.php tests/Feature/PosCallerEventsEtagTest.php tests/Feature/PosCallerIdPlanGateTest.php tests/Feature/PosCallerIdToggleAndEventsTest.php tests/Feature/AgentCallerReplayTest.php
+      - name: Check combined PRA cash, print and offline diagnostics
+        run: bash scripts/rc-safe-run -- vendor/bin/phpunit tests/Feature/Reporting tests/Feature/AgentHeartbeatUpdateTelemetryClearTest.php --testdox
       - name: Run full suite in clean loopback-only environment
         run: bash scripts/rc-safe-run -- vendor/bin/phpunit
       - name: Sanitize CI evidence
@@ -275,6 +279,12 @@ jobs:
         run: |
           bash scripts/rc-browser-fixture.sh setup
           RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
+      - name: Verify staff discount owner approval at desktop and 390px
+        env:
+          RC_MARIADB_PORT: '33117'
+          RC_BROWSER_PORT: '5911'
+          RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
+        run: RC_BROWSER_ONLY=staff-discount-approval bash scripts/rc-browser-fixture.sh run
       - name: Seed and verify authenticated Smart DI source import
         id: browser-preflight
         env:
@@ -371,6 +381,7 @@ jobs:
           bash scripts/rc-safe-run -- node --test --test-concurrency=1 "${tests[@]}"
           bash scripts/rc-safe-run -- node --test scripts/tests/notification-acknowledgement.test.mjs scripts/tests/notification-bell-unread.test.mjs scripts/tests/dashboard-notice-reading.test.mjs
           bash scripts/rc-safe-run -- node --test scripts/tests/hotel-settings-save.test.mjs scripts/tests/hotel-receipt-review.test.mjs scripts/tests/hotel-desk-preview.test.mjs scripts/tests/print-extension-bridge.test.mjs
+          bash scripts/rc-safe-run -- node --test scripts/tests/pra-ims-fee-totals.test.mjs
       - name: Check PRA B03 phone continuity and explicit table commit
         run: bash scripts/rc-safe-run -- node --test scripts/tests/b03-phone-search.test.mjs scripts/tests/b03-table-commit.test.mjs scripts/tests/b03-delivery-navigation.test.mjs scripts/tests/customer-bulk-print-flows.test.mjs
       - name: Install patched Electron runtime for real BrowserWindow acceptance

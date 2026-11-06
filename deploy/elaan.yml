@@ -1,8 +1,7 @@
-title: "Tax Integrations — PRA, FBR POS aur Digital Invoice ki aik jagah settings"
+title: "Staff aur family discount par owner ki manzoori"
 audience: pos
 type: improvement
 points:
-  - "Customize POS mein PRA Compliance ka naya naam Tax Integrations hai. PRA POS, FBR POS aur Digital Invoice ki settings yahan hain; receipt settings mein sirf receipt ke options hain."
-  - "Digital Invoice ke FBR details, Sandbox URL/token aur Production URL/token alag save karein. FBR POS ke dono environments ke POS IDs aur credentials bhi alag hain."
-  - "Required federal integration select karein. Aik completed bill ko review karke manual submit karein. Setup save karne se invoice nahi bheji jati."
-  - "Local FBR IMS ke liye designated shop PC par updated Desktop Agent v1.13.30 aur sahi FBR IMS component zaroori hai."
+  - "Payment screen se employee chun kar staff ya family discount ki request bheji ja sakti hai."
+  - "Owner discount ki raqam badal kar approve ya reject kar sakta hai. Approval ke baad cashier payment complete kare."
+  - "Yeh option pehle band rehta hai. Owner Staff / family requests ke page se apni marzi se on kar sakta hai."

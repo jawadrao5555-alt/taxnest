@@ -730,7 +730,7 @@ class PosRiderTrackingController extends Controller
             ->where('rider_id', $rider->id)
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->orderBy('id')
-            ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'delivery_address', 'total_amount', 'payment_method', 'delivery_status', 'created_at',
+            ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'delivery_address', 'total_amount', 'payment_method', 'delivery_status', 'created_at', 'invoice_mode',
                    ...(Schema::hasColumn('pos_transactions', 'rider_collection_amount') ? ['rider_collection_amount'] : []),
                    ...($hasAssignedAt ? ['rider_assigned_at'] : []),
                    ...($hasCustomerId ? ['customer_id'] : []),
@@ -805,6 +805,7 @@ class PosRiderTrackingController extends Controller
                 'customer_phone' => $b->customer_phone,
                 'address'        => $b->delivery_address,
                 'amount'         => \App\Models\PosRider::collectionAmount($b),
+                'delivery_cash_entry' => !$isPrepaid && $b->invoice_mode !== 'local' && \App\Services\PosDeliveryAccount::ready(),
                 'bill_total_amount' => (float) $b->total_amount,
                 'delivery_items' => $b->rider_collection_amount !== null ? $b->items->where('fulfillment', 'delivery')->filter(fn ($i) => !$i->skip_kitchen)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
                 'payment_method' => $b->payment_method,
@@ -874,6 +875,11 @@ class PosRiderTrackingController extends Controller
         $hasEvidenceSchema = Schema::hasTable('pos_delivery_completions')
             && Schema::hasTable('pos_customer_places');
         $clientEventId = trim((string) $request->input('client_event_id', ''));
+        $cashData = $request->validate([
+            'received_amount' => 'nullable|numeric|decimal:0,2|min:0|max:999999999999.99',
+            'client_event_id' => 'required_with:received_amount|nullable|string',
+        ]);
+        abort_if(isset($cashData['received_amount']) && !$hasEvidenceSchema, 503);
 
         // Durable phone outbox retries the same UUID until acknowledged. Return
         // success before looking at terminal bill state so a lost 200 response
@@ -982,7 +988,7 @@ class PosRiderTrackingController extends Controller
         }
 
         try {
-            $result = DB::transaction(function () use ($rider, $txnId, $evidence, $hasEvidenceSchema) {
+            $result = DB::transaction(function () use ($rider, $txnId, $evidence, $hasEvidenceSchema, $cashData) {
                 $txn = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $rider->company_id)
                     ->where('rider_id', $rider->id)
@@ -1109,6 +1115,10 @@ class PosRiderTrackingController extends Controller
                         ?? $lockedEvidence['completed_lat'];
                     $upd['customer_lng'] = $lockedEvidence['destination_lng']
                         ?? $lockedEvidence['completed_lng'];
+                }
+                if (isset($cashData['received_amount'])) {
+                    abort_unless($lockedEvidence, 422, 'Delivery evidence is required to record payment.');
+                    \App\Services\PosDeliveryAccount::record($txn, $rider, (string) $cashData['received_amount']);
                 }
                 $txn->update($upd);
 

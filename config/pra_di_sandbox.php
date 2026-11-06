@@ -1,6 +1,8 @@
 <?php
 
 return [
+    // Per-company/environment reviewed rules remain OFF until explicitly saved.
+    'automatic_enabled' => (bool) env('POS_FEDERAL_AUTOMATION_ENABLED', true),
     // Legacy local disposable-data rehearsal.
     'enabled' => (bool) env('PRA_DI_SANDBOX_ENABLED', false),
     // Owner setup is available on hosted servers. Every company starts OFF;

@@ -1834,6 +1834,7 @@ window.addEventListener('popstate', function() {
                             </div>
                             <div x-show="exemptAmount > 0" class="flex gap-2 text-green-300"><span>{{ __('pos.tax_exempt') }}</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
                             <div class="flex gap-2"><span x-text="taxInclusive ? (window.TXT.tax_paren + taxRate + window.TXT.pct_incl) : (window.TXT.tax_paren + taxRate + '%)')"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
+                            <div x-show="imsFee > 0" class="flex gap-2"><span>FBR POS Fee</span><span x-text="'Rs. ' + imsFee.toFixed(2)"></span></div>
                             <div x-show="Math.abs(roundOff) > 0.001" class="flex gap-2 text-white/60">
                                 <span>{{ __('pos.round_off') }}</span>
                                 <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
@@ -1854,8 +1855,8 @@ window.addEventListener('popstate', function() {
                     <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-white/50 pt-1">
                         <span>{{ __('pos.est_cost') }}</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
                     </div>
-                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - taxAmount - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
-                        <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - taxAmount - getCartCost()).toLocaleString()"></span>
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - taxAmount - imsFee - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
+                        <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - taxAmount - imsFee - getCartCost()).toLocaleString()"></span>
                     </div>
                 </div>
                 <div class="tn-payment-actions px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
@@ -2095,6 +2096,21 @@ window.addEventListener('popstate', function() {
                  — rider assignment now happens ONLY on the /pos/deliveries board after
                  payment; cash bills enter the rider khata the moment a rider is assigned. --}}
             <div x-show="!payingOrderAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
+                <div class="col-span-2 border rounded p-2 space-y-2" data-staff-discount-panel>
+                    <a href="{{ route('pos.staff-discounts') }}" target="_blank" rel="noopener" class="underline text-xs">Staff / family requests and owner settings</a>
+                    <button type="button" x-show="!staffDiscount" @click="openStaffDiscount()" :disabled="!cart.length || submitting" class="border rounded p-2 text-sm">Request staff / family discount</button>
+                    <template x-if="staffDiscount"><div class="space-y-2">
+                        <select aria-label="Employee" x-model="staffDiscount.employee_id" :disabled="!!staffDiscountRequest" class="w-full"><option value="">Choose employee</option><template x-for="person in staffDiscountEmployees" :key="person.id"><option :value="person.id" x-text="person.name"></option></template></select>
+                        <select aria-label="Staff or family" x-model="staffDiscount.kind" :disabled="!!staffDiscountRequest"><option value="staff">Staff</option><option value="family">Family</option></select>
+                        <input aria-label="Discount reason" x-model="staffDiscount.reason" :disabled="!!staffDiscountRequest" maxlength="500" placeholder="Reason" class="w-full">
+                        <select aria-label="Staff discount type" x-model="discountType" @change="recalcDiscount()" :disabled="!!staffDiscountRequest"><option value="percentage">Percent</option><option value="amount">Rupees</option></select>
+                        <input aria-label="Staff discount value" type="number" min="0.01" step="0.01" x-model.number="discountValue" @input="recalcDiscount()" :disabled="!!staffDiscountRequest" class="w-28">
+                        <p class="text-xs">Cash/Card sends the proposal first. After owner approval, check approval and press the same payment method to finalize.</p>
+                        <button type="button" x-show="staffDiscountRequest" @click="checkStaffApproval()" class="border rounded p-2">Check approval</button>
+                        <span x-text="staffDiscountRequest ? ('#' + staffDiscountRequest.id + ': ' + staffDiscountRequest.status) : ''"></span>
+                        <button type="button" x-show="!staffDiscountRequest" @click="staffDiscount=null; discountValue=0" class="border rounded p-2">Cancel proposal</button>
+                    </div></template>
+                </div>
                 <button data-video="cash-payment" @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -3063,10 +3079,24 @@ window.addEventListener('popstate', function() {
                         <button type="button" @click="pdSearch = ''" class="mt-2 text-xs font-bold text-amber-600 hover:text-amber-800 underline">{{ __('pos.clear_word') }}</button>
                     </div>
                 </template>
+                <div x-show="canAssignRider && bulkAssignableBills().length" class="flex flex-wrap items-center gap-2 px-4 py-2 border-b dark:border-gray-700">
+                    <button type="button" @click="toggleAllDeliveryBills()" :disabled="!!riderAssignBusyId" class="text-xs font-semibold text-blue-600"
+                            x-text="bulkAssignableBills().every(b => bulkDeliveryIds.includes(String(b.id))) ? 'Clear selection' : 'Select all shown'"></button>
+                    <span class="text-xs" x-text="bulkSelectedBills().length + ' selected'"></span>
+                    <select x-model="bulkDeliveryRider" aria-label="Rider for selected deliveries" class="text-xs rounded dark:bg-gray-800">
+                        <option value="">{{ __('pos.no_rider_opt') }}</option>
+                        <template x-for="r in deliveryRiders" :key="r.id"><option :value="r.id" x-text="r.name"></option></template>
+                    </select>
+                    <button type="button" @click="assignSelectedDeliveries()" :disabled="!bulkDeliveryRider || !bulkSelectedBills().length || !!riderAssignBusyId"
+                            class="px-2 py-1 rounded bg-blue-600 text-white text-xs disabled:opacity-50">Assign selected</button>
+                </div>
                 <template x-for="bill in pdFiltered(pendingDeliveryBills()).slice(0, 100)" :key="bill.id">
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800">
                         <div class="flex items-center justify-between mb-1.5">
                             <div class="flex items-center gap-2 flex-wrap">
+                                <input type="checkbox" x-show="canAssignRider && canBulkAssign(bill)" :value="String(bill.id)"
+                                       :disabled="!!riderAssignBusyId" x-model="bulkDeliveryIds"
+                                       :aria-label="'Select delivery ' + billDisplayNumber(bill)">
                                 <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="billDisplayNumber(bill)"></span>
                                 <span class="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" x-text="window.TXT.delivery"></span>
                                 <template x-if="bill.rider_name">
@@ -3088,7 +3118,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <template x-if="bill.rider_collection_amount != null">
                             <div class="text-xs font-semibold text-teal-700 dark:text-teal-300 mb-2">
-                                <p x-text="window.TXT.fulfill_rider_cash + ': Rs. ' + Number(Math.max(0, Number(bill.rider_collection_amount) - Number(bill.rider_partial_paid || 0))).toLocaleString()"></p>
+                                <p x-text="window.TXT.fulfill_rider_cash + ': Rs. ' + Number(Math.max(0, Number(bill.rider_collection_amount) - Number(bill.rider_partial_paid || 0) - Number(bill.delivery_credit_amount || 0))).toLocaleString()"></p>
                                 <p x-text="(bill.delivery_items || []).map(i => i.quantity + ' × ' + i.name).join(' · ')"></p>
                             </div>
                         </template>
@@ -3165,10 +3195,10 @@ window.addEventListener('popstate', function() {
                             <div class="mb-2 flex items-center gap-2">
                                 <span class="text-[11px] font-semibold text-gray-500">{{ __('pos.rider_word') }}:</span>
                                 <select @change="assignRider(bill, $event.target.value); $event.target.value = bill.rider_id"
-                                        :value="bill.rider_id" :disabled="riderAssignBusyId"
+                                        :disabled="riderAssignBusyId"
                                         class="flex-1 rounded-lg border-amber-300 dark:border-amber-700 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-amber-500 focus:border-amber-500 disabled:opacity-50">
                                     <template x-for="r in deliveryRiders" :key="'reassign-' + bill.id + '-' + r.id">
-                                        <option :value="r.id" x-text="r.name + (r.battery_pct != null && r.battery_pct <= 20 ? ' 🪫 ' + r.battery_pct + '%' : '')"></option>
+                                        <option :value="r.id" :selected="String(r.id) === String(bill.rider_id)" x-text="r.name + (r.battery_pct != null && r.battery_pct <= 20 ? ' 🪫 ' + r.battery_pct + '%' : '')"></option>
                                     </template>
                                 </select>
                             </div>
@@ -4451,7 +4481,7 @@ window.addEventListener('popstate', function() {
          blocks hide this layer and callerBlocked() still defers new rings.
          No NEW arbitrary Tailwind classes (vite-arbitrary-classes.md):
          width via inline style, z-[60]/text-[10px]/text-[11px] already built. --}}
-    <div x-show="callerPopup" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
+    <div data-tn-caller-incoming x-show="callerPopup" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 text-white" :class="callerPopup && callerPopup.source === 'whatsapp' ? 'bg-green-600' : 'bg-sky-600'">
                 <svg class="w-4 h-4 animate-pulse flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -4585,7 +4615,7 @@ window.addEventListener('popstate', function() {
          Wajah ka text server ke `reason` se banta hai, is liye teenon keys
          zabardasti bake karwani hain: --}}
     {{-- @posI18nExtra: caller_dial_no_device caller_dial_old_app caller_dial_notif_off --}}
-    <div x-show="callerDialFallback" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
+    <div data-tn-caller-dial-fallback x-show="!!(callerDialFallback && callerNumberOf(callerDialFallback))" x-cloak x-transition.opacity class="fixed right-4 z-[60]" :style="callerOverlayStyle(330)">
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_dial_title') }}</span>
@@ -4968,6 +4998,9 @@ function restaurantPos() {
         // Total for a given rate under card-save: base derived at the MENU (cash)
         // rate, chosen method's rate applied on top. Exempt items pass through.
         cardSaveTotalForRate(rate) {
+            return this.cardSaveBeforeImsFee(rate) + this.imsFee;
+        },
+        cardSaveBeforeImsFee(rate) {
             const allocated = this.allocatedDealBill(rate);
             if (allocated) return allocated.total_amount;
             const after = Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
@@ -5308,6 +5341,9 @@ function restaurantPos() {
         deliveryRiders: [],
         canAssignRider: false,
         riderAssignBusyId: null,
+        bulkDeliveryIds: [],
+        bulkDeliveryRider: '',
+        localBillsRequestId: 0,
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
@@ -5573,6 +5609,53 @@ function restaurantPos() {
         // Cart-level Bill Note toggle (owner, 28 Jul 2026) — same kitchenNotes model
         // as the Pay-modal note; collapsed by default so cart height is untouched.
         showCartNote: false,
+        staffDiscount: null,
+        staffDiscountEmployees: [],
+        staffDiscountRequest: null,
+        async openStaffDiscount() {
+            if (!navigator.onLine || this.editingBillId) { this.showToast('Staff approval needs an online new cart.', 'error'); return; }
+            try {
+                const res = await fetch('{{ route("pos.staff-discounts") }}', {headers: {'Accept':'application/json'}});
+                const data = await res.json();
+                if (!res.ok || !data.enabled) throw new Error('Owner must enable staff discount in the requests page.');
+                this.staffDiscountEmployees = data.employees || [];
+                this.staffDiscount = {employee_id:'',kind:'staff',reason:'',request_uuid:this._newOfflineUuid()};
+                this.staffDiscountRequest = null;
+            } catch (e) { this.showToast(e.message, 'error'); }
+        },
+        async checkStaffApproval() {
+            if (!this.staffDiscountRequest) return;
+            try {
+                const res = await fetch('{{ url("/pos/staff-discounts") }}/' + Number(this.staffDiscountRequest.id), {headers: {'Accept':'application/json'}});
+                const data = await res.json();
+                const row = data.request;
+                if (!res.ok || !row) throw new Error('Request is unavailable.');
+                this.staffDiscountRequest = {id:row.id,revision:row.revision,status:row.status};
+                if (row.status === 'approved') { this.discountType = row.approved_type; this.discountValue = Number(row.approved_value); this.recalcDiscount(); }
+                this.showToast('Discount request: ' + row.status, row.status === 'approved' ? 'success' : 'error');
+            } catch (e) { this.showToast(e.message, 'error'); }
+        },
+        async resumeStaffRequest(id) {
+            try {
+                const res=await fetch('{{ url("/pos/staff-discounts") }}/'+Number(id),{headers:{'Accept':'application/json'}});
+                const data=await res.json(), row=data.request;
+                if(!res.ok || !row || !['pending','approved'].includes(row.status)) throw new Error('Request cannot be resumed.');
+                if(this.cart.length && !confirm('Replace this draft with the saved staff request cart?')) return;
+                const saved=JSON.parse(row.order_snapshot).checkout;
+                this.clearCart();
+                this.cart=saved.items.map((item,index)=>({...item,item_name:item.name,item_type:item._manual?'manual':(item.type||'product'),cart_uid:'staff-'+row.id+'-'+index}));
+                this.orderType=saved.order_type||'takeaway'; this.selectedTable=saved.table_id?{id:saved.table_id}:null;
+                this.selectedCustomer={name:saved.customer_name||'',phone:saved.customer_phone||''};
+                this.selectedDeliveryAddress=saved.delivery_address||''; this.deliveryCollectionMode=saved.delivery_collection_mode||null;
+                this.kitchenNotes=saved.kitchen_notes||''; this.incomingOrderId=saved.incoming_order_id||null;
+                this.incomingEditRevision=saved.expected_incoming_revision??null; this.recalledOrderId=saved.recalled_order_id||null;
+                this.terminalId=saved.terminal_id||null;
+                this.staffDiscount={employee_id:row.employee_id,kind:row.kind,reason:row.reason,request_uuid:row.request_uuid};
+                this.staffDiscountEmployees=data.employees||[]; this.staffDiscountRequest={id:row.id,revision:row.revision,status:row.status};
+                this.discountType=row.approved_type||row.proposed_type; this.discountValue=Number(row.approved_value||row.proposed_value);
+                this.recalcDiscount(); this.showPayModal=true;
+            }catch(e){this.showToast(e.message,'error');}
+        },
         discountType: 'percentage',
         discountValue: 0,
         discountAmount: 0,
@@ -5660,7 +5743,15 @@ function restaurantPos() {
             }
             return this.r2(this.taxableSubtotal * this.taxRate / 100);
         },
+        imsFeeConfigured: {{ \App\Services\PosImsFee::quote((int)$company->id) }},
+        get imsFee() {
+            if (this.editingBillId) return Number(this.editingBillData?.fbr_service_charge || 0);
+            return this.praEnabled && !this.saveAsProvisional && (this.cart.length || this.payingHeldOrderId) ? this.imsFeeConfigured : 0;
+        },
         get totalAmount() {
+            return this.totalBeforeImsFee + this.imsFee;
+        },
+        get totalBeforeImsFee() {
             const allocated = this.allocatedDealBill();
             if (allocated) return allocated.total_amount;
             // Inclusive mode: menu prices already contain tax — never add it on top.
@@ -5683,13 +5774,16 @@ function restaurantPos() {
         // Mirrors heldOrderEstimate()/payModalTotal math for the LIVE cart.
         get cartQtyCount() { return this.cart.reduce((s, i) => s + this._safeQty(i.quantity), 0); },
         cartTotalForMethod(method) {
+            return this.cartTotalBeforeImsFee(method) + this.imsFee;
+        },
+        cartTotalBeforeImsFee(method) {
             const rate = method === 'card'
                 ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
                 : (this.taxRules['cash'] ?? this.taxRate);
             const allocated = this.allocatedDealBill(rate);
             if (allocated) return allocated.total_amount;
             if (this.taxInclusive) {
-                if (this.cardSaveMode() && Math.abs(this.taxMenuRate - rate) >= 0.005) return this.cardSaveTotalForRate(rate);
+                if (this.cardSaveMode() && Math.abs(this.taxMenuRate - rate) >= 0.005) return this.cardSaveBeforeImsFee(rate);
                 // Plain inclusive: menu total is method-independent.
                 return Math.round(Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount)));
             }
@@ -5909,6 +6003,8 @@ function restaurantPos() {
             // Do NOT call this.restoreCart() here without explicit product approval.
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
+            const staffResumeId = new URLSearchParams(window.location.search).get('staff_request');
+            if (/^[1-9][0-9]*$/.test(staffResumeId || '')) this.$nextTick(() => this.resumeStaffRequest(staffResumeId));
             // Held-window search (owner, 26 Aug 2026): window band hote hi search
             // saaf ho — warna agli dafa khulte hi purani filter lagi milti aur
             // cashier ko lagta "baqi orders gayab ho gaye".
@@ -6553,7 +6649,7 @@ function restaurantPos() {
             if (!bridge || typeof bridge.acceptImmediateSale !== 'function') return false;
             // Deliberately narrow: immediate final universal sale only. Every
             // unsupported shape returns to the established IndexedDB path.
-            if (!['cash', 'card'].includes(method) || !this.praEnabled || payload.save_as_provisional ||
+            if (this.imsFee > 0 || !['cash', 'card'].includes(method) || !this.praEnabled || payload.save_as_provisional ||
                 this._localCoreInventoryEnabled || payload.incoming_order_id ||
                 payload.recalled_order_id || payload.table_id ||
                 payload.online_payment_confirmed || this.orderType === 'delivery' ||
@@ -6834,6 +6930,7 @@ function restaurantPos() {
             } catch(e) {}
         },
         clearCartStorage() {
+            this.staffDiscount = null; this.staffDiscountRequest = null;
             try { localStorage.removeItem(this.storageKey); localStorage.removeItem(this.notesKey); } catch(e) {}
         },
 
@@ -11346,6 +11443,12 @@ function restaurantPos() {
         },
 
         async processPayment(method) {
+            if (this.staffDiscount) {
+                if (!this.staffDiscount.employee_id || this.staffDiscount.reason.trim().length < 3 || this.saveAsProvisional) { this.showToast('Choose employee, add a reason and use final payment.', 'error'); return; }
+                if (this.staffDiscountRequest && this.staffDiscountRequest.status !== 'approved') { this.showToast('Check owner approval before payment.', 'error'); return; }
+                if (this.staffDiscountRequest?.status === 'approved') this.reserveWaWindow(this.selectedCustomer?.phone);
+                return await this.processPaymentManual(method, false, !this.payPrintReceipt);
+            }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
             if (this.hasMixedService() && this.hasDeliveryPortion() && (!this.selectedCustomer?.phone || !this.selectedDeliveryAddress?.trim())) { this.showToast(window.TXT.fulfill_delivery_contact, 'error'); return; }
@@ -11528,6 +11631,8 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            const wasStaffDiscount = !!this.staffDiscount;
+            const staffNeedsTransactionKot = wasStaffDiscount && this.isRestaurantMode && !this.incomingOrderId && !this.recalledOrderId && !this.payingHeldOrderId && this.cart.some(item => item.item_id && !item.skip_kitchen);
             if (!window.PosDealAllocation && this.cart.some(i => i.item_type === 'deal')) { this.showToast(window.TXT.deal_calculation_unavailable, 'error'); return; }
             if (!this.confirmRecalledAdditions()) return;
             if (this.hasDeliveryPortion() && await this.waitForDeliveryAddress() === false) return;
@@ -11575,6 +11680,7 @@ function restaurantPos() {
                             : null,
                     })),
                     payment_method: method,
+                    fbr_service_charge: this.imsFee,
                     // Cash Received / Wapsi — server stores cash_received + change_due
                     // so the printed receipt (agent silent print incl.) carries them.
                     cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null,
@@ -11606,7 +11712,7 @@ function restaurantPos() {
                     // ISI manual raste se aati hai. Bina is id ke woh parked order
                     // khula reh jata aur roz ka day-close block kar deta.
                     // Provisionals kabhi settle nahi karte (bill final hi nahi).
-                    recalled_order_id: (!provisional && this.recalledOrderId) ? this.recalledOrderId : null,
+                    recalled_order_id: (!provisional && (this.recalledOrderId || (this.staffDiscount && this.payingHeldOrderId))) ? (this.recalledOrderId || this.payingHeldOrderId) : null,
                     // Online-adaigi ki tasdeeq isi waiter order ke saath jati hai,
                     // warna server (jaiz taur par) dobara rok deta hai.
                     online_payment_confirmed: (() => { const oid = this.incomingOrderId || this.recalledOrderId; return !!(oid && this._onlineOkByOrder[oid]); })(),
@@ -11623,6 +11729,15 @@ function restaurantPos() {
                     // the counter is gone — a sale is never blocked over it.
                     terminal_id: this.terminalId || null,
                 };
+                if (this.staffDiscount) {
+                    if (!navigator.onLine) throw new Error('Staff discount approval and payment require an online connection.');
+                    payload.offline_uuid = this.staffDiscount.request_uuid;
+                    this.payAttemptUuid = payload.offline_uuid;
+                    if (this.staffDiscountRequest) {
+                        payload.staff_discount_request_id = this.staffDiscountRequest.id;
+                        payload.staff_discount_revision = this.staffDiscountRequest.revision;
+                    } else payload.staff_discount = {...this.staffDiscount, employee_id:Number(this.staffDiscount.employee_id)};
+                }
                 // OFFLINE-FIRST (Jul 2026): no internet → queue the bill on this
                 // device (IndexedDB) and keep billing. Sync engine replays it.
                 // Task 117: NEW offline queueing is plan-gated (Business+). Cart
@@ -11659,6 +11774,7 @@ function restaurantPos() {
                         body: JSON.stringify(payload),
                     });
                 } catch (netErr) {
+                    if (this.staffDiscount) throw new Error('Connection interrupted. Keep this cart and retry with the same request key.');
                     // fetch threw = server unreachable (WiFi says "connected" but
                     // internet is dead) OR timed out. Same offline path — HTTP
                     // errors from a REACHABLE server never land here.
@@ -11687,6 +11803,10 @@ function restaurantPos() {
                 let data = null;
                 let rawBody = '';
                 try { rawBody = await res.text(); data = JSON.parse(rawBody); } catch(_) {}
+                if (res.ok && data?.approval_pending) {
+                    this.staffDiscountRequest = {id:data.request_id,revision:data.revision,status:'pending'};
+                    this.showToast(data.message, 'success'); this.submitting = false; return;
+                }
                 if (!res.ok || !data || !data.success) {
                     console.error('[storeInvoice] HTTP', res.status, res.statusText, rawBody.slice(0, 500));
                     const msg = (data && (data.message || data.error)) || ('Failed (HTTP ' + res.status + ') — F12 console');
@@ -11725,6 +11845,7 @@ function restaurantPos() {
                 }
                 // Mirror payHeldOrderDirect success path so receipt modal works.
                 console.log('[storeInvoice] OK response:', data);
+                this.staffDiscount = null; this.staffDiscountRequest = null;
                 console.log('[storeInvoice] isRestaurantMode=', this.isRestaurantMode, 'transaction_id=', data.transaction_id);
                 this.lastIsOffline = false;
                 this.lastOfflineRec = null;
@@ -11764,7 +11885,7 @@ function restaurantPos() {
                 // (payment confirm) par nikalti hai. Final bills = payment ho chuki → KOT abhi.
                 const kotHeldForPayment = !!this.kitchenSettings.delivery_kot_after_payment
                     && this.orderType === 'delivery' && (data.pra_status === 'local');
-                const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId && !kotHeldForPayment)
+                const txnKotId = ((this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId || staffNeedsTransactionKot) && !kotHeldForPayment)
                     ? (data.transaction_id || null) : null;
                 if (kotHeldForPayment) this.showToast(window.TXT.kot_held_until_payment, 'info');
                 // Task 1356: waiter-origin final bills DO have a restaurant order.
@@ -11849,12 +11970,12 @@ function restaurantPos() {
                     const after = Math.max(0, sub - disc);
                     const taxableAfter = taxable * ratio;
                     const exemptShare = Math.max(0, after - taxableAfter);
-                    return Math.round(exemptShare + taxableAfter * (100 + rate) / (100 + this.taxMenuRate));
+                    return Math.round(exemptShare + taxableAfter * (100 + rate) / (100 + this.taxMenuRate)) + Number(this.imsFee || 0);
                 }
-                return Math.round(sub - disc);
+                return Math.round(sub - disc) + Number(this.imsFee || 0);
             }
             const tax = Math.round(taxable * ratio * rate / 100);
-            return Math.round(sub - disc + tax);
+            return Math.round(sub - disc + tax) + Number(this.imsFee || 0);
         },
         payingOrderAwaitingOnline() {
             if (this.boardConfirm?.table?.order?.online_payment_awaited_at) return true;
@@ -12247,9 +12368,13 @@ function restaurantPos() {
             // unchanged and the exact finalized transaction is still what the
             // server renders when the agent fetches this job.
             this.praPrintGrace().catch(() => {});
-            const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
-            console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             const txnId = this.lastTransactionId;
+            if (txnId && !this.lastIsOffline) {
+                await this.waitForFbrPosReceipt(txnId);
+                if (this.lastTransactionId !== txnId || !this.showReceipt) return;
+            }
+            const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + txnId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
+            console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             const fallback = () => {
                 // Silent path failed → bill now depends on the popup/iframe route
                 // (invisible when blocked). Leave a trail (Task #63).
@@ -12750,14 +12875,15 @@ function restaurantPos() {
         // Lightweight fetch + inline action methods. All errors degrade to a
         // toast — modal stays open so cashier doesn't lose context.
         async loadLocalBills() {
+            const requestId = ++this.localBillsRequestId;
             this.localBillsLoading = true;
             try {
                 const res = await fetch('{{ route('pos.api.provisional-bills') }}', {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
-                if (!res.ok) { this.localBillsLoading = false; return; }
+                if (!res.ok) return;
                 const data = await res.json();
-                if (data && data.success) {
+                if (requestId === this.localBillsRequestId && data && data.success) {
                     this.localBills = data.bills || [];
                     this.finalDeliveryBills = data.final_deliveries || [];
                     this.deliveryRiders = data.riders || [];
@@ -12768,7 +12894,7 @@ function restaurantPos() {
                     }
                 }
             } catch (e) { console.warn('loadLocalBills error', e); }
-            this.localBillsLoading = false;
+            finally { if (requestId === this.localBillsRequestId) this.localBillsLoading = false; }
         },
         openLocalBills() {
             this.activeLocalIndex = 0;
@@ -12939,6 +13065,49 @@ function restaurantPos() {
         // /pos/deliveries/{id}/assign (same backend as the Deliveries board;
         // koi naya path nahi). Success = list refresh (bill assigned-section
         // mein chala jata hai, khata rider_id follow karta hai).
+        canBulkAssign(bill) {
+            return !bill.rider_settlement_id && !Number(bill.rider_partial_paid || 0)
+                && !['delivered', 'returned'].includes(bill.delivery_status);
+        },
+        bulkAssignableBills() {
+            return this.pdFiltered(this.pendingDeliveryBills()).slice(0, 100).filter(b => this.canBulkAssign(b));
+        },
+        bulkSelectedBills() {
+            return this.bulkAssignableBills().filter(b => this.bulkDeliveryIds.includes(String(b.id)));
+        },
+        toggleAllDeliveryBills() {
+            const ids = this.bulkAssignableBills().map(b => String(b.id));
+            this.bulkDeliveryIds = ids.every(id => this.bulkDeliveryIds.includes(id)) ? [] : ids;
+        },
+        async assignSelectedDeliveries() {
+            const bills = this.bulkSelectedBills();
+            const riderId = this.bulkDeliveryRider;
+            if (!bills.length || !riderId || this.riderAssignBusyId) return;
+            const rider = this.deliveryRiders.find(r => String(r.id) === String(riderId));
+            if (!rider || !window.confirm('Assign ' + bills.length + ' deliveries to ' + rider.name + '?')) return;
+            this.riderAssignBusyId = 'bulk';
+            try {
+                const response = await fetch(@json(route('pos.deliveries.bulk-assign')), {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ rider_id: riderId, bills: bills.map(b => ({
+                        id: b.id, expected_rider_id: b.rider_id || null, assignment_revision: b.assignment_revision || null
+                    })) }),
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok || !data?.success) {
+                    this.showToast(data?.message || @json(__('pos.rider_assign_failed')), 'error');
+                } else {
+                    this.bulkDeliveryIds = [];
+                    this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                }
+                await this.loadLocalBills();
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            } finally {
+                this.riderAssignBusyId = null;
+            }
+        },
         async assignRider(bill, riderId) {
             if (!bill || !riderId || this.riderAssignBusyId) return;
             if (bill.rider_id && Number(bill.rider_id) !== Number(riderId)
@@ -12963,7 +13132,7 @@ function restaurantPos() {
                 if (res.ok && data && data.success) {
                     this.showToast(@json(__('pos.rider_assign_ok')), 'success');
                     if (data.print_receipt) this.printAssignedDeliveryReceipt(bill);
-                    this.loadLocalBills();
+                    await this.loadLocalBills();
                 } else {
                     this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
                 }
@@ -13037,7 +13206,7 @@ function restaurantPos() {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     },
-                    body: JSON.stringify({ settle_all: 1, received_amount: received }),
+                    body: JSON.stringify({ settle_all: 1, received_amount: received, expected_outstanding: outstanding }),
                 });
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {
@@ -13895,7 +14064,7 @@ function restaurantPos() {
                 if (this.receiptCloseLeft > 1) { this.receiptCloseLeft--; return; }
                 // Reached zero — if popup-print iframes/timers are still in flight,
                 // wait 2 more seconds instead of cancelling their prints.
-                if ((this.pendingPrintTimers && this.pendingPrintTimers.length) || (this.printMessageHandlers && this.printMessageHandlers.length)) {
+                if (this.printWorkInFlight > 0 || (this.pendingPrintTimers && this.pendingPrintTimers.length) || (this.printMessageHandlers && this.printMessageHandlers.length)) {
                     this.receiptCloseLeft = 2;
                     return;
                 }
@@ -13914,6 +14083,16 @@ function restaurantPos() {
         // Poll the tiny status endpoint (~2.5s interval, bounded 30s) so the
         // badge flips to PRA VERIFIED + fiscal number and the receipt iframe
         // reloads with the fiscal box + QR. Popup band → stopPraPoll (x-effect).
+        async waitForFbrPosReceipt(txnId) {
+            const deadline = Date.now() + 18000;
+            do {
+                const status = await this._fetchPraStatus(txnId, Math.min(2000, Math.max(1, deadline - Date.now())));
+                if (this.lastTransactionId !== txnId || !this.showReceipt) return;
+                if (status?.fbr_pos_ready) this.refreshReceiptIframe();
+                if (!status?.fbr_pos_pending) return;
+                await new Promise(resolve => setTimeout(resolve, Math.min(750, Math.max(0, deadline - Date.now()))));
+            } while (Date.now() < deadline);
+        },
         praPollTimer: null,
         startPraPoll() {
             this.stopPraPoll();
@@ -13939,9 +14118,9 @@ function restaurantPos() {
         stopPraPoll() {
             if (this.praPollTimer) { clearInterval(this.praPollTimer); this.praPollTimer = null; }
         },
-        async _fetchPraStatus(txnId) {
+        async _fetchPraStatus(txnId, timeoutMs = 5000) {
             try {
-                const res = await fetch('/pos/transaction/' + txnId + '/pra-status', { headers: { 'Accept': 'application/json' } });
+                const res = await fetch('/pos/transaction/' + txnId + '/pra-status', { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(timeoutMs) });
                 if (!res.ok) return null;
                 return await res.json();
             } catch (e) { return null; } // network blip — next tick retries
@@ -14169,8 +14348,10 @@ function restaurantPos() {
             const height = window.innerHeight;
             const bottom = header ? header.getBoundingClientRect().bottom : 64;
             const top = Math.min(Math.max(8, bottom + 8), Math.max(8, height - 120));
-            return 'top:' + top + 'px;max-height:' + Math.max(100, height - top - 8)
-                + 'px;max-width:calc(100vw - 32px);overflow-y:auto;width:' + (width ? width + 'px' : 'auto') + ';';
+            // Alpine merges object style properties; a string replaces cssText
+            // and removes the display:none owned by x-show on hidden overlays.
+            return { top: top + 'px', maxHeight: Math.max(100, height - top - 8) + 'px',
+                maxWidth: 'calc(100vw - 32px)', overflowY: 'auto', width: width ? width + 'px' : 'auto' };
         },
         callerBlocked() {
             return this.showPayModal || this.showReceipt || this.showManagerPinModal

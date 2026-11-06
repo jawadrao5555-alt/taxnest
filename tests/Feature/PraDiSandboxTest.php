@@ -622,7 +622,7 @@ class PraDiSandboxTest extends TestCase
         $this->assertNull($live->payload); // no promotion/copy of the test payload
         $this->assertSame($live->id, $this->service->capture($this->company, $id, $this->owner->id, 'production')->id);
         $this->assertArrayNotHasKey('scenarioId', $this->service->template($live));
-        $this->assertSame('', $this->service->template($live)['buyerBusinessName']);
+        $this->assertSame('Walk-in customer', $this->service->template($live)['buyerBusinessName']);
         $this->service->prepare($this->company->id, $live->id, $this->payload($live));
         $this->postJson(route('pos.di-sandbox.submit', $live->id), [
             '_token' => 'pilot-csrf', 'confirm_sandbox' => 1,
@@ -728,6 +728,128 @@ class PraDiSandboxTest extends TestCase
         $this->service->prepare($this->company->id, $record->id, $p);
     }
 
+    private function unresolvedImsForPortal(): array
+    {
+        $this->imsProfile('production','fiscal_device');
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'production');
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));
+        $svc->submit($this->company->id,$r->id,$this->owner->id);
+        $claim=$svc->claim($this->company->id,'synthetic-device');
+        $r=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],null,'invalid_json_result');
+        $p=$r->payload;
+        return [$r,['_token'=>'portal-csrf','environment'=>'production','pos_id'=>$p['POSID'],
+            'usin'=>$p['USIN'],'invoice_date'=>substr($p['DateTime'],0,10),'invoice_type'=>$p['InvoiceType'],
+            'sale_value'=>$p['TotalSaleValue'],'tax_charged'=>$p['TotalTaxCharged'],
+            'total_amount'=>$p['TotalBillAmount'],'quantity'=>$p['TotalQuantity'],
+            'fiscal_number'=>'54321TEST12345678','evidence_note'=>'Fictional portal report checked against all frozen invoice fields.',
+            'confirm_portal'=>1],$claim];
+    }
+
+    public function test_owner_portal_recovery_restores_receipt_reference_without_resending_or_changing_sale(): void
+    {
+        Http::preventStrayRequests();
+        [$r,$evidence,$claim]=$this->unresolvedImsForPortal();
+        $before=(array)DB::table('pos_transactions')->find($r->source_transaction_id);
+        $this->assertSame('invalid_json_result',$r->attempts[0]['diagnostic']);
+        $this->get(route('pos.tax-integrations.ims.show',$r->id))->assertOk()
+            ->assertSee('Recover an invoice already visible in FBR')->assertSee('invalid_json_result');
+        $url=route('pos.tax-integrations.ims.reconcile',$r->id);
+        $this->postJson($url,$evidence)->assertStatus(419);
+        $this->withSession(['_token'=>'portal-csrf'])->post($url,$evidence)->assertRedirect();
+        $r->refresh();$this->assertSame('accepted',$r->state);
+        $this->assertSame($evidence['fiscal_number'],$r->fiscal_number);
+        $this->assertSame('owner_verified_fbr_portal',$r->attempts[1]['source']);
+        $this->assertSame($this->owner->id,$r->attempts[1]['actor_id']);
+        $this->assertSame($before,(array)DB::table('pos_transactions')->find($r->source_transaction_id));
+        $this->get(route('pos.tax-integrations.ims.receipt',$r->id))->assertOk()->assertSee($evidence['fiscal_number']);
+        $this->postJson($url,$evidence)->assertStatus(409);
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $late=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],null);
+        $this->assertSame('accepted',$late->state);$this->assertCount(2,$late->attempts);
+        try {$svc->submit($this->company->id,$r->id,$this->owner->id);$this->fail('Accepted bill resent');}
+        catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        Http::assertNothingSent();
+    }
+
+    public function test_portal_recovery_rejects_mismatched_evidence_staff_and_second_tenant(): void
+    {
+        Http::preventStrayRequests();[$r,$data]=$this->unresolvedImsForPortal();
+        $url=route('pos.tax-integrations.ims.reconcile',$r->id);
+        $this->withSession(['_token'=>'portal-csrf']);
+        foreach(['pos_id'=>999,'usin'=>'WRONG-BILL','invoice_date'=>'2000-01-01','environment'=>'sandbox',
+            'invoice_type'=>3,'sale_value'=>999,'tax_charged'=>999,'total_amount'=>999,'quantity'=>999] as $key=>$wrong) {
+            \Illuminate\Support\Facades\Cache::flush(); // Each synthetic case has its own request budget.
+            $this->postJson($url,array_replace($data,[$key=>$wrong]))->assertUnprocessable();
+            $this->assertSame('verification_required',$r->fresh()->state);
+        }
+        $this->postJson($url,array_replace($data,['confirm_portal'=>0]))->assertUnprocessable();
+        $this->owner->forceFill(['role'=>'employee','pos_role'=>'pos_cashier'])->saveQuietly();
+        $this->postJson($url,$data)->assertForbidden();
+        $other=DB::table('companies')->insertGetId(['name'=>'Second fictional shop']);
+        $uid=DB::table('users')->insertGetId(['company_id'=>$other]);
+        $this->actingAs(User::findOrFail($uid),'pos')->postJson($url,$data)->assertNotFound();
+        Http::assertNothingSent();
+    }
+
+    public function test_portal_reference_cannot_be_reused_for_another_bill_or_applied_before_dispatch(): void
+    {
+        Http::preventStrayRequests();[$first,$firstData]=$this->unresolvedImsForPortal();
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $svc->reconcilePortal($this->company->id,$first->id,$this->owner->id,$firstData);
+        [$second,$secondData]=$this->unresolvedImsForPortal();
+        try {$svc->reconcilePortal($this->company->id,$second->id,$this->owner->id,$secondData);$this->fail('Reference reused');}
+        catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        $second->update(['state'=>'draft']);
+        try {$svc->reconcilePortal($this->company->id,$second->id,$this->owner->id,$secondData);$this->fail('Draft marked accepted');}
+        catch(HttpException $e){$this->assertSame(409,$e->getStatusCode());}
+        $this->assertSame('draft',$second->fresh()->state);Http::assertNothingSent();
+    }
+
+    public function test_ims_callback_trims_status_keeps_safe_evidence_and_refuses_conflicting_codes(): void
+    {
+        $service=\App\Services\PosImsReportingService::class;
+        $this->assertSame('local_accepted',$service::result(['Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->assertSame('verification_required',$service::result(['Code'=>'100','code'=>'400','InvoiceNumber'=>'LOCAL-IMS-123456'],true)['state']);
+        $this->imsProfile('sandbox','fiscal_device');$svc=app($service);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));Http::fake();
+        $svc->submit($this->company->id,$r->id,$this->owner->id);$claim=$svc->claim($this->company->id,'synthetic-device');
+        $r=$svc->callback($this->company->id,$r->id,'synthetic-device',$claim['claim'],[
+            'Code'=>' 100 ','InvoiceNumber'=>'LOCAL-IMS-123456','Token'=>'private-token',
+            'BuyerCNIC'=>'private-identity','Response'=>'Private buyer details never retained'], 'response_received',['Code:string','InvoiceNumber:string','bad value with spaces']);
+        $this->assertSame('local_accepted',$r->state);
+        $this->assertSame(['Code'=>'100','InvoiceNumber'=>'LOCAL-IMS-123456'],$r->attempts[0]['acknowledgement']);
+        $this->assertSame(['Code:string','InvoiceNumber:string'],$r->attempts[0]['response_fields']);
+        $this->assertStringNotContainsString('private',json_encode($r->attempts));
+        $this->get(route('pos.tax-integrations.ims.show',$r->id))->assertOk()->assertSee('Code: 100')->assertSee('LOCAL-IMS-123456');
+        Http::assertNothingSent();
+    }
+
+    public function test_live_ims_number_only_acknowledgement_must_match_the_claimed_pos(): void
+    {
+        foreach ([
+            ['production', '054321FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'local_accepted'],
+            ['production', '054322FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'verification_required'],
+            ['production', '054321FK6N1234567', ['InvoiceNumber:string'], 'response_received', 'verification_required'],
+            ['production', '054321FK6N1234567', ['FBRInvoiceNumber:string'], 'transport_timeout', 'verification_required'],
+            ['sandbox', '012345FK6N1234567', ['FBRInvoiceNumber:string'], 'response_received', 'verification_required'],
+        ] as [$environment, $number, $fields, $diagnostic, $state]) {
+            $this->imsProfile($environment, 'fiscal_device');
+            $service = app(\App\Services\PosImsReportingService::class);
+            $record = $service->capture($this->company, $this->bill(), $this->owner->id, $environment);
+            $service->prepare($this->company->id, $record->id, $this->imsPayload($record));
+            Http::fake();
+            $service->submit($this->company->id, $record->id, $this->owner->id);
+            $claim = $service->claim($this->company->id, 'synthetic-device');
+            $record = $service->callback($this->company->id, $record->id, 'synthetic-device',
+                $claim['claim'], ['InvoiceNumber'=>$number], $diagnostic, $fields);
+            $this->assertSame($state, $record->state);
+            $this->assertSame($state === 'local_accepted' ? $number : null, $record->fiscal_number);
+            Http::assertNothingSent();
+        }
+    }
+
     private function imsProfile(string $environment='sandbox', string $mode='cloud'): \App\Models\PosImsProfile
     {
         PosDiSandboxProfile::where('company_id',$this->company->id)->update(['enabled'=>false]);
@@ -768,6 +890,26 @@ class PraDiSandboxTest extends TestCase
         $this->assertSame($token,$profile->fresh()->sandbox_token);
         $this->assertSame('7654321',$this->company->fresh()->fbr_registration_no);
     }
+    public function test_ims_manual_preparation_keeps_no_catalogue_code_compatibility_and_rejects_invalid_pct(): void
+    {
+        $this->imsProfile();
+        $ims=app(\App\Services\PosImsReportingService::class);
+        $record=$ims->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $p=$this->imsPayload($record);
+        $this->assertSame('00000000',$ims->template($record)['Items'][0]['PCTCode']);
+        foreach ($p['Items'] as &$line) $line['PCTCode']='00000000'; unset($line);
+        $ims->prepare($this->company->id,$record->id,$p);
+        $this->assertSame('00000000',$record->fresh()->payload['Items'][0]['PCTCode']);
+        $p['Items'][0]['PCTCode']='invalid';
+        try {
+            $ims->prepare($this->company->id,$record->id,$p);
+            $this->fail('Malformed PCT accepted');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('Items.0.PCTCode',$e->errors());
+        }
+        Http::assertNothingSent();
+    }
+
     public function test_ims_evidence_preserves_source_and_uses_only_ims_environment_credentials(): void
     {
         $this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);$bill=$this->bill('credit');
@@ -837,6 +979,21 @@ class PraDiSandboxTest extends TestCase
         $this->assertSame('LOCAL-IMS-123456',$same->fiscal_number);
         $this->get('/pos/tax-integrations/fbr-pos/'.$r->id.'/receipt')->assertOk()->assertSee('Central synchronization not independently verified.');
     }
+    public function test_legacy_agent_cannot_claim_a_soap_record(): void
+    {
+        $p=$this->imsProfile('sandbox','fiscal_device');
+        $p->update(['local_ims_url'=>'http://127.0.0.1:8524/TcpService/IMSHttp']);
+        $svc=app(\App\Services\PosImsReportingService::class);
+        $r=$svc->capture($this->company,$this->bill(),$this->owner->id,'sandbox');
+        $svc->prepare($this->company->id,$r->id,$this->imsPayload($r));
+        Http::fake();$svc->submit($this->company->id,$r->id,$this->owner->id);Http::assertNothingSent();
+        $this->assertNull($svc->claim($this->company->id,'synthetic-device'));
+        $this->assertSame('queued_agent',$r->fresh()->state);
+        $claim=$svc->claim($this->company->id,'synthetic-device',true);
+        $this->assertSame($r->id,$claim['id']);
+        $this->assertSame('http://127.0.0.1:8524/TcpService/IMSHttp',$claim['endpoint']);
+    }
+
     public function test_ims_rejects_wrong_tenant_device_stale_identity_and_unbalanced_mapping(): void
     {
         $p=$this->imsProfile();$svc=app(\App\Services\PosImsReportingService::class);

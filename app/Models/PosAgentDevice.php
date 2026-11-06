@@ -24,10 +24,12 @@ class PosAgentDevice extends Model
         'printers',
         'printers_reported_at',
         'receipt_printer',
+        'local_fbr_ims',
     ];
 
     protected $casts = [
         'printers' => 'array',
+        'local_fbr_ims' => 'array',
         'last_seen_at' => 'datetime',
         'printers_reported_at' => 'datetime',
     ];

@@ -1480,6 +1480,9 @@ ipcMain.handle('save-pos-settings', (event, s) => {
   return { ok: true };
 });
 
+ipcMain.handle('open-installation-folder', async () => { await shell.openPath(path.dirname(process.execPath)); return {ok:true}; });
+ipcMain.handle('open-installed-apps', async () => { if(process.platform!=='win32') return {ok:false}; await shell.openExternal('ms-settings:appsfeatures'); return {ok:true}; });
+
 ipcMain.handle('open-pos-window', () => ({ ok: openPos() }));
 
 // Explicit owner/cashier click only; no renderer-supplied destination.
@@ -1671,18 +1674,15 @@ function sendImsProgress(payload) {
 }
 
 ipcMain.handle('check-ims-service', async () => {
-  try {
-    // Any HTTP response (even 404) means the IMS service is listening.
-    await axios.get('http://localhost:8524/', { timeout: 3000, validateStatus: () => true });
-    return { running: true };
-  } catch (e) {
-    return { running: false, error: e.code || e.message };
-  }
+  const services = await require('./src/ims-discovery').discover(axios);
+  let praReachable=false;
+  try { await axios.get('http://127.0.0.1:8524/',{timeout:1500,maxRedirects:0,validateStatus:()=>true}); praReachable=true; } catch (_) {}
+  return { running: services.length > 0, pra_reachable:praReachable, services, environment: 'unknown' };
 });
 
 ipcMain.handle('install-fbr-ims', async () => {
   const { imsMode } = require('./src/ims-visibility');
-  if (imsMode(getStatus()) !== 'fbr') {
+  if (!['fbr','both'].includes(imsMode(getStatus()))) {
     return { ok: false, error: 'Connect an FBR fiscal-device company before installing FBR IMS.' };
   }
   if (process.platform !== 'win32') {
@@ -1746,7 +1746,7 @@ ipcMain.handle('install-fbr-ims', async () => {
     };
     walk(extractDir, 0);
     const setup = found.find((f) => /setup|install/i.test(path.basename(f))) || found[0] || null;
-    if (imsMode(getStatus()) !== 'fbr') {
+    if (!['fbr','both'].includes(imsMode(getStatus()))) {
       return { ok: false, error: 'The connected company changed. FBR IMS installer was not launched.' };
     }
     sendImsProgress({ stage: 'launch', message: setup ? 'Launching FBR installer...' : 'Opening extracted folder...' });

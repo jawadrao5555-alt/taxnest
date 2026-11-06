@@ -11,7 +11,10 @@ function imsMode(status) {
     return 'fbr';
   }
   if (company.product_type === 'pos') {
-    return company.pra_connection_mode === 'fiscal_device' ? 'pra' : null;
+    // Preparation is independent of dispatch permission. Owners must be able
+    // to find/install IMS before enabling the alongside reporting profile.
+    if (company.fbr_alongside_pra === true) return 'both';
+    return company.pra_connection_mode === 'fiscal_device' ? 'both' : 'fbr';
   }
   return null; // unknown / legacy responses fail closed for this optional UI
 }

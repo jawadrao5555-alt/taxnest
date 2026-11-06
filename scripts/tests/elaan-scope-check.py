@@ -53,6 +53,7 @@ assert 'audience=CONVERT(0x'+os.environ['AUDIENCE'].encode().hex()+' USING utf8m
 assert 'is_published=1' in q and 'target_categories IS NULL' in q
 case=os.environ['CASE']
 if case in {'db_error','missing_key'}: print('ELAAN_DB_ERROR');sys.exit(1)
+if case=='stdout_noise': print('unexpected protocol output')
 if case=='missing_marker': print('ELAAN_NO_MARKER');sys.exit(0)
 negative={'wrong_scope','wrong_sha','unpublished','archived','deleted','unrelated'}
 fresh=0 if case in negative or case=='same_sha' else 1
@@ -61,12 +62,12 @@ print('ELAAN_COUNT=%d MARKER_COMMIT=%s RECEIPT_COUNT=%d' % (fresh,'a'*40,existin
 ''')
             mysql.chmod(0o700)
             ssh = temp/'ssh'
-            ssh.write_text('#!/bin/bash\n[ "$CASE" != ssh_error ] || exit 1\nbash -c "${@: -1}"\n')
+            ssh.write_text('#!/bin/bash\n[ "$CASE" != ssh_error ] || exit 1\nif [ "$CASE" = ssh_warning ]; then echo "SSH informational warning" >&2; fi\nbash -c "${@: -1}"\n')
             ssh.chmod(0o700)
             for audience in ['pos', 'fbr_pos', 'di', 'all']:
                 spec = temp/'spec.yml'
                 spec.write_text(f'title: Fictional receipt\naudience: {audience}\npoints:\n  - Point\n')
-                for case in ['fresh', 'same_sha', 'wrong_scope', 'wrong_sha', 'unpublished', 'archived', 'deleted', 'unrelated', 'db_error', 'missing_key', 'ssh_error', 'missing_marker', 'invalid_spec']:
+                for case in ['fresh', 'same_sha', 'ssh_warning', 'stdout_noise', 'wrong_scope', 'wrong_sha', 'unpublished', 'archived', 'deleted', 'unrelated', 'db_error', 'missing_key', 'ssh_error', 'missing_marker', 'invalid_spec']:
                     marker = temp/'marker'
                     if case == 'missing_marker': marker.unlink()
                     else: marker.write_text('1|' + SHA)
@@ -83,7 +84,7 @@ elaan_freshness_check "$3" "$3"
 '''
                     env = dict(os.environ, PATH=str(temp)+os.pathsep+os.environ['PATH'], CASE=case, AUDIENCE=audience)
                     result = subprocess.run(['bash', '-c', script, 'fixture', str(ROOT), str(temp), SHA], env=env, capture_output=True, timeout=10)
-                    self.assertEqual(case in ['fresh', 'same_sha'], result.returncode == 0, (audience, case, result.stdout, result.stderr))
+                    self.assertEqual(case in ['fresh', 'same_sha', 'ssh_warning'], result.returncode == 0, (audience, case, result.stdout, result.stderr))
 
     def test_sql_scope_requires_exact_categories(self):
         value = sql.scope_sql({'audience': 'di', 'categories': ['di_services']})

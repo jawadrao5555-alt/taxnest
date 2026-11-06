@@ -36,16 +36,25 @@ class FbrService
         return $this->submitPosDiPayload($payload, $sandboxToken, 'sandbox', $companyId);
     }
 
-    public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId): array
+    public function submitPosDiPayload(array $payload, string $token, string $environment, ?int $companyId, bool $automatic = false): array
     {
         \App\Support\PraDiSandboxGate::enforce($companyId, $environment);
         $profile = $companyId ? \App\Models\PosDiSandboxProfile::where('company_id', $companyId)->first() : null;
         $url = PosTaxIntegrationEndpoints::checked('di', $environment, $profile?->{$environment.'_url'});
         $unknown = ['state' => 'verification_required', 'reference' => null, 'error_codes' => []];
         try {
-            // Fixed environment endpoint; no overrides, redirects or automatic retry.
-            $response = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)
-                ->withoutRedirecting()->post($url, $payload);
+            $request = Http::withToken($token)->acceptJson()->connectTimeout(10)->timeout(45)->withoutRedirecting();
+            if ($automatic) {
+                // DNS or connect failures happen before an HTTP request reaches FBR.
+                // Timeouts, HTTP errors and incomplete replies remain ambiguous.
+                $request->retry(3, 1000, function (\Throwable $exception): bool {
+                    $cause = $exception instanceof \Illuminate\Http\Client\ConnectionException
+                        ? $exception->getPrevious() : $exception;
+                    return $cause instanceof \GuzzleHttp\Exception\ConnectException
+                        && in_array($cause->getHandlerContext()['errno'] ?? null, [5, 6, 7], true);
+                }, throw: false);
+            }
+            $response = $request->post($url, $payload);
             if (!$response->successful() || !is_array($response->json())) return $unknown;
             $data = $response->json();
             $validation = $data['validationResponse'] ?? null;
@@ -1020,6 +1029,12 @@ class FbrService
     private function formatNtnCnic(?string $value): string
     {
         if (empty($value)) return "";
+        // FBR also issues seven-character NTNs beginning with a letter.
+        // Strip an optional check digit, never the identifying letter.
+        $ntn = strtoupper(trim($value));
+        if (preg_match('/^([A-Z][0-9]{6})(?:-?[0-9])?$/', $ntn, $match)) {
+            return $match[1];
+        }
         $clean = preg_replace('/[^0-9]/', '', $value);
         if (strlen($clean) === 13) return $clean;
         if (strlen($clean) >= 7) return substr($clean, 0, 7);
@@ -1029,6 +1044,7 @@ class FbrService
     private function determineBuyerRegistrationType(?string $buyerNtn): string
     {
         if (empty($buyerNtn)) return "Unregistered";
+        if (preg_match('/^[A-Z][0-9]{6}(?:-?[0-9])?$/i', trim($buyerNtn))) return "Registered";
         $clean = preg_replace('/[^0-9]/', '', $buyerNtn);
         if (strlen($clean) === 7 || strlen($clean) === 13) return "Registered";
         return "Unregistered";
@@ -2462,9 +2478,9 @@ class FbrService
             ];
         }
 
-        // NOTE: PCTCode (HS code) is OPTIONAL for FBR IMS POS Fiscalization (SRO 1279/2021),
-        // unlike Digital Invoicing where hsCode is mandatory. Retail POS items often have no
-        // HS code, so we send PCTCode when available and blank otherwise — never block the bill.
+        // buildFbrPosPayload keeps PCTCode present and uses the existing
+        // 00000000 compatibility default when the catalogue has no HS code.
+        // Do not confuse that transport fallback with a statutory exemption.
 
         $token = $this->getFbrPosToken($company);
         $url = $this->getFbrPosUrl($company);

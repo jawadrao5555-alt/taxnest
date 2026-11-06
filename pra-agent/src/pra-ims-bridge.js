@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const soap = require('./ims-soap');
 function localEndpoint(value) {
   try {
     const u = new URL(value);
@@ -12,15 +13,7 @@ function localEndpoint(value) {
       u.pathname === '/api/IMSFiscal/GetInvoiceNumberByModel' && !u.username && !u.password && !u.search && !u.hash;
   } catch (_) { return false; }
 }
-function resultOnly(data) {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-  // Keep every supplied reference so a conflicting response remains uncertain on the server.
-  const result = {};
-  for (const k of ['Code', 'code', 'InvoiceNumber', 'FBRInvoiceNumber', 'invoiceNumber', 'Response']) {
-    if (typeof data[k] === 'string' || typeof data[k] === 'number') result[k] = String(data[k]).slice(0, 120);
-  }
-  return result;
-}
+const {resultOnly,describeResponse}=require('./ims-result');
 function createBridge({ axios, directory = path.join(os.homedir(), '.taxnest-pra-agent'), log = () => {} }) {
   let busy = false;
   return async function sync(config) {
@@ -39,17 +32,24 @@ function createBridge({ axios, directory = path.join(os.homedir(), '.taxnest-pra
         try { await send(pending); fs.unlinkSync(filename); } catch (_) { return; }
       }
       let data;
-      try { data = (await axios.post(`${config.serverUrl}/pra-fbr-ims/claim`, { device_uid: config.deviceUid }, options)).data; }
+      try { data = (await axios.post(`${config.serverUrl}/pra-fbr-ims/claim`, { device_uid: config.deviceUid, supported_protocols: ['json','soap'] }, options)).data; }
       catch (_) { return; } // absent/disabled on old servers is normal
       const invoice = data?.invoice;
       if (!invoice) return;
       if (!Number.isSafeInteger(invoice.id) || !/^[a-f0-9]{64}$/.test(invoice.claim || '')) return;
-      const body = { id: invoice.id, claim: invoice.claim, device_uid: config.deviceUid, response: null };
-      if (localEndpoint(invoice.endpoint)) {
+      const body = { id: invoice.id, claim: invoice.claim, device_uid: config.deviceUid, response: null, diagnostic: 'invalid_endpoint' };
+      if (localEndpoint(invoice.endpoint) || soap.endpoint(invoice.endpoint)) {
         try {
-          const res = await axios.post(invoice.endpoint, invoice.payload, { timeout: 45000, maxRedirects: 0, headers: { 'Content-Type': 'application/json' } });
+          const res = soap.endpoint(invoice.endpoint) ? await soap.submit(axios, invoice.endpoint, invoice.payload) : await axios.post(invoice.endpoint, invoice.payload, { timeout: 45000, maxRedirects: 0, headers: { 'Content-Type': 'application/json' } });
+          body.response_fields = describeResponse(res.data);
           body.response = resultOnly(res.data);
-        } catch (_) { /* timeout / HTTP failure stays unknown, never replay fiscal POST */ }
+          body.diagnostic = body.response ? 'response_received' : 'unrecognized_response';
+        } catch (error) {
+          // Enum only: never persist raw response XML, headers, URLs or credentials.
+          body.diagnostic = ['ECONNABORTED','ETIMEDOUT'].includes(error?.code) ? 'transport_timeout'
+            : error?.response ? 'http_error' : error instanceof SyntaxError ? 'invalid_json_result'
+            : 'unconfirmed_soap_or_transport';
+        }
       }
       // Persist only the scoped result (not the source invoice, token or raw response).
       fs.mkdirSync(directory, { recursive: true });

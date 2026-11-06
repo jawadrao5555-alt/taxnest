@@ -555,10 +555,31 @@ $amountOwner = $user($amountCompany, 'Synthetic Amount Owner', 'amount-owner@rc-
 $diagnosticDate = $now->copy()->subDays(7)->toDateString();
 \App\Models\PosDayCloseReport::forceCreate([
     'company_id' => $amountCompany->id, 'branch_id' => 0, 'report_date' => $diagnosticDate, 'report_number' => 'RC-DIAGNOSTIC-CASH',
+    'total_invoices'=>3, 'returns_count'=>1, 'other_amount'=>0,
     'opening_float' => 0, 'cash_amount' => 800, 'card_amount' => 200, 'expected_cash' => 750, 'counted_cash' => 760, 'cash_variance' => 10,
     'rider_summary' => ['cash_out' => 100, 'cash_in' => 50, 'notes' => 'SYNTHETIC-PRIVATE-RIDER'],
     'counter_summary' => [['terminal_id' => 0, 'opening' => 0, 'cash_sales' => 800, 'rider_out' => 100, 'rider_in' => 50, 'expected' => 750, 'counted' => 760, 'variance' => 10]],
 ]);
+// Independent source evidence: the frozen arithmetic passes, but cash is Rs100 low.
+DB::table('pos_day_openings')->insert(['company_id'=>$amountCompany->id,'branch_id'=>0,'business_date'=>$diagnosticDate,'opening_cash'=>0]);
+foreach ([[900,'cash','sale',false],[100,'cash','sale',true],[100,'cash','return',false],[200,'debit_card','sale',false],[50,'cash','sale',false]] as $n => [$amount,$method,$kind,$delivery]) {
+    $sourceDate = $n === 4 ? $now->copy()->subDays(8)->toDateString() : $diagnosticDate;
+    $sourceBill = \App\Models\PosTransaction::forceCreate(['company_id'=>$amountCompany->id,'created_by'=>$amountOwner->id,
+        'invoice_number'=>'RC-DIAG-SOURCE-'.$n,'invoice_mode'=>'pra','status'=>'completed','transaction_type'=>$kind,
+        'subtotal'=>$amount,'total_amount'=>$amount,'payment_method'=>$method,'business_date'=>$sourceDate,
+        'order_type'=>$delivery?'delivery':'takeaway','rider_partial_paid'=>0,
+        'created_at'=>$sourceDate.' 22:00:00','updated_at'=>$sourceDate.' 22:00:00']);
+}
+DB::table('pos_rider_settlements')->insert(['company_id'=>$amountCompany->id,'rider_id'=>0,'panel'=>'pra',
+    'business_date'=>$diagnosticDate,'total_amount'=>50,'bill_count'=>1,'created_at'=>$diagnosticDate.' 23:00:00',
+    'allocation'=>json_encode([['bill_id'=>$sourceBill->id,'amount'=>50,'business_date'=>$sourceBill->business_date]])]);
+$sampleUpload = ['version'=>1,'stream_id'=>'22222222-2222-4222-8222-222222222222','pending'=>2,'dropped'=>0,'resets'=>0,'storage_status'=>'available',
+    'events'=>[['sequence'=>1,'at'=>$now->copy()->subDays(2)->toISOString(),'pending_callbacks'=>2,'raw_error'=>'FICTIONAL_DIAGNOSTIC_SECRET'],
+        ['sequence'=>3,'at'=>$now->toISOString(),'pending_callbacks'=>0]]];
+foreach ([1,2] as $retry) {
+    $ack = app(\App\Services\PraAgentDiagnosticEvidence::class)->ingest($amountCompany, 'FICTIONAL_DIAGNOSTIC_SECRET', $sampleUpload);
+    if (($ack['accepted'] ?? []) !== [1,3]) throw new RuntimeException('Native diagnostic upload/deduplication failed');
+}
 $amountCustomer = \App\Models\PosCustomer::create([
     'company_id' => $amountCompany->id, 'name' => 'Synthetic Amount Customer', 'phone' => '00000000111',
 ]);
@@ -814,14 +835,49 @@ foreach([1366,390] as $width){
         'business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,'pos_setup_completed'=>true,
         'feature_flags'=>array_merge(PosFeatureService::defaultsForCategory('restaurant'),['inventory'=>false]),
         'inventory_enabled'=>false,'pra_reporting_enabled'=>true,'pra_environment'=>'sandbox','pra_pos_id'=>'10000',
-        'province'=>'Punjab','address'=>'Synthetic integration street']);
+        'province'=>'Punjab','address'=>'Synthetic integration street','receipt_printer_size'=>$width===390?'58mm':'80mm']);
     $taxOwner=$user($taxCompany,'Synthetic integration owner','tax-integration-owner-'.$width.'@rc-browser.invalid','company_admin','pos_admin');
     $taxBill=\App\Models\PosTransaction::forceCreate(['company_id'=>$taxCompany->id,'invoice_number'=>'SYN-TAX-'.$width,'status'=>'completed',
         'invoice_mode'=>'pra','transaction_type'=>'sale','subtotal'=>100,'tax_amount'=>16,'total_amount'=>116,'discount_amount'=>0,
         'payment_method'=>'cash','pra_status'=>'submitted','pra_invoice_number'=>'SYN-PRA-'.$width]);
     \App\Models\PosTransactionItem::forceCreate(['transaction_id'=>$taxBill->id,'item_type'=>'product','item_name'=>'Synthetic meal',
         'quantity'=>2,'unit_price'=>50,'subtotal'=>100,'taxable_base'=>100,'exempt_base'=>0,'tax_amount'=>16,'tax_rate'=>16]);
-    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id];
+    // Receipt-only acknowledgement is synthetic evidence, never a regulator call.
+    $dualBill=$taxBill->replicate(); $dualBill->invoice_number='SYN-DUAL-'.$width; $dualBill->save();
+    foreach($taxBill->items as $item){$copy=$item->replicate();$copy->transaction_id=$dualBill->id;$copy->save();}
+    \App\Models\PosDiSandboxSubmission::create(['company_id'=>$taxCompany->id,'source_transaction_id'=>$dualBill->id,
+        'created_by'=>$taxOwner->id,'environment'=>'sandbox','state'=>'accepted','snapshot'=>[],
+        'sandbox_invoice_number'=>'SYN-FBR-'.$width,'attempts'=>[]]);
+    $legacyBill=$taxBill->replicate();$legacyBill->invoice_number='SYN-RECOVER-'.$width;
+    $legacyBill->tax_inclusive=false;$legacyBill->tax_rate=16;$legacyBill->save();
+    foreach($taxBill->items as $item){$copy=$item->replicate();$copy->transaction_id=$legacyBill->id;
+        $copy->taxable_base=null;$copy->exempt_base=null;$copy->save();}
+    // Fictional central-portal evidence: no regulator or local IMS request.
+    $portalBill=$taxBill->replicate();$portalBill->invoice_number='SYN-PORTAL-BILL-'.$width;$portalBill->save();
+    foreach($taxBill->items as $item){$copy=$item->replicate();$copy->transaction_id=$portalBill->id;$copy->save();}
+    $portalSnapshot=\App\Services\PosFiscalSnapshot::capture($taxCompany,$portalBill,true);
+    $portalSnapshot['pos_id']=12345;
+    $portalRecord=\App\Models\PosImsSubmission::create(['company_id'=>$taxCompany->id,'source_transaction_id'=>$portalBill->id,
+        'created_by'=>$taxOwner->id,'environment'=>'sandbox','connection_mode'=>'fiscal_device',
+        'state'=>'verification_required','snapshot'=>$portalSnapshot,'attempts'=>[['at'=>now()->toIso8601String(),
+            'state'=>'verification_required','error_codes'=>[],'diagnostic'=>'invalid_json_result']]]);
+    $portalPayload=app(\App\Services\PosImsReportingService::class)->template($portalRecord);
+    foreach($portalPayload['Items'] as &$line){$line['TaxRate']=16;$line['TaxCharged']=16;$line['TotalAmount']=116;}unset($line);
+    $portalPayload['TotalTaxCharged']=16;$portalPayload['TotalBillAmount']=116;
+    $portalRecord->update(['payload'=>$portalPayload]);
+    $taxCases[$width]=['login'=>$taxOwner->email,'bill'=>$taxBill->id,'dualBill'=>$dualBill->id,'legacyBill'=>$legacyBill->id,
+        'portal'=>['id'=>$portalRecord->id,'usin'=>$portalPayload['USIN'],'date'=>substr($portalPayload['DateTime'],0,10),
+            'reference'=>'SYN-PORTAL-'.$width]];
+}
+$staffCases=[];
+foreach ([1366,390] as $staffWidth) {
+    $staffCompany=$company('Synthetic Staff Approval '.$staffWidth,'staff-company-'.$staffWidth.'@rc-browser.invalid','RCSTAFF'.$staffWidth,'pos',[
+        'pos_integration_mode'=>'pra','pra_reporting_enabled'=>false,'pos_setup_completed'=>true,'pos_tax_rate_cash'=>16,'pos_tax_rate_card'=>5]);
+    $staffPlan=\App\Models\PricingPlan::create(['name'=>'Synthetic staff acceptance '.$staffWidth,'product_type'=>'pos','price'=>100,'invoice_limit'=>100]);
+    \App\Models\Subscription::create(['company_id'=>$staffCompany->id,'pricing_plan_id'=>$staffPlan->id,'active'=>true,'start_date'=>now()->subDay()->toDateString(),'end_date'=>now()->addDays(30)->toDateString()]);
+    $staffOwner=$user($staffCompany,'Synthetic Staff Owner','staff-owner-'.$staffWidth.'@rc-browser.invalid','company_admin','pos_admin');
+    $staffCashier=$user($staffCompany,'Synthetic Staff Cashier','staff-cashier-'.$staffWidth.'@rc-browser.invalid','user','pos_cashier');
+    $staffCases[$staffWidth]=['owner'=>$staffOwner->email,'cashier'=>$staffCashier->email,'employee'=>$staffCashier->id];
 }
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
@@ -865,6 +921,7 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,
         ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',
             'paths'=>[], 'b01Account'=>$b01Cases],

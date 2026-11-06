@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Reviewed 5 November: only Agent root release versions advance 1.13.34 -> 1.13.35; dependency graph unchanged.
 /**
  * Offline guard for the five committed npm lockfiles.
  *
@@ -15,6 +16,10 @@ import { fileURLToPath } from 'node:url';
 // Reviewed 31 Oct 2026: follow-redirects 1.16.2 and minimatch upstream 11.0.1
 // close GHSA-mrwp-f3q8-3g9p / GHSA-g3hv-75wg-m249. The hash-pinned
 // facade preserves old callable packaging APIs without an older matching engine.
+// Reviewed 5 Nov 2026: Agent 1.13.34: full JSON comparison changes only two root release version fields.
+// Reviewed 5 Nov 2026: Agent 1.13.33 changes only the two root version fields; full JSON comparison preserves the dependency graph.
+// Reviewed 4 Nov 2026: Agent 1.13.32 changes only the two root version fields; dependency graph preserved.
+// Reviewed 4 Nov 2026: Agent 1.13.31; full JSON comparison shows only two root version fields changed.
 // Reviewed 3 Nov 2026: Agent 1.13.30 adds the separate PRA + IMS bridge.
 // Full JSON comparison confirms only the two root release-version fields changed.
 // Reviewed 2 Nov 2026: Agent 1.13.29 reconciles the customer bulk with 1.13.28.
@@ -79,7 +84,7 @@ const LOCKS = [
     lock: 'pra-agent/package-lock.json',
     packages: 294,
     resolved: 293,
-    graph: 'fa2607f9089f40fb4cf488f88227a0ed23646da68256043c6033bacfbde52c7b',
+    graph: 'd3dff61b60427d18adc75b09fefb4595ca82940e4b503908b919acba101eb2c6',
   },
   {
     lock: 'tools/video-pipeline/package-lock.json',

@@ -5558,6 +5558,7 @@ class PosController extends Controller
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
                     ...($hasAssignmentRevision ? ['rider_assignment_revision'] : []),
+                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_credit_amount') ? ['delivery_credit_amount'] : []),
                        ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'has_delivery_items') ? ['has_delivery_items', 'rider_collection_amount'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid') ? ['rider_partial_paid'] : []),
                        ...($hasBillToken ? ['bill_token'] : []),
@@ -5719,6 +5720,8 @@ class PosController extends Controller
                 'delivery_address' => $b->delivery_address,
                 'total_amount'     => (float) $b->total_amount,
                 'rider_collection_amount' => $b->rider_collection_amount === null ? null : (float) $b->rider_collection_amount,
+                'delivery_credit_amount' => (float) ($b->delivery_credit_amount ?? 0),
+                'rider_settlement_id' => $b->rider_settlement_id,
                 'rider_partial_paid' => (float) ($b->rider_partial_paid ?? 0),
                 'has_delivery_items' => (bool) $b->has_delivery_items,
                 'delivery_items' => $b->has_delivery_items ? $b->items->where('fulfillment', 'delivery')->where('skip_kitchen', false)->map(fn ($i) => ['name' => $i->item_name, 'quantity' => (float) $i->quantity])->values() : [],
@@ -5752,6 +5755,7 @@ class PosController extends Controller
                     && $b->order_type === 'delivery'
                     && $b->rider_id
                     && $b->payment_method === 'cash'
+                    && !(float) $b->delivery_credit_amount
                     && empty($b->rider_settlement_id)
                     && $b->delivery_status !== 'returned'),
                 'can_unmark_prepaid' => (bool) ($canPrepaidRole

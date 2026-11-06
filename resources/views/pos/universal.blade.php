@@ -3103,7 +3103,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <template x-if="bill.rider_collection_amount != null">
                             <div class="text-xs font-semibold text-teal-700 dark:text-teal-300 mb-2">
-                                <p x-text="window.TXT.fulfill_rider_cash + ': Rs. ' + Number(Math.max(0, Number(bill.rider_collection_amount) - Number(bill.rider_partial_paid || 0))).toLocaleString()"></p>
+                                <p x-text="window.TXT.fulfill_rider_cash + ': Rs. ' + Number(Math.max(0, Number(bill.rider_collection_amount) - Number(bill.rider_partial_paid || 0) - Number(bill.delivery_credit_amount || 0))).toLocaleString()"></p>
                                 <p x-text="(bill.delivery_items || []).map(i => i.quantity + ' × ' + i.name).join(' · ')"></p>
                             </div>
                         </template>

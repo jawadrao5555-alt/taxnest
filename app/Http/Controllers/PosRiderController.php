@@ -1878,6 +1878,8 @@ class PosRiderController extends Controller
             ->where('company_id', $companyId)
             ->where('id', $txn->id)
             ->where('payment_method', 'cash')
+            ->when(Schema::hasColumn('pos_transactions', 'delivery_credit_amount'),
+                fn ($query) => $query->where('delivery_credit_amount', 0))
             ->whereRaw(\App\Models\PosRider::remainingExpr('pos_transactions') . ' > 0')
             ->update($upd);
         if ($written === 0) {

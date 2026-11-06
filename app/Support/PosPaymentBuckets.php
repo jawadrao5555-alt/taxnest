@@ -57,7 +57,7 @@ final class PosPaymentBuckets
                 continue; // Sales credit is not money refunded.
             }
             $amount = (float) ($t->{$column} ?? 0);
-            $credit = $column === 'total_amount' ? min($amount, (float) ($t->delivery_credit_amount ?? 0)) : 0;
+            $credit = $column === 'total_amount' ? max(0, min($amount, (float) ($t->delivery_credit_amount ?? 0))) : 0;
             $sums[self::bucket($t->payment_method)] += $amount - $credit;
             $sums['other'] += $credit;
         }

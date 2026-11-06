@@ -138,4 +138,6 @@
     <string name="delivered_queued">انٹرنیٹ نہیں — ڈیلیوری محفوظ کر لی گئی، بھیجی جائے گی</string>
     <string name="delivery_gps_waiting">تازہ اور درست جی پی ایس لوکیشن کا انتظار ہے۔ یہ اسکرین کھلی رکھیں اور دوبارہ کوشش کریں۔</string>
     <string name="delivery_too_far">آپ ابھی محفوظ ڈیلیوری جگہ کے کافی قریب نہیں ہیں۔</string>
+    <string name="delivery_cash_received">Cash received (PKR)</string>
+    <string name="delivery_cash_invalid">Enter the cash received, up to the delivery amount, with at most two decimal places.</string>
 </resources>

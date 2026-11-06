@@ -302,6 +302,6 @@ class PosReturnController extends Controller
         PosReturnService::submitToPraPostCommit($result);
 
         return redirect()->route('pos.transaction.show', $return->id)
-            ->with('success', __('pos.return_processed', ['amount' => number_format((float) $return->total_amount)]));
+            ->with('success', __('pos.return_processed', ['amount' => number_format((float) $return->total_amount - (float) $return->delivery_credit_amount, 2)]));
     }
 }

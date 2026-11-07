@@ -272,9 +272,9 @@ bae94f3e4e745c862e8ecf944ab861e028557562 native job128463373975 explicitly
 passed concurrent trial creation with one frozen term, paid company and documents
 unchanged; that result does not cover this latest transaction/UI update.
 
-Existing-policy upgrades/proration, companion parity and audited financial
-adjustments remain open. Proposed prices and new commercial policies are not
-approved. Finish all three workstreams before one combined approval PR.
+Existing-policy upgrades/proration and companion parity remain open. Proposed
+prices and new commercial policies are not approved. Finish all three
+workstreams before one combined approval PR.
 
 ## Nest ERPS / Healthcare billing-document parity
 
@@ -298,5 +298,42 @@ passed **4 tests / 48 assertions**, covering owner history, both PDFs,
 administrator denial and second-tenant isolation. Hosted PHP8.4/full suite and
 desktop/mobile acceptance remain required after publication. This closes the
 Healthcare browser-document parity slice only; mobile/Agent/API enforcement,
-existing-policy upgrades/proration and audited financial adjustments remain
-open.
+existing-policy upgrades/proration and audited financial adjustments were
+still open at that checkpoint; the next section records the adjustment slice.
+
+## Append-only financial-adjustment evidence
+
+Added explicit, company/invoice-scoped evidence for a reviewed credit note, an
+externally completed refund and an exact reversal. These are immutable
+append-only rows with a unique request identity, persisted reviewer, reason,
+time, amount and safe invoice/receipt snapshot. A refund must identify the
+exact reviewed receipt and an external reference. A reversal retains the
+original row and must exactly offset it; it cannot rewrite or delete history.
+
+The service locks the persisted billing administrator, company, invoice and
+receipt. Active credit evidence cannot exceed the issued invoice and active
+refund evidence cannot exceed the reviewed receipt. Concurrent requests are
+therefore bounded. A same-key retry returns the original row only when every
+material field matches. A separate audit row is written atomically. Foreign
+company invoices/receipts and stale non-billing roles are refused.
+
+This is deliberately evidence only. It does not move bank money, forgive a
+balance, issue an automatic refund, change subscription access, alter a price,
+or update an issued invoice/receipt. The SaaS company account screen exposes
+the retained rows and a clearly labelled administrator form; company product
+logins do not receive the admin route.
+
+Focused feature coverage now exercises partial refund evidence, retained
+credit, exact reversal, idempotent retry, over-allocation refusal, tenant/role
+isolation, immutable rows and unchanged company/subscription/invoice/payment
+records. A mandatory native MariaDB two-worker probe races two 700 PKR refund
+records against one 1,000 PKR receipt, requires exactly one winner, then proves
+idempotent retry, retained reversal/replacement, audit count and byte-for-byte
+preservation of the billing records and a second tenant. Local PHP execution is
+unavailable in this current workspace, so no local PHP/native pass is claimed;
+the exact published HEAD requires hosted PHP8.4, MariaDB, browser and validate
+evidence.
+
+This closes the explicit audited credit/refund/reversal runtime slice without
+approving a new commercial policy. Existing-policy upgrade/proration behavior
+and remaining mobile/Agent/API companion parity stay open.

@@ -1612,6 +1612,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/dashboard/invoices/{product}/{company}/{record}/{action}', [\App\Http\Controllers\SaasAdmin\AdminInvoicePreviewController::class, 'show'])->whereIn('product', ['di', 'pos', 'fbrpos'])->whereNumber(['company', 'record'])->whereIn('action', ['preview', 'download'])->name('saas.admin.invoice.document');
     Route::get('/companies/{company}/billing/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminInvoice'])->whereNumber(['company', 'invoice'])->name('saas.admin.billing.documents.invoice');
     Route::get('/companies/{company}/billing/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'adminReceipt'])->whereNumber(['company', 'payment'])->name('saas.admin.billing.documents.receipt');
+    Route::post('/companies/{company}/billing/adjustments', [\App\Http\Controllers\SaasAdmin\AdminSubscriptionAdjustmentController::class, 'store'])
+        ->whereNumber('company')->name('saas.admin.billing.adjustments.store');
     Route::get('/dashboard/details/{metric}', [\App\Http\Controllers\SaasAdmin\AdminDashboardDetailController::class, 'show'])->name('saas.admin.dashboard.detail');
     Route::get('/live-activity', [\App\Http\Controllers\SaasAdmin\AdminLiveActivityController::class, 'index'])->name('saas.admin.live-activity');
 

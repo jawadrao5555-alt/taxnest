@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Reporting;
 
-use App\Services\Reporting\{DiagnosticSourceCollection, DiagnosticSourceEvidence};
+use App\Services\Reporting\DiagnosticSourceCollection;
+use App\Services\Reporting\DiagnosticSourceEvidence;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\{DB, Schema};
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -16,24 +18,38 @@ class DiagnosticSourceCollectionTest extends TestCase
         Schema::dropAllTables();
         $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-07 12:00:00', 'UTC'));
         config(['app.timezone' => 'UTC', 'reporting_connector.timezone' => 'Asia/Karachi']);
-        Schema::create('companies', function (Blueprint $t) { $t->id(); $t->string('name'); $t->string('product_type'); $t->softDeletes(); });
+        Schema::create('companies', function (Blueprint $t) {
+            $t->id();
+            $t->string('name');
+            $t->string('product_type');
+            $t->softDeletes();
+        });
         DB::table('companies')->insert([
-            ['id'=>1,'name'=>'Synthetic observed PRA','product_type'=>'pos'],
-            ['id'=>2,'name'=>'Other observed PRA','product_type'=>'pos'],
-            ['id'=>3,'name'=>'Legacy observed Healthcare','product_type'=>'health'],
+            ['id' => 1, 'name' => 'Synthetic observed PRA', 'product_type' => 'pos'],
+            ['id' => 2, 'name' => 'Other observed PRA', 'product_type' => 'pos'],
+            ['id' => 3, 'name' => 'Legacy observed Healthcare', 'product_type' => 'health'],
         ]);
         (require base_path('database/migrations/2026_12_10_040000_create_diagnostic_source_observations.php'))->up();
-        Schema::create('pra_logs', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('company_id'); $t->dateTime('created_at'); $t->text('payload'); });
+        Schema::create('pra_logs', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->dateTime('created_at');
+            $t->text('payload');
+        });
     }
 
-    protected function tearDown(): void { $this->travelBack(); parent::tearDown(); }
+    protected function tearDown(): void
+    {
+        $this->travelBack();
+        parent::tearDown();
+    }
 
     public function test_scoped_observations_preserve_late_arrivals_and_same_run_is_idempotent(): void
     {
         DB::table('pra_logs')->insert([
-            ['id'=>1,'company_id'=>1,'created_at'=>'2026-11-05 20:00:00','payload'=>'PRIVATE-TOKEN'],
-            ['id'=>2,'company_id'=>2,'created_at'=>'2026-11-05 21:00:00','payload'=>'FOREIGN-PRIVATE'],
-            ['id'=>3,'company_id'=>1,'created_at'=>'2026-11-05 18:59:59','payload'=>'OUTSIDE-DATE'],
+            ['id' => 1, 'company_id' => 1, 'created_at' => '2026-11-05 20:00:00', 'payload' => 'PRIVATE-TOKEN'],
+            ['id' => 2, 'company_id' => 2, 'created_at' => '2026-11-05 21:00:00', 'payload' => 'FOREIGN-PRIVATE'],
+            ['id' => 3, 'company_id' => 1, 'created_at' => '2026-11-05 18:59:59', 'payload' => 'OUTSIDE-DATE'],
         ]);
         $collector = app(DiagnosticSourceCollection::class);
         $run = (string) Str::uuid();
@@ -42,11 +58,11 @@ class DiagnosticSourceCollectionTest extends TestCase
         $this->assertSame(1, DB::table('diagnostic_source_observations')->count());
         $old = DB::table('diagnostic_source_observations')->sole();
         $this->assertSame(1, (int) $old->retained_rows);
-        DB::table('pra_logs')->insert(['id'=>4,'company_id'=>1,'created_at'=>'2026-11-06 05:00:00','payload'=>'PRIVATE-LATE']);
+        DB::table('pra_logs')->insert(['id' => 4, 'company_id' => 1, 'created_at' => '2026-11-06 05:00:00', 'payload' => 'PRIVATE-LATE']);
         $collector->capture(1, 'pra.fiscal', '2026-11-06', (string) Str::uuid());
         $this->assertSame(2, DB::table('diagnostic_source_observations')->count());
         $this->assertEquals($old, DB::table('diagnostic_source_observations')->find($old->id));
-        $report = app(DiagnosticSourceEvidence::class)->read(['company_name'=>'Synthetic observed PRA', 'source'=>'pra.fiscal','date_from'=>'2026-11-06'], [1]);
+        $report = app(DiagnosticSourceEvidence::class)->read(['company_name' => 'Synthetic observed PRA', 'source' => 'pra.fiscal', 'date_from' => '2026-11-06'], [1]);
         $this->assertSame(2, $report['collection_observation']['retained_rows']);
         $this->assertFalse($report['collection_observation']['complete_collection_proven']);
         $foreign = $collector->latest(2, 'pra.fiscal', '2026-11-06', '2026-11-06');
@@ -70,11 +86,14 @@ class DiagnosticSourceCollectionTest extends TestCase
     {
         $collector = app(DiagnosticSourceCollection::class);
         $collector->capture(1, 'pra.fiscal', '2026-11-06', (string) Str::uuid());
-        DB::table('diagnostic_source_observations')->update(['collected_at'=>'2026-10-30 01:00:00']);
-        DB::table('pra_logs')->insert(['id'=>1,'company_id'=>1,'created_at'=>'2026-10-01 01:00:00','payload'=>'RETAIN-SOURCE']);
+        DB::table('diagnostic_source_observations')->update(['collected_at' => '2026-10-30 01:00:00']);
+        DB::table('pra_logs')->insert(['id' => 1, 'company_id' => 1, 'created_at' => '2026-10-01 01:00:00', 'payload' => 'RETAIN-SOURCE']);
         $this->artisan('diagnostics:observe-sources')->assertSuccessful();
-        $this->assertSame(0, DB::table('diagnostic_source_observations')->where('collected_at','<','2026-10-31 12:00:00')->count());
-        $this->assertSame(10, DB::table('diagnostic_source_observations')->count());
+        $this->assertSame(0, DB::table('diagnostic_source_observations')->where('collected_at', '<', '2026-10-31 12:00:00')->count());
+        // Nine PRA sources per company and five legacy-Healthcare sources.
+        $this->assertSame(23, DB::table('diagnostic_source_observations')->count());
+        $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.offline_samples', 'status' => 'UNAVAILABLE']);
+        $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 3, 'source' => 'health.federal', 'status' => 'UNAVAILABLE']);
         $this->assertSame('RETAIN-SOURCE', DB::table('pra_logs')->sole()->payload);
         $this->expectException(\InvalidArgumentException::class);
         $collector->capture(1, 'pra.fiscal', '2026-10-01', (string) Str::uuid());
@@ -84,8 +103,8 @@ class DiagnosticSourceCollectionTest extends TestCase
     {
         Schema::drop('diagnostic_source_observations');
         Schema::create('diagnostic_source_observations', fn (Blueprint $t) => $t->id());
-        $report = app(DiagnosticSourceEvidence::class)->read(['company_name'=>'Synthetic observed PRA',
-            'source'=>'pra.fiscal','date_from'=>'2026-11-06'], [1]);
+        $report = app(DiagnosticSourceEvidence::class)->read(['company_name' => 'Synthetic observed PRA',
+            'source' => 'pra.fiscal', 'date_from' => '2026-11-06'], [1]);
         $this->assertSame('COLLECTION_READ_FAILED', $report['collection_observation']['status']);
         $this->assertSame('NO_RETAINED_EVENTS', $report['status']);
         $this->assertFalse($report['coverage']['seven_day_complete']);
@@ -95,12 +114,15 @@ class DiagnosticSourceCollectionTest extends TestCase
     public function test_operational_adapter_collection_is_scoped_and_preserves_print_rows(): void
     {
         Schema::create('pos_print_jobs', function (Blueprint $t) {
-            $t->id(); $t->unsignedBigInteger('company_id'); $t->dateTime('created_at');
-            $t->string('result_outcome')->nullable(); $t->text('error')->nullable();
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->dateTime('created_at');
+            $t->string('result_outcome')->nullable();
+            $t->text('error')->nullable();
         });
         DB::table('pos_print_jobs')->insert([
-            ['id'=>10, 'company_id'=>1, 'created_at'=>'2026-11-05 20:00:00', 'result_outcome'=>'failed', 'error'=>'PRIVATE-DEVICE'],
-            ['id'=>11, 'company_id'=>2, 'created_at'=>'2026-11-05 20:00:00', 'result_outcome'=>'printed', 'error'=>'FOREIGN-PRIVATE'],
+            ['id' => 10, 'company_id' => 1, 'created_at' => '2026-11-05 20:00:00', 'result_outcome' => 'failed', 'error' => 'PRIVATE-DEVICE'],
+            ['id' => 11, 'company_id' => 2, 'created_at' => '2026-11-05 20:00:00', 'result_outcome' => 'printed', 'error' => 'FOREIGN-PRIVATE'],
         ]);
         $before = DB::table('pos_print_jobs')->orderBy('id')->get()->toJson();
         $collector = app(DiagnosticSourceCollection::class);

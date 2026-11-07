@@ -4,7 +4,8 @@ namespace Tests\Feature\Reporting;
 
 use App\Services\Reporting\DiagnosticBillEvidence;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\{DB, Schema};
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -14,7 +15,11 @@ class DiagnosticBillEvidenceTest extends TestCase
     {
         parent::setUp();
         Schema::dropAllTables();
-        Schema::create('companies', function (Blueprint $t) { $t->id(); $t->string('name'); $t->string('product_type'); });
+        Schema::create('companies', function (Blueprint $t) {
+            $t->id();
+            $t->string('name');
+            $t->string('product_type');
+        });
         DB::table('companies')->insert([
             ['id' => 1, 'name' => 'Synthetic PRA', 'product_type' => 'pos'],
             ['id' => 2, 'name' => 'Synthetic DI', 'product_type' => 'di'],
@@ -26,8 +31,12 @@ class DiagnosticBillEvidenceTest extends TestCase
     private function table(string $name, string $foreign, bool $tenant = true): void
     {
         Schema::create($name, function (Blueprint $t) use ($foreign, $tenant) {
-            $t->id(); if ($tenant) $t->unsignedBigInteger('company_id');
-            $t->unsignedBigInteger($foreign); $t->text('private_payload')->nullable();
+            $t->id();
+            if ($tenant) {
+                $t->unsignedBigInteger('company_id');
+            }
+            $t->unsignedBigInteger($foreign);
+            $t->text('private_payload')->nullable();
         });
     }
 
@@ -38,61 +47,157 @@ class DiagnosticBillEvidenceTest extends TestCase
         $this->table('pos_payments', 'transaction_id', false);
         $this->table('pra_logs', 'transaction_id');
         DB::table('pos_payments')->insert([
-            ['id'=>1, 'transaction_id'=>10, 'private_payload'=>'SECRET-PAYMENT'],
-            ['id'=>2, 'transaction_id'=>10, 'private_payload'=>'SECRET-PAYMENT'],
-            ['id'=>3, 'transaction_id'=>99, 'private_payload'=>'SECRET-FOREIGN'],
+            ['id' => 1, 'transaction_id' => 10, 'private_payload' => 'SECRET-PAYMENT'],
+            ['id' => 2, 'transaction_id' => 10, 'private_payload' => 'SECRET-PAYMENT'],
+            ['id' => 3, 'transaction_id' => 99, 'private_payload' => 'SECRET-FOREIGN'],
         ]);
         DB::table('pra_logs')->insert([
-            ['id'=>1, 'company_id'=>1, 'transaction_id'=>10, 'private_payload'=>'SECRET-FISCAL'],
-            ['id'=>2, 'company_id'=>2, 'transaction_id'=>10, 'private_payload'=>'SECRET-FOREIGN'],
+            ['id' => 1, 'company_id' => 1, 'transaction_id' => 10, 'private_payload' => 'SECRET-FISCAL'],
+            ['id' => 2, 'company_id' => 2, 'transaction_id' => 10, 'private_payload' => 'SECRET-FOREIGN'],
         ]);
         $before = DB::table('pos_payments')->get()->toJson();
-        $args=['company_name'=>'Synthetic PRA','bill_id'=>10,'limit'=>1];
-        $service=app(DiagnosticBillEvidence::class);
-        $r=$service->read($args,[1]);
-        $this->assertSame([['id'=>1]],$r['sources']['payments']['rows']);
+        $args = ['company_name' => 'Synthetic PRA', 'bill_id' => 10, 'limit' => 1];
+        $service = app(DiagnosticBillEvidence::class);
+        $r = $service->read($args, [1]);
+        $this->assertSame([['id' => 1]], $r['sources']['payments']['rows']);
         $this->assertTrue($r['sources']['payments']['has_more']);
-        $this->assertSame(1,$r['sources']['payments']['next_after_id']);
-        $this->assertSame([['id'=>1]],$r['sources']['pra_attempts']['rows']);
-        $this->assertSame('UNAVAILABLE',$r['sources']['stock']['status']);
+        $this->assertSame(1, $r['sources']['payments']['next_after_id']);
+        $this->assertSame([['id' => 1]], $r['sources']['pra_attempts']['rows']);
+        $this->assertSame('UNAVAILABLE', $r['sources']['stock']['status']);
         $this->assertFalse($r['complete']);
-        $this->assertSame('not_assessed',$r['fiscal_acceptance']);
-        $this->assertStringNotContainsString('SECRET',json_encode($r));
-        $page=$service->read($args+['after_id'=>1],[1]);
-        $this->assertSame([['id'=>2]],$page['sources']['payments']['rows']);
-        $this->assertSame('NO_RETAINED_LINKS',$page['sources']['pra_attempts']['status']);
-        $this->assertSame($before,DB::table('pos_payments')->get()->toJson());
+        $this->assertSame('not_assessed', $r['fiscal_acceptance']);
+        $this->assertStringNotContainsString('SECRET', json_encode($r));
+        $page = $service->read($args + ['after_id' => 1], [1]);
+        $this->assertSame([['id' => 2]], $page['sources']['payments']['rows']);
+        $this->assertSame('NO_RETAINED_LINKS', $page['sources']['pra_attempts']['status']);
+        $this->assertSame($before, DB::table('pos_payments')->get()->toJson());
         $this->expectException(ValidationException::class);
-        $service->read($args,[2]);
+        $service->read($args, [2]);
     }
 
     public function test_other_products_follow_actual_parent_links_and_reject_wrong_tenant_bills(): void
     {
         foreach ([
-            [2,'Synthetic DI','invoices','fbr_logs','invoice_id',false,'fbr_attempts'],
-            [3,'Synthetic FBR','fbr_pos_transactions','fbr_pos_logs','transaction_id',true,'fbr_attempts'],
-            [4,'Synthetic Health','health_bills','health_payments','health_bill_id',true,'payments'],
+            [2, 'Synthetic DI', 'invoices', 'fbr_logs', 'invoice_id', false, 'fbr_attempts'],
+            [3, 'Synthetic FBR', 'fbr_pos_transactions', 'fbr_pos_logs', 'transaction_id', true, 'fbr_attempts'],
+            [4, 'Synthetic Health', 'health_bills', 'health_payments', 'health_bill_id', true, 'payments'],
         ] as [$id,$name,$root,$child,$foreign,$tenant,$key]) {
-            $this->table($root,'unused'); $this->table($child,$foreign,$tenant);
-            DB::table($root)->insert(['id'=>20,'company_id'=>$id,'unused'=>0]);
-            $row=['id'=>1,$foreign=>20,'private_payload'=>'SECRET']; if($tenant)$row['company_id']=$id;
+            $this->table($root, 'unused');
+            $this->table($child, $foreign, $tenant);
+            DB::table($root)->insert(['id' => 20, 'company_id' => $id, 'unused' => 0]);
+            $row = ['id' => 1, $foreign => 20, 'private_payload' => 'SECRET'];
+            if ($tenant) {
+                $row['company_id'] = $id;
+            }
             DB::table($child)->insert($row);
-            $r=app(DiagnosticBillEvidence::class)->read(['company_name'=>$name,'bill_id'=>20],[$id]);
-            $this->assertSame([['id'=>1]],$r['sources'][$key]['rows']);
-            $this->assertStringNotContainsString('SECRET',json_encode($r));
+            $r = app(DiagnosticBillEvidence::class)->read(['company_name' => $name, 'bill_id' => 20], [$id]);
+            $this->assertSame([['id' => 1]], $r['sources'][$key]['rows']);
+            $this->assertStringNotContainsString('SECRET', json_encode($r));
         }
         $this->expectException(ValidationException::class);
-        app(DiagnosticBillEvidence::class)->read(['company_name'=>'Synthetic DI','bill_id'=>99],[2]);
+        app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic DI', 'bill_id' => 99], [2]);
     }
 
     public function test_arbitrary_filters_and_ambiguous_identity_are_refused(): void
     {
         try {
-            app(DiagnosticBillEvidence::class)->read(['company_name'=>'Synthetic DI','bill_id'=>1,'table'=>'users'],[2]);
+            app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic DI', 'bill_id' => 1, 'table' => 'users'], [2]);
             $this->fail('Arbitrary source accepted.');
-        } catch (ValidationException) { $this->assertTrue(true); }
-        DB::table('companies')->insert(['id'=>5,'name'=>'Synthetic DI','product_type'=>'di']);
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+        DB::table('companies')->insert(['id' => 5, 'name' => 'Synthetic DI', 'product_type' => 'di']);
         $this->expectException(ValidationException::class);
-        app(DiagnosticBillEvidence::class)->read(['company_name'=>'Synthetic DI','bill_id'=>1],null);
+        app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic DI', 'bill_id' => 1], null);
+    }
+
+    public function test_dual_federal_and_order_only_print_links_require_both_parent_and_company(): void
+    {
+        $this->table('pos_transactions', 'unused');
+        DB::table('pos_transactions')->insert(['id' => 10, 'company_id' => 1, 'unused' => 0]);
+        foreach (['pos_ims_submissions', 'pos_di_sandbox_submissions'] as $table) {
+            $this->table($table, 'source_transaction_id');
+            DB::table($table)->insert([
+                ['id' => 1, 'company_id' => 1, 'source_transaction_id' => 10, 'private_payload' => 'PRIVATE'],
+                ['id' => 2, 'company_id' => 2, 'source_transaction_id' => 10, 'private_payload' => 'PRIVATE-FOREIGN'],
+                ['id' => 3, 'company_id' => 1, 'source_transaction_id' => 99, 'private_payload' => 'PRIVATE-OTHER'],
+            ]);
+        }
+        $this->table('restaurant_orders', 'pos_transaction_id');
+        DB::table('restaurant_orders')->insert([
+            ['id' => 100, 'company_id' => 1, 'pos_transaction_id' => 10],
+            ['id' => 101, 'company_id' => 2, 'pos_transaction_id' => 10],
+            ['id' => 102, 'company_id' => 1, 'pos_transaction_id' => 99],
+        ]);
+        Schema::create('pos_print_evidence', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->string('product_type');
+            $t->unsignedBigInteger('order_id');
+            $t->unsignedBigInteger('transaction_id')->nullable();
+        });
+        DB::table('pos_print_evidence')->insert([
+            ['id' => 1, 'company_id' => 1, 'product_type' => 'pos', 'order_id' => 100, 'transaction_id' => null],
+            ['id' => 2, 'company_id' => 1, 'product_type' => 'pos', 'order_id' => 101, 'transaction_id' => null],
+            ['id' => 3, 'company_id' => 1, 'product_type' => 'pos', 'order_id' => 102, 'transaction_id' => null],
+            ['id' => 4, 'company_id' => 2, 'product_type' => 'pos', 'order_id' => 100, 'transaction_id' => null],
+            ['id' => 5, 'company_id' => 1, 'product_type' => 'fbrpos', 'order_id' => 100, 'transaction_id' => null],
+            ['id' => 6, 'company_id' => 1, 'product_type' => 'pos', 'order_id' => 100, 'transaction_id' => 10],
+        ]);
+        $r = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic PRA', 'bill_id' => 10], [1]);
+        foreach (['federal_ims_attempts', 'federal_di_attempts', 'order_only_print_events'] as $key) {
+            $this->assertSame([['id' => 1]], $r['sources'][$key]['rows']);
+        }
+        $this->assertSame([['id' => 6]], $r['sources']['print_events']['rows']);
+        $this->assertStringNotContainsString('PRIVATE', json_encode($r));
+        $this->assertFalse($r['complete']);
+        $this->assertSame('not_assessed', $r['fiscal_acceptance']);
+    }
+
+    public function test_fbr_callbacks_and_health_bill_sources_use_explicit_identities(): void
+    {
+        foreach ([
+            [3, 'Synthetic FBR', 'fbr_pos_transactions', 'fbr_pos_callback_diagnostics', 'transaction_id', 'callbacks'],
+            [4, 'Synthetic Health', 'health_bills', 'health_fbr_submissions', 'health_bill_id', 'fbr_attempts'],
+            [4, 'Synthetic Health', 'health_bills', 'health_charges', 'health_bill_id', 'charges'],
+            [4, 'Synthetic Health', 'health_bills', 'health_bill_lines', 'health_bill_id', 'bill_lines'],
+        ] as [$company,$name,$root,$child,$foreign,$key]) {
+            if (! Schema::hasTable($root)) {
+                $this->table($root, 'unused');
+                DB::table($root)->insert(['id' => 10, 'company_id' => $company, 'unused' => 0]);
+            }
+            $this->table($child, $foreign);
+            DB::table($child)->insert([['id' => 1, 'company_id' => $company, $foreign => 10], ['id' => 2, 'company_id' => 99, $foreign => 10]]);
+            $r = app(DiagnosticBillEvidence::class)->read(['company_name' => $name, 'bill_id' => 10], [$company]);
+            $this->assertSame([['id' => 1]], $r['sources'][$key]['rows']);
+        }
+        $this->table('health_audit_events', 'entity_id');
+        Schema::table('health_audit_events', fn (Blueprint $t) => $t->string('entity_type'));
+        DB::table('health_audit_events')->insert([
+            ['id' => 1, 'company_id' => 4, 'entity_id' => 10, 'entity_type' => 'health_bills'],
+            ['id' => 2, 'company_id' => 4, 'entity_id' => 10, 'entity_type' => 'health_patients'],
+            ['id' => 3, 'company_id' => 99, 'entity_id' => 10, 'entity_type' => 'health_bills'],
+        ]);
+        $r = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic Health', 'bill_id' => 10], [4]);
+        $this->assertSame([['id' => 1]], $r['sources']['bill_audit_events']['rows']);
+    }
+
+    public function test_one_failed_source_does_not_erase_other_bill_links_or_leak_sql(): void
+    {
+        $this->table('pos_transactions', 'unused');
+        $this->table('pra_logs', 'transaction_id');
+        $this->table('pos_ims_submissions', 'source_transaction_id');
+        DB::table('pos_transactions')->insert(['id' => 10, 'company_id' => 1, 'unused' => 0]);
+        DB::table('pra_logs')->insert(['id' => 1, 'company_id' => 1, 'transaction_id' => 10]);
+        DB::connection()->beforeExecuting(function ($sql) {
+            if (str_contains($sql, 'from "pos_ims_submissions"')) {
+                throw new \Illuminate\Database\QueryException('sqlite', $sql, [], new \RuntimeException('PRIVATE-FAILURE'));
+            }
+        });
+        $r = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic PRA', 'bill_id' => 10], [1]);
+        $this->assertSame('SOURCE_QUERY_FAILED', $r['sources']['federal_ims_attempts']['status']);
+        $this->assertSame([['id' => 1]], $r['sources']['pra_attempts']['rows']);
+        $this->assertStringNotContainsString('PRIVATE',json_encode($r));
+        $this->assertStringNotContainsString('select',json_encode($r));
     }
 }

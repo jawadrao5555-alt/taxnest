@@ -1,5 +1,45 @@
 # Whole-SaaS diagnostics bulk — P1
 
+## Expanded retained evidence and explicit bill links (7 November continuation)
+
+Registry v3 adds retained PRA order, IMS/DI submission, print-receipt and
+offline-sample streams; DI sale rows; FBR callback/print receipts; Healthcare
+payment/federal/stock streams. Both read and daily observation use identical
+fixed product filters for shared print storage. Window-wide retained count and
+timestamp extents are separate from paged extents. No source payload, amount,
+patient/customer detail, raw error or token is selected for output. The PRA
+offline source points to the existing scoped Agent collection operation for
+sequence gaps, pending/dropped/reset/capacity and clock-or-upload-delay evidence;
+it does not create a second collector or claim that upload delay is clock skew.
+
+Bill evidence v2 adds explicit PRA IMS/DI attempts, order-only print events
+through same-company order-to-bill identity, FBR callback/print evidence and
+Healthcare charge/line/federal/bill-audit identities. Both parent and child
+company constraints apply. Order-only evidence excludes already bill-linked
+rows. Matching bill numbers/times/amounts are never substituted for IDs. A
+single source QueryException yields SOURCE_QUERY_FAILED without erasing other
+sources or returning SQL/exception content. An empty source stays distinct
+from missing schema and failed reads.
+
+Local PHP8.3.6/SQLite full Reporting: **69 tests /673 assertions passed**,
+including new adapter tenant/product isolation, identical collection/read
+filters, stable window extents across pagination, explicit federated and
+order/print joins, Healthcare parent identity, payload exclusion, failure
+isolation, OAuth scope/revocation and unchanged source rows. Syntax/diff checks
+pass. The required native two-worker observation probe additionally verifies
+IMS attribution and product-filtered print read/collection on the migrated
+schema, with unchanged original bill and no private content returned. New
+native/full supported PHP8.4/browser/validate results are required for the next
+exact published HEAD. Local MariaDB/Chrome equivalence is not claimed.
+
+Still open: per-bill offline event attribution (retained periodic samples have
+no immutable bill identity), remaining clinical/pharmacy deep correlations,
+shared/admin job/release/backup/support adapters, bounded exports/branch
+acceptance and observed seven-day completeness. Field evidence is not
+invented from synthetic tests. This increment does not complete #364 or make
+the combined scope approval-ready. No operational/fiscal replay or business
+records/settings changes were performed.
+
 Base: 363a0d6823eae113336a6cd6069f160fc7a1a441 (merged #362). Priority: P1, owner requested 7 November 2026.
 
 This is an implementation workstream opened as a Draft. Initial content records source reconciliation and acceptance; runtime implementation and acceptance are not complete. No approval-ready or deployed claim follows from documentation CI.

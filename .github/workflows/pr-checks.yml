@@ -278,6 +278,7 @@ jobs:
           RC_BROWSER_STATE_ROOT: /tmp/taxnest-rc-browser-${{ github.run_id }}-${{ github.job }}
         run: |
           bash scripts/rc-browser-fixture.sh setup
+          RC_BROWSER_ONLY=kot-note-visibility bash scripts/rc-browser-fixture.sh run
           RC_BROWSER_ONLY=tax-integrations bash scripts/rc-browser-fixture.sh run
       - name: Verify staff discount owner approval at desktop and 390px
         env:

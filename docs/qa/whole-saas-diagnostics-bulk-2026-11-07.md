@@ -199,3 +199,17 @@ clock-or-upload evidence is reused through get_pra_operations_evidence; its
 presence does not prove seven-day device collection, paper or fiscal success.
 No operational health or full-scope readiness claim is made. Finish all three
 workstreams before one latest-main combined PR and fresh full acceptance.
+
+## Company-linked support source (registry v5)
+
+The durable support-case lifecycle is now a registered source for PRA, DI,
+FBR POS and Healthcare. It is scoped by the case's exact company identity and
+uses the case `updated_at` clock, so a resolve or reopen can appear in the
+retained window without exposing the subject, evidence note, mailbox content,
+actor details or resolution build. Reads and the bounded collector apply the
+same company/product/window rules and return IDs/timestamps only. Missing
+support schema remains explicitly unavailable on a partially deployed host;
+an empty source is not called healthy. Local registry coverage verifies all
+four product aliases, foreign-company exclusion, payload redaction, unchanged
+case rows and derived-observation parity. This closes only the support adapter
+slice; release/job/backup adapters and complete field evidence remain open.

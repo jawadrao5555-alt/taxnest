@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 4;
+    public const REGISTRY_VERSION = 5;
 
     public const SOURCES = [
         'pra.fiscal' => ['pos', 'pra_logs', 'created_at'],
@@ -36,15 +36,19 @@ final class DiagnosticSourceEvidence
         'pos.platform_audit' => ['pos', 'audit_logs', 'created_at'],
         'pos.notifications' => ['pos', 'notifications', 'created_at'],
         'pos.branches' => ['pos', 'branches', 'created_at'],
+        'pos.support_cases' => ['pos', 'support_cases', 'updated_at'],
         'di.platform_audit' => ['di', 'audit_logs', 'created_at'],
         'di.notifications' => ['di', 'notifications', 'created_at'],
         'di.branches' => ['di', 'branches', 'created_at'],
+        'di.support_cases' => ['di', 'support_cases', 'updated_at'],
         'fbrpos.platform_audit' => ['fbrpos', 'audit_logs', 'created_at'],
         'fbrpos.notifications' => ['fbrpos', 'notifications', 'created_at'],
         'fbrpos.branches' => ['fbrpos', 'branches', 'created_at'],
+        'fbrpos.support_cases' => ['fbrpos', 'support_cases', 'updated_at'],
         'health.platform_audit' => ['erps', 'audit_logs', 'created_at'],
         'health.notifications' => ['erps', 'notifications', 'created_at'],
         'health.branches' => ['erps', 'branches', 'created_at'],
+        'health.support_cases' => ['erps', 'support_cases', 'updated_at'],
         'di.import_batches' => ['di', 'invoice_import_batches', 'created_at'],
         'di.audit_exports' => ['di', 'audit_packs', 'created_at'],
         'health.prescriptions' => ['erps', 'health_prescriptions', 'created_at'],

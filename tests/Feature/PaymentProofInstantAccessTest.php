@@ -496,6 +496,78 @@ class PaymentProofInstantAccessTest extends TestCase
         $this->assertSame('suspended', $company->company_status);
     }
 
+    public static function renewalProducts(): array
+    {
+        return [['di', 'DI Basic'], ['pos', 'Starter'], ['fbrpos', 'Starter']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('renewalProducts')]
+    public function test_same_package_paid_renewal_preserves_time_and_retry_does_not_extend_twice(string $product, string $planName): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-11-07 10:00:00'));
+        $company = $this->makeLockedCompany(['product_type' => $product]);
+        $plan = \App\Models\PricingPlan::create([
+            'name' => $planName, 'product_type' => $product, 'is_trial' => false, 'price' => 1000,
+        ]);
+        $old = $this->activeSub($company);
+        $old->update([
+            'pricing_plan_id' => $plan->id, 'trial_ends_at' => null,
+            'final_price' => 1000, 'end_date' => '2027-02-28', 'override_type' => 'none',
+        ]);
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual']);
+        $input = ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'verified_received_amount' => 1000];
+        $this->actingAs($this->admin(), 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)
+            ->assertRedirect()->assertSessionHas('success');
+        $renewed = $this->activeSub($company);
+        $this->assertSame('2028-02-28', $renewed->end_date->toDateString());
+        $this->assertSame('2026-11-07', $renewed->start_date->toDateString());
+        $this->assertSame('2027-02-28', $old->fresh()->end_date->toDateString());
+        $this->assertFalse((bool) $old->fresh()->active);
+        $count = Subscription::where('company_id', $company->id)->count();
+        $this->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)->assertRedirect();
+        $this->assertSame($count, Subscription::where('company_id', $company->id)->count());
+        $this->assertSame($renewed->id, $this->activeSub($company)->id);
+        $this->travelBack();
+    }
+
+    public function test_trial_time_is_not_carried_into_a_paid_renewal(): void
+    {
+        $company = $this->makeLockedCompany();
+        $plan = \App\Models\PricingPlan::create([
+            'name' => 'DI Basic', 'product_type' => 'di', 'is_trial' => false, 'price' => 1000,
+        ]);
+        $this->activeSub($company)->update([
+            'pricing_plan_id' => $plan->id, 'end_date' => now()->addMonths(2),
+            'trial_ends_at' => now()->addDays(3), 'final_price' => 1000,
+        ]);
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual']);
+        $this->actingAs($this->admin(), 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'verified_received_amount' => 1000,
+        ])->assertRedirect();
+        $this->assertSame(now()->addMonths(12)->toDateString(), $this->activeSub($company)->end_date->toDateString());
+    }
+
+    public function test_ambiguous_active_terms_block_renewal_without_touching_payment_or_another_company(): void
+    {
+        $company = $this->makeLockedCompany();
+        $other = $this->makeLockedCompany();
+        $foreign = $this->activeSub($other)->getAttributes();
+        $plan = \App\Models\PricingPlan::create([
+            'name' => 'DI Basic', 'product_type' => 'di', 'is_trial' => false, 'price' => 1000,
+        ]);
+        $current = $this->activeSub($company);
+        $current->replicate()->save();
+        $before = Subscription::where('company_id', $company->id)->orderBy('id')->get()->toArray();
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual']);
+        $this->actingAs($this->admin(), 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), [
+            'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'verified_received_amount' => 1000,
+        ])->assertSessionHasErrors('pricing_plan_id');
+        $this->assertSame($before, Subscription::where('company_id', $company->id)->orderBy('id')->get()->toArray());
+        $this->assertSame('pending', $proof->fresh()->status);
+        $this->assertNull($proof->fresh()->subscription_id);
+        $this->assertSame($foreign, $this->activeSub($other)->getAttributes());
+    }
+
     // --- approve(): enforced-cycle & product-line guards (Aug 2026) ---
 
     private function makeAdmin(): AdminUser

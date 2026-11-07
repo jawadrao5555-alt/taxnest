@@ -196,7 +196,8 @@ class AdminPaymentProofController extends Controller
             $sub = SubscriptionAssignmentService::assign(
                 $locked->company_id,
                 $plan->id,
-                $enforcedCycle
+                $enforcedCycle,
+                paidRenewal: true
             );
 
             $proofAttrs = [
@@ -266,6 +267,8 @@ class AdminPaymentProofController extends Controller
         AdminAuditLog::log(auth('admin')->id(), 'Payment proof approved', 'PaymentProof', $proof->id, array_filter([
             'company_id' => $proof->company_id,
             'subscription_id' => $subscription->id,
+            'period_start' => $subscription->start_date->toDateString(),
+            'period_end' => $subscription->end_date->toDateString(),
             'expected_total' => $review['applies'] ? $review['expected_total'] : null,
             'amount_claimed' => $review['applies'] ? $review['paid'] : null,
             'verified_received_amount' => $result['verified_received_amount'],

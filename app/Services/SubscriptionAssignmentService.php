@@ -127,7 +127,7 @@ class SubscriptionAssignmentService
     /**
      * @param  string  $billingCycle  monthly | quarterly | semi_annual | annual (legacy 'yearly' ok)
      */
-    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly', bool $reuseCurrentPlan = false): Subscription
+    public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly', bool $reuseCurrentPlan = false, bool $paidRenewal = false): Subscription
     {
         $plan = PricingPlan::findOrFail($pricingPlanId);
         if (PlanSellabilityService::isRetired($plan)) {
@@ -136,7 +136,7 @@ class SubscriptionAssignmentService
             ]);
         }
 
-        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $plan, $reuseCurrentPlan) {
+        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $plan, $reuseCurrentPlan, $paidRenewal) {
             // This is the subscription-replacement mutex. Add-on approval takes
             // the same company lock, so it can never attach a paid feature to a
             // package renewal that is being replaced at the same moment.
@@ -167,10 +167,26 @@ class SubscriptionAssignmentService
             $cycle = $priced['cycle'];
             $months = Subscription::getMonthsForCycle($cycle);
 
-            Subscription::where('company_id', $companyId)
+            $active = Subscription::where('company_id', $companyId)
                 ->where('active', true)
                 ->lockForUpdate()
                 ->get();
+            if ($paidRenewal && $active->count() > 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'pricing_plan_id' => 'Multiple active subscriptions need review before renewing this company.',
+                ]);
+            }
+
+            $endDate = now()->addMonths($months);
+            $previous = $active->first();
+            if ($paidRenewal && $previous
+                && (int) $previous->pricing_plan_id === $pricingPlanId
+                && !$previous->trial_ends_at
+                && !$previous->hasActiveOverride()
+                && (float) $previous->final_price > 0
+                && $previous->end_date?->greaterThan(now()->startOfDay())) {
+                $endDate = $previous->end_date->copy()->addMonthsNoOverflow($months);
+            }
             Subscription::where('company_id', $companyId)
                 ->where('active', true)
                 ->update(['active' => false]);
@@ -179,7 +195,7 @@ class SubscriptionAssignmentService
                 'company_id' => $companyId,
                 'pricing_plan_id' => $pricingPlanId,
                 'start_date' => now()->toDateString(),
-                'end_date' => now()->addMonths($months)->toDateString(),
+                'end_date' => $endDate->toDateString(),
                 'active' => true,
                 'billing_cycle' => $cycle,
                 'discount_percent' => $priced['discount_percent'],

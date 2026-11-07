@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Exceptions\DeploymentGitHubUnavailable;
 use App\Models\OwnerDeploymentApprovalRequest;
 use App\Services\EligibleDeploymentPullRequestService;
+use App\Services\DeploymentReleaseHistory;
 use App\Services\GitHubActionsOidcVerifier;
 use App\Services\OwnerDeploymentApprovalService;
 use App\Support\OwnerApprovalPickupStatus;
@@ -16,11 +17,21 @@ use Illuminate\Support\Facades\Hash;
 
 class OwnerDeploymentApprovalController extends Controller
 {
-    public function index(EligibleDeploymentPullRequestService $github)
+    public function index(Request $request, EligibleDeploymentPullRequestService $github, DeploymentReleaseHistory $history)
     {
         $this->authorizeOwner();
 
-        $eligiblePullRequests = $github->eligible();
+        $showHistory = $request->boolean('history');
+        $releases = null;
+        $historyWarning = null;
+        if ($showHistory) {
+            try {
+                $releases = $history->recent();
+            } catch (DeploymentGitHubUnavailable $exception) {
+                $historyWarning = $exception->getMessage();
+            }
+        }
+        $eligiblePullRequests = $showHistory ? [] : $github->eligible();
 
         $requests = OwnerDeploymentApprovalRequest::query()
             ->with(['requestedBy:id,name', 'approvedBy:id,name'])
@@ -31,6 +42,9 @@ class OwnerDeploymentApprovalController extends Controller
 
         return view('saas-admin.deployment-approval.index', [
             'requests' => $requests,
+            'showHistory' => $showHistory,
+            'releases' => $releases,
+            'historyWarning' => $historyWarning,
             'eligiblePullRequests' => $eligiblePullRequests,
             'eligibilityWarning' => $github->availabilityWarning(),
             'immediateDispatch' => OwnerApprovalImmediateDispatch::status(),
@@ -51,22 +65,29 @@ class OwnerDeploymentApprovalController extends Controller
         $input = $request->validate([
             'pull_request_number' => ['required', 'integer', 'min:1'],
             'password' => ['required', 'string'],
+            'merge_sha' => ['nullable', 'regex:/^[a-f0-9]{40}$/i'],
         ]);
 
         if (!Hash::check((string) $request->input('password'), auth('admin')->user()->password)) {
-            return back()->withErrors(['password' => 'Current admin password is incorrect.'])->withInput();
+            return back()->withErrors(['password' => 'Current admin password is incorrect.'])->withInput($request->only('pull_request_number', 'merge_sha'));
         }
 
         try {
-            $candidate = $github->resolve((int) $input['pull_request_number']);
-            $approval = $service->create([
-                'pull_request_number' => $candidate['number'],
-                'head_sha' => $candidate['head_sha'],
-            ], auth('admin')->id());
+            if (!empty($input['merge_sha'])) {
+                $approval = $service->requestMergedRelease(
+                    (int) $input['pull_request_number'], $input['merge_sha'], auth('admin')->id()
+                );
+            } else {
+                $candidate = $github->resolve((int) $input['pull_request_number']);
+                $approval = $service->create([
+                    'pull_request_number' => $candidate['number'],
+                    'head_sha' => $candidate['head_sha'],
+                ], auth('admin')->id());
+            }
             $approval = $service->approve($approval, auth('admin')->id());
             $immediateDispatch->dispatch($approval);
         } catch (\InvalidArgumentException $exception) {
-            return back()->withErrors(['pull_request_number' => $exception->getMessage()])->withInput();
+            return back()->withErrors(['pull_request_number' => $exception->getMessage()])->withInput($request->only('pull_request_number', 'merge_sha'));
         }
 
         return back()->with('success', "PR #{$approval->pull_request_number} approved. One approval is enough. GitHub's scheduled Approval Relay will pick this up — do not approve again. If pickup is delayed, use GitHub Actions → Approval Relay Dispatch → Run workflow. Immediate auto-dispatch would need a GitHub App installation token, which this app does not store.");

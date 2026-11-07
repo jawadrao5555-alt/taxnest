@@ -179,6 +179,65 @@ class SmartDeploymentApprovalTest extends TestCase
         $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
     }
 
+    public function test_release_history_shows_direct_merge_and_requires_password_to_approve_its_exact_commit(): void
+    {
+        Mail::fake();
+        $merge = str_repeat('b', 40);
+        $pr = array_replace($this->eligiblePr(), [
+            'state' => 'closed', 'merged' => true, 'merged_at' => '2026-11-06T14:11:07Z',
+            'merge_commit_sha' => $merge,
+        ]);
+        $base = 'https://api.github.com/repos/jawadrao5555-alt/taxnest/';
+        Http::preventStrayRequests();
+        Http::fake([
+            $base.'pulls?state=closed*' => Http::response([$pr]),
+            $base.'pulls/55' => Http::response($pr),
+            $base.'commits/main' => Http::response(['sha' => $merge]),
+            $base.'commits/'.self::SHA.'/check-runs*' => Http::response([
+                'check_runs' => [['name' => 'validate', 'status' => 'completed', 'conclusion' => 'success']],
+            ]),
+        ]);
+        $owner = AdminUser::query()->create([
+            'name' => 'Owner', 'email' => 'owner@example.test',
+            'password' => 'secret-password', 'role' => 'super_admin',
+        ]);
+
+        $this->actingAs($owner, 'admin')->get('/admin/deployment-approval?history=1')
+            ->assertOk()->assertSee($merge)->assertSee('No deployment record')
+            ->assertSee('Unverified')->assertSee('Approve deployment of this commit');
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
+
+        $form = ['pull_request_number' => 55, 'merge_sha' => $merge];
+        $this->post('/admin/deployment-approval', $form + ['password' => 'wrong-password'])
+            ->assertSessionHasErrors('password');
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
+
+        $this->post('/admin/deployment-approval', array_replace($form, [
+            'merge_sha' => str_repeat('c', 40), 'password' => 'secret-password',
+        ]))->assertSessionHasErrors('pull_request_number');
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 0);
+
+        $this->post('/admin/deployment-approval', $form + ['password' => 'secret-password'])
+            ->assertSessionHas('success');
+        $row = OwnerDeploymentApprovalRequest::query()->sole();
+        $this->assertSame(self::SHA, $row->head_sha);
+        $this->assertSame($merge, $row->merge_sha);
+        $this->assertSame('approved', $row->status);
+        $this->assertSame($owner->id, $row->approved_admin_id);
+
+        $this->post('/admin/deployment-approval', $form + ['password' => 'secret-password'])
+            ->assertSessionHasErrors('pull_request_number');
+        $this->assertDatabaseCount('owner_deployment_approval_requests', 1);
+
+        $row->update([
+            'status' => 'succeeded', 'deploy_result' => 'success',
+            'deployed_sha' => $merge, 'deployment_run_id' => 123,
+        ]);
+        $this->get('/admin/deployment-approval?history=1')->assertOk()
+            ->assertSee('Passed for this commit')->assertSee('actions/runs/123')
+            ->assertDontSee('Approve deployment of this commit');
+    }
+
     private function eligiblePr(): array
     {
         return [

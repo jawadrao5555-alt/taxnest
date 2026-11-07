@@ -26,6 +26,10 @@ if (($argv[1] ?? '') === 'worker') {
     if (! ctype_digit($id) || ! ctype_digit($index) || ! str_starts_with($barrier, dirname($socket).'/trial-signup-')) {
         throw new RuntimeException('Unsafe trial barrier');
     }
+    // Establish an outer repeatable-read snapshot before racing the nested
+    // service. Its active-term read must be current, not that older snapshot.
+    DB::beginTransaction();
+    Subscription::where('company_id', (int) $id)->count();
     file_put_contents($barrier.'.ready-'.$index, 'ready');
     $deadline = microtime(true) + 20;
     while (! is_file($barrier)) {
@@ -33,7 +37,9 @@ if (($argv[1] ?? '') === 'worker') {
             throw new RuntimeException('Trial barrier timeout');
         }usleep(10000);
     }
-    echo 'TRIAL_ID='.TrialSubscriptionService::ensureTrial((int) $id, 'di')->id."\n";
+    $trial = TrialSubscriptionService::ensureTrial((int) $id, 'di');
+    DB::commit();
+    echo 'TRIAL_ID='.$trial->id."\n";
     exit(0);
 }
 $suffix = bin2hex(random_bytes(8));

@@ -35,6 +35,7 @@ class TrialSubscriptionService
             $existing = Subscription::where('company_id', $companyId)
                 ->where('active', true)
                 ->orderByDesc('id')
+                ->lockForUpdate()
                 ->first();
             if ($existing) {
                 return $existing;

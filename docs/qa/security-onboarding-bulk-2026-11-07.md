@@ -169,3 +169,14 @@ next HEAD; no confirmed root-cause or browser success claim is made yet.
 Mobile acceptance checks the visible main setup heading rather than a toolbar
 heading that is hidden at390px; form completion/skip/recovery and real click
 assertions remain. No force click, artificial DOM unhide or gate suppression.
+
+Full-suite iteration at da382f3fae2cf5ffdf31908e4019a2c3cfbf91cb
+reached 5,975 tests but exposed one stale inventory-export fixture. The
+fixture used an unpersisted admin placeholder and no current POS identity, so
+the new persisted-identity revalidation correctly ended its supposed view-as
+session with a302. The production middleware was not relaxed. The isolated
+test now supplies re-readable current super-admin and active same-company POS
+identities for both view-as and manage-as modes. Its export, unchanged session
+grant and zero-write assertions remain. Focused local PHP8.3.6 evidence:
+1 test /13 assertions passed. Fresh hosted PHP8.4/full-suite evidence is still
+required for the updated exact HEAD.

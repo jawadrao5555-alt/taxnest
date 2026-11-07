@@ -35,7 +35,7 @@ Removing the gate or migrating every company to ON would override saved choices.
 - Existing kitchen layout/settings set: **24 tests / 187 assertions PASS** (the combined earlier run had two failures in the then-unfinished new fixtures; those new cases subsequently passed as above).
 - `node --test scripts/tests/customer-bulk-print-flows.test.mjs scripts/tests/b03-table-commit.test.mjs`: **9 tests PASS**.
 - PHP syntax, Blade compilation, Node syntax, Vite asset build and whitespace check pass.
-- Full `php artisan test` was started; unsupported PHP 8.3 fails the unchanged Composer platform contract. Final supported-runtime full-suite proof must come from PR CI.
+- Full `php artisan test` was started; unsupported PHP 8.3 fails the unchanged Composer platform contract. The run was then blocked by automatic approval review because it unexpectedly contacts an external PRA fiscal endpoint, outside the local-only test boundary. It was not resumed or rerun; there is no full-suite PASS. External fiscal calls must be isolated/faked in the verification environment before that lane can be safely accepted. Targeted local tests remain the completed application evidence.
 - `php scripts/pos-i18n-check.php` reports existing hardcoded staff-discount/bulk-rider labels on unchanged main; all referenced locale keys have parity and no missing keys. The new copy is translated in en/rur/ur. No guard was weakened.
 - Browser bootstrap attempted: pinned Playwright download repeatedly returned truncated archives; separately extracted Google Chrome starts its version command but actual headless launch through the repository helper exits SIGSEGV in this sandbox. **No local Chrome UI pass or native MariaDB pass is claimed.**
 

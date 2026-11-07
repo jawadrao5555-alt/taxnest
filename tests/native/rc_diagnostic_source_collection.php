@@ -109,6 +109,26 @@ try {
         throw new RuntimeException('Native IMS/print attribution or source preservation failed');
     }
     echo "PASS: native IMS links and print source read/collection retain exact tenant/product attribution and unchanged bill\n";
+    $notifications = [];
+    foreach ([$company->id, $other->id, null] as $tenant) {
+        $notifications[] = DB::table('notifications')->insertGetId(['company_id' => $tenant,
+            'type' => 'synthetic_diagnostic', 'title' => 'PRIVATE synthetic title', 'message' => 'PRIVATE synthetic message',
+            'read' => false, 'created_at' => $stamp, 'updated_at' => $stamp]);
+    }
+    $notificationBefore = DB::table('notifications')->whereIn('id', $notifications)->orderBy('id')->get()->toJson();
+    $collection->capture($company->id, 'pos.notifications', $day, (string) Str::uuid());
+    $shared = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.notifications', 'date_from' => $day], [$company->id]);
+    $exhausted = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.notifications', 'date_from' => $day, 'after_id' => max($notifications)], [$company->id]);
+    if (array_column($shared['rows'], 'id') !== [(int) $notifications[0]] || $shared['collection_observation']['retained_rows'] !== 1
+        || $exhausted['status'] !== 'PARTIAL' || $exhausted['rows'] !== [] || $exhausted['observed']['retained_rows_in_window'] !== 1
+        || str_contains(json_encode([$shared, $exhausted]), 'PRIVATE')
+        || $notificationBefore !== DB::table('notifications')->whereIn('id', $notifications)->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native shared notification source scope or exhausted cursor proof failed');
+    }
+    echo "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows\n";
+
 } finally {
     foreach ($processes as $p) {
         if ($p->isRunning()) {

@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 3;
+    public const REGISTRY_VERSION = 4;
 
     public const SOURCES = [
         'pra.fiscal' => ['pos', 'pra_logs', 'created_at'],
@@ -33,6 +33,22 @@ final class DiagnosticSourceEvidence
         'health.payments' => ['erps', 'health_payments', 'created_at'],
         'health.federal' => ['erps', 'health_fbr_submissions', 'created_at'],
         'health.stock' => ['erps', 'health_batch_movements', 'created_at'],
+        'pos.platform_audit' => ['pos', 'audit_logs', 'created_at'],
+        'pos.notifications' => ['pos', 'notifications', 'created_at'],
+        'pos.branches' => ['pos', 'branches', 'created_at'],
+        'di.platform_audit' => ['di', 'audit_logs', 'created_at'],
+        'di.notifications' => ['di', 'notifications', 'created_at'],
+        'di.branches' => ['di', 'branches', 'created_at'],
+        'fbrpos.platform_audit' => ['fbrpos', 'audit_logs', 'created_at'],
+        'fbrpos.notifications' => ['fbrpos', 'notifications', 'created_at'],
+        'fbrpos.branches' => ['fbrpos', 'branches', 'created_at'],
+        'health.platform_audit' => ['erps', 'audit_logs', 'created_at'],
+        'health.notifications' => ['erps', 'notifications', 'created_at'],
+        'health.branches' => ['erps', 'branches', 'created_at'],
+        'di.import_batches' => ['di', 'invoice_import_batches', 'created_at'],
+        'di.audit_exports' => ['di', 'audit_packs', 'created_at'],
+        'health.prescriptions' => ['erps', 'health_prescriptions', 'created_at'],
+        'health.pharmacy_sales' => ['erps', 'health_pharmacy_sales', 'created_at'],
     ];
 
     public function read(array $args, ?array $allowed): array
@@ -112,7 +128,7 @@ final class DiagnosticSourceEvidence
                 ->get(['e.id', 'e.'.$stamp.' as event_at']);
             $page = $rows->take($limit);
 
-            return $meta + ['status' => $rows->isEmpty() ? 'NO_RETAINED_EVENTS' : 'PARTIAL',
+            return $meta + ['status' => (int) $extent->retained_rows === 0 ? 'NO_RETAINED_EVENTS' : 'PARTIAL',
                 'observed' => ['retained_rows_in_window' => (int) $extent->retained_rows,
                     'earliest_in_window' => $extent->first_at, 'latest_in_window' => $extent->last_at,
                     'timestamp_column' => $stamp, 'page_rows' => $page->count(), 'earliest_on_page' => $page->min('event_at'), 'latest_on_page' => $page->max('event_at'),

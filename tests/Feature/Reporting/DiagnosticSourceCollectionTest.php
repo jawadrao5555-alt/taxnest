@@ -90,8 +90,8 @@ class DiagnosticSourceCollectionTest extends TestCase
         DB::table('pra_logs')->insert(['id' => 1, 'company_id' => 1, 'created_at' => '2026-10-01 01:00:00', 'payload' => 'RETAIN-SOURCE']);
         $this->artisan('diagnostics:observe-sources')->assertSuccessful();
         $this->assertSame(0, DB::table('diagnostic_source_observations')->where('collected_at', '<', '2026-10-31 12:00:00')->count());
-        // Nine PRA sources per company and five legacy-Healthcare sources.
-        $this->assertSame(23, DB::table('diagnostic_source_observations')->count());
+        // Twelve PRA sources per company and ten legacy-Healthcare sources.
+        $this->assertSame(34, DB::table('diagnostic_source_observations')->count());
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.offline_samples', 'status' => 'UNAVAILABLE']);
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 3, 'source' => 'health.federal', 'status' => 'UNAVAILABLE']);
         $this->assertSame('RETAIN-SOURCE', DB::table('pra_logs')->sole()->payload);

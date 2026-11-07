@@ -40,6 +40,10 @@ class DiagnosticExpandedSourcesTest extends TestCase
             [3, 'Synthetic Health', 'health.federal', 'health_fbr_submissions', 'created_at', null],
             [3, 'Synthetic Health', 'health.stock', 'health_batch_movements', 'created_at', null],
             [1, 'Synthetic DI', 'di.sales', 'invoices', 'created_at', null],
+            [1, 'Synthetic DI', 'di.import_batches', 'invoice_import_batches', 'created_at', null],
+            [1, 'Synthetic DI', 'di.audit_exports', 'audit_packs', 'created_at', null],
+            [3, 'Synthetic Health', 'health.prescriptions', 'health_prescriptions', 'created_at', null],
+            [3, 'Synthetic Health', 'health.pharmacy_sales', 'health_pharmacy_sales', 'created_at', null],
         ] as [$company,$name,$source,$table,$stamp,$product]) {
             Schema::create($table, function (Blueprint $t) use ($stamp, $product) {
                 $t->id();
@@ -72,6 +76,50 @@ class DiagnosticExpandedSourcesTest extends TestCase
                 $this->assertSame('agent_collection', $r['related_operation']['stream']);
             }
         }
+    }
+
+    public function test_shared_streams_read_and_collect_only_exact_company_rows_for_all_products(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-07 12:00:00', 'UTC'));
+        (require base_path('database/migrations/2026_12_10_040000_create_diagnostic_source_observations.php'))->up();
+        foreach (['platform_audit' => 'audit_logs', 'notifications' => 'notifications', 'branches' => 'branches'] as $suffix => $table) {
+            Schema::create($table, function (Blueprint $t) {
+                $t->id(); $t->unsignedBigInteger('company_id')->nullable(); $t->dateTime('created_at'); $t->text('private_payload');
+            });
+            foreach ([1,3,4,5,null] as $id) {
+                DB::table($table)->insert(['company_id' => $id, 'created_at' => '2026-11-06 20:00:00', 'private_payload' => 'PRIVATE-DETAIL']);
+            }
+            $before = DB::table($table)->get()->toJson();
+            foreach ([[1,'di','Synthetic DI'],[3,'health','Synthetic Health'],[4,'fbrpos','Synthetic FBR'],[5,'pos','Synthetic PRA']] as [$id,$prefix,$name]) {
+                $source = $prefix.'.'.$suffix;
+                $this->assertSame('OBSERVED', app(DiagnosticSourceCollection::class)->capture($id,$source,'2026-11-07',(string) \Illuminate\Support\Str::uuid()));
+                $r = app(DiagnosticSourceEvidence::class)->read(['company_name' => $name,'date_from' => '2026-11-07','source' => $source],[$id]);
+                $this->assertSame('PARTIAL',$r['status']);
+                $this->assertSame(1,$r['observed']['retained_rows_in_window']);
+                $this->assertSame(1,$r['collection_observation']['retained_rows']);
+                $this->assertSame((int) DB::table($table)->where('company_id',$id)->value('id'),$r['rows'][0]['id']);
+                $this->assertStringNotContainsString('PRIVATE',json_encode($r));
+                $this->assertFalse($r['coverage']['seven_day_complete']);
+            }
+            $this->assertSame($before,DB::table($table)->get()->toJson());
+        }
+        $this->travelBack();
+    }
+
+    public function test_exhausted_cursor_does_not_claim_the_retained_window_is_empty(): void
+    {
+        Schema::create('pos_ims_submissions', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->dateTime('created_at');
+        });
+        DB::table('pos_ims_submissions')->insert(['id' => 1, 'company_id' => 5, 'created_at' => '2026-11-06 20:00:00']);
+        $r = app(DiagnosticSourceEvidence::class)->read(['company_name' => 'Synthetic PRA', 'date_from' => '2026-11-07',
+            'source' => 'pos.ims', 'after_id' => 999], [5]);
+        $this->assertSame('PARTIAL', $r['status']);
+        $this->assertSame(1, $r['observed']['retained_rows_in_window']);
+        $this->assertSame(0, $r['observed']['page_rows']);
+        $this->assertSame([], $r['rows']);
+        $this->assertFalse($r['pagination']['has_more']);
+        $this->assertFalse($r['coverage']['complete']);
     }
 
     public function test_read_and_collection_apply_identical_print_product_filter(): void

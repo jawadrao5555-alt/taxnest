@@ -161,3 +161,41 @@ all four products, foreign/inconsistent child attribution, cursor boundaries,
 missing sources, exact/ambiguous identity, arbitrary-filter refusal and actual
 authenticated MCP scope/audit/revocation with unchanged source rows. Full
 PHP8.4/native/browser/validate acceptance must verify the next published HEAD.
+
+## Registry v3/v4 continuation and native evidence
+
+Registry v3 introduced retained PRA orders, IMS/DI submissions, print receipts,
+offline samples, DI sales, FBR callbacks/print receipts and Healthcare
+payments/federal/stock. Fixed product filters are identical in read/collection.
+Bill v2 uses explicit same-tenant IMS/DI, order-only print, FBR callback/print
+and Healthcare charge/line/federal/audit associations. Local full Reporting
+69tests673assertions passed. Exactc724d0e1ecfa27db4b55a1d2a2dc1fcf7da3d12b
+native job128472275758 passed two-worker observation uniqueness plus exact IMS
+and print read/collection attribution with original bill unchanged; full PHP8.4
+passed while browser/validate still needed their final result.
+
+Registry v4 adds same-company platform-audit, notification and branch metadata
+for every supported product; DI import batches/generated audit export identities;
+Healthcare prescription and pharmacy sale identities. Only IDs/time extents
+are returned, never message/audit/import/patient/item payloads. Global/null-tenant
+rows and other-company rows remain excluded. All adapters retain explicit
+UNAVAILABLE, empty, failed and partial states and use the same collection
+registry; no arbitrary table/filter input is accepted.
+
+Actual exhausted-cursor regression previously reported NO_RETAINED_EVENTS despite
+rows existing in the selected window. Status now follows the independent window
+count; an empty later page keeps the retained window evidence. Local full
+Reporting **71tests790assertions passed**. Mandatory native probe additionally
+checks real migrated notification rows, foreign/global exclusion, safe exhausted
+cursor, identical collector count and unchanged source bytes. New required exact
+success marker added without weakening the existing concurrency/IMS gates.
+Fresh exact-HEAD full/native/browser/Node/build/validate acceptance is required.
+
+Remaining full scope: explicit per-bill offline attribution (existing periodic
+samples have no bill identity), deeper clinical/pharmacy relation correlation,
+admin job/release/backup/support lifecycle adapters, branch/export interactions
+and truthful field collection completeness. Existing device sequence/capacity/
+clock-or-upload evidence is reused through get_pra_operations_evidence; its
+presence does not prove seven-day device collection, paper or fiscal success.
+No operational health or full-scope readiness claim is made. Finish all three
+workstreams before one latest-main combined PR and fresh full acceptance.

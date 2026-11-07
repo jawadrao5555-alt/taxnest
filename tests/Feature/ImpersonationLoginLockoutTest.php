@@ -49,12 +49,20 @@ class ImpersonationLoginLockoutTest extends TestCase
 
         $panelGuard = \Mockery::mock(StatefulGuard::class);
         $panelGuard->shouldReceive('check')->andReturn($panelLoggedIn);
+        $panel = \Mockery::mock(\App\Models\User::class)->makePartial();
+        $panel->forceFill(['id' => 2, 'company_id' => 7, 'is_active' => true]);
+        $panel->shouldReceive('fresh')->andReturnSelf();
+        $panelGuard->shouldReceive('user')->andReturn($panel);
         $panelGuard->shouldReceive('logout')->andReturnUsing(function () use (&$panelLoggedOut) {
             $panelLoggedOut = true;
         });
 
         $adminGuard = \Mockery::mock(StatefulGuard::class);
         $adminGuard->shouldReceive('check')->andReturn($adminLoggedIn);
+        $admin = \Mockery::mock(\App\Models\AdminUser::class)->makePartial();
+        $admin->forceFill(['id' => 1, 'role' => 'super_admin']);
+        $admin->shouldReceive('fresh')->andReturnSelf();
+        $adminGuard->shouldReceive('user')->andReturn($admin);
 
         Auth::shouldReceive('guard')->andReturnUsing(function ($name) use ($adminGuard, $panelGuard) {
             return $name === 'admin' ? $adminGuard : $panelGuard;

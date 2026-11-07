@@ -879,6 +879,28 @@ foreach ([1366,390] as $staffWidth) {
     $staffCashier=$user($staffCompany,'Synthetic Staff Cashier','staff-cashier-'.$staffWidth.'@rc-browser.invalid','user','pos_cashier');
     $staffCases[$staffWidth]=['owner'=>$staffOwner->email,'cashier'=>$staffCashier->email,'employee'=>$staffCashier->id];
 }
+$securityCases=[];
+foreach ([1366,390] as $securityWidth) {
+    foreach (['incomplete','ready','reset'] as $setupState) {
+        $setupCompany=$company('Synthetic setup '.$setupState.' '.$securityWidth,'setup-'.$setupState.'-'.$securityWidth.'@rc-browser.invalid',
+            'RCSET'.$setupState.$securityWidth,'di',['onboarding_completed'=>false,
+                'fbr_sandbox_token'=>$setupState==='ready'?'FICTIONAL_LOCAL_ONLY_TOKEN':null]);
+        $setupUser=$user($setupCompany,'Synthetic setup owner','setup-owner-'.$setupState.'-'.$securityWidth.'@rc-browser.invalid','company_admin');
+        $securityCases[$securityWidth][$setupState]=$setupUser->email;
+        if ($setupState==='ready') {
+            \App\Models\Branch::create(['company_id'=>$setupCompany->id,'name'=>'Existing fictional branch']);
+            \App\Models\Product::create(['company_id'=>$setupCompany->id,'name'=>'Existing fictional product','hs_code'=>'0000.0000']);
+            \App\Models\Invoice::create(['company_id'=>$setupCompany->id,'buyer_name'=>'Fictional draft buyer']);
+        }
+        if ($setupState==='reset') {
+            $setupToken=bin2hex(random_bytes(32));
+            DB::table('password_reset_otps')->insert(['email'=>$setupUser->email,'otp'=>'123456','token'=>$setupToken,
+                'product_type'=>'di','used'=>false,'expires_at'=>now()->addHours(4),'created_at'=>now(),'updated_at'=>now()]);
+            $securityCases[$securityWidth]['reset']=['email'=>$setupUser->email,'token'=>$setupToken,
+                'newPassword'=>'SyntheticNew!'.bin2hex(random_bytes(12))];
+        }
+    }
+}
 $fixture = [
     'generated_at' => $now->toIso8601String(), 'synthetic' => true,
     'readOnlyJourneys' => array_merge([
@@ -921,6 +943,8 @@ $fixture = [
         ['name' => 'service-work-orders-denied', 'login' => $serviceDenied->email, 'password' => $password, 'loginPath' => '/pos/login', 'paths' => ['/pos/work-orders', '/pos/work-orders/report.csv'], 'denied' => true],
     ], $categoryJourneys, $optionalArchiveJourneys),
     'transactionalJourneys' => [
+        ['name'=>'security-onboarding','login'=>$securityCases[1366]['incomplete'],'password'=>$password,
+            'loginPath'=>'/login','paths'=>[], 'securityOnboarding'=>$securityCases],
         ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,
         ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',

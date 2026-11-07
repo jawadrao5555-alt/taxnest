@@ -18,9 +18,11 @@ patient, clinical, fiscal or subscription row is rewritten by the migration.
 The Healthcare form displays the current recorded/withdrawn state and disclosure
 version in English, Roman Urdu and Urdu. Focused actual-HTTP coverage exercises
 grant, unrelated edit, full withdrawal and later re-grant through the existing
-patient controller. Exact updated-HEAD PHP8.4/full-suite and desktop/mobile
-browser acceptance remain required; no production consent or patient data was
-used.
+patient controller. The required general browser journey now grants and withdraws
+consent through that real receptionist form at desktop1366 and mobile390, while
+retaining the existing cross-branch and cross-tenant refusal assertions. Exact
+updated-HEAD PHP8.4/full-suite and desktop/mobile browser acceptance remain
+required; no production consent or patient data was used.
 
 ## Persisted company-lifecycle authority continuation
 

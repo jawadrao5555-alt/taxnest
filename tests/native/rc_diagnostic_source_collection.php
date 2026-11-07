@@ -129,6 +129,64 @@ try {
     }
     echo "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows\n";
 
+    $health = Company::create(['name' => 'Synthetic health diagnostic '.$suffix, 'ntn' => 'h'.$suffix, 'product_type' => 'erps']);
+    $otherHealth = Company::create(['name' => 'Other health diagnostic '.$suffix, 'ntn' => 'y'.$suffix, 'product_type' => 'erps']);
+    $healthBill = DB::table('health_bills')->insertGetId([
+        'company_id' => $health->id, 'health_patient_id' => 900001, 'bill_no' => 'HB-'.$suffix,
+        'bill_date' => $day, 'created_at' => $stamp, 'updated_at' => $stamp,
+    ]);
+    $healthSources = [
+        'clinical_visits' => ['health_visits', 'visit', [
+            'health_patient_id' => 900001, 'health_doctor_id' => 800001, 'visit_no' => 'HV-'.$suffix, 'visit_date' => $day,
+        ]],
+        'pharmacy_sales' => ['health_pharmacy_sales', 'pharmacy_sale', ['sale_number' => 'HS-'.$suffix]],
+        'admission_charges' => ['health_admission_charges', 'admission_charge', [
+            'health_admission_id' => 700001, 'charge_date' => $day, 'description' => 'PRIVATE admission source',
+        ]],
+        'operations' => ['health_operations', 'operation', [
+            'health_patient_id' => 900001, 'operation_no' => 'HO-'.$suffix, 'title' => 'PRIVATE operation source',
+        ]],
+    ];
+    $healthSourceIds = [];
+    foreach ($healthSources as $key => [$table, $sourceType, $required]) {
+        $healthSourceIds[$key] = DB::table($table)->insertGetId($required + [
+            'company_id' => $health->id, 'created_at' => $stamp, 'updated_at' => $stamp,
+        ]);
+        $foreignId = DB::table($table)->insertGetId($required + [
+            'company_id' => $otherHealth->id, 'created_at' => $stamp, 'updated_at' => $stamp,
+        ]);
+        DB::table('health_charges')->insert([
+            ['company_id' => $health->id, 'health_patient_id' => 900001, 'charge_no' => 'HC-'.substr(hash('sha256', $sourceType.$suffix), 0, 20),
+                'charge_date' => $day, 'description' => 'PRIVATE charge', 'source_type' => $sourceType,
+                'source_id' => $healthSourceIds[$key], 'health_bill_id' => $healthBill, 'created_at' => $stamp, 'updated_at' => $stamp],
+            ['company_id' => $otherHealth->id, 'health_patient_id' => 900002, 'charge_no' => 'HF-'.substr(hash('sha256', $sourceType.$suffix), 0, 20),
+                'charge_date' => $day, 'description' => 'PRIVATE foreign charge', 'source_type' => $sourceType,
+                'source_id' => $foreignId, 'health_bill_id' => $healthBill, 'created_at' => $stamp, 'updated_at' => $stamp],
+        ]);
+    }
+    $healthBefore = collect(array_keys($healthSources))->mapWithKeys(function ($key) use ($healthSources) {
+        $table = $healthSources[$key][0];
+
+        return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
+    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
+    $healthReport = app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read([
+        'company_name' => $health->name, 'bill_id' => $healthBill,
+    ], [$health->id]);
+    foreach ($healthSourceIds as $key => $id) {
+        if ($healthReport['sources'][$key]['rows'] !== [['id' => (int) $id]]) {
+            throw new RuntimeException('Native health source attribution failed for '.$key);
+        }
+    }
+    $healthAfter = collect(array_keys($healthSources))->mapWithKeys(function ($key) use ($healthSources) {
+        $table = $healthSources[$key][0];
+
+        return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
+    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
+    if ($healthReport['version'] !== 3 || str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
+        throw new RuntimeException('Native health source report leaked or changed retained rows');
+    }
+    echo "PASS: native healthcare bill follows exact tenant-scoped clinical and pharmacy source IDs without changing rows\n";
+
 } finally {
     foreach ($processes as $p) {
         if ($p->isRunning()) {

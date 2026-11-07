@@ -213,3 +213,22 @@ an empty source is not called healthy. Local registry coverage verifies all
 four product aliases, foreign-company exclusion, payload redaction, unchanged
 case rows and derived-observation parity. This closes only the support adapter
 slice; release/job/backup adapters and complete field evidence remain open.
+
+## Healthcare bill source-link continuation
+
+Bill evidence version 3 follows the existing immutable
+`health_charges.source_type/source_id` link for visit, pharmacy-sale,
+admission-charge and operation sources. It returns only the linked source IDs
+and requires the bill, charge and source row to belong to the authorized
+company. Duplicate charges for one source collapse to one source ID; rows from
+another company, another bill or another source type are excluded. No patient,
+clinical, medicine, amount, reference or timestamp content is returned, and no
+amount/time/name matching is used.
+
+The new focused regression covers all four source families, duplicate links,
+wrong tenant, wrong bill, wrong type, cursor exhaustion and unchanged source
+rows. Local PHP execution is unavailable in this continuation environment, so
+only static diff review is claimed locally; supported PHP8.4/full-suite and
+native hosted checks must verify the next exact published HEAD. Lab-order,
+pharmacy-stock and print associations remain explicit gaps rather than being
+guessed.

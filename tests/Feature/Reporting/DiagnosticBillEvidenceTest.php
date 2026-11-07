@@ -182,6 +182,61 @@ class DiagnosticBillEvidenceTest extends TestCase
         $this->assertSame([['id' => 1]], $r['sources']['bill_audit_events']['rows']);
     }
 
+    public function test_health_clinical_and_pharmacy_sources_require_explicit_charge_links_and_both_tenants(): void
+    {
+        $this->table('health_bills', 'unused');
+        DB::table('health_bills')->insert(['id' => 10, 'company_id' => 4, 'unused' => 0]);
+        Schema::create('health_charges', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->unsignedBigInteger('health_bill_id');
+            $t->string('source_type');
+            $t->unsignedBigInteger('source_id');
+            $t->text('private_payload')->nullable();
+        });
+        foreach ([
+            ['health_visits', 'visit', 'clinical_visits'],
+            ['health_pharmacy_sales', 'pharmacy_sale', 'pharmacy_sales'],
+            ['health_admission_charges', 'admission_charge', 'admission_charges'],
+            ['health_operations', 'operation', 'operations'],
+        ] as [$table, $sourceType, $key]) {
+            Schema::create($table, function (Blueprint $t) {
+                $t->id();
+                $t->unsignedBigInteger('company_id');
+                $t->text('private_payload')->nullable();
+            });
+            DB::table($table)->insert([
+                ['id' => 100, 'company_id' => 4, 'private_payload' => 'PRIVATE-OWN'],
+                ['id' => 101, 'company_id' => 99, 'private_payload' => 'PRIVATE-FOREIGN'],
+                ['id' => 102, 'company_id' => 4, 'private_payload' => 'PRIVATE-UNLINKED'],
+            ]);
+            DB::table('health_charges')->insert([
+                ['company_id' => 4, 'health_bill_id' => 10, 'source_type' => $sourceType, 'source_id' => 100, 'private_payload' => 'PRIVATE-CHARGE'],
+                ['company_id' => 4, 'health_bill_id' => 10, 'source_type' => $sourceType, 'source_id' => 100, 'private_payload' => 'PRIVATE-DUPLICATE'],
+                ['company_id' => 99, 'health_bill_id' => 10, 'source_type' => $sourceType, 'source_id' => 101, 'private_payload' => 'PRIVATE-FOREIGN'],
+                ['company_id' => 4, 'health_bill_id' => 99, 'source_type' => $sourceType, 'source_id' => 102, 'private_payload' => 'PRIVATE-OTHER-BILL'],
+                ['company_id' => 4, 'health_bill_id' => 10, 'source_type' => 'wrong_'.$sourceType, 'source_id' => 102, 'private_payload' => 'PRIVATE-WRONG-TYPE'],
+            ]);
+            $sourceBefore = DB::table($table)->orderBy('id')->get()->toJson();
+            $chargesBefore = DB::table('health_charges')->orderBy('id')->get()->toJson();
+            $report = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic Health', 'bill_id' => 10], [4]);
+            $this->assertSame([['id' => 100]], $report['sources'][$key]['rows'], $key);
+            $this->assertSame('PARTIAL', $report['sources'][$key]['status']);
+            $this->assertStringNotContainsString('PRIVATE', json_encode($report));
+            $this->assertSame(3, $report['version']);
+            $this->assertSame($sourceBefore, DB::table($table)->orderBy('id')->get()->toJson());
+            $this->assertSame($chargesBefore, DB::table('health_charges')->orderBy('id')->get()->toJson());
+        }
+        $report = app(DiagnosticBillEvidence::class)->read([
+            'company_name' => 'Synthetic Health', 'bill_id' => 10, 'after_id' => 100,
+        ], [4]);
+        foreach (['clinical_visits', 'pharmacy_sales', 'admission_charges', 'operations'] as $key) {
+            $this->assertSame('NO_RETAINED_LINKS', $report['sources'][$key]['status']);
+            $this->assertSame([], $report['sources'][$key]['rows']);
+        }
+        $this->assertSame(20, DB::table('health_charges')->count());
+    }
+
     public function test_one_failed_source_does_not_erase_other_bill_links_or_leak_sql(): void
     {
         $this->table('pos_transactions', 'unused');

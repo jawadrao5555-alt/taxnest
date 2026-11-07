@@ -101,6 +101,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_diagnostic_source_collection.php" | tee "$EVIDENCE_DIR/diagnostic-source-observations.log"
     grep -Fqx "PASS: native IMS links and print source read/collection retain exact tenant/product attribution and unchanged bill" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-ims-print-attribution-missing-success-proof
     grep -Fqx "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-shared-source-attribution-missing-success-proof
+    grep -Fqx "PASS: native healthcare bill follows exact tenant-scoped clinical and pharmacy source IDs without changing rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-health-source-attribution-missing-success-proof
     grep -Fqx "PASS: native concurrent source observation is idempotent, scoped and preserves source rows" "$EVIDENCE_DIR/diagnostic-source-observations.log" || fail diagnostic-source-observations-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
     clean_php php "$ROOT/tests/native/rc_pra_incident_timeline.php"

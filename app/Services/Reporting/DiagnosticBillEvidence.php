@@ -37,7 +37,7 @@ final class DiagnosticBillEvidence
             'pos' => 'pos_transactions', 'di' => 'invoices', 'fbrpos' => 'fbr_pos_transactions', 'erps' => 'health_bills',
             default => null,
         };
-        $base = ['version' => 2, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
+        $base = ['version' => 3, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
             'bill_id' => (int) $v['bill_id'], 'complete' => false, 'physical_print' => 'unknown', 'fiscal_acceptance' => 'not_assessed',
             'notes' => ['Only explicit stored foreign-key/reference links are included. Matching numbers, amounts or timestamps are never treated as associations.',
                 'Each source has its own immutable ID cursor and may have late arrivals. Missing/deleted/uncollected evidence remains unknown.',
@@ -118,12 +118,53 @@ final class DiagnosticBillEvidence
             }
         }
 
+        // Healthcare charges freeze the source type and immutable source ID
+        // that produced a bill line. Follow that explicit link to the original
+        // clinical/pharmacy row, but require both the charge and the source row
+        // to belong to the already-authorized company. Never infer a relation
+        // from patient, amount, reference text or timestamps.
+        if ($product === 'erps') {
+            foreach ([
+                'clinical_visits' => ['health_visits', 'visit'],
+                'pharmacy_sales' => ['health_pharmacy_sales', 'pharmacy_sale'],
+                'admission_charges' => ['health_admission_charges', 'admission_charge'],
+                'operations' => ['health_operations', 'operation'],
+            ] as $key => [$table, $sourceType]) {
+                try {
+                    if (! $this->columns('health_charges', ['id', 'company_id', 'health_bill_id', 'source_type', 'source_id'])
+                        || ! $this->columns($table, ['id', 'company_id'])) {
+                        $sources[$key] = ['status' => 'UNAVAILABLE', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
+
+                        continue;
+                    }
+                    $limit = (int) ($v['limit'] ?? 25);
+                    $ids = DB::table($table.' as source')
+                        ->join('health_charges as charge', function ($join) use ($company, $sourceType) {
+                            $join->on('charge.source_id', '=', 'source.id')
+                                ->where('charge.company_id', '=', $company->id)
+                                ->where('charge.source_type', '=', $sourceType);
+                        })
+                        ->where('source.company_id', $company->id)
+                        ->where('charge.health_bill_id', $v['bill_id'])
+                        ->where('source.id', '>', $v['after_id'] ?? 0)
+                        ->select('source.id')->distinct()->orderBy('source.id')->limit($limit + 1)->pluck('id');
+                    $more = $ids->count() > $limit;
+                    $page = $ids->take($limit);
+                    $sources[$key] = ['status' => $ids->isEmpty() ? 'NO_RETAINED_LINKS' : 'PARTIAL',
+                        'rows' => $page->map(fn ($id) => ['id' => (int) $id])->values()->all(),
+                        'has_more' => $more, 'next_after_id' => $more ? (int) $page->last() : null];
+                } catch (\Illuminate\Database\QueryException) {
+                    $sources[$key] = ['status' => 'SOURCE_QUERY_FAILED', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
+                }
+            }
+        }
+
         return $base + ['status' => 'PARTIAL', 'sources' => $sources,
             'unimplemented_links' => match ($product) {
                 'pos' => ['offline_agent_events'],
                 'di' => ['payments', 'stock', 'print_events'],
                 'fbrpos' => ['payments', 'offline_agent_events'],
-                'erps' => ['clinical_events', 'pharmacy_stock', 'print_events'],
+                'erps' => ['lab_orders', 'pharmacy_stock', 'print_events'],
             }];
     }
 

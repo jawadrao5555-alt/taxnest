@@ -99,6 +99,33 @@ class Subscription extends Model
         return $this->belongsTo(PricingPlan::class);
     }
 
+    /** A read-only plan view for access checks; quotes still use the catalogue. */
+    public function entitlementPlan(): ?PricingPlan
+    {
+        $plan = $this->pricingPlan;
+        $snapshot = $this->purchase_snapshot;
+        if (!is_array($snapshot) || ($snapshot['version'] ?? null) !== 1
+            || (int) ($snapshot['company_id'] ?? 0) !== (int) $this->company_id
+            || (int) ($snapshot['plan']['id'] ?? 0) !== (int) $this->pricing_plan_id
+            || !is_array($snapshot['plan'] ?? null)) {
+            return $plan;
+        }
+
+        // Missing legacy fields retain their existing catalogue meaning. Never
+        // mutate the related catalogue model or overlay price/campaign fields.
+        $view = $plan ? clone $plan : new PricingPlan();
+        $fields = ['id', 'name', 'product_type', 'erps_vertical', 'is_trial', 'features', 'health_modules',
+            'invoice_limit', 'user_limit', 'branch_limit', 'max_terminals', 'max_users', 'max_products',
+            'ai_page_limit', 'fair_use_limit', 'health_department_limit'];
+        foreach ($snapshot['plan'] as $key => $value) {
+            if (in_array($key, $fields, true) || str_ends_with($key, '_enabled')) {
+                $view->setAttribute($key, $value);
+            }
+        }
+
+        return $view;
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

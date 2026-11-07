@@ -27,7 +27,8 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         $company = Company::create(['name' => 'Synthetic snapshot company', 'ntn' => 'RCSNAP1', 'product_type' => $product,
             'email' => 'snapshot@example.test', 'status' => 'approved', 'company_status' => 'active']);
         $plan = PricingPlan::create(['name' => 'Starter', 'product_type' => $product, 'price' => 1000,
-            'is_trial' => false, 'invoice_limit' => 100, 'features' => ['Original feature'], 'reports_enabled' => true]);
+            'is_trial' => false, 'invoice_limit' => 100, 'features' => ['Original feature'], 'reports_enabled' => true,
+            'inventory_enabled' => false]);
         $proof = PaymentProof::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id,
             'billing_cycle' => 'annual', 'amount' => 1000, 'proof_path' => 'synthetic-snapshot', 'status' => 'pending']);
         $input = ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'verified_received_amount' => 1000];
@@ -52,7 +53,20 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         $this->assertSame(['Original feature'], $snapshot['plan']['features']);
         $this->assertSame(100, $snapshot['plan']['invoice_limit']);
         $this->assertTrue($snapshot['plan']['reports_enabled']);
-        $plan->update(['price' => 8000, 'invoice_limit' => 5, 'features' => ['Replacement feature'], 'reports_enabled' => false]);
+        $plan->update(['price' => 8000, 'invoice_limit' => 5, 'features' => ['Replacement feature'], 'reports_enabled' => false,
+            'inventory_enabled' => true]);
+        $effective = $sub->fresh()->entitlementPlan();
+        $this->assertSame(100, $effective->invoice_limit);
+        $this->assertTrue((bool) $effective->reports_enabled);
+        $this->assertFalse((bool) $effective->inventory_enabled);
+        $this->assertSame(['Original feature'], $effective->features);
+        $this->assertEquals(8000, $plan->fresh()->price, 'Catalogue pricing remains independently editable.');
+        $this->assertSame(100, \App\Services\PlanLimitService::getActiveSubscription($company->id)->entitlementPlan()->invoice_limit);
+        $this->assertSame(100, \App\Services\PlanLimitService::getEffectiveLimits($company->id)['invoice']['limit']);
+        if ($product !== 'di') {
+            \App\Services\PosFeatureService::flushGateCaches();
+            $this->assertTrue(\App\Services\PosFeatureService::planAllows($company, 'reports_enabled'));
+        }
         $this->assertSame($snapshot, $sub->fresh()->purchase_snapshot);
         $this->assertSame($document, $invoice->fresh()->document_snapshot);
         $this->assertSame($receipt, $payment->fresh()->receipt_snapshot);
@@ -89,5 +103,26 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         }
         $this->expectException(\LogicException::class);
         $legacy->update(['purchase_snapshot' => $original]);
+    }
+
+    public function test_legacy_and_misattributed_snapshots_retain_catalogue_fallback_without_mutating_it(): void
+    {
+        $plan = PricingPlan::create(['name' => 'Starter', 'product_type' => 'pos', 'price' => 1000,
+            'is_trial' => false, 'invoice_limit' => 25, 'reports_enabled' => false]);
+        foreach ([null, ['version' => 99], ['version' => 1, 'company_id' => 200,
+            'plan' => ['id' => $plan->id, 'invoice_limit' => -1, 'reports_enabled' => true]]] as $snapshot) {
+            $sub = new Subscription(['company_id' => 100, 'pricing_plan_id' => $plan->id, 'purchase_snapshot' => $snapshot]);
+            $sub->setRelation('pricingPlan', $plan);
+            $this->assertSame(25, $sub->entitlementPlan()->invoice_limit);
+            $this->assertFalse((bool) $sub->entitlementPlan()->reports_enabled);
+        }
+        $sub = new Subscription(['company_id' => 100, 'pricing_plan_id' => $plan->id,
+            'purchase_snapshot' => ['version' => 1, 'company_id' => 100,
+                'plan' => ['id' => $plan->id, 'invoice_limit' => 60, 'reports_enabled' => true, 'price' => 1]]]);
+        $sub->setRelation('pricingPlan', $plan);
+        $this->assertSame(60, $sub->entitlementPlan()->invoice_limit);
+        $this->assertFalse($plan->isDirty());
+        $this->assertSame(25, $plan->invoice_limit);
+        $this->assertEquals(1000, $sub->entitlementPlan()->price);
     }
 }

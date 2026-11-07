@@ -151,3 +151,23 @@ checks pass. Native migration/concurrency and full PHP8.4/browser acceptance
 are still required for the next exact published HEAD. Shared purchased-feature
 readers, unpaid/signup activation paths, upgrade/proration and explicit
 credit/refund/reversal transitions remain pending; this PR is not ready.
+
+## Purchased plan readers
+
+The shared DI/PRA/FBR feature and numeric-limit readers now resolve a read-only
+plan view from the version1 purchase snapshot. A catalogue edit no longer
+replaces the recorded limits/features/name for that assignment. The snapshot
+must match both company and assigned plan. Unknown versions, legacy rows and
+misattributed snapshots retain the existing catalogue fallback; omitted legacy
+fields also keep their existing meaning. Price/campaign fields are never
+overlaid, and the related catalogue model is not mutated. Existing trial,
+internal and administrator override rules continue through the same gates.
+
+Local PHP8.3.6/SQLite:164 tests/617 assertions passed across purchased snapshot,
+paid add-on, DI premium, Caller ID, monthly quota, offline gate, quick-create
+and analytics gate suites. A wider run also hit5 workbook-import failures in
+the private runtime, which lacks ZipArchive; those import checks remain hosted
+requirements rather than a claimed local pass. Full PHP8.4/native/browser
+checks must verify the next published HEAD. Remaining add-on/ERP/Agent direct
+catalogue readers still require reconciliation alongside unpaid activation,
+upgrades/proration and audited adjustment transitions.

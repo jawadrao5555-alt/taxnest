@@ -147,7 +147,7 @@ class DiFeatureService
         // their granted plan on the same subscription row — a Business-plan
         // lifetime grant gets Business features, not everything. A bare
         // carrier row (no plan) grants base access only, no premium gates.
-        if (self::planIncludes($subscription->pricingPlan, $feature)) {
+        if (self::planIncludes($subscription->entitlementPlan(), $feature)) {
             return true;
         }
 

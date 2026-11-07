@@ -78,6 +78,14 @@ class AuditPackReadOnlyRetentionTest extends TestCase
     {
         Storage::fake('local');
         $owner = $this->owner();
+        $invoiceId = \Illuminate\Support\Facades\DB::table('invoices')->insertGetId([
+            'company_id' => $owner->company_id, 'invoice_number' => 'RC-EXPORT-RETENTION',
+            'internal_invoice_number' => 'RC-EXPORT-RETENTION', 'invoice_date' => now()->toDateString(),
+            'status' => 'locked', 'fbr_status' => 'sandbox', 'buyer_name' => 'Fictional export buyer',
+            'total_amount' => 0, 'total_sales_tax' => 0, 'total_value_excluding_st' => 0,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $invoiceBefore = (array) \Illuminate\Support\Facades\DB::table('invoices')->find($invoiceId);
         $old = $this->pack($owner);
         $old2 = $this->pack($owner);
         $fresh = $this->pack($owner, 1);
@@ -95,6 +103,7 @@ class AuditPackReadOnlyRetentionTest extends TestCase
         $this->assertDatabaseCount('audit_packs', 4);
         $this->assertSame('ready', $fresh->fresh()->status);
         $this->assertSame('processing', $active->fresh()->status);
+        $this->assertSame($invoiceBefore, (array) \Illuminate\Support\Facades\DB::table('invoices')->find($invoiceId));
     }
 
     public function test_explicit_delete_refuses_a_foreign_export_path(): void

@@ -907,7 +907,7 @@ foreach ([1366,390] as $securityWidth) {
                 'file_path'=>'audit-packs/company_'.$setupCompany->id.'/fbr-audit-pack-'.$expiredExport->id.'.zip','file_size'=>18])->save();
             \Illuminate\Support\Facades\Storage::disk('local')->put($expiredExport->file_path,'SYNTHETIC ZIP DATA');
             $securityCases[$securityWidth]['reset']['expiredPackId']=$expiredExport->id;
-            DB::table('invoices')->insert(['company_id'=>$setupCompany->id,'user_id'=>$setupUser->id,
+            DB::table('invoices')->insert(['company_id'=>$setupCompany->id,
                 'invoice_number'=>'RC-EXPORT-'.$securityWidth,'internal_invoice_number'=>'RC-EXPORT-'.$securityWidth,
                 'invoice_date'=>now()->toDateString(),'status'=>'locked','fbr_status'=>'sandbox',
                 'buyer_name'=>'Fictional export buyer','total_amount'=>0,'total_sales_tax'=>0,'total_value_excluding_st'=>0,

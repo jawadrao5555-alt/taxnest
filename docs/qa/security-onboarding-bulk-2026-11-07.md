@@ -1,5 +1,16 @@
 # Security and onboarding bulk — P1
 
+## Export fixture correction after native acceptance
+
+Exact65b15fb6fba3c26b8f192a4adc627e38d3c4e4c3 native job128478806265
+passed concurrent export expiry/history/invoice and foreign-path preservation.
+Browser fixture seed failed before UI execution because invoices has no user_id
+column. Removed that synthetic insert field, preserving actual migration/schema
+and all browser assertions. The retention regression now inserts that same
+fictional locked invoice shape against real migrations and proves its complete
+row remains unchanged. Fresh exact-HEAD hosted browser/full-suite/validate still
+required; the earlier fixture failure is not a product or UI acceptance pass.
+
 ## Billing authority and read-only export retention continuation
 
 Actual HTTP regressions reproduced support/viewer/unmapped roles mutating billing,

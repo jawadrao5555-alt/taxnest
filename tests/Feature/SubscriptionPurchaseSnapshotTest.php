@@ -28,7 +28,7 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
             'email' => 'snapshot@example.test', 'status' => 'approved', 'company_status' => 'active']);
         $plan = PricingPlan::create(['name' => 'Starter', 'product_type' => $product, 'price' => 1000,
             'is_trial' => false, 'invoice_limit' => 100, 'features' => ['Original feature'], 'reports_enabled' => true,
-            'inventory_enabled' => false]);
+            'inventory_enabled' => false, 'ai_page_limit' => 200]);
         $proof = PaymentProof::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id,
             'billing_cycle' => 'annual', 'amount' => 1000, 'proof_path' => 'synthetic-snapshot', 'status' => 'pending']);
         $input = ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual', 'verified_received_amount' => 1000];
@@ -54,7 +54,7 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         $this->assertSame(100, $snapshot['plan']['invoice_limit']);
         $this->assertTrue($snapshot['plan']['reports_enabled']);
         $plan->update(['price' => 8000, 'invoice_limit' => 5, 'features' => ['Replacement feature'], 'reports_enabled' => false,
-            'inventory_enabled' => true]);
+            'inventory_enabled' => true, 'ai_page_limit' => 10]);
         $effective = $sub->fresh()->entitlementPlan();
         $this->assertSame(100, $effective->invoice_limit);
         $this->assertTrue((bool) $effective->reports_enabled);
@@ -63,6 +63,9 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         $this->assertEquals(8000, $plan->fresh()->price, 'Catalogue pricing remains independently editable.');
         $this->assertSame(100, \App\Services\PlanLimitService::getActiveSubscription($company->id)->entitlementPlan()->invoice_limit);
         $this->assertSame(100, \App\Services\PlanLimitService::getEffectiveLimits($company->id)['invoice']['limit']);
+        if ($product === 'di') {
+            $this->assertSame(200, \App\Services\AiInvoiceReaderService::monthlyQuota($company));
+        }
         if ($product !== 'di') {
             \App\Services\PosFeatureService::flushGateCaches();
             $this->assertTrue(\App\Services\PosFeatureService::planAllows($company, 'reports_enabled'));
@@ -124,5 +127,18 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         $this->assertFalse($plan->isDirty());
         $this->assertSame(25, $plan->invoice_limit);
         $this->assertEquals(1000, $sub->entitlementPlan()->price);
+    }
+
+    public function test_healthcare_purchased_modules_and_department_limit_survive_catalogue_edits(): void
+    {
+        $company = Company::create(['name'=>'Synthetic purchased clinic','ntn'=>'SNAPCLINIC','product_type'=>'erps','erps_vertical'=>'health']);
+        $plan = PricingPlan::create(['name'=>'Synthetic clinic package','product_type'=>'erps','erps_vertical'=>'health',
+            'price'=>1000,'is_trial'=>false,'invoice_limit'=>100,'health_modules'=>['opd'],'health_department_limit'=>2]);
+        \App\Services\SubscriptionAssignmentService::assign($company->id,$plan->id,'annual');
+        $plan->update(['health_modules'=>['pharmacy'],'health_department_limit'=>0]);
+        \App\Services\HealthModuleService::forget($company->id);
+        $this->assertSame(['opd'],\App\Services\HealthModuleService::planModules($company));
+        $this->assertSame(2,\App\Services\HealthPlatformService::departmentLimit($company));
+        $this->assertSame(['pharmacy'],$plan->fresh()->health_modules);
     }
 }

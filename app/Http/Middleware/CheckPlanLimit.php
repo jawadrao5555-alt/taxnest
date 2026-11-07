@@ -64,11 +64,11 @@ class CheckPlanLimit
             ->with('pricingPlan')
             ->first();
 
-        if (!$subscription || !$subscription->pricingPlan) {
+        if (!$subscription || !$subscription->entitlementPlan()) {
             return $next($request);
         }
 
-        $plan = $subscription->pricingPlan;
+        $plan = $subscription->entitlementPlan();
         $exceeded = false;
         $limitName = '';
         $customReason = null;

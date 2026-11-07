@@ -198,3 +198,21 @@ compilation pass locally. Current environment has no Chrome or MariaDB binary;
 actual browser/native/full-suite evidence remains required on hosted CI.
 Signup, package upgrades/proration, remaining direct entitlement readers and
 audited credit/refund/reversal transitions still need completion.
+
+## Remaining central purchased-access consumers
+
+Connected existing add-on/branch-slot gates, DI AI allowance, Healthcare module
+and department gates, terminal/inventory controller checks, middleware and
+billing usage displays to the same purchased plan view. Add-on expiry and
+subscription binding, internal/granted/trial compatibility and company numeric
+overrides stay in the existing paths. Sale/renewal quotes continue to use the
+catalogue and existing pricing services. Healthcare tests prove purchased OPD
+modules/department limits survive a later catalogue edit without modifying the
+catalogue. DI tests additionally prove a purchased page allowance is retained.
+
+Local PHP8.3.6/SQLite:181 tests/791 assertions passed across snapshot, paid
+add-ons/branch slots, branch renewal, AI credits/reader, Healthcare foundation
+and subscription lock plus DI API access. Follow-up access-service regression
+passed59 tests/341 assertions. All required hosted full-suite/native/browser/Agent gates remain required on
+the next published HEAD. This does not complete signup/upgrade/proration or
+audited financial-adjustment acceptance.

@@ -75,7 +75,7 @@ class BillingController extends Controller
                 // Quota is per calendar month and only FBR-submitted invoices
                 // count — the page must show the same number the gate enforces.
                 $invoiceCount = \App\Services\PlanLimitService::monthlyInvoiceCount($companyId);
-                $limit = $currentSubscription->pricingPlan->invoice_limit;
+                $limit = $currentSubscription->entitlementPlan()->invoice_limit;
 
                 // An admin override replaces the package limit, so showing the
                 // package number here would be a lie on the one screen a shop
@@ -91,8 +91,8 @@ class BillingController extends Controller
 
                 $userCount = User::where('company_id', $companyId)->where('is_active', true)->count();
                 $branchCount = Branch::where('company_id', $companyId)->count();
-                $userLimit = $currentSubscription->pricingPlan->user_limit;
-                $branchLimit = $currentSubscription->pricingPlan->branch_limit;
+                $userLimit = $currentSubscription->entitlementPlan()->user_limit;
+                $branchLimit = $currentSubscription->entitlementPlan()->branch_limit;
 
                 $trialInfo = null;
                 if ($currentSubscription->trial_ends_at) {

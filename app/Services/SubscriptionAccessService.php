@@ -153,7 +153,7 @@ class SubscriptionAccessService
         // Trial plan row owns the bill number; -1 / 0 = no cap, only the day
         // limit (PRA POS runs uncapped since Aug 2026 — owner's call: a shop
         // that cannot bill freely never converts). DI / FBR POS keep theirs.
-        $plan = $subscription->pricingPlan ?? $subscription->loadMissing('pricingPlan')->pricingPlan;
+        $plan = $subscription->entitlementPlan();
         if ($plan && $plan->is_trial) {
             $limit = (int) ($plan->invoice_limit ?? 0);
             if ($limit > 0) {
@@ -190,7 +190,7 @@ class SubscriptionAccessService
             return null;
         }
 
-        $plan = $subscription->pricingPlan ?? $subscription->loadMissing('pricingPlan')->pricingPlan;
+        $plan = $subscription->entitlementPlan();
         if (!$plan || !$plan->is_trial) {
             return null;
         }
@@ -251,8 +251,8 @@ class SubscriptionAccessService
         if (!$subscription
             || $subscription->override_type !== 'none'
             || !$subscription->end_date
-            || !$subscription->pricingPlan
-            || $subscription->pricingPlan->is_trial) {
+            || !$subscription->entitlementPlan()
+            || $subscription->entitlementPlan()->is_trial) {
             return null;
         }
 

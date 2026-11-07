@@ -53,7 +53,7 @@
                             <svg class="w-8 h-8 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <div>
                                 <h3 class="text-lg font-semibold text-yellow-800">Subscription Expiring Soon</h3>
-                                <p class="text-sm text-yellow-600">@if((int) $usageData['days_left'] === 0) <span class="font-bold">Expires today</span> on your @elseif((int) $usageData['days_left'] === 1) <span class="font-bold">1</span> day remaining on your @else <span class="font-bold">{{ (int) $usageData['days_left'] }}</span> days remaining on your @endif {{ $currentSubscription->pricingPlan->name }} plan</p>
+                                <p class="text-sm text-yellow-600">@if((int) $usageData['days_left'] === 0) <span class="font-bold">Expires today</span> on your @elseif((int) $usageData['days_left'] === 1) <span class="font-bold">1</span> day remaining on your @else <span class="font-bold">{{ (int) $usageData['days_left'] }}</span> days remaining on your @endif {{ $currentSubscription->entitlementPlan()->name }} plan</p>
                             </div>
                         </div>
                     </div>
@@ -63,7 +63,7 @@
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8">
                     <div class="flex items-center justify-between mb-4">
                         <div>
-                            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Current Plan: {{ $currentSubscription->pricingPlan->name }}</h3>
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Current Plan: {{ $currentSubscription->entitlementPlan()->name }}</h3>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 {{ \App\Models\Subscription::getCycleLabel($usageData['billing_cycle']) }} billing
                                 &middot; Active until {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}

@@ -114,7 +114,7 @@ class PosAddonService
         }
 
         $sub = self::activeSubscription($company);
-        $plan = $sub?->pricingPlan;
+        $plan = $sub?->entitlementPlan();
         if (!$sub || !self::planEligibleForPurchase($plan)) {
             return ['allowed' => false, 'reason_key' => 'pos.addons_upgrade_required'];
         }
@@ -179,7 +179,7 @@ class PosAddonService
         // NULL subscription_id rows predate this binding and keep their old
         // access while this eligible package remains active, until expiry.
         $subscription = self::activeSubscription($company);
-        if (!self::planEligibleForPurchase($subscription?->pricingPlan)
+        if (!self::planEligibleForPurchase($subscription?->entitlementPlan())
             || (self::remainingMonths($subscription) ?? 0) === 0) {
             return self::$activeCache[$company->id] = [];
         }

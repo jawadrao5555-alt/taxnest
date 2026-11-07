@@ -108,7 +108,7 @@ class AiInvoiceReaderService
         }
 
         $sub = DiFeatureService::effectiveSubscription($company);
-        $plan = $sub?->pricingPlan;
+        $plan = $sub?->entitlementPlan();
 
         $planPages = (int) ($plan->ai_page_limit ?? 0);
         if ($planPages !== 0) {

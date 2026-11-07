@@ -10,14 +10,14 @@
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Annual billing — pick a plan, start selling</p>
             </div>
 
-            @if($currentSubscription && $currentSubscription->pricingPlan)
+            @if($currentSubscription && $currentSubscription->entitlementPlan())
             <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl p-4 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center">
                         <svg class="w-5 h-5 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     </div>
                     <div>
-                        <p class="font-semibold text-purple-800 dark:text-purple-200">{{ $currentSubscription->pricingPlan->name }} Plan</p>
+                        <p class="font-semibold text-purple-800 dark:text-purple-200">{{ $currentSubscription->entitlementPlan()->name }} Plan</p>
                         <p class="text-xs text-purple-600 dark:text-purple-400">Active until {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}</p>
                     </div>
                 </div>
@@ -31,9 +31,9 @@
                  never disagree with the expiry popup / lock modal / admin panel. --}}
             @php
                 $ebSlots = \App\Services\BranchAddonService::slots($company);
-                $ebRenewal = ($ebSlots > 0 && $currentSubscription && $currentSubscription->pricingPlan)
+                $ebRenewal = ($ebSlots > 0 && $currentSubscription && $currentSubscription->entitlementPlan())
                     ? \App\Services\SubscriptionAssignmentService::computePrice(
-                        $currentSubscription->pricingPlan,
+                        $currentSubscription->entitlementPlan(),
                         $currentSubscription->billing_cycle ?? 'annual',
                         $company
                       )

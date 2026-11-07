@@ -9699,10 +9699,10 @@ class PosController extends Controller
             ->where('active', true)
             ->with('pricingPlan')
             ->first();
-        if ($subscription && $subscription->pricingPlan
-            && $subscription->pricingPlan->max_terminals !== null
-            && (int) $subscription->pricingPlan->max_terminals >= 0) {
-            $terminalLimit = (int) $subscription->pricingPlan->max_terminals;
+        if ($subscription && $subscription->entitlementPlan()
+            && $subscription->entitlementPlan()->max_terminals !== null
+            && (int) $subscription->entitlementPlan()->max_terminals >= 0) {
+            $terminalLimit = (int) $subscription->entitlementPlan()->max_terminals;
         }
         $terminalsActive = $terminals->where('is_active', true)->count();
 

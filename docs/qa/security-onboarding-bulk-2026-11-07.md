@@ -54,3 +54,20 @@ supported PHP8.4/full suite/browser acceptance are pending hosted verification.
 This increment does not complete broader role/impersonation/revocation,
 consent/backup, two-step, onboarding, support or UI accessibility acceptance.
 The original checklist remains open. No production or release actions used.
+
+## Onboarding completion validation
+
+Reproduced using the actual authenticated DI route with an active fictional
+owner: POST /onboarding/complete marked an empty setup complete and redirected
+to the dashboard. Completion now checks the same branch/token/product/invoice
+milestones as the setup display under the company lock. Incomplete setup
+returns to onboarding; owner Skip Setup remains available. Completion/skip
+require the existing company owner role or company-bound super admin. Other
+staff cannot change the company's setup flag. Existing completed companies
+retain their state; repeat completion does not create stock/invoices.
+
+Local real-schema HTTP coverage passed 3 tests /23 assertions for incomplete
+setup, staff denial, owner skip, second-tenant isolation, existing configured
+records and repeated completion. Draft invoice presence suffices: no fiscal
+invoice is submitted to complete setup. Full authenticated browser acceptance
+of the updated completion flow and broader guided setup remain pending.

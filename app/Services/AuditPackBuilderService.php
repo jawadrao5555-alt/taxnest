@@ -607,23 +607,10 @@ class AuditPackBuilderService
     }
 
     /**
-     * Delete packs (rows + files) older than the retention window for a company.
+     * Compatibility entrypoint for explicit background expiry, never a GET hook.
      */
     public static function cleanupExpired(int $companyId): void
     {
-        try {
-            $expired = AuditPack::where('company_id', $companyId)
-                ->where('created_at', '<', now()->subDays(self::RETENTION_DAYS))
-                ->get();
-
-            foreach ($expired as $pack) {
-                if ($pack->file_path) {
-                    Storage::disk('local')->delete($pack->file_path);
-                }
-                $pack->delete();
-            }
-        } catch (\Throwable $e) {
-            Log::warning('AuditPack cleanup failed', ['company_id' => $companyId, 'error' => $e->getMessage()]);
-        }
+        AuditPackRetention::prune($companyId,100);
     }
 }

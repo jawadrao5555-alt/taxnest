@@ -1,0 +1,100 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\AdminUser;
+use App\Models\Company;
+use App\Models\PricingPlan;
+use App\Models\Subscription;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Tests\TestCase;
+
+class AdminBillingCapabilityTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function admin(string $role): AdminUser
+    {
+        return AdminUser::create(['name' => 'Fictional '.$role, 'email' => uniqid('billing').'@example.invalid',
+            'password' => 'Synthetic123!', 'role' => $role]);
+    }
+
+    private function paid(): Subscription
+    {
+        $company = Company::create(['name' => 'Fictional capability company', 'ntn' => uniqid('CAP'), 'product_type' => 'di']);
+        $plan = PricingPlan::firstOrCreate(['name' => 'Business', 'product_type' => 'di', 'is_trial' => false], ['price' => 12000, 'invoice_limit' => 100]);
+
+        return Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'active' => true,
+            'start_date' => now(), 'end_date' => now()->addYear(), 'final_price' => 12000]);
+    }
+
+    public function test_read_only_support_and_unknown_roles_cannot_change_billing(): void
+    {
+        Mail::fake();
+        $sub = $this->paid();
+        $before = $sub->fresh()->getAttributes();
+        $plans = DB::table('pricing_plans')->orderBy('id')->get()->toJson();
+        foreach (['viewer', 'support', 'unknown_role'] as $role) {
+            $this->actingAs($this->admin($role), 'admin');
+            foreach ([
+                ['POST', '/admin/subscriptions/'.$sub->id.'/toggle', []],
+                ['POST', '/admin/subscriptions/assign', ['company_id' => $sub->company_id, 'pricing_plan_id' => $sub->pricing_plan_id, 'billing_cycle' => 'annual']],
+                ['POST', '/admin/payment-proofs/999999/approve', []], ['POST', '/admin/payment-proofs/999999/reject', []],
+                ['POST', '/admin/companies', []],
+                ['POST', '/admin/di-companies/store', []],
+                ['POST', '/admin/companies/'.$sub->company_id.'/approve', []],
+                ['POST', '/admin/companies/'.$sub->company_id.'/limits', ['extra_branch_slots' => 10]],
+                ['POST', '/admin/companies/'.$sub->company_id.'/override/lifetime', []],
+                ['POST', '/admin/companies/'.$sub->company_id.'/override/temporary', []],
+                ['DELETE', '/admin/companies/'.$sub->company_id.'/override', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/approve', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/change-plan', ['pricing_plan_id' => $sub->pricing_plan_id]],
+                ['POST', '/admin/company/'.$sub->company_id.'/toggle-internal', []],
+                ['POST', '/admin/company/'.$sub->company_id.'/update-limits', ['invoice_limit_override' => -1]],
+                ['POST', '/admin/company/'.$sub->company_id.'/reset-limits', []],
+                ['POST', '/admin/plans', []], ['POST', '/admin/plans/addons', []], ['PUT', '/admin/plans/'.$sub->pricing_plan_id, []],
+            ] as [$method,$url,$input]) {
+                $this->call($method, $url, $input)->assertForbidden();
+            }
+        }
+        $this->assertSame($before, $sub->fresh()->getAttributes());
+        $this->assertSame($plans, DB::table('pricing_plans')->orderBy('id')->get()->toJson());
+        $this->assertSame(1, Subscription::where('company_id', $sub->company_id)->count());
+        Mail::assertNothingSent();
+    }
+
+    public function test_persisted_role_downgrade_revokes_a_cached_billing_session(): void
+    {
+        $sub = $this->paid();
+        $admin = $this->admin('admin');
+        $this->actingAs($admin, 'admin');
+        AdminUser::whereKey($admin->id)->update(['role' => 'viewer']);
+        $this->post('/admin/subscriptions/'.$sub->id.'/toggle')->assertForbidden();
+        $this->assertTrue((bool) $sub->fresh()->active);
+    }
+
+    public function test_read_only_billing_pages_keep_history_but_do_not_offer_write_forms(): void
+    {
+        $sub = $this->paid();
+        $this->actingAs($this->admin('viewer'), 'admin');
+        $this->get('/admin/subscriptions')->assertOk()->assertSee('Fictional capability company')
+            ->assertDontSee('action="'.route('saas.admin.subscriptions.assign').'"', false)
+            ->assertDontSee('action="'.route('saas.admin.subscriptions.toggle', $sub->id).'"', false);
+        $this->get('/admin/plans')->assertOk()
+            ->assertDontSee('action="'.route('saas.admin.plans.store').'"', false)
+            ->assertDontSee('action="'.route('saas.admin.plans.addons.update').'"', false)
+            ->assertDontSee('action="'.route('saas.admin.plans.update', $sub->pricing_plan_id).'"', false);
+    }
+
+    public function test_existing_admin_and_owner_billing_authority_is_preserved(): void
+    {
+        foreach (['admin', 'super_admin'] as $role) {
+            $sub = $this->paid();
+            $this->actingAs($this->admin($role), 'admin');
+            $this->post('/admin/subscriptions/'.$sub->id.'/toggle')->assertRedirect();
+            $this->assertFalse((bool) $sub->fresh()->active);
+        }
+    }
+}

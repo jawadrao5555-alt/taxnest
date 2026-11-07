@@ -1,4 +1,7 @@
 <x-admin-layout>
+@php
+    $canManageBilling = auth('admin')->user() instanceof \App\Models\AdminUser && auth('admin')->user()->canManageBilling();
+@endphp
 <div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ activeTab: 'di' }">
     <div class="flex items-center justify-between mb-6">
         <div>
@@ -29,6 +32,7 @@
     </div>
     @endif
 
+    @if($canManageBilling)
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
         <div class="flex items-start justify-between gap-4 mb-4">
             <div>
@@ -66,6 +70,7 @@
         </form>
     </div>
 
+    @endif
     <div class="tn-admin-plan-tabs flex flex-wrap items-center gap-2 mb-6">
         <button :aria-pressed="activeTab === 'di'" @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
         <button :aria-pressed="activeTab === 'pos'" @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
@@ -73,6 +78,7 @@
         <button :aria-pressed="activeTab === 'erps'" @click="activeTab = 'erps'" :class="activeTab === 'erps' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">{{ \App\Support\NestErps::LABEL }} Plans</button>
     </div>
 
+    @if($canManageBilling)
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-sm font-semibold text-white">Create New Plan</h3>
@@ -123,6 +129,7 @@
         </form>
     </div>
 
+    @endif
     <div x-show="activeTab === 'di'">
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-emerald-500"></div>

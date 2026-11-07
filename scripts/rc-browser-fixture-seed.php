@@ -881,6 +881,9 @@ foreach ([1366,390] as $staffWidth) {
 }
 $securityCases=[];
 foreach ([1366,390] as $securityWidth) {
+    $billingViewer=AdminUser::create(['name'=>'Synthetic billing viewer '.$securityWidth,
+        'email'=>'billing-viewer-'.$securityWidth.'@rc-browser.invalid','password'=>\Illuminate\Support\Facades\Hash::make($password),'role'=>'viewer']);
+    $securityCases[$securityWidth]['billingViewer']=$billingViewer->email;
     foreach (['incomplete','ready','reset'] as $setupState) {
         $setupCompany=$company('Synthetic setup '.$setupState.' '.$securityWidth,'setup-'.$setupState.'-'.$securityWidth.'@rc-browser.invalid',
             'RCSET'.$setupState.$securityWidth,'di',['onboarding_completed'=>false,
@@ -898,6 +901,21 @@ foreach ([1366,390] as $securityWidth) {
                 'product_type'=>'di','used'=>false,'expires_at'=>now()->addHours(4),'created_at'=>now(),'updated_at'=>now()]);
             $securityCases[$securityWidth]['reset']=['email'=>$setupUser->email,'token'=>$setupToken,
                 'newPassword'=>'SyntheticNew!'.bin2hex(random_bytes(12))];
+            $expiredExport=\App\Models\AuditPack::create(['company_id'=>$setupCompany->id,'user_id'=>$setupUser->id,
+                'date_from'=>'2026-01-01','date_to'=>'2026-01-31','status'=>'ready','progress'=>100]);
+            $expiredExport->forceFill(['created_at'=>now()->subDays(8),
+                'file_path'=>'audit-packs/company_'.$setupCompany->id.'/fbr-audit-pack-'.$expiredExport->id.'.zip','file_size'=>18])->save();
+            \Illuminate\Support\Facades\Storage::disk('local')->put($expiredExport->file_path,'SYNTHETIC ZIP DATA');
+            $securityCases[$securityWidth]['reset']['expiredPackId']=$expiredExport->id;
+            DB::table('invoices')->insert(['company_id'=>$setupCompany->id,'user_id'=>$setupUser->id,
+                'invoice_number'=>'RC-EXPORT-'.$securityWidth,'internal_invoice_number'=>'RC-EXPORT-'.$securityWidth,
+                'invoice_date'=>now()->toDateString(),'status'=>'locked','fbr_status'=>'sandbox',
+                'buyer_name'=>'Fictional export buyer','total_amount'=>0,'total_sales_tax'=>0,'total_value_excluding_st'=>0,
+                'created_at'=>now(),'updated_at'=>now()]);
+            $pendingExport=\App\Models\AuditPack::create(['company_id'=>$setupCompany->id,'user_id'=>$setupUser->id,
+                'date_from'=>now()->toDateString(),'date_to'=>now()->toDateString(),'status'=>'pending']);
+            $pendingExport->forceFill(['updated_at'=>now()->subMinute()])->save(['timestamps'=>false]);
+            $securityCases[$securityWidth]['reset']['pendingPackId']=$pendingExport->id;
         }
     }
 }

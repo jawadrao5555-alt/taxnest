@@ -608,6 +608,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
         Route::post('/compliance/audit-packs', [ComplianceController::class, 'store'])->name('compliance.packs.store');
         Route::get('/compliance/audit-packs/{pack}/status', [ComplianceController::class, 'status'])->name('compliance.packs.status');
+        Route::post('/compliance/audit-packs/{pack}/advance', [ComplianceController::class, 'advance'])->middleware('throttle:30,1')->name('compliance.packs.advance');
         Route::get('/compliance/audit-packs/{pack}/download', [ComplianceController::class, 'download'])->name('compliance.packs.download');
         Route::delete('/compliance/audit-packs/{pack}', [ComplianceController::class, 'destroy'])->name('compliance.packs.destroy');
 

@@ -24,8 +24,6 @@ class ComplianceController extends Controller
     {
         $companyId = (int) app('currentCompanyId');
 
-        AuditPackBuilderService::cleanupExpired($companyId);
-
         $company = Company::find($companyId);
 
         $totalInvoices = Invoice::where('company_id', $companyId)->count();
@@ -149,6 +147,27 @@ class ComplianceController extends Controller
         $companyId = (int) app('currentCompanyId');
         abort_if((int) $pack->company_id !== $companyId, 403);
 
+        $expired = !$pack->expiresAt() || $pack->expiresAt()->lte(now());
+        return response()->json([
+            'id' => $pack->id,
+            'status' => $expired ? 'expired' : $pack->status,
+            'progress' => (int) $pack->progress,
+            'processed' => (int) $pack->processed_invoices,
+            'total' => (int) $pack->total_invoices,
+            'file_size' => !$expired && $pack->file_size ? (int) $pack->file_size : null,
+            'download_url' => !$expired && $pack->status === 'ready' ? route('compliance.packs.download', $pack) : null,
+            'advance_url' => !$expired && $pack->isActive() && $pack->updated_at?->lt(now()->subSeconds(15))
+                ? route('compliance.packs.advance', $pack) : null,
+            'error' => $pack->status === 'failed' ? 'Pack generation failed. Please try again — if it keeps failing, contact support.' : null,
+        ])->header('Cache-Control','private, no-store');
+    }
+
+    public function advance(AuditPack $pack)
+    {
+        $companyId = (int) app('currentCompanyId');
+        abort_if((int) $pack->company_id !== $companyId, 403);
+        abort_if(!$pack->expiresAt() || $pack->expiresAt()->lte(now()),410,'This Audit Pack has expired.');
+
         // Worker-less fallback: if no queue worker has touched this pack recently,
         // advance one chunk inline so the pack still completes via polling alone.
         if ($pack->isActive() && $pack->updated_at && $pack->updated_at->lt(now()->subSeconds(15))) {
@@ -162,22 +181,15 @@ class ComplianceController extends Controller
             $pack->refresh();
         }
 
-        return response()->json([
-            'id' => $pack->id,
-            'status' => $pack->status,
-            'progress' => (int) $pack->progress,
-            'processed' => (int) $pack->processed_invoices,
-            'total' => (int) $pack->total_invoices,
-            'file_size' => $pack->file_size ? (int) $pack->file_size : null,
-            'download_url' => $pack->status === 'ready' ? route('compliance.packs.download', $pack) : null,
-            'error' => $pack->status === 'failed' ? 'Pack generation failed. Please try again — if it keeps failing, contact support.' : null,
-        ]);
+        return $this->status($pack);
     }
 
     public function download(AuditPack $pack)
     {
         $companyId = (int) app('currentCompanyId');
         abort_if((int) $pack->company_id !== $companyId, 403);
+        abort_if(!$pack->expiresAt() || $pack->expiresAt()->lte(now()),410,'This Audit Pack has expired. Generate a new one.');
+        abort_unless(\App\Services\AuditPackRetention::ownsPath($pack),410,'This Audit Pack file is unavailable.');
 
         if ($pack->status !== 'ready' || !$pack->file_path) {
             return redirect()->route('compliance.index')->with('error', 'This Audit Pack is not ready yet.');
@@ -194,13 +206,15 @@ class ComplianceController extends Controller
     /**
      * Public download via a temporary signed URL (sent in the "pack ready" email).
      * The 'signed' middleware already 403s tampered/expired links; the URL expiry
-     * equals the pack's retention expiry, so a valid signature implies the file
-     * is still within its retention window. Company scoping comes from the pack
+     * normally equals the pack's retention expiry; independently check the
+     * persisted deadline and owned path too. Company scoping comes from the pack
      * itself (the signature covers the pack id, so it can't be swapped).
      */
     public function downloadSigned(AuditPack $pack)
     {
+        abort_if(!$pack->expiresAt() || $pack->expiresAt()->lte(now()),410,'This Audit Pack has expired. Generate a new one.');
         abort_if($pack->status !== 'ready' || !$pack->file_path, 403);
+        abort_unless(\App\Services\AuditPackRetention::ownsPath($pack),410,'This Audit Pack file is unavailable.');
 
         $abs = Storage::disk('local')->path($pack->file_path);
         abort_unless(is_file($abs), 410, 'This Audit Pack file has expired. Please generate a new one from the Compliance page.');
@@ -247,6 +261,8 @@ class ComplianceController extends Controller
         if ($pack->isActive() && $pack->updated_at && $pack->updated_at->gt(now()->subSeconds(AuditPackBuilderService::STALE_LOCK_SECONDS))) {
             return redirect()->route('compliance.index')->with('error', 'This Audit Pack is still being generated. Please wait a moment.');
         }
+
+        abort_if($pack->file_path && !\App\Services\AuditPackRetention::ownsPath($pack), 409, 'This Audit Pack path requires review.');
 
         if ($pack->file_path) {
             try {

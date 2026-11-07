@@ -1,5 +1,45 @@
 # Security and onboarding bulk — P1
 
+## Billing authority and read-only export retention continuation
+
+Actual HTTP regressions reproduced support/viewer/unmapped roles mutating billing,
+including alternative company approval/grant/limit and legacy plan paths. Financial
+mutations now re-read the persisted AdminUser and require the existing admin or
+super_admin role. Cached role downgrades revoke writes; existing default admin
+and owner permissions remain. Read-only billing pages retain history without
+write forms. The tables-first direct-controller fixture now supplies a real
+persisted administrator rather than bypassing authentication. No price or
+purchased-access policy changes are introduced.
+
+Compliance GET previously deleted expired export files and history; stale status
+GET also advanced a build. GET is now read-only. Workerless builds use a bounded,
+authenticated CSRF POST from the existing poller, preserving the chunk claim.
+Both download paths independently enforce the original seven-day export deadline
+and exact company/pack path. Expired history stays visible. Scheduled bounded
+pruning removes generated ZIPs only, retains export metadata and all invoice
+rows, isolates unsafe paths, skips active/locked work and rechecks under locks.
+Explicit deletion likewise refuses a mismatched file path. No source/fiscal
+retention or production backup/restore policy is changed.
+
+Local PHP8.3/SQLite selected regression93tests1489assertions initially found two
+old unauthenticated direct-controller fixtures; after adding the persisted actor,
+capability/retention/tables-first12tests110assertions passed. Final extended
+capability/retention/company-form/account-overview/plan/payment/annual regression:
+**94 tests /1500 assertions passed**, including the retained default-admin paths
+and refusal of foreign-path explicit deletion. Earlier combined
+recovery/billing/retention121tests720assertions passed before this last path
+extension; neither result is native/browser/full-suite proof. Blade compilation,
+Node/PHP/bash syntax and diff checks pass. Mandatory native two-worker export
+retention probe and actual1366/390 GET/POST/expiry/viewer journeys are wired into
+required hosted checks. A real-ZIP HTTP workerless build test requires hosted
+ZipArchive (unavailable locally). Exact updated HEAD needs fresh PHP8.4/full suite,
+native, browser, Node/build and validate acceptance.
+
+Previous exact7febb411c3d02af57709017b462c3fde9e525a01 passed all required lanes
+including validate in42391564035. That proves the prior two-step increment only,
+not these new changes or full remaining consent/import/support/UI scope. All
+three workstreams must finish before creating the combined approval PR.
+
 ## Optional authenticator two-step implementation (7 November continuation)
 
 Implemented on this feature branch, default OFF for existing accounts:

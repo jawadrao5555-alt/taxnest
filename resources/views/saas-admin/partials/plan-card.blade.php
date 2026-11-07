@@ -13,7 +13,9 @@
             <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-teal-900/30 text-teal-400">{{ \App\Support\NestErps::verticalLabel(\App\Support\NestErps::verticalOf($plan)) }}</span>
             @endif
         </div>
+        @if($canManageBilling ?? false)
         <button @click="editing = !editing" class="text-xs px-2 py-1 rounded transition" :class="editing ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30'" x-text="editing ? 'Cancel' : 'Edit'"></button>
+        @endif
     </div>
 
     <div x-show="!editing">
@@ -76,6 +78,7 @@
         @endif
     </div>
 
+    @if($canManageBilling ?? false)
     <form x-show="editing" method="POST" action="{{ route('saas.admin.plans.update', $plan->id) }}" class="space-y-3">
         @csrf
         @method('PUT')
@@ -166,4 +169,5 @@
         </label>
         <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save Changes</button>
     </form>
+    @endif
 </div>

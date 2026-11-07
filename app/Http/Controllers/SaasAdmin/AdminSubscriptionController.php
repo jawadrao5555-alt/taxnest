@@ -57,6 +57,7 @@ class AdminSubscriptionController extends Controller
 
     public function assign(Request $request)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate([
             'company_id' => 'required|exists:companies,id',
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
@@ -90,6 +91,7 @@ class AdminSubscriptionController extends Controller
 
     public function toggle($id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $outcome = DB::transaction(function () use ($id) {
             $target = Subscription::findOrFail($id);
             Company::withTrashed()->whereKey($target->company_id)->lockForUpdate()->firstOrFail();

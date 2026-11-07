@@ -190,6 +190,7 @@ class AdminController extends Controller
 
     public function storeCompany(Request $request)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate([
             'name' => 'required|string|max:255',
             'owner_name' => 'nullable|string|max:255',
@@ -291,6 +292,7 @@ class AdminController extends Controller
 
     public function approveCompany(Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company->update(['company_status' => 'active', 'status' => 'approved']);
 
         // Owner rule (Jul 2026): approval activates the package the shop picked
@@ -389,6 +391,7 @@ class AdminController extends Controller
 
     public function changePlan(Request $request, Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
         ]);
@@ -933,6 +936,7 @@ class AdminController extends Controller
 
     public function toggleInternalAccount(Request $request, Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company->update(['is_internal_account' => !$company->is_internal_account]);
         AuditLogService::log(
             $company->is_internal_account ? 'internal_account_enabled' : 'internal_account_disabled',
@@ -1170,6 +1174,7 @@ class AdminController extends Controller
 
     public function updateCompanyLimits(Request $request, Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate([
             'invoice_limit_override' => 'nullable|integer|min:-1',
             'user_limit_override' => 'nullable|integer|min:-1',
@@ -1194,6 +1199,7 @@ class AdminController extends Controller
 
     public function resetCompanyLimits(Request $request, Company $company)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company->update([
             'invoice_limit_override' => null,
             'user_limit_override' => null,

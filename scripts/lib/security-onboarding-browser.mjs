@@ -64,6 +64,26 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     await page.getByRole('heading',{name:"Let's set up your account",exact:true}).waitFor();
     if(errors.length)throw Error('Reset browser errors: '+errors.join('; '));
   } finally {await recoveryContext.close();}
+  const advanceRequests=[];
+  const watchAdvance=request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/compliance/audit-packs/'+fixture.reset.pendingPackId+'/advance')advanceRequests.push(true);};
+  page.on('request',watchAdvance);
+  await page.goto(baseUrl+'/compliance',{waitUntil:'domcontentloaded'});
+  await page.getByText('Expired export — history retained',{exact:true}).waitFor();
+  const expiredPack=fixture.reset.expiredPackId;
+  if(await page.locator('a[href$="/audit-packs/'+expiredPack+'/download"]').count())throw Error('Expired export offered download');
+  const expiredStatus=await page.request.get(baseUrl+'/compliance/audit-packs/'+expiredPack+'/status');
+  if(expiredStatus.status()!==200)throw Error('Compliance GET removed export history');
+  const retained=await expiredStatus.json();
+  if(retained.status!=='expired'||retained.download_url!==null||retained.advance_url!==null)throw Error('Expired export status is misleading');
+  const expiredDownload=await page.request.get(baseUrl+'/compliance/audit-packs/'+expiredPack+'/download',{maxRedirects:0});
+  if(expiredDownload.status()!==410)throw Error('Expired export still downloadable');
+  await page.locator('a[href$="/audit-packs/'+fixture.reset.pendingPackId+'/download"]').waitFor({state:'visible',timeout:90000});
+  page.off('request',watchAdvance);
+  if(!advanceRequests.length)throw Error('Workerless export did not use an explicit authenticated POST');
+  const readyExport=await page.request.get(baseUrl+'/compliance/audit-packs/'+fixture.reset.pendingPackId+'/status');
+  const readyData=await readyExport.json();
+  if(readyData.status!=='ready'||readyData.processed!==1)throw Error('Explicit export progress did not finish its fictional invoice');
+  await saveEvidenceScreenshot(page,'rc-security-read-only-export-'+v.width);
   // Opt in through actual forms. The fictional key/recovery values stay in
   // memory and never enter screenshots, log messages or evidence manifests.
   await page.goto(baseUrl+'/security/two-step/di',{waitUntil:'domcontentloaded'});
@@ -109,5 +129,17 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByLabel('Authenticator or recovery code',{exact:true}).fill(codes[2]);
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Turn off two-step login',exact:true}).click()]);
   await page.getByRole('button',{name:'Set up two-step login',exact:true}).waitFor();
+  await page.context().clearCookies();
+  await login(page,{...t,loginPath:'/admin/login',login:fixture.billingViewer,password:t.password});
+  await page.goto(baseUrl+'/admin/subscriptions',{waitUntil:'domcontentloaded'});
+  await page.getByRole('heading',{name:'Subscriptions',exact:true}).waitFor();
+  if(await page.locator('form[action*="/subscriptions/assign"],form[action$="/toggle"]').count())throw Error('Viewer offered subscription write form');
+  const billingCsrf=await page.locator('form[action$="/admin/logout"] input[name="_token"]').first().inputValue();
+  const forbidden=await page.request.post(baseUrl+'/admin/subscriptions/assign',{form:{_token:billingCsrf},maxRedirects:0});
+  if(forbidden.status()!==403)throw Error('Viewer billing POST not refused');
+  await saveEvidenceScreenshot(page,'rc-security-billing-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/plans',{waitUntil:'domcontentloaded'});
+  await page.getByRole('heading',{name:'Subscription Plans',exact:true}).waitFor();
+  if(await page.locator('form[action*="/admin/plans"]').count())throw Error('Viewer offered package write form');
   pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable');
 }

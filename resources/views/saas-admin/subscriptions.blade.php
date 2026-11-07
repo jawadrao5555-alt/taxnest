@@ -1,7 +1,11 @@
 <x-admin-layout>
+@php
+    $canManageBilling = auth('admin')->user() instanceof \App\Models\AdminUser && auth('admin')->user()->canManageBilling();
+@endphp
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <h1 class="text-2xl font-bold text-white mb-6">Subscriptions</h1>
 
+    @if($canManageBilling)
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6"
          x-data="{ showForm: {{ $errors->has('pricing_plan_id') ? 'true' : 'false' }}, companyId: @js((string) old('company_id', '')), planId: @js((string) old('pricing_plan_id', '')), plans: @js($assignmentPlans), get availablePlans() { return this.plans.filter(plan => plan.company_ids.includes(Number(this.companyId))); } }">
         <div class="flex items-center justify-between mb-3">
@@ -27,6 +31,9 @@
         </form>
     </div>
 
+    @else
+    <p class="mb-4 text-sm text-gray-400">Billing is read-only for this administrator.</p>
+    @endif
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <p class="px-4 py-3 text-xs text-gray-400 border-b border-gray-800">One row per company. Previous trials, package changes and renewals are available under History.</p>
         <div class="overflow-x-auto">
@@ -61,7 +68,7 @@
                             @if($activeCount > 1)<span class="block text-xs text-amber-400 mt-1">Multiple active records — review</span>@endif
                         </td>
                         <td class="px-4 py-3 text-center">
-                            @if(!$company->trashed())
+                            @if(!$company->trashed() && $canManageBilling)
                                 @if($activeCount > 1)
                                 <span class="text-xs text-amber-400">Review conflict</span>
                                 @elseif($sub->active || ($activeCount === 0 && !$sub->isExpired() && !$sub->isTrialExpired() && !\App\Services\PlanSellabilityService::isRetired($sub->pricingPlan)))

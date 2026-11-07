@@ -100,6 +100,8 @@ concurrency(){
     grep -Fqx "PASS: native concurrent paid renewal preserves remaining term once; retry and other company preserved" "$EVIDENCE_DIR/paid-renewal.log" || fail paid-renewal-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_password_reset_grant.php" | tee "$EVIDENCE_DIR/password-reset-grant.log"
     clean_php php "$ROOT/tests/native/rc_two_step_login.php" | tee "$EVIDENCE_DIR/two-step-login.log"
+    clean_php php "$ROOT/tests/native/rc_audit_export_retention.php" | tee "$EVIDENCE_DIR/audit-export-retention.log"
+    grep -Fqx "PASS: native concurrent audit export expiry retains history and invoices; foreign paths and current exports preserved" "$EVIDENCE_DIR/audit-export-retention.log" || fail audit-export-retention-missing-success-proof
     grep -Fqx "PASS: native concurrent two-step controller permits one TOTP and one recovery use; other account unchanged" "$EVIDENCE_DIR/two-step-login.log" || fail two-step-single-use-missing-success-proof
     grep -Fqx "PASS: native password reset grant permits one concurrent completion and preserves other account" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-grant-missing-success-proof
     grep -Fqx "PASS: native reset rotates the company browser session generation atomically" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-session-generation-missing-success-proof

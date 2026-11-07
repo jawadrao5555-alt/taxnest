@@ -504,6 +504,28 @@ class AuditPackTest extends TestCase
             ->assertHeader('Content-Type', 'application/zip');
     }
 
+    public function test_explicit_authenticated_post_preserves_workerless_build_without_mutating_status_get(): void
+    {
+        Storage::fake('local');\Illuminate\Support\Facades\Mail::fake();
+        $companyId=$this->makeCompany();$user=$this->makeUser($companyId);
+        $this->makeInvoice($companyId,'POST-AUDIT-001','2026-03-05',true);
+        $pack=AuditPack::create(['company_id'=>$companyId,'user_id'=>$user->id,
+            'date_from'=>'2026-03-01','date_to'=>'2026-03-31','status'=>'pending']);
+        $this->actingAs($user);
+        for($attempt=0;$attempt<10;$attempt++) {
+            $pack->refresh();if($pack->status==='ready')break;
+            $pack->forceFill(['updated_at'=>now()->subSeconds(20)])->save(['timestamps'=>false]);
+            $before=$pack->fresh()->getAttributes();
+            $this->get(route('compliance.packs.status',$pack))->assertOk();
+            $this->assertSame($before,$pack->fresh()->getAttributes());
+            $this->post(route('compliance.packs.advance',$pack))->assertOk();
+            $this->assertNotSame('failed',$pack->fresh()->status,$pack->fresh()->error_message??'');
+        }
+        $pack->refresh();$this->assertSame('ready',$pack->status);
+        $this->assertSame(1,(int)$pack->processed_invoices);
+        Storage::disk('local')->assertExists($pack->file_path);
+    }
+
     public function test_tampered_signed_link_is_rejected(): void
     {
         Storage::fake('local');

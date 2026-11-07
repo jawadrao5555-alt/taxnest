@@ -44,6 +44,7 @@ class AdminCompanyController extends Controller
 
     public function store(Request $request)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         // Which POS panel (if any) this company is being created on. The
         // business type is a POS-only question: Digital Invoice and healthcare
         // companies are created exactly as they always were.
@@ -912,6 +913,7 @@ class AdminCompanyController extends Controller
 
     public function approve($id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
         // Flip BOTH status columns: `status` drives the CheckCompanyApproval
         // view-only gate + admin UI badges; `company_status` drives login-time
@@ -1056,6 +1058,7 @@ class AdminCompanyController extends Controller
 
     public function updateLimits(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
         $request->validate([
             'invoice_limit_override' => 'nullable|integer|min:0',
@@ -1674,6 +1677,7 @@ class AdminCompanyController extends Controller
 
     public function grantLifetime(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate(['reason' => 'nullable|string|max:255']);
         $company = Company::findOrFail($id);
         $sub = $this->getOrCreateActiveSubscription($company->id);
@@ -1694,6 +1698,7 @@ class AdminCompanyController extends Controller
 
     public function grantTemporary(Request $request, $id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $request->validate([
             'until' => 'required|date|after:today',
             'pricing_plan_id' => 'nullable|integer|exists:pricing_plans,id',
@@ -1761,6 +1766,7 @@ class AdminCompanyController extends Controller
 
     public function removeOverride($id)
     {
+        \App\Models\AdminUser::requireBillingAdministrator();
         $company = Company::findOrFail($id);
         $sub = Subscription::where('company_id', $company->id)->orderByDesc('id')->first();
         if (!$sub) {

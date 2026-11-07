@@ -1487,7 +1487,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 async function workflow(page,t,v,diagnostics) {
   if(t.taxIntegrations)return taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b01Account)return b01CompanyAccountWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
-  if(t.kotNoteVisibility)return kotNoteVisibilityWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});
+  if(t.kotNoteVisibility)return kotNoteVisibilityWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart,loopback,login,attachDiagnostics});
   if(t.b03AutoKot)return b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});
   if(t.optionalArchive)return optionalArchiveWorkflow(page,t,v);
   if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);

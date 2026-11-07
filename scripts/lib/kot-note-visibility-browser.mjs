@@ -1,5 +1,13 @@
 /** Real disposable desktop/mobile journey; never sends a print job or sale. */
-export async function kotNoteVisibilityWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart}) {
+export async function kotNoteVisibilityWorkflow(originalPage,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart,loopback,login,attachDiagnostics}) {
+  // This journey proves a persisted server setting with an ordinary reload.
+  // Isolate it from the cache-first page's separate fingerprint-refresh reload;
+  // the general PWA/service-worker journeys remain enabled and unchanged.
+  const context=await originalPage.context().browser().newContext({viewport:v,serviceWorkers:'block'});
+  await context.route('**/*',route=>loopback(new URL(route.request().url()).hostname)?route.continue():route.abort('blockedbyclient'));
+  const page=await context.newPage(), diagnostics=attachDiagnostics(page);
+  try {
+  await login(page,t);
   const ticket=baseUrl+'/pos/restaurant/orders/'+t.kotNoteVisibility.orderId+'/kitchen-ticket';
   // Use the real settings form so each viewport independently reproduces OFF.
   await page.goto(baseUrl+'/pos/restaurant/kitchen-settings',{waitUntil:'domcontentloaded'});
@@ -12,8 +20,13 @@ export async function kotNoteVisibilityWorkflow(page,t,v,{baseUrl,waitForOperati
   const before=await page.request.get(ticket+'?auto_print=0');
   if(!before.ok()||(await before.text()).includes('Pack separately'))throw Error('KOT notes OFF reproduction failed');
 
+  // Let the initial real boot fingerprint request finish before changing its
+  // setting. Otherwise the 1.5s boot check can reload halfway through this flow.
+  const boot=page.waitForResponse(r=>new URL(r.url()).pathname==='/pos/api/boot-check'&&r.request().method()==='GET');
   await page.goto(baseUrl+'/pos/invoice/create',{waitUntil:'domcontentloaded'});
   await waitForOperationalSurface(page); await dismiss(page);
+  const bootResponse=await boot;
+  if(!bootResponse.ok()||(await bootResponse.json()).ok!==true)throw Error('Initial POS boot check did not succeed');
   await openMobileCart(page,v,['Current Order']);
   await page.locator('[data-kot-note-toggle]:visible').click();
   await page.locator('textarea[name="pos_cart_note_nofill"]:visible').fill('Pack separately');
@@ -35,5 +48,10 @@ export async function kotNoteVisibilityWorkflow(page,t,v,{baseUrl,waitForOperati
   if(!await editor.isVisible())await page.locator('[data-kot-note-toggle]:visible').click();
   await editor.fill('Pack separately');
   await page.locator('[data-kot-note-status]:visible').first().getByText('Order notes are ON for new kitchen slips.',{exact:true}).waitFor();
-  pass(t.name+'/'+v.width+': real OFF reproduction, visible warning, explicit enable, persisted reload and original kitchen-ticket note rendered; no physical print');
+  const unexpectedConsole=diagnostics.consoleErrors.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));
+  const unexpectedRequests=diagnostics.failedRequests.filter(x=>!x.includes('ERR_BLOCKED_BY_CLIENT'));
+  if(diagnostics.pageErrors.length||unexpectedConsole.length||unexpectedRequests.length||diagnostics.httpErrors.length)
+    throw Error('KOT note journey diagnostics failed: '+JSON.stringify({page:diagnostics.pageErrors,console:unexpectedConsole,requests:unexpectedRequests,http:diagnostics.httpErrors}));
+  pass(t.name+'/'+v.width+': real OFF reproduction, visible warning, explicit enable, persisted network reload and original kitchen-ticket note rendered; no physical print');
+  } finally {await context.close();}
 }

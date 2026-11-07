@@ -43,6 +43,8 @@ class BillingController extends Controller
         $aiTopupPending = false;
 
         $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
+        $pendingSelection = null;
+        $pendingSelectionPlan = null;
         $billingHistory = null;
         $billingDocumentRoutes = ['invoice' => 'billing.documents.invoice', 'receipt' => 'billing.documents.receipt'];
         if ($companyId) {
@@ -54,6 +56,12 @@ class BillingController extends Controller
 
             $company = \App\Models\Company::find($companyId);
             if ($company) {
+                $selectedId = (int) session(\App\Services\PendingSubscriptionSelection::key((int) $companyId).'.quote.plan_id');
+                $selected = $plans->firstWhere('id', $selectedId);
+                if ($selected) {
+                    $pendingSelection = \App\Services\PendingSubscriptionSelection::quote($company, $selected);
+                    $pendingSelectionPlan = $pendingSelection ? $selected : null;
+                }
                 $aiPages = \App\Services\AiPageCreditService::summary($company);
                 $aiReaderAllowed = \App\Services\DiFeatureService::planAllows($company, 'ai_reader');
                 $aiTopupPending = \Illuminate\Support\Facades\Schema::hasTable('payment_proofs')
@@ -148,12 +156,15 @@ class BillingController extends Controller
             'aiReaderAllowed',
             'aiTopupPending',
             'billingHistory',
-            'billingDocumentRoutes'
+            'billingDocumentRoutes',
+            'pendingSelection',
+            'pendingSelectionPlan'
         ));
     }
 
     public function subscribe(Request $request)
     {
+        abort_unless(in_array((string) auth('web')->user()?->role, ['company_admin', 'super_admin'], true), 403);
         $request->validate([
             'plan_id' => 'required|exists:pricing_plans,id',
             // Annual-only since 23 Aug 2026 (owner). 'yearly' = legacy spelling.
@@ -180,41 +191,20 @@ class BillingController extends Controller
             return back()->with('error', 'That package is no longer available. Please choose one of the current packages.');
         }
 
-        [$subscription, $pricing] = \Illuminate\Support\Facades\DB::transaction(function () use ($companyId, $plan, $cycle) {
+        $quote = \Illuminate\Support\Facades\DB::transaction(function () use ($companyId, $plan, $cycle) {
             $company = \App\Models\Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
-            $pricing = Subscription::priceForPlanCycle($plan, $cycle);
-            $quote = \App\Services\DistributorDiscountService::quote($company, $plan, $cycle, true);
-            $pricing['distributor_discount_percent'] = $quote['discount_percent'];
-            $pricing['distributor_discount_amount'] = $quote['discount_amount'];
-            $pricing['final_price'] = $quote['net_quote'];
-            $months = Subscription::getMonthsForCycle($cycle);
-
-            Subscription::where('company_id', $companyId)->update(['active' => false]);
-            $subscription = Subscription::create([
-                'company_id' => $companyId,
-                'pricing_plan_id' => $plan->id,
-                'billing_cycle' => $cycle,
-                'discount_percent' => $pricing['discount_percent'],
-                'final_price' => $pricing['final_price'],
-                'start_date' => now(),
-                'end_date' => now()->addMonths($months),
-                'active' => true,
-                'distributor_quote_snapshot' => (float) $quote['discount_percent'] > 0 ? $quote : null,
-            ]);
-
-            return [$subscription, $pricing];
+            $plan = PricingPlan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
+            if ($plan->is_trial || $plan->product_type !== 'di' || !\App\Services\DiPlanComparisonService::isSellablePlan($plan)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['plan_id' => 'Please choose a current Digital Invoice package.']);
+            }
+            $quote = \App\Services\PendingSubscriptionSelection::quote($company, $plan)
+                ?? \App\Services\DistributorDiscountService::quote($company, $plan, $cycle, true);
+            \App\Services\PendingSubscriptionSelection::remember($company, $quote);
+            return $quote;
         }, 3);
 
-        SecurityLogService::log('subscription_changed', auth()->id(), [
-            'plan' => $plan->name,
-            'cycle' => $cycle,
-            'discount' => $pricing['discount_percent'] . '%',
-            'final_price' => $pricing['final_price'],
-            'company_id' => $companyId,
-        ]);
-
-        $cycleLabel = Subscription::getCycleLabel($cycle);
-        return redirect('/dashboard')->with('success', "Subscribed to {$plan->name} plan ({$cycleLabel}) for PKR " . number_format($pricing['final_price']) . "!");
+        return redirect()->route('billing.plans')->with('info',
+            'Package selected. Upload your payment receipt for review. Your current package stays in place until approval.');
     }
 
     /**

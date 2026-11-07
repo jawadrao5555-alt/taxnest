@@ -94,7 +94,8 @@ class PaymentProofController extends Controller
                 return null;
             }
             $hasSnapshotColumn = Schema::hasColumn('payment_proofs', 'distributor_quote_snapshot');
-            $snapshot = \App\Services\DistributorDiscountService::quote(
+            $snapshot = \App\Services\PendingSubscriptionSelection::quote($lockedCompany, $plan)
+                ?? \App\Services\DistributorDiscountService::quote(
                 $lockedCompany,
                 $plan,
                 $validated['billing_cycle'],

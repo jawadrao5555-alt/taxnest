@@ -171,3 +171,30 @@ requirements rather than a claimed local pass. Full PHP8.4/native/browser
 checks must verify the next published HEAD. Remaining add-on/ERP/Agent direct
 catalogue readers still require reconciliation alongside unpaid activation,
 upgrades/proration and audited adjustment transitions.
+
+## DI unpaid package selection
+
+The existing direct Subscribe route deactivated the current term and created
+an active paid subscription without a receipt. Replaced that mutation with a
+server-created, company-scoped session selection and a labelled receipt form.
+The existing payment-proof review/temporary-access rules remain the only
+submission path; choosing a package alone creates no subscription or payment.
+The existing paid term is retained byte-for-byte. Only the company owner may
+select. Retired, trial and other-product plans remain refused, including a
+second validation after locking the catalogue row.
+
+Repeat selection and later receipt upload reuse the server quote for that
+company/plan. A completed verified proof invalidates the older selection so
+its first-purchase discount cannot be replayed for renewal. Existing legacy
+active subscription quote compatibility remains in the distributor service.
+No client-supplied quote or claimed payment amount becomes receipt evidence.
+
+Local PHP8.3.6/SQLite:34 tests/265 assertions passed across actual DI selection,
+repeated quote and later upload, unchanged existing paid term, staff refusal,
+retired endpoints and existing temporary payment-proof access. Added required
+real desktop1366/mobile390 browser journey for package selection and receipt
+upload while the current paid package stays visible. Node syntax and Blade
+compilation pass locally. Current environment has no Chrome or MariaDB binary;
+actual browser/native/full-suite evidence remains required on hosted CI.
+Signup, package upgrades/proration, remaining direct entitlement readers and
+audited credit/refund/reversal transitions still need completion.

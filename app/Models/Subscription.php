@@ -23,6 +23,7 @@ class Subscription extends Model
         'override_reason',
         'override_by',
         'distributor_quote_snapshot',
+        'purchase_snapshot',
     ];
 
     protected $casts = [
@@ -35,7 +36,19 @@ class Subscription extends Model
         'override_granted_at' => 'datetime',
         'free_invoice_limit' => 'integer',
         'distributor_quote_snapshot' => 'array',
+        'purchase_snapshot' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $subscription) {
+            // Assignment owns creation. Historical rows remain unknown; a
+            // later update must not mint or replace their purchase evidence.
+            if ($subscription->isDirty('purchase_snapshot')) {
+                throw new \LogicException('Subscription purchase evidence cannot be changed after creation.');
+            }
+        });
+    }
 
     public function hasActiveOverride(): bool
     {

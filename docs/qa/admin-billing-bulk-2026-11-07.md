@@ -27,4 +27,32 @@ Source trackers: #337 / #316. Delivery order: first active batch.
 
 Use fictional tenants and mocked mail/payment delivery. Required PHP8.4/full suite, native MariaDB concurrency and authenticated desktop/mobile billing journeys must pass for the final HEAD. Preserve sales, payments, stock, subscriptions, fiscal references, printers and pairing. Unknown legacy terms require explicit review rather than guessed backfill.
 
-Initial validation: source inspection only. Runtime and browser acceptance pending. No production access or release action.
+## First implementation increment — assignment evidence
+
+The real synthetic payment-approval route reproduced a missing snapshot: the
+new subscription's purchase_snapshot was null. Assignment now stores version 1
+catalogue identity, feature flags, limits, quoted package/branch price and period
+under the existing company lock and a locked plan read. A nullable additive
+migration leaves legacy history unknown; no backfill or price policy change.
+Normal Eloquent updates reject replacing or adding historical snapshots. This
+is an application write guard, not a database trigger against arbitrary SQL.
+
+The snapshot describes assignment-time package terms, not bank receipt or net
+distributor payment. It is not yet the authoritative entitlement reader. The DI
+self-subscribe path, signup/trials, submitted purchase quote, add-on documents,
+invoices/receipts, purchased-access enforcement, prorated upgrades and reversals
+still require implementation/reconciliation. The checklist above stays open.
+
+Local PHP8.3.6/SQLite tests passed: 51 tests /1178 assertions for the new actual
+HTTP DI/PRA/FBR POS snapshot regressions plus renewal, instant-access, annual
+pricing and account-overview suites. Tests cover catalogue edits, duplicate
+approval, write immutability, unknown legacy rows and another tenant. The
+initial adjacent add-on run hit missing local GD; GD was added to the private
+runtime and the unchanged add-on suite was rerun. Supported PHP8.4/full-suite
+and native MariaDB validation remain hosted requirements. The existing native
+two-worker paid-renewal probe now also asserts snapshot stability across plan
+edits and approval retry. Syntax and diff checks pass.
+
+No UI markup changed in this increment. A full authenticated billing journey
+and native result must still be verified on the published commit. This PR is
+work in progress and is not ready for owner approval/deployment.

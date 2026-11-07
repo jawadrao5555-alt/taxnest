@@ -114,12 +114,28 @@ try {
         || $foreign->fresh()->getAttributes() !== $foreignBefore) {
         throw new RuntimeException('Concurrent renewal changed or duplicated a paid term.');
     }
+    $purchaseSnapshot = $new->purchase_snapshot;
+    if (!is_array($purchaseSnapshot) || ($purchaseSnapshot['version'] ?? null) !== 1
+        || ($purchaseSnapshot['company_id'] ?? null) !== $company->id
+        || ($purchaseSnapshot['plan']['invoice_limit'] ?? null) !== 100
+        || ($purchaseSnapshot['price']['final_price'] ?? null) !== (string) $new->final_price
+        || ($purchaseSnapshot['period']['end'] ?? null) !== $new->end_date->toDateString()) {
+        throw new RuntimeException('Concurrent approval did not retain the purchased plan and period.');
+    }
+    $plan->update(['invoice_limit' => 5, 'price' => 8000]);
+    if ($new->fresh()->purchase_snapshot !== $purchaseSnapshot) {
+        throw new RuntimeException('Catalogue editing changed retained purchase evidence.');
+    }
     approveRenewal($proof->id, $plan->id, $admin->id);
     if (Subscription::where('company_id', $company->id)->count() !== 2
         || AdminAuditLog::where('target_type', 'PaymentProof')->where('target_id', $proof->id)
             ->where('action', 'Payment proof approved')->count() !== 1) {
         throw new RuntimeException('Renewal retry duplicated a subscription or approval audit.');
     }
+    if ($new->fresh()->purchase_snapshot !== $purchaseSnapshot || $old->fresh()->purchase_snapshot !== null) {
+        throw new RuntimeException('Retry changed purchase evidence or backfilled unknown history.');
+    }
+    echo "PASS: native purchase snapshot survives catalogue edit and concurrent approval retry\n";
     echo "PASS: native concurrent paid renewal preserves remaining term once; retry and other company preserved\n";
 } finally {
     foreach ($processes as $process) if ($process->isRunning()) $process->stop(1);

@@ -6,7 +6,7 @@ use App\Services\GitHubActionsOidcVerifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Jose\Component\Core\Util\RSAKey;
-use Jose\Component\KeyManagement\JWKFactory;
+use Jose\Component\Core\JWK;
 use Tests\TestCase;
 
 class GitHubActionsOidcVerifierTest extends TestCase
@@ -18,11 +18,16 @@ class GitHubActionsOidcVerifierTest extends TestCase
     {
         parent::setUp();
 
-        $key = JWKFactory::createRSAKey(2048, [
-            'kid' => 'deterministic-test-kid',
-            'use' => 'sig',
-            'alg' => 'RS256',
-        ]);
+        // Public, synthetic test-only RSA key. Per-case OpenSSL key generation
+        // failed before the verifier ran in full CI; entropy is not the behavior
+        // under test. Real signing/verification and every rejection remain tested.
+        $key = new JWK(json_decode((string) file_get_contents(
+            base_path('tests/Fixtures/github-actions-oidc-synthetic-jwk.json')
+        ), true, 512, JSON_THROW_ON_ERROR));
+        $this->assertSame('RSA', $key->get('kty'));
+        $modulus = base64_decode(strtr($key->get('n'), '-_', '+/'), true);
+        $this->assertNotFalse($modulus);
+        $this->assertSame(256, strlen($modulus), 'Keep the real RSA-2048 test contract.');
         $this->signingKey = $key;
         Http::fake([
             'https://token.actions.githubusercontent.com/.well-known/jwks' => Http::response([
@@ -49,7 +54,7 @@ class GitHubActionsOidcVerifierTest extends TestCase
         $encodedHeader = $this->base64url(json_encode($header, JSON_THROW_ON_ERROR));
         $encodedClaims = $this->base64url(json_encode($claims, JSON_THROW_ON_ERROR));
         $signingInput = $encodedHeader.'.'.$encodedClaims;
-        openssl_sign($signingInput, $signature, RSAKey::createFromJWK($key)->toPEM(), OPENSSL_ALGO_SHA256);
+        $this->assertTrue(openssl_sign($signingInput, $signature, RSAKey::createFromJWK($key)->toPEM(), OPENSSL_ALGO_SHA256));
         $this->token = $signingInput.'.'.$this->base64url($signature);
     }
 
@@ -109,7 +114,7 @@ class GitHubActionsOidcVerifierTest extends TestCase
         $payload = $this->base64url(json_encode($claims, JSON_THROW_ON_ERROR));
         $input = $parts[0].'.'.$payload;
         // The verifier must reject identity changes even when the signature is valid.
-        openssl_sign($input, $signature, RSAKey::createFromJWK($this->signingKey)->toPEM(), OPENSSL_ALGO_SHA256);
+        $this->assertTrue(openssl_sign($input, $signature, RSAKey::createFromJWK($this->signingKey)->toPEM(), OPENSSL_ALGO_SHA256));
         return $input.'.'.$this->base64url($signature);
     }
 

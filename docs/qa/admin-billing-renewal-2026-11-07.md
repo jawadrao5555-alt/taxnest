@@ -25,6 +25,11 @@ customer records are backfilled. The payment audit includes the resulting term.
 - Focused local tests cover DI, PRA POS and FBR POS, repeated payment approval,
   trial conversion, ambiguous active terms, rollback and another company.
 - The adjacent annual-price and company-account overview tests passed locally.
+- The combined focused run passed 46 tests and 1120 assertions.
+- Hosted native acceptance runs two independent approval-controller processes
+  against one payment proof, then retries it and checks the original term,
+  exactly one new subscription/approval audit, and a second company's records.
+  Its result must be verified on the updated published commit.
 - Local PHP is 8.3.6 with SQLite, below the repository's unchanged PHP 8.4.1
   requirement. Hosted PHP 8.4 full-suite and native MariaDB gates remain required.
 - No UI markup changes. The real payment approval HTTP endpoint is exercised

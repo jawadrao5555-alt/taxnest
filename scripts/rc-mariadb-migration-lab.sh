@@ -98,6 +98,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_staff_discount_concurrency.php"
     clean_php php "$ROOT/tests/native/rc_paid_renewal.php" | tee "$EVIDENCE_DIR/paid-renewal.log"
     grep -Fqx "PASS: native concurrent paid renewal preserves remaining term once; retry and other company preserved" "$EVIDENCE_DIR/paid-renewal.log" || fail paid-renewal-missing-success-proof
+    grep -Fqx "PASS: native concurrent reviewed payment retains one immutable invoice and receipt" "$EVIDENCE_DIR/paid-renewal.log" || fail paid-renewal-documents-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
     clean_php php "$ROOT/tests/native/rc_pra_incident_timeline.php"
     clean_php php "$ROOT/tests/native/rc_survey_company_response.php"

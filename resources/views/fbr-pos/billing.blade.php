@@ -88,6 +88,8 @@
                 @endforeach
             </div>
 
+            @include('billing._subscription-history')
+
             <div class="mt-8 text-center">
                 <div class="inline-flex flex-wrap items-center justify-center gap-6 text-xs text-gray-400">
                     <span class="flex items-center gap-1.5">

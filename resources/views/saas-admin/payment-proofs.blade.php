@@ -214,6 +214,11 @@
                                             <p class="text-[11px] text-gray-500 pt-1">
                                                 Billing: {{ ucfirst($paCycleSel) }} — kept exactly as the shop requested and paid for.
                                             </p>
+                                            <div>
+                                                <label class="block text-[11px] text-gray-400 mb-1">Amount verified in bank/receipt (PKR)</label>
+                                                <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                                <p class="text-[11px] text-gray-500 mt-1">Independent reviewer amount; the company-entered claim is not used as receipt evidence.</p>
+                                            </div>
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Add-on</button>
                                         </form>
                                     </div>
@@ -247,6 +252,8 @@
                                         <p class="text-[11px] text-gray-500">Current purchased balance: {{ number_format($aiBalance) }} pages</p>
                                         <form method="POST" action="{{ route('saas.admin.payment-proofs.approve', $proof->id) }}" class="space-y-2">
                                             @csrf
+                                            <label class="block text-[11px] text-gray-400">Amount verified in bank/receipt (PKR)</label>
+                                            <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Add {{ number_format($aiQty) }} Pages</button>
                                         </form>
                                     </div>
@@ -262,6 +269,8 @@
                                             @csrf
                                             <label class="block text-[11px] text-gray-400">Branch slots to add</label>
                                             <input type="number" name="extra_branch_qty" value="{{ $ebQtySel }}" min="1" max="{{ \App\Services\BranchAddonService::MAX_QTY }}" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                            <label class="block text-[11px] text-gray-400">Amount verified in bank/receipt (PKR)</label>
+                                            <input type="number" name="verified_received_amount" value="{{ old('verified_received_amount', $proof->amount) }}" step="0.01" min="0.01" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Extra Branch</button>
                                         </form>
                                     </div>

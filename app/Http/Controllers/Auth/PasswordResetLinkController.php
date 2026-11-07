@@ -267,7 +267,11 @@ class PasswordResetLinkController extends Controller
         // grant. Its deadline is the original OTP deadline, never extended.
         $claimed = DB::table('password_reset_otps')->where('id', $record->id)
             ->where('used', false)->where('expires_at', '>', now())
-            ->update(['used' => true, 'reset_grant_hash' => hash('sha256', $token), 'updated_at' => now()]);
+            ->update(['used' => true, 'reset_grant_hash' => hash('sha256', $token),
+                // Some existing MariaDB schemas implicitly attach ON UPDATE
+                // CURRENT_TIMESTAMP to the first non-null TIMESTAMP column.
+                // Claiming the OTP must never change its original deadline.
+                'expires_at' => $record->expires_at, 'updated_at' => now()]);
 
         return $claimed === 1 ? $token : null;
     }

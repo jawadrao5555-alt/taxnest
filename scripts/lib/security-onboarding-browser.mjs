@@ -4,7 +4,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     await page.context().clearCookies();
     await login(page,{...t,login:loginName,password});
     await page.goto(baseUrl+'/onboarding',{waitUntil:'domcontentloaded'});
-    await page.getByRole('heading',{name:'Welcome to TaxNest',exact:true}).waitFor();
+    await page.getByRole('heading',{name:"Let's set up your account",exact:true}).waitFor();
   };
   await signIn(fixture.incomplete);
   if(await page.locator('form[action="/onboarding/complete"]').count())throw Error('Incomplete setup exposes completion');
@@ -12,7 +12,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   const rejected=await page.request.post(baseUrl+'/onboarding/complete',{form:{_token:csrf},maxRedirects:0});
   if(rejected.status()!==302||new URL(rejected.headers().location,baseUrl).pathname!=='/onboarding')throw Error('Incomplete setup bypassed validation');
   await page.reload({waitUntil:'domcontentloaded'});
-  await page.getByRole('heading',{name:'Welcome to TaxNest',exact:true}).waitFor();
+  await page.getByRole('heading',{name:"Let's set up your account",exact:true}).waitFor();
   await saveEvidenceScreenshot(page,'rc-security-incomplete-'+v.width);
   await Promise.all([page.waitForURL(u=>u.pathname==='/dashboard'),page.getByRole('button',{name:'Skip Setup',exact:true}).click()]);
   await page.goto(baseUrl+'/onboarding',{waitUntil:'domcontentloaded'});
@@ -49,7 +49,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     await saveEvidenceScreenshot(page,'rc-security-reset-revoked-'+v.width);
     await login(page,{...t,login:fixture.reset.email,password:fixture.reset.newPassword});
     await page.goto(baseUrl+'/onboarding',{waitUntil:'domcontentloaded'});
-    await page.getByRole('heading',{name:'Welcome to TaxNest',exact:true}).waitFor();
+    await page.getByRole('heading',{name:"Let's set up your account",exact:true}).waitFor();
     if(errors.length)throw Error('Reset browser errors: '+errors.join('; '));
   } finally {await recoveryContext.close();}
   pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login');

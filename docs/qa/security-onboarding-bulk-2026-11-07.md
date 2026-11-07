@@ -156,3 +156,16 @@ refuses an incorrect recovery destination immediately, retaining all original
 form/revocation assertions. Local backend regression run:8 tests/75 assertions
 passed; Node syntax/diff checks passed. Original pointer and recovery failures
 require fresh hosted browser evidence; no browser pass is claimed here.
+
+The next browser trace at3c4c936dd34ef36a1824ae71f494c26c5667108e
+localized recovery rejection to GET /reset-password after successful link
+consumption. Link claim now explicitly preserves expires_at in its atomic
+update, supporting legacy MariaDB first-TIMESTAMP ON UPDATE behavior instead
+of allowing the claim to change the original deadline. Native acceptance now
+starts through the actual link controller, verifies the unchanged deadline
+and issued grant, then runs the existing competing final-reset workers. This
+compatibility correction still requires native/browser confirmation at the
+next HEAD; no confirmed root-cause or browser success claim is made yet.
+Mobile acceptance checks the visible main setup heading rather than a toolbar
+heading that is hidden at390px; form completion/skip/recovery and real click
+assertions remain. No force click, artificial DOM unhide or gate suppression.

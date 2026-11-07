@@ -101,6 +101,7 @@ concurrency(){
     clean_php php "$ROOT/tests/native/rc_password_reset_grant.php" | tee "$EVIDENCE_DIR/password-reset-grant.log"
     grep -Fqx "PASS: native password reset grant permits one concurrent completion and preserves other account" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-grant-missing-success-proof
     grep -Fqx "PASS: native reset rotates the company browser session generation atomically" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-session-generation-missing-success-proof
+    grep -Fqx "PASS: native reset link claim preserves its original TIMESTAMP deadline" "$EVIDENCE_DIR/password-reset-grant.log" || fail password-reset-link-deadline-missing-success-proof
     clean_php php "$ROOT/tests/native/rc_elaan_scope.php"
     clean_php php "$ROOT/tests/native/rc_pra_incident_timeline.php"
     clean_php php "$ROOT/tests/native/rc_survey_company_response.php"

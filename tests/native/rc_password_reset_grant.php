@@ -51,9 +51,25 @@ $foreign = User::create(['name' => 'Synthetic reset other owner', 'company_id' =
     'password' => bcrypt('SyntheticOther123!'), 'role' => 'company_admin']);
 $foreignBefore = $foreign->fresh()->getAttributes();
 $token = bin2hex(random_bytes(32));
+$deadline = now()->addMinutes(15)->format('Y-m-d H:i:s');
 $recordId = DB::table('password_reset_otps')->insertGetId(['email' => $user->email, 'otp' => '123456',
-    'token' => bin2hex(random_bytes(32)), 'product_type' => 'di', 'used' => true,
-    'reset_grant_hash' => hash('sha256', $token), 'expires_at' => now()->addMinutes(15), 'created_at' => now(), 'updated_at' => now()]);
+    'token' => $token, 'product_type' => 'di', 'used' => false,
+    'expires_at' => $deadline, 'created_at' => now(), 'updated_at' => now()]);
+// Consume the ACTUAL link controller before the competing final form workers.
+// SQLite cannot prove MariaDB's implicit TIMESTAMP update compatibility.
+$session = app('session')->driver();
+$request = Request::create('/reset-password-link', 'GET', ['email' => $user->email, 'token' => $token, 'panel' => 'di']);
+$request->setLaravelSession($session);
+app()->instance('request', $request);
+$consumed = app(\App\Http\Controllers\Auth\PasswordResetLinkController::class)->resetViaLink($request);
+$token = $session->get('password_reset_token');
+$claimed = DB::table('password_reset_otps')->find($recordId);
+if (!$token || $claimed->expires_at !== $deadline || !$claimed->used
+    || $claimed->reset_grant_hash !== hash('sha256', $token)
+    || parse_url($consumed->getTargetUrl(), PHP_URL_PATH) !== '/reset-password') {
+    throw new RuntimeException('Native link consumption changed its original deadline or lost its grant.');
+}
+echo "PASS: native reset link claim preserves its original TIMESTAMP deadline\n";
 $barrier = dirname($socket).'/reset-grant-'.$suffix;
 $processes = [];
 try {

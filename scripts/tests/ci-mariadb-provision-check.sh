@@ -59,13 +59,37 @@ if RC_MARIADB_VERSION=10.6.23 PATH="$tmp:/usr/bin:/bin" \
     fail 'MariaDB version check accepted a matching --version output with exit 1'
 fi
 
+job_block() {
+    # Bound evidence to the actual job, not an arbitrary line budget or the
+    # following job's uploader. New acceptance steps can legitimately make a
+    # lane longer without changing its always-uploaded evidence contract.
+    awk -v job="$1" '
+        $0 == "  " job ":" { inside = 1; next }
+        inside && /^  [A-Za-z0-9_-]+:/ { exit }
+        inside { print }
+    ' "$2"
+}
+
 for lane in workflow-safety dependency-audit-build fullphpunit native-mariadb-di \
     browserdesktopmobile jsagentrealtime manifest-provenance; do
     # Consume the full pipe: grep -q can close early and SIGPIPE the producer.
-    grep -A120 "^  ${lane}:" "$workflow" |
+    job_block "$lane" "$workflow" |
         grep -F 'actions/upload-artifact@v4' >/dev/null ||
         fail "$lane lacks its always-uploaded evidence artifact"
 done
+
+# The real extractor must accept an uploader beyond line 120, while refusing
+# a missing uploader even when the next job has one. No false cross-job green.
+{
+    printf '  long-lane:\n'
+    for ((i=0;i<130;i++)); do printf '      # synthetic acceptance line\n'; done
+    printf '      uses: actions/upload-artifact@v4\n  missing-lane:\n      steps: []\n  following-lane:\n      uses: actions/upload-artifact@v4\n'
+} >"$tmp/evidence-workflow.yml"
+job_block long-lane "$tmp/evidence-workflow.yml" | grep -F 'actions/upload-artifact@v4' >/dev/null || fail 'long-job evidence extraction regressed'
+if job_block missing-lane "$tmp/evidence-workflow.yml" | grep -F 'actions/upload-artifact@v4' >/dev/null; then
+    fail 'evidence from another job was accepted'
+fi
+printf 'PASS: evidence extraction accepts long jobs and rejects next-job uploaders.\n'
 
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-discovery-check.py"
 python3 "$(dirname "${BASH_SOURCE[0]}")/rc-mariadb-startup-check.py"

@@ -132,3 +132,14 @@ Owner's latest delivery decision: finish all three workstreams (#363/#364/#365),
 then combine on a feature branch based on current main and perform fresh
 combined full-suite/native/desktop/mobile acceptance before one owner release.
 This does not authorize an agent merge to main, approval, relay or deployment.
+
+CI iteration: run42368848487 at161b66eb062afc41f807cd9d4e2a2cff16d7e23c
+failed Workflow and release safety because ci-mariadb-provision-check.sh only
+searched the first120 lines of each job for its artifact uploader. Adding the
+new browser acceptance moved the existing uploader beyond that arbitrary
+window. Replaced the bounded line budget with exact job-block extraction;
+the uploader requirement remains. Added positive long-job and negative
+next-job-uploader regression checks. Those checks plus38 discovery and12
+startup regression cases pass locally. The subsequent fixture socket test is
+blocked by this environment's Unix-socket EPERM; hosted safety must verify the
+updated HEAD. Other earlier checks do not confer readiness on the update.

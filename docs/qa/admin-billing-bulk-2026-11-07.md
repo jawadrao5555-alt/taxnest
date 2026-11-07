@@ -334,6 +334,12 @@ unavailable in this current workspace, so no local PHP/native pass is claimed;
 the exact published HEAD requires hosted PHP8.4, MariaDB, browser and validate
 evidence.
 
+The first hosted native migration stopped before exercising runtime logic
+because Laravel's generated invoice foreign-key identifier exceeded MariaDB's
+64-character limit. The migration now uses explicit short FK and index names;
+no constraint, assertion or business rule was removed. Fresh exact-HEAD hosted
+evidence is required after this correction.
+
 This closes the explicit audited credit/refund/reversal runtime slice without
 approving a new commercial policy. Existing-policy upgrade/proration behavior
 and remaining mobile/Agent/API companion parity stay open.

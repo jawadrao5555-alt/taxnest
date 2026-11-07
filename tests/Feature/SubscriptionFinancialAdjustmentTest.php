@@ -192,6 +192,7 @@ class SubscriptionFinancialAdjustmentTest extends TestCase
     {
         $f = $this->fixture('support');
         $this->postAdjustment($f)->assertSessionHasErrors('adjustment');
+        auth('admin')->logout();
         $companyUser = \App\Models\User::create([
             'name' => 'Synthetic tenant user',
             'email' => Str::uuid().'@adjustment.invalid',

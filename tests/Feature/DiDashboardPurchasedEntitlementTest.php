@@ -18,6 +18,7 @@ class DiDashboardPurchasedEntitlementTest extends TestCase
             'product_type' => 'di',
             'status' => 'approved',
             'company_status' => 'active',
+            'onboarding_completed' => true,
         ]);
         $plan = PricingPlan::create([
             'name' => 'Kaarobar',

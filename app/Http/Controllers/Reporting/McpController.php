@@ -135,6 +135,7 @@ final class McpController extends Controller
                     'bill_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name', 'bill_id']],
             ['get_diagnostic_source_evidence', 'Registered source metadata for PRA, DI, FBR POS or Healthcare. At most seven dates. IDs/timestamps only; missing sources and incomplete collection remain explicit. No fiscal requests or retries.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
+                    'branch_id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Optional exact company branch. Sources without a retained branch key return BRANCH_SCOPE_UNAVAILABLE.'],
                     'source' => ['type' => 'string', 'enum' => array_keys(\App\Services\Reporting\DiagnosticSourceEvidence::SOURCES)]], ['company_name', 'date_from', 'source']],
             ['get_pra_operations_evidence', 'PRA cash source reconciliation, print attempt chains or retained Agent collection samples. At most seven dates; cash uses stored business dates, other streams use server receipt dates. Explicit gaps, no business writes or retries. Cash pages allow at most ten reports.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [

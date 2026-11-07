@@ -90,4 +90,57 @@ class DiagnosticSourceEvidenceTest extends TestCase
             $this->assertStringNotContainsString('PRIVATE', json_encode($r));
         }
     }
+
+    public function test_optional_branch_scope_is_exact_and_never_falls_back_to_company_wide_rows(): void
+    {
+        Schema::create('branches', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->dateTime('created_at');
+        });
+        DB::table('branches')->insert([
+            ['id' => 10, 'company_id' => 5, 'created_at' => '2026-11-06 20:00:00'],
+            ['id' => 11, 'company_id' => 5, 'created_at' => '2026-11-06 20:00:00'],
+            ['id' => 20, 'company_id' => 2, 'created_at' => '2026-11-06 20:00:00'],
+        ]);
+        Schema::create('pos_transactions', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->unsignedBigInteger('branch_id')->nullable();
+            $t->dateTime('created_at');
+            $t->text('private_payload');
+        });
+        DB::table('pos_transactions')->insert([
+            ['id' => 1, 'company_id' => 5, 'branch_id' => 10, 'created_at' => '2026-11-06 20:00:00', 'private_payload' => 'PRIVATE-SELECTED'],
+            ['id' => 2, 'company_id' => 5, 'branch_id' => 11, 'created_at' => '2026-11-06 20:00:00', 'private_payload' => 'PRIVATE-OTHER-BRANCH'],
+            ['id' => 3, 'company_id' => 2, 'branch_id' => 20, 'created_at' => '2026-11-06 20:00:00', 'private_payload' => 'PRIVATE-FOREIGN'],
+        ]);
+
+        $service = app(DiagnosticSourceEvidence::class);
+        $r = $service->read(['company_name' => 'Synthetic PRA', 'date_from' => '2026-11-07',
+            'source' => 'pos.sales', 'branch_id' => 10], [5]);
+        $this->assertSame([1], array_column($r['rows'], 'id'));
+        $this->assertSame(['id' => 10, 'scope' => 'exact'], $r['branch']);
+        $this->assertSame('UNAVAILABLE_FOR_BRANCH_SCOPE', $r['collection_observation']['status']);
+        $this->assertStringNotContainsString('PRIVATE', json_encode($r));
+
+        $branch = $service->read(['company_name' => 'Synthetic PRA', 'date_from' => '2026-11-07',
+            'source' => 'pos.branches', 'branch_id' => 11], [5]);
+        $this->assertSame([11], array_column($branch['rows'], 'id'));
+
+        Schema::create('pra_logs', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->dateTime('created_at');
+        });
+        DB::table('pra_logs')->insert(['id' => 9, 'company_id' => 5, 'created_at' => '2026-11-06 20:00:00']);
+        $unsupported = $service->read(['company_name' => 'Synthetic PRA', 'date_from' => '2026-11-07',
+            'source' => 'pra.fiscal', 'branch_id' => 10], [5]);
+        $this->assertSame('BRANCH_SCOPE_UNAVAILABLE', $unsupported['status']);
+        $this->assertSame([], $unsupported['rows']);
+
+        $this->expectException(ValidationException::class);
+        $service->read(['company_name' => 'Synthetic PRA', 'date_from' => '2026-11-07',
+            'source' => 'pos.sales', 'branch_id' => 20], [5]);
+    }
 }

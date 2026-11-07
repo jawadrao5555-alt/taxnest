@@ -129,6 +129,60 @@ try {
     }
     echo "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows\n";
 
+    $branchIds = [
+        'selected' => DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Synthetic selected '.$suffix,
+            'created_at' => $stamp, 'updated_at' => $stamp]),
+        'sibling' => DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Synthetic sibling '.$suffix,
+            'created_at' => $stamp, 'updated_at' => $stamp]),
+        'foreign' => DB::table('branches')->insertGetId(['company_id' => $other->id, 'name' => 'Synthetic foreign '.$suffix,
+            'created_at' => $stamp, 'updated_at' => $stamp]),
+    ];
+    $branchSaleIds = [];
+    foreach ($branchIds as $key => $branchId) {
+        $tenant = $key === 'foreign' ? $other->id : $company->id;
+        $branchSaleIds[$key] = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $tenant, 'branch_id' => $branchId, 'invoice_number' => 'RC-BRANCH-'.strtoupper($key).'-'.$suffix,
+            'invoice_mode' => 'local', 'pra_status' => 'local', 'status' => 'completed', 'transaction_type' => 'sale',
+            'subtotal' => 100, 'total_amount' => 100, 'payment_method' => 'cash',
+            'created_at' => $stamp, 'updated_at' => $stamp,
+        ]);
+    }
+    $branchBefore = [
+        'branches' => DB::table('branches')->whereIn('id', array_values($branchIds))->orderBy('id')->get()->toJson(),
+        'sales' => DB::table('pos_transactions')->whereIn('id', array_values($branchSaleIds))->orderBy('id')->get()->toJson(),
+    ];
+    $branchScoped = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.sales', 'date_from' => $day,
+        'branch_id' => $branchIds['selected'],
+    ], [$company->id]);
+    $branchRow = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.branches', 'date_from' => $day,
+        'branch_id' => $branchIds['sibling'],
+    ], [$company->id]);
+    $unsupportedBranch = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pra.fiscal', 'date_from' => $day,
+        'branch_id' => $branchIds['selected'],
+    ], [$company->id]);
+    try {
+        app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+            'company_name' => $company->name, 'source' => 'pos.sales', 'date_from' => $day,
+            'branch_id' => $branchIds['foreign'],
+        ], [$company->id]);
+        throw new RuntimeException('Foreign branch was accepted.');
+    } catch (\Illuminate\Validation\ValidationException) {
+        // Expected: branch ownership is validated before any source read.
+    }
+    if (array_column($branchScoped['rows'], 'id') !== [(int) $branchSaleIds['selected']]
+        || $branchScoped['collection_observation']['status'] !== 'UNAVAILABLE_FOR_BRANCH_SCOPE'
+        || array_column($branchRow['rows'], 'id') !== [(int) $branchIds['sibling']]
+        || $unsupportedBranch['status'] !== 'BRANCH_SCOPE_UNAVAILABLE' || $unsupportedBranch['rows'] !== []
+        || str_contains(json_encode([$branchScoped, $branchRow, $unsupportedBranch]), 'Synthetic selected')
+        || $branchBefore['branches'] !== DB::table('branches')->whereIn('id', array_values($branchIds))->orderBy('id')->get()->toJson()
+        || $branchBefore['sales'] !== DB::table('pos_transactions')->whereIn('id', array_values($branchSaleIds))->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native exact branch source scope or row preservation failed');
+    }
+    echo "PASS: native exact branch source scope excludes sibling and foreign rows; company-wide collection is not branch proof\n";
+
     $health = Company::create(['name' => 'Synthetic health diagnostic '.$suffix, 'ntn' => 'h'.$suffix, 'product_type' => 'erps']);
     $otherHealth = Company::create(['name' => 'Other health diagnostic '.$suffix, 'ntn' => 'y'.$suffix, 'product_type' => 'erps']);
     $healthBill = DB::table('health_bills')->insertGetId([

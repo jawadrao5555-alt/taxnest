@@ -240,3 +240,21 @@ for matching. Focused SQLite coverage and the mandatory native probe preserve
 all source bytes. Lab-order (no retained lab-order table exists in the current
 runtime) and bill-level Healthcare print associations (only aggregate collection
 health is retained) remain explicit gaps rather than being guessed.
+
+## Exact branch-scoped source reads (registry v6)
+
+The registered source report now accepts an optional exact branch ID. The
+branch must belong to the already authorized company. A source is filtered only
+when the retained source table has a branch key, when a DI fiscal row can use
+its same-company invoice branch, or when the source is the branch row itself.
+Any other source returns BRANCH_SCOPE_UNAVAILABLE; it never silently widens
+to company-wide data. Existing daily collection observations remain explicitly
+company-wide and are returned as unavailable for branch proof.
+
+Focused coverage requires selected-branch rows only, sibling/foreign exclusion,
+explicit unsupported-source state, redacted payloads and unchanged source
+bytes. The mandatory native MariaDB probe repeats those checks against migrated
+tables and preserves the earlier concurrency, shared-source, IMS/print and
+Healthcare attribution gates. This closes only bounded branch filtering for
+registered sources. Branch-level collection completeness, bounded exports,
+release/job/backup adapters and full field evidence remain open.

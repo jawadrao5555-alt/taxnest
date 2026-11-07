@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 5;
+    public const REGISTRY_VERSION = 6;
 
     public const SOURCES = [
         'pra.fiscal' => ['pos', 'pra_logs', 'created_at'],
@@ -57,10 +57,11 @@ final class DiagnosticSourceEvidence
 
     public function read(array $args, ?array $allowed): array
     {
-        if (array_diff(array_keys($args), ['company_name', 'company_id', 'date_from', 'date_to', 'source', 'after_id', 'limit'])) {
+        if (array_diff(array_keys($args), ['company_name', 'company_id', 'branch_id', 'date_from', 'date_to', 'source', 'after_id', 'limit'])) {
             throw ValidationException::withMessages(['arguments' => 'Unsupported source evidence filter.']);
         }
         $v = validator($args, ['company_name' => 'required|string|min:2|max:150', 'company_id' => 'nullable|integer|min:1',
+            'branch_id' => 'nullable|integer|min:1',
             'date_from' => 'required|date_format:Y-m-d', 'date_to' => 'nullable|date_format:Y-m-d',
             'source' => 'required|in:'.implode(',', array_keys(self::SOURCES)),
             'after_id' => 'nullable|integer|min:0', 'limit' => 'nullable|integer|min:1|max:50'])->validate();
@@ -87,20 +88,33 @@ final class DiagnosticSourceEvidence
             throw ValidationException::withMessages(['company_name' => 'Exact company is ambiguous, unavailable or outside this connection scope.']);
         }
         $company = $matches->sole();
+        $branchId = isset($v['branch_id']) ? (int) $v['branch_id'] : null;
+        if ($branchId !== null) {
+            if (! Schema::hasTable('branches') || ! Schema::hasColumn('branches', 'id')
+                || ! Schema::hasColumn('branches', 'company_id')
+                || ! DB::table('branches')->where('id', $branchId)->where('company_id', $company->id)->exists()) {
+                throw ValidationException::withMessages(['branch_id' => 'Branch is unavailable or outside the selected company.']);
+            }
+        }
         [$product, $table, $stamp] = self::SOURCES[$v['source']];
         $fixed = self::SOURCES[$v['source']][3] ?? [];
         if (\App\Support\NestErps::canonicalProductType($company->product_type) !== $product) {
             throw ValidationException::withMessages(['source' => 'This source does not apply to the selected product.']);
         }
         $meta = ['company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $company->product_type],
+            'branch' => $branchId === null ? null : ['id' => $branchId, 'scope' => 'exact'],
             'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'basis' => 'stored_server_calendar', 'timezone' => $tz],
             'as_of' => Carbon::now($tz)->toIso8601String(), 'registry_version' => self::REGISTRY_VERSION, 'source' => $v['source'],
-            'collection_observation' => app(DiagnosticSourceCollection::class)->latest((int) $company->id, $v['source'], $from->toDateString(), $to->toDateString()),
+            'collection_observation' => $branchId === null
+                ? app(DiagnosticSourceCollection::class)->latest((int) $company->id, $v['source'], $from->toDateString(), $to->toDateString())
+                : ['status' => 'UNAVAILABLE_FOR_BRANCH_SCOPE',
+                    'reason' => 'Stored collection observations are company-wide and are not proof of branch collection.'],
             'coverage' => ['complete' => false, 'seven_day_complete' => false, 'collection_status' => 'UNKNOWN',
                 'deleted_or_never_collected_events' => 'UNKNOWN', 'sequence_gaps' => 'UNAVAILABLE', 'client_clock_skew' => 'UNAVAILABLE'],
             'notes' => ['Stored event presence does not establish complete collection, regulator acceptance or product health.',
                 'Missing tables are unavailable; an empty window proves only that no retained rows matched.',
                 'Rows contain IDs and timestamps only. Regulatory payloads, patient data, customer details and credentials are excluded.',
+                'Branch filtering is applied only through an exact retained branch key; sources without one return BRANCH_SCOPE_UNAVAILABLE.',
                 'Pages use immutable IDs, not a database snapshot; re-read for late arrivals. DI logs whose source invoice was deleted cannot be attributed.']];
         if ($v['source'] === 'pos.offline_samples') {
             $meta['related_operation'] = ['name' => 'get_pra_operations_evidence', 'stream' => 'agent_collection',
@@ -120,6 +134,18 @@ final class DiagnosticSourceEvidence
                 $q->join('invoices as i', 'i.id', '=', 'e.invoice_id')->where('i.company_id', $company->id);
             } else {
                 $q->where('e.company_id', $company->id);
+            }
+            if ($branchId !== null) {
+                if ($table === 'branches') {
+                    $q->where('e.id', $branchId);
+                } elseif ($v['source'] === 'di.fiscal' && Schema::hasColumn('invoices', 'branch_id')) {
+                    $q->where('i.branch_id', $branchId);
+                } elseif (Schema::hasColumn($table, 'branch_id')) {
+                    $q->where('e.branch_id', $branchId);
+                } else {
+                    return $meta + ['status' => 'BRANCH_SCOPE_UNAVAILABLE', 'observed' => null, 'rows' => [],
+                        'pagination' => ['has_more' => false, 'next_after_id' => null]];
+                }
             }
             foreach ($fixed as $column => $value) {
                 $q->where('e.'.$column, $value);

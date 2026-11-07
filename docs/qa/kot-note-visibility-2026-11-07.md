@@ -36,7 +36,8 @@ Removing the gate or migrating every company to ON would override saved choices.
 - `node --test scripts/tests/customer-bulk-print-flows.test.mjs scripts/tests/b03-table-commit.test.mjs`: **9 tests PASS**.
 - PHP syntax, Blade compilation, Node syntax, Vite asset build and whitespace check pass.
 - Full `php artisan test` was started; unsupported PHP 8.3 fails the unchanged Composer platform contract. The run was then blocked by automatic approval review because it unexpectedly contacts an external PRA fiscal endpoint, outside the local-only test boundary. It was not resumed or rerun; there is no full-suite PASS. External fiscal calls must be isolated/faked in the verification environment before that lane can be safely accepted. Targeted local tests remain the completed application evidence.
-- `php scripts/pos-i18n-check.php` reports existing hardcoded staff-discount/bulk-rider labels on unchanged main; all referenced locale keys have parity and no missing keys. The new copy is translated in en/rur/ur. No guard was weakened.
+- Readiness follow-up: the existing sale-screen release preflight was reproduced failing on 20 hardcoded staff-discount, proof-bill and bulk-rider labels. These labels now use en/rur/ur translation keys while preserving the English wording and behavior. `php scripts/pos-i18n-check.php` now **PASS**: PRA 377 baked keys / FBR 289, no missing keys or dynamic-access problems. No guard was changed.
+- Readiness Node rerun including rider selection: **12 tests PASS**; syntax and whitespace checks pass.
 - Browser bootstrap attempted: pinned Playwright download repeatedly returned truncated archives; separately extracted Google Chrome starts its version command but actual headless launch through the repository helper exits SIGSEGV in this sandbox. **No local Chrome UI pass or native MariaDB pass is claimed.**
 
 ## Required hosted acceptance

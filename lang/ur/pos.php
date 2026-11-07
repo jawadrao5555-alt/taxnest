@@ -7254,5 +7254,27 @@ return [
     'kot_note_saving' => 'محفوظ ہو رہا ہے…',
     'kot_note_ask_admin' => 'مالک یا منیجر سے کچن سیٹنگز میں آرڈر نوٹس آن کروائیں۔',
     'kot_note_save_failed' => 'KOT نوٹس آن نہیں ہوئے۔ کنکشن اور اجازت چیک کرکے دوبارہ کوشش کریں۔',
+
+    // Existing sale copy required by the release translation guard.
+    'sale_staff_requests_settings' => 'عملے / خاندان کی درخواستیں اور مالک کی سیٹنگز',
+    'sale_staff_request_discount' => 'عملے / خاندان کے ڈسکاؤنٹ کی درخواست کریں',
+    'sale_staff_choose_employee' => 'ملازم منتخب کریں',
+    'sale_staff_payment_hint' => 'کیش/کارڈ سے پہلے درخواست بھیجی جاتی ہے۔ مالک کی منظوری چیک کرکے اسی طریقے سے بل فائنل کریں۔',
+    'sale_staff_check_approval' => 'منظوری چیک کریں',
+    'sale_staff_cancel_proposal' => 'درخواست منسوخ کریں',
+    'sale_proof_cash' => '🗎 پروف بل — کیش',
+    'sale_proof_card' => '🗎 پروف بل — کارڈ',
+    'sale_delivery_assign_selected' => 'منتخب ڈیلیوریاں تفویض کریں',
+    'sale_staff_kind' => 'عملہ یا خاندان',
+    'sale_staff_reason' => 'ڈسکاؤنٹ کی وجہ',
+    'sale_staff_discount_type' => 'عملے کے ڈسکاؤنٹ کی قسم',
+    'sale_staff_discount_value' => 'عملے کے ڈسکاؤنٹ کی مقدار',
+    'sale_delivery_selected_rider' => 'منتخب ڈیلیوریوں کا رائیڈر',
+    'sale_staff_online_cart' => 'عملے کی منظوری کے لیے انٹرنیٹ کے ساتھ نیا کارٹ درکار ہے۔',
+    'sale_staff_request_status' => 'ڈسکاؤنٹ درخواست: ',
+    'sale_staff_payment_instructions' => 'ملازم منتخب کریں، وجہ لکھیں اور فائنل ادائیگی کریں۔',
+    'sale_staff_check_before_payment' => 'ادائیگی سے پہلے مالک کی منظوری چیک کریں۔',
+    'sale_delivery_clear_selection' => 'انتخاب ختم کریں',
+    'sale_delivery_select_all_shown' => 'تمام دکھائی گئی ڈیلیوریاں منتخب کریں',
 ];
 

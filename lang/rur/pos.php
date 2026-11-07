@@ -7257,5 +7257,27 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_note_saving' => 'Save ho raha hai…',
     'kot_note_ask_admin' => 'Owner ya manager se Kitchen Settings mein order notes ON karwayein.',
     'kot_note_save_failed' => 'KOT notes ON nahi hue. Connection aur ijazat check karke dobara koshish karein.',
+
+    // Existing sale copy required by the release translation guard.
+    'sale_staff_requests_settings' => 'Staff / family ki requests aur owner settings',
+    'sale_staff_request_discount' => 'Staff / family discount ki request karein',
+    'sale_staff_choose_employee' => 'Employee chunein',
+    'sale_staff_payment_hint' => 'Cash/Card pehle request bhejta hai. Owner ki manzoori check karke usi payment tareeqay se bill final karein.',
+    'sale_staff_check_approval' => 'Manzoori check karein',
+    'sale_staff_cancel_proposal' => 'Request mansookh karein',
+    'sale_proof_cash' => '🗎 Proof Bill — Cash',
+    'sale_proof_card' => '🗎 Proof Bill — Card',
+    'sale_delivery_assign_selected' => 'Chuni hui deliveries assign karein',
+    'sale_staff_kind' => 'Staff ya family',
+    'sale_staff_reason' => 'Discount ki wajah',
+    'sale_staff_discount_type' => 'Staff discount ki qisam',
+    'sale_staff_discount_value' => 'Staff discount ki miqdar',
+    'sale_delivery_selected_rider' => 'Chuni hui deliveries ka rider',
+    'sale_staff_online_cart' => 'Staff ki manzoori ke liye internet ke sath naya cart chahiye.',
+    'sale_staff_request_status' => 'Discount request: ',
+    'sale_staff_payment_instructions' => 'Employee chunein, wajah likhein aur final payment karein.',
+    'sale_staff_check_before_payment' => 'Payment se pehle owner ki manzoori check karein.',
+    'sale_delivery_clear_selection' => 'Intikhab khatam karein',
+    'sale_delivery_select_all_shown' => 'Dikhai gai sab deliveries chunein',
 ];
 

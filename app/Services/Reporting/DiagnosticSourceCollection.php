@@ -23,7 +23,7 @@ final class DiagnosticSourceCollection
         [$product, $table, $stamp] = DiagnosticSourceEvidence::SOURCES[$source];
         if (!$company || NestErps::canonicalProductType($company->product_type) !== $product) throw new \InvalidArgumentException('Source does not apply to company.');
         $identity = ['company_id' => $companyId, 'source' => $source, 'business_date' => $day, 'run_id' => $run];
-        $result = ['registry_version' => 1, 'collected_at' => Carbon::now(config('app.timezone'))->format('Y-m-d H:i:s'), 'status' => 'UNAVAILABLE',
+        $result = ['registry_version' => DiagnosticSourceEvidence::REGISTRY_VERSION, 'collected_at' => Carbon::now(config('app.timezone'))->format('Y-m-d H:i:s'), 'status' => 'UNAVAILABLE',
             'retained_rows' => null, 'first_source_at' => null, 'last_source_at' => null];
         try {
             $required = ['id', $stamp, $source === 'di.fiscal' ? 'invoice_id' : 'company_id'];

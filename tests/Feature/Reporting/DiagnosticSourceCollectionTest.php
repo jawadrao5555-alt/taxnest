@@ -74,7 +74,7 @@ class DiagnosticSourceCollectionTest extends TestCase
         DB::table('pra_logs')->insert(['id'=>1,'company_id'=>1,'created_at'=>'2026-10-01 01:00:00','payload'=>'RETAIN-SOURCE']);
         $this->artisan('diagnostics:observe-sources')->assertSuccessful();
         $this->assertSame(0, DB::table('diagnostic_source_observations')->where('collected_at','<','2026-10-31 12:00:00')->count());
-        $this->assertSame(3, DB::table('diagnostic_source_observations')->count());
+        $this->assertSame(10, DB::table('diagnostic_source_observations')->count());
         $this->assertSame('RETAIN-SOURCE', DB::table('pra_logs')->sole()->payload);
         $this->expectException(\InvalidArgumentException::class);
         $collector->capture(1, 'pra.fiscal', '2026-10-01', (string) Str::uuid());
@@ -90,5 +90,25 @@ class DiagnosticSourceCollectionTest extends TestCase
         $this->assertSame('NO_RETAINED_EVENTS', $report['status']);
         $this->assertFalse($report['coverage']['seven_day_complete']);
         $this->assertStringNotContainsString('select', json_encode($report));
+    }
+
+    public function test_operational_adapter_collection_is_scoped_and_preserves_print_rows(): void
+    {
+        Schema::create('pos_print_jobs', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->dateTime('created_at');
+            $t->string('result_outcome')->nullable(); $t->text('error')->nullable();
+        });
+        DB::table('pos_print_jobs')->insert([
+            ['id'=>10, 'company_id'=>1, 'created_at'=>'2026-11-05 20:00:00', 'result_outcome'=>'failed', 'error'=>'PRIVATE-DEVICE'],
+            ['id'=>11, 'company_id'=>2, 'created_at'=>'2026-11-05 20:00:00', 'result_outcome'=>'printed', 'error'=>'FOREIGN-PRIVATE'],
+        ]);
+        $before = DB::table('pos_print_jobs')->orderBy('id')->get()->toJson();
+        $collector = app(DiagnosticSourceCollection::class);
+        $this->assertSame('OBSERVED', $collector->capture(1, 'pos.print_attempts', '2026-11-06', (string) Str::uuid()));
+        $latest = $collector->latest(1, 'pos.print_attempts', '2026-11-06', '2026-11-06');
+        $this->assertSame(1, $latest['retained_rows']);
+        $this->assertSame(DiagnosticSourceEvidence::REGISTRY_VERSION, $latest['registry_version']);
+        $this->assertStringNotContainsString('PRIVATE', json_encode($latest));
+        $this->assertSame($before, DB::table('pos_print_jobs')->orderBy('id')->get()->toJson());
     }
 }

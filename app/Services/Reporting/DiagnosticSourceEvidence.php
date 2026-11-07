@@ -9,11 +9,17 @@ use Illuminate\Validation\ValidationException;
 /** Registered, SELECT-only source metadata. Never returns stored payloads. */
 final class DiagnosticSourceEvidence
 {
+    public const REGISTRY_VERSION = 2;
     public const SOURCES = [
         'pra.fiscal' => ['pos', 'pra_logs', 'created_at'],
+        'pos.sales' => ['pos', 'pos_transactions', 'created_at'],
+        'pos.print_attempts' => ['pos', 'pos_print_jobs', 'created_at'],
+        'pos.stock_movements' => ['pos', 'inventory_movements', 'created_at'],
         'di.fiscal' => ['di', 'fbr_logs', 'created_at'],
         'fbrpos.fiscal' => ['fbrpos', 'fbr_pos_logs', 'created_at'],
+        'fbrpos.sales' => ['fbrpos', 'fbr_pos_transactions', 'created_at'],
         'health.audit' => ['erps', 'health_audit_events', 'occurred_at'],
+        'health.billing' => ['erps', 'health_bills', 'created_at'],
     ];
 
     public function read(array $args, ?array $allowed): array
@@ -48,7 +54,7 @@ final class DiagnosticSourceEvidence
         }
         $meta = ['company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $company->product_type],
             'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'basis' => 'stored_server_calendar', 'timezone' => $tz],
-            'as_of' => Carbon::now($tz)->toIso8601String(), 'registry_version' => 1, 'source' => $v['source'],
+            'as_of' => Carbon::now($tz)->toIso8601String(), 'registry_version' => self::REGISTRY_VERSION, 'source' => $v['source'],
             'collection_observation' => app(DiagnosticSourceCollection::class)->latest((int) $company->id, $v['source'], $from->toDateString(), $to->toDateString()),
             'coverage' => ['complete' => false, 'seven_day_complete' => false, 'collection_status' => 'UNKNOWN',
                 'deleted_or_never_collected_events' => 'UNKNOWN', 'sequence_gaps' => 'UNAVAILABLE', 'client_clock_skew' => 'UNAVAILABLE'],

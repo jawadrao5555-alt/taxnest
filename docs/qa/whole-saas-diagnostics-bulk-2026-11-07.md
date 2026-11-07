@@ -77,9 +77,23 @@ MariaDB two-worker observation probe for exact idempotency, second-tenant
 exclusion and byte-for-byte source-row preservation. Syntax/diff checks pass;
 supported PHP8.4, native and full required CI must verify the published HEAD.
 
-Remaining: adapters beyond these four, source event/receipt correlation,
+Remaining: adapters beyond the currently registered sources, source event/receipt correlation,
 per-device sequence/clock/capacity evidence, remaining offline collection and
 other broad acceptance above. Derived daily observations do not fill these
 gaps. No installed-device seven-day soak or physical/fiscal success is claimed.
 Owner's delivery decision remains: finish363/364/365, then combine on latest
 main and run fresh combined acceptance before one owner-approved bulk release.
+
+## Operational source adapter expansion
+
+Registry version 2 adds direct, tenant-scoped retained-source adapters for PRA
+sales, retained print jobs/attempt outcomes, inventory movements, FBR POS sales
+and Healthcare bills. They reuse the same SELECT-only ID/timestamp contract and
+daily derived observation ledger. No sale, payment, stock, print or fiscal row
+is changed, and no payload, customer, patient, item or error text is serialized.
+
+These adapters establish only retained row presence and time extents. They do
+not yet correlate a bill to all payments, stock movements, print outcomes and
+fiscal attempts; do not infer paper output, regulator acceptance, sequence
+continuity or complete collection. Missing tables remain UNAVAILABLE and empty
+windows remain NO_RETAINED_EVENTS. The broad checklist therefore stays open.

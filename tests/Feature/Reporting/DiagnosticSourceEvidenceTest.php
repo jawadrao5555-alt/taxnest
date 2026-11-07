@@ -21,6 +21,7 @@ class DiagnosticSourceEvidenceTest extends TestCase
             ['id' => 2, 'name' => 'Synthetic Other', 'product_type' => 'di'],
             ['id' => 3, 'name' => 'Synthetic Health', 'product_type' => 'erps'],
             ['id' => 4, 'name' => 'Synthetic FBR', 'product_type' => 'fbrpos'],
+            ['id' => 5, 'name' => 'Synthetic PRA', 'product_type' => 'pos'],
         ]);
     }
 
@@ -57,5 +58,36 @@ class DiagnosticSourceEvidenceTest extends TestCase
         $this->assertSame('UNKNOWN', $r['coverage']['collection_status']);
         $this->expectException(ValidationException::class);
         $service->read($args, [1]);
+    }
+
+    public function test_operational_adapters_are_tenant_scoped_and_return_metadata_only(): void
+    {
+        foreach ([
+            'pos_transactions' => 'pos.sales',
+            'pos_print_jobs' => 'pos.print_attempts',
+            'inventory_movements' => 'pos.stock_movements',
+        ] as $table => $source) {
+            Schema::create($table, function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('company_id'); $t->dateTime('created_at'); $t->text('private_payload'); });
+            DB::table($table)->insert([
+                ['id'=>1, 'company_id'=>5, 'created_at'=>'2026-11-06 20:00:00', 'private_payload'=>'PRIVATE-OWN'],
+                ['id'=>2, 'company_id'=>99, 'created_at'=>'2026-11-06 20:00:00', 'private_payload'=>'PRIVATE-FOREIGN'],
+            ]);
+            $r = app(DiagnosticSourceEvidence::class)->read(['company_name'=>'Synthetic PRA', 'date_from'=>'2026-11-07', 'source'=>$source], [5]);
+            $this->assertSame([1], array_column($r['rows'], 'id'), $source);
+            $this->assertSame(DiagnosticSourceEvidence::REGISTRY_VERSION, $r['registry_version']);
+            $this->assertStringNotContainsString('PRIVATE', json_encode($r));
+            $this->assertFalse($r['coverage']['complete']);
+        }
+
+        foreach ([
+            ['fbr_pos_transactions', 'fbrpos.sales', 4, 'Synthetic FBR'],
+            ['health_bills', 'health.billing', 3, 'Synthetic Health'],
+        ] as [$table, $source, $companyId, $companyName]) {
+            Schema::create($table, function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('company_id'); $t->dateTime('created_at'); $t->text('private_payload'); });
+            DB::table($table)->insert(['id'=>1, 'company_id'=>$companyId, 'created_at'=>'2026-11-06 20:00:00', 'private_payload'=>'PRIVATE']);
+            $r = app(DiagnosticSourceEvidence::class)->read(['company_name'=>$companyName, 'date_from'=>'2026-11-07', 'source'=>$source], [$companyId]);
+            $this->assertSame([1], array_column($r['rows'], 'id'));
+            $this->assertStringNotContainsString('PRIVATE', json_encode($r));
+        }
     }
 }

@@ -48,3 +48,38 @@ addition. Coverage includes real HTTP scope denial/revocation, pagination,
 PRA/DI/FBR/Healthcare storage shapes, missing/empty sources, timezone boundaries,
 payload exclusion and unchanged source rows. Hosted PHP8.4/native/full suite and
 browser acceptance remain required. No production access or business writes.
+
+## Durable derived source observations
+
+Added an additive, versioned observation ledger and daily bounded collection
+for the four registered source adapters. Each run stores only source presence,
+count and timestamp extents for the previous business date; no stored payload,
+patient/customer data, token or diagnostic exception is copied. Collection
+uses100-company batches and product/tenant attribution (including legacy
+Healthcare spelling). Same-run retries use a unique identity; later runs retain
+separate readings, preserving late-arrival evidence rather than overwriting it.
+
+The scoped MCP source report now includes the latest applicable observation.
+Missing source, empty retained source, query failure, missing observation and
+incompatible observation schema stay distinct. A failed observation read does
+not erase the independent source result. None of these observations claims
+complete original collection, healthy operation, regulator acceptance or
+seven-day field completeness. The daily command performs no messages, fiscal
+requests, settings changes or business writes. Its retention deletes only
+derived observations older than seven days; original source records are never
+pruned by this collector. Query/storage failures produce a failed command.
+
+Local PHP8.3.6/SQLite:57 reporting tests/524 assertions passed, including scoped
+counts/timezone, same-run retry, retained late-arrival readings, missing vs
+empty, old Healthcare identity, scheduled retention with unchanged original
+records and an incompatible observation schema. Added a mandatory native
+MariaDB two-worker observation probe for exact idempotency, second-tenant
+exclusion and byte-for-byte source-row preservation. Syntax/diff checks pass;
+supported PHP8.4, native and full required CI must verify the published HEAD.
+
+Remaining: adapters beyond these four, source event/receipt correlation,
+per-device sequence/clock/capacity evidence, remaining offline collection and
+other broad acceptance above. Derived daily observations do not fill these
+gaps. No installed-device seven-day soak or physical/fiscal success is claimed.
+Owner's delivery decision remains: finish363/364/365, then combine on latest
+main and run fresh combined acceptance before one owner-approved bulk release.

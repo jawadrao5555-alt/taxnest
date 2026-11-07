@@ -1,4 +1,6 @@
 <?php
+// Derived source-presence evidence only. No source deletion, invoice replay or messages.
+\Illuminate\Support\Facades\Schedule::command('diagnostics:observe-sources')->dailyAt('03:15')->withoutOverlapping();
 // Durable, bounded drain. Overlapping runners also take per-record database locks.
 \Illuminate\Support\Facades\Schedule::command('pos:federal-outbox')->everyMinute()->withoutOverlapping();
 

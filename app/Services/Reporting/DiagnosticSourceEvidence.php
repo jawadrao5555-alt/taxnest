@@ -43,12 +43,13 @@ final class DiagnosticSourceEvidence
         }
         $company = $matches->sole();
         [$product, $table, $stamp] = self::SOURCES[$v['source']];
-        if ($company->product_type !== $product) {
+        if (\App\Support\NestErps::canonicalProductType($company->product_type) !== $product) {
             throw ValidationException::withMessages(['source' => 'This source does not apply to the selected product.']);
         }
         $meta = ['company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $company->product_type],
             'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'basis' => 'stored_server_calendar', 'timezone' => $tz],
             'as_of' => Carbon::now($tz)->toIso8601String(), 'registry_version' => 1, 'source' => $v['source'],
+            'collection_observation' => app(DiagnosticSourceCollection::class)->latest((int) $company->id, $v['source'], $from->toDateString(), $to->toDateString()),
             'coverage' => ['complete' => false, 'seven_day_complete' => false, 'collection_status' => 'UNKNOWN',
                 'deleted_or_never_collected_events' => 'UNKNOWN', 'sequence_gaps' => 'UNAVAILABLE', 'client_clock_skew' => 'UNAVAILABLE'],
             'notes' => ['Stored event presence does not establish complete collection, regulator acceptance or product health.',

@@ -336,7 +336,9 @@ class PosPaidAddonFlowTest extends TestCase
     private function approve(PaymentProof $proof, array $payload = [])
     {
         return $this->actingAs($this->admin(), 'admin')
-            ->post(route('saas.admin.payment-proofs.approve', $proof->id), $payload);
+            ->post(route('saas.admin.payment-proofs.approve', $proof->id), array_merge([
+                'verified_received_amount' => (float) $proof->amount,
+            ], $payload));
     }
 
     // ─── 1. who may buy ──────────────────────────────────────────────────

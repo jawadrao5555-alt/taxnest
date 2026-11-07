@@ -124,3 +124,30 @@ actual PDF responses, verified document creation and company account history.
 Supported PHP8.4/full suite and authenticated desktop/mobile acceptance remain
 hosted requirements. Add-on documents and the other unchecked billing items
 remain pending, so the broad checklist and PR stay work in progress.
+
+## Verified add-on invoices and receipts
+
+Extended the same immutable reviewed-document path to paid PRA feature
+add-ons, extra branch slots and DI AI-page top-ups. Their approval forms now
+require an independently verified bank/receipt amount; the company-entered
+claim remains display evidence only. The due amount is the server quote that
+the existing approval path actually activates. Partial balances and excess
+remain evidence only and do not forgive debt, create credit/refund or alter
+entitlements.
+
+The existing invoice table now permits a null subscription reference because
+an AI-page top-up may legitimately be approved without a live package. Company
+and unique payment-proof attribution remain mandatory. Feature and branch
+add-ons keep their actual current subscription reference. Documents store a
+versioned purchase kind and safe quote/quantity/code snapshot; history and PDF
+labels distinguish add-ons without exposing proof uploads. Approval and
+document creation remain one transaction, so a late document failure rolls
+back entitlement/slot/page activation.
+
+Local PHP8.3.6/SQLite focused run:75 tests/329 assertions passed across feature
+add-ons, extra branches, reviewed package documents, authorized downloads and
+standalone/same-subscription add-on document attribution. Syntax and diff
+checks pass. Native migration/concurrency and full PHP8.4/browser acceptance
+are still required for the next exact published HEAD. Shared purchased-feature
+readers, unpaid/signup activation paths, upgrade/proration and explicit
+credit/refund/reversal transitions remain pending; this PR is not ready.

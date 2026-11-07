@@ -318,6 +318,7 @@ class AdminPaymentProofController extends Controller
     {
         $request->validate([
             'extra_branch_qty' => 'nullable|integer|min:1|max:' . \App\Services\BranchAddonService::MAX_QTY,
+            'verified_received_amount' => 'required|numeric|min:0.01|max:1000000000',
         ]);
 
         if (!\App\Services\BranchAddonService::slotsColumnExists()) {
@@ -326,8 +327,9 @@ class AdminPaymentProofController extends Controller
 
         $qty = (int) ($request->input('extra_branch_qty') ?: $proof->extra_branch_qty ?: 1);
         $qty = max(1, min(\App\Services\BranchAddonService::MAX_QTY, $qty));
+        $verifiedReceived = round((float) $request->input('verified_received_amount'), 2);
 
-        $result = DB::transaction(function () use ($proof, $qty) {
+        $result = DB::transaction(function () use ($proof, $qty, $verifiedReceived) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return null;
@@ -351,6 +353,7 @@ class AdminPaymentProofController extends Controller
             }
 
             $before = \App\Services\BranchAddonService::slots($company);
+            $quote = \App\Services\BranchAddonService::quote($company, $qty);
             $company->update(['extra_branch_slots' => $before + $qty]);
 
             $locked->update([
@@ -360,8 +363,17 @@ class AdminPaymentProofController extends Controller
                 'verified_at' => now(),
                 'reject_reason' => null,
             ]);
+            $locked->refresh();
+            \App\Services\VerifiedSubscriptionDocuments::recordAddon(
+                $locked,
+                \App\Services\BranchAddonService::activeSubscription($company),
+                $verifiedReceived,
+                (float) $quote['price'],
+                'extra_branch',
+                ['label' => 'Extra branch slots', 'quantity' => $qty, 'quote' => $quote]
+            );
 
-            return ['company' => $company, 'before' => $before, 'after' => $before + $qty];
+            return ['company' => $company, 'before' => $before, 'after' => $before + $qty, 'quote' => $quote];
         });
 
         if (!$result) {
@@ -381,6 +393,8 @@ class AdminPaymentProofController extends Controller
             'qty' => $qty,
             'slots_before' => $result['before'],
             'slots_after' => $result['after'],
+            'verified_received_amount' => $verifiedReceived,
+            'quoted_total' => $result['quote']['price'],
         ]);
 
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
@@ -398,6 +412,9 @@ class AdminPaymentProofController extends Controller
      */
     private function approveAiPages(Request $request, PaymentProof $proof)
     {
+        $request->validate([
+            'verified_received_amount' => 'required|numeric|min:0.01|max:1000000000',
+        ]);
         $pages = $proof->aiPagesRequested();
         if ($pages <= 0) {
             return back()->with('error', 'This top-up request has no valid pack on it — reject it and ask the company to resubmit.');
@@ -407,7 +424,9 @@ class AdminPaymentProofController extends Controller
             return back()->with('error', 'The AI page credit tables are missing — run php artisan migrate --force first.');
         }
 
-        $result = DB::transaction(function () use ($proof, $pages) {
+        $verifiedReceived = round((float) $request->input('verified_received_amount'), 2);
+        $expected = (float) \App\Services\AiPageCreditService::packPrice($pages);
+        $result = DB::transaction(function () use ($proof, $pages, $verifiedReceived, $expected) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return null;
@@ -435,6 +454,15 @@ class AdminPaymentProofController extends Controller
                 'verified_at' => now(),
                 'reject_reason' => null,
             ]);
+            $locked->refresh();
+            \App\Services\VerifiedSubscriptionDocuments::recordAddon(
+                $locked,
+                \App\Services\PlanLimitService::getActiveSubscription($company->id),
+                $verifiedReceived,
+                $expected,
+                'ai_pages',
+                ['label' => 'AI Reader page top-up', 'pages' => $pages]
+            );
 
             return ['company' => $company, 'before' => $before, 'after' => $before + $pages];
         });
@@ -449,6 +477,8 @@ class AdminPaymentProofController extends Controller
             'balance_before' => $result['before'],
             'balance_after' => $result['after'],
             'amount_claimed' => $proof->amount,
+            'verified_received_amount' => $verifiedReceived,
+            'quoted_total' => $expected,
         ]);
 
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
@@ -476,6 +506,7 @@ class AdminPaymentProofController extends Controller
         $request->validate([
             'addon_codes' => 'nullable|array',
             'addon_codes.*' => 'string',
+            'verified_received_amount' => 'required|numeric|min:0.01|max:1000000000',
         ]);
 
         if (!Schema::hasTable('pos_addons')) {
@@ -495,7 +526,8 @@ class AdminPaymentProofController extends Controller
         // may narrow features, but changing the cycle here would make the
         // displayed/payment-proof quote disagree with what is activated.
         $cycle = $proofSnapshot['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
-        $result = DB::transaction(function () use ($proof, $codes, $cycle) {
+        $verifiedReceived = round((float) $request->input('verified_received_amount'), 2);
+        $result = DB::transaction(function () use ($proof, $codes, $cycle, $verifiedReceived) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return ['outcome' => 'already_processed'];
@@ -574,6 +606,15 @@ class AdminPaymentProofController extends Controller
                 'verified_at' => now(),
                 'reject_reason' => null,
             ]);
+            $locked->refresh();
+            \App\Services\VerifiedSubscriptionDocuments::recordAddon(
+                $locked,
+                $sub,
+                $verifiedReceived,
+                (float) $quote['total'],
+                'pos_addon',
+                ['label' => 'PRA POS feature add-on', 'codes' => $quote['codes'], 'quote' => $quote]
+            );
 
             return [
                 'outcome' => 'approved',
@@ -605,6 +646,7 @@ class AdminPaymentProofController extends Controller
             'quoted_total' => $quote['total'],
             'amount_claimed' => $proof->amount,
             'ends_at' => (string) ($result['subscription']->end_date ?? ''),
+            'verified_received_amount' => $verifiedReceived,
         ]);
 
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');

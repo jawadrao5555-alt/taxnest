@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\{AdminUser, Company, PaymentProof, PricingPlan, Subscription, SubscriptionInvoice, SubscriptionPayment};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\{Http, Mail};
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -85,5 +86,38 @@ class VerifiedSubscriptionDocumentsTest extends TestCase
             $this->assertSame($before, $receipt->fresh()->getAttributes());
             $this->assertNull($foreign->fresh()->document_snapshot);
         }
+    }
+
+    public function test_addon_documents_support_scoped_subscription_and_standalone_topup_purchases(): void
+    {
+        [$company, $plan, $seed] = $this->purchase();
+        $sub = Subscription::create(['company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'active' => true,
+            'start_date' => now(), 'end_date' => now()->addYear(), 'billing_cycle' => 'annual', 'final_price' => 1000]);
+        $adminId = (int) auth('admin')->id();
+        $seed->update(['status' => 'verified', 'verified_by' => $adminId, 'verified_at' => now()]);
+
+        DB::transaction(fn () => \App\Services\VerifiedSubscriptionDocuments::recordAddon(
+            $seed->fresh(), $sub, 599, 600, 'pos_addon',
+            ['label' => 'PRA POS feature add-on', 'codes' => ['caller_id']]
+        ));
+        $feature = SubscriptionInvoice::where('payment_proof_id', $seed->id)->sole();
+        $this->assertSame($sub->id, $feature->subscription_id);
+        $this->assertSame('ADD-', substr($feature->document_number, 0, 4));
+        $this->assertSame('pos_addon', $feature->document_snapshot['kind']);
+        $this->assertSame('1.00', $feature->document_snapshot['remaining_balance']);
+        $this->assertSame('599.00', $feature->payments()->sole()->receipt_snapshot['verified_received']);
+
+        $topup = PaymentProof::create(['company_id' => $company->id, 'amount' => 9999,
+            'payment_method' => 'bank_transfer', 'reference' => 'Second fictional bank record',
+            'proof_path' => 'synthetic-topup', 'request_type' => 'ai_pages', 'status' => 'verified',
+            'verified_by' => $adminId, 'verified_at' => now()]);
+        DB::transaction(fn () => \App\Services\VerifiedSubscriptionDocuments::recordAddon(
+            $topup, null, 1200, 1000, 'ai_pages', ['label' => 'AI Reader page top-up', 'pages' => 100]
+        ));
+        $standalone = SubscriptionInvoice::where('payment_proof_id', $topup->id)->sole();
+        $this->assertNull($standalone->subscription_id);
+        $this->assertSame('ai_pages', $standalone->document_snapshot['kind']);
+        $this->assertSame('200.00', $standalone->document_snapshot['unallocated_excess']);
+        $this->assertSame(2, SubscriptionInvoice::where('company_id', $company->id)->count());
     }
 }

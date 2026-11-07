@@ -1,7 +1,7 @@
 @if($billingHistory !== null)
 <section class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mt-8" aria-labelledby="subscription-document-history">
     <h3 id="subscription-document-history" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Billing history</h3>
-    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Verified subscription invoices and receipts. A remaining balance or excess is shown as recorded; excess is not an automatic credit or refund.</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Verified package and add-on invoices and receipts. A remaining balance or excess is shown as recorded; excess is not an automatic credit or refund.</p>
     <div class="overflow-x-auto mt-4" role="region" tabindex="0" aria-label="Subscription billing history">
         <table class="w-full text-sm">
             <thead><tr class="text-left border-b border-gray-200 dark:border-gray-700"><th class="p-2">Invoice / plan</th><th class="p-2">Period</th><th class="p-2">Due / received</th><th class="p-2">Balance / excess</th><th class="p-2">Documents</th></tr></thead>
@@ -10,7 +10,7 @@
                 @php
                     $snapshot = $document->document_snapshot ?? [];
                     $purchase = $snapshot['purchase'] ?? [];
-                    $plan = $purchase['plan']['name'] ?? $document->subscription?->pricingPlan?->name ?? 'Plan record unavailable';
+                    $plan = $purchase['plan']['name'] ?? $purchase['label'] ?? $document->subscription?->pricingPlan?->name ?? 'Purchase record';
                     $period = $purchase['period'] ?? [];
                 @endphp
                 <tr class="border-b border-gray-100 dark:border-gray-800 align-top">
@@ -26,7 +26,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="p-3 text-gray-500">No verified subscription documents recorded yet. Legacy records remain unknown and are not invented.</td></tr>
+                <tr><td colspan="5" class="p-3 text-gray-500">No verified billing documents recorded yet. Legacy records remain unknown and are not invented.</td></tr>
             @endforelse
             </tbody>
         </table>

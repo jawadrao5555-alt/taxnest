@@ -229,6 +229,14 @@ The new focused regression covers all four source families, duplicate links,
 wrong tenant, wrong bill, wrong type, cursor exhaustion and unchanged source
 rows. Local PHP execution is unavailable in this continuation environment, so
 only static diff review is claimed locally; supported PHP8.4/full-suite and
-native hosted checks must verify the next exact published HEAD. Lab-order,
-pharmacy-stock and print associations remain explicit gaps rather than being
-guessed.
+native hosted checks must verify the next exact published HEAD.
+
+Bill evidence version 4 also follows only the complete immutable chain from a
+bill's same-tenant pharmacy charge to its same-tenant pharmacy sale and retained
+batch movements whose reference type and ID identify that exact sale. It returns
+only movement IDs. Foreign, unlinked and wrong-reference rows are excluded;
+amounts, medicine/batch data, notes and timestamps are neither exposed nor used
+for matching. Focused SQLite coverage and the mandatory native probe preserve
+all source bytes. Lab-order (no retained lab-order table exists in the current
+runtime) and bill-level Healthcare print associations (only aggregate collection
+health is retained) remain explicit gaps rather than being guessed.

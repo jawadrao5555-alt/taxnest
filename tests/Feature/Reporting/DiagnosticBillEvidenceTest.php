@@ -223,10 +223,30 @@ class DiagnosticBillEvidenceTest extends TestCase
             $this->assertSame([['id' => 100]], $report['sources'][$key]['rows'], $key);
             $this->assertSame('PARTIAL', $report['sources'][$key]['status']);
             $this->assertStringNotContainsString('PRIVATE', json_encode($report));
-            $this->assertSame(3, $report['version']);
+            $this->assertSame(4, $report['version']);
             $this->assertSame($sourceBefore, DB::table($table)->orderBy('id')->get()->toJson());
             $this->assertSame($chargesBefore, DB::table('health_charges')->orderBy('id')->get()->toJson());
         }
+        Schema::create('health_batch_movements', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->string('reference_type');
+            $t->unsignedBigInteger('reference_id');
+            $t->text('private_payload')->nullable();
+        });
+        DB::table('health_batch_movements')->insert([
+            ['id' => 200, 'company_id' => 4, 'reference_type' => 'health_pharmacy_sale', 'reference_id' => 100, 'private_payload' => 'PRIVATE-STOCK'],
+            ['id' => 201, 'company_id' => 99, 'reference_type' => 'health_pharmacy_sale', 'reference_id' => 100, 'private_payload' => 'PRIVATE-FOREIGN'],
+            ['id' => 202, 'company_id' => 4, 'reference_type' => 'health_pharmacy_sale', 'reference_id' => 102, 'private_payload' => 'PRIVATE-UNLINKED'],
+            ['id' => 203, 'company_id' => 4, 'reference_type' => 'health_pharmacy_return', 'reference_id' => 100, 'private_payload' => 'PRIVATE-WRONG-TYPE'],
+        ]);
+        $movementsBefore = DB::table('health_batch_movements')->orderBy('id')->get()->toJson();
+        $report = app(DiagnosticBillEvidence::class)->read(['company_name' => 'Synthetic Health', 'bill_id' => 10], [4]);
+        $this->assertSame([['id' => 200]], $report['sources']['pharmacy_stock']['rows']);
+        $this->assertSame('PARTIAL', $report['sources']['pharmacy_stock']['status']);
+        $this->assertSame(4, $report['version']);
+        $this->assertStringNotContainsString('PRIVATE', json_encode($report));
+        $this->assertSame($movementsBefore, DB::table('health_batch_movements')->orderBy('id')->get()->toJson());
         $report = app(DiagnosticBillEvidence::class)->read([
             'company_name' => 'Synthetic Health', 'bill_id' => 10, 'after_id' => 100,
         ], [4]);
@@ -234,6 +254,11 @@ class DiagnosticBillEvidenceTest extends TestCase
             $this->assertSame('NO_RETAINED_LINKS', $report['sources'][$key]['status']);
             $this->assertSame([], $report['sources'][$key]['rows']);
         }
+        $this->assertSame([['id' => 200]], $report['sources']['pharmacy_stock']['rows']);
+        $report = app(DiagnosticBillEvidence::class)->read([
+            'company_name' => 'Synthetic Health', 'bill_id' => 10, 'after_id' => 200,
+        ], [4]);
+        $this->assertSame('NO_RETAINED_LINKS', $report['sources']['pharmacy_stock']['status']);
         $this->assertSame(20, DB::table('health_charges')->count());
     }
 

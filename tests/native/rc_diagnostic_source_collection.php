@@ -164,11 +164,25 @@ try {
                 'source_id' => $foreignId, 'health_bill_id' => $healthBill, 'created_at' => $stamp, 'updated_at' => $stamp],
         ]);
     }
+    $stockMovement = DB::table('health_batch_movements')->insertGetId([
+        'company_id' => $health->id, 'medicine_id' => 600001, 'type' => 'dispense', 'direction' => 'out',
+        'reference_type' => 'health_pharmacy_sale', 'reference_id' => $healthSourceIds['pharmacy_sales'],
+        'notes' => 'PRIVATE stock source', 'created_at' => $stamp, 'updated_at' => $stamp,
+    ]);
+    DB::table('health_batch_movements')->insert([
+        ['company_id' => $otherHealth->id, 'medicine_id' => 600002, 'type' => 'dispense', 'direction' => 'out',
+            'reference_type' => 'health_pharmacy_sale', 'reference_id' => $healthSourceIds['pharmacy_sales'],
+            'notes' => 'PRIVATE foreign stock', 'created_at' => $stamp, 'updated_at' => $stamp],
+        ['company_id' => $health->id, 'medicine_id' => 600003, 'type' => 'dispense', 'direction' => 'out',
+            'reference_type' => 'health_pharmacy_return', 'reference_id' => $healthSourceIds['pharmacy_sales'],
+            'notes' => 'PRIVATE wrong stock type', 'created_at' => $stamp, 'updated_at' => $stamp],
+    ]);
     $healthBefore = collect(array_keys($healthSources))->mapWithKeys(function ($key) use ($healthSources) {
         $table = $healthSources[$key][0];
 
         return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
-    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
+    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson())
+        ->put('health_batch_movements', DB::table('health_batch_movements')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
     $healthReport = app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read([
         'company_name' => $health->name, 'bill_id' => $healthBill,
     ], [$health->id]);
@@ -177,15 +191,19 @@ try {
             throw new RuntimeException('Native health source attribution failed for '.$key);
         }
     }
+    if ($healthReport['sources']['pharmacy_stock']['rows'] !== [['id' => (int) $stockMovement]]) {
+        throw new RuntimeException('Native health pharmacy stock attribution failed');
+    }
     $healthAfter = collect(array_keys($healthSources))->mapWithKeys(function ($key) use ($healthSources) {
         $table = $healthSources[$key][0];
 
         return [$table => DB::table($table)->orderBy('id')->get()->toJson()];
-    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
-    if ($healthReport['version'] !== 3 || str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
+    })->put('health_charges', DB::table('health_charges')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson())
+        ->put('health_batch_movements', DB::table('health_batch_movements')->whereIn('company_id', [$health->id, $otherHealth->id])->orderBy('id')->get()->toJson());
+    if ($healthReport['version'] !== 4 || str_contains(json_encode($healthReport), 'PRIVATE') || $healthBefore->all() !== $healthAfter->all()) {
         throw new RuntimeException('Native health source report leaked or changed retained rows');
     }
-    echo "PASS: native healthcare bill follows exact tenant-scoped clinical and pharmacy source IDs without changing rows\n";
+    echo "PASS: native healthcare bill follows exact tenant-scoped clinical, pharmacy and stock source IDs without changing rows\n";
 
 } finally {
     foreach ($processes as $p) {

@@ -37,7 +37,7 @@ final class DiagnosticBillEvidence
             'pos' => 'pos_transactions', 'di' => 'invoices', 'fbrpos' => 'fbr_pos_transactions', 'erps' => 'health_bills',
             default => null,
         };
-        $base = ['version' => 3, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
+        $base = ['version' => 4, 'company' => ['id' => (int) $company->id, 'name' => $company->name, 'product' => $product],
             'bill_id' => (int) $v['bill_id'], 'complete' => false, 'physical_print' => 'unknown', 'fiscal_acceptance' => 'not_assessed',
             'notes' => ['Only explicit stored foreign-key/reference links are included. Matching numbers, amounts or timestamps are never treated as associations.',
                 'Each source has its own immutable ID cursor and may have late arrivals. Missing/deleted/uncollected evidence remains unknown.',
@@ -157,6 +157,44 @@ final class DiagnosticBillEvidence
                     $sources[$key] = ['status' => 'SOURCE_QUERY_FAILED', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
                 }
             }
+
+            // A pharmacy charge freezes the sale ID that produced the bill.
+            // Stock movements independently freeze that same sale ID as their
+            // reference. Follow the complete charge -> sale -> movement chain
+            // and require every retained row to belong to this tenant. Amount,
+            // medicine, batch, reference text and timestamps are never used to
+            // guess or expose a relationship.
+            try {
+                if (! $this->columns('health_charges', ['id', 'company_id', 'health_bill_id', 'source_type', 'source_id'])
+                    || ! $this->columns('health_pharmacy_sales', ['id', 'company_id'])
+                    || ! $this->columns('health_batch_movements', ['id', 'company_id', 'reference_type', 'reference_id'])) {
+                    $sources['pharmacy_stock'] = ['status' => 'UNAVAILABLE', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
+                } else {
+                    $limit = (int) ($v['limit'] ?? 25);
+                    $ids = DB::table('health_batch_movements as movement')
+                        ->join('health_pharmacy_sales as sale', function ($join) use ($company) {
+                            $join->on('sale.id', '=', 'movement.reference_id')
+                                ->where('sale.company_id', '=', $company->id);
+                        })
+                        ->join('health_charges as charge', function ($join) use ($company) {
+                            $join->on('charge.source_id', '=', 'sale.id')
+                                ->where('charge.company_id', '=', $company->id)
+                                ->where('charge.source_type', '=', 'pharmacy_sale');
+                        })
+                        ->where('movement.company_id', $company->id)
+                        ->where('movement.reference_type', 'health_pharmacy_sale')
+                        ->where('charge.health_bill_id', $v['bill_id'])
+                        ->where('movement.id', '>', $v['after_id'] ?? 0)
+                        ->select('movement.id')->distinct()->orderBy('movement.id')->limit($limit + 1)->pluck('id');
+                    $more = $ids->count() > $limit;
+                    $page = $ids->take($limit);
+                    $sources['pharmacy_stock'] = ['status' => $ids->isEmpty() ? 'NO_RETAINED_LINKS' : 'PARTIAL',
+                        'rows' => $page->map(fn ($id) => ['id' => (int) $id])->values()->all(),
+                        'has_more' => $more, 'next_after_id' => $more ? (int) $page->last() : null];
+                }
+            } catch (\Illuminate\Database\QueryException) {
+                $sources['pharmacy_stock'] = ['status' => 'SOURCE_QUERY_FAILED', 'rows' => [], 'has_more' => false, 'next_after_id' => null];
+            }
         }
 
         return $base + ['status' => 'PARTIAL', 'sources' => $sources,
@@ -164,7 +202,7 @@ final class DiagnosticBillEvidence
                 'pos' => ['offline_agent_events'],
                 'di' => ['payments', 'stock', 'print_events'],
                 'fbrpos' => ['payments', 'offline_agent_events'],
-                'erps' => ['lab_orders', 'pharmacy_stock', 'print_events'],
+                'erps' => ['lab_orders', 'print_events'],
             }];
     }
 

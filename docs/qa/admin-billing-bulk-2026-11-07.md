@@ -343,3 +343,20 @@ evidence is required after this correction.
 This closes the explicit audited credit/refund/reversal runtime slice without
 approving a new commercial policy. Existing-policy upgrade/proration behavior
 and remaining mobile/Agent/API companion parity stay open.
+
+## Consultant companion purchased-access parity
+
+The consented consultant console previously read the mutable catalogue plan for
+client plan/quota/trial chips while backend access used the frozen purchased
+snapshot. Referral commission descriptions and trial exclusion had the same
+drift. Both paths now call the shared read-only entitlement plan. A later
+catalogue rename, trial flag or invoice-limit edit cannot rewrite what the
+client bought or what its consented consultant sees; company overrides and the
+existing commission rate/final-price rules remain unchanged.
+
+A focused regression keeps the active consent link, company, subscription and
+snapshot fixed, edits the catalogue, and requires the original purchased name,
+quota and paid/trial state plus a single commission described by the purchased
+plan. This does not add consultant write access, new pricing, proration or an
+automatic refund/credit policy. Hosted PHP8.4/full-suite acceptance is required
+for the exact published HEAD; no local PHP runtime is available here.

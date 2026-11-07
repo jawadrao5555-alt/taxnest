@@ -180,3 +180,30 @@ identities for both view-as and manage-as modes. Its export, unchanged session
 grant and zero-write assertions remain. Focused local PHP8.3.6 evidence:
 1 test /13 assertions passed. Fresh hosted PHP8.4/full-suite evidence is still
 required for the updated exact HEAD.
+
+## Record-bound reset OTP retry limit
+
+Reproduced through actual HTTP: after five wrong OTP attempts from distinct
+client addresses, the original correct code still issued a reset grant. The
+existing IP/email endpoint throttle did not bound guesses against the issued
+record when the client address changed.
+
+An additive verification_failures counter now limits each unexpired issued
+record to five wrong guesses. Increments and the final grant claim are
+conditional atomic updates. Unscoped guesses also count for all still-active
+panel codes for that address, so omitting the panel is not a bypass. Neutral
+invalid-code responses remain identical. A fresh reset request invalidates the
+old code and provides a new attempt budget; the high-entropy recovery link
+remains an independent authorized recovery path. Updates explicitly preserve
+the original expiry on legacy MariaDB TIMESTAMP schemas. The existing endpoint
+throttle remains in place. Pre-migration minimal schemas retain the old route
+throttle until the additive column is installed.
+
+Local PHP8.3.6/SQLite Auth + impersonation + onboarding:55 tests/303 assertions
+passed, including the original cross-client failure, unchanged deadline,
+fresh-request recovery and existing link/session behavior. The mandatory
+native reset probe now exercises actual OTP rejection and deadline retention
+before its existing link-consumption/concurrent-completion checks. Native and
+full supported PHP8.4 acceptance must verify the next published HEAD. This
+does not complete optional two-step login enrollment/recovery or the other
+unchecked security/onboarding requirements.

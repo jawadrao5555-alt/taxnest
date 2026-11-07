@@ -85,4 +85,30 @@ class PasswordResetGrantSafetyTest extends TestCase
             ->assertRedirect(route('login'));
         $this->assertTrue(Hash::check('ValidOtpSynthetic123!', $user->fresh()->password));
     }
+
+    public function test_otp_guess_limit_follows_the_issued_record_across_client_addresses(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create();
+        $this->post('/forgot-password', ['email' => $user->email]);
+        $row = DB::table('password_reset_otps')->where('email', $user->email)->where('used', false)->sole();
+        $wrong = $row->otp === '000000' ? '111111' : '000000';
+        for ($i=1; $i<=5; $i++) {
+            $this->withServerVariables(['REMOTE_ADDR'=>'192.0.2.'.$i])->post(route('password.verify.otp.submit'),
+                ['email'=>$user->email,'otp'=>$wrong])->assertSessionHasErrors('otp');
+        }
+        $this->withServerVariables(['REMOTE_ADDR'=>'192.0.2.20'])->post(route('password.verify.otp.submit'),
+            ['email'=>$user->email,'otp'=>$row->otp])->assertSessionHasErrors('otp');
+        $this->assertNull(session('password_reset_token'));
+        $this->assertFalse((bool) DB::table('password_reset_otps')->where('id',$row->id)->value('used'));
+        $blocked = DB::table('password_reset_otps')->where('id',$row->id)->sole();
+        $this->assertSame(5, (int) $blocked->verification_failures);
+        $this->assertSame($row->expires_at, $blocked->expires_at);
+        $this->withServerVariables(['REMOTE_ADDR'=>'192.0.2.21'])->post('/forgot-password', ['email'=>$user->email]);
+        $fresh = DB::table('password_reset_otps')->where('email',$user->email)->where('used',false)->sole();
+        $this->assertNotSame($row->id, $fresh->id);
+        $this->withServerVariables(['REMOTE_ADDR'=>'192.0.2.22'])->post(route('password.verify.otp.submit'),
+            ['email'=>$user->email,'otp'=>$fresh->otp])->assertRedirect();
+        $this->assertNotEmpty(session('password_reset_token'));
+    }
 }

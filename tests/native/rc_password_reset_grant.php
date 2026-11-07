@@ -58,6 +58,21 @@ $recordId = DB::table('password_reset_otps')->insertGetId(['email' => $user->ema
 // Consume the ACTUAL link controller before the competing final form workers.
 // SQLite cannot prove MariaDB's implicit TIMESTAMP update compatibility.
 $session = app('session')->driver();
+foreach (range(1, 6) as $attempt) {
+    $request = Request::create('/verify-otp', 'POST', ['email'=>$user->email, 'panel'=>'di',
+        'otp'=>$attempt <= 5 ? '000000' : '123456'], [], [], ['REMOTE_ADDR'=>'192.0.2.'.$attempt]);
+    $request->setLaravelSession($session);
+    app()->instance('request', $request);
+    $response = app(\App\Http\Controllers\Auth\PasswordResetLinkController::class)->verifyOtp($request);
+    if ($session->get('password_reset_token') || parse_url($response->getTargetUrl(), PHP_URL_PATH) === '/reset-password') {
+        throw new RuntimeException('Native OTP guessing limit issued an unauthorized grant.');
+    }
+}
+$attempted = DB::table('password_reset_otps')->find($recordId);
+if ((int) $attempted->verification_failures !== 5 || $attempted->expires_at !== $deadline || $attempted->used) {
+    throw new RuntimeException('Native OTP retry count or original TIMESTAMP deadline changed.');
+}
+echo "PASS: native record-bound OTP retry limit survives client changes and preserves deadline\n";
 $request = Request::create('/reset-password-link', 'GET', ['email' => $user->email, 'token' => $token, 'panel' => 'di']);
 $request->setLaravelSession($session);
 app()->instance('request', $request);

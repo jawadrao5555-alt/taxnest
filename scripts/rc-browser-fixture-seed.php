@@ -896,6 +896,15 @@ foreach ([1366,390] as $securityWidth) {
     $billingViewer=AdminUser::create(['name'=>'Synthetic billing viewer '.$securityWidth,
         'email'=>'billing-viewer-'.$securityWidth.'@rc-browser.invalid','password'=>\Illuminate\Support\Facades\Hash::make($password),'role'=>'viewer']);
     $securityCases[$securityWidth]['billingViewer']=$billingViewer->email;
+    $viewerCompany=$company('Synthetic viewer revocation '.$securityWidth,
+        'viewer-revocation-'.$securityWidth.'@rc-browser.invalid','RCVIEW'.$securityWidth,'pos',[
+            'pos_setup_completed'=>true,'pos_integration_mode'=>'local']);
+    $viewer=$user($viewerCompany,'Synthetic Local Bills Viewer',
+        'local-viewer-revoke-'.$securityWidth.'@rc-browser.invalid','employee','local_viewer');
+    $securityCases[$securityWidth]['viewer']=[
+        'companyId'=>$viewerCompany->id,'userId'=>$viewer->id,'email'=>$viewer->email,
+        'newPassword'=>'SyntheticViewerNew!'.bin2hex(random_bytes(12)),'admin'=>$admin->email,
+    ];
     foreach (['incomplete','ready','reset'] as $setupState) {
         $setupCompany=$company('Synthetic setup '.$setupState.' '.$securityWidth,'setup-'.$setupState.'-'.$securityWidth.'@rc-browser.invalid',
             'RCSET'.$setupState.$securityWidth,'di',['onboarding_completed'=>false,

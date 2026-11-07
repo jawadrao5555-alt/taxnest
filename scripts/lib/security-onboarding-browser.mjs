@@ -129,6 +129,42 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByLabel('Authenticator or recovery code',{exact:true}).fill(codes[2]);
   await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Turn off two-step login',exact:true}).click()]);
   await page.getByRole('button',{name:'Set up two-step login',exact:true}).waitFor();
+
+  // A password reset performed from the SaaS company page must revoke an
+  // already-open Local Bills Viewer browser. Use two genuinely independent
+  // contexts so this proves cached-session refusal rather than a logout in
+  // the administrator's own browser.
+  const viewerFixture=fixture.viewer;
+  const viewerContext=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
+  const adminContext=await page.context().browser().newContext({viewport:v,serviceWorkers:'block'});
+  for(const context of [viewerContext,adminContext]) {
+    await context.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
+  }
+  const viewerPage=await viewerContext.newPage();
+  const adminPage=await adminContext.newPage();
+  try {
+    await login(viewerPage,{...t,loginPath:'/pos/login',login:viewerFixture.email,password:t.password});
+    await viewerPage.goto(baseUrl+'/pos/local-bills',{waitUntil:'domcontentloaded'});
+    if(new URL(viewerPage.url()).pathname!=='/pos/local-bills')throw Error('Synthetic Local Bills Viewer could not open its read-only portal');
+
+    await login(adminPage,{...t,loginPath:'/admin/login',login:viewerFixture.admin,password:t.password});
+    await adminPage.goto(baseUrl+'/admin/companies/'+viewerFixture.companyId,{waitUntil:'domcontentloaded'});
+    const editForm=adminPage.locator('form[action$="/local-viewer/'+viewerFixture.userId+'"]');
+    await editForm.waitFor({state:'attached'});
+    await editForm.locator('input[name="password"]').fill(viewerFixture.newPassword);
+    await Promise.all([adminPage.waitForNavigation(),editForm.evaluate(form=>form.requestSubmit())]);
+
+    await viewerPage.goto(baseUrl+'/pos/local-bills',{waitUntil:'domcontentloaded'});
+    if(new URL(viewerPage.url()).pathname!=='/pos/login')throw Error('Old Local Bills Viewer browser survived an administrator password reset');
+    await login(viewerPage,{...t,loginPath:'/pos/login',login:viewerFixture.email,password:viewerFixture.newPassword});
+    await viewerPage.goto(baseUrl+'/pos/local-bills',{waitUntil:'domcontentloaded'});
+    if(new URL(viewerPage.url()).pathname!=='/pos/local-bills')throw Error('Fresh Local Bills Viewer login failed after password reset');
+    await saveEvidenceScreenshot(viewerPage,'rc-security-viewer-revoked-'+v.width);
+  } finally {
+    await viewerContext.close();
+    await adminContext.close();
+  }
+
   await page.context().clearCookies();
   await login(page,{...t,loginPath:'/admin/login',login:fixture.billingViewer,password:t.password});
   await page.goto(baseUrl+'/admin/subscriptions',{waitUntil:'domcontentloaded'});
@@ -156,5 +192,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; Local Bills Viewer password reset revokes the old browser and permits a fresh login; durable support ownership, explicit resolution build and reopen timeline');
 }

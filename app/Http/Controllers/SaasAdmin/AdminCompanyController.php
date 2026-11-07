@@ -771,8 +771,16 @@ class AdminCompanyController extends Controller
         ];
         if ($request->filled('password')) {
             $update['password'] = bcrypt($request->password);
+            // A credential reset is also a revocation event. Rotate the
+            // browser-session generation in the same write so an already
+            // signed-in archive device cannot keep its old-password session.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'session_generation')) {
+                $update['session_generation'] = (string) \Illuminate\Support\Str::uuid();
+            }
         }
-        $user->update($update);
+        // Internal validated field set. forceFill is required for the hidden,
+        // non-mass-assignable session_generation revocation marker.
+        $user->forceFill($update)->save();
 
         AdminAuditLog::log(auth('admin')->id(), 'Archive Viewer updated', 'User', $user->id, [
             'company_id' => $company->id,
@@ -871,8 +879,15 @@ class AdminCompanyController extends Controller
             $update['password'] = bcrypt($request->password);
             // Keep the owner-viewable copy in step (Task 665) — see storeLocalViewer.
             $update = ViewablePasswordService::apply($update, $request->password);
+            // Revoke this viewer's cached browser sessions without touching
+            // the owner/admin login or stateless Agent/API credentials.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'session_generation')) {
+                $update['session_generation'] = (string) \Illuminate\Support\Str::uuid();
+            }
         }
-        $user->update($update);
+        // Internal validated field set. forceFill is required for the hidden,
+        // non-mass-assignable session_generation revocation marker.
+        $user->forceFill($update)->save();
 
         AdminAuditLog::log(auth('admin')->id(), 'Local Bills Viewer updated', 'User', $user->id, [
             'company_id' => $company->id,

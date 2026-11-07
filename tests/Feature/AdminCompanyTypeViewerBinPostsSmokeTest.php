@@ -75,6 +75,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
             $table->string('role')->nullable();
             $table->string('pos_role')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->uuid('session_generation')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -269,6 +270,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
         $this->assertSame('new-archive@taxnest.test', $user->email);
         $this->assertTrue(Hash::check('NewPass@123', $user->password));
         $this->assertSame('archive_viewer', $user->pos_role, 'pos_role must never change on update');
+        $this->assertNotNull($user->session_generation, 'password reset must revoke an already-open viewer browser session');
     }
 
     public function test_archive_viewer_update_without_password_keeps_old_password(): void
@@ -285,6 +287,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
             ->assertSessionMissing('errors');
 
         $this->assertTrue(Hash::check('OldPass@123', DB::table('users')->where('id', $userId)->value('password')));
+        $this->assertNull(DB::table('users')->where('id', $userId)->value('session_generation'), 'profile-only edits must not revoke viewer sessions');
     }
 
     public function test_archive_viewer_update_invalid_data_bounces_and_leaves_user_unchanged(): void
@@ -411,6 +414,7 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
         $this->assertSame('new-local@taxnest.test', $user->email);
         $this->assertTrue(Hash::check('NewPass@123', $user->password));
         $this->assertSame('local_viewer', $user->pos_role);
+        $this->assertNotNull($user->session_generation, 'password reset must revoke an already-open viewer browser session');
     }
 
     public function test_local_viewer_update_invalid_data_bounces_and_leaves_user_unchanged(): void

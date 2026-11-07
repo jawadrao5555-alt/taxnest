@@ -1,5 +1,34 @@
 # Security and onboarding bulk — P1
 
+## Read-only viewer credential revocation continuation
+
+Reproduced a cached-access gap in both Local Bills Viewer management paths and
+the SaaS Archive Viewer path: changing a viewer password replaced the stored
+credential, but an already signed-in browser retained access. Password changes
+now rotate the existing per-user browser-session generation atomically with the
+credential update. `CompanySessionGeneration` refuses the old browser on its
+next request while a fresh generation works. Profile-only edits do not revoke a
+session; another viewer, the company owner, the SaaS admin and stateless
+Agent/API credentials are unchanged. The additive column check keeps
+deploy-before-migrate and legacy schemas safe.
+
+Focused HTTP coverage exercises both company-owner and SaaS-admin password
+reset paths, exact tenant/user ownership, stale-generation refusal,
+fresh-generation access, profile-only stability and a second viewer left
+unchanged. The Archive Viewer fixture also requires generation rotation on a
+password change and no rotation on a name/email-only edit. Exact updated-HEAD
+hosted PHP8.4, browser and final validate evidence is still required. The
+mandatory security journey now uses independent viewer/admin browser contexts
+at desktop1366 and mobile390: the old Local Bills Viewer browser must be sent
+to login after the real SaaS edit form resets its password, then the new
+password must open the portal. Local
+PHP8.3/SQLite viewer-only coverage passed **38 tests / 261 assertions**; the
+expanded Auth, impersonation, consultant and viewer set passed **114 tests /
+807 assertions**. PHP8.3 remains below the supported contract and SQLite is not
+native concurrency proof. This increment does not complete the remaining
+OAuth/device/consultant,
+deletion/restore, import, support and wider UI checklist.
+
 ## Export fixture correction after native acceptance
 
 Exact65b15fb6fba3c26b8f192a4adc627e38d3c4e4c3 native job128478806265

@@ -246,6 +246,16 @@
                         {{ __('health.patient_consent_recorded', ['at' => $patient->consent_recorded_at->format('d M Y, h:i A')]) }}
                     </p>
                 @endif
+                @if($editing && $patient->consent_withdrawn_at)
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400">
+                        {{ __('health.patient_consent_withdrawn', ['at' => $patient->consent_withdrawn_at->format('d M Y, h:i A')]) }}
+                    </p>
+                @endif
+                @if($editing && $patient->consent_policy_version)
+                    <p class="text-[11px] text-gray-400">
+                        {{ __('health.patient_consent_version', ['version' => $patient->consent_policy_version]) }}
+                    </p>
+                @endif
             </div>
 
             <div class="flex items-center gap-2">

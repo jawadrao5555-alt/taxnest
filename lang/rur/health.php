@@ -355,6 +355,8 @@ return [
     'patient_consent' => 'Ijazat',
     'patient_consent_hint' => 'Jawab badalte hi darj ho jata hai — kuch farz nahi kiya jata.',
     'patient_consent_recorded' => 'Ijazat darj hui :at',
+    'patient_consent_withdrawn' => 'Ijazat wapas li gayi :at',
+    'patient_consent_version' => 'Maloomat version: :version',
     'consent_treatment' => 'Muaina aur ilaj ki ijazat deta hai',
     'consent_share_reports' => 'Reports ghar walon ke saath share karne ki ijazat',
     'consent_contact' => 'Yaad dahani ki call aur message ki ijazat',

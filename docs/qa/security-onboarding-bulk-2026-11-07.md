@@ -1,5 +1,27 @@
 # Security and onboarding bulk — P1
 
+## Versioned Healthcare consent and withdrawal evidence continuation
+
+Source reconciliation reproduced an evidence ambiguity in the patient record:
+removing the final granted consent cleared the current consent timestamp and
+actor, making an explicit withdrawal look the same as a patient for whom no
+consent had ever been recorded. The patient row now retains the disclosure
+version used for a consent decision and records the exact withdrawal time and
+actor separately. A declined initial registration is not mislabeled as a
+withdrawal. Re-granting consent records the new current decision and clears the
+current-row withdrawal marker; the existing append-only Healthcare audit trail
+continues to retain the earlier transition.
+
+Unrelated demographic edits do not restamp consent. The additive columns are
+deploy-before-migrate guarded, existing patient rows remain nullable, and no
+patient, clinical, fiscal or subscription row is rewritten by the migration.
+The Healthcare form displays the current recorded/withdrawn state and disclosure
+version in English, Roman Urdu and Urdu. Focused actual-HTTP coverage exercises
+grant, unrelated edit, full withdrawal and later re-grant through the existing
+patient controller. Exact updated-HEAD PHP8.4/full-suite and desktop/mobile
+browser acceptance remain required; no production consent or patient data was
+used.
+
 ## Persisted company-lifecycle authority continuation
 
 Actual route reconciliation found that the AdminAuth middleware proved only an

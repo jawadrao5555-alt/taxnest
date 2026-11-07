@@ -358,6 +358,8 @@ return [
     'patient_consent' => 'اجازت',
     'patient_consent_hint' => 'جواب بدلتے ہی درج ہو جاتا ہے — کچھ فرض نہیں کیا جاتا۔',
     'patient_consent_recorded' => 'اجازت درج ہوئی :at',
+    'patient_consent_withdrawn' => 'اجازت واپس لی گئی :at',
+    'patient_consent_version' => 'معلوماتی ورژن: :version',
     'consent_treatment' => 'معائنے اور علاج کی اجازت دیتا ہے',
     'consent_share_reports' => 'رپورٹس ساتھ آنے والے اہلِ خانہ کو دکھانے کی اجازت',
     'consent_contact' => 'یاد دہانی کی کال اور پیغام کی اجازت',

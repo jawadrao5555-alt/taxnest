@@ -357,6 +357,8 @@ return [
     'patient_consent' => 'Consent',
     'patient_consent_hint' => 'Recorded the moment an answer changes — nothing is assumed.',
     'patient_consent_recorded' => 'Consent recorded :at',
+    'patient_consent_withdrawn' => 'Consent withdrawn :at',
+    'patient_consent_version' => 'Disclosure version: :version',
     'consent_treatment' => 'Consents to examination and treatment',
     'consent_share_reports' => 'Allows reports to be shared with the accompanying family member',
     'consent_contact' => 'Allows reminder calls and messages',

@@ -49,6 +49,7 @@ class HealthAuditObserver
                 'mrn', 'company_id', 'branch_id', 'is_active', 'is_confidential',
                 'registered_by', 'consent_treatment', 'consent_share_reports',
                 'consent_contact', 'consent_recorded_at', 'consent_recorded_by',
+                'consent_policy_version', 'consent_withdrawn_at', 'consent_withdrawn_by',
             ],
         ],
         \App\Models\HealthAppointment::class => [

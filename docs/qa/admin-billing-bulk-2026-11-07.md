@@ -359,4 +359,19 @@ snapshot fixed, edits the catalogue, and requires the original purchased name,
 quota and paid/trial state plus a single commission described by the purchased
 plan. This does not add consultant write access, new pricing, proration or an
 automatic refund/credit policy. Hosted PHP8.4/full-suite acceptance is required
+
+## DI dashboard purchased-access parity
+
+The DI company dashboard now derives both its displayed monthly invoice quota
+and plan tier from the same immutable purchased entitlement used by access
+enforcement. Editing the live catalogue after purchase can no longer change the
+customer's displayed quota or tier while their frozen term is active. Existing
+company quota overrides remain authoritative.
+
+An actual authenticated dashboard regression creates a frozen Kaarobar term,
+edits the catalogue row to Asaan with a different invoice limit, and requires
+the rendered dashboard to retain the purchased quota and enterprise tier while
+leaving the catalogue row unchanged. This changes no price, term, upgrade,
+proration, credit or refund policy. Hosted PHP8.4/full-suite/browser acceptance
+must verify the published exact HEAD.
 for the exact published HEAD; no local PHP runtime is available here.

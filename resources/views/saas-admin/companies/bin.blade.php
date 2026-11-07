@@ -49,11 +49,15 @@
                         </td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
+                                @if($canManageCompanyLifecycle)
                                 <form method="POST" action="{{ route('saas.admin.companies.restore', $company->id) }}" class="inline">
                                     @csrf
                                     <button class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-[10px] rounded hover:bg-emerald-600/40 transition">Restore</button>
                                 </form>
                                 <button @click="deleteId = {{ $company->id }}; deleteName = @js($company->name); deleteHold = @js($binHold); deleteEligible = @js($binEligible); deleteSiblings = @js($siblingNames[$company->id] ?? []); typedName = ''" class="px-2 py-1 bg-red-600/20 text-red-400 text-[10px] rounded hover:bg-red-600/40 transition">Delete Forever</button>
+                                @else
+                                <span class="text-[10px] text-gray-500">Read only</span>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -112,6 +116,7 @@
                 </div>
             </template>
 
+            @if($canManageCompanyLifecycle)
             <form id="binDeleteForm" :action="`{{ url('/admin/bin') }}/${deleteId}/destroy`" method="POST">
                 @csrf
                 @method('DELETE')
@@ -123,6 +128,12 @@
                             class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg font-medium transition">Delete Forever</button>
                 </div>
             </form>
+            @else
+                <div class="flex justify-end">
+                    <button type="button" @click="deleteId = null" class="px-4 py-2 bg-gray-800 text-gray-300 text-sm rounded-lg hover:bg-gray-700 transition">Close</button>
+                </div>
+                <p class="mt-3 text-xs text-gray-400">Read-only bin access. Restore and permanent delete require an administrator.</p>
+            @endif
         </div>
     </div>
 </div>

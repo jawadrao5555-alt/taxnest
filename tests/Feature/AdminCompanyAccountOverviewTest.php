@@ -178,4 +178,24 @@ class AdminCompanyAccountOverviewTest extends TestCase
         $this->assertSame('approved',$company->fresh()->status);
         $this->assertSame(0,AdminAuditLog::count());
     }
+
+    public function test_persisted_role_downgrade_revokes_cached_company_lifecycle_actions(): void
+    {
+        [$admin,$company,$sub] = $this->fixture();
+        $this->actingAs($admin,'admin');
+
+        $before = $company->fresh()->getAttributes();
+        $term = $sub->fresh()->getAttributes();
+        $admin->update(['role'=>'support']);
+
+        $this->post('/admin/companies/'.$company->id.'/suspend',['reason'=>'Must not land'])->assertForbidden();
+        $this->post('/admin/companies/'.$company->id.'/reject')->assertForbidden();
+
+        $this->assertSame($before,$company->fresh()->getAttributes());
+        $this->assertSame($term,$sub->fresh()->getAttributes());
+        $this->assertSame(0,AdminAuditLog::count());
+        $this->get('/admin/companies/'.$company->id)->assertOk()
+            ->assertSee('Read-only company access')
+            ->assertDontSee('data-company-state-action');
+    }
 }

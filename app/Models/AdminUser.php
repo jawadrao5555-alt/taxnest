@@ -26,11 +26,29 @@ class AdminUser extends Authenticatable
         return in_array($this->role, ['admin', 'super_admin'], true);
     }
 
+    public function canManageCompanyLifecycle(): bool
+    {
+        // Company rejection/suspension/bin/purge changes customer access or
+        // destroys operational rows.  Keep the established administrator
+        // roles, but never let support/viewer/unmapped roles inherit that
+        // authority merely because they have an admin-panel session.
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
     public static function requireBillingAdministrator(): self
     {
         $actor = auth('admin')->user();
         $current = $actor instanceof self ? $actor->fresh() : null;
         abort_unless($current && $current->canManageBilling(), 403, 'Billing changes require an administrator.');
+
+        return $current;
+    }
+
+    public static function requireCompanyLifecycleAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->canManageCompanyLifecycle(), 403, 'Company lifecycle changes require an administrator.');
 
         return $current;
     }

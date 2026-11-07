@@ -1040,9 +1040,10 @@ class AdminCompanyController extends Controller
 
     public function reject($id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $company->update(['status' => 'rejected', 'company_status' => 'rejected']);
-        AdminAuditLog::log(auth('admin')->id(), 'Company rejected', 'Company', $id, ['name' => $company->name]);
+        AdminAuditLog::log($actor->id, 'Company rejected', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been rejected.");
     }
 
@@ -1058,13 +1059,14 @@ class AdminCompanyController extends Controller
 
     private function changeCompanyState(Request $request, int $id, bool $activate)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $data = $request->validate([
             // Versioned forms require a reason; existing unversioned clients remain compatible.
             'reason' => [$request->filled('state_token') ? 'required' : 'nullable', 'string', 'max:1000'],
             'restoration_condition' => ['nullable', 'string', 'max:1000'],
             'state_token' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/D'],
         ]);
-        $result = \App\Services\CompanyAccountStateService::change($id, $activate, (int) auth('admin')->id(), $data);
+        $result = \App\Services\CompanyAccountStateService::change($id, $activate, (int) $actor->id, $data);
         if ($request->wantsJson()) {
             return response()->json(['success' => !$result['conflict']] + $result, $result['conflict'] ? 409 : 200);
         }
@@ -1161,10 +1163,11 @@ class AdminCompanyController extends Controller
 
     public function softDelete(Request $request, $id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::findOrFail($id);
         $company->update(['deleted_reason' => $request->input('reason', 'Moved to bin by admin')]);
         $company->delete();
-        AdminAuditLog::log(auth('admin')->id(), 'Company moved to bin', 'Company', $id, ['name' => $company->name, 'reason' => $request->input('reason')]);
+        AdminAuditLog::log($actor->id, 'Company moved to bin', 'Company', $id, ['name' => $company->name, 'reason' => $request->input('reason')]);
         return redirect()->route('saas.admin.companies')->with('success', "Company '{$company->name}' moved to bin.");
     }
 
@@ -1191,22 +1194,26 @@ class AdminCompanyController extends Controller
                 ->map(fn ($s) => $s->name . ' (' . \App\Support\ProductCatalog::shortLabel($s->product_type) . ')')
                 ->values()->all();
         }
-        $isSuperAdmin = (bool) auth('admin')->user()?->isSuperAdmin();
+        $currentAdmin = auth('admin')->user()?->fresh();
+        $isSuperAdmin = (bool) $currentAdmin?->isSuperAdmin();
+        $canManageCompanyLifecycle = (bool) $currentAdmin?->canManageCompanyLifecycle();
 
-        return view('saas-admin.companies.bin', compact('companies', 'siblingNames', 'isSuperAdmin'));
+        return view('saas-admin.companies.bin', compact('companies', 'siblingNames', 'isSuperAdmin', 'canManageCompanyLifecycle'));
     }
 
     public function restore($id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::onlyTrashed()->findOrFail($id);
         $company->restore();
         $company->update(['deleted_reason' => null]);
-        AdminAuditLog::log(auth('admin')->id(), 'Company restored from bin', 'Company', $id, ['name' => $company->name]);
+        AdminAuditLog::log($actor->id, 'Company restored from bin', 'Company', $id, ['name' => $company->name]);
         return back()->with('success', "Company '{$company->name}' has been restored.");
     }
 
     public function forceDelete(Request $request, $id)
     {
+        $actor = \App\Models\AdminUser::requireCompanyLifecycleAdministrator();
         $company = Company::onlyTrashed()->findOrFail($id);
         $companyName = $company->name;
 
@@ -1215,7 +1222,7 @@ class AdminCompanyController extends Controller
         // recoverable. A super-admin may override, but only by typing the
         // company's exact name — both the refusal and the override are audited.
         if ($company->purgeHoldActive()) {
-            $admin = auth('admin')->user();
+            $admin = $actor;
             $typed = trim((string) $request->input('confirm_name', ''));
             $eligible = $company->purgeEligibleAt()->format('d M Y, h:i A');
 
@@ -1375,7 +1382,7 @@ class AdminCompanyController extends Controller
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Healthcare file purge failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
-        AdminAuditLog::log(auth('admin')->id(), 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
+        AdminAuditLog::log($actor->id, 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
         return redirect()->route('saas.admin.companies.bin')->with('success', "Company '{$companyName}' has been permanently deleted.");
     }
 

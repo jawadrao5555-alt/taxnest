@@ -1,4 +1,5 @@
 <x-admin-layout>
+@php $canManageCompanyLifecycle = (bool) auth('admin')->user()?->fresh()?->canManageCompanyLifecycle(); @endphp
 @if(auth('admin')->user()?->isSuperAdmin() && $company->product_type === 'pos')
 <div class="px-6 pt-4"><a class="text-teal-500 underline" href="{{ route('saas.admin.local-bill-records', $company->id) }}">SaaS local bill records &amp; retention</a></div>
 @endif
@@ -508,6 +509,7 @@
         </div>
         @endif
         <div class="flex flex-wrap gap-2">
+            @if($canManageCompanyLifecycle)
             @if(!$company->trashed())
                 @if($company->status === 'pending')
                 <form method="POST" action="{{ route('saas.admin.companies.approve', $company->id) }}">@csrf<button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition font-medium">Approve</button></form>
@@ -522,6 +524,9 @@
             @else
                 <p class="text-sm text-red-400">This company is in the bin (deleted on {{ $company->deleted_at->format('d M Y') }}).</p>
                 <form method="POST" action="{{ route('saas.admin.companies.restore', $company->id) }}">@csrf<button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition font-medium">Restore</button></form>
+            @endif
+            @else
+                <p class="text-sm text-gray-400">Read-only company access. Company lifecycle actions require an administrator.</p>
             @endif
         </div>
     </div>
@@ -1001,6 +1006,7 @@
     </div>
     @endif
 
+    @if($canManageCompanyLifecycle)
     <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showDeleteModal = false">
         <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md mx-4" @click.stop>
             <h3 class="text-lg font-bold text-white mb-2">Move to Bin</h3>
@@ -1018,5 +1024,6 @@
             </form>
         </div>
     </div>
+    @endif
 </div>
 </x-admin-layout>

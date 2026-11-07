@@ -592,6 +592,29 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
         $this->assertSame(1, DB::table('companies')->where('id', $id)->count());
     }
 
+    public function test_support_role_cannot_bin_restore_or_permanently_delete_a_company(): void
+    {
+        $activeId = $this->makeCompany(['name' => 'Active Protected Co']);
+        $binnedId = $this->makeCompany([
+            'name' => 'Binned Protected Co',
+            'deleted_at' => now()->subDays(\App\Models\Company::BIN_HOLD_DAYS + 1),
+        ]);
+        $support = AdminUser::create([
+            'name' => 'Read-only Support', 'email' => 'readonly.lifecycle@taxnest.test',
+            'password' => Hash::make('Secret@12345'), 'role' => 'support',
+        ]);
+
+        $this->actingAs($support, 'admin')
+            ->post("/admin/companies/{$activeId}/delete", ['reason' => 'Must not land'])
+            ->assertForbidden();
+        $this->post("/admin/bin/{$binnedId}/restore")->assertForbidden();
+        $this->delete("/admin/bin/{$binnedId}/destroy")->assertForbidden();
+
+        $this->assertNull(DB::table('companies')->where('id', $activeId)->value('deleted_at'));
+        $this->assertNotNull(DB::table('companies')->where('id', $binnedId)->value('deleted_at'));
+        $this->assertSame(0, DB::table('admin_audit_logs')->count());
+    }
+
     // ── Guests never reach these POSTs ───────────────────────────────────
 
     public function test_guests_are_redirected_from_all_covered_posts(): void

@@ -1,5 +1,30 @@
 # Security and onboarding bulk — P1
 
+## Persisted company-lifecycle authority continuation
+
+Actual route reconciliation found that the AdminAuth middleware proved only an
+admin-panel login.  The company reject, suspend, activate, move-to-bin,
+restore and post-hold permanent-delete methods did not re-read the persisted
+role.  A support/viewer account—or an administrator downgraded while its
+cookie remained open—could therefore change customer access or destroy
+operational rows.
+
+Those mutations now require the existing persisted `admin` or `super_admin`
+roles on every request.  Cached role downgrades are refused before company,
+subscription or audit state changes.  The company directory, company detail
+and bin remain readable to support staff, but their lifecycle forms are
+replaced by explicit read-only wording.  Existing administrators retain the
+same lifecycle authority; the super-admin-only early bin-hold override stays
+super-admin-only.  No subscription period, purchased feature, company setting
+or retention rule was changed.
+
+Focused HTTP regressions require a cached super-admin downgraded to support to
+receive403 on suspend and reject with the complete company/subscription rows
+and audit count unchanged.  A separate real-route regression requires support
+to receive403 on bin, restore and permanent delete while both companies remain
+in their original state.  Hosted PHP8.4/full-suite and desktop/mobile browser
+acceptance for the exact updated HEAD remain required.
+
 ## Guided import concurrent-posting continuation
 
 The existing Healthcare setup importer already required an owner-only,

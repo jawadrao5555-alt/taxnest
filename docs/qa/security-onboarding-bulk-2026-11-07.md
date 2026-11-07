@@ -1,5 +1,34 @@
 # Security and onboarding bulk — P1
 
+## Guided import concurrent-posting continuation
+
+The existing Healthcare setup importer already required an owner-only,
+tenant-sealed upload, an explicit row-by-row preview, an unchanged workbook
+fingerprint and a re-analysis before posting.  It also deleted the workbook
+and review evidence after a successful commit.  Source reconciliation found a
+remaining posting race: two requests could both pass the review/fingerprint
+checks before either deleted the file.  Natural-key upserts made simple master
+data look idempotent, but staff credential creation and opening journals must
+not depend on that incidental behavior.
+
+Commit now takes an exclusive per-company/per-token filesystem claim before it
+parses or writes the reviewed workbook.  A concurrent request is refused with
+a visible English, Roman Urdu or Urdu message and writes nothing.  Exceptions
+release the claim so the reviewed workbook can be retried; success deletes the
+workbook and review before releasing, so a later replay follows the existing
+file-gone path.  The claim contains only its timestamp and actor id, never
+workbook rows, CNICs or credentials.  Another company still resolves the token
+inside its own directory only.
+
+Focused HTTP coverage pre-owns the exact commit claim, requires the competing
+request to leave all department rows untouched, releases it, then commits the
+same retained preview once.  Existing tests continue to cover preview-before-
+write, file-swap detection, sequential replay, tenant isolation, owner-only
+authority and per-row transactions.  This workspace has no PHP/Chrome/MariaDB
+runtime; only diff and shell syntax checks are local.  Exact updated-HEAD
+hosted PHP8.4/full-suite and final validate remain required, and no local or
+production acceptance is claimed.
+
 ## Read-only viewer credential revocation continuation
 
 Reproduced a cached-access gap in both Local Bills Viewer management paths and

@@ -2926,6 +2926,7 @@ return [
     'import_err_opening_post_failed' => 'Opening balance books mein post nahi ho saki (:reason), is liye ye account save nahi hua.',
     'import_err_review_first' => 'Import se pehle preview dekh lein. Abhi kuch bhi import nahi hua.',
     'import_err_file_changed' => 'Preview ke baad file badal gayi hai. Preview dobara dekh lein.',
+    'import_err_processing' => 'Yeh reviewed import pehle se process ho rahi hai. Koi cheez dobara import nahi hui.',
     'import_err_file_gone' => 'Woh upload ki hui file ab yahan nahi hai. Dobara upload karein.',
     'import_err_unreadable' => 'Woh file parhi nahi ja saki. Download kiya hua template istemal karein aur .xlsx mein save karein.',
     'import_err_missing_columns' => 'File mein yeh column mojood nahi: :columns. Download kiya hua template istemal karein.',

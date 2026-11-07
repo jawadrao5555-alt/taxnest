@@ -2960,6 +2960,7 @@ return [
     'import_err_opening_post_failed' => 'The opening balance could not be posted to the books (:reason), so this account was not saved.',
     'import_err_review_first' => 'Look through the preview before importing. Nothing has been imported.',
     'import_err_file_changed' => 'The uploaded file has changed since it was previewed. Look through the preview again.',
+    'import_err_processing' => 'This reviewed import is already being processed. Nothing has been imported twice.',
     'import_err_file_gone' => 'That uploaded file is no longer here. Upload it again.',
     'import_err_unreadable' => 'That file could not be read. Use the downloaded template and save it as .xlsx.',
     'import_err_missing_columns' => 'The file is missing these columns: :columns. Use the downloaded template.',

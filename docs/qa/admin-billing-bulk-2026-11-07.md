@@ -1,5 +1,39 @@
 # Admin billing bulk — P1
 
+## Signup/trial evidence continuation
+
+The corrected disposable signup cases reproduced two additional gaps against
+the original service: a missing DI trial seed borrowed the PRA product's trial
+plan, and newly created trials had no immutable terms. The old service was
+loaded independently in a temporary test bootstrap to confirm those failures;
+the feature branch was not reset for reproduction.
+
+Trial creation now takes the same company lock as paid assignment. It returns
+an existing active term unchanged, selects only its own product's trial plan,
+retains the existing time-bounded plan-less fallback when that seed is absent,
+and freezes available trial terms using the existing versioned snapshot.
+The snapshot explicitly says trial_assignment and zero charged price; no paid
+invoice or receipt is invented. A wrong-product creation request is refused;
+legacy unknown product and the Healthcare stored aliases retain compatibility.
+No existing trial, paid term, limit, price or company setting is backfilled.
+
+Local PHP8.3.6/SQLite: **56 tests /268 assertions passed** across actual
+DI/PRA/FBR signup, requested/picked packages, trial idempotency, existing paid
+term preservation, migrated snapshot terms, missing-seed product isolation,
+wrong-product refusal, registration and Healthcare pre-pilot. Paid package
+selection during signup creates only the trial, retaining the requested plan
+for the existing review flow; paid documents remain empty. Fixtures use the
+actual sellable plan names and required PRA package selection.
+
+The required native MariaDB lane now races two independent trial service
+workers: both must return the same one frozen zero-price term, leaving another
+company's paid term and all invoice/receipt counts unchanged. Native and
+supported PHP8.4/full suite/browser/validate evidence is pending for this new
+exact HEAD. No local MariaDB/Chrome acceptance is claimed. Whole registration
+rollback/browser acceptance, upgrades/proration, companion/API parity and
+audited financial adjustments remain in the full-scope checklist; this is
+not completion of #363 or readiness for owner approval.
+
 Base: 363a0d6823eae113336a6cd6069f160fc7a1a441 (merged #362). Priority: P1, owner requested 7 November 2026.
 
 This is an implementation workstream opened as a Draft. Initial content records source reconciliation and acceptance; runtime implementation and acceptance are not complete. No approval-ready or deployed claim follows from documentation CI.

@@ -63,6 +63,10 @@ final class DiagnosticCoverage
         $total = count($routes);
 
         return ['catalog_version' => 1, 'status' => 'PARTIAL', 'complete' => false, 'tenant_checks_run' => 0,
+            'source_registry' => ['version' => 1, 'operation' => 'get_diagnostic_source_evidence',
+                'adapters' => array_map(fn ($id, $source) => ['id' => $id, 'product' => $source[0],
+                    'evidence' => 'retained_ids_and_timestamps_only', 'complete_collection_proven' => false],
+                    array_keys(DiagnosticSourceEvidence::SOURCES), array_values(DiagnosticSourceEvidence::SOURCES))],
             'features' => $features, 'feature_count' => count($features), 'implemented_complete_features' => 0,
             'route_inventory' => ['total' => $total, 'unmapped' => count(array_filter($routes, fn ($r) => $r['mapping'] === 'UNMAPPED')),
                 'fingerprint' => hash('sha256', implode('|', array_keys($routes))), 'rows' => array_slice(array_values($routes), $offset, $limit),

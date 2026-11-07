@@ -25,4 +25,26 @@ Source trackers: #337 / #319. Delivery order: second batch after billing; may be
 
 ## Verification and preservation
 
-Synthetic seven-day timelines prove algorithms only. Installed-device collection, physical printing and field soak remain separate evidence. Collection failure must not alter checkout, fiscal queues or printing. Required hosted PHP/native/browser/Agent gates must verify final HEAD. Initial source inspection complete; runtime implementation and acceptance pending.
+Synthetic seven-day timelines prove algorithms only. Installed-device collection, physical printing and field soak remain separate evidence. Collection failure must not alter checkout, fiscal queues or printing. Required hosted PHP/native/browser/Agent gates must verify final HEAD.
+
+## First implementation increment — retained source metadata
+
+Implemented a version 1 allow-listed source registry and scoped reporting tool
+for PRA logs, DI logs (tenant joined through invoices), FBR POS logs and
+Healthcare audit timestamps. Existing OAuth scope, read auditing and revocation
+are reused. Exact company resolution also supports ERPS without expanding the
+older billing tools. No arbitrary table/query input or payload serialization.
+
+The report permits at most seven calendar dates and 50 records per ID page.
+It distinguishes missing source/schema from empty retained windows and reports
+only IDs/timestamps with explicit unknown collection/deletion/sequence/skew
+coverage. Page extents are not global retention extents. Missing DI parents
+cannot be attributed. This does not implement the broader collector, retention,
+offline buffering or seven-day completeness acceptance above.
+
+Local PHP8.3.6/SQLite: 34 tests /391 assertions passed across the source,
+authenticated OAuth/MCP and Day Close suites before the final registry display
+addition. Coverage includes real HTTP scope denial/revocation, pagination,
+PRA/DI/FBR/Healthcare storage shapes, missing/empty sources, timezone boundaries,
+payload exclusion and unchanged source rows. Hosted PHP8.4/native/full suite and
+browser acceptance remain required. No production access or business writes.

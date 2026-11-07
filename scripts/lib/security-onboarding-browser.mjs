@@ -34,10 +34,13 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await recoveryContext.route('**/*',r=>loopback(new URL(r.request().url()).hostname)?r.continue():r.abort('blockedbyclient'));
   const recovery=await recoveryContext.newPage();
   const errors=[];
+  const redirects=[];
   recovery.on('pageerror',e=>errors.push(e.message));
   recovery.on('response',r=>{if(r.status()>=400&&loopback(new URL(r.url()).hostname))errors.push('HTTP '+r.status()+' '+new URL(r.url()).pathname);});
+  recovery.on('response',r=>{if(r.request().isNavigationRequest())redirects.push(r.status()+':'+new URL(r.url()).pathname);});
   try {
     await recovery.goto(baseUrl+'/reset-password-link?token='+encodeURIComponent(fixture.reset.token)+'&email='+encodeURIComponent(fixture.reset.email)+'&panel=di',{waitUntil:'domcontentloaded'});
+    if(new URL(recovery.url()).pathname!=='/reset-password')throw Error('Reset form redirect failed: '+redirects.join(' -> '));
     await recovery.locator('input[name="password"]').fill(fixture.reset.newPassword);
     await recovery.locator('input[name="password_confirmation"]').fill(fixture.reset.newPassword);
     await Promise.all([recovery.waitForURL(u=>u.pathname==='/login'),recovery.locator('form[action$="/reset-password"] button[type="submit"]').click()]);

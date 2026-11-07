@@ -143,3 +143,16 @@ next-job-uploader regression checks. Those checks plus38 discovery and12
 startup regression cases pass locally. The subsequent fixture socket test is
 blocked by this environment's Unix-socket EPERM; hosted safety must verify the
 updated HEAD. Other earlier checks do not confer readiness on the update.
+
+Browser iteration at e0142b7849898cd959348b2fe298bd9ccf822e3c:
+native MariaDB and workflow safety passed, but the dedicated security journey
+failed on both widths. Mobile pointer evidence showed the header's Download
+App control intercepting the Skip Setup button; moved that form to the main
+content with an explicit touch target and keyboard focus. Completion errors
+are displayed as an alert. Desktop reached the recovery stage but could not
+find the password field; its root cause is not yet established. Added a
+navigation-path/status trace (no tokens, query strings or user data) that
+refuses an incorrect recovery destination immediately, retaining all original
+form/revocation assertions. Local backend regression run:8 tests/75 assertions
+passed; Node syntax/diff checks passed. Original pointer and recovery failures
+require fresh hosted browser evidence; no browser pass is claimed here.

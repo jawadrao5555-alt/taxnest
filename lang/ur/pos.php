@@ -7245,5 +7245,14 @@ return [
     'receipt_advanced_hint' => 'اضافی خانے اور پرنٹر کی سیدھ۔ آپ کی محفوظ ترتیبات تبھی بدلیں گی جب آپ خود بدلیں گے۔',
     'receipt_printer_support' => 'پرنٹر کی ترتیب اور مدد',
     'receipt_designs_basic' => 'رسید اور باورچی خانے کی پرچی کے انداز',
+
+    // Order-note visibility at the point of entry.
+    'kot_note_off_warning' => 'کچن پرچی پر آرڈر نوٹس بند ہیں۔ یہ نوٹ KOT پر نہیں آئے گا۔',
+    'kot_note_on_status' => 'نئی کچن پرچی پر آرڈر نوٹس آن ہیں۔',
+    'kot_note_already_sent' => 'KOT پہلے بھیج چکے ہیں؟ نیا یا بدلا ہوا نوٹ کچن کو بتائیں؛ نوٹ محفوظ کرنے سے دوسری پرچی نہیں نکلتی۔',
+    'kot_note_enable_shop' => 'اس دکان کی KOT پر آرڈر نوٹس آن کریں',
+    'kot_note_saving' => 'محفوظ ہو رہا ہے…',
+    'kot_note_ask_admin' => 'مالک یا منیجر سے کچن سیٹنگز میں آرڈر نوٹس آن کروائیں۔',
+    'kot_note_save_failed' => 'KOT نوٹس آن نہیں ہوئے۔ کنکشن اور اجازت چیک کرکے دوبارہ کوشش کریں۔',
 ];
 

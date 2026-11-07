@@ -1774,7 +1774,7 @@ window.addEventListener('popstate', function() {
                          the Pay-modal note comes too late for the kitchen. This opens a one-line
                          input bound to the SAME kitchenNotes model as the Pay-modal field (one
                          note, two surfaces). Collapsed by default: zero cart-height cost. --}}
-                    <button @click="showCartNote = !showCartNote; if (showCartNote) $nextTick(() => $refs.cartNoteInput?.focus())" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="(kitchenNotes || '').length > 0 ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
+                    <button data-kot-note-toggle @click="showCartNote = !showCartNote; if (showCartNote) $nextTick(() => $refs.cartNoteInput?.focus())" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="(kitchenNotes || '').length > 0 ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
                         <span x-text="(kitchenNotes || '').length > 0 ? '✎ Note ✓' : '✎ Note'"></span>
                     </button>
                     <button @click="showDiscount = !showDiscount" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 border-orange-200 dark:border-orange-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
@@ -1789,6 +1789,7 @@ window.addEventListener('popstate', function() {
                         placeholder="{{ __('pos.ph_bill_note_multi') }}"
                         @keydown.escape.prevent="showCartNote = false"
                         class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
+                        @include('pos.partials.kot-note-status')
                 </div>
                 <div class="px-3 pb-1.5" x-show="showDiscount" x-transition>
                     <div class="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
@@ -2165,6 +2166,7 @@ window.addEventListener('popstate', function() {
                     autocomplete="off" name="pos_bill_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     placeholder="{{ __('pos.ph_bill_note_multi') }}"
                     class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
+                    @include('pos.partials.kot-note-status')
             </div>
             {{-- Task 514: per-bill receipt auto-print choice (default = company setting;
                  unticked = SIRF is bill ki receipt auto-print skip — KOT/PRA/popup untouched). --}}

@@ -7248,5 +7248,14 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_advanced_hint' => 'Izafi fields aur printer ki alignment. Aap ki saved settings tabhi badlein gi jab aap khud badlein ge.',
     'receipt_printer_support' => 'Printer setup aur madad',
     'receipt_designs_basic' => 'Receipt aur kitchen ticket ke designs',
+
+    // Order-note visibility at the point of entry.
+    'kot_note_off_warning' => 'Kitchen parchi par order notes BAND hain. Yeh note KOT par nahi aayega.',
+    'kot_note_on_status' => 'Nayi kitchen parchi par order notes ON hain.',
+    'kot_note_already_sent' => 'KOT pehle bhej chukay hain? Naya ya badla hua note kitchen ko batayein; note save karne se doosri parchi nahi nikalti.',
+    'kot_note_enable_shop' => 'Is shop ki KOT par order notes ON karein',
+    'kot_note_saving' => 'Save ho raha hai…',
+    'kot_note_ask_admin' => 'Owner ya manager se Kitchen Settings mein order notes ON karwayein.',
+    'kot_note_save_failed' => 'KOT notes ON nahi hue. Connection aur ijazat check karke dobara koshish karein.',
 ];
 

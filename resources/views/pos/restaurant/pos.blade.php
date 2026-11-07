@@ -491,6 +491,7 @@ window.addEventListener('popstate', function() {
             <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
                 <div class="px-3 py-1.5">
                     <textarea x-model="kitchenNotes" rows="1" placeholder="Kitchen notes..." class="w-full text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-purple-500 resize-none placeholder-gray-300"></textarea>
+                    @include('pos.partials.kot-note-status')
                 </div>
                 <div class="px-3 py-1.5">
                     <div class="flex items-center gap-1.5">

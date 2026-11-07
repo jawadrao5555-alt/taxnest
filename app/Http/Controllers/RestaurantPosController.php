@@ -2468,6 +2468,23 @@ class RestaurantPosController extends Controller
         return back()->with('success', 'Counter removed. Its categories now print with the main Kitchen.');
     }
 
+    /** Explicit note-editor opt-in; never rewrite the other kitchen settings. */
+    public function enableKitchenNotes(Request $request)
+    {
+        $user = auth('pos')->user();
+        $companyId = (int) app('currentCompanyId');
+        $customize = \App\Services\PosAccessService::customAllows($user, 'customize');
+        abort_unless($user && (int) $user->company_id === $companyId
+            && ($customize === true || ($customize === null && $user->isPosAdmin())), 403);
+        abort_unless(Schema::hasColumn('companies', 'kot_show_kitchen_notes'), 409);
+
+        // Idempotent enable, not a toggle: double taps / retries cannot turn notes off.
+        $company = Company::findOrFail($companyId);
+        $company->update(['kot_show_kitchen_notes' => true]);
+
+        return response()->json(['success' => true, 'enabled' => true]);
+    }
+
     public function updateKitchenSettings(Request $request)
     {
         $companyId = app('currentCompanyId');

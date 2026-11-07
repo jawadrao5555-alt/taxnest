@@ -385,6 +385,7 @@
                     <textarea x-model="kitchenNotes" rows="2" placeholder="{{ __('pos.ph_kitchen_note_order') }}"
                               autocomplete="off" name="waiter_kn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                               class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500"></textarea>
+                              @include('pos.partials.kot-note-status')
                     @else
                     <input type="text" x-model="customerName" placeholder="{{ __('pos.ph_customer_name_optional') }}"
                            autocomplete="off" name="waiter_customer_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
@@ -426,6 +427,7 @@
                         <textarea x-model="kitchenNotes" rows="2" placeholder="{{ __('pos.ph_kitchen_note_order') }}"
                                   autocomplete="off" name="waiter_kn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                                   class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500"></textarea>
+                                  @include('pos.partials.kot-note-status')
                         <div>
                             {{-- Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026): default = counter,
                                  order shows on EVERY cashier's incoming list. Picking a specific cashier

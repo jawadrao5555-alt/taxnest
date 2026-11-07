@@ -7260,5 +7260,14 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'receipt_advanced_hint' => 'Optional field visibility and printer alignment. Your saved choices stay the same unless you change them.',
     'receipt_printer_support' => 'Printer setup and support',
     'receipt_designs_basic' => 'Receipt and kitchen ticket designs',
+
+    // Order-note visibility at the point of entry.
+    'kot_note_off_warning' => 'Order notes are OFF on kitchen slips. This note will be missing from the KOT.',
+    'kot_note_on_status' => 'Order notes are ON for new kitchen slips.',
+    'kot_note_already_sent' => 'Already sent the KOT? Tell the kitchen about a new or changed note; saving a note does not print another slip.',
+    'kot_note_enable_shop' => 'Enable order notes on KOTs for this shop',
+    'kot_note_saving' => 'Saving…',
+    'kot_note_ask_admin' => 'Ask your owner or manager to enable order notes in Kitchen Settings.',
+    'kot_note_save_failed' => 'Could not enable KOT notes. Check your connection and permission, then try again.',
 ];
 

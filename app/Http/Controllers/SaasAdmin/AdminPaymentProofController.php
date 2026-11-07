@@ -567,7 +567,7 @@ class AdminPaymentProofController extends Controller
             // proof to a different package, even if its end date happens to
             // match. The owner can reject/reconcile that payment explicitly.
             if (($locked->pricing_plan_id && (int) $locked->pricing_plan_id !== (int) $sub->pricing_plan_id)
-                || array_diff($codes, \App\Services\PosAddonService::purchasableCodesForPlan($sub->pricingPlan))) {
+                || array_diff($codes, \App\Services\PosAddonService::purchasableCodesForPlan($sub->entitlementPlan()))) {
                 return ['outcome' => 'subscription_changed'];
             }
 

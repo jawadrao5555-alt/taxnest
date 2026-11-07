@@ -1,5 +1,22 @@
 # Admin billing bulk — P1
 
+## Pending add-on approval purchased-entitlement parity
+
+Reproduced a second live-catalogue drift path after the DI dashboard correction:
+the final review of an already quoted POS feature add-on compared its codes with
+the current editable pricing-plan row. If the catalogue later moved that feature
+into the package, the pending paid proof was rejected as a package change even
+though the subscription ID, purchased package snapshot, quoted codes, amount and
+expiry were unchanged. The approval recheck now uses the same immutable
+`entitlementPlan()` view as access enforcement. New purchases still use the live
+catalogue, and a real package-ID or expiry change is still refused.
+
+Focused actual-controller coverage freezes Caller ID as optional, files its
+server quote, edits only the live catalogue gate, and requires one approved
+add-on at the original amount and subscription. No price, proration, refund,
+credit, package term or add-on policy changed. Exact updated-HEAD hosted
+PHP8.4/full-suite/native/browser/build acceptance remains required.
+
 ## Signup/trial evidence continuation
 
 The corrected disposable signup cases reproduced two additional gaps against

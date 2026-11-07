@@ -26,10 +26,15 @@ customer records are backfilled. The payment audit includes the resulting term.
   trial conversion, ambiguous active terms, rollback and another company.
 - The adjacent annual-price and company-account overview tests passed locally.
 - The combined focused run passed 46 tests and 1120 assertions.
+- A separate full-migration SQLite HTTP regression passed 1 test / 7 assertions,
+  including leap-day expiry and the resulting immutable approval audit period.
 - Hosted native acceptance runs two independent approval-controller processes
   against one payment proof, then retries it and checks the original term,
   exactly one new subscription/approval audit, and a second company's records.
   Its result must be verified on the updated published commit.
+- The first hosted native probe exposed a missing required invoice_limit in its
+  new fictional pricing-plan fixture. The fixture now uses a bounded limit of
+  100 and the full-schema HTTP regression exercises the corresponding fields.
 - Local PHP is 8.3.6 with SQLite, below the repository's unchanged PHP 8.4.1
   requirement. Hosted PHP 8.4 full-suite and native MariaDB gates remain required.
 - No UI markup changes. The real payment approval HTTP endpoint is exercised

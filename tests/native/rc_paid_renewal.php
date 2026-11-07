@@ -65,7 +65,10 @@ $other = Company::create([
     'name' => 'Synthetic other renewal account', 'email' => 'other-'.$suffix.'@renewal.invalid',
     'ntn' => 'x'.$suffix, 'product_type' => 'pos', 'status' => 'approved', 'company_status' => 'active',
 ]);
-$plan = PricingPlan::create(['name' => 'Starter', 'product_type' => 'pos', 'price' => 1000, 'is_trial' => false]);
+$plan = PricingPlan::create([
+    'name' => 'Starter', 'product_type' => 'pos', 'price' => 1000,
+    'is_trial' => false, 'invoice_limit' => 100,
+]);
 $previousEnd = now()->addMonthsNoOverflow(2)->startOfDay();
 $old = Subscription::create([
     'company_id' => $company->id, 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',

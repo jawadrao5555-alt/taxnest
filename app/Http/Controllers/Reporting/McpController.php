@@ -90,6 +90,7 @@ final class McpController extends Controller
                 'get_pra_operations_evidence' => app(\App\Services\Reporting\PraOperationsEvidence::class)->read($args, $allowed),
                 'get_diagnostic_coverage' => app(DiagnosticCoverage::class)->catalog($args),
                 'get_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read($args, $allowed),
+                'get_diagnostic_bill_evidence' => app(\App\Services\Reporting\DiagnosticBillEvidence::class)->read($args, $allowed),
                 default => null,
             };
             if ($result === null) {
@@ -129,6 +130,9 @@ final class McpController extends Controller
             'stream' => ['type' => 'string', 'enum' => ['reports', 'openings', 'counter_closes']],
             'branch_id' => ['type' => 'integer', 'minimum' => 0], 'terminal_id' => ['type' => 'integer', 'minimum' => 0]];
         $defs = [
+            ['get_diagnostic_bill_evidence', 'Bounded explicit bill-to-source record associations for PRA, DI, FBR POS or Healthcare. IDs only; missing links and unsupported streams stay unknown. No replay or fiscal acceptance inference.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id'])) + $cursor + [
+                    'bill_id' => ['type' => 'integer', 'minimum' => 1]], ['company_name', 'bill_id']],
             ['get_diagnostic_source_evidence', 'Registered source metadata for PRA, DI, FBR POS or Healthcare. At most seven dates. IDs/timestamps only; missing sources and incomplete collection remain explicit. No fiscal requests or retries.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
                     'source' => ['type' => 'string', 'enum' => array_keys(\App\Services\Reporting\DiagnosticSourceEvidence::SOURCES)]], ['company_name', 'date_from', 'source']],

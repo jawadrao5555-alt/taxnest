@@ -97,3 +97,27 @@ not yet correlate a bill to all payments, stock movements, print outcomes and
 fiscal attempts; do not infer paper output, regulator acceptance, sequence
 continuity or complete collection. Missing tables remain UNAVAILABLE and empty
 windows remain NO_RETAINED_EVENTS. The broad checklist therefore stays open.
+
+## Explicit bill/source associations
+
+Added get_diagnostic_bill_evidence through the existing revocable OAuth/MCP
+read path. Exact scoped company plus bill identity selects explicit retained
+foreign-key/reference links: PRA payments, orders, print events, stock and PRA
+attempts; DI fiscal attempts; FBR fiscal attempts/stock; Healthcare payments.
+No matching-by-amount/time/number guess is made. Child tables without company_id
+are scoped through the already verified parent; tables with company_id require
+both the company and the parent link. Stock links require the correct reference
+type, and print evidence requires its recorded product.
+
+Each source returns only IDs, its own bounded cursor and explicit missing/empty
+states. Deleted/missing parent bills are refused rather than reconstructed.
+Payloads, payment amounts, customer/patient data and fiscal responses stay out
+of this report. No business row changes, replay or acceptance inference occurs.
+Order-only print linkage, federal IMS, offline events and additional streams
+remain explicitly listed as unimplemented links. Scope completion remains open.
+
+Local PHP8.3.6/SQLite full Reporting set:63 tests/586 assertions passed. Includes
+all four products, foreign/inconsistent child attribution, cursor boundaries,
+missing sources, exact/ambiguous identity, arbitrary-filter refusal and actual
+authenticated MCP scope/audit/revocation with unchanged source rows. Full
+PHP8.4/native/browser/validate acceptance must verify the next published HEAD.

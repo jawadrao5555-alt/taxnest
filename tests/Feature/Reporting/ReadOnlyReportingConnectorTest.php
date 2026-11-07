@@ -193,6 +193,31 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args)->assertUnauthorized();
     }
 
+    public function test_bill_links_reuse_oauth_scope_audit_and_revocation_without_business_writes(): void
+    {
+        [, $tokens] = $this->connection();
+        Schema::create('pra_logs', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->unsignedBigInteger('transaction_id'); $t->text('response_payload');
+        });
+        DB::table('pra_logs')->insert([
+            ['id'=>1,'company_id'=>1,'transaction_id'=>1,'response_payload'=>'PRIVATE-OWN'],
+            ['id'=>2,'company_id'=>2,'transaction_id'=>1,'response_payload'=>'PRIVATE-FOREIGN'],
+        ]);
+        $before = DB::table('pos_transactions')->get()->toJson();
+        $args = ['company_name'=>'Pizza Master Test','bill_id'=>1];
+        $this->toolCall($tokens['access_token'],'get_diagnostic_bill_evidence',$args)->assertOk()
+            ->assertJsonPath('result.isError',false)->assertJsonPath('result.structuredContent.sources.pra_attempts.rows.0.id',1)
+            ->assertJsonCount(1,'result.structuredContent.sources.pra_attempts.rows')->assertDontSee('PRIVATE');
+        $this->assertSame(1,DB::table('reporting_read_audits')->where('tool','get_diagnostic_bill_evidence')->where('company_id',1)->count());
+        $this->toolCall($tokens['access_token'],'get_diagnostic_bill_evidence',array_replace($args,['bill_id'=>6]))
+            ->assertJsonPath('result.isError',true);
+        $this->toolCall($tokens['access_token'],'get_diagnostic_bill_evidence',array_replace($args,['company_name'=>'Pizza Master Twin']))
+            ->assertJsonPath('result.isError',true);
+        $this->assertSame($before,DB::table('pos_transactions')->get()->toJson());
+        DB::table('reporting_oauth_grants')->update(['revoked_at'=>now()]);
+        $this->toolCall($tokens['access_token'],'get_diagnostic_bill_evidence',$args)->assertUnauthorized();
+    }
+
     public function test_day_close_and_coverage_use_existing_revocable_connection_with_no_business_writes(): void
     {
         [, $tokens] = $this->connection();
@@ -288,7 +313,8 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_tax_items', $this->period() + ['classification' => 'exempt'])->assertJsonPath('result.structuredContent.items.0.description', 'Exempt item');
         $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period())->assertJsonPath('result.structuredContent.actual_collected_total', null);
         $tools = $this->withToken($t['access_token'])->postJson('/api/reporting/mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'])->json('result.tools');
-        $this->assertCount(12, $tools);
+        $this->assertCount(13, $tools);
+        $this->assertContains('get_diagnostic_bill_evidence', array_column($tools, 'name'));
         foreach ($tools as $tool) {
             $this->assertTrue($tool['annotations']['readOnlyHint']);
             $this->assertFalse($tool['annotations']['destructiveHint']);

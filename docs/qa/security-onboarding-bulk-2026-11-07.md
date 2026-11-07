@@ -340,3 +340,17 @@ equivalence is claimed.
 The remaining consent/deletion/restore, import preview/posting, broader
 OAuth/device revocation, accessibility/tutorial/notification and backup-restore
 evidence checklist remains open. This increment is not full #365 readiness.
+
+## Cached Agent-device revocation acceptance
+
+The Desktop Agent's known-good cache is only a shared-IP brute-force throttle
+exemption; authorization still re-reads the company key and enabled/deleted
+state on every background poll. New negative coverage first authenticates and
+proves the cache exists, then rotates the company key: the cached old key is
+refused immediately while the replacement succeeds. A separate sequence
+proves disable and soft-delete also refuse the previously healthy key on the
+next poll. No pairing, printer, offline record or company setting is changed by
+the implementation; these are disposable tests of the existing runtime path.
+This closes the Desktop Agent cached-key slice only. OAuth/viewer/consultant
+and other companion/background revocation acceptance remains part of the
+broader open matrix.

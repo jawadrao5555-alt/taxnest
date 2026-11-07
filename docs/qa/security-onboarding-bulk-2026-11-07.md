@@ -27,4 +27,30 @@ Source trackers: #337 / #320 / #321. Delivery order: third batch; security regre
 
 ## Verification and preservation
 
-Only local disposable or hosted synthetic data; fake mail/HTTP delivery. Preserve existing password-copy policy pending explicit review rather than silently changing owner decisions. No production credentials/browser/data, real messages, fiscal submissions or release actions. Required PHP8.4/native and real desktop/mobile authenticated journeys must pass before approval readiness. Initial source inspection complete; runtime implementation and acceptance pending.
+Only local disposable or hosted synthetic data; fake mail/HTTP delivery. Preserve existing password-copy policy pending explicit review rather than silently changing owner decisions. No production credentials/browser/data, real messages, fiscal submissions or release actions. Required PHP8.4/native and real desktop/mobile authenticated journeys must pass before approval readiness.
+
+## First implementation increment — expiring single-use reset grants
+
+Reproduced through actual HTTP: consuming a valid link and waiting 16 minutes
+still allowed password change because the final form checked only session
+token/email. OTP/link consumption also used read-then-unconditional-update.
+
+OTP and link now claim a grant through an atomic conditional update. A random
+session token is stored as a SHA256 grant hash in the existing OTP row; the
+original deadline remains authoritative. Final password change locks that row
+and the selected product user, validates deadline/identity/hash and marks the
+grant completed in the same transaction. Issuing a new reset revokes older
+grants. Existing product identity and approved viewable-password behavior stay
+in the original path. A nullable additive migration adds only grant metadata;
+old in-progress forms without a grant must request a fresh reset.
+
+Local PHP8.3.6/SQLite: 23 tests /149 assertions passed for actual HTTP expiry,
+copied-session replay, new-request revocation, valid OTP and link flows,
+cross-product identity and locale regressions. Added a required native MariaDB
+probe with two independent final-password controller workers sharing one grant,
+asserting one completion and another account unchanged. Native result and
+supported PHP8.4/full suite/browser acceptance are pending hosted verification.
+
+This increment does not complete broader role/impersonation/revocation,
+consent/backup, two-step, onboarding, support or UI accessibility acceptance.
+The original checklist remains open. No production or release actions used.

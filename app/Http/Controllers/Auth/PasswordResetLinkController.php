@@ -113,8 +113,7 @@ class PasswordResetLinkController extends Controller
             ->when($scoped, fn ($q) => $q->where(function ($inner) use ($panel) {
                 $inner->where('product_type', $panel)->orWhereNull('product_type');
             }))
-            ->where('used', false)
-            ->update(['used' => true]);
+            ->update(['used' => true, 'reset_grant_hash' => null]);
 
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $token = bin2hex(random_bytes(32));
@@ -209,11 +208,10 @@ class PasswordResetLinkController extends Controller
             return back()->withInput()->withErrors(['otp' => __('pos.auth_otp_invalid')]);
         }
 
-        $tempToken = bin2hex(random_bytes(32));
-
-        DB::table('password_reset_otps')
-            ->where('id', $record->id)
-            ->update(['used' => true, 'updated_at' => now()]);
+        $tempToken = $this->issueResetGrant($record);
+        if ($tempToken === null) {
+            return back()->withInput()->withErrors(['otp' => __('pos.auth_otp_invalid')]);
+        }
 
         // The product travels with the reset, so the new password lands on the
         // account the OTP was actually issued for.
@@ -221,6 +219,7 @@ class PasswordResetLinkController extends Controller
             'password_reset_token'   => $tempToken,
             'password_reset_email'   => $request->email,
             'password_reset_product' => $record->product_type ?? $panel,
+            'password_reset_record'  => $record->id,
         ]);
 
         return redirect()->route('password.reset.form', ['token' => $tempToken, 'email' => $request->email]);
@@ -246,19 +245,31 @@ class PasswordResetLinkController extends Controller
             return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_link_expired')]);
         }
 
-        DB::table('password_reset_otps')
-            ->where('id', $record->id)
-            ->update(['used' => true, 'updated_at' => now()]);
-
-        $sessionToken = bin2hex(random_bytes(32));
+        $sessionToken = $this->issueResetGrant($record);
+        if ($sessionToken === null) {
+            return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_link_expired')]);
+        }
         session([
             'password_reset_token'   => $sessionToken,
             'password_reset_email'   => $email,
             // The link carries its own product; the row is the safer source.
             'password_reset_product' => $record->product_type ?? $this->panel($request),
+            'password_reset_record' => $record->id,
         ]);
 
         return redirect()->route('password.reset.form', ['token' => $sessionToken, 'email' => $email]);
+    }
+
+    private function issueResetGrant(object $record): ?string
+    {
+        $token = bin2hex(random_bytes(32));
+        // Compare-and-set: competing link/OTP requests can issue only one
+        // grant. Its deadline is the original OTP deadline, never extended.
+        $claimed = DB::table('password_reset_otps')->where('id', $record->id)
+            ->where('used', false)->where('expires_at', '>', now())
+            ->update(['used' => true, 'reset_grant_hash' => hash('sha256', $token), 'updated_at' => now()]);
+
+        return $claimed === 1 ? $token : null;
     }
 
     private function buildEmailHtml(string $otp, string $resetLink, string $email): string

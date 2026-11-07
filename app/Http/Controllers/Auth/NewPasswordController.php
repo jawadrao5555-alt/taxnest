@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
@@ -47,30 +48,39 @@ class NewPasswordController extends Controller
         // may hold a PRA POS, an FBR POS and a Digital Invoice account, and
         // the two the visitor did not ask for must stay untouched.
         $product = session('password_reset_product');
-        $user = $product === null
-            ? User::where('email', $request->email)->first()
-            : \App\Support\IdentityScope::findUserByEmail($request->email, $product);
-        if (!$user) {
-            return back()->withErrors(['email' => __('pos.auth_user_not_found')]);
-        }
+        $user = DB::transaction(function () use ($product, $request) {
+            $grant = DB::table('password_reset_otps')->where('id', session('password_reset_record'))
+                ->where('email', $request->email)->where('used', true)
+                ->whereNull('reset_completed_at')->where('expires_at', '>', now())
+                ->lockForUpdate()->first();
+            if (!$grant || !$grant->reset_grant_hash
+                || !hash_equals($grant->reset_grant_hash, hash('sha256', $request->token))
+                || (($grant->product_type ?? null) !== null && $grant->product_type !== $product)) {
+                return null;
+            }
+            $user = $product === null
+                ? User::where('email', $request->email)->first()
+                : \App\Support\IdentityScope::findUserByEmail($request->email, $product);
+            if (!$user) return null;
+            $user = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
 
-        $fill = [
-            'password' => Hash::make($request->password),
-            'remember_token' => Str::random(60),
-        ];
-        // Roles with an owner/admin-viewable password copy keep it in sync
-        // (owner, Jul 2026) so /pos/team — and, since Task 665, the owner's
-        // Local Bills viewer section — never shows a stale password after a
-        // forgot-password reset. ViewablePasswordService = single truth for
-        // the role list and the drift guard.
-        if (\App\Services\ViewablePasswordService::supports($user->pos_role)) {
-            $fill = \App\Services\ViewablePasswordService::apply($fill, $request->password);
+            $fill = ['password' => Hash::make($request->password), 'remember_token' => Str::random(60)];
+            // Preserve the existing owner-approved viewable-password policy.
+            if (\App\Services\ViewablePasswordService::supports($user->pos_role)) {
+                $fill = \App\Services\ViewablePasswordService::apply($fill, $request->password);
+            }
+            $user->forceFill($fill)->save();
+            DB::table('password_reset_otps')->where('id', $grant->id)
+                ->update(['reset_completed_at' => now(), 'reset_grant_hash' => null, 'updated_at' => now()]);
+            return $user;
+        });
+
+        session()->forget(['password_reset_token', 'password_reset_email', 'password_reset_product', 'password_reset_record']);
+        if (!$user) {
+            return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_session_invalid')]);
         }
-        $user->forceFill($fill)->save();
 
         event(new PasswordReset($user));
-
-        session()->forget(['password_reset_token', 'password_reset_email']);
 
         return redirect()->route('login')->with('status', __('pos.auth_password_reset_success'));
     }

@@ -250,3 +250,28 @@ and subscription lock plus DI API access. Follow-up access-service regression
 passed59 tests/341 assertions. All required hosted full-suite/native/browser/Agent gates remain required on
 the next published HEAD. This does not complete signup/upgrade/proration or
 audited financial-adjustment acceptance.
+
+## Atomic public signup continuation
+
+An actual HTTP trial-creation failure reproduced retained company/user/credential
+rows on PRA and FBR POS registration. DI already wrapped these writes. PRA/FBR
+now wrap company, owner, credential ledger and trial in one transaction; login
+and referral-session consumption happen only after commit. Existing language,
+category, requested package, annual cycle and pending approval defaults remain.
+A late failure leaves no burned credential or orphan owner/company. The same
+credentials can retry, with one zero-price trial and no paid documents; another
+paid tenant and its original term remain byte-for-byte unchanged.
+
+Local supported-behavior regression on private PHP8.3/SQLite: **53 tests /285
+assertions passed** across atomic signup, trial, requested/picked packages,
+registration and tables-first behavior. New browser acceptance exercises actual
+DI/PRA/FBR registration forms in isolated contexts at1366/390, alongside the
+existing selection/receipt flow. Browser/native/full PHP8.4/validate proof is
+pending for the updated exact HEAD; no claim follows from local SQLite. Earlier
+bae94f3e4e745c862e8ecf944ab861e028557562 native job128463373975 explicitly
+passed concurrent trial creation with one frozen term, paid company and documents
+unchanged; that result does not cover this latest transaction/UI update.
+
+Existing-policy upgrades/proration, companion parity and audited financial
+adjustments remain open. Proposed prices and new commercial policies are not
+approved. Finish all three workstreams before one combined approval PR.

@@ -20,6 +20,9 @@ class PasswordResetGrantSafetyTest extends TestCase
         $token = DB::table('password_reset_otps')->where('email', $user->email)->value('token');
         $this->get('/reset-password-link?token='.$token.'&email='.urlencode($user->email))->assertRedirect();
         $sessionToken = session('password_reset_token');
+        $stored = DB::table('password_reset_otps')->where('email', $user->email)->sole();
+        $this->assertSame(hash('sha256', $sessionToken), $stored->reset_grant_hash);
+        $this->assertNotSame($sessionToken, $stored->reset_grant_hash);
         $this->travel(16)->minutes();
         $this->post('/reset-password', ['token' => $sessionToken, 'email' => $user->email,
             'password' => 'NewSynthetic123!', 'password_confirmation' => 'NewSynthetic123!'])
@@ -44,6 +47,21 @@ class PasswordResetGrantSafetyTest extends TestCase
             ['password' => 'ReplaySynthetic123!', 'password_confirmation' => 'ReplaySynthetic123!']))
             ->assertRedirect(route('password.request'))->assertSessionHasErrors('email');
         $this->assertTrue(Hash::check('NewSynthetic123!', $user->fresh()->password));
+    }
+
+    public function test_expired_reset_form_redirects_to_a_fresh_request(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create();
+        $this->post('/forgot-password', ['email' => $user->email]);
+        $token = DB::table('password_reset_otps')->where('email', $user->email)->value('token');
+        $this->get('/reset-password-link?token='.$token.'&email='.urlencode($user->email));
+        $grant = session('password_reset_token');
+        $this->travel(16)->minutes();
+        $this->get('/reset-password?token='.$grant.'&email='.urlencode($user->email))
+            ->assertRedirect(route('password.request'))->assertSessionHasErrors('email');
+        $this->assertNull(session('password_reset_token'));
+        $this->travelBack();
     }
 
     public function test_new_request_revokes_a_previously_verified_grant_and_otp_still_works(): void

@@ -44,9 +44,9 @@ grants. Existing product identity and approved viewable-password behavior stay
 in the original path. A nullable additive migration adds only grant metadata;
 old in-progress forms without a grant must request a fresh reset.
 
-Local PHP8.3.6/SQLite: 23 tests /149 assertions passed for actual HTTP expiry,
+Local PHP8.3.6/SQLite: 24 tests /156 assertions passed for actual HTTP expiry,
 copied-session replay, new-request revocation, valid OTP and link flows,
-cross-product identity and locale regressions. Added a required native MariaDB
+cross-product identity, expired-form redirect and locale regressions. Added a required native MariaDB
 probe with two independent final-password controller workers sharing one grant,
 asserting one completion and another account unchanged. Native result and
 supported PHP8.4/full suite/browser acceptance are pending hosted verification.

@@ -24,6 +24,14 @@ class NewPasswordController extends Controller
             return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_session_invalid')]);
         }
 
+        $valid = DB::table('password_reset_otps')->where('id', session('password_reset_record'))
+            ->where('email', $email)->where('used', true)->whereNull('reset_completed_at')
+            ->where('reset_grant_hash', hash('sha256', $token))->where('expires_at', '>', now())->exists();
+        if (!$valid) {
+            session()->forget(['password_reset_token', 'password_reset_email', 'password_reset_product', 'password_reset_record']);
+            return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_session_invalid')]);
+        }
+
         return view('auth.reset-password', ['email' => $email, 'token' => $token]);
     }
 

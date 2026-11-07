@@ -4,6 +4,7 @@ import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow }
 import { b02DealWorkflow } from './lib/pra-b02-browser.mjs';
 import { mixedFulfillmentWorkflow } from './lib/mixed-fulfillment-browser.mjs';
 import { staffDiscountWorkflow } from './lib/pra-staff-discount-browser.mjs';
+import { securityOnboardingWorkflow } from './lib/security-onboarding-browser.mjs';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -1484,6 +1485,7 @@ async function deliveryContactSearchWorkflow(page,t,v) {
 }
 
 async function workflow(page,t,v,diagnostics) {
+  if(t.securityOnboarding)return securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvidenceScreenshot,pass,loopback});
   if(t.taxIntegrations)return taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b01Account)return b01CompanyAccountWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b03AutoKot)return b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});

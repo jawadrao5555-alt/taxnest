@@ -77,9 +77,11 @@ try {
         $wins += substr_count($process->getOutput(), 'RESET_WON');
     }
     $record = DB::table('password_reset_otps')->find($recordId);
-    $password = $user->fresh()->password;
+    $resetUser = $user->fresh();
+    $password = $resetUser->password;
     if ($wins !== 1 || !$record->reset_completed_at || $record->reset_grant_hash !== null
         || (!Hash::check('SyntheticReset1!', $password) && !Hash::check('SyntheticReset2!', $password))
+        || !\Illuminate\Support\Str::isUuid((string) $resetUser->session_generation)
         || $foreign->fresh()->getAttributes() !== $foreignBefore) {
         throw new RuntimeException('Reset grant proof failed: wins='.$wins
             .'; completed='.(int) (bool) $record->reset_completed_at
@@ -88,6 +90,7 @@ try {
             .'; other_account_unchanged='.(int) ($foreign->fresh()->getAttributes() === $foreignBefore));
     }
     echo "PASS: native password reset grant permits one concurrent completion and preserves other account\n";
+    echo "PASS: native reset rotates the company browser session generation atomically\n";
 } finally {
     foreach ($processes as $process) if ($process->isRunning()) $process->stop(1);
     if (is_file($barrier)) unlink($barrier);

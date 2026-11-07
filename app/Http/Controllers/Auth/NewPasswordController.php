@@ -73,6 +73,9 @@ class NewPasswordController extends Controller
             $user = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
 
             $fill = ['password' => Hash::make($request->password), 'remember_token' => Str::random(60)];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'session_generation')) {
+                $fill['session_generation'] = (string) Str::uuid();
+            }
             // Preserve the existing owner-approved viewable-password policy.
             if (\App\Services\ViewablePasswordService::supports($user->pos_role)) {
                 $fill = \App\Services\ViewablePasswordService::apply($fill, $request->password);

@@ -396,6 +396,7 @@ class User extends Authenticatable
     }
 
     protected $hidden = [
+        'session_generation',
         'password',
         'remember_token',
         // Encrypted copy of a POS team account's password (viewable by the

@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 // $request->session() unguarded, so they MUST come off together with
 // StartSession or every request would 500.
 $statelessMachine = [
+    \App\Http\Middleware\CompanySessionGeneration::class,
     \Illuminate\Cookie\Middleware\EncryptCookies::class,
     \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
     \Illuminate\Session\Middleware\StartSession::class,

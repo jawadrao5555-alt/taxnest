@@ -105,6 +105,14 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Event::listen(Login::class, function (Login $event) {
+            if ($event->user instanceof \App\Models\User
+                && in_array($event->guard, \App\Http\Middleware\CompanySessionGeneration::guards(), true)
+                && request()->hasSession()) {
+                request()->session()->put(\App\Http\Middleware\CompanySessionGeneration::key($event->guard), [
+                    'user_id' => $event->user->id,
+                    'generation' => (string) $event->user->getAttribute('session_generation'),
+                ]);
+            }
             SecurityLogService::log('login', $event->user->id);
 
             // Last-login stamp for company users (web/pos/fbrpos guards).

@@ -93,5 +93,9 @@
                 {{ $fbrReadiness['configured'] ? __('health.dash_fbr_ready') : __('health.dash_fbr_not_ready') }}
             </p>
         </div>
+
+        @if($isOwner)
+            @include('billing._subscription-history')
+        @endif
     </div>
 </x-health-layout>

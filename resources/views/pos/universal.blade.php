@@ -1774,7 +1774,7 @@ window.addEventListener('popstate', function() {
                          the Pay-modal note comes too late for the kitchen. This opens a one-line
                          input bound to the SAME kitchenNotes model as the Pay-modal field (one
                          note, two surfaces). Collapsed by default: zero cart-height cost. --}}
-                    <button @click="showCartNote = !showCartNote; if (showCartNote) $nextTick(() => $refs.cartNoteInput?.focus())" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="(kitchenNotes || '').length > 0 ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
+                    <button data-kot-note-toggle @click="showCartNote = !showCartNote; if (showCartNote) $nextTick(() => $refs.cartNoteInput?.focus())" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="(kitchenNotes || '').length > 0 ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
                         <span x-text="(kitchenNotes || '').length > 0 ? '✎ Note ✓' : '✎ Note'"></span>
                     </button>
                     <button @click="showDiscount = !showDiscount" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 border-orange-200 dark:border-orange-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
@@ -1789,6 +1789,7 @@ window.addEventListener('popstate', function() {
                         placeholder="{{ __('pos.ph_bill_note_multi') }}"
                         @keydown.escape.prevent="showCartNote = false"
                         class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
+                        @include('pos.partials.kot-note-status')
                 </div>
                 <div class="px-3 pb-1.5" x-show="showDiscount" x-transition>
                     <div class="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
@@ -2097,18 +2098,18 @@ window.addEventListener('popstate', function() {
                  payment; cash bills enter the rider khata the moment a rider is assigned. --}}
             <div x-show="!payingOrderAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
                 <div class="col-span-2 border rounded p-2 space-y-2" data-staff-discount-panel>
-                    <a href="{{ route('pos.staff-discounts') }}" target="_blank" rel="noopener" class="underline text-xs">Staff / family requests and owner settings</a>
-                    <button type="button" x-show="!staffDiscount" @click="openStaffDiscount()" :disabled="!cart.length || submitting" class="border rounded p-2 text-sm">Request staff / family discount</button>
+                    <a href="{{ route('pos.staff-discounts') }}" target="_blank" rel="noopener" class="underline text-xs">{{ __('pos.sale_staff_requests_settings') }}</a>
+                    <button type="button" x-show="!staffDiscount" @click="openStaffDiscount()" :disabled="!cart.length || submitting" class="border rounded p-2 text-sm">{{ __('pos.sale_staff_request_discount') }}</button>
                     <template x-if="staffDiscount"><div class="space-y-2">
-                        <select aria-label="Employee" x-model="staffDiscount.employee_id" :disabled="!!staffDiscountRequest" class="w-full"><option value="">Choose employee</option><template x-for="person in staffDiscountEmployees" :key="person.id"><option :value="person.id" x-text="person.name"></option></template></select>
-                        <select aria-label="Staff or family" x-model="staffDiscount.kind" :disabled="!!staffDiscountRequest"><option value="staff">Staff</option><option value="family">Family</option></select>
-                        <input aria-label="Discount reason" x-model="staffDiscount.reason" :disabled="!!staffDiscountRequest" maxlength="500" placeholder="Reason" class="w-full">
-                        <select aria-label="Staff discount type" x-model="discountType" @change="recalcDiscount()" :disabled="!!staffDiscountRequest"><option value="percentage">Percent</option><option value="amount">Rupees</option></select>
-                        <input aria-label="Staff discount value" type="number" min="0.01" step="0.01" x-model.number="discountValue" @input="recalcDiscount()" :disabled="!!staffDiscountRequest" class="w-28">
-                        <p class="text-xs">Cash/Card sends the proposal first. After owner approval, check approval and press the same payment method to finalize.</p>
-                        <button type="button" x-show="staffDiscountRequest" @click="checkStaffApproval()" class="border rounded p-2">Check approval</button>
+                        <select aria-label="Employee" x-model="staffDiscount.employee_id" :disabled="!!staffDiscountRequest" class="w-full"><option value="">{{ __('pos.sale_staff_choose_employee') }}</option><template x-for="person in staffDiscountEmployees" :key="person.id"><option :value="person.id" x-text="person.name"></option></template></select>
+                        <select aria-label="{{ __('pos.sale_staff_kind') }}" x-model="staffDiscount.kind" :disabled="!!staffDiscountRequest"><option value="staff">Staff</option><option value="family">Family</option></select>
+                        <input aria-label="{{ __('pos.sale_staff_reason') }}" x-model="staffDiscount.reason" :disabled="!!staffDiscountRequest" maxlength="500" placeholder="Reason" class="w-full">
+                        <select aria-label="{{ __('pos.sale_staff_discount_type') }}" x-model="discountType" @change="recalcDiscount()" :disabled="!!staffDiscountRequest"><option value="percentage">Percent</option><option value="amount">Rupees</option></select>
+                        <input aria-label="{{ __('pos.sale_staff_discount_value') }}" type="number" min="0.01" step="0.01" x-model.number="discountValue" @input="recalcDiscount()" :disabled="!!staffDiscountRequest" class="w-28">
+                        <p class="text-xs">{{ __('pos.sale_staff_payment_hint') }}</p>
+                        <button type="button" x-show="staffDiscountRequest" @click="checkStaffApproval()" class="border rounded p-2">{{ __('pos.sale_staff_check_approval') }}</button>
                         <span x-text="staffDiscountRequest ? ('#' + staffDiscountRequest.id + ': ' + staffDiscountRequest.status) : ''"></span>
-                        <button type="button" x-show="!staffDiscountRequest" @click="staffDiscount=null; discountValue=0" class="border rounded p-2">Cancel proposal</button>
+                        <button type="button" x-show="!staffDiscountRequest" @click="staffDiscount=null; discountValue=0" class="border rounded p-2">{{ __('pos.sale_staff_cancel_proposal') }}</button>
                     </div></template>
                 </div>
                 <button data-video="cash-payment" @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
@@ -2165,6 +2166,7 @@ window.addEventListener('popstate', function() {
                     autocomplete="off" name="pos_bill_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     placeholder="{{ __('pos.ph_bill_note_multi') }}"
                     class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
+                    @include('pos.partials.kot-note-status')
             </div>
             {{-- Task 514: per-bill receipt auto-print choice (default = company setting;
                  unticked = SIRF is bill ki receipt auto-print skip — KOT/PRA/popup untouched). --}}
@@ -2356,8 +2358,8 @@ window.addEventListener('popstate', function() {
                             <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? window.TXT.loading_generic : window.TXT.open_edit_bill"></button>
                             {{-- Proof Bill (Pizza Master feedback, Jul 2026): customer ko bill
                                  dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
-                            <button @click="boardProofBill('cash')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill — Cash</button>
-                            <button @click="boardProofBill('card')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill — Card</button>
+                            <button @click="boardProofBill('cash')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">{{ __('pos.sale_proof_cash') }}</button>
+                            <button @click="boardProofBill('card')" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">{{ __('pos.sale_proof_card') }}</button>
                             {{-- ONLINE ADAIGI (owner, 26 Aug 2026): dine-in table kehta hai
                                  "online bhej deta hoon" — nishan lagao, proof bill khud
                                  ONLINE likh dega aur bill tasdeeq ke baghair final nahi
@@ -3081,14 +3083,14 @@ window.addEventListener('popstate', function() {
                 </template>
                 <div x-show="canAssignRider && bulkAssignableBills().length" class="flex flex-wrap items-center gap-2 px-4 py-2 border-b dark:border-gray-700">
                     <button type="button" @click="toggleAllDeliveryBills()" :disabled="!!riderAssignBusyId" class="text-xs font-semibold text-blue-600"
-                            x-text="bulkAssignableBills().every(b => bulkDeliveryIds.includes(String(b.id))) ? 'Clear selection' : 'Select all shown'"></button>
+                            x-text="bulkAssignableBills().every(b => bulkDeliveryIds.includes(String(b.id))) ? window.TXT.sale_delivery_clear_selection : window.TXT.sale_delivery_select_all_shown"></button>
                     <span class="text-xs" x-text="bulkSelectedBills().length + ' selected'"></span>
-                    <select x-model="bulkDeliveryRider" aria-label="Rider for selected deliveries" class="text-xs rounded dark:bg-gray-800">
+                    <select x-model="bulkDeliveryRider" aria-label="{{ __('pos.sale_delivery_selected_rider') }}" class="text-xs rounded dark:bg-gray-800">
                         <option value="">{{ __('pos.no_rider_opt') }}</option>
                         <template x-for="r in deliveryRiders" :key="r.id"><option :value="r.id" x-text="r.name"></option></template>
                     </select>
                     <button type="button" @click="assignSelectedDeliveries()" :disabled="!bulkDeliveryRider || !bulkSelectedBills().length || !!riderAssignBusyId"
-                            class="px-2 py-1 rounded bg-blue-600 text-white text-xs disabled:opacity-50">Assign selected</button>
+                            class="px-2 py-1 rounded bg-blue-600 text-white text-xs disabled:opacity-50">{{ __('pos.sale_delivery_assign_selected') }}</button>
                 </div>
                 <template x-for="bill in pdFiltered(pendingDeliveryBills()).slice(0, 100)" :key="bill.id">
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800">
@@ -5613,7 +5615,7 @@ function restaurantPos() {
         staffDiscountEmployees: [],
         staffDiscountRequest: null,
         async openStaffDiscount() {
-            if (!navigator.onLine || this.editingBillId) { this.showToast('Staff approval needs an online new cart.', 'error'); return; }
+            if (!navigator.onLine || this.editingBillId) { this.showToast(window.TXT.sale_staff_online_cart, 'error'); return; }
             try {
                 const res = await fetch('{{ route("pos.staff-discounts") }}', {headers: {'Accept':'application/json'}});
                 const data = await res.json();
@@ -5632,7 +5634,7 @@ function restaurantPos() {
                 if (!res.ok || !row) throw new Error('Request is unavailable.');
                 this.staffDiscountRequest = {id:row.id,revision:row.revision,status:row.status};
                 if (row.status === 'approved') { this.discountType = row.approved_type; this.discountValue = Number(row.approved_value); this.recalcDiscount(); }
-                this.showToast('Discount request: ' + row.status, row.status === 'approved' ? 'success' : 'error');
+                this.showToast(window.TXT.sale_staff_request_status + row.status, row.status === 'approved' ? 'success' : 'error');
             } catch (e) { this.showToast(e.message, 'error'); }
         },
         async resumeStaffRequest(id) {
@@ -11444,8 +11446,8 @@ function restaurantPos() {
 
         async processPayment(method) {
             if (this.staffDiscount) {
-                if (!this.staffDiscount.employee_id || this.staffDiscount.reason.trim().length < 3 || this.saveAsProvisional) { this.showToast('Choose employee, add a reason and use final payment.', 'error'); return; }
-                if (this.staffDiscountRequest && this.staffDiscountRequest.status !== 'approved') { this.showToast('Check owner approval before payment.', 'error'); return; }
+                if (!this.staffDiscount.employee_id || this.staffDiscount.reason.trim().length < 3 || this.saveAsProvisional) { this.showToast(window.TXT.sale_staff_payment_instructions, 'error'); return; }
+                if (this.staffDiscountRequest && this.staffDiscountRequest.status !== 'approved') { this.showToast(window.TXT.sale_staff_check_before_payment, 'error'); return; }
                 if (this.staffDiscountRequest?.status === 'approved') this.reserveWaWindow(this.selectedCustomer?.phone);
                 return await this.processPaymentManual(method, false, !this.payPrintReceipt);
             }

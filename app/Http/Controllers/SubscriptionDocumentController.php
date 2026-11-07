@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{SubscriptionInvoice, SubscriptionPayment};
+use App\Services\HealthAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
@@ -53,10 +54,13 @@ final class SubscriptionDocumentController extends Controller
     private function authorizeCompanyUser(Request $request): void
     {
         $route = (string) $request->route()?->getName();
-        $guard = str_starts_with($route, 'fbrpos.') ? 'fbrpos' : (str_starts_with($route, 'pos.') ? 'pos' : 'web');
+        $guard = str_starts_with($route, 'health.')
+            ? 'health'
+            : (str_starts_with($route, 'fbrpos.') ? 'fbrpos' : (str_starts_with($route, 'pos.') ? 'pos' : 'web'));
         $user = auth($guard)->user();
         abort_unless($user && (int) $user->company_id === (int) app('currentCompanyId'), 403);
-        $owner = in_array((string) ($user->role ?? ''), ['super_admin', 'company_admin'], true)
+        $owner = ($guard === 'health' && HealthAccessService::isOwner($user))
+            || in_array((string) ($user->role ?? ''), ['super_admin', 'company_admin'], true)
             || (method_exists($user, 'isPosAdmin') && $user->isPosAdmin());
         abort_unless($owner, 403);
     }

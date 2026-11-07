@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\{AdminUser, Company, PricingPlan, Subscription, SubscriptionInvoice, SubscriptionPayment, User};
+use App\Services\HealthAccessService;
+use App\Support\NestErps;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -91,5 +93,53 @@ class SubscriptionDocumentAccessTest extends TestCase
         $this->actingAs($admin, 'admin')->get($invoiceUrl)->assertOk()->assertHeader('content-type', 'application/pdf');
         $this->get($receiptUrl)->assertOk()->assertHeader('content-type', 'application/pdf');
         $this->get(route('saas.admin.billing.documents.invoice', ['company' => $company->id + 99, 'invoice' => $invoice->id]))->assertNotFound();
+    }
+
+    public function test_healthcare_owner_has_the_same_scoped_history_and_documents_without_exposing_them_to_staff(): void
+    {
+        extract($this->fixture());
+        $company->update(['product_type' => NestErps::PRODUCT_TYPE]);
+        $plan = $subscription->pricingPlan;
+        $plan->update(['product_type' => NestErps::PRODUCT_TYPE]);
+
+        $this->actingAs($owner, 'health')->get(route('health.settings'))
+            ->assertOk()->assertSee($invoice->document_number)->assertSee($payment->receipt_number)
+            ->assertSee('Invoice PDF')->assertSee('Receipt RCP');
+        $this->get(route('health.billing.documents.invoice', $invoice->id))
+            ->assertOk()->assertHeader('content-type', 'application/pdf');
+        $this->get(route('health.billing.documents.receipt', $payment->id))
+            ->assertOk()->assertHeader('content-type', 'application/pdf');
+
+        $staff = User::create([
+            'name' => 'Fictional health administrator',
+            'email' => 'health-admin@documents.invalid',
+            'password' => bcrypt('SyntheticOnly123!'),
+            'company_id' => $company->id,
+            'role' => 'employee',
+            'health_role' => 'health_admin',
+            'is_active' => true,
+        ]);
+        $this->assertFalse(HealthAccessService::isOwner($staff));
+        $this->actingAs($staff, 'health')->get(route('health.settings'))
+            ->assertOk()->assertDontSee($invoice->document_number)->assertDontSee($payment->receipt_number);
+        $this->get(route('health.billing.documents.invoice', $invoice->id))->assertForbidden();
+
+        $other = Company::create([
+            'name' => 'Foreign healthcare tenant',
+            'ntn' => 'DOC-HEALTH-2',
+            'product_type' => NestErps::PRODUCT_TYPE,
+            'status' => 'approved',
+            'company_status' => 'active',
+        ]);
+        $foreignOwner = User::create([
+            'name' => 'Foreign healthcare owner',
+            'email' => 'foreign-health@documents.invalid',
+            'password' => bcrypt('SyntheticOnly123!'),
+            'company_id' => $other->id,
+            'role' => 'company_admin',
+            'is_active' => true,
+        ]);
+        $this->actingAs($foreignOwner, 'health')
+            ->get(route('health.billing.documents.invoice', $invoice->id))->assertNotFound();
     }
 }

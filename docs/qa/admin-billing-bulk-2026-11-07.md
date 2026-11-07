@@ -275,3 +275,28 @@ unchanged; that result does not cover this latest transaction/UI update.
 Existing-policy upgrades/proration, companion parity and audited financial
 adjustments remain open. Proposed prices and new commercial policies are not
 approved. Finish all three workstreams before one combined approval PR.
+
+## Nest ERPS / Healthcare billing-document parity
+
+Reproduced a product-surface gap: Healthcare owners could use the shared
+purchased-plan gates but could not see or download the same issued subscription
+invoice and receipt evidence available in DI, PRA POS and FBR POS. The existing
+company-scoped history reader and PDF renderer are now reused on the Healthcare
+settings screen. No second ledger, price calculation or access policy was
+introduced.
+
+The route name selects the `health` guard explicitly. Healthcare ownership is
+resolved by `HealthAccessService`, so the legacy `company_admin` owner remains
+compatible while a healthcare administrator or delegated staff member cannot
+read owner subscription documents. Every document lookup remains bound to the
+current company; a second Healthcare owner receives not-found for another
+tenant's invoice. Unknown legacy rows are still not invented.
+
+Local PHP8.3.6/SQLite: **42 tests / 228 assertions passed** across the focused
+document access and Healthcare foundation suites. The narrower document suite
+passed **4 tests / 48 assertions**, covering owner history, both PDFs,
+administrator denial and second-tenant isolation. Hosted PHP8.4/full suite and
+desktop/mobile acceptance remain required after publication. This closes the
+Healthcare browser-document parity slice only; mobile/Agent/API enforcement,
+existing-policy upgrades/proration and audited financial adjustments remain
+open.

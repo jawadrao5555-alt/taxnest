@@ -1384,6 +1384,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         // Custom Access (Task #111): per-member feature tick-boxes.
         Route::post('/team/cashier/{id}/access', [PosController::class, 'setCashierAccess'])->name('pos.team.set-access');
 
+        Route::post('/restaurant/kitchen-settings/notes/enable', [RestaurantPosController::class, 'enableKitchenNotes'])
+            ->middleware('feature:kot')->name('pos.restaurant.kitchen-notes.enable');
         Route::prefix('restaurant')->middleware('feature:kitchen')->group(function () {
             Route::get('/kitchen-settings', [RestaurantPosController::class, 'kitchenSettings'])->name('pos.restaurant.kitchen-settings');
             Route::post('/kitchen-settings', [RestaurantPosController::class, 'updateKitchenSettings'])->name('pos.restaurant.kitchen-settings.update');
@@ -1966,6 +1968,10 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
     // so a forgotten middleware argument here still cannot open the screen.
     Route::get('/settings', [HealthController::class, 'settings'])
         ->middleware('health.can:settings.manage')->name('health.settings');
+    Route::get('/settings/billing/documents/invoices/{invoice}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyInvoice'])
+        ->whereNumber('invoice')->middleware('health.can:settings.manage')->name('health.billing.documents.invoice');
+    Route::get('/settings/billing/documents/receipts/{payment}', [\App\Http\Controllers\SubscriptionDocumentController::class, 'companyReceipt'])
+        ->whereNumber('payment')->middleware('health.can:settings.manage')->name('health.billing.documents.receipt');
 
     // Module switchboard: owner only, both here and in HealthAuth's path map.
     Route::get('/settings/modules', [HealthController::class, 'modules'])

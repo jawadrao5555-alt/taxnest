@@ -259,6 +259,18 @@ $b03Product=\App\Models\PosProduct::forceCreate(['company_id'=>$b03Shop->id,'nam
 $b03Floor=RestaurantFloor::create(['company_id'=>$b03Shop->id,'name'=>'Synthetic B03 floor','is_active'=>true]);
 $b03Table=RestaurantTable::create(['company_id'=>$b03Shop->id,'floor_id'=>$b03Floor->id,'table_number'=>'B03-1','seats'=>4,'status'=>'available','is_active'=>true]);
 
+// Isolated note visibility journey: no real sale, printer or fiscal submission.
+$kotNoteShop=$company('Synthetic KOT Notes','kot-note-company@rc-browser.invalid','RCBROWSERNOTES','pos',[
+    'business_category'=>'restaurant','pos_type'=>'restaurant','restaurant_mode'=>true,
+    'feature_flags'=>PosFeatureService::defaultsForCategory('restaurant'),'pos_setup_completed'=>true,
+    'pos_guided_flow_enabled'=>false,'kot_show_kitchen_notes'=>false,
+]);
+$kotNoteOwner=$user($kotNoteShop,'Synthetic Notes Owner','kot-note-owner@rc-browser.invalid','company_admin','pos_admin');
+$kotNoteOrder=RestaurantOrder::create(['company_id'=>$kotNoteShop->id,'order_number'=>'SYNTHETIC-NOTES',
+    'order_type'=>'takeaway','status'=>'held','created_by'=>$kotNoteOwner->id,'kitchen_notes'=>'Pack separately',
+    'subtotal'=>100,'tax_amount'=>0,'discount_amount'=>0,'total_amount'=>100]);
+$kotNoteOrder->items()->create(['item_type'=>'manual','item_name'=>'Synthetic Meal','quantity'=>1,'unit_price'=>100,'subtotal'=>100]);
+
 $contactShop = $company('Synthetic Contact Search', 'contact-company@rc-browser.invalid', 'RCBROWSERCONTACT', 'pos', [
     'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'restaurant_mode' => true,
     'feature_flags' => PosFeatureService::defaultsForCategory('restaurant'),
@@ -936,6 +948,7 @@ $fixture = [
     'transactionalJourneys' => [
         ['name'=>'billing-package-selection','login'=>$billingSelectionCases[1366]['login'],'password'=>$password,'loginPath'=>'/login',
             'paths'=>[], 'billingSelection'=>$billingSelectionCases],
+        ['name'=>'kot-note-visibility','login'=>$kotNoteOwner->email,'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/invoice/create'],'markers'=>['Current Order'],'kotNoteVisibility'=>['orderId'=>$kotNoteOrder->id]],
         ['name'=>'staff-discount-approval','login'=>$staffCases[1366]['cashier'],'password'=>$password,'loginPath'=>'/pos/login','paths'=>['/pos/staff-discounts'],'markers'=>['Staff / family discount requests'],'staffDiscount'=>$staffCases],
         ...$surveyJourneys,
         ['name'=>'b01-company-account','login'=>$admin->email,'password'=>$password,'loginPath'=>'/admin/login',

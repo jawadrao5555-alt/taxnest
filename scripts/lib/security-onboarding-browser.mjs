@@ -141,5 +141,20 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.goto(baseUrl+'/admin/plans',{waitUntil:'domcontentloaded'});
   await page.getByRole('heading',{name:'Subscription Plans',exact:true}).waitFor();
   if(await page.locator('form[action*="/admin/plans"]').count())throw Error('Viewer offered package write form');
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable');
+  await page.context().clearCookies();
+  await login(page,{...t,loginPath:'/admin/login',login:fixture.supportAdmin,password:t.password});
+  await page.goto(baseUrl+'/admin/support-cases/'+fixture.supportCaseId,{waitUntil:'domcontentloaded'});
+  await page.getByRole('heading',{name:new RegExp('^Case #'+fixture.supportCaseId)}).waitFor();
+  const build='rc-security-'+v.width;
+  await page.getByLabel('Resolution build / release',{exact:true}).fill(build);
+  await page.getByLabel('Resolution evidence',{exact:true}).fill('Synthetic desktop/mobile support acceptance passed.');
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Resolve explicitly',exact:true}).click()]);
+  await page.getByText('RESOLVED',{exact:true}).waitFor();
+  if(await page.getByText(build,{exact:true}).count()<2)throw Error('Support resolution build was not retained in case and timeline');
+  await page.getByLabel('Reopen evidence',{exact:true}).fill('Synthetic recurrence received after explicit resolution.');
+  await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Reopen case',exact:true}).click()]);
+  await page.getByText('REOPENED',{exact:true}).waitFor();
+  if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
+  await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; durable support ownership, explicit resolution build and reopen timeline');
 }

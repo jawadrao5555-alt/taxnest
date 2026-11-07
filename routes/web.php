@@ -1872,6 +1872,12 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/support-inbox/send', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'send'])->middleware('throttle:20,1')->name('saas.admin.support-inbox.send');
     Route::get('/support-inbox/unread', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'unread'])->name('saas.admin.support-inbox.unread');
     Route::get('/support-inbox/poll', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'poll'])->middleware('throttle:30,1')->name('saas.admin.support-inbox.poll');
+    Route::get('/support-cases', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseIndex'])->name('saas.admin.support-cases');
+    Route::get('/support-cases/{supportCase}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'caseShow'])->whereNumber('supportCase')->name('saas.admin.support-cases.show');
+    Route::post('/support-inbox/{box}/{uid}/case', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'storeCase'])->whereNumber('uid')->name('saas.admin.support-inbox.case.store');
+    Route::post('/support-inbox/cases/{supportCase}/assign', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'assignCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.assign');
+    Route::post('/support-inbox/cases/{supportCase}/resolve', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'resolveCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.resolve');
+    Route::post('/support-inbox/cases/{supportCase}/reopen', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'reopenCase'])->whereNumber('supportCase')->name('saas.admin.support-inbox.case.reopen');
     Route::get('/support-inbox/{box}/{uid}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'show'])->name('saas.admin.support-inbox.show');
     Route::get('/support-inbox/{box}/{uid}/attachment/{index}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'attachment'])->name('saas.admin.support-inbox.attachment');
 

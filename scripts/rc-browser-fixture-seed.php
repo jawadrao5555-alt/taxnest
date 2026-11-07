@@ -916,6 +916,20 @@ foreach ([1366,390] as $securityWidth) {
                 'date_from'=>now()->toDateString(),'date_to'=>now()->toDateString(),'status'=>'pending']);
             $pendingExport->forceFill(['updated_at'=>now()->subMinute()])->save(['timestamps'=>false]);
             $securityCases[$securityWidth]['reset']['pendingPackId']=$pendingExport->id;
+            $supportCase=\App\Models\SupportCase::create([
+                'company_id'=>$setupCompany->id,'assigned_admin_id'=>$admin->id,'opened_by_admin_id'=>$admin->id,
+                'source_box'=>'inbox','source_uid'=>900000+$securityWidth,
+                'source_message_id'=>'<synthetic-support-'.$securityWidth.'@rc-browser.invalid>',
+                'subject'=>'Synthetic support lifecycle '.$securityWidth,'status'=>\App\Models\SupportCase::STATUS_OPEN,
+                'opened_at'=>now(),
+            ]);
+            \App\Models\SupportCaseEvent::create([
+                'support_case_id'=>$supportCase->id,'actor_admin_id'=>$admin->id,'event_type'=>'opened',
+                'from_status'=>null,'to_status'=>\App\Models\SupportCase::STATUS_OPEN,
+                'note'=>'Synthetic browser fixture case.','occurred_at'=>now(),
+            ]);
+            $securityCases[$securityWidth]['supportAdmin']=$admin->email;
+            $securityCases[$securityWidth]['supportCaseId']=$supportCase->id;
         }
     }
 }

@@ -66,6 +66,112 @@
     </div>
 
     @if($box === 'inbox')
+        <section class="mt-4 bg-gray-900 border border-gray-800 rounded-xl p-5" aria-labelledby="support-case-heading">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 id="support-case-heading" class="text-sm font-bold text-white">Company support case</h2>
+                    <p class="mt-1 text-xs text-gray-500">Email reply apne aap case resolve nahi karti. Company, owner aur resolution build alag record hotay hain.</p>
+                </div>
+                @if($supportCase)
+                    @php
+                        $caseTone = $supportCase->status === 'resolved'
+                            ? 'bg-emerald-900/50 text-emerald-300 border-emerald-700'
+                            : ($supportCase->status === 'reopened'
+                                ? 'bg-amber-900/50 text-amber-300 border-amber-700'
+                                : 'bg-sky-900/50 text-sky-300 border-sky-700');
+                    @endphp
+                    <span class="rounded-full border px-3 py-1 text-xs font-bold {{ $caseTone }}">#{{ $supportCase->id }} · {{ strtoupper($supportCase->status) }}</span>
+                @endif
+            </div>
+
+            @if(! $supportCase)
+                <form method="POST" action="{{ route('saas.admin.support-inbox.case.store', ['box' => $box, 'uid' => $message['uid']]) }}" class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+                    @csrf
+                    <div class="flex-1">
+                        <label for="support-company" class="block text-xs font-medium text-gray-400 mb-1">Link company</label>
+                        <select id="support-company" name="company_id" required class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">
+                            <option value="">Select company…</option>
+                            @foreach($supportCompanies as $company)
+                                <option value="{{ $company->id }}" @selected((int) old('company_id') === (int) $company->id)>
+                                    {{ $company->account_code ? $company->account_code.' · ' : '' }}{{ $company->name }} ({{ strtoupper($company->product_type ?? 'unknown') }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('company_id') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold">Open linked case</button>
+                </form>
+                @if($supportCompanies->isEmpty())
+                    <p class="mt-3 text-xs text-amber-300">No active company is available to link.</p>
+                @endif
+            @else
+                <dl class="mt-4 grid gap-3 sm:grid-cols-2 text-xs">
+                    <div><dt class="text-gray-500">Company</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ $supportCase->company?->account_code ? $supportCase->company->account_code.' · ' : '' }}{{ $supportCase->company?->name ?? 'Deleted company record' }}</dd></div>
+                    <div><dt class="text-gray-500">Owner</dt><dd class="mt-0.5 font-semibold text-gray-200">{{ $supportCase->assignedAdmin?->name ?? 'Unassigned' }}</dd></div>
+                    <div><dt class="text-gray-500">Opened</dt><dd class="mt-0.5 text-gray-300">{{ $supportCase->opened_at?->format('d M Y, h:i A') }}</dd></div>
+                    <div><dt class="text-gray-500">Last resolution build</dt><dd class="mt-0.5 font-mono text-gray-300">{{ $supportCase->resolution_build ?? 'Not resolved yet' }}</dd></div>
+                </dl>
+
+                <form method="POST" action="{{ route('saas.admin.support-inbox.case.assign', $supportCase) }}" class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+                    @csrf
+                    <div class="flex-1">
+                        <label for="support-owner" class="block text-xs font-medium text-gray-400 mb-1">Case owner</label>
+                        <select id="support-owner" name="assigned_admin_id" required class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">
+                            @foreach($supportOwners as $owner)
+                                <option value="{{ $owner->id }}" @selected((int) old('assigned_admin_id', $supportCase->assigned_admin_id) === (int) $owner->id)>{{ $owner->name }} · {{ $owner->role }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold">Update owner</button>
+                </form>
+
+                @if($supportCase->status !== 'resolved')
+                    <form method="POST" action="{{ route('saas.admin.support-inbox.case.resolve', $supportCase) }}" class="mt-4 grid gap-3 sm:grid-cols-2">
+                        @csrf
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Resolution build / release</label>
+                            <input name="resolution_build" required maxlength="100" value="{{ old('resolution_build') }}" placeholder="e.g. 1.13.35 or commit SHA" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Resolution evidence</label>
+                            <textarea name="resolution_note" required maxlength="2000" rows="2" placeholder="What was verified before resolving?" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">{{ old('resolution_note') }}</textarea>
+                        </div>
+                        <div class="sm:col-span-2 flex justify-end">
+                            <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold">Resolve explicitly</button>
+                        </div>
+                    </form>
+                @else
+                    <form method="POST" action="{{ route('saas.admin.support-inbox.case.reopen', $supportCase) }}" class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+                        @csrf
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Why is this case being reopened?</label>
+                            <textarea name="reopen_note" required maxlength="2000" rows="2" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">{{ old('reopen_note') }}</textarea>
+                        </div>
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold">Reopen case</button>
+                    </form>
+                @endif
+
+                <div class="mt-5 border-t border-gray-800 pt-4">
+                    <h3 class="text-xs font-bold uppercase tracking-wide text-gray-400">Immutable timeline</h3>
+                    <ol class="mt-3 space-y-3">
+                        @foreach($supportCase->events as $event)
+                            <li class="border-l-2 border-gray-700 pl-3 text-xs">
+                                <div class="flex flex-wrap gap-x-2 text-gray-300">
+                                    <strong>{{ ucfirst($event->event_type) }}</strong>
+                                    <span>{{ $event->actor?->name ?? 'Former administrator' }}</span>
+                                    <time class="text-gray-500">{{ $event->occurred_at?->format('d M Y, h:i A') }}</time>
+                                    @if($event->resolution_build)<code class="text-emerald-300">{{ $event->resolution_build }}</code>@endif
+                                </div>
+                                @if($event->note)<p class="mt-1 whitespace-pre-wrap text-gray-400">{{ $event->note }}</p>@endif
+                            </li>
+                        @endforeach
+                    </ol>
+                </div>
+            @endif
+        </section>
+    @endif
+
+    @if($box === 'inbox')
         <div class="mt-4">
             <button @click="reply = !reply" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Reply</button>
 

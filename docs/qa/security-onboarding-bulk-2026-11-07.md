@@ -307,3 +307,36 @@ before its existing link-consumption/concurrent-completion checks. Native and
 full supported PHP8.4 acceptance must verify the next published HEAD. This
 does not complete optional two-step login enrollment/recovery or the other
 unchecked security/onboarding requirements.
+
+## Durable company support-case lifecycle
+
+The existing Support Inbox was only a super-admin IMAP/SMTP reader. A reply had
+no durable company ownership, case state, resolution build or reopen history,
+so an email or bot response could be mistaken for operational resolution.
+
+Inbound messages can now be linked once to an active company. The resulting
+case has an explicit administrator owner, open/resolved/reopened state and an
+append-only event timeline. Resolution is a separate authenticated action that
+requires both an exact build/release identifier and evidence note; sending an
+email does not change status. Reopening retains the previous resolution build,
+timestamp and timeline. Persisted super-admin identity is re-read for every
+case mutation, so a cached role cannot continue writing after downgrade.
+Mailbox availability is not required to view or operate the durable case queue.
+No email is sent by these lifecycle actions and no company/product setting is
+changed.
+
+Local PHP8.3/SQLite focused evidence: **20 tests / 94 assertions** across the
+existing mocked mailbox plus real-schema case creation, duplicate source
+idempotency, active/deleted company scope, explicit ownership, reply-not-resolve,
+resolution, reopen, retained history and cached-role revocation. PHP/Blade/Node
+and shell syntax plus diff checks pass. The required MariaDB lane now races two
+actual resolution controller workers and requires exactly one resolution event,
+then a retained reopen timeline and unchanged second-company case. The required
+desktop1366/mobile390 security journey resolves and reopens separate fictional
+cases through the actual admin UI. These native/browser checks remain pending
+until the exact published HEAD completes hosted CI; no local MariaDB/Chrome
+equivalence is claimed.
+
+The remaining consent/deletion/restore, import preview/posting, broader
+OAuth/device revocation, accessibility/tutorial/notification and backup-restore
+evidence checklist remains open. This increment is not full #365 readiness.

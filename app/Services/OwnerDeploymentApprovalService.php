@@ -136,6 +136,61 @@ class OwnerDeploymentApprovalService
         return $row;
     }
 
+    public function requestMergedRelease(int $number, string $mergeSha, int $adminId): OwnerDeploymentApprovalRequest
+    {
+        $mergeSha = strtolower($mergeSha);
+        if (!preg_match('/^[a-f0-9]{40}$/', $mergeSha)) {
+            throw new \InvalidArgumentException('Select an exact merge commit from Release History.');
+        }
+
+        $pr = app(DeploymentGitHubReader::class)->get('pulls/'.$number, 'pull_request')->json();
+        $headSha = strtolower((string) ($pr['head']['sha'] ?? ''));
+        $this->validatePullRequest($number, $headSha, $mergeSha);
+
+        return DB::transaction(function () use ($number, $headSha, $mergeSha, $adminId) {
+            // Serialize merged-release requests even before an approval row exists.
+            AdminUser::query()->where('role', 'super_admin')->orderBy('id')->lockForUpdate()->firstOrFail();
+
+            $alreadyRequested = OwnerDeploymentApprovalRequest::query()
+                ->where('repository', self::REPOSITORY)
+                ->where(function ($query) use ($number, $headSha, $mergeSha) {
+                    $query->where('merge_sha', $mergeSha)
+                        ->orWhere(fn ($pr) => $pr->where('pull_request_number', $number)->where('head_sha', $headSha));
+                })
+                ->where(function ($query) {
+                    $query->where('status', 'succeeded')
+                        ->orWhereIn('status', ['deploy_registered', 'deploying'])
+                        ->orWhere(fn ($active) => $active
+                            ->whereIn('status', ['pending', 'approved', 'dispatching', 'claimed', 'merged'])
+                            ->where('expires_at', '>', now()));
+                })
+                ->exists();
+            if ($alreadyRequested) {
+                throw new \InvalidArgumentException('This release already has an active or successful deployment request.');
+            }
+
+            $row = OwnerDeploymentApprovalRequest::create([
+                'pull_request_number' => $number,
+                'head_sha' => $headSha,
+                'merge_sha' => $mergeSha,
+                'repository' => self::REPOSITORY,
+                'status' => 'pending',
+                'requested_admin_id' => $adminId,
+                'expires_at' => now()->addMinutes((int) config('deployment_approval.approval_ttl_minutes', 30)),
+            ]);
+            AdminAuditLog::log($adminId, 'owner_deployment_requested', self::class, null, [
+                'request_id' => $row->request_id,
+                'repository' => $row->repository,
+                'pull_request_number' => $number,
+                'head_sha' => $headSha,
+                'merge_sha' => $mergeSha,
+                'source' => 'merged_release_history',
+            ]);
+
+            return $row;
+        });
+    }
+
     public function approve(OwnerDeploymentApprovalRequest $row, int $adminId): OwnerDeploymentApprovalRequest
     {
         $this->validatePullRequest($row->pull_request_number, $row->head_sha, $row->merge_sha);

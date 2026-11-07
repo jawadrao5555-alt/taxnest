@@ -224,6 +224,7 @@ class AdminPaymentProofController extends Controller
                 }
             }
             $locked->update($proofAttrs);
+            \App\Services\VerifiedSubscriptionDocuments::record($locked, $sub, $netReceived);
 
             return [
                 'outcome' => 'ok',

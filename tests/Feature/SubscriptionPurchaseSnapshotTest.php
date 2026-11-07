@@ -34,6 +34,15 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         $this->actingAs($admin, 'admin')->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)
             ->assertRedirect()->assertSessionHas('success');
         $sub = Subscription::findOrFail($proof->fresh()->subscription_id);
+        $this->assertSame(1, \App\Models\SubscriptionInvoice::where('company_id', $company->id)->count(), 'Verified approval must retain its subscription invoice.');
+        $invoice = \App\Models\SubscriptionInvoice::where('payment_proof_id', $proof->id)->sole();
+        $payment = $invoice->payments()->sole();
+        $document = $invoice->document_snapshot;
+        $receipt = $payment->receipt_snapshot;
+        $this->assertSame((float) $sub->final_price > 1000 ? 'part_paid' : 'paid', $invoice->status);
+        $this->assertSame('1000.00', $receipt['verified_received']);
+        $this->assertSame($company->id, $document['company']['id']);
+        $this->assertSame($invoice->document_number, $receipt['invoice_number']);
         $snapshot = $sub->purchase_snapshot;
         $this->assertIsArray($snapshot);
         $this->assertSame(1, $snapshot['version']);
@@ -45,8 +54,13 @@ class SubscriptionPurchaseSnapshotTest extends TestCase
         $this->assertTrue($snapshot['plan']['reports_enabled']);
         $plan->update(['price' => 8000, 'invoice_limit' => 5, 'features' => ['Replacement feature'], 'reports_enabled' => false]);
         $this->assertSame($snapshot, $sub->fresh()->purchase_snapshot);
+        $this->assertSame($document, $invoice->fresh()->document_snapshot);
+        $this->assertSame($receipt, $payment->fresh()->receipt_snapshot);
+        $this->assertSame(1, $invoice->payments()->count());
         $this->post(route('saas.admin.payment-proofs.approve', $proof->id), $input)->assertRedirect();
         $this->assertSame(1, Subscription::where('company_id', $company->id)->count());
+        $this->assertSame(1, \App\Models\SubscriptionInvoice::where('payment_proof_id', $proof->id)->count());
+        $this->assertSame(1, $invoice->payments()->count());
         $this->assertSame($snapshot, $sub->fresh()->purchase_snapshot);
         Http::assertNothingSent();
     }

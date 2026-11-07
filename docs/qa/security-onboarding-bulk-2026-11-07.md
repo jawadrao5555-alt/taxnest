@@ -370,6 +370,16 @@ The remaining consent/deletion/restore, import preview/posting, broader
 OAuth/device revocation, accessibility/tutorial/notification and backup-restore
 evidence checklist remains open. This increment is not full #365 readiness.
 
+The first exact-HEAD hosted browser run for the Local Bills Viewer revocation
+journey reached the real administrator page but stopped before submitting the
+password change: the test locator matched both the update form and the delete
+form because those routes intentionally share the same URL and differ by the
+spoofed HTTP method. The journey now selects the Alpine edit form explicitly
+(`x-show="edit"`). Node syntax and diff checks pass locally; a fresh hosted
+desktop1366/mobile390 run is required before this slice is accepted. No
+application authorization, route, assertion or production state was changed
+to address this test-harness ambiguity.
+
 ## Cached Agent-device revocation acceptance
 
 The Desktop Agent's known-good cache is only a shared-IP brute-force throttle

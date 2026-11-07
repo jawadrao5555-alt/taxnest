@@ -149,7 +149,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
 
     await login(adminPage,{...t,loginPath:'/admin/login',login:viewerFixture.admin,password:t.password});
     await adminPage.goto(baseUrl+'/admin/companies/'+viewerFixture.companyId,{waitUntil:'domcontentloaded'});
-    const editForm=adminPage.locator('form[action$="/local-viewer/'+viewerFixture.userId+'"]');
+    const editForm=adminPage.locator('form[x-show="edit"][action$="/local-viewer/'+viewerFixture.userId+'"]');
     await editForm.waitFor({state:'attached'});
     await editForm.locator('input[name="password"]').fill(viewerFixture.newPassword);
     await Promise.all([adminPage.waitForNavigation(),editForm.evaluate(form=>form.requestSubmit())]);

@@ -89,6 +89,7 @@ final class McpController extends Controller
                 'get_pra_day_close_evidence' => $this->reports->dayClose($args, $allowed),
                 'get_pra_operations_evidence' => app(\App\Services\Reporting\PraOperationsEvidence::class)->read($args, $allowed),
                 'get_diagnostic_coverage' => app(DiagnosticCoverage::class)->catalog($args),
+                'get_diagnostic_source_evidence' => app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read($args, $allowed),
                 default => null,
             };
             if ($result === null) {
@@ -128,6 +129,9 @@ final class McpController extends Controller
             'stream' => ['type' => 'string', 'enum' => ['reports', 'openings', 'counter_closes']],
             'branch_id' => ['type' => 'integer', 'minimum' => 0], 'terminal_id' => ['type' => 'integer', 'minimum' => 0]];
         $defs = [
+            ['get_diagnostic_source_evidence', 'Registered source metadata for PRA, DI, FBR POS or Healthcare. At most seven dates. IDs/timestamps only; missing sources and incomplete collection remain explicit. No fiscal requests or retries.',
+                array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
+                    'source' => ['type' => 'string', 'enum' => array_keys(\App\Services\Reporting\DiagnosticSourceEvidence::SOURCES)]], ['company_name', 'date_from', 'source']],
             ['get_pra_operations_evidence', 'PRA cash source reconciliation, print attempt chains or retained Agent collection samples. At most seven dates; cash uses stored business dates, other streams use server receipt dates. Explicit gaps, no business writes or retries. Cash pages allow at most ten reports.',
                 array_intersect_key($operationsPeriod, array_flip(['company_name', 'company_id', 'date_from', 'date_to'])) + $cursor + [
                     'stream' => ['type' => 'string', 'enum' => ['cash_reconciliation', 'print_chains', 'agent_collection']],

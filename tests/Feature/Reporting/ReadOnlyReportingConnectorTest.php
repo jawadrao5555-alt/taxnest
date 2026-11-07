@@ -162,6 +162,37 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->assertSame(1, DB::table('reporting_read_audits')->count());
     }
 
+    public function test_source_evidence_is_scoped_paginated_redacted_and_revocable(): void
+    {
+        [, $tokens] = $this->connection();
+        Schema::create('pra_logs', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->text('request_payload'); $t->dateTime('created_at');
+        });
+        DB::table('pra_logs')->insert([
+            ['id' => 1, 'company_id' => 1, 'request_payload' => 'PRIVATE-TOKEN', 'created_at' => '2026-10-13 11:00:00'],
+            ['id' => 2, 'company_id' => 2, 'request_payload' => 'PRIVATE-FOREIGN', 'created_at' => '2026-10-13 12:00:00'],
+            ['id' => 3, 'company_id' => 1, 'request_payload' => 'PRIVATE-BUYER', 'created_at' => '2026-10-13 13:00:00'],
+        ]);
+        $before = DB::table('pra_logs')->orderBy('id')->get()->toJson();
+        $args = $this->period() + ['source' => 'pra.fiscal', 'limit' => 1];
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args)
+            ->assertJsonPath('result.isError', false)->assertJsonPath('result.structuredContent.rows.0.id', 1)
+            ->assertJsonPath('result.structuredContent.pagination.next_after_id', 1)
+            ->assertJsonPath('result.structuredContent.coverage.seven_day_complete', false)->assertDontSee('PRIVATE');
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args + ['after_id' => 1])
+            ->assertJsonPath('result.structuredContent.rows.0.id', 3)
+            ->assertJsonPath('result.structuredContent.pagination.has_more', false);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', array_replace($args, ['company_name' => 'Pizza Master Twin']))
+            ->assertJsonPath('result.isError', true);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args + ['table' => 'users'])
+            ->assertJsonPath('result.isError', true);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', array_replace($args, ['date_to' => '2026-10-21']))
+            ->assertJsonPath('result.isError', true);
+        $this->assertSame($before, DB::table('pra_logs')->orderBy('id')->get()->toJson());
+        DB::table('reporting_oauth_grants')->update(['revoked_at' => now()]);
+        $this->toolCall($tokens['access_token'], 'get_diagnostic_source_evidence', $args)->assertUnauthorized();
+    }
+
     public function test_day_close_and_coverage_use_existing_revocable_connection_with_no_business_writes(): void
     {
         [, $tokens] = $this->connection();
@@ -257,7 +288,7 @@ class ReadOnlyReportingConnectorTest extends TestCase
         $this->toolCall($t['access_token'], 'get_company_tax_items', $this->period() + ['classification' => 'exempt'])->assertJsonPath('result.structuredContent.items.0.description', 'Exempt item');
         $this->toolCall($t['access_token'], 'get_company_payment_summary', $this->period())->assertJsonPath('result.structuredContent.actual_collected_total', null);
         $tools = $this->withToken($t['access_token'])->postJson('/api/reporting/mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'])->json('result.tools');
-        $this->assertCount(11, $tools);
+        $this->assertCount(12, $tools);
         foreach ($tools as $tool) {
             $this->assertTrue($tool['annotations']['readOnlyHint']);
             $this->assertFalse($tool['annotations']['destructiveHint']);

@@ -91,10 +91,11 @@ class DiagnosticSourceCollectionTest extends TestCase
         $this->artisan('diagnostics:observe-sources')->assertSuccessful();
         $this->assertSame(0, DB::table('diagnostic_source_observations')->where('collected_at', '<', '2026-10-31 12:00:00')->count());
         // Thirteen PRA sources per company and eleven legacy-Healthcare sources.
-        $this->assertSame(37, DB::table('diagnostic_source_observations')->count());
+        $this->assertSame(41, DB::table('diagnostic_source_observations')->count());
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.offline_samples', 'status' => 'UNAVAILABLE']);
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 3, 'source' => 'health.federal', 'status' => 'UNAVAILABLE']);
         $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.support_cases', 'status' => 'UNAVAILABLE']);
+        $this->assertDatabaseHas('diagnostic_source_observations', ['company_id' => 1, 'source' => 'pos.live_ops', 'status' => 'UNAVAILABLE']);
         $this->assertSame('RETAIN-SOURCE', DB::table('pra_logs')->sole()->payload);
         $this->expectException(\InvalidArgumentException::class);
         $collector->capture(1, 'pra.fiscal', '2026-10-01', (string) Str::uuid());

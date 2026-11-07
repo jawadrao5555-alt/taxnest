@@ -156,6 +156,65 @@ class DiagnosticExpandedSourcesTest extends TestCase
         $this->travelBack();
     }
 
+    public function test_live_ops_job_and_release_evidence_is_company_scoped_and_payload_free(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-07 12:00:00', 'UTC'));
+        (require base_path('database/migrations/2026_12_10_040000_create_diagnostic_source_observations.php'))->up();
+        Schema::create('live_ops_autonomous_requests', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id')->nullable();
+            $t->string('status');
+            $t->text('error')->nullable();
+            $t->json('tests_result')->nullable();
+            $t->json('deployment_result')->nullable();
+            $t->timestamps();
+        });
+        foreach ([1, 3, 4, 5] as $companyId) {
+            DB::table('live_ops_autonomous_requests')->insert([
+                'company_id' => $companyId,
+                'status' => 'FAILED',
+                'error' => 'PRIVATE-FAILURE-'.$companyId,
+                'tests_result' => json_encode(['private' => 'PRIVATE-TESTS']),
+                'deployment_result' => json_encode(['private' => 'PRIVATE-DEPLOYMENT']),
+                'created_at' => '2026-11-06 19:00:00',
+                'updated_at' => '2026-11-06 20:00:00',
+            ]);
+        }
+        DB::table('live_ops_autonomous_requests')->insert([
+            'company_id' => null,
+            'status' => 'FAILED',
+            'error' => 'PRIVATE-GLOBAL',
+            'created_at' => '2026-11-06 19:00:00',
+            'updated_at' => '2026-11-06 20:00:00',
+        ]);
+        DB::table('live_ops_autonomous_requests')->insert([
+            'company_id' => 99,
+            'status' => 'FAILED',
+            'error' => 'PRIVATE-FOREIGN',
+            'created_at' => '2026-11-06 19:00:00',
+            'updated_at' => '2026-11-06 20:00:00',
+        ]);
+        $before = DB::table('live_ops_autonomous_requests')->orderBy('id')->get()->toJson();
+        foreach ([[1, 'di', 'Synthetic DI'], [3, 'health', 'Synthetic Health'], [4, 'fbrpos', 'Synthetic FBR'], [5, 'pos', 'Synthetic PRA']] as [$id, $prefix, $name]) {
+            $source = $prefix.'.live_ops';
+            $this->assertSame('OBSERVED', app(DiagnosticSourceCollection::class)->capture($id, $source, '2026-11-07', (string) \Illuminate\Support\Str::uuid()));
+            $report = app(DiagnosticSourceEvidence::class)->read([
+                'company_name' => $name,
+                'date_from' => '2026-11-07',
+                'source' => $source,
+            ], [$id]);
+            $this->assertSame('PARTIAL', $report['status']);
+            $this->assertSame(1, $report['observed']['retained_rows_in_window']);
+            $this->assertSame(1, $report['collection_observation']['retained_rows']);
+            $this->assertCount(1, $report['rows']);
+            $this->assertSame(['id', 'event_at'], array_keys($report['rows'][0]));
+            $this->assertStringNotContainsString('PRIVATE', json_encode($report));
+            $this->assertFalse($report['coverage']['complete']);
+        }
+        $this->assertSame($before, DB::table('live_ops_autonomous_requests')->orderBy('id')->get()->toJson());
+        $this->travelBack();
+    }
+
     public function test_exhausted_cursor_does_not_claim_the_retained_window_is_empty(): void
     {
         Schema::create('pos_ims_submissions', function (Blueprint $t) {

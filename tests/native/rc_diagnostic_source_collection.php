@@ -129,6 +129,33 @@ try {
     }
     echo "PASS: native shared source excludes global and foreign rows; exhausted cursor retains window evidence and original rows\n";
 
+    $liveOpsIds = [];
+    foreach ([[$company->id, 'OWN'], [$other->id, 'FOREIGN'], [null, 'GLOBAL']] as [$tenant, $label]) {
+        $liveOpsIds[] = DB::table('live_ops_autonomous_requests')->insertGetId([
+            'request_id' => 'RC-LIVEOPS-'.$label.'-'.$suffix,
+            'owner_text' => 'PRIVATE '.$label.' owner request',
+            'company_id' => $tenant,
+            'status' => 'FAILED',
+            'tests_result' => json_encode(['private' => 'PRIVATE '.$label.' tests']),
+            'deployment_result' => json_encode(['private' => 'PRIVATE '.$label.' deployment']),
+            'error' => 'PRIVATE '.$label.' failure',
+            'created_at' => $stamp,
+            'updated_at' => $stamp,
+        ]);
+    }
+    $liveOpsBefore = DB::table('live_ops_autonomous_requests')->whereIn('id', $liveOpsIds)->orderBy('id')->get()->toJson();
+    $collection->capture($company->id, 'pos.live_ops', $day, (string) Str::uuid());
+    $liveOps = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([
+        'company_name' => $company->name, 'source' => 'pos.live_ops', 'date_from' => $day,
+    ], [$company->id]);
+    if (array_column($liveOps['rows'], 'id') !== [(int) $liveOpsIds[0]]
+        || $liveOps['collection_observation']['retained_rows'] !== 1
+        || str_contains(json_encode($liveOps), 'PRIVATE')
+        || $liveOpsBefore !== DB::table('live_ops_autonomous_requests')->whereIn('id', $liveOpsIds)->orderBy('id')->get()->toJson()) {
+        throw new RuntimeException('Native Live Ops source scope, redaction or preservation failed');
+    }
+    echo "PASS: native company-linked Live Ops source excludes global and foreign rows without exposing job or deployment payloads\n";
+
     $branchIds = [
         'selected' => DB::table('branches')->insertGetId(['company_id' => $company->id, 'name' => 'Synthetic selected '.$suffix,
             'created_at' => $stamp, 'updated_at' => $stamp]),

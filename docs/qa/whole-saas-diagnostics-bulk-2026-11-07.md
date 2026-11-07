@@ -258,3 +258,20 @@ tables and preserves the earlier concurrency, shared-source, IMS/print and
 Healthcare attribution gates. This closes only bounded branch filtering for
 registered sources. Branch-level collection completeness, bounded exports,
 release/job/backup adapters and full field evidence remain open.
+
+## Company-linked live-operations source (registry v7)
+
+The retained source registry now includes company-linked Live Ops requests for
+PRA POS, DI, FBR POS and Healthcare. It exposes only the request row identity
+and last-update time, while status details, failures, test output, deployment
+output, owner text and metadata remain excluded. Exact company scope filters
+out global and foreign requests; the daily bounded collector uses the same
+registered query and leaves every source row unchanged.
+
+This is evidence that a retained company-linked diagnostic/release operation
+row exists, not proof that a job passed, a deployment occurred or production is
+healthy. Global release-chain state cannot be attributed to a tenant and is not
+silently attached. Backup evidence still has no company-scoped retained source
+in the current schema. Required exact-HEAD PHP8.4/full-suite, native, browser,
+build and validate checks remain pending. Full field completeness and bounded
+export acceptance remain open.

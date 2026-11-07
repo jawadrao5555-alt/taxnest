@@ -5844,7 +5844,10 @@ class FbrPosController extends Controller
             ->with('pricingPlan')
             ->first();
 
-        return view('fbr-pos.billing', compact('company', 'plans', 'currentSubscription'));
+        $billingHistory = \App\Services\SubscriptionBillingHistory::forCompany((int) $companyId);
+        $billingDocumentRoutes = ['invoice' => 'fbrpos.billing.documents.invoice', 'receipt' => 'fbrpos.billing.documents.receipt'];
+
+        return view('fbr-pos.billing', compact('company', 'plans', 'currentSubscription', 'billingHistory', 'billingDocumentRoutes'));
     }
 
     public function receipt($id)

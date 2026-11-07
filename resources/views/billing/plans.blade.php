@@ -220,6 +220,8 @@
             </div>
             @endif
 
+            @include('billing._subscription-history')
+
             <div class="text-center mb-8">
                 <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Choose Your Plan</h3>
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Every package includes FBR digital invoicing, the AI Invoice Reader and the 6-year audit archive.</p>

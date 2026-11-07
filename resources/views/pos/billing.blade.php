@@ -328,6 +328,8 @@
                 surface="panel"
                 class="mt-10" />
 
+            @include('billing._subscription-history')
+
             <div class="mt-8 text-center">
                 <div class="inline-flex items-center gap-6 text-xs text-gray-400 dark:text-gray-500">
                     <span class="flex items-center gap-1.5">

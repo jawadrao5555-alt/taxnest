@@ -43,7 +43,10 @@ class BillingController extends Controller
         $aiTopupPending = false;
 
         $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
+        $billingHistory = null;
+        $billingDocumentRoutes = ['invoice' => 'billing.documents.invoice', 'receipt' => 'billing.documents.receipt'];
         if ($companyId) {
+            $billingHistory = \App\Services\SubscriptionBillingHistory::forCompany((int) $companyId);
             $currentSubscription = Subscription::where('company_id', $companyId)
                 ->where('active', true)
                 ->with('pricingPlan')
@@ -143,7 +146,9 @@ class BillingController extends Controller
             'planPricing',
             'aiPages',
             'aiReaderAllowed',
-            'aiTopupPending'
+            'aiTopupPending',
+            'billingHistory',
+            'billingDocumentRoutes'
         ));
     }
 

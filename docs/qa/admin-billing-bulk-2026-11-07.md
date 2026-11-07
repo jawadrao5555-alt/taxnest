@@ -93,9 +93,34 @@ and receipt, preserved after catalogue edit/retry. Its exact-HEAD hosted result
 is still required, alongside PHP8.4/full suite/browser/validate.
 
 This increment covers reviewed subscription proofs only. Add-on document
-paths, authorized company downloads/itemized UI, authoritative purchased-access
-reading, self-service upgrade/proration, explicit adjustments/refunds/credits
+paths, authoritative purchased-access reading, self-service upgrade/proration,
+explicit adjustments/refunds/credits
 and the remaining signup/payment paths are not complete. The broad acceptance
 checklist stays open. Owner's latest delivery decision is to finish363/364/365
 and then combine on a latest-main feature branch with fresh combined testing
 before presenting one bulk PR for owner approval. No merge/deploy authorized.
+
+## Authorized verified-document history and downloads
+
+Added a shared company-scoped history reader for the verified subscription
+documents above. Digital Invoice, PRA POS and FBR POS billing screens now show
+the frozen package/period, due amount, independently verified receipt amount,
+remaining balance and unallocated excess. Owner/admin users can download the
+invoice and receipt PDFs; SaaS admins receive the same documents from the
+company account view. Every lookup is constrained to the authenticated company
+or explicit admin company route. An independently logged-in product guard can
+no longer be selected accidentally: the route name chooses the exact guard.
+
+Only records carrying both a document identity and versioned snapshot are
+downloadable. Unknown legacy charges stay visible to SaaS admins but are not
+turned into invented invoices or receipts. PDFs render an allow-listed subset
+of the snapshot and do not expose proof files, customer claims or arbitrary
+metadata. Responses are private/no-store. This adds no activation, payment,
+credit, refund or pricing behavior.
+
+Local PHP8.3.6/SQLite focused regression:21 tests/1102 assertions passed across
+tenant/admin authorization, cross-tenant denial, legacy unknown handling,
+actual PDF responses, verified document creation and company account history.
+Supported PHP8.4/full suite and authenticated desktop/mobile acceptance remain
+hosted requirements. Add-on documents and the other unchecked billing items
+remain pending, so the broad checklist and PR stay work in progress.

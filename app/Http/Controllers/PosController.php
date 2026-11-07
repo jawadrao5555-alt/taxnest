@@ -13527,7 +13527,10 @@ class PosController extends Controller
             'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
         ];
 
-        return view('pos.billing', compact('company', 'plans', 'currentSubscription', 'addons', 'bank'));
+        $billingHistory = \App\Services\SubscriptionBillingHistory::forCompany((int) $companyId);
+        $billingDocumentRoutes = ['invoice' => 'pos.billing.documents.invoice', 'receipt' => 'pos.billing.documents.receipt'];
+
+        return view('pos.billing', compact('company', 'plans', 'currentSubscription', 'addons', 'bank', 'billingHistory', 'billingDocumentRoutes'));
     }
 
     public function businessProfile(Request $request)

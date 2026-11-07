@@ -49,7 +49,7 @@ $user = User::create(['name' => 'Synthetic reset owner', 'company_id' => $compan
     'password' => bcrypt('SyntheticOriginal123!'), 'role' => 'company_admin']);
 $foreign = User::create(['name' => 'Synthetic reset other owner', 'company_id' => $other->id, 'email' => 'other-'.$suffix.'@reset.invalid',
     'password' => bcrypt('SyntheticOther123!'), 'role' => 'company_admin']);
-$foreignBefore = $foreign->getAttributes();
+$foreignBefore = $foreign->fresh()->getAttributes();
 $token = bin2hex(random_bytes(32));
 $recordId = DB::table('password_reset_otps')->insertGetId(['email' => $user->email, 'otp' => '123456',
     'token' => bin2hex(random_bytes(32)), 'product_type' => 'di', 'used' => true,
@@ -81,7 +81,11 @@ try {
     if ($wins !== 1 || !$record->reset_completed_at || $record->reset_grant_hash !== null
         || (!Hash::check('SyntheticReset1!', $password) && !Hash::check('SyntheticReset2!', $password))
         || $foreign->fresh()->getAttributes() !== $foreignBefore) {
-        throw new RuntimeException('Concurrent reset grant was replayed or affected another account.');
+        throw new RuntimeException('Reset grant proof failed: wins='.$wins
+            .'; completed='.(int) (bool) $record->reset_completed_at
+            .'; hash_cleared='.(int) ($record->reset_grant_hash === null)
+            .'; password_matches='.(int) (Hash::check('SyntheticReset1!', $password) || Hash::check('SyntheticReset2!', $password))
+            .'; other_account_unchanged='.(int) ($foreign->fresh()->getAttributes() === $foreignBefore));
     }
     echo "PASS: native password reset grant permits one concurrent completion and preserves other account\n";
 } finally {

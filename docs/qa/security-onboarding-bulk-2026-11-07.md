@@ -1,5 +1,54 @@
 # Security and onboarding bulk — P1
 
+## Optional authenticator two-step implementation (7 November continuation)
+
+Implemented on this feature branch, default OFF for existing accounts:
+password-confirmed enrollment, a ten-minute setup deadline, confirmed six-digit
+RFC6238 SHA1 authenticator codes, encrypted per-account keys, ten hashed
+single-use recovery codes, per-record five-guess/five-minute cooldown, locked
+one-use time steps, password-plus-factor disable, and append-only security
+events containing no secrets. DI/PRA/FBR/Healthcare/Admin have their own guard
+proofs; enabling requires no company setting or Agent credential change.
+Password changes and every new login invalidate that guard's proof. Recovery
+does not silently disable the enrolled factor. Manual authenticator key entry
+works without an external QR or SMS/email provider.
+
+The DI gate deliberately runs AFTER existing password-generation, persisted
+impersonation and consultant-consent revocation. An initial middleware-based
+implementation ran before consultant revocation; the actual revoke regression
+was corrected by placing the DI gate after those web middleware. Delegated
+sessions authenticate the granting admin/consenting consultant rather than
+borrowing the client's factor. Enrollment/disable during delegation is refused;
+existing Exit remains reachable without a factor. Other company guards keep
+their existing product/role checks. Stateless API and Agent keys are unchanged;
+this is browser-session two-step, not an assertion of full companion API parity.
+
+Compatibility matrix exercised: default-OFF/legacy schema; opted-in five
+panels; protected GET/POST/JSON refusal; wrong product and guest; different
+account/provider; expired/password-changed setup; used time-step/recovery
+replay; distributed-IP guessing; password change/new login; another active
+product session; read-only impersonation; consented/revoked consultant and
+delegated exit. Local PHP8.3.6/SQLite Auth + consultant + impersonation +
+onboarding: **85 tests /586 assertions passed**. PHP HOTP/TOTP RFC vectors and
+an independent Node SHA1 implementation agree. Syntax/diff checks pass.
+
+Mandatory native MariaDB now runs two independent ACTUAL verification
+controller workers against one authenticator step, then one recovery code;
+each must produce exactly one verified session and retain the other account.
+Required desktop1366/mobile390 security journeys now enroll through actual
+forms, verify a genuinely fresh authenticator step, use and reject replay of a
+recovery code, then disable with password + another recovery code. Fictional
+keys/codes stay out of screenshots/logs. Native and real browser evidence for
+this new increment is pending hosted CI, not inferred from SQLite. Local
+MariaDB/Chrome are unavailable. PHP8.4/full suite and final validate must also
+verify the newly published exact HEAD.
+
+Previous published cc81de6919d65482cf2373e9e90cbbd5c29449fe passed all lanes,
+including validate in run42387012247; that result does NOT cover this increment.
+This does not finish the broader capability/revocation, consent/deletion/restore,
+import/support, language/accessibility/tutorial/notification checklist below.
+No approval-ready, deployed or production acceptance claim is made.
+
 Base: 363a0d6823eae113336a6cd6069f160fc7a1a441 (merged #362). Priority: P1, owner requested 7 November 2026.
 
 This is an implementation workstream opened as a Draft. Initial content records source reconciliation and acceptance; runtime implementation and acceptance are not complete. No approval-ready or deployed claim follows from documentation CI.

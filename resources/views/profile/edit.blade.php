@@ -6,6 +6,7 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your account and business details</p>
             </div>
 
+            <p class="mb-4"><a class="text-emerald-700 underline" href="{{ route('two-step.settings',['panel'=>'di']) }}">Two-step login</a></p>
             @if(session('status') === 'profile-updated')
             <div class="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-lg text-emerald-700 dark:text-emerald-300 font-medium">Account information updated.</div>
             @endif

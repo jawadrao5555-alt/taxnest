@@ -40,6 +40,9 @@ class PosAuth
             return redirect('/login')->with('error', 'This account is not registered for NestPOS.');
         }
 
+        if ($challenge = \App\Services\TwoStepLogin::challenge($request, 'pos')) {
+            return $challenge;
+        }
         app()->instance('currentCompanyId', $user->company_id);
         app()->instance('currentBranchGuard', 'pos');
 

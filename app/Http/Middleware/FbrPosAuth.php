@@ -37,6 +37,9 @@ class FbrPosAuth
             return $this->toLogin()->with('error', 'FBR POS is not enabled for your company.');
         }
 
+        if ($challenge = \App\Services\TwoStepLogin::challenge($request, 'fbrpos')) {
+            return $challenge;
+        }
         app()->instance('currentCompanyId', $user->company_id);
         app()->instance('currentBranchGuard', 'fbrpos');
 

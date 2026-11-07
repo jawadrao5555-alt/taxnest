@@ -4,6 +4,17 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Pos\OfflineQueueReportController;
 use Illuminate\Support\Facades\Route;
 
+// Exact-guard authorization lives in the controller so the challenge cannot
+// redirect back into its own protected middleware. All writes retain web CSRF.
+Route::prefix('security/two-step/{panel}')->where(['panel' => 'di|pos|fbrpos|health|admin'])
+    ->controller(\App\Http\Controllers\Auth\TwoStepController::class)->group(function () {
+        Route::get('/', 'settings')->name('two-step.settings');
+        Route::get('/challenge', 'challenge')->name('two-step.challenge');
+        foreach (['begin', 'confirm', 'verify', 'disable', 'logout'] as $action) {
+            Route::post('/'.$action, $action)->middleware('throttle:20,1')->name('two-step.'.$action);
+        }
+    });
+
 // ── Stateless machine endpoints (Task 1090) ─────────────────────────────────
 // Token/webhook-authenticated endpoints hit by machines (Desktop Agent every
 // 5-30s per shop, rider/caller apps, biometric devices, WA webhooks). They

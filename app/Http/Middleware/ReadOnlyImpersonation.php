@@ -91,6 +91,13 @@ class ReadOnlyImpersonation
             return $next($request);
         }
 
+        // This verifies the admin's own factor; it never writes company data
+        // or allows enrolling/disabling a factor while impersonating.
+        if (($path === 'security/two-step/admin/challenge' && $request->isMethod('GET'))
+            || ($path === 'security/two-step/admin/verify' && $request->isMethod('POST'))) {
+            return $next($request);
+        }
+
         $isWrite = !in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true);
 
         // Identity / session paths blocked in ANY mode (view AND full-access) so an

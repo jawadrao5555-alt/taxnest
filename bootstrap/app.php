@@ -99,6 +99,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // every request while the switch flag is set; forces exit when the
             // link is revoked mid-session. Same StartSession constraint as above.
             \App\Http\Middleware\ConsultantSwitchGuard::class,
+            \App\Http\Middleware\TwoStepWebSession::class,
             \App\Http\Middleware\SetPosLocale::class,
             // "NEW" nishan ki yaadasht (ZFC, 1 Sep 2026): jis page par naya switch
             // baitha hai woh khulte hi us feature ka nishan khamosh. Cookie likhta

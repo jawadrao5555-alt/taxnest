@@ -1,3 +1,4 @@
+import { kotNoteVisibilityWorkflow } from './lib/kot-note-visibility-browser.mjs';
 import { taxIntegrationsWorkflow } from './lib/tax-integrations-browser.mjs';
 import { b01CompanyAccountWorkflow } from './lib/b01-company-account-browser.mjs';
 import { b03DesignsWorkflow, b03DeliveryNavigationWorkflow, b03AutoKotWorkflow } from './lib/pra-b03-browser.mjs';
@@ -1488,6 +1489,7 @@ async function workflow(page,t,v,diagnostics) {
   if(t.securityOnboarding)return securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvidenceScreenshot,pass,loopback});
   if(t.taxIntegrations)return taxIntegrationsWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
   if(t.b01Account)return b01CompanyAccountWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass});
+  if(t.kotNoteVisibility)return kotNoteVisibilityWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart,loopback,login,attachDiagnostics});
   if(t.b03AutoKot)return b03AutoKotWorkflow(page,t,v,{baseUrl,waitForOperationalSurface,dismiss,saveEvidenceScreenshot,pass,openMobileCart});
   if(t.optionalArchive)return optionalArchiveWorkflow(page,t,v);
   if(t.deliveryContactSearch)return deliveryContactSearchWorkflow(page,t,v);

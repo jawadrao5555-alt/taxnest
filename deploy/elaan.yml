@@ -1,7 +1,10 @@
-title: "Staff aur family discount par owner ki manzoori"
+title: "Kitchen parchi par order note ka wazeh status"
 audience: pos
+categories:
+  - restaurant
+  - hotel
 type: improvement
 points:
-  - "Payment screen se employee chun kar staff ya family discount ki request bheji ja sakti hai."
-  - "Owner discount ki raqam badal kar approve ya reject kar sakta hai. Approval ke baad cashier payment complete kare."
-  - "Yeh option pehle band rehta hai. Owner Staff / family requests ke page se apni marzi se on kar sakta hai."
+  - "Order note likhte waqt ab nazar aayega ke woh kitchen parchi par aayega ya notes ka switch band hai."
+  - "Ijazat rakhne wala owner ya manager note ke paas se hi shop ki KOT par order notes ON kar sakta hai."
+  - "Pehle bheji hui kitchen parchi par naya note khud nahi pohanchta; aisi tabdeeli kitchen ko alag se batayein."

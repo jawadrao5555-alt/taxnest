@@ -1393,6 +1393,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         // Custom Access (Task #111): per-member feature tick-boxes.
         Route::post('/team/cashier/{id}/access', [PosController::class, 'setCashierAccess'])->name('pos.team.set-access');
 
+        Route::post('/restaurant/kitchen-settings/notes/enable', [RestaurantPosController::class, 'enableKitchenNotes'])
+            ->middleware('feature:kot')->name('pos.restaurant.kitchen-notes.enable');
         Route::prefix('restaurant')->middleware('feature:kitchen')->group(function () {
             Route::get('/kitchen-settings', [RestaurantPosController::class, 'kitchenSettings'])->name('pos.restaurant.kitchen-settings');
             Route::post('/kitchen-settings', [RestaurantPosController::class, 'updateKitchenSettings'])->name('pos.restaurant.kitchen-settings.update');

@@ -3,6 +3,12 @@
     <h1 class="text-2xl font-bold text-white mb-1">Support &amp; Payment Settings</h1>
     <p class="text-xs text-gray-500 dark:text-gray-400 mb-6">Configure the global WhatsApp support number and the bank / payment account details shown to companies whose free trial has ended.</p>
 
+    @if(!$canManageSensitiveConfiguration)
+    <div class="bg-amber-950/40 border border-amber-800 rounded-xl p-5 text-sm text-amber-100">
+        <p class="font-semibold">Sensitive configuration is read-only for this account.</p>
+        <p class="text-xs text-amber-200/80 mt-1">SMTP and WhatsApp credentials, payment destinations, AI models and application release switches are available only to an administrator. No configuration values are exposed on this page.</p>
+    </div>
+    @else
     <form method="POST" action="{{ route('saas.admin.settings.update') }}" class="space-y-6">
         @csrf
 
@@ -369,5 +375,6 @@
         <p class="text-[11px] text-gray-500 mt-3">Last successful send: {{ $tnMailLastOk }}.</p>
         @endif
     </div>
+    @endif
 </div>
 </x-admin-layout>

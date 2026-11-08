@@ -43,6 +43,14 @@ class AdminUser extends Authenticatable
         return in_array($this->role, ['admin', 'super_admin'], true);
     }
 
+    public function canManageSensitiveConfiguration(): bool
+    {
+        // Global destinations, SMTP/WhatsApp credentials, AI models and app
+        // version switches can disclose infrastructure details or change
+        // customer-facing behaviour.  Support/viewer sessions stay read-only.
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
     public static function requireBillingAdministrator(): self
     {
         $actor = auth('admin')->user();
@@ -66,6 +74,16 @@ class AdminUser extends Authenticatable
         $actor = auth('admin')->user();
         $current = $actor instanceof self ? $actor->fresh() : null;
         abort_unless($current && $current->canManageRelease(), 403, 'Release changes require an administrator.');
+
+        return $current;
+    }
+
+    public static function requireSensitiveConfigurationAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->canManageSensitiveConfiguration(), 403,
+            'Sensitive configuration changes require an administrator.');
 
         return $current;
     }

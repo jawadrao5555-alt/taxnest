@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
 use App\Models\AdminAuditLog;
+use App\Models\AdminUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -41,12 +42,19 @@ class AdminSettingsController extends Controller
 
     public function index()
     {
-        $settings = [];
-        foreach ($this->keys as $key) {
-            $settings[$key] = SystemSetting::get($key, '');
-        }
+        $actor = auth('admin')->user();
+        $current = $actor instanceof AdminUser ? $actor->fresh() : null;
+        $canManageSensitiveConfiguration = $current?->canManageSensitiveConfiguration() ?? false;
 
-        $smtpRaw = \App\Services\SmtpRuntimeConfig::settings() ?? [];
+        $settings = [];
+        foreach ($this->keys as $key) $settings[$key] = '';
+        $smtpRaw = [];
+        if ($canManageSensitiveConfiguration) {
+            foreach ($this->keys as $key) {
+                $settings[$key] = SystemSetting::get($key, '');
+            }
+            $smtpRaw = \App\Services\SmtpRuntimeConfig::settings() ?? [];
+        }
         $smtp = [
             'enabled' => (bool) ($smtpRaw['enabled'] ?? false),
             'host' => (string) ($smtpRaw['host'] ?? ''),
@@ -55,22 +63,25 @@ class AdminSettingsController extends Controller
             'username' => (string) ($smtpRaw['username'] ?? ''),
             'from_address' => (string) ($smtpRaw['from_address'] ?? ''),
             'from_name' => (string) ($smtpRaw['from_name'] ?? ''),
-            'has_password' => \App\Services\SmtpRuntimeConfig::hasPassword(),
+            'has_password' => $canManageSensitiveConfiguration && \App\Services\SmtpRuntimeConfig::hasPassword(),
         ];
 
         $wa = [
-            'enabled' => \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_ENABLED_KEY, '0') === '1',
-            'phone_number_id' => (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_PHONE_ID_KEY, ''),
-            'template' => (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_OFFLINE_TEMPLATE_KEY, ''),
-            'lang' => (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_LANG_KEY, ''),
-            'has_token' => \App\Services\WhatsAppBusinessApi::centralHasToken(),
+            'enabled' => $canManageSensitiveConfiguration
+                && \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_ENABLED_KEY, '0') === '1',
+            'phone_number_id' => $canManageSensitiveConfiguration ? (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_PHONE_ID_KEY, '') : '',
+            'template' => $canManageSensitiveConfiguration ? (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_OFFLINE_TEMPLATE_KEY, '') : '',
+            'lang' => $canManageSensitiveConfiguration ? (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_LANG_KEY, '') : '',
+            'has_token' => $canManageSensitiveConfiguration && \App\Services\WhatsAppBusinessApi::centralHasToken(),
         ];
 
-        return view('saas-admin.settings', compact('settings', 'smtp', 'wa'));
+        return view('saas-admin.settings', compact('settings', 'smtp', 'wa', 'canManageSensitiveConfiguration'));
     }
 
     public function update(Request $request)
     {
+        $actor = AdminUser::requireSensitiveConfigurationAdministrator();
+
         $data = $request->validate([
             'support_whatsapp_number' => ['nullable', 'string', 'max:25'],
             'company_legal_name' => ['nullable', 'string', 'max:150'],
@@ -135,7 +146,7 @@ class AdminSettingsController extends Controller
             SystemSetting::set($key, $data[$key] ?? '', 'Trial / payment / support configuration');
         }
 
-        AdminAuditLog::log(auth('admin')->id(), 'Support & payment settings updated', 'SystemSetting', null, [
+        AdminAuditLog::log($actor->id, 'Support & payment settings updated', 'SystemSetting', null, [
             'whatsapp' => $data['support_whatsapp_number'] ?? '',
             'bank' => $data['payment_bank_name'] ?? '',
             'distributor_policy' => array_intersect_key($data, array_flip(['distributor_year1','distributor_year2','distributor_year3','distributor_max_discount','distributor_hold_days','distributor_tiers'])),
@@ -208,6 +219,7 @@ class AdminSettingsController extends Controller
      */
     public function updateSmtp(Request $request)
     {
+        $actor = AdminUser::requireSensitiveConfigurationAdministrator();
         $enabled = $request->boolean('smtp_enabled');
 
         $data = $request->validate([
@@ -242,7 +254,7 @@ class AdminSettingsController extends Controller
             'from_name' => $data['smtp_from_name'] ?? '',
         ], $newPassword);
 
-        AdminAuditLog::log(auth('admin')->id(), 'SMTP settings updated', 'SystemSetting', null, [
+        AdminAuditLog::log($actor->id, 'SMTP settings updated', 'SystemSetting', null, [
             'enabled' => $enabled,
             'host' => $data['smtp_host'] ?? '',
             'username' => $data['smtp_username'] ?? '',
@@ -262,6 +274,7 @@ class AdminSettingsController extends Controller
      */
     public function updateWhatsApp(Request $request)
     {
+        $actor = AdminUser::requireSensitiveConfigurationAdministrator();
         $enabled = $request->boolean('wa_enabled');
 
         $data = $request->validate([
@@ -292,7 +305,7 @@ class AdminSettingsController extends Controller
             );
         }
 
-        AdminAuditLog::log(auth('admin')->id(), 'Central WhatsApp settings updated', 'SystemSetting', null, [
+        AdminAuditLog::log($actor->id, 'Central WhatsApp settings updated', 'SystemSetting', null, [
             'enabled' => $enabled,
             'phone_number_id' => trim((string) ($data['wa_phone_number_id'] ?? '')),
             'token_changed' => $newToken !== '',
@@ -313,7 +326,7 @@ class AdminSettingsController extends Controller
      */
     public function sendTestEmail()
     {
-        $admin = auth('admin')->user();
+        $admin = AdminUser::requireSensitiveConfigurationAdministrator();
         $email = trim((string) ($admin->email ?? ''));
 
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -344,7 +357,7 @@ class AdminSettingsController extends Controller
 
         \App\Services\MailHealth::recordSuccess();
 
-        AdminAuditLog::log(auth('admin')->id(), 'Test email sent', 'SystemSetting', null, [
+        AdminAuditLog::log($admin->id, 'Test email sent', 'SystemSetting', null, [
             'to' => $email,
             'mailer' => $mailer,
         ]);

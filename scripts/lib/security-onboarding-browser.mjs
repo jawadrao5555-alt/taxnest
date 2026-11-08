@@ -212,6 +212,12 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   if(await page.locator('form[action*="/admin/surveys"]').count())throw Error('Viewer offered survey release controls');
   if(await page.locator('#createSurveyModal,#editSurveyModal').count())throw Error('Viewer received hidden survey write modals');
   await saveEvidenceScreenshot(page,'rc-security-survey-history-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/settings',{waitUntil:'domcontentloaded'});
+  await page.getByText('Sensitive configuration is read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action="/admin/settings"],form[action="/admin/settings/smtp"],form[action="/admin/settings/whatsapp"],form[action="/admin/settings/test-email"]').count())throw Error('Viewer received sensitive configuration forms');
+  const settingsForbidden=await page.request.post(baseUrl+'/admin/settings/test-email',{form:{_token:billingCsrf},maxRedirects:0});
+  if(settingsForbidden.status()!==403)throw Error('Viewer sensitive configuration POST not refused');
+  await saveEvidenceScreenshot(page,'rc-security-sensitive-settings-viewer-'+v.width);
   await page.context().clearCookies();
   await login(page,{...t,loginPath:'/admin/login',login:fixture.supportAdmin,password:t.password});
   await page.goto(baseUrl+'/admin/support-cases/'+fixture.supportCaseId,{waitUntil:'domcontentloaded'});
@@ -227,5 +233,5 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await page.getByText('REOPENED',{exact:true}).waitFor();
   if(await page.getByText('Synthetic recurrence received after explicit resolution.',{exact:true}).count()!==1)throw Error('Support reopen evidence missing from timeline');
   await saveEvidenceScreenshot(page,'rc-security-support-case-'+v.width);
-  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement and survey release controls stay read-only for viewer; durable support ownership, explicit resolution build and reopen timeline');
+  pass('SECURITY ONBOARDING PASS: '+v.width+': incomplete setup refused, explicit skip, configured completion, actual password form and independent old-session revocation/fresh login; optional two-step enrollment, fresh authenticator login, single-use recovery and disable; password-verified company deletion request retains the owner/company pending review; Local Bills Viewer password reset revokes the old browser and permits a fresh login; billing, customer-update, tutorial, announcement, survey and sensitive configuration controls stay read-only for viewer; durable support ownership, explicit resolution build and reopen timeline');
 }

@@ -663,3 +663,34 @@ the real service worker's 503 recovery screen, its Try again action must still
 load a repaired document, and saved local state must remain intact. No service
 worker, application route or assertion was weakened. Node syntax and diff
 checks pass locally; a fresh hosted real-Chromium run is required.
+
+## Sensitive global-configuration capability boundary
+
+The shared administrator settings page contained payment destinations, app
+release switches, AI model identifiers and central SMTP/WhatsApp credentials.
+It previously relied only on possession of an admin-panel session. A support,
+viewer, unmapped or cached-role-downgraded actor could load the configuration
+metadata and reach all four write endpoints.
+
+The page now re-reads the persisted administrator role. Existing `admin` and
+`super_admin` roles retain authority; every other role receives one explicit
+read-only explanation and no configuration values or forms. Each general,
+SMTP, WhatsApp and test-email mutation independently rechecks the persisted
+actor before validation, configuration reads, audit writes or mail dispatch.
+Audit entries use that revalidated actor. Actual HTTP coverage preserves a
+cached super-admin session, downgrades its database row, then requires hidden
+values/forms, four 403 responses, byte-for-byte unchanged settings, no audit
+row and no mail. A normal administrator still loads the forms and completes a
+mocked test-email path. The hosted desktop1366/mobile390 journey now checks the
+same page and direct POST refusal.
+
+The first native run of the deletion lifecycle also exposed legacy MariaDB
+implicit `TIMESTAMP` behaviour moving a retained hold boundary. All request,
+hold, restore, purge and audit instants in that new table now use `DATETIME`;
+the existing exact seven-day native assertion remains unchanged. Local
+PHP8.3/SQLite focused evidence is **29 tests / 211 assertions**, plus PHP,
+Blade/Node and shell syntax/diff checks. Fresh supported MariaDB, PHP8.4 and
+real-Chromium acceptance is required for the published exact HEAD. This does
+not claim that the combined page has been split into independent billing,
+release, AI and messaging screens, and the broader capability/consent/import/
+restore/UI checklist remains open.

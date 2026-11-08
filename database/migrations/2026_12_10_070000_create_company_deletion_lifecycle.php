@@ -31,11 +31,16 @@ return new class extends Migration
                 $table->json('scope_manifest')->nullable();
                 $table->string('scope_manifest_sha256', 64)->nullable();
                 $table->dateTime('requested_at');
-                $table->timestamp('binned_at')->nullable();
-                $table->timestamp('hold_until')->nullable();
-                $table->timestamp('restored_at')->nullable();
-                $table->timestamp('purged_at')->nullable();
-                $table->timestamps();
+                // Keep every lifecycle instant on DATETIME.  On supported
+                // MariaDB with legacy implicit TIMESTAMP defaults enabled,
+                // the first TIMESTAMP can acquire automatic update semantics
+                // and silently move an already-recorded hold boundary.
+                $table->dateTime('binned_at')->nullable();
+                $table->dateTime('hold_until')->nullable();
+                $table->dateTime('restored_at')->nullable();
+                $table->dateTime('purged_at')->nullable();
+                $table->dateTime('created_at')->nullable();
+                $table->dateTime('updated_at')->nullable();
             });
         }
 

@@ -19,8 +19,8 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
     await page.getByRole('heading',{name:"Let's set up your account",exact:true}).waitFor();
   };
   await signIn(fixture.incomplete);
-  if(await page.locator('form[action="/onboarding/complete"]').count())throw Error('Incomplete setup exposes completion');
-  const csrf=await page.locator('form[action="/onboarding/skip"] input[name="_token"]').inputValue();
+  if(await page.locator('form[action$="/onboarding/complete"]').count())throw Error('Incomplete setup exposes completion');
+  const csrf=await page.locator('form[action$="/onboarding/skip"] input[name="_token"]').inputValue();
   const rejected=await page.request.post(baseUrl+'/onboarding/complete',{form:{_token:csrf},maxRedirects:0});
   if(rejected.status()!==302||new URL(rejected.headers().location,baseUrl).pathname!=='/onboarding')throw Error('Incomplete setup bypassed validation');
   await page.reload({waitUntil:'domcontentloaded'});
@@ -31,7 +31,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   if(new URL(page.url()).pathname!=='/dashboard')throw Error('Explicit owner skip was not retained');
 
   await signIn(fixture.ready);
-  const complete=page.locator('form[action="/onboarding/complete"]');
+  const complete=page.locator('form[action$="/onboarding/complete"]');
   await complete.getByRole('button',{name:'Go to Dashboard',exact:true}).waitFor();
   await saveEvidenceScreenshot(page,'rc-security-ready-'+v.width);
   await Promise.all([page.waitForURL(u=>u.pathname==='/dashboard'),complete.getByRole('button',{name:'Go to Dashboard',exact:true}).click()]);
@@ -217,7 +217,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await saveEvidenceScreenshot(page,'rc-security-billing-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/all-users',{waitUntil:'domcontentloaded'});
   await page.getByText('User and company assignments are read-only for this account.',{exact:false}).waitFor();
-  if(await page.locator('#addUserModal,form[action="/admin/all-users"]').count())throw Error('Viewer offered cross-company user provisioning controls');
+  if(await page.locator('#addUserModal,form[action$="/admin/all-users"]').count())throw Error('Viewer offered cross-company user provisioning controls');
   await saveEvidenceScreenshot(page,'rc-security-user-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/plans',{waitUntil:'domcontentloaded'});
   await page.getByRole('heading',{name:'Subscription Plans',exact:true}).waitFor();
@@ -233,7 +233,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   if(await page.locator('form[action*="/admin/groups"]').count())throw Error('Viewer offered business-group controls');
   await page.goto(baseUrl+'/admin/app-updates',{waitUntil:'domcontentloaded'});
   await page.getByText('Release history is read-only for this account.',{exact:false}).waitFor();
-  if(await page.locator('form[action="/admin/app-updates/feature-toggle"],form[action$="/toggle"],form[action$="/reannounce"],form[action$="/delete"]').count())throw Error('Viewer offered customer-update release controls');
+  if(await page.locator('form[action$="/admin/app-updates/feature-toggle"],form[action$="/toggle"],form[action$="/reannounce"],form[action$="/delete"]').count())throw Error('Viewer offered customer-update release controls');
   if(await page.locator('#addUpdateModal,#editUpdateModal').count())throw Error('Viewer received hidden customer-update write modals');
   await saveEvidenceScreenshot(page,'rc-security-release-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/tutorial-videos',{waitUntil:'domcontentloaded'});
@@ -242,22 +242,22 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   await saveEvidenceScreenshot(page,'rc-security-tutorial-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/announcements',{waitUntil:'domcontentloaded'});
   await page.getByText('Announcement history is read-only.',{exact:false}).waitFor();
-  if(await page.locator('form[action^="/admin/announcements/"]').count())throw Error('Viewer offered announcement release controls');
+  if(await page.locator('form[action*="/admin/announcements/"]').count())throw Error('Viewer offered announcement release controls');
   if(await page.locator('#addAnnouncementModal').count())throw Error('Viewer received hidden announcement write modal');
   await saveEvidenceScreenshot(page,'rc-security-announcement-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/surveys',{waitUntil:'domcontentloaded'});
   await page.getByText('Survey release history and results are read-only.',{exact:false}).waitFor();
   if(await page.locator('form[action*="/admin/surveys"]').count())throw Error('Viewer offered survey release controls');
   if(await page.locator('#createSurveyModal,#editSurveyModal').count())throw Error('Viewer received hidden survey write modals');
-  const surveyResultsHref=await page.getByRole('link',{name:'Results',exact:true}).first().getAttribute('href');
-  if(!surveyResultsHref)throw Error('Viewer survey history did not expose results link');
-  await page.goto(new URL(surveyResultsHref,baseUrl).toString(),{waitUntil:'domcontentloaded'});
+  const surveyResults=page.getByRole('link',{name:'Results',exact:true}).first();
+  await Promise.all([page.waitForNavigation(),surveyResults.click()]);
+  if(!/^\/admin\/surveys\/\d+$/.test(new URL(page.url()).pathname))throw Error('Survey results link did not open the real read-only result page');
   await page.getByText('Survey results and response history are read-only for this account.',{exact:true}).waitFor();
   if(await page.locator('form[action$="/toggle-close"]').count())throw Error('Viewer offered survey close or reopen control on results page');
   await saveEvidenceScreenshot(page,'rc-security-survey-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/settings',{waitUntil:'domcontentloaded'});
   await page.getByText('Sensitive configuration is read-only for this account.',{exact:true}).waitFor();
-  if(await page.locator('form[action="/admin/settings"],form[action="/admin/settings/smtp"],form[action="/admin/settings/whatsapp"],form[action="/admin/settings/test-email"]').count())throw Error('Viewer received sensitive configuration forms');
+  if(await page.locator('form[action$="/admin/settings"],form[action$="/admin/settings/smtp"],form[action$="/admin/settings/whatsapp"],form[action$="/admin/settings/test-email"]').count())throw Error('Viewer received sensitive configuration forms');
   const settingsForbidden=await page.request.post(baseUrl+'/admin/settings/test-email',{form:{_token:billingCsrf},maxRedirects:0});
   if(settingsForbidden.status()!==403)throw Error('Viewer sensitive configuration POST not refused');
   await page.goto(baseUrl+'/admin/risk-settings',{waitUntil:'domcontentloaded'});
@@ -301,7 +301,7 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   const legacyCompany=fixture.viewer.companyId;
   await page.goto(baseUrl+'/admin/company/'+legacyCompany,{waitUntil:'domcontentloaded'});
   await page.getByText('Legacy company history is read-only for this account.',{exact:false}).waitFor();
-  if(await page.locator('form[action^="/admin/company/'+legacyCompany+'/"],form[action^="'+baseUrl+'/admin/company/'+legacyCompany+'/"]').count())throw Error('Viewer received legacy company write controls');
+  if(await page.locator('form[action*="/admin/company/'+legacyCompany+'/"],form[action^="'+baseUrl+'/admin/company/'+legacyCompany+'/"]').count())throw Error('Viewer received legacy company write controls');
   await saveEvidenceScreenshot(page,'rc-security-legacy-company-history-viewer-'+v.width);
   await page.goto(baseUrl+'/admin/company/'+legacyCompany+'/pos-features',{waitUntil:'domcontentloaded'});
   await page.getByText('POS feature configuration is read-only for this account.',{exact:false}).waitFor();

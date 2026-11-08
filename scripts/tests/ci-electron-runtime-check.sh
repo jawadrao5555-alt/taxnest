@@ -25,5 +25,10 @@ with tempfile.TemporaryDirectory(prefix='taxnest-electron-bootstrap-test-') as d
     result=subprocess.run(['bash',str(root/'scripts/ci-electron-runtime.sh')],env=env,capture_output=True,text=True,timeout=15)
     if result.returncode!=2 or 'version does not match' not in result.stderr:
         raise SystemExit('FAIL: unreviewed runtime version was accepted')
-print('PASS: Electron fallback rejects counterfeit bytes before extraction and refuses an unreviewed package version; no network used')
+    shutil.copyfile(pathlib.Path(sys.argv[1])/'scripts/ci-gradle-runtime.sh', root/'scripts/ci-gradle-runtime.sh')
+    env.update({'RUNNER_TEMP':str(root),'GITHUB_PATH':str(root/'github-path')})
+    result=subprocess.run(['bash',str(root/'scripts/ci-gradle-runtime.sh')],env=env,capture_output=True,text=True,timeout=15)
+    if result.returncode==0 or (root/'github-path').exists() or list(root.glob('taxnest-gradle-runtime-*/gradle-8.11.1')):
+        raise SystemExit('FAIL: counterfeit Gradle distribution was accepted or added to PATH')
+print('PASS: Electron fallback rejects counterfeit bytes before extraction and refuses an unreviewed package version; Gradle rejects counterfeit bytes without updating PATH; no network used')
 PY

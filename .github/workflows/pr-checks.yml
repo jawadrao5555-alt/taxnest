@@ -192,6 +192,8 @@ jobs:
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
       - uses: shivammathur/setup-php@v2
+        env:
+          use_builds_cache: 'false'
         with:
           php-version: '8.4'
           extensions: pdo_mysql
@@ -253,6 +255,8 @@ jobs:
       - name: Install isolated MariaDB-container build prerequisites
         run: bash scripts/ci-mariadb-provision.sh install
       - uses: shivammathur/setup-php@v2
+        env:
+          use_builds_cache: 'false'
         with:
           php-version: '8.4'
           extensions: pdo_mysql
@@ -427,6 +431,8 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
+      - name: Pre-provision verified Gradle 8.11.1
+        run: bash scripts/ci-gradle-runtime.sh
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.11.1'

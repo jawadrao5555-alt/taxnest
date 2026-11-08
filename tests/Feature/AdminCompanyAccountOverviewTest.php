@@ -11,12 +11,14 @@ class AdminCompanyAccountOverviewTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function fixture(): array
+    private function fixture(?string $purchasedPlanName = null): array
     {
         $admin = AdminUser::create(['name'=>'Synthetic account reviewer','email'=>uniqid().'@b01.invalid','password'=>bcrypt('SyntheticOnly123!'),'role'=>'super_admin']);
         $company = Company::create(['name'=>'Synthetic B01 account','email'=>uniqid().'@b01.invalid','ntn'=>uniqid(),'product_type'=>'pos','status'=>'approved','company_status'=>'active']);
         $plan = PricingPlan::create(['name'=>'Synthetic current catalogue price','product_type'=>'pos','price'=>9999,'invoice_limit'=>100,'user_limit'=>2,'branch_limit'=>1,'is_active'=>true,'is_trial'=>false]);
-        $sub = Subscription::create(['company_id'=>$company->id,'pricing_plan_id'=>$plan->id,'billing_cycle'=>'annual','start_date'=>'2025-01-01','end_date'=>'2025-12-31','final_price'=>12499,'active'=>true]);
+        $sub = Subscription::create(['company_id'=>$company->id,'pricing_plan_id'=>$plan->id,'billing_cycle'=>'annual','start_date'=>'2025-01-01','end_date'=>'2025-12-31','final_price'=>12499,'active'=>true,
+            'purchase_snapshot'=>$purchasedPlanName === null ? null : ['version'=>1,'company_id'=>$company->id,
+                'plan'=>['id'=>$plan->id,'name'=>$purchasedPlanName,'product_type'=>'pos']]]);
         return [$admin,$company,$sub];
     }
 
@@ -31,17 +33,8 @@ class AdminCompanyAccountOverviewTest extends TestCase
 
     public function test_manage_company_uses_frozen_purchased_name_for_current_history_and_correction_context(): void
     {
-        [$admin,$company,$sub] = $this->fixture();
+        [$admin,$company,$sub] = $this->fixture('Purchased B01 Package');
         $plan = $sub->pricingPlan;
-        $sub->update(['purchase_snapshot' => [
-            'version' => 1,
-            'company_id' => $company->id,
-            'plan' => [
-                'id' => $plan->id,
-                'name' => 'Purchased B01 Package',
-                'product_type' => 'pos',
-            ],
-        ]]);
         $plan->update(['name' => 'Later Catalogue Label']);
 
         $before = $sub->fresh()->getAttributes();

@@ -166,14 +166,14 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
             'feature_flags'     => json_encode(['kitchen' => true, 'inventory' => true]),
         ]);
 
-        $support = AdminUser::create([
-            'name'     => 'Support Admin',
-            'email'    => 'support@adminguard.test',
+        $billingAdmin = AdminUser::create([
+            'name'     => 'Billing Admin',
+            'email'    => 'billing@adminguard.test',
             'password' => Hash::make('Admin@98765'),
-            'role'     => 'support',
+            'role'     => 'admin',
         ]);
 
-        $this->actingAs($support, 'admin');
+        $this->actingAs($billingAdmin, 'admin');
         $this->put($this->url(), [
             '_token'            => csrf_token(),
             'fs_present'        => '1',
@@ -190,6 +190,33 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
             'The rest of the non-super admin feature save must still succeed');
         $this->assertFalse((bool) ($flags['kitchen'] ?? true),
             'Unticked modules on that same save must still persist');
+    }
+
+    /** Support accounts cannot save either categories or feature flags. */
+    public function test_support_cannot_mutate_pos_features_or_category(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'business_category' => 'salon',
+            'feature_flags' => json_encode(['kitchen' => true, 'inventory' => true]),
+        ]);
+        $before = DB::table('companies')->where('id', $this->companyId)->first();
+        $support = AdminUser::create([
+            'name' => 'Support Admin',
+            'email' => 'support@adminguard.test',
+            'password' => Hash::make('Admin@98765'),
+            'role' => 'support',
+        ]);
+
+        $this->actingAs($support, 'admin')->put($this->url(), [
+            '_token' => csrf_token(),
+            'fs_present' => '1',
+            'business_category' => 'gym',
+            'feature_flags' => ['inventory' => '1'],
+        ])->assertForbidden();
+
+        $this->assertEquals($before, DB::table('companies')->where('id', $this->companyId)->first());
+        $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertDatabaseCount('security_logs', 0);
     }
 
     /** A super admin still changes the preset exactly as before. */

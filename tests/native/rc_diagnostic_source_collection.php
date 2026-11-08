@@ -136,6 +136,10 @@ try {
             'owner_text' => 'PRIVATE '.$label.' owner request',
             'company_id' => $tenant,
             'status' => 'FAILED',
+            'operation' => 'diagnose',
+            'fix_commit' => $tenant === $company->id ? str_repeat('a', 40) : null,
+            'pull_request' => $tenant === $company->id ? '#364' : null,
+            'deployment_sha' => $tenant === $company->id ? str_repeat('b', 40) : null,
             'tests_result' => json_encode(['private' => 'PRIVATE '.$label.' tests']),
             'deployment_result' => json_encode(['private' => 'PRIVATE '.$label.' deployment']),
             'error' => 'PRIVATE '.$label.' failure',
@@ -150,11 +154,17 @@ try {
     ], [$company->id]);
     if (array_column($liveOps['rows'], 'id') !== [(int) $liveOpsIds[0]]
         || $liveOps['collection_observation']['retained_rows'] !== 1
+        || $liveOps['rows'][0]['status'] !== 'FAILED'
+        || $liveOps['rows'][0]['operation'] !== 'diagnose'
+        || $liveOps['rows'][0]['fix_commit'] !== str_repeat('a', 40)
+        || $liveOps['rows'][0]['pull_request'] !== '#364'
+        || $liveOps['rows'][0]['deployment_sha'] !== str_repeat('b', 40)
+        || ! str_contains($liveOps['release_evidence_note'], 'do not prove')
         || str_contains(json_encode($liveOps), 'PRIVATE')
         || $liveOpsBefore !== DB::table('live_ops_autonomous_requests')->whereIn('id', $liveOpsIds)->orderBy('id')->get()->toJson()) {
         throw new RuntimeException('Native Live Ops source scope, redaction or preservation failed');
     }
-    echo "PASS: native company-linked Live Ops source excludes global and foreign rows without exposing job or deployment payloads\n";
+    echo "PASS: native company-linked Live Ops source retains safe job/release identifiers without exposing payloads or claiming deployment\n";
 
     $collection->capture($company->id, 'pos.backup_evidence', $day, (string) Str::uuid());
     $backupGap = app(\App\Services\Reporting\DiagnosticSourceEvidence::class)->read([

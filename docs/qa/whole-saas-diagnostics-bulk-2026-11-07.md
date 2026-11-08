@@ -294,3 +294,24 @@ record is read, created, changed or deleted.
 This closes only truthful registration of the backup gap. Actual tenant-bound
 backup/restore evidence, remaining field completeness and bounded export
 acceptance remain open; fresh exact-HEAD hosted checks are required.
+
+## Actionable company-linked job/release evidence (registry v9)
+
+The company-linked Live Ops source previously returned only row identity and
+time. That safely proved a retained request existed but could not identify a
+failed state or the exact stored commit, pull request and deployment SHA needed
+for operational follow-up.
+
+Live Ops rows now expose only an allow-list of status, operation, fix commit,
+pull request and deployment SHA alongside ID/time. Owner text, failure detail,
+test/deployment/live-verification payloads, metadata and credentials remain
+excluded. Global and foreign rows stay outside the tenant query. Every response
+states that retained identifiers and status do not prove tests, deployment,
+live verification or company health. Missing compatibility columns make the
+source unavailable instead of silently returning partial fields.
+
+Focused SQLite and mandatory native MariaDB checks require exact safe values,
+payload redaction, tenant isolation and byte-for-byte preservation of all Live
+Ops rows. Hosted exact-HEAD PHP8.4/full-suite/native/browser/Node/final validate
+remains required. This is read-only evidence and never retries a job, deploys,
+messages a customer or changes company/business state.

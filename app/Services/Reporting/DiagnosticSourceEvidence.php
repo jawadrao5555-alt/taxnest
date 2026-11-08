@@ -7,10 +7,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
-/** Registered, SELECT-only source metadata. Never returns stored payloads. */
+/** Registered, SELECT-only source metadata. Never returns stored payloads or unrestricted columns. */
 final class DiagnosticSourceEvidence
 {
-    public const REGISTRY_VERSION = 8;
+    public const REGISTRY_VERSION = 9;
 
     public const SOURCES = [
         'pra.fiscal' => ['pos', 'pra_logs', 'created_at'],
@@ -37,22 +37,26 @@ final class DiagnosticSourceEvidence
         'pos.notifications' => ['pos', 'notifications', 'created_at'],
         'pos.branches' => ['pos', 'branches', 'created_at'],
         'pos.support_cases' => ['pos', 'support_cases', 'updated_at'],
-        'pos.live_ops' => ['pos', 'live_ops_autonomous_requests', 'updated_at'],
+        'pos.live_ops' => ['pos', 'live_ops_autonomous_requests', 'updated_at', [], null,
+            ['status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']],
         'di.platform_audit' => ['di', 'audit_logs', 'created_at'],
         'di.notifications' => ['di', 'notifications', 'created_at'],
         'di.branches' => ['di', 'branches', 'created_at'],
         'di.support_cases' => ['di', 'support_cases', 'updated_at'],
-        'di.live_ops' => ['di', 'live_ops_autonomous_requests', 'updated_at'],
+        'di.live_ops' => ['di', 'live_ops_autonomous_requests', 'updated_at', [], null,
+            ['status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']],
         'fbrpos.platform_audit' => ['fbrpos', 'audit_logs', 'created_at'],
         'fbrpos.notifications' => ['fbrpos', 'notifications', 'created_at'],
         'fbrpos.branches' => ['fbrpos', 'branches', 'created_at'],
         'fbrpos.support_cases' => ['fbrpos', 'support_cases', 'updated_at'],
-        'fbrpos.live_ops' => ['fbrpos', 'live_ops_autonomous_requests', 'updated_at'],
+        'fbrpos.live_ops' => ['fbrpos', 'live_ops_autonomous_requests', 'updated_at', [], null,
+            ['status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']],
         'health.platform_audit' => ['erps', 'audit_logs', 'created_at'],
         'health.notifications' => ['erps', 'notifications', 'created_at'],
         'health.branches' => ['erps', 'branches', 'created_at'],
         'health.support_cases' => ['erps', 'support_cases', 'updated_at'],
-        'health.live_ops' => ['erps', 'live_ops_autonomous_requests', 'updated_at'],
+        'health.live_ops' => ['erps', 'live_ops_autonomous_requests', 'updated_at', [], null,
+            ['status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha']],
         // No current table retains tenant-bound backup evidence. Register the
         // gap explicitly so callers receive UNAVAILABLE instead of a false
         // healthy/empty result or globally attributed infrastructure state.
@@ -110,6 +114,7 @@ final class DiagnosticSourceEvidence
         [$product, $table, $stamp] = self::SOURCES[$v['source']];
         $fixed = self::SOURCES[$v['source']][3] ?? [];
         $unavailableReason = self::SOURCES[$v['source']][4] ?? null;
+        $safeColumns = self::SOURCES[$v['source']][5] ?? [];
         if (\App\Support\NestErps::canonicalProductType($company->product_type) !== $product) {
             throw ValidationException::withMessages(['source' => 'This source does not apply to the selected product.']);
         }
@@ -125,19 +130,22 @@ final class DiagnosticSourceEvidence
                 'deleted_or_never_collected_events' => 'UNKNOWN', 'sequence_gaps' => 'UNAVAILABLE', 'client_clock_skew' => 'UNAVAILABLE'],
             'notes' => ['Stored event presence does not establish complete collection, regulator acceptance or product health.',
                 'Missing tables are unavailable; an empty window proves only that no retained rows matched.',
-                'Rows contain IDs and timestamps only. Regulatory payloads, patient data, customer details and credentials are excluded.',
+                'Rows contain IDs/timestamps and only source-specific allow-listed operational identifiers. Regulatory payloads, patient data, customer details and credentials are excluded.',
                 'Branch filtering is applied only through an exact retained branch key; sources without one return BRANCH_SCOPE_UNAVAILABLE.',
                 'Pages use immutable IDs, not a database snapshot; re-read for late arrivals. DI logs whose source invoice was deleted cannot be attributed.']];
         if ($v['source'] === 'pos.offline_samples') {
             $meta['related_operation'] = ['name' => 'get_pra_operations_evidence', 'stream' => 'agent_collection',
                 'purpose' => 'Retained device sequence gaps, source/receipt clock-or-upload difference, stale streams, pending/dropped/reset counts and storage status.'];
         }
+        if (str_ends_with($v['source'], '.live_ops')) {
+            $meta['release_evidence_note'] = 'Stored status and identifiers only; they do not prove tests passed, deployment occurred, live verification succeeded or the company is healthy.';
+        }
         if ($unavailableReason !== null) {
             return $meta + ['status' => 'UNAVAILABLE', 'availability_reason' => $unavailableReason,
                 'observed' => null, 'rows' => [], 'pagination' => ['has_more' => false, 'next_after_id' => null]];
         }
         try {
-            foreach (array_merge(['id', $stamp, $v['source'] === 'di.fiscal' ? 'invoice_id' : 'company_id'], array_keys($fixed)) as $column) {
+            foreach (array_merge(['id', $stamp, $v['source'] === 'di.fiscal' ? 'invoice_id' : 'company_id'], array_keys($fixed), $safeColumns) as $column) {
                 if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column)) {
                     return $meta + ['status' => 'UNAVAILABLE', 'observed' => null, 'rows' => [], 'pagination' => ['has_more' => false, 'next_after_id' => null]];
                 }
@@ -170,8 +178,9 @@ final class DiagnosticSourceEvidence
                 $to->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s')]);
             $limit = (int) ($v['limit'] ?? 25);
             $extent = (clone $q)->selectRaw('COUNT(*) AS retained_rows, MIN(e.'.$stamp.') AS first_at, MAX(e.'.$stamp.') AS last_at')->first();
+            $select = array_merge(['e.id', 'e.'.$stamp.' as event_at'], array_map(fn ($column) => 'e.'.$column, $safeColumns));
             $rows = $q->where('e.id', '>', (int) ($v['after_id'] ?? 0))->orderBy('e.id')->limit($limit + 1)
-                ->get(['e.id', 'e.'.$stamp.' as event_at']);
+                ->get($select);
             $page = $rows->take($limit);
 
             return $meta + ['status' => (int) $extent->retained_rows === 0 ? 'NO_RETAINED_EVENTS' : 'PARTIAL',
@@ -179,8 +188,15 @@ final class DiagnosticSourceEvidence
                     'earliest_in_window' => $extent->first_at, 'latest_in_window' => $extent->last_at,
                     'timestamp_column' => $stamp, 'page_rows' => $page->count(), 'earliest_on_page' => $page->min('event_at'), 'latest_on_page' => $page->max('event_at'),
                     'timestamp_storage_timezone' => config('app.timezone')],
-                'rows' => $page->map(fn ($r) => ['id' => (int) $r->id,
-                    'event_at' => Carbon::parse($r->event_at, config('app.timezone'))->setTimezone($tz)->toIso8601String()])->values()->all(),
+                'rows' => $page->map(function ($r) use ($safeColumns, $tz) {
+                    $row = ['id' => (int) $r->id,
+                        'event_at' => Carbon::parse($r->event_at, config('app.timezone'))->setTimezone($tz)->toIso8601String()];
+                    foreach ($safeColumns as $column) {
+                        $row[$column] = $r->{$column};
+                    }
+
+                    return $row;
+                })->values()->all(),
                 'pagination' => ['has_more' => $rows->count() > $limit, 'next_after_id' => $rows->count() > $limit ? (int) $page->last()->id : null]];
         } catch (\Illuminate\Database\QueryException) {
             return $meta + ['status' => 'SOURCE_QUERY_FAILED', 'observed' => null, 'rows' => [],

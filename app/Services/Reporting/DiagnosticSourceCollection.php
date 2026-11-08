@@ -30,6 +30,7 @@ final class DiagnosticSourceCollection
         [$product, $table, $stamp] = DiagnosticSourceEvidence::SOURCES[$source];
         $fixed = DiagnosticSourceEvidence::SOURCES[$source][3] ?? [];
         $unavailableReason = DiagnosticSourceEvidence::SOURCES[$source][4] ?? null;
+        $safeColumns = DiagnosticSourceEvidence::SOURCES[$source][5] ?? [];
         if (! $company || NestErps::canonicalProductType($company->product_type) !== $product) {
             throw new \InvalidArgumentException('Source does not apply to company.');
         }
@@ -42,7 +43,7 @@ final class DiagnosticSourceCollection
 
                 return $result['status'];
             }
-            $required = array_merge(['id', $stamp, $source === 'di.fiscal' ? 'invoice_id' : 'company_id'], array_keys($fixed));
+            $required = array_merge(['id', $stamp, $source === 'di.fiscal' ? 'invoice_id' : 'company_id'], array_keys($fixed), $safeColumns);
             $available = Schema::hasTable($table);
             foreach ($required as $field) {
                 $available = $available && Schema::hasColumn($table, $field);

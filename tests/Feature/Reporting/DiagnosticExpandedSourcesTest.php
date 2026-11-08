@@ -164,6 +164,10 @@ class DiagnosticExpandedSourcesTest extends TestCase
             $t->id();
             $t->unsignedBigInteger('company_id')->nullable();
             $t->string('status');
+            $t->string('operation')->nullable();
+            $t->string('fix_commit', 64)->nullable();
+            $t->string('pull_request', 32)->nullable();
+            $t->string('deployment_sha', 64)->nullable();
             $t->text('error')->nullable();
             $t->json('tests_result')->nullable();
             $t->json('deployment_result')->nullable();
@@ -173,6 +177,10 @@ class DiagnosticExpandedSourcesTest extends TestCase
             DB::table('live_ops_autonomous_requests')->insert([
                 'company_id' => $companyId,
                 'status' => 'FAILED',
+                'operation' => 'diagnose',
+                'fix_commit' => 'commit-'.$companyId,
+                'pull_request' => '#'.$companyId,
+                'deployment_sha' => null,
                 'error' => 'PRIVATE-FAILURE-'.$companyId,
                 'tests_result' => json_encode(['private' => 'PRIVATE-TESTS']),
                 'deployment_result' => json_encode(['private' => 'PRIVATE-DEPLOYMENT']),
@@ -183,6 +191,7 @@ class DiagnosticExpandedSourcesTest extends TestCase
         DB::table('live_ops_autonomous_requests')->insert([
             'company_id' => null,
             'status' => 'FAILED',
+            'operation' => 'global',
             'error' => 'PRIVATE-GLOBAL',
             'created_at' => '2026-11-06 19:00:00',
             'updated_at' => '2026-11-06 20:00:00',
@@ -190,6 +199,7 @@ class DiagnosticExpandedSourcesTest extends TestCase
         DB::table('live_ops_autonomous_requests')->insert([
             'company_id' => 99,
             'status' => 'FAILED',
+            'operation' => 'foreign',
             'error' => 'PRIVATE-FOREIGN',
             'created_at' => '2026-11-06 19:00:00',
             'updated_at' => '2026-11-06 20:00:00',
@@ -207,7 +217,13 @@ class DiagnosticExpandedSourcesTest extends TestCase
             $this->assertSame(1, $report['observed']['retained_rows_in_window']);
             $this->assertSame(1, $report['collection_observation']['retained_rows']);
             $this->assertCount(1, $report['rows']);
-            $this->assertSame(['id', 'event_at'], array_keys($report['rows'][0]));
+            $this->assertSame(['id', 'event_at', 'status', 'operation', 'fix_commit', 'pull_request', 'deployment_sha'], array_keys($report['rows'][0]));
+            $this->assertSame('FAILED', $report['rows'][0]['status']);
+            $this->assertSame('diagnose', $report['rows'][0]['operation']);
+            $this->assertSame('commit-'.$id, $report['rows'][0]['fix_commit']);
+            $this->assertSame('#'.$id, $report['rows'][0]['pull_request']);
+            $this->assertNull($report['rows'][0]['deployment_sha']);
+            $this->assertStringContainsString('do not prove', $report['release_evidence_note']);
             $this->assertStringNotContainsString('PRIVATE', json_encode($report));
             $this->assertFalse($report['coverage']['complete']);
         }

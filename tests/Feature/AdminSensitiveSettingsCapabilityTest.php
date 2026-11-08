@@ -62,6 +62,24 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             ->assertDontSee('/admin/settings/test-email', false)
             ->assertDontSee('action="http://localhost/admin/settings"', false);
 
+        $this->get('/admin/risk-settings')
+            ->assertOk()
+            ->assertSee('Risk configuration is read-only for this account.')
+            ->assertDontSee('SYNTHETIC-SECRET-ACCOUNT', false)
+            ->assertDontSee('action="http://localhost/admin/risk-settings"', false)
+            ->assertDontSee('Save Settings');
+
+        $this->get('/admin/madadgar-chats')
+            ->assertOk()
+            ->assertSee('Madadgar configuration is read-only for this account.')
+            ->assertSee('Key source:')
+            ->assertSee('restricted')
+            ->assertDontSee('Admin panel (encrypted)')
+            ->assertDontSee('Server .env')
+            ->assertDontSee('action="http://localhost/admin/madadgar-settings"', false)
+            ->assertDontSee('OpenAI API Key (leave blank to keep current)')
+            ->assertDontSee('Save Settings');
+
         foreach ([
             fn () => $this->post('/admin/settings'),
             fn () => $this->post('/admin/settings/smtp'),
@@ -121,6 +139,18 @@ class AdminSensitiveSettingsCapabilityTest extends TestCase
             ->assertSee('/admin/settings/smtp', false)
             ->assertSee('/admin/settings/whatsapp', false)
             ->assertSee('/admin/settings/test-email', false);
+
+        $this->actingAs($actor, 'admin')->get('/admin/risk-settings')
+            ->assertOk()
+            ->assertDontSee('Risk configuration is read-only for this account.')
+            ->assertSee('/admin/risk-settings', false)
+            ->assertSee('Save Settings');
+
+        $this->actingAs($actor, 'admin')->get('/admin/madadgar-chats')
+            ->assertOk()
+            ->assertDontSee('Madadgar configuration is read-only for this account.')
+            ->assertSee('/admin/madadgar-settings', false)
+            ->assertSee('OpenAI API Key (leave blank to keep current)');
 
         $this->actingAs($actor, 'admin')->post('/admin/settings/test-email')
             ->assertRedirect()

@@ -800,13 +800,16 @@ class AdminController extends Controller
 
     public function riskSettings()
     {
+        $actor = auth('admin')->user();
+        $currentActor = $actor instanceof \App\Models\AdminUser ? $actor->fresh() : null;
+        $canManageSensitiveConfiguration = (bool) $currentActor?->canManageSensitiveConfiguration();
         $settings = [
             'mom_spike_threshold' => \App\Models\SystemSetting::get('mom_spike_threshold', '200'),
             'tax_drop_threshold' => \App\Models\SystemSetting::get('tax_drop_threshold', '60'),
             'critical_score_threshold' => \App\Models\SystemSetting::get('critical_score_threshold', '40'),
             'stability_bonus_weight' => \App\Models\SystemSetting::get('stability_bonus_weight', '10'),
         ];
-        return view('admin.risk-settings', compact('settings'));
+        return view('admin.risk-settings', compact('settings', 'canManageSensitiveConfiguration'));
     }
 
     public function updateRiskSettings(Request $request)

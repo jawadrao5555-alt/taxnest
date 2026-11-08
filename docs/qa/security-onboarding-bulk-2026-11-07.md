@@ -885,3 +885,21 @@ that assertion to the visible layout success banner and separately retains the
 unique durable request-number/status assertion. No application response,
 deletion rule or acceptance outcome was weakened; fresh exact-HEAD desktop and
 mobile hosted evidence is required.
+
+The Madadgar chat and risk-threshold read screens also rendered their complete
+configuration forms to support/viewer sessions even though the write endpoints
+were already protected. Both screens now reload the persisted administrator
+role before rendering. Risk thresholds remain visible as explicit read-only
+values, and Madadgar chat/source totals remain available for support review,
+but neither screen emits a write form. Madadgar also redacts whether its API
+key comes from encrypted database configuration or the server environment.
+The existing administrator path still renders and submits both forms.
+
+Cached-role downgrade and positive administrator HTTP coverage passes **3
+tests / 85 assertions**. The broader affected billing, release, account,
+company-form and tables-first set passes **76 tests / 1729 assertions**, with
+Blade compilation, Node syntax and diff checks. The required 1366/390 journey
+now visits both real read screens, requires the read-only notices and absence
+of forms/key-source disclosure, and retains the existing direct POST refusal.
+This local PHP8.3/SQLite evidence is supplemental; fresh exact-HEAD hosted
+PHP8.4 and real-Chromium acceptance remains required.

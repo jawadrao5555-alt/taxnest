@@ -223,6 +223,15 @@ export async function securityOnboardingWorkflow(page,t,v,{baseUrl,login,saveEvi
   if(await page.locator('form[action="/admin/settings"],form[action="/admin/settings/smtp"],form[action="/admin/settings/whatsapp"],form[action="/admin/settings/test-email"]').count())throw Error('Viewer received sensitive configuration forms');
   const settingsForbidden=await page.request.post(baseUrl+'/admin/settings/test-email',{form:{_token:billingCsrf},maxRedirects:0});
   if(settingsForbidden.status()!==403)throw Error('Viewer sensitive configuration POST not refused');
+  await page.goto(baseUrl+'/admin/risk-settings',{waitUntil:'domcontentloaded'});
+  await page.getByText('Risk configuration is read-only for this account.',{exact:true}).waitFor();
+  if(await page.locator('form[action$="/admin/risk-settings"]').count())throw Error('Viewer received risk configuration form');
+  await saveEvidenceScreenshot(page,'rc-security-risk-settings-viewer-'+v.width);
+  await page.goto(baseUrl+'/admin/madadgar-chats',{waitUntil:'domcontentloaded'});
+  await page.getByText('Madadgar configuration is read-only for this account.',{exact:false}).waitFor();
+  if(await page.locator('form[action$="/admin/madadgar-settings"]').count())throw Error('Viewer received Madadgar configuration form');
+  if(await page.getByText('Admin panel (encrypted)',{exact:true}).count())throw Error('Viewer received Madadgar key source');
+  await saveEvidenceScreenshot(page,'rc-security-madadgar-settings-viewer-'+v.width);
   const legacyCompany=fixture.viewer.companyId;
   await page.goto(baseUrl+'/admin/companies/'+legacyCompany,{waitUntil:'domcontentloaded'});
   await page.getByText('Read-only company access.',{exact:false}).waitFor();

@@ -784,3 +784,13 @@ journey now sends direct fictional legacy mutation requests as a viewer and
 requires 403 before controller validation, dispatch or state change. Supported
 PHP8.4/full-suite/native/browser acceptance remains required for the published
 exact HEAD.
+
+The company create and detail reads had two remaining cached-super-admin
+decisions. Company creation now uses the freshly authorized actor when deciding
+whether an Agent may be attributed, so downgrade to ordinary admin cannot keep
+the stale super-admin grant. The company detail page fresh-reloads the actor
+before exposing the super-admin-only `exempt_internal` PRA requeue list; a
+cached downgrade to support keeps the general read-only account page but no
+longer receives those bill identifiers. Focused account/lifecycle coverage
+passes **12 tests / 966 assertions** with the fictional exempt bill hidden and
+all company/subscription state unchanged.

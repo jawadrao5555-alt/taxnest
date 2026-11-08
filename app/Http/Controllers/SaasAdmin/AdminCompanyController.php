@@ -44,7 +44,7 @@ class AdminCompanyController extends Controller
 
     public function store(Request $request)
     {
-        \App\Models\AdminUser::requireBillingAdministrator();
+        $currentAdmin = \App\Models\AdminUser::requireBillingAdministrator();
         // Which POS panel (if any) this company is being created on. The
         // business type is a POS-only question: Digital Invoice and healthcare
         // companies are created exactly as they always were.
@@ -165,7 +165,7 @@ class AdminCompanyController extends Controller
         // Only super admin sees/sets the agent dropdown (Agents section is
         // super-admin-only); key added conditionally so older schemas without
         // the column never receive it.
-        if (auth('admin')->user()?->isSuperAdmin()
+        if ($currentAdmin->isSuperAdmin()
             && $request->filled('agent_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_id')) {
             $companyData['agent_id'] = $request->agent_id;
@@ -370,6 +370,7 @@ class AdminCompanyController extends Controller
 
     public function show($id)
     {
+        $currentAdmin = auth('admin')->user()?->fresh();
         $company = Company::withTrashed()->with(['franchise', 'activeSubscription', 'requestedPlan'])->findOrFail($id);
         $usageStats = CompanyUsageStat::refreshForCompany($id);
         $accountOverview = \App\Services\CompanyAccountOverview::for($company);
@@ -456,7 +457,7 @@ class AdminCompanyController extends Controller
         // that were never submitted to PRA (pre-Task-760). Super-admin can re-queue
         // them from the UI instead of needing SSH/artisan access.
         $exemptInternalBills = collect();
-        if ($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin()) {
+        if ($company->product_type === 'pos' && $currentAdmin?->isSuperAdmin()) {
             $exemptInternalBills = PosTransaction::where('company_id', $id)
                 ->where('pra_status', 'exempt_internal')
                 ->whereNull('pra_invoice_number')

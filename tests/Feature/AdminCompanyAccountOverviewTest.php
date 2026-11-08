@@ -183,6 +183,13 @@ class AdminCompanyAccountOverviewTest extends TestCase
     {
         [$admin,$company,$sub] = $this->fixture();
         $this->actingAs($admin,'admin');
+        \App\Models\PosTransaction::create([
+            'company_id' => $company->id,
+            'invoice_number' => 'EXEMPT-ROLE-DOWNGRADE-ONLY',
+            'status' => 'draft',
+            'pra_status' => 'exempt_internal',
+            'total_amount' => 1,
+        ]);
 
         $before = $company->fresh()->getAttributes();
         $term = $sub->fresh()->getAttributes();
@@ -196,6 +203,7 @@ class AdminCompanyAccountOverviewTest extends TestCase
         $this->assertSame(0,AdminAuditLog::count());
         $this->get('/admin/companies/'.$company->id)->assertOk()
             ->assertSee('Read-only company access')
+            ->assertDontSee('EXEMPT-ROLE-DOWNGRADE-ONLY')
             ->assertDontSee('data-company-state-action');
     }
 }

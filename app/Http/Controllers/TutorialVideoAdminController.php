@@ -28,11 +28,14 @@ class TutorialVideoAdminController extends Controller
             'gateOptions' => self::gateOptions(),
             'roleOptions' => self::roleOptions(),
             'audienceOptions' => PosVocabulary::audienceOptions(),
+            'canManageRelease' => auth('admin')->user()?->fresh()?->canManageRelease() ?? false,
         ]);
     }
 
     public function togglePublished($id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $video = TutorialVideo::findOrFail($id);
         $video->update(['is_published' => !$video->is_published]);
 
@@ -44,6 +47,8 @@ class TutorialVideoAdminController extends Controller
 
     public function togglePublic($id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $video = TutorialVideo::findOrFail($id);
         $video->update(['show_public' => !$video->show_public]);
 
@@ -55,6 +60,8 @@ class TutorialVideoAdminController extends Controller
 
     public function setGate(Request $request, $id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $video = TutorialVideo::findOrFail($id);
         $data = $request->validate([
             'required_feature' => 'nullable|string',
@@ -81,6 +88,8 @@ class TutorialVideoAdminController extends Controller
     /** Role tier inside company logins (ZFC, 5 Aug 2026): staff-filtering. */
     public function setRole(Request $request, $id)
     {
+        \App\Models\AdminUser::requireReleaseAdministrator();
+
         $video = TutorialVideo::findOrFail($id);
         $data = $request->validate([
             'min_role' => 'required|string',

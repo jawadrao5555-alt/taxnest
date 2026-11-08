@@ -35,6 +35,14 @@ class AdminUser extends Authenticatable
         return in_array($this->role, ['admin', 'super_admin'], true);
     }
 
+    public function canManageRelease(): bool
+    {
+        // Publishing customer notices and changing tutorial visibility/gates
+        // changes the customer-facing release.  A support/viewer session may
+        // inspect history, but it is not release authority.
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
     public static function requireBillingAdministrator(): self
     {
         $actor = auth('admin')->user();
@@ -49,6 +57,15 @@ class AdminUser extends Authenticatable
         $actor = auth('admin')->user();
         $current = $actor instanceof self ? $actor->fresh() : null;
         abort_unless($current && $current->canManageCompanyLifecycle(), 403, 'Company lifecycle changes require an administrator.');
+
+        return $current;
+    }
+
+    public static function requireReleaseAdministrator(): self
+    {
+        $actor = auth('admin')->user();
+        $current = $actor instanceof self ? $actor->fresh() : null;
+        abort_unless($current && $current->canManageRelease(), 403, 'Release changes require an administrator.');
 
         return $current;
     }

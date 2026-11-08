@@ -1,5 +1,28 @@
 # Security and onboarding bulk — P1
 
+## Persisted customer-release authority continuation
+
+Actual route reconciliation found that an admin-panel login alone could publish,
+edit, reannounce or archive customer updates, change the What's New master switch,
+and alter tutorial publication, public visibility, feature audience or role gates.
+Those operations change the customer-facing release and must not be available to
+support, viewer or unmapped roles—or to a formerly privileged browser after its
+persisted actor is downgraded.
+
+Every release mutation now re-reads the persisted administrator and requires the
+existing `admin` or `super_admin` role. Customer-update and tutorial histories stay
+readable to support/viewer accounts, but the write forms and hidden edit modals are
+not rendered and the screen states that it is read-only. Existing administrators
+retain the same release controls; audience preview remains a read-only calculation.
+
+Focused actual-HTTP coverage keeps a super-admin model cached, downgrades only its
+persisted row, requires every customer-update and tutorial mutation to return 403,
+and proves the update, tutorial, feature setting and audit-facing history stay
+unchanged. The required security browser journey now checks the real read-only
+screens at desktop1366 and mobile390 and requires all release forms to be absent.
+It does not publish a notice, toggle a tutorial or contact a customer. Fresh
+exact-HEAD PHP8.4/full-suite/browser/final-validate acceptance remains required.
+
 ## Versioned Healthcare consent and withdrawal evidence continuation
 
 Source reconciliation reproduced an evidence ambiguity in the patient record:

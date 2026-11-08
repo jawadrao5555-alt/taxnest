@@ -21,12 +21,16 @@ return new class extends Migration
                 $table->unsignedBigInteger('requested_by_user_id')->nullable();
                 $table->unsignedBigInteger('requested_by_admin_id')->nullable();
                 $table->string('requester_email_hash', 64)->nullable();
-                $table->timestamp('requester_verified_at');
+                // Use DATETIME for required lifecycle instants. MariaDB with
+                // explicit_defaults_for_timestamp disabled applies legacy
+                // implicit defaults to the first TIMESTAMP and can reject a
+                // later required TIMESTAMP with an invalid zero default.
+                $table->dateTime('requester_verified_at');
                 $table->text('reason')->nullable();
                 $table->string('status', 30)->index();
                 $table->json('scope_manifest')->nullable();
                 $table->string('scope_manifest_sha256', 64)->nullable();
-                $table->timestamp('requested_at');
+                $table->dateTime('requested_at');
                 $table->timestamp('binned_at')->nullable();
                 $table->timestamp('hold_until')->nullable();
                 $table->timestamp('restored_at')->nullable();
@@ -45,7 +49,7 @@ return new class extends Migration
                 $table->string('actor_guard', 20);
                 $table->unsignedBigInteger('actor_id')->nullable();
                 $table->json('metadata')->nullable();
-                $table->timestamp('created_at');
+                $table->dateTime('created_at');
             });
         }
     }

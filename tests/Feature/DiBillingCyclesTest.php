@@ -82,4 +82,26 @@ class DiBillingCyclesTest extends TestCase
         $this->assertSame(1, Subscription::where('company_id', $company->id)->count());
         $this->assertSame(1, $invoice->payments()->count());
     }
+    public function test_current_plan_can_select_a_new_configured_period_without_replacing_paid_access(): void
+    {
+        Http::preventStrayRequests();
+        Mail::fake();
+        $company = Company::create(['name' => 'Synthetic renewal buyer', 'ntn' => 'DIRENEWPICK', 'product_type' => 'di',
+            'status' => 'approved', 'company_status' => 'active', 'onboarding_completed' => true]);
+        $plan = PricingPlan::create(['name' => 'Kaarobar', 'product_type' => 'di', 'price' => 1000,
+            'price_quarterly' => 2970, 'price_yearly' => 11280, 'invoice_limit' => 100, 'is_trial' => false, 'is_public' => true]);
+        $sub = SubscriptionAssignmentService::assign($company->id, $plan->id, 'annual');
+        $before = $sub->fresh()->getAttributes();
+        $owner = \App\Models\User::create(['name' => 'Synthetic renewal owner', 'email' => 'cycle-owner@example.test',
+            'password' => 'unused', 'role' => 'company_admin', 'company_id' => $company->id, 'is_active' => true]);
+        $this->actingAs($owner)->get('/billing/plans')->assertOk()->assertSee('Select period &amp; upload renewal receipt', false);
+        $this->post('/billing/subscribe', ['plan_id' => $plan->id, 'billing_cycle' => 'quarterly'])
+            ->assertSessionHasNoErrors()->assertRedirect('/billing/plans');
+        $this->get('/billing/plans')->assertOk()->assertSee('value="quarterly"', false)->assertSee('Quarterly package total');
+        $this->assertSame('quarterly', session(\App\Services\PendingSubscriptionSelection::key($company->id))['quote']['cycle']);
+        $this->assertSame($before, $sub->fresh()->getAttributes());
+        $this->assertSame(1, Subscription::where('company_id', $company->id)->count());
+        Http::assertNothingSent();
+    }
+
 }

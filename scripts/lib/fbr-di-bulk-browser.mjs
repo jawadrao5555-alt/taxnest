@@ -32,7 +32,7 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
     const fields=await product.evaluate(form=>Array.from(new FormData(form).entries()).filter(([name])=>name!=='_token'));
     throw new Error('Product packing save failed at '+new URL(page.url()).pathname+': '+errors.join('; ')+'; fields='+JSON.stringify(fields)+'; submissions='+JSON.stringify(submissions)+'; pageErrors='+JSON.stringify(diagnostics?.pageErrors||[])+'; '+error.message);
   } finally { page.off('response',record); }
-  await page.getByText('Product created successfully.',{exact:true}).waitFor();
+  await page.getByText('Product created successfully.',{exact:true}).first().waitFor();
   await page.goto(baseUrl+'/invoice/create',{waitUntil:'domcontentloaded'});
   const invoice=page.locator('form[action="/invoice/store"]');
   await invoice.locator('[name="buyer_name"]').fill('Synthetic Packing Browser Buyer');
@@ -45,7 +45,7 @@ export async function fbrDiBulkWorkflow(page,t,v,{baseUrl,saveEvidenceScreenshot
   await invoice.getByText(/^Reporting quantity: 50 (Kilograms|KG)$/).waitFor();
   await saveEvidenceScreenshot(page,'rc-di-packing-entry-'+v.width);
   await Promise.all([page.waitForURL(u=>u.pathname==='/invoices'),invoice.locator('button[type="submit"]').filter({hasText:'Save'}).first().click()]);
-  await page.getByText('Invoice created successfully.',{exact:true}).waitFor();
+  await page.getByText('Invoice created successfully.',{exact:true}).first().waitFor();
   const link=page.locator('a[href*="/invoice/"]').filter({hasText:/View/i}).first();
   if(await link.count())await link.click();
   else {

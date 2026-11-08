@@ -321,22 +321,16 @@
                                 </li>
                                 @endforeach
                             </ul>
-                            @if(!$isCurrent)
                             <form method="POST" action="/billing/subscribe" class="mt-6">
                                 @csrf
                                 <input type="hidden" name="plan_id" value="{{ $plan->id }}">
                                 <input type="hidden" name="billing_cycle" :value="cycle">
                                 <p x-show="!row({{ $plan->id }})" class="text-amber-700 text-sm">This period is not configured for this package.</p>
-                                <button type="submit" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-sm
+                                <button type="submit" :disabled="!row({{ $plan->id }})" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed
                                     {{ $isFeatured ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
-                                    Select package &amp; upload receipt
+                                    {{ $isCurrent ? 'Select period & upload renewal receipt' : 'Select package & upload receipt' }}
                                 </button>
                             </form>
-                            @else
-                            <div class="mt-6">
-                                <button disabled class="w-full py-2.5 rounded-lg font-semibold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">Current Plan</button>
-                            </div>
-                            @endif
                         </div>
                     </div>
                     @endforeach
